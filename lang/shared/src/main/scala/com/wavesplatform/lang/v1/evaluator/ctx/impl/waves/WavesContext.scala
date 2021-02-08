@@ -20,8 +20,8 @@ object WavesContext {
       getBooleanFromStateF,
       getBinaryFromStateF,
       getStringFromStateF,
-      addressFromRecipientF,
-      )
+      addressFromRecipientF
+    )
 
   private val balanceV123Functions =
     Array(
@@ -73,7 +73,7 @@ object WavesContext {
       transactionFromProtoBytesF(proofsEnabled, version),
       simplifiedIssueActionConstructor,
       detailedIssueActionConstructor
-    )
+    ) ++ balanceV4Functions
 
   private def fromV5Funcs(proofsEnabled: Boolean, version: StdLibVersion) =
     fromV4Funcs(proofsEnabled, version) ++ Array(
@@ -95,23 +95,24 @@ object WavesContext {
         getBinaryByIndexF(version),
         getStringByIndexF(version),
         addressFromPublicKeyF(version),
-        if (version >= V4) addressFromStringV4 else addressFromStringF(version),
+        if (version >= V4) addressFromStringV4 else addressFromStringF(version)
       )
 
     val versionSpecificFuncs =
       version match {
         case V1 | V2 => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
         case V3      => fromV3Funcs(proofsEnabled, version) ++ balanceV123Functions
-        case V4 | V5 => fromV4Funcs(proofsEnabled, version) ++ balanceV4Functions
-     }
+        case V4      => fromV4Funcs(proofsEnabled, version)
+        case V5      => fromV5Funcs(proofsEnabled, version)
+      }
     commonFuncs ++ versionSpecificFuncs
   }
 
   private def variableVars(
-    isTokenContext: Boolean,
-    version:        StdLibVersion,
-    contentType:    ContentType,
-    proofsEnabled:  Boolean
+      isTokenContext: Boolean,
+      version: StdLibVersion,
+      contentType: ContentType,
+      proofsEnabled: Boolean
   ) = {
     val txVal = tx(isTokenContext, version, proofsEnabled)
     version match {
@@ -126,6 +127,6 @@ object WavesContext {
   }
 
   private def variableTypes(version: StdLibVersion, proofsEnabled: Boolean) =
-    buildWavesTypes(proofsEnabled, version)           ++
-    (if (version >= V3) dAppTypes(version) else Nil)
+    buildWavesTypes(proofsEnabled, version) ++
+      (if (version >= V3) dAppTypes(version) else Nil)
 }
