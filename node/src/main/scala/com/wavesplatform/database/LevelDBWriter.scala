@@ -843,7 +843,7 @@ abstract class LevelDBWriter private[database] (
     transactionInfo(leaseId, db) match {
       case Some((h, lt: LeaseTransaction, true)) =>
         Some(LeaseDetails(lt.sender, lt.recipient, h, lt.amount, loadLeaseStatus(db, leaseId)))
-      case Some((_, _, ApplicationStatus.ScriptExecutionFailed)) =>
+      case Some((_, _, false)) =>
         None
       case _ =>
         db.get(Keys.leaseActionDetails(leaseId))

@@ -24,18 +24,14 @@ import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult,
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.metrics._
-import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon.StepInfo
-import com.wavesplatform.transaction.ApplicationStatus.ScriptExecutionInProgress
 import com.wavesplatform.state.diffs.FeeValidation._
-import com.wavesplatform.state.diffs.FeeValidation._
-import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
+import com.wavesplatform.transaction.{Transaction, TxVersion}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -67,17 +63,10 @@ object InvokeScriptTransactionDiff {
           }
 
           stepLimit = ContractLimits.MaxComplexityByVersion(version)
-          stepsNumber = if (invocationComplexity % stepLimit == 0)
-            invocationComplexity / stepLimit
-          else
-            invocationComplexity / stepLimit + 1
 
-          _ <- TracedResult {
-            val minFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
-            val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
-            val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+          _ <- TracedResult(
             Either.cond(
-              feeInfo._1 >= minFee,
+              invocationComplexity <= stepLimit || tx.version >= TxVersion.V3,
               (),
               GenericError("Continuation is not allowed for Invoke Script Transaction with version below V3")
             )
@@ -143,10 +132,26 @@ object InvokeScriptTransactionDiff {
                     fullLimit
 
                 for {
-                  (failFreeResult, evaluationCtx, failFreeLog) <- evaluateV2(version, contract, directives, invocation, environment, failFreeLimit)
+                  (failFreeResult, evaluationCtx, failFreeLog) <- evaluateV2(
+                    version,
+                    contract,
+                    directives,
+                    invocation,
+                    environment,
+                    failFreeLimit,
+                    continuationFirstStepMode = invocationComplexity > stepLimit
+                  )
                   (result, log) <- failFreeResult match {
                     case IncompleteResult(expr, unusedComplexity) if !limitedExecution =>
-                      continueEvaluation(version, expr, evaluationCtx, fullLimit - failFreeLimit + unusedComplexity, tx.id(), invocationComplexity)
+                      continueEvaluation(
+                        version,
+                        expr,
+                        evaluationCtx,
+                        fullLimit - failFreeLimit + unusedComplexity,
+                        tx.id(),
+                        invocationComplexity,
+                        continuationFirstStepMode = invocationComplexity > stepLimit
+                      )
                     case _ =>
                       Right((failFreeResult, Nil))
                   }
@@ -171,7 +176,6 @@ object InvokeScriptTransactionDiff {
               version,
               dAppAddress,
               pk,
-              feeInfo,
               invocationComplexity,
               tx,
               CompositeBlockchain(blockchain, Some(invocationDiff)),
@@ -187,17 +191,6 @@ object InvokeScriptTransactionDiff {
               case ScriptResultV3(dataItems, transfers, _) => doProcessActions(dataItems ::: transfers)
               case ScriptResultV4(actions, _, _)              => doProcessActions(actions)
               case _: IncompleteResult if limitedExecution => doProcessActions(Nil)
-              case ir: IncompleteResult =>
-                val state = ContinuationState.InProgress(ir.expr, ir.unusedComplexity, tx.id.value(), 0)
-                val diffWithState = Diff.empty
-                  .copy(
-                    transactions = Map(tx.id.value() -> NewTransactionInfo(tx, Set(), ScriptExecutionInProgress)),
-                    scriptsComplexity = fullLimit - ir.unusedComplexity
-                  )
-                  .addContinuationState(dAppAddress, state)
-                val StepInfo(_, _, scriptsRun) = InvokeDiffsCommon.stepInfo(diffWithState, blockchain, tx)
-                val portfolios = Diff.stateOps(portfolios = totalFeePortfolio, scriptsRun = scriptsRun)
-                TracedResult.wrapValue(InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()) |+| diffWithState |+| portfolios)
             }
           } yield invocationDiff |+| resultDiff
         } yield result
@@ -213,7 +206,8 @@ object InvokeScriptTransactionDiff {
       directives: DirectiveSet,
       invocation: ContractEvaluator.Invocation,
       environment: Environment[Id],
-      limit: Int
+      limit: Int,
+      continuationFirstStepMode: Boolean
   ): Either[ScriptExecutionError, (ScriptResult, EvaluationContext[Environment, Id], Log[Id])] = {
     val wavesContext = WavesContext.build(directives)
     val ctx =
@@ -224,7 +218,7 @@ object InvokeScriptTransactionDiff {
     val freezingLets  = wavesContext.evaluationContext(environment).letDefs
     val evaluationCtx = ctx.evaluationContext(environment)
 
-    Try(ContractEvaluator.applyV2(evaluationCtx, freezingLets, contract, invocation, version, limit))
+    Try(ContractEvaluator.applyV2(evaluationCtx, freezingLets, contract, invocation, version, limit, continuationFirstStepMode))
       .fold(
         e => Left((e.getMessage, Nil)),
         _.map { case (result, log) => (result, evaluationCtx, log) }
@@ -240,9 +234,10 @@ object InvokeScriptTransactionDiff {
       evaluationCtx: EvaluationContext[Environment, Id],
       limit: Int,
       transactionId: ByteStr,
-      failComplexity: Long
+      failComplexity: Long,
+      continuationFirstStepMode: Boolean
   ): Either[FailedTransactionError, (ScriptResult, Log[Id])] =
-    Try(ContractEvaluator.applyV2(evaluationCtx, Map[String, LazyVal[Id]](), expr, version, transactionId, limit))
+    Try(ContractEvaluator.applyV2(evaluationCtx, Map[String, LazyVal[Id]](), expr, version, transactionId, limit, continuationFirstStepMode))
       .fold(e => Left((e.getMessage, Nil)), identity)
       .leftMap { case (error, log) => FailedTransactionError.dAppExecution(error, failComplexity, log) }
 
