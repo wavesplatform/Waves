@@ -120,39 +120,8 @@ object InvokeDiffsCommon {
       } yield (attachedFeeInWaves, portfolioDiff)
     }
 
-  private def expectedStepFeeInAttachedAsset(tx: InvokeScriptTransaction, blockchain: Blockchain): Long =
-    wavesToAttachedAsset(tx, blockchain, FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit)
-
   private def expectedStepFeeInWaves(tx: InvokeScriptTransaction, blockchain: Blockchain): Long =
-    FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + attachedAssetToWaves(tx, blockchain, 0L)
-
-  private def wavesToAttachedAsset(
-      tx: InvokeScriptTransaction,
-      blockchain: Blockchain,
-      waves: Long
-  ): Long =
-    invokeSponsorshipConverter(tx, blockchain, Sponsorship.fromWaves)(waves)
-
-  private def attachedAssetToWaves(
-      tx: InvokeScriptTransaction,
-      blockchain: Blockchain,
-      attachedAsset: Long
-  ): Long =
-    invokeSponsorshipConverter(tx, blockchain, Sponsorship.toWaves)(attachedAsset)
-
-  private def invokeSponsorshipConverter(
-      tx: InvokeScriptTransaction,
-      blockchain: Blockchain,
-      converter: (Long, Long) => Long
-  ): Long => Long =
-    amount =>
-      tx.assetFee._1 match {
-        case Waves =>
-          amount
-        case asset @ IssuedAsset(_) =>
-          val assetInfo = blockchain.assetDescription(asset).get
-          converter(amount, assetInfo.sponsorship)
-      }
+    FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
 
   def getInvocationComplexity(
       blockchain: Blockchain,
