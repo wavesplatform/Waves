@@ -79,7 +79,7 @@ object ScriptRunner {
           (directives, ctx) =>
             val verify = ContractEvaluator.verify(decls, vf, ctx, evaluate, _)
             val bindingsVersion =
-              if (blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction))
+              if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls))
                 directives.stdLibVersion
               else
                 V3

@@ -45,7 +45,7 @@ case class LeaseApiRoute(
   def active: Route = (pathPrefix("active") & get & extractScheduler) { implicit sc =>
     path(AddrSegment) { address =>
       val leaseInfoJson =
-        if (blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction))
+        if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls))
           commonAccountApi.activeLeases(address).map(Json.toJson(_))
         else
           commonAccountApi

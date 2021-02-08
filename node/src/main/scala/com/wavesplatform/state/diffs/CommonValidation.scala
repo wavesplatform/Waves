@@ -134,7 +134,7 @@ object CommonValidation {
 
       val v3Activation = activationBarrier(BlockchainFeatures.Ride4DApps)
       val v4Activation = activationBarrier(BlockchainFeatures.BlockV5)
-      val v5Activation = activationBarrier(BlockchainFeatures.ContinuationTransaction)
+      val v5Activation = activationBarrier(BlockchainFeatures.SynchronousCalls)
 
       def scriptVersionActivation(sc: Script): Either[ActivationError, T] = sc.stdLibVersion match {
         case V1 | V2 | V3 if sc.containsArray      => v4Activation
