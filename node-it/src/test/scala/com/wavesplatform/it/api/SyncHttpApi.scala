@@ -313,6 +313,9 @@ object SyncHttpApi extends Assertions {
     def transactionStatus(txIds: Seq[String]): Seq[TransactionStatus] =
       sync(async(n).transactionsStatus(txIds))
 
+    def transactionStatus(txId: String): TransactionStatus =
+      sync(async(n).transactionsStatus(Seq(txId))).head
+
     def transactionsByAddress(address: String, limit: Int): Seq[TransactionInfo] =
       sync(async(n).transactionsByAddress(address, limit))
 
