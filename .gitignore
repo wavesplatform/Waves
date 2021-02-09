@@ -30,8 +30,8 @@ waves_logback.xml
 *.csv
 *.dat
 
-# standalone docker
-Dockerfile
+# Docker
+docker/temp
 
 package
 !src/package
