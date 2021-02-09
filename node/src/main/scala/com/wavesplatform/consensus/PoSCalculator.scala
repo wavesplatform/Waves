@@ -21,9 +21,9 @@ trait PoSCalculator {
 
 object PoSCalculator {
   private[consensus] val HitSize: Int        = 8
-  private[consensus] val MinBaseTarget: Long = 9
+  val MinBaseTarget: Long = 9
 
-  private[consensus] def generationSignature(signature: ByteStr, publicKey: PublicKey): Array[Byte] = {
+  def generationSignature(signature: ByteStr, publicKey: PublicKey): Array[Byte] = {
     val s = new Array[Byte](crypto.DigestLength * 2)
     System.arraycopy(signature.arr, 0, s, 0, crypto.DigestLength)
     System.arraycopy(publicKey.arr, 0, s, crypto.DigestLength, crypto.DigestLength)
@@ -33,7 +33,7 @@ object PoSCalculator {
   private[consensus] def generationVRFSignature(signature: Array[Byte], privateKey: PrivateKey): ByteStr =
     crypto.signVRF(privateKey, signature)
 
-  private[consensus] def hit(generatorSignature: Array[Byte]): BigInt = BigInt(1, generatorSignature.take(HitSize).reverse)
+  def hit(generatorSignature: Array[Byte]): BigInt = BigInt(1, generatorSignature.take(HitSize).reverse)
 
   private[consensus] def normalize(value: Long, targetBlockDelaySeconds: Long): Double =
     value * targetBlockDelaySeconds / (60: Double)
@@ -82,12 +82,11 @@ object NxtPoSCalculator extends PoSCalculator {
   }
 
   def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long = Math.ceil((BigDecimal(hit) / (BigDecimal(bt) * balance)).toDouble).toLong * 1000
-
 }
 
 object FairPoSCalculator {
-  lazy val V1 = FairPoSCalculator(5000, 0)
-  lazy val V2 = FairPoSCalculator(15000, 8)
+  lazy val V1: FairPoSCalculator = FairPoSCalculator(5000, 0)
+  lazy val V2: FairPoSCalculator = FairPoSCalculator(15000, 8)
 
   def fromSettings(fs: FunctionalitySettings): PoSCalculator =
     if (fs.minBlockTime.toSeconds == 15 && fs.delayDelta == 8) V2
