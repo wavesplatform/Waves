@@ -1916,7 +1916,7 @@ class InvokeScriptTransactionDiffTest
         setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
         call        = Some(FUNCTION_CALL(FunctionHeader.User(func), Nil))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V2, invoker, master.toAddress, call, Seq(), fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
+          .selfSigned(TxVersion.V2, invoker, master.toAddress, call, Seq(), fee, Waves, ts + 3)
           .explicitGet()
       } yield (activated, func, invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
 
@@ -1925,8 +1925,9 @@ class InvokeScriptTransactionDiffTest
         tempDb { _ =>
           val miner       = TestBlock.defaultSigner.toAddress
           val dAppAddress = invoke.dAppAddressOrAlias.asInstanceOf[Address]
-          def invokeInfo(status: ApplicationStatus) =
-            Map(invoke.id.value() -> NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), status))
+          def invokeInfo(succeeded: Boolean) =
+            Map(invoke.id.value() -> NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded))
+
           val expectedResult =
             if (activated) {
               val expectingMessage =
@@ -1935,7 +1936,7 @@ class InvokeScriptTransactionDiffTest
                 else
                   s"Transferring asset '$illegalAsset2' is not found in the blockchain"
               Diff.empty.copy(
-                transactions = invokeInfo(ScriptExecutionFailed),
+                transactions = invokeInfo(false),
                 portfolios = Map(
                   invoke.senderAddress -> Portfolio.waves(-invoke.fee),
                   miner                -> Portfolio.waves(invoke.fee)
@@ -1946,7 +1947,7 @@ class InvokeScriptTransactionDiffTest
             } else {
               val asset = if (func == "f1") illegalAsset1 else illegalAsset2
               Diff.empty.copy(
-                transactions = invokeInfo(Succeeded),
+                transactions = invokeInfo(true),
                 portfolios = Map(
                   invoke.senderAddress -> Portfolio(-invoke.fee, assets = Map(asset -> 0)),
                   miner                -> Portfolio(invoke.fee),
