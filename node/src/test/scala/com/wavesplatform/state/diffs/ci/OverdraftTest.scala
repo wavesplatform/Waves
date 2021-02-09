@@ -44,7 +44,7 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
 
   private def features(activateV4: Boolean, activateV5: Boolean) = {
     val v4ForkO = if (activateV4) Seq(BlockchainFeatures.BlockV5) else Seq()
-    val v5ForkO = if (activateV5) Seq(BlockchainFeatures.ContinuationTransaction) else Seq()
+    val v5ForkO = if (activateV5) Seq(BlockchainFeatures.SynchronousCalls) else Seq()
     val parameters =
       Seq(
         BlockchainFeatures.SmartAccounts,

@@ -149,7 +149,11 @@ object ScriptResult {
       case other => err(other, V3, s"List(${FieldNames.Transfers})")
     }
 
-  private def processActionV3(ctx: EvaluationContext[Environment, Id], fields: Map[String, EVALUATED]): Either[String, ScriptResultV3] = {
+  private def processActionV3(
+      ctx: EvaluationContext[Environment, Id],
+      fields: Map[String, EVALUATED],
+      unusedComplexity: Int
+  ): Either[String, ScriptResultV3] = {
     val writes = fields(FieldNames.ScriptWriteSet) match {
       case CaseObj(tpe, fields) if tpe.name == FieldNames.WriteSet => processWriteSetV3(fields)
       case other                                                   => err(other, V3, FieldNames.Data)
@@ -161,7 +165,7 @@ object ScriptResult {
     for {
       w <- writes
       p <- payments
-    } yield ScriptResultV3(w, p)
+    } yield ScriptResultV3(w, p, unusedComplexity)
   }
 
   private def processScriptResultV3(
@@ -308,7 +312,13 @@ object ScriptResult {
   private val v4ActionHandlers = fromV4ActionHandlers(V4)
   private val v5ActionHandlers = fromV4ActionHandlers(V5) ++ fromV5ActionHandlers(V5)
 
-  def fromObj(ctx: EvaluationContext[Environment, Id], txId: ByteStr, e: EVALUATED, version: StdLibVersion): Either[ExecutionError, ScriptResult] =
+  def fromObj(
+      ctx: EvaluationContext[Environment, Id],
+      txId: ByteStr,
+      e: EVALUATED,
+      version: StdLibVersion,
+      unusedComplexity: Int
+  ): Either[ExecutionError, ScriptResult] =
     (e, version) match {
       case (CaseObj(tpe, fields), V3) => processScriptResultV3(ctx, tpe, fields, unusedComplexity)
       case (ARR(actions), V4)         => processScriptResult(ctx, txId, actions, v4ActionHandlers, V4, unusedComplexity)

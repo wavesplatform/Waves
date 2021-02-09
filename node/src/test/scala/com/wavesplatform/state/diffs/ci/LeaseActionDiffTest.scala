@@ -31,7 +31,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
   private def ts   = time.getTimestamp()
 
   private def features(activateV5: Boolean): FunctionalitySettings = {
-    val v5ForkO = if (activateV5) Seq(BlockchainFeatures.ContinuationTransaction) else Seq()
+    val v5ForkO = if (activateV5) Seq(BlockchainFeatures.SynchronousCalls) else Seq()
     val parameters =
       Seq(
         BlockchainFeatures.SmartAccounts,
@@ -207,7 +207,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
       for {
         genesis  <- GenesisTransaction.create(dAppAcc.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
-        invoke   <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, dAppAcc.toAddress, None, Nil, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts)
+        invoke   <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, dAppAcc.toAddress, None, Nil, fee, Waves, ts)
         leasesFromDApp <- (1 to leaseCancelCount).toList.traverse(
           i => LeaseTransaction.selfSigned(2.toByte, dAppAcc, invoker.toAddress, leaseTxAmount1, fee, ts + i)
         )
@@ -226,14 +226,14 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
       } yield (preparingTxs, invoke, leaseAmount, dAppAcc.toAddress, invoker.toAddress, leaseTxs, leaseCancel)
     }.explicitGet()
 
-  property(s"Lease action is restricted before activation ${BlockchainFeatures.ContinuationTransaction}") {
+  property(s"Lease action is restricted before activation ${BlockchainFeatures.SynchronousCalls}") {
     forAll(leasePreconditions()) {
       case (preparingTxs, _, _, _, _, _, _) =>
           assertDiffEi(
             Seq(),
             TestBlock.create(preparingTxs),
             v4Features
-          )(_ should produce("Continuation Transaction feature has not been activated yet"))
+          )(_ should produce("Synchronous DAPP Calls feature has not been activated yet"))
     }
   }
 

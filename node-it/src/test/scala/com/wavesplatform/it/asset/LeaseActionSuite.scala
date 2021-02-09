@@ -20,7 +20,7 @@ class LeaseActionSuite extends BaseTransactionSuite {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
       .Builder(Default, 2, Seq.empty)
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.ContinuationTransaction.id, 1)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls.id, 1)))
       .buildNonConflicting()
 
   private def compile(script: String): String =

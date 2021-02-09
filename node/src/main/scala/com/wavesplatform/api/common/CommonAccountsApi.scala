@@ -12,7 +12,6 @@ import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height}
-import com.wavesplatform.transaction.ApplicationStatus
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.ScorexLogging
@@ -127,10 +126,10 @@ object CommonAccountsApi extends ScorexLogging {
     override def activeLeases(address: Address): Observable[LeaseInfo] = {
       addressTransactions(db, Some(Height(blockchain.height) -> diff), address, None, Set(), None)
         .flatMapIterable {
-          case TransactionMeta(h, lt: LeaseTransaction, ApplicationStatus.Succeeded) if leaseIsActive(lt.id()) =>
+          case TransactionMeta(h, lt: LeaseTransaction, true) if leaseIsActive(lt.id()) =>
             val recipient = blockchain.resolveAlias(lt.recipient).explicitGet()
             Seq(LeaseInfo(lt.id.value(), lt.id.value(), lt.sender.toAddress, recipient, lt.amount, h))
-          case Invoke(height, invoke, ApplicationStatus.Succeeded, scriptResult) =>
+          case Invoke(height, invoke, true, scriptResult) =>
             scriptResult
               .toSeq
               .flatMap(_.leases.filter(l => leaseIsActive(l.leaseId)))

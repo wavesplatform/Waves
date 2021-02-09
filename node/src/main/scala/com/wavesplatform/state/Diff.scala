@@ -10,7 +10,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.ApplicationStatus.Succeeded
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
@@ -170,12 +169,12 @@ case class Diff(
     leaseState.get(leaseId).flatMap {
       case (isActive, None) =>
         transactions.get(leaseId).collect {
-          case NewTransactionInfo(lt: LeaseTransaction, _, ApplicationStatus.Succeeded) =>
+          case NewTransactionInfo(lt: LeaseTransaction, _, true) =>
             LeaseDetails(lt.sender, lt.recipient, height, lt.amount, isActive)
         }
       case (isActive, Some(LeaseActionInfo(invokeId, dAppPublicKey, recipient, amount))) =>
         transactions.get(invokeId).collect {
-          case NewTransactionInfo(_, _, ApplicationStatus.Succeeded) =>
+          case NewTransactionInfo(_, _, true) =>
             LeaseDetails(dAppPublicKey, recipient, height, amount, isActive)
         }
     }

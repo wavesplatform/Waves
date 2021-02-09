@@ -153,7 +153,7 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
         )
 
       val fixedBlockchain = new EmptyBlockchain {
-        override def activatedFeatures: Map[Short, Int] = Map(BlockchainFeatures.ContinuationTransaction.id -> 0)
+        override def activatedFeatures: Map[Short, Int] = Map(BlockchainFeatures.SynchronousCalls.id -> 0)
       }
 
       for {

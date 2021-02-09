@@ -25,7 +25,6 @@ import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.ApplicationStatus._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
@@ -625,10 +624,10 @@ package object database extends ScorexLogging {
       id          <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
       leaseStatus <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
       if leaseStatus
-      pb.TransactionMeta(h, n, _, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
+      pb.TransactionMeta(h, n, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
       tx                                <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
     } yield tx).collect {
-      case (lt: LeaseTransaction, Succeeded) => lt
+      case (lt: LeaseTransaction, true) => lt
     }.toSeq
   }
 

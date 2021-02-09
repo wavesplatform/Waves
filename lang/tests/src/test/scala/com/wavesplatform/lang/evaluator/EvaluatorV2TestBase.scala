@@ -67,13 +67,13 @@ class EvaluatorV2TestBase extends PropSpec with PropertyChecks with ScriptGen wi
   private val evaluator =
     new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), ctx.evaluationContext(environment)), version)
 
-  protected def evalExpr(expr: EXPR, limit: Int, continuationFirstStepMode: Boolean = false): (EXPR, String, Int) = {
-    val (result, unusedComplexity) = evaluator(expr, limit, continuationFirstStepMode)
+  protected def evalExpr(expr: EXPR, limit: Int): (EXPR, String, Int) = {
+    val (result, unusedComplexity) = evaluator(expr, limit)
     (result, Decompiler(result, ctx.decompilerContext), limit - unusedComplexity)
   }
 
-  protected def eval(script: String, limit: Int, continuationFirstStepMode: Boolean = false): (EXPR, String, Int) =
-    evalExpr(compile(script), limit, continuationFirstStepMode)
+  protected def eval(script: String, limit: Int): (EXPR, String, Int) =
+    evalExpr(compile(script), limit)
 
   protected def compile(script: String): EXPR = {
     val parsed = Parser.parseExpr(script).get.value

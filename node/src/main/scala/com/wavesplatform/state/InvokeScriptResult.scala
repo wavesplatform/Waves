@@ -152,7 +152,7 @@ object InvokeScriptResult {
       Lease(AddressOrAlias.fromRide(l.recipient).explicitGet(), l.amount, l.nonce, lang.Lease.calculateId(l, invokeId))
 
     result match {
-      case ScriptResultV3(ds, ts) =>
+      case ScriptResultV3(ds, ts, _) =>
         InvokeScriptResult(data = ds.map(DataEntry.fromLangDataOp), transfers = ts.map(langTransferToPayment))
 
       case ScriptResultV4(actions, _, ret) =>

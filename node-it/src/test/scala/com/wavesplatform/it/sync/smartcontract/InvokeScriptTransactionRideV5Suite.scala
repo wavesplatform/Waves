@@ -35,7 +35,7 @@ class InvokeScriptTransactionRideV5Suite extends BaseTransactionSuite with Cance
         _.preactivatedFeatures(
           (BlockchainFeatures.Ride4DApps.id, 0),
           (BlockchainFeatures.BlockV5.id, 0),
-          (BlockchainFeatures.ContinuationTransaction.id, 0)
+          (BlockchainFeatures.SynchronousCalls.id, 0)
         )
       )
       .withDefault(1)

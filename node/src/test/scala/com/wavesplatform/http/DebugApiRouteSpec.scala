@@ -17,7 +17,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash}
-import com.wavesplatform.transaction.{ApplicationStatus, TxHelpers}
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -581,11 +581,6 @@ class DebugApiRouteSpec
           .when(*)
           .returns(Right(accountGen.sample.get.toAddress))
           .anyNumberOfTimes()
-
-        (() => blockchain.continuationStates)
-          .when()
-          .returns(Map())
-          .anyNumberOfTimes()
       }
       val route = debugApiRoute.copy(blockchain = blockchain).route
 
@@ -712,7 +707,7 @@ class DebugApiRouteSpec
       (() => blockchain.activatedFeatures).when().returning(Map.empty).anyNumberOfTimes()
       (transactionsApi.transactionById _)
         .when(invoke.id())
-        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, ApplicationStatus.Succeeded, Some(scriptResult))))
+        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, true, Some(scriptResult))))
         .once()
 
       Get(routePath(s"/stateChanges/info/${invoke.id()}")) ~> route ~> check {
