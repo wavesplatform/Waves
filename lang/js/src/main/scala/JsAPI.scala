@@ -123,13 +123,18 @@ object JsAPI {
   def parseAndCompile(
       input: String,
       estimatorVersion: Int,
-      libraries: Dictionary[String] = Dictionary.empty,
+      libraries: Dictionary[String] = Dictionary.empty
   ): js.Dynamic = {
     val r = for {
+      estimatorVer <- Either.cond(
+        estimatorVersion > 0 && estimatorVersion <= ScriptEstimator.all.length,
+        estimatorVersion,
+        s"Version of estimator must be not greater than ${ScriptEstimator.all.length}"
+      )
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
-      compiled    <- parseAndCompileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVersion - 1))
+      compiled    <- parseAndCompileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVer - 1))
     } yield compiled
     r.fold(
       e => js.Dynamic.literal("error" -> e),
@@ -139,7 +144,7 @@ object JsAPI {
 
   private def parseAndCompileScript(ds: DirectiveSet, input: String, estimator: ScriptEstimator) = {
     val stdLibVer = ds.stdLibVersion
-    val isAsset = ds.scriptType == Asset
+    val isAsset   = ds.scriptType == Asset
     ds.contentType match {
       case Expression =>
         val ctx = buildScriptContext(stdLibVer, isAsset, ds.contentType == DAppType)
@@ -189,10 +194,15 @@ object JsAPI {
       libraries: Dictionary[String] = Dictionary.empty
   ): js.Dynamic = {
     val r = for {
+      estimatorVer <- Either.cond(
+        estimatorVersion > 0 && estimatorVersion <= ScriptEstimator.all.length,
+        estimatorVersion,
+        s"Version of estimator must be not greater than ${ScriptEstimator.all.length}"
+      )
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
-      compiled    <- compileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVersion - 1))
+      compiled    <- compileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVer - 1))
     } yield compiled
     r.fold(
       e => js.Dynamic.literal("error" -> e),
@@ -216,10 +226,11 @@ object JsAPI {
                 "complexity" -> complexity
               )
               val errorFieldOpt: Seq[(String, Any)] =
-                Global.checkExpr(expr, complexity, version, isAsset, estimator)
+                Global
+                  .checkExpr(expr, complexity, version, isAsset, estimator)
                   .fold(
                     error => Seq("error" -> error),
-                    _     => Seq()
+                    _ => Seq()
                   )
               js.Dynamic.literal.applyDynamic("apply")(resultFields ++ errorFieldOpt: _*)
           }
@@ -241,16 +252,16 @@ object JsAPI {
           .compileContract(input, fullDAppContext(ds.stdLibVersion).compilerContext, version, estimator)
           .map {
             case DAppInfo(
-              bytes,
-              dApp,
-              maxComplexityFunc @ (_, maxComplexity),
-              annotatedComplexities,
-              verifierComplexity,
-              callableComplexities,
-              stateCallsComplexities,
-              userFunctionComplexities,
-              globalVariableComplexities
-            ) =>
+                bytes,
+                dApp,
+                maxComplexityFunc @ (_, maxComplexity),
+                annotatedComplexities,
+                verifierComplexity,
+                callableComplexities,
+                stateCallsComplexities,
+                userFunctionComplexities,
+                globalVariableComplexities
+                ) =>
               val resultFields: Seq[(String, Any)] = Seq(
                 "result"                     -> Global.toBuffer(bytes),
                 "ast"                        -> toJs(dApp),
@@ -259,13 +270,14 @@ object JsAPI {
                 "callableComplexities"       -> callableComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary,
                 "stateCallsComplexities"     -> stateCallsComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary,
                 "userFunctionComplexities"   -> userFunctionComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary,
-                "globalVariableComplexities" -> globalVariableComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary,
+                "globalVariableComplexities" -> globalVariableComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary
               )
               val errorFieldOpt: Seq[(String, Any)] = {
-                Global.checkContract(version, dApp, maxComplexityFunc, annotatedComplexities, estimator)
+                Global
+                  .checkContract(version, dApp, maxComplexityFunc, annotatedComplexities, estimator)
                   .fold(
                     error => Seq("error" -> error),
-                    _     => Seq()
+                    _ => Seq()
                   )
               }
               js.Dynamic.literal.applyDynamic("apply")(resultFields ++ errorFieldOpt: _*)
@@ -278,7 +290,7 @@ object JsAPI {
     Global
       .decompile(input)
       .fold(
-        err        => jObj("error" -> err.m),
+        err => jObj("error"         -> err.m),
         scriptText => jObj("result" -> scriptText)
       )
 
