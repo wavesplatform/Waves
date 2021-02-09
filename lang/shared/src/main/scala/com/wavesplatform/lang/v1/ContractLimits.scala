@@ -36,6 +36,7 @@ object ContractLimits {
   // Mass Transfer	0.001 + 0.0005*N, rounded up to 0.001, fee for CI is 0.005
   val MaxCallableActionsAmount = 10
   val MaxAttachedPaymentAmount = 2
+  val MaxAttachedPaymentAmountV5 = 10
 
   // Data weight related constants
   val OBJ_WEIGHT      = 40L
