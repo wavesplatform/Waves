@@ -4,7 +4,7 @@ import cats.data.Ior
 import cats.implicits._
 import cats.kernel.{Monoid, Semigroup}
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.Script
@@ -163,20 +163,6 @@ case class Diff(
 ) {
   def bindTransaction(tx: Transaction): Diff =
     copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
-
-  def leaseDetails(leaseId: ByteStr, height: Int): Option[LeaseDetails] =
-    leaseState.get(leaseId).flatMap {
-      case (isActive, None) =>
-        transactions.get(leaseId).collect {
-          case NewTransactionInfo(lt: LeaseTransaction, _, true) =>
-            LeaseDetails(lt.sender, lt.recipient, height, lt.amount, isActive)
-        }
-      case (isActive, Some(LeaseActionInfo(invokeId, dAppPublicKey, recipient, amount))) =>
-        transactions.get(invokeId).collect {
-          case NewTransactionInfo(_, _, true) =>
-            LeaseDetails(dAppPublicKey, recipient, height, amount, isActive)
-        }
-    }
 }
 
 object Diff {
