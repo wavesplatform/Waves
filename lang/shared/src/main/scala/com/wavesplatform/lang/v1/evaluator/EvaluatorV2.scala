@@ -30,12 +30,10 @@ class EvaluatorV2(
 
   private def root(
       expr: EXPR,
-      _update: EXPR => Coeval[Unit],
+      update: EXPR => Coeval[Unit],
       limit: Int,
       parentBlocks: List[BLOCK_DEF]
   ): Coeval[Int] = {
-    val update = _update
-
     def evaluateFunctionArgs(fc: FUNCTION_CALL): Coeval[Int] =
       Coeval.defer {
         fc.args.indices
@@ -47,7 +45,7 @@ class EvaluatorV2(
               else
                 root(
                   expr = fc.args(argIndex),
-                  _update = argValue => Coeval.delay(fc.args = fc.args.updated(argIndex, argValue)),
+                  update = argValue => Coeval.delay(fc.args = fc.args.updated(argIndex, argValue)),
                   limit = unused,
                   parentBlocks
                 )
@@ -88,10 +86,10 @@ class EvaluatorV2(
                 case ((argName, argValue), argsWithExpr) =>
                   BLOCK(LET(argName, argValue), argsWithExpr)
               }
-          _update(argsWithExpr).flatMap(
+          update(argsWithExpr).flatMap(
             _ =>
               if (limit > 0)
-                root(argsWithExpr, _update, limit, parentBlocks)
+                root(argsWithExpr, update, limit, parentBlocks)
               else
                 Coeval.now(limit)
           )
@@ -115,7 +113,7 @@ class EvaluatorV2(
         Coeval.defer(
           root(
             expr = b.body,
-            _update = {
+            update = {
               case ev: EVALUATED => Coeval.defer(update(ev))
               case nonEvaluated  => Coeval.delay(b.body = nonEvaluated)
             },
@@ -127,7 +125,7 @@ class EvaluatorV2(
         Coeval.defer(
           root(
             expr = g.expr,
-            _update = v => Coeval.delay(g.expr = v),
+            update = v => Coeval.delay(g.expr = v),
             limit = limit,
             parentBlocks = parentBlocks
           ).flatMap { unused =>
@@ -147,7 +145,7 @@ class EvaluatorV2(
         Coeval.defer(
           root(
             expr = i.cond,
-            _update = v => Coeval.delay(i.cond = v),
+            update = v => Coeval.delay(i.cond = v),
             limit = limit,
             parentBlocks = parentBlocks
           ).flatMap { unused =>
@@ -159,7 +157,7 @@ class EvaluatorV2(
                   _ =>
                     root(
                       expr = i.ifTrue,
-                      _update = update,
+                      update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks
                     )
@@ -169,7 +167,7 @@ class EvaluatorV2(
                   _ =>
                     root(
                       expr = i.ifFalse,
-                      _update = update,
+                      update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks
                     )
@@ -235,7 +233,7 @@ class EvaluatorV2(
     }
     root(
       expr = let.value,
-      _update = v =>
+      update = v =>
         Coeval
           .delay(let.value = v)
           .map(
