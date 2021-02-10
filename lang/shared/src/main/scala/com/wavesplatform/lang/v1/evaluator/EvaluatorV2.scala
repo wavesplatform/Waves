@@ -86,13 +86,10 @@ class EvaluatorV2(
                 case ((argName, argValue), argsWithExpr) =>
                   BLOCK(LET(argName, argValue), argsWithExpr)
               }
-          update(argsWithExpr).flatMap(
-            _ =>
-              if (limit > 0)
-                root(argsWithExpr, update, limit, parentBlocks)
-              else
-                Coeval.now(limit)
-          )
+          update(argsWithExpr)
+            .flatMap(
+              _ => root(argsWithExpr, update, limit, parentBlocks)
+            )
         }
     }
 
@@ -189,20 +186,16 @@ class EvaluatorV2(
         evaluateFunctionArgs(fc)
           .flatMap { unusedArgsComplexity =>
             val argsEvaluated = fc.args.forall(_.isInstanceOf[EVALUATED])
-            fc.function match {
-              case FunctionHeader.Native(_) if argsEvaluated =>
-                evaluateNativeFunction(fc, unusedArgsComplexity)
-              case FunctionHeader.Native(_) =>
-                Coeval.now(unusedArgsComplexity)
-              case FunctionHeader.User(_, name) =>
-                evaluateUserFunction(fc, unusedArgsComplexity, name)
-                  .getOrElse {
-                    if (argsEvaluated && unusedArgsComplexity > 0) {
-                      evaluateConstructor(fc, unusedArgsComplexity, name)
-                    } else
-                      Coeval.now(unusedArgsComplexity)
-                  }
-            }
+            if (argsEvaluated && unusedArgsComplexity > 0)
+              fc.function match {
+                case FunctionHeader.Native(_) =>
+                  evaluateNativeFunction(fc, unusedArgsComplexity)
+                case FunctionHeader.User(_, name) =>
+                  evaluateUserFunction(fc, unusedArgsComplexity, name)
+                    .getOrElse(evaluateConstructor(fc, unusedArgsComplexity, name))
+              }
+            else
+              Coeval.now(unusedArgsComplexity)
           }
 
       case evaluated: EVALUATED =>
