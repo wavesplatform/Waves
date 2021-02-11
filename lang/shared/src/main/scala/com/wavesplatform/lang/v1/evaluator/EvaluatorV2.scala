@@ -66,7 +66,7 @@ class EvaluatorV2(
           .map(
             _.fold(
               error => throw new RuntimeException(error),
-              result => (result, cost)
+              { case (result, additionalComplexity) => (result, cost + additionalComplexity) }
             )
           )
           .flatMap { case (functionResult, resultCost) => update(functionResult).map(_ => limit - resultCost) }

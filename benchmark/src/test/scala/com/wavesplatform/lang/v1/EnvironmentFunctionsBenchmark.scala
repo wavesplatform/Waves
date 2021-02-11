@@ -126,7 +126,7 @@ object EnvironmentFunctionsBenchmark {
           _.toString,
           address => Address(ByteStr(address.bytes))
         )
-    override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Coeval[Either[ValidationError, EVALUATED]] = ???
+    override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Coeval[Either[ValidationError, (EVALUATED, Int)]] = ???
   }
 
   val environmentFunctions = new EnvironmentFunctions(defaultEnvironment)

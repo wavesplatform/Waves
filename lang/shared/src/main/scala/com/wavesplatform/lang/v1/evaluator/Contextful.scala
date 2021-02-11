@@ -25,8 +25,8 @@ abstract class ContextfulNativeFunction[C[_[_]]](name: String, resultType: TYPE,
     }
   }
 
-  def coeval[F[_]: Monad](input: (C[F], List[EVALUATED])): Coeval[F[Either[ExecutionError, EVALUATED]]] =
-    Coeval.now(apply(input))
+  def coeval[F[_]: Monad](input: (C[F], List[EVALUATED])): Coeval[F[Either[ExecutionError, (EVALUATED, Int)]]] =
+    Coeval.now(apply(input).map(_.map((_, 0))))
 }
 
 trait ContextfulUserFunction[C[_[_]]] {

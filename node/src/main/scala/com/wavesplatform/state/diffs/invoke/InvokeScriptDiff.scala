@@ -186,12 +186,6 @@ object InvokeScriptDiff {
                   }
                 } yield (environment.currentDiff, (result, failFreeLog ::: log))
               })
-              /*              traced(
-                scriptResultE,
-                List(
-                  InvokeScriptTrace(tx.root.id.value(), tx.dAppAddress, functionCall, scriptResultE.map(_._2._1), scriptResultE.fold(_.log, _._2._2))
-                )
-              )*/
               scriptResultE
             }
 

@@ -196,7 +196,7 @@ class WavesEnvironment(
       func: String,
       args: List[EVALUATED],
       payments: Seq[(Option[Array[Byte]], Long)]
-  ): Coeval[Either[ValidationError, EVALUATED]] = ???
+  ): Coeval[Either[ValidationError, (EVALUATED, Int)]] = ???
 }
 
 class DAppEnvironment(
@@ -226,7 +226,7 @@ class DAppEnvironment(
       func: String,
       args: List[EVALUATED],
       payments: Seq[(Option[Array[Byte]], Long)]
-  ): Coeval[Either[ValidationError, EVALUATED]] = {
+  ): Coeval[Either[ValidationError, (EVALUATED, Int)]] = {
     val r = for {
       invoke <- traced(
         account.Address
@@ -270,7 +270,7 @@ class DAppEnvironment(
       mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
       remainingComplexity = remainingComplexity - diff.scriptsComplexity
       remainingCalls = remainingCalls - 1
-      evaluated
+      (evaluated, diff.scriptsComplexity.toInt)
     }
     r.v.map(_.resultE)
   }

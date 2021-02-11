@@ -489,9 +489,9 @@ object Functions {
         Seq(("dapp", BYTESTR), ("name", STRING), ("args", LIST(ANY)), ("payments", listPayment))
       ) {
         override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
-          coeval(input).value()
+          coeval(input).value().map(_.map(_._1))
 
-        override def coeval[F[_]: Monad](input: (Environment[F], List[EVALUATED])): Coeval[F[Either[ExecutionError, EVALUATED]]] = {
+        override def coeval[F[_]: Monad](input: (Environment[F], List[EVALUATED])): Coeval[F[Either[ExecutionError, (EVALUATED, Int)]]] = {
           val dappBytes = input match {
             case (env, (dapp: CaseObj) :: _) if dapp.caseType == addressType =>
               dapp.fields("bytes") match {
@@ -528,7 +528,7 @@ object Functions {
                 .map(_.map(_.leftMap(_.toString)))
             case (_, xs) =>
               val err = notImplemented[F, EVALUATED](s"Invoke(dapp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
-              Coeval(err)
+              Coeval.now(err.map(_.map((_, 0))))
           }
         }
       }

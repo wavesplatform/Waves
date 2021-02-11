@@ -147,5 +147,5 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
   private def getEntity[F[_]: Functor: ResponseWrapper, A : Decoder, B](url: String)(implicit ev: A => B): Future[F[B]] =
     client.get[F, A](url).map(_.map(ev))
 
-  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Coeval[Future[Either[ValidationError, EVALUATED]]] = ???
+  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Coeval[Future[Either[ValidationError, (EVALUATED, Int)]]] = ???
 }
