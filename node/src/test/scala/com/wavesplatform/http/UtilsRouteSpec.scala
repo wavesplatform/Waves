@@ -61,6 +61,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     ),
     stub[Blockchain]("globalBlockchain")
   )
+  (utilsApi.blockchain.activatedFeatures _).when().returning(Map()).anyNumberOfTimes()
   private val route = utilsApi.route
 
   val script = FUNCTION_CALL(
@@ -576,6 +577,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/compileWithImports"), request) ~> route ~> check {
       val expectedScript =
         """
+          | {-# STDLIB_VERSION 3 #-}
           | {-# SCRIPT_TYPE ACCOUNT #-}
           | func inc(a: Int) = a + 1
           | let a = 5
