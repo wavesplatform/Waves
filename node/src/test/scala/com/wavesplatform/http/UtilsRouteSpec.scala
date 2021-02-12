@@ -61,7 +61,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     ),
     stub[Blockchain]("globalBlockchain")
   )
-  (utilsApi.blockchain.activatedFeatures _).when().returning(Map()).anyNumberOfTimes()
+
+  (() => utilsApi.blockchain.activatedFeatures).when().returning(Map()).anyNumberOfTimes()
   private val route = utilsApi.route
 
   val script = FUNCTION_CALL(
