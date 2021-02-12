@@ -6,6 +6,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks}
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, VanillaTransaction}
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.{block => vb}
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
 import monix.execution.{Ack, AsyncQueue, Scheduler}
@@ -15,7 +16,7 @@ import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 
-package object grpc {
+package object grpc extends ScorexLogging {
   implicit class VanillaTransactionConversions(val tx: VanillaTransaction) extends AnyVal {
     def toPB: PBSignedTransaction = PBTransactions.protobuf(tx)
   }
@@ -29,15 +30,20 @@ package object grpc {
   }
 
   implicit class StreamObserverMonixOps[T](val streamObserver: StreamObserver[T]) extends AnyVal {
+    private[grpc] def id: String =
+      Integer.toHexString(System.identityHashCode(streamObserver))
+
     def completeWith(obs: Observable[T])(implicit sc: Scheduler): Unit =
       wrapObservable(obs, streamObserver)(identity)
 
-    def failWith(error: ApiError): Unit =
+    def failWith(error: Throwable): Unit = {
+      log.error(s"[${streamObserver.id}] gRPC call completed with error", error)
       streamObserver.onError(GRPCErrors.toStatusException(error))
+    }
 
     def interceptErrors(f: => Unit): Unit =
       try f
-      catch { case NonFatal(e) => streamObserver.onError(GRPCErrors.toStatusException(e)) }
+      catch { case NonFatal(e) => streamObserver.failWith(e) }
   }
 
   implicit class EitherVEExt[T](val e: Either[ValidationError, T]) extends AnyVal {
@@ -86,7 +92,7 @@ package object grpc {
               drainQueue()
               Ack.Continue
             },
-        err => cso.onError(GRPCErrors.toStatusException(err)),
+        cso.failWith,
         () => cso.onCompleted()
       )
 
@@ -103,7 +109,7 @@ package object grpc {
           dest.onNext(f(elem))
           Ack.Continue
         },
-        err => dest.onError(GRPCErrors.toStatusException(err)),
+        dest.failWith,
         () => dest.onCompleted()
       )
   }

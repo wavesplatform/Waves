@@ -13,8 +13,8 @@ import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.utils.{Schedulers, ScorexLogging}
-import io.grpc.Server
 import io.grpc.netty.NettyServerBuilder
+import io.grpc.{Metadata, Server, ServerStreamTracer, Status}
 import monix.execution.Scheduler
 import net.ceedubs.ficus.Ficus._
 
@@ -85,6 +85,19 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
     grpcServer = NettyServerBuilder
       .forAddress(bindAddress)
+        .addStreamTracerFactory((fullMethodName: String, headers: Metadata) => new ServerStreamTracer {
+          var callInfo = Option.empty[ServerStreamTracer.ServerCallInfo[_, _]]
+          private[this] def callId = callInfo.fold("???")(ci => Integer.toHexString(System.identityHashCode(ci)))
+
+          override def serverCallStarted(callInfo: ServerStreamTracer.ServerCallInfo[_, _]): Unit = {
+            this.callInfo = Some(callInfo)
+            log.trace(s"[$callId] gRPC call started: $fullMethodName, headers: $headers")
+          }
+
+          override def streamClosed(status: Status): Unit = {
+            log.trace(s"[$callId] gRPC call closed with status: $status")
+          }
+        })
       .addService(BlockchainUpdatesApiGrpc.bindService(new BlockchainUpdatesApiGrpcImpl(repo)(scheduler), scheduler))
       .build()
       .start()
