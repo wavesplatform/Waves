@@ -15,15 +15,16 @@ COPY build-scripts /tmp/
 RUN /bin/bash /tmp/setup-deps.sh
 
 # Node DEB files
+ENV WVDATA=/var/lib/waves
+ENV WVLOG=/var/log/waves
 COPY target /tmp/
 RUN /bin/bash /tmp/setup-node.sh
-RUN rm -rf /tmp/*
-
-USER waves
-WORKDIR /var/lib/waves
 
 EXPOSE 6869 6868 6863 6862 6870
 VOLUME /var/lib/waves
+VOLUME /var/log/waves
 VOLUME /usr/share/waves/lib/plugins
+WORKDIR /var/lib/waves
 
+STOPSIGNAL SIGINT
 ENTRYPOINT ["/usr/share/waves/bin/entrypoint.sh"]
