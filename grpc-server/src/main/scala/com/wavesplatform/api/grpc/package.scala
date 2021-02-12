@@ -1,5 +1,6 @@
 package com.wavesplatform.api
 
+import com.typesafe.scalalogging.StrictLogging
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.lang.ValidationError
@@ -15,7 +16,8 @@ import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 
-package object grpc {
+package object grpc extends StrictLogging {
+
   implicit class VanillaTransactionConversions(val tx: VanillaTransaction) extends AnyVal {
     def toPB: PBSignedTransaction = PBTransactions.protobuf(tx)
   }
@@ -32,12 +34,18 @@ package object grpc {
     def completeWith(obs: Observable[T])(implicit sc: Scheduler): Unit =
       wrapObservable(obs, streamObserver)(identity)
 
-    def failWith(error: ApiError): Unit =
+    def failWith(error: ApiError): Unit = {
+      logger.warn(s"StreamObserverMonixOps.failWith: $error")
       streamObserver.onError(GRPCErrors.toStatusException(error))
+    }
 
     def interceptErrors(f: => Unit): Unit =
       try f
-      catch { case NonFatal(e) => streamObserver.onError(GRPCErrors.toStatusException(e)) }
+      catch {
+        case NonFatal(e) =>
+          logger.error("Error in StreamObserverMonixOps.interceptErrors", e)
+          streamObserver.onError(GRPCErrors.toStatusException(e))
+      }
   }
 
   implicit class EitherVEExt[T](val e: Either[ValidationError, T]) extends AnyVal {
@@ -55,7 +63,9 @@ package object grpc {
 
   implicit class FutureExt[T](val f: Future[T]) extends AnyVal {
     def wrapErrors(implicit ec: ExecutionContext): Future[T] = f.recoverWith {
-      case err => Future.failed(GRPCErrors.toStatusException(err))
+      case err =>
+        logger.error("Error in FutureExt.wrapErrors", err)
+        Future.failed(GRPCErrors.toStatusException(err))
     }
   }
 
@@ -86,7 +96,10 @@ package object grpc {
               drainQueue()
               Ack.Continue
             },
-        err => cso.onError(GRPCErrors.toStatusException(err)),
+        { err =>
+          logger.error("Error in CallStreamObserver", err)
+          cso.onError(GRPCErrors.toStatusException(err))
+        },
         () => cso.onCompleted()
       )
 
@@ -103,7 +116,10 @@ package object grpc {
           dest.onNext(f(elem))
           Ack.Continue
         },
-        err => dest.onError(GRPCErrors.toStatusException(err)),
+        { err =>
+          logger.error("Error in StreamObserver", err)
+          dest.onError(GRPCErrors.toStatusException(err))
+        },
         () => dest.onCompleted()
       )
   }

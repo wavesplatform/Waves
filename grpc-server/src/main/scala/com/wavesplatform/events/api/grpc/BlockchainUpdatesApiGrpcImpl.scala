@@ -38,6 +38,7 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
 
   override def subscribe(request: SubscribeRequest, responseObserver: StreamObserver[SubscribeEvent]): Unit = {
     if (request.fromHeight <= 0) {
+      log.warn(s"Height ${request.fromHeight} is not positive, closing stream")
       responseObserver.onError(new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("height must be a positive integer")))
     } else {
       val updatesPB = repo
