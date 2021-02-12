@@ -41,7 +41,6 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
   private[this] val realTimeUpdates = ConcurrentSubject.replayLimited[BlockchainUpdated](100)
 
   private[this] def sendRealTimeUpdate(ba: BlockchainUpdated): Try[Unit] = {
-    println(s"Sending $ba")
     realTimeUpdates.onNext(ba) match {
       case Ack.Continue =>
         Success(())
