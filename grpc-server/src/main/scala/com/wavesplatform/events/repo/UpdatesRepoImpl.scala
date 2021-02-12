@@ -147,7 +147,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
       _ <- sendRealTimeUpdate(RollbackCompleted(toId, toHeight, result))
     } yield ()
 
-  private[this] def doFullLiquidRollback(): RollbackResult = {
+  private[this] def doFullLiquidRollback(): RollbackResult = writeLock {
     val microBlocks = liquidState.toSeq.flatMap(_.microBlocks)
     val removedTxs  = microBlocks.flatMap(_.microBlock.transactionData).map(_.id())
     val stateUpdate = MicroBlockAppended.revertMicroBlocks(microBlocks)
@@ -185,7 +185,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
   override def rollbackMicroBlock(toId: ByteStr): Try[Unit] =
     for {
       height <- this.height
-      stateUpdate <- liquidState match {
+      stateUpdate <- writeLock(liquidState match {
         case Some(ls) =>
           if (toId == ls.keyBlock.id) {
             liquidState = Some(ls.copy(microBlocks = Seq.empty))
@@ -214,7 +214,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
             }
           }
         case None => Failure(new IllegalStateException("BlockchainUpdates attempted to rollback microblock without liquid state present"))
-      }
+      })
       _ <- sendRealTimeUpdate(MicroBlockRollbackCompleted(toId, height, stateUpdate))
     } yield ()
 
