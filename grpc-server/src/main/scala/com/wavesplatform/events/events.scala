@@ -135,8 +135,8 @@ object StateUpdate {
       case object Inactive extends LeaseStatus
     }
 
-    import com.wavesplatform.events.protobuf.StateUpdate.{LeaseUpdate => PBLeaseUpdate}
     import com.wavesplatform.events.protobuf.StateUpdate.LeaseUpdate.{LeaseStatus => PBLeaseStatus}
+    import com.wavesplatform.events.protobuf.StateUpdate.{LeaseUpdate => PBLeaseUpdate}
 
     def fromPB(v: PBLeaseUpdate): LeaseUpdate = {
       LeaseUpdate(
@@ -179,22 +179,21 @@ object StateUpdate {
   }
 
   object AssetStateUpdate {
-    import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate => PBAssetStateUpdate}
-    import com.wavesplatform.events.protobuf.StateUpdate.{AssetDetails => PBAssetDetails}
     import com.wavesplatform.events.protobuf.StateUpdate.AssetDetails.{AssetScriptInfo => PBAssetScriptInfo}
+    import com.wavesplatform.events.protobuf.StateUpdate.{AssetDetails => PBAssetDetails, AssetStateUpdate => PBAssetStateUpdate}
 
     def fromPB(self: PBAssetStateUpdate): AssetStateUpdate = {
 
       def detailsFromPB(v: PBAssetDetails): AssetDescription = {
         AssetDescription(
           v.assetId.toByteStr,
-          null,
+          v.issuer.toPublicKey,
           ByteString.copyFromUtf8(v.name),
           ByteString.copyFromUtf8(v.description),
           v.decimals,
           v.reissuable,
           BigInt(v.safeVolume.toByteArray),
-          Height @@ 1,
+          Height @@ v.lastUpdated,
           v.scriptInfo.map(fromPBScriptInfo),
           v.sponsorship,
           v.nft
@@ -211,6 +210,7 @@ object StateUpdate {
       def detailsToPB(v: AssetDescription): PBAssetDetails = {
         PBAssetDetails(
           assetId = v.assetId.toByteString,
+          issuer = v.issuer.toByteString,
           decimals = v.decimals,
           name = v.name.toStringUtf8,
           description = v.description.toStringUtf8,
@@ -219,7 +219,8 @@ object StateUpdate {
           scriptInfo = v.script.map(toPBScriptInfo),
           sponsorship = v.sponsorship,
           nft = v.nft,
-          safeVolume = ByteString.copyFrom(v.totalVolume.toByteArray)
+          safeVolume = ByteString.copyFrom(v.totalVolume.toByteArray),
+          lastUpdated = v.lastUpdatedAt
         )
       }
 
