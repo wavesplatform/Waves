@@ -185,8 +185,9 @@ object PureContext {
       ("denominator", LONG)
     ) {
       case CONST_LONG(v) :: CONST_LONG(n) :: CONST_LONG(d) :: Nil =>
-        lazy val result = BigInt(v) * n / d
         for {
+          _ <- Either.cond(d != 0, (), "fraction: division by zero")
+          result = BigInt(v) * n / d
           _ <- Either.cond(result < Long.MaxValue, (), s"Long overflow: value `$result` greater than 2^63-1")
           _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^63-1")
         } yield CONST_LONG(result.toLong)
