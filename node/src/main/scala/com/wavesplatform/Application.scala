@@ -331,7 +331,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         WalletApiRoute(settings.restAPISettings, wallet),
         UtilsApiRoute(time, settings.restAPISettings, () => blockchainUpdater.estimator, limitedScheduler, blockchainUpdater),
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
-        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, limitedScheduler, extensionContext.accountsApi, settings.dbSettings.maxRollbackDepth),
+        AddressApiRoute(
+          settings.restAPISettings,
+          wallet,
+          blockchainUpdater,
+          utxSynchronizer,
+          time,
+          limitedScheduler,
+          extensionContext.accountsApi,
+          settings.dbSettings.maxRollbackDepth
+        ),
         DebugApiRoute(
           settings,
           time,
@@ -369,7 +378,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         RewardApiRoute(blockchainUpdater)
       )
 
-      val httpService   = CompositeHttpService(apiRoutes, settings.restAPISettings)
+      val httpService = CompositeHttpService(apiRoutes, settings.restAPISettings)
       val httpFuture  = Http().bindAndHandle(httpService.loggingCompositeRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)
       serverBinding.whenTerminated.foreach(_ => httpService.scheduler.shutdown())
@@ -502,11 +511,14 @@ object Application extends ScorexLogging {
       meta -> blockchainUpdater
         .liquidTransactions(meta.id)
         .orElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
-        .fold(Seq.empty[(Transaction, Boolean)])(identity)
+        .getOrElse(Seq.empty[(Transaction, Boolean)])
     }
 
-  private[wavesplatform] def loadBlockMetaAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =
-    blockchainUpdater.liquidBlockMeta.filter(_ => blockchainUpdater.height == height).orElse(db.get(Keys.blockMetaAt(Height(height))))
+  private[wavesplatform] def loadBlockMetaAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] = {
+    val result = blockchainUpdater.liquidBlockMeta.filter(_ => blockchainUpdater.height == height).orElse(db.get(Keys.blockMetaAt(Height(height))))
+    log.info(s"Loading block meta at $height: $result")
+    result
+  }
 
   def main(args: Array[String]): Unit = {
 
