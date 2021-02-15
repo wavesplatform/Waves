@@ -38,7 +38,11 @@ object CommonBlocksApi {
     private def heightOf(id: ByteStr): Option[Int] = blockchain.heightOf(id)
 
     def blocksRange(fromHeight: Int, toHeight: Int): Observable[(BlockMeta, Seq[(Transaction, Boolean)])] =
-      Observable.fromIterable((fixHeight(fromHeight) to fixHeight(toHeight)).flatMap(h => blockInfoAt(h)))
+      Observable
+        .fromIterable(fixHeight(fromHeight) to fixHeight(toHeight))
+        .map(blockInfoAt)
+        .takeWhile(_.isDefined)
+        .flatMap(Observable.fromIterable(_))
 
     def blocksRange(fromHeight: Int, toHeight: Int, generatorAddress: Address): Observable[(BlockMeta, Seq[(Transaction, Boolean)])] =
       Observable.fromIterable(
