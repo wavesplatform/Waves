@@ -140,7 +140,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
         Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to a non-positive height"))
       } else if (toHeight == h) {
         Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to current height"))
-      } else if (toHeight == h - 1) {
+      } else if (toHeight == h - 1 && liquidState.isDefined) {
         Success(doFullLiquidRollback())
       } else {
         doStateRollback(toHeight)
@@ -165,17 +165,21 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
         iter.seek(key(toHeight))
         iter.next()
         while (iter.hasNext) {
-          val key = iter.next.getKey
-          val update = protobuf.BlockchainUpdated.parseFrom(db.get(key)).vanilla.collect {
+          val next = iter.next
+          val key = next.getKey
+          val update = protobuf.BlockchainUpdated.parseFrom(next.getValue).vanilla.map {
             case ba: BlockAppended =>
-              val block        = readBlock(ba.height)
-              val transactions = block.transactionData.map(_.id())
-              RollbackResult(Seq(block), transactions.reverse, ba.reverseStateUpdate)
+              val block        = Try(readBlock(ba.height)).toOption
+              val transactions = block.fold(Seq.empty[ByteStr])(_.transactionData.map(_.id()))
+              RollbackResult(block.toSeq, transactions.reverse, ba.reverseStateUpdate)
+
+            case _ => ???
           }
           changes = update.get +: changes
           batch.delete(key)
         }
         db.write(batch)
+        require(height.get == toHeight, "Rollback doesn't succeed")
         Monoid.combineAll(changes)
       } finally {
         iter.close()

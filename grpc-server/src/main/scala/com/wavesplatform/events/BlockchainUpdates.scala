@@ -59,7 +59,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
             log.warn(s"BlockchainUpdates at height $extensionHeight is higher than node at height $nodeHeight, rolling back BlockchainUpdates")
             repo
               .rollback(extensionBlockAtNodeHeight.id, extensionBlockAtNodeHeight.height)
-              .recoverWith { case _: Throwable => Failure(new RuntimeException("BlockchainUpdates failed to rollback at startup")) }
+              .recoverWith { case err: Throwable => Failure(new RuntimeException("BlockchainUpdates failed to rollback at startup", err)) }
               .get
           }
         case (Failure(ex), _) =>
