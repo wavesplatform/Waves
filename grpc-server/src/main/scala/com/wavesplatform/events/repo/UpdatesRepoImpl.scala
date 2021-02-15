@@ -12,6 +12,7 @@ import com.wavesplatform.events._
 import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
+import monix.eval.Task
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
@@ -225,65 +226,52 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
 
   // UpdatesRepo.Stream impl
   override def stream(fromHeight: Int): Observable[BlockchainUpdated] = {
-
-    /**
-      * reads from level db by synchronous batches each using one iterator
-      * each batch gets a read lock
-      * @param from batch start height
-      * @return Task to be consumed by Observable.unfoldEval
-      */
-    def readBatch(from: Int): (Seq[BlockchainUpdated], Option[Int]) =
-      readLockCond {
-        def isLastBatch(data: Seq[_]): Boolean = data.length < LevelDBReadBatchSize
-
-        val data = {
-          val iterator = db.iterator()
-          try {
-            iterator.seek(key(from))
-            iterator.asScala
-              .take(LevelDBReadBatchSize)
-              .map(
-                e =>
-                  PBBlockchainUpdated.parseFrom(e.getValue).vanilla.get match {
-                    case b: BlockAppended =>
-                      log.info(s"Loading block for update: $b")
-                      b.copy(block = readBlock(b.height))
-                    case u => u
-                  }
-              )
-              .toVector
-          } finally iterator.close()
+    def readBatchTask(from: Int): Task[(Seq[BlockchainUpdated], Option[Int])] = {
+      blocks
+        .blocksRange(from, from + LevelDBReadBatchSize)
+        .map {
+          case (meta, txs) =>
+            Try(PBBlockchainUpdated.parseFrom(db.get(key(meta.height)))).flatMap(_.vanilla) match {
+              case Success(ba: BlockAppended) => Some(ba.copy(block = Block(meta.header, meta.signature, txs.map(_._1))))
+              case _ => None
+            }
         }
+        .takeWhile(_.isDefined)
+        .flatMap(Observable.fromIterable(_))
+        .toListL
+        .map { data =>
+          def isLastBatch(data: Seq[_]): Boolean = data.length < LevelDBReadBatchSize
 
-        if (isLastBatch(data)) {
-          val liquidUpdates = liquidState match {
-            case None => Seq.empty
-            case Some(LiquidState(keyBlock, microBlocks)) =>
-              val lastBlock = data.lastOption
-              require(lastBlock.forall(keyBlock.references))
-              Seq(keyBlock) ++ microBlocks
+          if (isLastBatch(data)) {
+            val liquidUpdates = liquidState match {
+              case None => Seq.empty
+              case Some(LiquidState(keyBlock, microBlocks)) =>
+                val lastBlock = data.lastOption
+                require(lastBlock.forall(keyBlock.references))
+                Seq(keyBlock) ++ microBlocks
+            }
+            (data ++ liquidUpdates, None)
+          } else {
+            val nextTickFrom = data.lastOption.map(_.height + 1)
+            (data, nextTickFrom)
           }
-          (data ++ liquidUpdates, None)
-        } else {
-          val nextTickFrom = data.lastOption.map(_.height + 1)
-          (data, nextTickFrom)
         }
-      }(_._2.isEmpty)
+    }
 
     Observable.fromTry(height).flatMap { h =>
       if (h < fromHeight) {
         Observable.raiseError(new IllegalArgumentException("Requested start height exceeds current blockchain height"))
       } else {
-        def readBatchStream(from: Int): Observable[BlockchainUpdated] = Observable.defer {
-          val (data, next) = concurrent.blocking(readBatch(from))
-          Observable.fromIterable(data) ++ (next match {
-            case Some(next) =>
-              readBatchStream(next)
+        def readBatchStream(from: Int): Observable[BlockchainUpdated] = Observable.fromTask(readBatchTask(from)).flatMap {
+          case (data, next) =>
+            Observable.fromIterable(data) ++ (next match {
+              case Some(next) =>
+                readBatchStream(next)
 
-            case None =>
-              val lastPersistentUpdate = data.lastOption
-              realTimeUpdates.dropWhile(u => !lastPersistentUpdate.forall(u.references))
-          })
+              case None =>
+                val lastPersistentUpdate = data.lastOption
+                realTimeUpdates.dropWhile(u => !lastPersistentUpdate.forall(u.references))
+            })
         }
         readBatchStream(fromHeight)
       }
