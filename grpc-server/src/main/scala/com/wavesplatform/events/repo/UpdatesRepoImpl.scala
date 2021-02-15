@@ -110,6 +110,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
     Try {
       liquidState.foreach { ls =>
         val solidBlock = ls.solidify()
+        log.info(s"BlockchainUpdates persisting: ${solidBlock.height}")
         db.put(
           key(solidBlock.height),
           solidBlock.protobuf.update(_.append.block.optionalBlock := None).toByteArray

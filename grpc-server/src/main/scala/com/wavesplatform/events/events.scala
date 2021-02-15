@@ -365,7 +365,7 @@ object StateUpdate {
 
         val tx = blockchainAfter.transactionInfo(leaseId) match {
           case Some((_, tx: LeaseTransaction, _)) => tx
-          case _ => throw new IllegalArgumentException(s"Transaction $leaseId is not a lease transaction")
+          case _                                  => throw new IllegalArgumentException(s"Transaction $leaseId is not a lease transaction")
         }
 
         LeaseUpdate(
@@ -415,7 +415,7 @@ object StateUpdate {
   }
 }
 
-sealed trait BlockchainUpdated extends Product with Serializable {
+sealed trait BlockchainUpdated {
   def id: ByteStr
   def height: Int
 }
@@ -443,7 +443,7 @@ final case class BlockAppended(
 }
 
 object BlockAppended {
-  def from(block: Block, diff: DetailedDiff, minerReward: Option[Long], blockchainBeforeWithMinerReward: Blockchain): BlockAppended = {
+  def from(block: Block, diff: DetailedDiff, blockchainBeforeWithMinerReward: Blockchain): BlockAppended = {
     val (blockStateUpdate, txsStateUpdates) =
       StateUpdate.container(blockchainBeforeWithMinerReward, diff, block.transactionData, block.sender.toAddress)
 

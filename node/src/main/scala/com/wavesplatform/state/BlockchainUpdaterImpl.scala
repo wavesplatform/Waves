@@ -52,7 +52,7 @@ class BlockchainUpdaterImpl(
 
   private val lock                     = new ReentrantReadWriteLock(true)
   private def writeLock[B](f: => B): B = inLock(lock.writeLock(), f)
-  private def readLock[B](f: => B): B  = inLock(lock.readLock(), f)
+  def readLock[B](f: => B): B          = inLock(lock.readLock(), f)
 
   private lazy val maxBlockReadinessAge = wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
 

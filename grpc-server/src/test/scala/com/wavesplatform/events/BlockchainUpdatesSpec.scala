@@ -49,6 +49,11 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       balances shouldBe Seq(10000000000000000L, 10000000600000000L, 10000001200000000L)
     }
 
+    "should include correct heights" in withNEmptyBlocksSubscription() { result =>
+      val heights = result.map(_.height)
+      heights shouldBe Seq(1, 2, 3)
+    }
+
     "should handle toHeight=0" in withNEmptyBlocksSubscription(request = SubscribeRequest.of(1, 0)) { result =>
       result should have size 3
     }
@@ -175,9 +180,9 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
     }
   }
 
-  def withNEmptyBlocksSubscription(count: Int = 3, request: SubscribeRequest = SubscribeRequest.of(1, Int.MaxValue))(
+  def withNEmptyBlocksSubscription(count: Int = 2, request: SubscribeRequest = SubscribeRequest.of(1, Int.MaxValue))(
       f: Seq[protobuf.BlockchainUpdated] => Unit
-  ): Unit = withGenerateSubscription(request)(d => for (_ <- 1 until count) d.appendBlock())(f)
+  ): Unit = withGenerateSubscription(request)(d => for (_ <- 1 to count) d.appendBlock())(f)
 
   def withRepo[T](blocksApi: CommonBlocksApi = stub[CommonBlocksApi])(f: (UpdatesRepoImpl, BlockchainUpdateTriggers) => T): T = {
     val repo = new UpdatesRepoImpl(Files.createTempDirectory("bc-updates").toString, blocksApi)
@@ -188,7 +193,7 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
           minerReward: Option[Long],
           blockchainBeforeWithMinerReward: Blockchain
       ): Unit = {
-        val newBlock = BlockAppended.from(block, diff, minerReward, blockchainBeforeWithMinerReward)
+        val newBlock = BlockAppended.from(block, diff, blockchainBeforeWithMinerReward)
         repo.appendBlock(newBlock).get
       }
 

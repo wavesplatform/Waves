@@ -126,7 +126,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       minerReward: Option[Long],
       blockchainBeforeWithMinerReward: Blockchain
   ): Unit = {
-    val newBlock = BlockAppended.from(block, diff, minerReward, blockchainBeforeWithMinerReward)
+    val newBlock = BlockAppended.from(block, diff, blockchainBeforeWithMinerReward)
     repo.appendBlock(newBlock).get
     if (newBlock.height % 100 == 0) {
       log.debug(s"BlockchainUpdates appended blocks up to ${newBlock.height}")
