@@ -337,7 +337,8 @@ object PureContext {
       STRING,
       ("xs", STRING), ("number", LONG)
     ) {
-      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => CONST_STRING(xs.codePoints().toArray().take(trimLongToInt(number)).map(Character.toString(_)).mkString)
+      //case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => CONST_STRING(xs.codePoints().toArray().take(trimLongToInt(number)).map(Character.toString(_)).mkString) // Old jvm failed
+      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => CONST_STRING(xs.codePoints().toArray().take(trimLongToInt(number)).flatMap(Character.toChars(_)).mkString)
       case xs                                            => notImplemented[Id, EVALUATED]("take(xs: String, number: Int)", xs)
     }
 
