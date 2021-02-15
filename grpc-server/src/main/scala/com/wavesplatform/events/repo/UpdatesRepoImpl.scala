@@ -241,8 +241,10 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
               .map(
                 e =>
                   PBBlockchainUpdated.parseFrom(e.getValue).vanilla.get match {
-                    case b: BlockAppended => b.copy(block = readBlock(b.height))
-                    case u                => u
+                    case b: BlockAppended =>
+                      log.info(s"Loading block for update: $b")
+                      b.copy(block = readBlock(b.height))
+                    case u => u
                   }
               )
               .toVector
