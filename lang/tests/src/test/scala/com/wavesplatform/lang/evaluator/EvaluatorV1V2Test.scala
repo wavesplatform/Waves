@@ -60,7 +60,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
   private def pureEvalContext(implicit version: StdLibVersion): EvaluationContext[NoContext, Id] =
     PureContext.build(version).evaluationContext
 
-  private val defaultEvaluator   = new EvaluatorV1[Id, Environment]()
+  private val defaultEvaluator = new EvaluatorV1[Id, Environment]()
 
   private def evalV1[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] =
     defaultEvaluator[T](context, expr)
@@ -266,15 +266,17 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
           evaluated(1L)
       }
 
-      val context = Monoid.combine(
-        pureEvalContext,
-        EvaluationContext[NoContext, Id](
-          Contextful.empty[Id],
-          typeDefs = Map.empty,
-          letDefs = Map.empty,
-          functions = Map(f.header -> f)
+      val context = Monoid
+        .combine(
+          pureEvalContext,
+          EvaluationContext[NoContext, Id](
+            Contextful.empty[Id],
+            typeDefs = Map.empty,
+            letDefs = Map.empty,
+            functions = Map(f.header -> f)
+          )
         )
-      ).asInstanceOf[EvaluationContext[Environment, Id]]
+        .asInstanceOf[EvaluationContext[Environment, Id]]
 
       val expr = block(LET("X", FUNCTION_CALL(f.header, List(CONST_LONG(1000)))), FUNCTION_CALL(sumLong.header, List(REF("X"), REF("X"))))
 
@@ -865,13 +867,15 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
   private def recCmp(cnt: Int)(
       f: ((String => String) => String) = (gen => gen("x") ++ gen("y") ++ s"x${cnt + 1} == y${cnt + 1}")
   ): Either[(ExecutionError, Log[Id]), (Boolean, Log[Id])] = {
-    val context = Monoid.combineAll(
-      Seq(
-        pureContext,
-        defaultCryptoContext,
-        CTX[NoContext](Seq(), Map(), Array.empty[BaseFunction[NoContext]])
+    val context = Monoid
+      .combineAll(
+        Seq(
+          pureContext,
+          defaultCryptoContext,
+          CTX[NoContext](Seq(), Map(), Array.empty[BaseFunction[NoContext]])
+        )
       )
-    ).withEnvironment[Environment]
+      .withEnvironment[Environment]
 
     def gen(a: String) = (0 to cnt).foldLeft(s"""let ${a}0="qqqq";""") { (c, n) =>
       c ++ s"""let $a${n + 1}=[$a$n,$a$n,$a$n];"""
@@ -904,7 +908,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
   }
 
   property("recData fail by ARR") {
-    val cnt           = 8
+    val cnt    = 8
     val result = recCmp(cnt)(gen => gen("x") ++ s"x${cnt + 1}.size() == 3")
 
     result shouldBe Symbol("Left")
@@ -993,13 +997,15 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
       ("bobPubKey", (BYTESTR, ContextfulVal.pure[NoContext](ByteStr(bobPK))))
     )
 
-    val context = Monoid.combineAll(
-      Seq(
-        pureContext,
-        defaultCryptoContext,
-        CTX[NoContext](Seq(txType), vars, Array.empty[BaseFunction[NoContext]])
+    val context = Monoid
+      .combineAll(
+        Seq(
+          pureContext,
+          defaultCryptoContext,
+          CTX[NoContext](Seq(txType), vars, Array.empty[BaseFunction[NoContext]])
+        )
       )
-    ).withEnvironment[Environment]
+      .withEnvironment[Environment]
 
     val script =
       s"""
@@ -1110,14 +1116,16 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
     }
 
-    val context = Monoid.combine(
-      pureEvalContext,
-      EvaluationContext.build(
-        typeDefs = Map.empty,
-        letDefs = Map.empty,
-        functions = Seq(f, doubleFst)
+    val context = Monoid
+      .combine(
+        pureEvalContext,
+        EvaluationContext.build(
+          typeDefs = Map.empty,
+          letDefs = Map.empty,
+          functions = Seq(f, doubleFst)
+        )
       )
-    ).asInstanceOf[EvaluationContext[Environment, Id]]
+      .asInstanceOf[EvaluationContext[Environment, Id]]
 
     // g(...(g(f(1000)))))
     val expr = (1 to 6).foldLeft(FUNCTION_CALL(f.header, List(CONST_LONG(1000)))) {
@@ -1144,17 +1152,19 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
     // let x = 3
     // let y = 100
-    val context = Monoid.combine(
-      pureEvalContext,
-      EvaluationContext.build(
-        typeDefs = Map.empty,
-        letDefs = Map(
-          "x" -> LazyVal.fromEvaluated[Id](3L),
-          "y" -> LazyVal.fromEvaluated[Id](100L)
-        ),
-        functions = Seq(doubleFn, subFn)
+    val context = Monoid
+      .combine(
+        pureEvalContext,
+        EvaluationContext.build(
+          typeDefs = Map.empty,
+          letDefs = Map(
+            "x" -> LazyVal.fromEvaluated[Id](3L),
+            "y" -> LazyVal.fromEvaluated[Id](100L)
+          ),
+          functions = Seq(doubleFn, subFn)
+        )
       )
-    ).asInstanceOf[EvaluationContext[Environment, Id]]
+      .asInstanceOf[EvaluationContext[Environment, Id]]
 
     // mulFn(doubleFn(x), 7) = (x + x) - 7 = 6 - 7 = -1
     val expr1 = FUNCTION_CALL(subFn.header, List(FUNCTION_CALL(doubleFn.header, List(REF("x"))), CONST_LONG(7)))
@@ -1166,7 +1176,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
   }
 
   property("fromBase16String limit 32768 digits from V4") {
-    val string32Kb                   = ("fedcba9876543210" * (32 * 1024 / 16))
+    val string32Kb = ("fedcba9876543210" * (32 * 1024 / 16))
     def script(base16String: String) =
       FUNCTION_CALL(
         Native(FunctionIds.FROMBASE16),
@@ -1194,5 +1204,12 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
     eval[CaseObj](v4Ctx, createTuple(ContractLimits.MaxTupleSize)).explicitGet().fields.size shouldBe ContractLimits.MaxTupleSize
     eval[CaseObj](v4Ctx, createTuple(ContractLimits.MaxTupleSize + 1)) should produce("not found")
+  }
+
+  property("illegal concatenation args") {
+    evalPure(expr = FUNCTION_CALL(PureContext.sumString, List(CONST_LONG(1), CONST_LONG(2)))) should produce(
+      "Unexpected args (1,2) for string concatenation operator")
+    evalPure(expr = FUNCTION_CALL(PureContext.sumByteStr, List(CONST_LONG(1), CONST_LONG(2)))) should produce(
+      "Unexpected args (1,2) for bytes concatenation operator")
   }
 }

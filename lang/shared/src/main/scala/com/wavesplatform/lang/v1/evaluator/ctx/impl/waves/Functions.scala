@@ -330,7 +330,7 @@ object Functions {
   private def caseObjToRecipient(c: CaseObj): Recipient = c.caseType.name match {
     case addressType.name => Recipient.Address(c.fields("bytes").asInstanceOf[CONST_BYTESTR].bs)
     case aliasType.name   => Recipient.Alias(c.fields("alias").asInstanceOf[CONST_STRING].s)
-    case _                => ???
+    case t                => throw new IllegalArgumentException(s"Unexpected recipient type $t")
   }
 
   val assetBalanceF: BaseFunction[Environment] =
@@ -496,18 +496,18 @@ object Functions {
             case (dapp: CaseObj) :: _ if dapp.caseType == addressType =>
               dapp.fields("bytes") match {
                 case CONST_BYTESTR(d) => d.pure[F]
-                case _                => ???
+                case a => throw new IllegalArgumentException(s"Unexpected address bytes $a")
               }
             case (dapp: CaseObj) :: _ if dapp.caseType == aliasType =>
               dapp.fields("alias") match {
                 case CONST_STRING(a) => env.resolveAlias(a).map(_.explicitGet().bytes)
               }
-            case _ => ???
+            case (_, args) => throw new IllegalArgumentException(s"Unexpected recipient args $args")
           }
           val name = args match {
             case _ :: CONST_STRING(name) :: _ => name
             case _ :: CaseObj(UNIT, _) :: _   => "default"
-            case _                            => ???
+            case (_                            , args) => throw new IllegalArgumentException(s"Unexpected input args $args")
           }
           args match {
             case _ :: _ :: ARR(args) :: ARR(payments) :: Nil =>
@@ -522,7 +522,7 @@ object Functions {
                         case List(CONST_BYTESTR(a), CONST_LONG(v)) => (Some(a.arr), v)
                         case List(CaseObj(UNIT, _), CONST_LONG(v)) => (None, v)
                       }
-                    case _ => ???
+                    case arg => throw new IllegalArgumentException(s"Unexpected payment arg $arg")
                   },
                   availableComplexity
                 )
