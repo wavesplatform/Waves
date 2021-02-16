@@ -6,6 +6,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
@@ -17,14 +18,14 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
-import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, _}
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.DiffsCommon
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -321,6 +322,17 @@ object InvokeDiffsCommon {
       )
   }
 
+  private def checkTransferAsset(blockchain: Blockchain, assetId: ByteStr): Either[String, Unit] =
+    if (blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction))
+      if (assetId.size != AssetIdLength)
+        Left(s"Invalid transferring asset '$assetId' length = ${assetId.size} bytes != $AssetIdLength")
+      else if (blockchain.assetDescription(IssuedAsset(assetId)).isEmpty)
+        Left(s"Transferring asset '$assetId' is not found in the blockchain")
+      else
+        Right(())
+    else
+      Right(())
+
   private[this] def checkDataEntries(
       tx: InvokeScriptLike,
       dataEntries: Seq[DataEntry[_]],
@@ -408,7 +420,12 @@ object InvokeDiffsCommon {
                     Map(address       -> Portfolio(assets = Map(a -> amount))) |+|
                       Map(dAppAddress -> Portfolio(assets = Map(a -> -amount)))
                 )
-                blockchain.assetScript(a).fold(TracedResult(nextDiff.asRight[FailedTransactionError])) {
+                blockchain.assetScript(a).fold {
+                  val r = checkTransferAsset(blockchain, id)
+                    .map(_ => nextDiff)
+                    .leftMap(FailedTransactionError.dAppExecution(_, 0))
+                  TracedResult(r)
+                } {
                   case AssetScriptInfo(script, complexity) =>
                     val assetVerifierDiff =
                       if (blockchain.disallowSelfPayment) nextDiff
