@@ -60,14 +60,14 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
         lastUpdate.height
       }
 
-      try Try(iter.seekToLast()).fold(
-        _ =>
-          iter.asScala
-            .foldLeft(Option.empty[Array[Byte]]) { case (_, e) => Some(e.getValue) }
-            .fold(0)(parseHeight),
-        _ => if (iter.hasNext) parseHeight(iter.next.getValue) else 0
-      )
-      finally iter.close()
+      try {
+        iter.seekToLast()
+        iter.asScala
+          .map(e => parseHeight(e.getValue))
+          .to(LazyList)
+          .lastOption
+          .getOrElse(0)
+      } finally iter.close()
     }
   }
 
@@ -137,10 +137,8 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
       h <- this.height
       result <- if (toHeight > h) {
         Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to a height higher than current"))
-      } else if (toHeight <= 0) {
-        Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to a non-positive height"))
       } else if (toHeight == h) {
-        Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to current height"))
+        Success(Monoid.empty[RollbackResult])
       } else if (toHeight == h - 1 && liquidState.isDefined) {
         Success(doFullLiquidRollback())
       } else {
@@ -163,10 +161,9 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
       val batch = db.createWriteBatch()
       try {
         var changes = Seq.empty[RollbackResult]
-        iter.seek(key(toHeight))
-        iter.next()
-        while (iter.hasNext) {
-          val next = iter.next
+
+        iter.seek(key(toHeight + 1))
+        iter.asScala.foreach { next =>
           val key = next.getKey
           val update = protobuf.BlockchainUpdated.parseFrom(next.getValue).vanilla.map {
             case ba: BlockAppended =>
@@ -179,8 +176,9 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
           changes = update.get +: changes
           batch.delete(key)
         }
+
         db.write(batch)
-        require(height.get == toHeight, "Rollback doesn't succeed")
+        require(height.get == toHeight, s"Rollback doesn't succeed: ${height.get} != $toHeight")
         Monoid.combineAll(changes)
       } finally {
         iter.close()
@@ -233,7 +231,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
           case (meta, txs) =>
             Try(PBBlockchainUpdated.parseFrom(db.get(key(meta.height)))).flatMap(_.vanilla) match {
               case Success(ba: BlockAppended) => Some(ba.copy(block = Block(meta.header, meta.signature, txs.map(_._1))))
-              case _ => None
+              case _                          => None
             }
         }
         .takeWhile(_.isDefined)
@@ -247,7 +245,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
               case None => Seq.empty
               case Some(LiquidState(keyBlock, microBlocks)) =>
                 val lastBlock = data.lastOption
-                require(lastBlock.forall(keyBlock.references))
+                require(lastBlock.forall(keyBlock.references), "Liquid block doesn't reference last hard block")
                 Seq(keyBlock) ++ microBlocks
             }
             (data ++ liquidUpdates, None)

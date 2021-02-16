@@ -40,7 +40,10 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       val exception = new IllegalStateException(s"BlockchainUpdates at height $extensionHeight is lower than node at height $nodeHeight")
       log.error("BlockchainUpdates startup check failed", exception)
       throw exception
-    } else if (nodeHeight > 0) {
+    } else if (nodeHeight == 0) {
+      if (extensionHeight > 0) log.warn("Data has been reset, dropping entire blockchain updates data")
+      repo.rollback(ByteStr.empty, 0).get
+    } else {
       (repo.updateForHeight(nodeHeight), context.blockchain.blockHeader(nodeHeight)) match {
         case (Success(extensionBlockAtNodeHeight), Some(lastNodeBlockHeader)) =>
           val lastNodeBlockId = lastNodeBlockHeader.id()
@@ -85,19 +88,22 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
     grpcServer = NettyServerBuilder
       .forAddress(bindAddress)
-        .addStreamTracerFactory((fullMethodName: String, headers: Metadata) => new ServerStreamTracer {
-          var callInfo = Option.empty[ServerStreamTracer.ServerCallInfo[_, _]]
-          private[this] def callId = callInfo.fold("???")(ci => Integer.toHexString(System.identityHashCode(ci)))
+      .addStreamTracerFactory(
+        (fullMethodName: String, headers: Metadata) =>
+          new ServerStreamTracer {
+            var callInfo             = Option.empty[ServerStreamTracer.ServerCallInfo[_, _]]
+            private[this] def callId = callInfo.fold("???")(ci => Integer.toHexString(System.identityHashCode(ci)))
 
-          override def serverCallStarted(callInfo: ServerStreamTracer.ServerCallInfo[_, _]): Unit = {
-            this.callInfo = Some(callInfo)
-            log.trace(s"[$callId] gRPC call started: $fullMethodName, headers: $headers")
-          }
+            override def serverCallStarted(callInfo: ServerStreamTracer.ServerCallInfo[_, _]): Unit = {
+              this.callInfo = Some(callInfo)
+              log.trace(s"[$callId] gRPC call started: $fullMethodName, headers: $headers")
+            }
 
-          override def streamClosed(status: Status): Unit = {
-            log.trace(s"[$callId] gRPC call closed with status: $status")
+            override def streamClosed(status: Status): Unit = {
+              log.trace(s"[$callId] gRPC call closed with status: $status")
+            }
           }
-        })
+      )
       .addService(BlockchainUpdatesApiGrpc.bindService(new BlockchainUpdatesApiGrpcImpl(repo)(scheduler), scheduler))
       .build()
       .start()
