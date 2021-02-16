@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs.ci
 import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithState}
 import com.wavesplatform.features.BlockchainFeatures
@@ -19,6 +20,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -71,7 +73,7 @@ class SyncDAppComplexityCountTest
       ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
     }
 
-    def dApp(otherDApp: Option[Address]): Script = {
+    def dApp(otherDApp: Option[Address], paymentAsset: Option[IssuedAsset]): Script = {
       val expr = {
         val script =
           s"""
@@ -84,7 +86,8 @@ class SyncDAppComplexityCountTest
              |    if (
              |      $groth
              |    ) then {
-             |      ${otherDApp.fold("")(address => s""" strict r = Invoke(Address(base58'$address'), "default", [], []) """)}
+             |      let payment = ${paymentAsset.fold("[]")(id => s"[AttachedPayment(base58'$id', 1)]")}
+             |      ${otherDApp.fold("")(address => s""" strict r = Invoke(Address(base58'$address'), "default", [], payment) """)}
              |      []
              |    } else {
              |      throw("unexpected")
@@ -96,7 +99,7 @@ class SyncDAppComplexityCountTest
       ContractScript(V5, compileContractFromExpr(expr, V5)).explicitGet()
     }
 
-    def scenario(dAppCount: Int, withPayment: Boolean) =
+    def scenario(dAppCount: Int, withPayment: Boolean, withThroughPayment: Boolean) =
       for {
         invoker  <- accountGen
         dAppAccs <- Gen.listOfN(dAppCount, accountGen)
@@ -117,18 +120,25 @@ class SyncDAppComplexityCountTest
             ts + 1
           )
           .explicitGet()
+        asset   = IssuedAsset(assetIssue.id.value())
+        payment = List(Payment(1, asset))
 
-        dAppGenesisTxs = dAppAccs.map(a => GenesisTransaction.create(a.toAddress, ENOUGH_AMT, ts).explicitGet())
+        dAppGenesisTxs = dAppAccs.flatMap(
+          a =>
+            List(
+              GenesisTransaction.create(a.toAddress, ENOUGH_AMT, ts).explicitGet(),
+              TransferTransaction.selfSigned(TxVersion.V2, invoker, a.toAddress, asset, 10, Waves, fee, ByteStr.empty, ts).explicitGet()
+            )
+        )
         invokerGenesis = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
         setScriptTxs = dAppAccs.foldLeft(List.empty[SetScriptTransaction]) {
           case (txs, currentAcc) =>
-            val callingDApp = Some(dApp(txs.headOption.map(_.sender.toAddress)))
+            val callPayment = if (withThroughPayment) Some(asset) else None
+            val callingDApp = Some(dApp(txs.headOption.map(_.sender.toAddress), callPayment))
             val nextTx      = SetScriptTransaction.selfSigned(1.toByte, currentAcc, callingDApp, fee, ts + 5).explicitGet()
             nextTx :: txs
         }
-        asset   = IssuedAsset(assetIssue.id.value())
-        payment = List(Payment(1, asset))
         invokeTx = InvokeScriptTransaction
           .selfSigned(
             TxVersion.V3,
@@ -142,15 +152,28 @@ class SyncDAppComplexityCountTest
           )
           .explicitGet()
       } yield (
-        dAppGenesisTxs ++ setScriptTxs ++ Seq(invokerGenesis, assetIssue),
+        Seq(invokerGenesis, assetIssue) ++ dAppGenesisTxs ++ setScriptTxs,
         invokeTx,
-        asset
+        asset,
+        dAppAccs.head.toAddress
       )
 
-    def assert(dAppCount: Int, complexity: Int, withPayment: Boolean, exceeding: Boolean): Unit = {
-      val (preparingTxs, invokeTx, asset) = scenario(dAppCount, withPayment).sample.get
+    def assert(
+        dAppCount: Int,
+        complexity: Int,
+        withPayment: Boolean = false,
+        withThroughPayment: Boolean = false,
+        exceeding: Boolean = false
+    ): Unit = {
+      val (preparingTxs, invokeTx, asset, lastCallingDApp) = scenario(dAppCount, withPayment, withThroughPayment).sample.get
       assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
         case (diff, _) =>
+          diff.scriptsComplexity shouldBe complexity
+          if (exceeding)
+            diff.errorMessage(invokeTx.id.value()).get.text should include("Invoke complexity limit = 52000 is exceeded")
+          else
+            diff.errorMessage(invokeTx.id.value()) shouldBe None
+
           val dAppAddress = invokeTx.dAppAddressOrAlias.asInstanceOf[Address]
           val basePortfolios = Map(
             TestBlock.defaultSigner.toAddress -> Portfolio(invokeTx.fee),
@@ -160,28 +183,38 @@ class SyncDAppComplexityCountTest
             invokeTx.senderAddress -> Portfolio(assets = Map(asset -> -1)),
             dAppAddress            -> Portfolio(assets = Map(asset -> 1))
           )
-          val totalPortfolios = if (withPayment && !exceeding) basePortfolios |+| paymentsPortfolios else basePortfolios
-          diff.portfolios shouldBe totalPortfolios
-          diff.scriptsComplexity shouldBe complexity
-          if (exceeding)
-            diff.errorMessage(invokeTx.id.value()).get.text should include("Invoke complexity limit = 52000 is exceeded")
-          else
-            diff.errorMessage(invokeTx.id.value()) shouldBe None
+          val throughPaymentsPortfolios = Map(
+            lastCallingDApp -> Portfolio(assets = Map(asset -> 1)),
+            dAppAddress     -> Portfolio(assets = Map(asset -> -1))
+          )
+          val emptyPortfolios = Map.empty[Address, Portfolio]
+          val additionalPortfolios =
+            (if (withPayment) paymentsPortfolios else emptyPortfolios) |+|
+              (if (withThroughPayment) throughPaymentsPortfolios else emptyPortfolios)
+          val totalPortfolios = if (!exceeding) basePortfolios |+| additionalPortfolios else basePortfolios
+
+          val actuallyEmptyPortfolio = Portfolio(assets = Map(asset -> 0))  // intermediate payments overlap each other
+          diff.portfolios.filter(_._2 != actuallyEmptyPortfolio) shouldBe totalPortfolios.filter(_._2 != actuallyEmptyPortfolio)
       }
     }
 
-    assert(1, 2709, withPayment = false, exceeding = false)
-    assert(2, 5457, withPayment = false, exceeding = false)
-    assert(18, 49425, withPayment = false, exceeding = false)
-    assert(19, 52000, withPayment = false, exceeding = true)
-    assert(20, 51987, withPayment = false, exceeding = true)
-    assert(100, 51987, withPayment = false, exceeding = true)
+    assert(1, 2709)
+    assert(2, 5458)
+    assert(18, 49442)
+    assert(19, 52000, exceeding = true)
+    assert(20, 51973, exceeding = true)
+    assert(100, 51973, exceeding = true)
 
-    assert(1, 5415, withPayment = true, exceeding = false)
-    assert(2, 8163, withPayment = true, exceeding = false)
-    assert(17, 49383, withPayment = true, exceeding = false)
+    assert(1, 5415, withPayment = true)
+    assert(2, 8164, withPayment = true)
+    assert(17, 49399, withPayment = true)
     assert(18, 52000, withPayment = true, exceeding = true)
-    assert(19, 51957, withPayment = true, exceeding = true)
-    assert(100, 51957, withPayment = true, exceeding = true)
+    assert(19, 51975, withPayment = true, exceeding = true)
+    assert(100, 51975, withPayment = true, exceeding = true)
+
+    assert(2, 8169, withThroughPayment = true)
+    assert(10, 51849, withThroughPayment = true)
+    assert(11, 52000, withThroughPayment = true, exceeding = true)
+    assert(100, 52000, withThroughPayment = true, exceeding = true)
   }
 }

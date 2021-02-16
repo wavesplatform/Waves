@@ -104,6 +104,8 @@ object InvokeScriptDiff {
                 CoevalR(Coeval.now(r))
             }
           }
+          val paymentsComplexity = checkedPayments.map(_._1.complexity).sum.toInt
+
           tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
           input <- traced(
             buildThisValue(Coproduct[TxOrd](tx.root: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply)
@@ -141,7 +143,7 @@ object InvokeScriptDiff {
 
                 for {
                   result <- CoevalR(
-                    evaluateV2(version, contract, invocation, environment, remainingComplexity).map(TracedResult(_))
+                    evaluateV2(version, contract, invocation, environment, remainingComplexity, paymentsComplexity).map(TracedResult(_))
                   )
                 } yield (environment.currentDiff, result)
               })
@@ -160,7 +162,7 @@ object InvokeScriptDiff {
                     tx,
                     CompositeBlockchain(blockchain, Some(scriptResult._1)),
                     blockTime,
-                    remainingComplexity - scriptResult._1.scriptsComplexity - checkedPayments.map(_._1.complexity).sum,
+                    remainingComplexity - scriptResult._1.scriptsComplexity - paymentsComplexity,
                     isSyncCall = true,
                     limitedExecution,
                     Seq()
@@ -178,7 +180,7 @@ object InvokeScriptDiff {
                 val error          = FailedTransactionError.dAppExecution(s"Invoke complexity limit = $limit is exceeded", usedComplexity, scriptResult._2._2)
                 traced(error.asLeft[(Diff, EVALUATED)])
             }
-          } yield resultDiff.copy(_1 = scriptResult._1 combine resultDiff._1)
+          } yield resultDiff.copy(_1 = scriptResult._1 |+| resultDiff._1 |+| Diff.empty.copy(scriptsComplexity = paymentsComplexity))
         } yield result
 
       case _ => traced(Left(GenericError(s"No contract at address ${tx.dAppAddress}")))
@@ -190,16 +192,17 @@ object InvokeScriptDiff {
       contract: DApp,
       invocation: ContractEvaluator.Invocation,
       environment: Environment[Id],
-      limit: Int
+      limit: Int,
+      paymentsComplexity: Int
   ): Coeval[Either[ValidationError, (ScriptResult, Log[Id])]] = {
     val evaluationCtx = CachedDAppCTX.forVersion(version).completeContext(environment)
     ContractEvaluator
-      .applyV2Coeval(evaluationCtx, Map(), contract, invocation, version, limit)
+      .applyV2Coeval(evaluationCtx, Map(), contract, invocation, version, limit - paymentsComplexity)
       .map(
         _.leftMap(
           {
             case (error, unusedComplexity, log) =>
-              val usedComplexity = limit - unusedComplexity
+              val usedComplexity = paymentsComplexity + limit - unusedComplexity
               FailedTransactionError.dAppExecution(error, usedComplexity, log)
           }
         )
