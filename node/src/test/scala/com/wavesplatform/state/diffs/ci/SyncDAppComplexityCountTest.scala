@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
+import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -95,7 +96,7 @@ class SyncDAppComplexityCountTest
       ContractScript(V5, compileContractFromExpr(expr, V5)).explicitGet()
     }
 
-    def scenario(dAppCount: Int) =
+    def scenario(dAppCount: Int, withPayment: Boolean) =
       for {
         invoker  <- accountGen
         dAppAccs <- Gen.listOfN(dAppCount, accountGen)
@@ -126,32 +127,41 @@ class SyncDAppComplexityCountTest
             val nextTx      = SetScriptTransaction.selfSigned(1.toByte, currentAcc, callingDApp, fee, ts + 5).explicitGet()
             nextTx :: txs
         }
-        payments = List(Payment(1, IssuedAsset(assetIssue.id.value())))
+        asset   = IssuedAsset(assetIssue.id.value())
+        payment = List(Payment(1, asset))
         invokeTx = InvokeScriptTransaction
           .selfSigned(
             TxVersion.V3,
             invoker,
             dAppAccs.last.toAddress,
             None,
-            Nil,
+            if (withPayment) payment else Nil,
             fee,
             Waves,
             ts + 10
           )
           .explicitGet()
       } yield (
-        dAppGenesisTxs ++ setScriptTxs ++ Seq(invokerGenesis /*, assetIssue*/ ),
-        invokeTx
+        dAppGenesisTxs ++ setScriptTxs ++ Seq(invokerGenesis, assetIssue),
+        invokeTx,
+        asset
       )
 
-    def assert(dAppCount: Int, complexity: Int, exceeding: Boolean): Unit = {
-      val (preparingTxs, invokeTx) = scenario(dAppCount).sample.get
+    def assert(dAppCount: Int, complexity: Int, withPayment: Boolean, exceeding: Boolean): Unit = {
+      val (preparingTxs, invokeTx, asset) = scenario(dAppCount, withPayment).sample.get
       assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
         case (diff, _) =>
-          diff.portfolios shouldBe Map(
-            TestBlock.defaultSigner.toAddress -> Portfolio.waves(invokeTx.fee),
-            invokeTx.senderAddress            -> Portfolio.waves(-invokeTx.fee)
+          val dAppAddress = invokeTx.dAppAddressOrAlias.asInstanceOf[Address]
+          val basePortfolios = Map(
+            TestBlock.defaultSigner.toAddress -> Portfolio(invokeTx.fee),
+            invokeTx.senderAddress            -> Portfolio(-invokeTx.fee)
           )
+          val paymentsPortfolios = Map(
+            invokeTx.senderAddress -> Portfolio(assets = Map(asset -> -1)),
+            dAppAddress            -> Portfolio(assets = Map(asset -> 1))
+          )
+          val totalPortfolios = if (withPayment && !exceeding) basePortfolios |+| paymentsPortfolios else basePortfolios
+          diff.portfolios shouldBe totalPortfolios
           diff.scriptsComplexity shouldBe complexity
           if (exceeding)
             diff.errorMessage(invokeTx.id.value()).get.text should include("Invoke complexity limit = 52000 is exceeded")
@@ -160,12 +170,18 @@ class SyncDAppComplexityCountTest
       }
     }
 
-    assert(1, 2709, exceeding = false)
-    assert(2, 5457, exceeding = false)
-    assert(3, 8205, exceeding = false)
-    assert(18, 49425, exceeding = false)
-    assert(19, 52000, exceeding = true)
-    assert(20, 51987, exceeding = true)
-    assert(100, 51987, exceeding = true)
+    assert(1, 2709, withPayment = false, exceeding = false)
+    assert(2, 5457, withPayment = false, exceeding = false)
+    assert(18, 49425, withPayment = false, exceeding = false)
+    assert(19, 52000, withPayment = false, exceeding = true)
+    assert(20, 51987, withPayment = false, exceeding = true)
+    assert(100, 51987, withPayment = false, exceeding = true)
+
+    assert(1, 5415, withPayment = true, exceeding = false)
+    assert(2, 8163, withPayment = true, exceeding = false)
+    assert(17, 49383, withPayment = true, exceeding = false)
+    assert(18, 52000, withPayment = true, exceeding = true)
+    assert(19, 51957, withPayment = true, exceeding = true)
+    assert(100, 51957, withPayment = true, exceeding = true)
   }
 }

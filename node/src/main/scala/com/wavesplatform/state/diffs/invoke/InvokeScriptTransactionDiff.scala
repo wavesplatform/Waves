@@ -121,6 +121,8 @@ object InvokeScriptTransactionDiff {
                   remainingCalls
                 )
 
+                val paymentsComplexity = tx.checkedAssets.flatMap(blockchain.assetScript).map(_.complexity).sum.toInt
+
                 val fullLimit =
                   if (blockchain.estimator == ScriptEstimatorV2)
                     Int.MaxValue //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
@@ -143,7 +145,8 @@ object InvokeScriptTransactionDiff {
                     environment,
                     fullLimit,
                     failFreeLimit,
-                    invocationComplexity.toInt
+                    invocationComplexity.toInt,
+                    paymentsComplexity
                   )
                 } yield (environment.currentDiff, result, log)
               })
@@ -200,20 +203,22 @@ object InvokeScriptTransactionDiff {
       environment: Environment[Id],
       limit: Int,
       failFreeLimit: Int,
-      estimatedComplexity: Int
+      estimatedComplexity: Int,
+      paymentsComplexity: Int
   ): Either[ValidationError with WithLog, (ScriptResult, Log[Id])] = {
     val evaluationCtx = CachedDAppCTX.forVersion(version).completeContext(environment)
+    val limitAfterPayments = limit - paymentsComplexity
     ContractEvaluator
-      .applyV2Coeval(evaluationCtx, Map(), contract, invocation, version, limit)
+      .applyV2Coeval(evaluationCtx, Map(), contract, invocation, version, limitAfterPayments)
       .runAttempt()
       .leftMap(error => (error.getMessage: ExecutionError, 0, Nil: Log[Id]))
       .flatten
       .leftMap {
         case (error, unusedComplexity, log) =>
-          val usedComplexity = limit - unusedComplexity.max(0)
+          val usedComplexity = limitAfterPayments - unusedComplexity.max(0)
           if (usedComplexity > failFreeLimit) {
             val storingComplexity = Math.max(usedComplexity, estimatedComplexity)
-            FailedTransactionError.dAppExecution(error, storingComplexity, log)
+            FailedTransactionError.dAppExecution(error, storingComplexity + paymentsComplexity, log)
           } else
             ScriptExecutionError.dAppExecution(error, log)
       }
