@@ -1,10 +1,10 @@
 package com.wavesplatform.lang.v1.traits
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
-import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.traits.domain._
 import monix.eval.Coeval
 import shapeless._
 
@@ -15,10 +15,10 @@ object Environment {
 
   implicit val BalanceDetailsDecoder: Decoder[BalanceDetails] = (c: HCursor) =>
     for {
-      available <- c.downField("available").as[Long]
-      regular <- c.downField("regular").as[Long]
+      available  <- c.downField("available").as[Long]
+      regular    <- c.downField("regular").as[Long]
       generating <- c.downField("generating").as[Long]
-      effective <- c.downField("effective").as[Long]
+      effective  <- c.downField("effective").as[Long]
     } yield BalanceDetails(available, regular, generating, effective)
 
   type InputEntity = Tx :+: Ord :+: PseudoTx :+: CNil
@@ -47,5 +47,11 @@ trait Environment[F[_]] {
   def transferTransactionFromProto(b: Array[Byte]): F[Option[Tx.Transfer]]
   def addressFromString(address: String): Either[String, Address]
   def dAppAlias: Boolean = false
-  def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Coeval[F[Either[ValidationError, (EVALUATED, Int)]]]
+  def callScript(
+      dApp: Address,
+      func: String,
+      args: List[EVALUATED],
+      payments: Seq[(Option[Array[Byte]], Long)],
+      availableComplexity: Int
+  ): Coeval[F[(Either[ValidationError, EVALUATED], Int)]]
 }

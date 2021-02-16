@@ -46,7 +46,7 @@ package object utils {
     override def multiPaymentAllowed: Boolean                                                                    = true
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
     override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
-    override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Coeval[Either[ValidationError, (EVALUATED, Int)]] = ???
+    override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], availableComplexity: Int): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
   }
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {

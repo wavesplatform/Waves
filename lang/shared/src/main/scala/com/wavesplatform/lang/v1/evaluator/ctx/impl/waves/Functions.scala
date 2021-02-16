@@ -489,46 +489,47 @@ object Functions {
         Seq(("dapp", BYTESTR), ("name", STRING), ("args", LIST(ANY)), ("payments", listPayment))
       ) {
         override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
-          coeval(input).value().map(_.map(_._1))
+          evaluateExtended(input._1, input._2, 0).value().map(_._1)
 
-        override def coeval[F[_]: Monad](input: (Environment[F], List[EVALUATED])): Coeval[F[Either[ExecutionError, (EVALUATED, Int)]]] = {
-          val dappBytes = input match {
-            case (env, (dapp: CaseObj) :: _) if dapp.caseType == addressType =>
+        override def evaluateExtended[F[_]: Monad](env: Environment[F], args: List[EVALUATED], availableComplexity: Int): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] = {
+          val dappBytes = args match {
+            case (dapp: CaseObj) :: _ if dapp.caseType == addressType =>
               dapp.fields("bytes") match {
                 case CONST_BYTESTR(d) => d.pure[F]
                 case _                => ???
               }
-            case (env, (dapp: CaseObj) :: _) if dapp.caseType == aliasType =>
+            case (dapp: CaseObj) :: _ if dapp.caseType == aliasType =>
               dapp.fields("alias") match {
                 case CONST_STRING(a) => env.resolveAlias(a).map(_.explicitGet().bytes)
               }
             case _ => ???
           }
-          val name = input match {
-            case (_, _ :: CONST_STRING(name) :: _) => name
-            case (_, _ :: CaseObj(UNIT, _) :: _)   => "default"
-            case _                                 => ???
+          val name = args match {
+            case _ :: CONST_STRING(name) :: _ => name
+            case _ :: CaseObj(UNIT, _) :: _   => "default"
+            case _                            => ???
           }
-          input match {
-            case (env, _ :: _ :: ARR(args) :: ARR(payments) :: Nil) =>
+          args match {
+            case _ :: _ :: ARR(args) :: ARR(payments) :: Nil =>
               env
                 .callScript(
                   Recipient.Address(dappBytes.asInstanceOf[ByteStr]),
                   name,
                   args.toList,
                   payments.map {
-                    case (p: CaseObj) if p.caseType == paymentType =>
+                    case p: CaseObj if p.caseType == paymentType =>
                       List("assetId", "amount").map(p.fields) match {
                         case List(CONST_BYTESTR(a), CONST_LONG(v)) => (Some(a.arr), v)
                         case List(CaseObj(UNIT, _), CONST_LONG(v)) => (None, v)
                       }
                     case _ => ???
-                  }
+                  },
+                  availableComplexity
                 )
-                .map(_.map(_.leftMap(_.toString)))
-            case (_, xs) =>
+                .map(_.map { case (result, complexity) => (result.leftMap(_.toString), complexity) })
+            case xs =>
               val err = notImplemented[F, EVALUATED](s"Invoke(dapp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
-              Coeval.now(err.map(_.map((_, 0))))
+              Coeval.now(err.map((_, 0)))
           }
         }
       }

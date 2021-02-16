@@ -912,7 +912,7 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE.explicitGet().scriptsRun shouldBe 3
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, 3997)), _),
+                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, _)), _),
                 AssetVerifierTrace(transferringAssetId, None, _),
                 AssetVerifierTrace(attachedAssetId, None, _)
                 ) =>
@@ -1062,7 +1062,7 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE should produce("Transaction is not allowed by script")
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, dAppAddress, functionCall, Right(ScriptResultV3(_, transfers, 3995)), _),
+                InvokeScriptTrace(_, dAppAddress, functionCall, Right(ScriptResultV3(_, transfers, _)), _),
                 AssetVerifierTrace(allowedAssetId, None, _),
                 AssetVerifierTrace(bannedAssetId, Some(_: FailedTransactionError), _)
                 ) =>
@@ -1127,7 +1127,7 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE should produce("TransactionValidationError")
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, 3997)), _),
+                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, _)), _),
                 AssetVerifierTrace(transferringAssetId, Some(_), _)
                 ) =>
               transferringAssetId shouldBe transferringAsset.id()
@@ -2324,7 +2324,7 @@ class InvokeScriptTransactionDiffTest
     forAll(scenario) {
       case (genesisTxs, invokeTx, dApp) =>
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
-          ei should produce("DApp calls limit = 0 is exceeded")
+          ei should produce(s"DApp calls limit = 0 for attached fee = ${invokeTx.fee} is exceeded")
         }
     }
   }
@@ -2793,7 +2793,7 @@ class InvokeScriptTransactionDiffTest
     def assertLimitByFee(limit: Int, dAppsFee: Int): Unit = {
       val (genesisTxs, invokeTx) = recursiveScenario(dAppsFee).sample.get
       assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
-        ei should produce(s"DApp calls limit = $limit is exceeded")
+        ei should produce(s"DApp calls limit = $limit for attached fee = ${invokeTx.fee} is exceeded")
       }
     }
 

@@ -19,6 +19,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset._
+import com.wavesplatform.transaction.TxValidationError.FailedTransactionError
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -195,8 +196,9 @@ class WavesEnvironment(
       dApp: Address,
       func: String,
       args: List[EVALUATED],
-      payments: Seq[(Option[Array[Byte]], Long)]
-  ): Coeval[Either[ValidationError, (EVALUATED, Int)]] = ???
+      payments: Seq[(Option[Array[Byte]], Long)],
+      availableComplexity: Int
+  ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
 }
 
 class DAppEnvironment(
@@ -211,8 +213,7 @@ class DAppEnvironment(
     currentDAppPk: com.wavesplatform.account.PublicKey,
     senderDApp: com.wavesplatform.account.Address,
     callsLimit: Int,
-    var remainingCalls: Int,
-    var remainingComplexity: Long,
+    var remainingCalls: Int
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
 
   var currentDiff: Diff = Diff.empty
@@ -225,8 +226,9 @@ class DAppEnvironment(
       dApp: Address,
       func: String,
       args: List[EVALUATED],
-      payments: Seq[(Option[Array[Byte]], Long)]
-  ): Coeval[Either[ValidationError, (EVALUATED, Int)]] = {
+      payments: Seq[(Option[Array[Byte]], Long)],
+      availableComplexity: Int
+  ): Coeval[(Either[ValidationError, EVALUATED], Int)] = {
     val r = for {
       invoke <- traced(
         account.Address
@@ -245,8 +247,8 @@ class DAppEnvironment(
       (diff, evaluated) <- InvokeScriptDiff(
         mutableBlockchain,
         blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
-        false,
-        remainingComplexity,
+        limitedExecution = false,
+        availableComplexity,
         remainingCalls,
         callsLimit
       )(invoke)
@@ -268,10 +270,15 @@ class DAppEnvironment(
       )
       currentDiff = currentDiff combine fixedDiff
       mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
-      remainingComplexity = remainingComplexity - diff.scriptsComplexity
       remainingCalls = remainingCalls - 1
       (evaluated, diff.scriptsComplexity.toInt)
     }
-    r.v.map(_.resultE)
+    r.v.map {
+      _.resultE match {
+        case Left(f: FailedTransactionError) => (Left(f), f.spentComplexity.toInt)
+        case Left(e)                         => (Left(e), 0)
+        case Right((evaluated, complexity))  => (Right(evaluated), complexity)
+      }
+    }
   }
 }

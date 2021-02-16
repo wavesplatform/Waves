@@ -111,16 +111,6 @@ object ContractEvaluator {
       result            <- ScriptResult.fromObj(ctx, i.transactionId, evaluation, version, unusedComplexity = 0).leftMap((_, log))
     } yield (result, log)
 
-  def applyV2(
-      ctx: EvaluationContext[Environment, Id],
-      freezingLets: Map[String, LazyVal[Id]],
-      dApp: DApp,
-      i: Invocation,
-      version: StdLibVersion,
-      limit: Int
-  ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] =
-    applyV2Coeval(ctx, freezingLets, dApp, i, version, limit).value()
-
   def applyV2Coeval(
       ctx: EvaluationContext[Environment, Id],
       freezingLets: Map[String, LazyVal[Id]],
@@ -128,24 +118,14 @@ object ContractEvaluator {
       i: Invocation,
       version: StdLibVersion,
       limit: Int
-  ): Coeval[Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])]] =
+  ): Coeval[Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])]] =
     Coeval
-      .now(buildExprFromInvocation(dApp, i, version).leftMap((_, Nil)))
+      .now(buildExprFromInvocation(dApp, i, version).leftMap((_, limit, Nil)))
       .flatMap {
-        case l: Left[_, _] => Coeval.now(l.asInstanceOf[Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])]])
-        case Right(value)  => applyV2Coeval(ctx, freezingLets, value, version, i.transactionId, limit)
+        case Right(value) => applyV2Coeval(ctx, freezingLets, value, version, i.transactionId, limit)
+        case Left(error)  => Coeval.now(Left(error))
       }
 
-  def applyV2(
-      ctx: EvaluationContext[Environment, Id],
-      freezingLets: Map[String, LazyVal[Id]],
-      expr: EXPR,
-      version: StdLibVersion,
-      transactionId: ByteStr,
-      limit: Int
-  ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] =
-    applyV2Coeval(ctx, freezingLets, expr, version, transactionId, limit).value()
-
   def applyV2Coeval(
       ctx: EvaluationContext[Environment, Id],
       freezingLets: Map[String, LazyVal[Id]],
@@ -153,7 +133,7 @@ object ContractEvaluator {
       version: StdLibVersion,
       transactionId: ByteStr,
       limit: Int
-  ): Coeval[Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])]] = {
+  ): Coeval[Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])]] = {
     val exprWithLets =
       freezingLets.foldLeft(expr) {
         case (buildingExpr, (letName, letValue)) =>
@@ -168,7 +148,7 @@ object ContractEvaluator {
               case value: EVALUATED => ScriptResult.fromObj(ctx, transactionId, value, version, unusedComplexity)
               case expr: EXPR       => Right(IncompleteResult(expr, unusedComplexity))
             }
-          result.bimap((_, log), (_, log))
+          result.bimap((_, unusedComplexity, log), (_, log))
       })
   }
 }
