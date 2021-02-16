@@ -189,7 +189,7 @@ object InvokeDiffsCommon {
       )
       _ <- TracedResult(checkOverflow(transferList.map(_.amount))).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
 
-      actionAssets = tx.checkedAssets ++
+      actionAssets =
         transferList.flatMap(_.assetId).map(IssuedAsset) ++
         reissueList.map(r => IssuedAsset(r.assetId)) ++
         burnList.map(b => IssuedAsset(b.assetId)) ++
@@ -212,17 +212,13 @@ object InvokeDiffsCommon {
           additionalScripts.size
         ).map(_._2)
 
-      // TODO there will be no failed tests if code block below would be commented
-      // is it useful?
       additionalComplexity = additionalScripts.sum
+      totalLimit = ContractLimits.MaxTotalInvokeComplexity(version)
       _ <- TracedResult(
         Either.cond(
           additionalComplexity <= remainingComplexity,
           (),
-          FailedTransactionError.feeForActions(
-            s"Too many additional scripts complexity: remaining limit: $remainingComplexity, actual: $additionalComplexity",
-            invocationComplexity
-          )
+          FailedTransactionError.feeForActions(s"Invoke complexity limit = $totalLimit is exceeded", totalLimit - remainingComplexity)
         )
       )
 

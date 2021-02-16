@@ -73,7 +73,7 @@ class SyncDAppComplexityCountTest
       ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
     }
 
-    def dApp(otherDApp: Option[Address], paymentAsset: Option[IssuedAsset]): Script = {
+    def dApp(otherDApp: Option[Address], paymentAsset: Option[IssuedAsset], transferAsset: Option[IssuedAsset]): Script = {
       val expr = {
         val script =
           s"""
@@ -87,8 +87,9 @@ class SyncDAppComplexityCountTest
              |      $groth
              |    ) then {
              |      let payment = ${paymentAsset.fold("[]")(id => s"[AttachedPayment(base58'$id', 1)]")}
+             |      let transfer = ${transferAsset.fold("[]")(id => s"[ScriptTransfer(i.caller, 1, base58'$id')]")}
              |      ${otherDApp.fold("")(address => s""" strict r = Invoke(Address(base58'$address'), "default", [], payment) """)}
-             |      []
+             |      transfer
              |    } else {
              |      throw("unexpected")
              |    }
@@ -99,7 +100,7 @@ class SyncDAppComplexityCountTest
       ContractScript(V5, compileContractFromExpr(expr, V5)).explicitGet()
     }
 
-    def scenario(dAppCount: Int, withPayment: Boolean, withThroughPayment: Boolean) =
+    def scenario(dAppCount: Int, withPayment: Boolean, withThroughPayment: Boolean, withThroughTransfer: Boolean) =
       for {
         invoker  <- accountGen
         dAppAccs <- Gen.listOfN(dAppCount, accountGen)
@@ -135,7 +136,8 @@ class SyncDAppComplexityCountTest
         setScriptTxs = dAppAccs.foldLeft(List.empty[SetScriptTransaction]) {
           case (txs, currentAcc) =>
             val callPayment = if (withThroughPayment) Some(asset) else None
-            val callingDApp = Some(dApp(txs.headOption.map(_.sender.toAddress), callPayment))
+            val transfer    = if (withThroughTransfer) Some(asset) else None
+            val callingDApp = Some(dApp(txs.headOption.map(_.sender.toAddress), callPayment, transfer))
             val nextTx      = SetScriptTransaction.selfSigned(1.toByte, currentAcc, callingDApp, fee, ts + 5).explicitGet()
             nextTx :: txs
         }
@@ -163,9 +165,10 @@ class SyncDAppComplexityCountTest
         complexity: Int,
         withPayment: Boolean = false,
         withThroughPayment: Boolean = false,
+        withThroughTransfer: Boolean = false,
         exceeding: Boolean = false
     ): Unit = {
-      val (preparingTxs, invokeTx, asset, lastCallingDApp) = scenario(dAppCount, withPayment, withThroughPayment).sample.get
+      val (preparingTxs, invokeTx, asset, lastCallingDApp) = scenario(dAppCount, withPayment, withThroughPayment, withThroughTransfer).sample.get
       assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
         case (diff, _) =>
           diff.scriptsComplexity shouldBe complexity
@@ -187,34 +190,48 @@ class SyncDAppComplexityCountTest
             lastCallingDApp -> Portfolio(assets = Map(asset -> 1)),
             dAppAddress     -> Portfolio(assets = Map(asset -> -1))
           )
-          val emptyPortfolios = Map.empty[Address, Portfolio]
-          val additionalPortfolios =
-            (if (withPayment) paymentsPortfolios else emptyPortfolios) |+|
-              (if (withThroughPayment) throughPaymentsPortfolios else emptyPortfolios)
-          val totalPortfolios = if (!exceeding) basePortfolios |+| additionalPortfolios else basePortfolios
+          val throughTransfersPortfolios = Map(
+            invokeTx.senderAddress -> Portfolio(assets = Map(asset -> 1)),
+            lastCallingDApp        -> Portfolio(assets = Map(asset -> -1))
+          )
 
           val overlappedPortfolio = Portfolio(assets = Map(asset -> 0))
+          val emptyPortfolios     = Map.empty[Address, Portfolio]
+
+          val additionalPortfolios =
+            (if (withPayment) paymentsPortfolios else emptyPortfolios) |+|
+              (if (withThroughPayment) throughPaymentsPortfolios else emptyPortfolios) |+|
+              (if (withThroughTransfer) throughTransfersPortfolios else emptyPortfolios)
+
+          val totalPortfolios = if (!exceeding) basePortfolios |+| additionalPortfolios else basePortfolios
+
           diff.portfolios.filter(_._2 != overlappedPortfolio) shouldBe totalPortfolios.filter(_._2 != overlappedPortfolio)
       }
     }
 
     assert(1, 2709)
-    assert(2, 5458)
-    assert(18, 49442)
+    assert(2, 5459)
+    assert(18, 49459)
     assert(19, 52000, exceeding = true)
     assert(20, 51973, exceeding = true)
     assert(100, 51973, exceeding = true)
 
     assert(1, 5415, withPayment = true)
-    assert(2, 8164, withPayment = true)
-    assert(17, 49399, withPayment = true)
+    assert(2, 8165, withPayment = true)
+    assert(17, 49415, withPayment = true)
     assert(18, 52000, withPayment = true, exceeding = true)
     assert(19, 51975, withPayment = true, exceeding = true)
     assert(100, 51975, withPayment = true, exceeding = true)
 
-    assert(2, 8169, withThroughPayment = true)
-    assert(10, 51849, withThroughPayment = true)
+    assert(2, 8170, withThroughPayment = true)
+    assert(10, 51858, withThroughPayment = true)
     assert(11, 52000, withThroughPayment = true, exceeding = true)
     assert(100, 52000, withThroughPayment = true, exceeding = true)
+
+    assert(1, 5424, withThroughTransfer = true)
+    assert(2, 10889, withThroughTransfer = true)
+    assert(9, 49144, withThroughTransfer = true)
+    assert(10, 51890, withThroughTransfer = true, exceeding = true)
+    assert(100, 51973, withThroughTransfer = true, exceeding = true)
   }
 }

@@ -175,16 +175,16 @@ object InvokeScriptTransactionDiff {
               tx,
               CompositeBlockchain(blockchain, Some(invocationDiff)),
               blockTime,
-              remainingComplexity - invocationDiff.scriptsComplexity,
+              _,
               isSyncCall = false,
               limitedExecution,
               otherIssues
             )
 
             resultDiff <- scriptResult match {
-              case ScriptResultV3(dataItems, transfers, _) => doProcessActions(dataItems ::: transfers)
-              case ScriptResultV4(actions, _, _)           => doProcessActions(actions)
-              case _: IncompleteResult if limitedExecution => doProcessActions(Nil)
+              case ScriptResultV3(dataItems, transfers, unusedComplexity) => doProcessActions(dataItems ::: transfers, unusedComplexity)
+              case ScriptResultV4(actions, unusedComplexity, _)           => doProcessActions(actions, unusedComplexity)
+              case _: IncompleteResult if limitedExecution                => doProcessActions(Nil, 0)
               case i: IncompleteResult =>
                 TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
             }
@@ -206,7 +206,7 @@ object InvokeScriptTransactionDiff {
       estimatedComplexity: Int,
       paymentsComplexity: Int
   ): Either[ValidationError with WithLog, (ScriptResult, Log[Id])] = {
-    val evaluationCtx = CachedDAppCTX.forVersion(version).completeContext(environment)
+    val evaluationCtx      = CachedDAppCTX.forVersion(version).completeContext(environment)
     val limitAfterPayments = limit - paymentsComplexity
     ContractEvaluator
       .applyV2Coeval(evaluationCtx, Map(), contract, invocation, version, limitAfterPayments)
