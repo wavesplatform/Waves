@@ -18,6 +18,4 @@ jobs:
       - name: Check PR
         run: |
           sbt --mem 6144 --batch checkPR
-          echo Removing snapshots...
-          find ~/.cache/coursier -type d -name '*SNAPSHOT'
           find ~/.cache/coursier -type d -name '*SNAPSHOT' | xargs rm -vrf {} \;
