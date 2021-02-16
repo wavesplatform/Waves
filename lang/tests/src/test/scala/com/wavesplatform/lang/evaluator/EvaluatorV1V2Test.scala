@@ -9,7 +9,6 @@ import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.Global.MaxBase58String
 import com.wavesplatform.lang.{Common, EvalF, ExecutionError, Global}
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
