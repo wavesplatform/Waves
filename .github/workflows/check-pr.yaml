@@ -9,16 +9,13 @@ jobs:
         uses: actions/cache@v1
         with:
           path: ~/.sbt
-          key: sbt-cache-${{ hashFiles('project/**') }}-${{ hashFiles('**/**.sbt') }}
-      - name: Cache SBT (Ivy)
-        uses: actions/cache@v1
-        with:
-          path: ~/.ivy2/cache
-          key: sbt-cache-ivy-${{ hashFiles('project/**') }}-${{ hashFiles('**/**.sbt') }}
-      - name: Cache SBT (Coursier)
+          key: sbt-cache-${{ hashFiles('project/build.properties') }}
+      - name: Cache Coursier
         uses: actions/cache@v1
         with:
           path: ~/.cache/coursier
-          key: sbt-cache-coursier-${{ hashFiles('project/**') }}-${{ hashFiles('**/**.sbt') }}
+          key: coursier-cache
       - name: Check PR
-        run: sbt --mem 6144 --batch checkPR
+        run: |
+          sbt --mem 6144 --batch checkPR
+          find ~/.cache/coursier -type d -name '*SNAPSHOT' | xargs rm -rf {} \;
