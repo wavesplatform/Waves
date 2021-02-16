@@ -248,12 +248,14 @@ class EvaluatorV2(
         }
       }
       .onErrorHandle { e =>
-        if (e.isInstanceOf[EvaluationException]) throw e
-        else {
+        if (!wasLogged) {
           val error = if (e.getMessage != null) e.getMessage else e.toString
-          if (!wasLogged) ctx.l(let.name)(Left(error))
-          throw EvaluationException(e.getMessage, limit)
+          ctx.l(let.name)(Left(error))
         }
+        throw if (e.isInstanceOf[EvaluationException])
+          e
+        else
+          EvaluationException(e.getMessage, limit)
       }
   }
 
