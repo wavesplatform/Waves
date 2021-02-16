@@ -118,13 +118,14 @@ object InvokeScriptTransactionDiff {
                   pk,
                   dAppAddress,
                   remainingCalls,
-                  remainingCalls,
+                  remainingCalls
                 )
 
-                //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
                 val fullLimit =
                   if (blockchain.estimator == ScriptEstimatorV2)
-                    Int.MaxValue
+                    Int.MaxValue //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
+                  else if (limitedExecution)
+                    ContractLimits.FailFreeInvokeComplexity
                   else
                     ContractLimits.MaxTotalInvokeComplexity(version)
 
@@ -210,10 +211,10 @@ object InvokeScriptTransactionDiff {
       .leftMap {
         case (error, unusedComplexity, log) =>
           val usedComplexity = limit - unusedComplexity.max(0)
-          val storingComplexity = Math.max(usedComplexity, estimatedComplexity)
-          if (usedComplexity > failFreeLimit)
+          if (usedComplexity > failFreeLimit) {
+            val storingComplexity = Math.max(usedComplexity, estimatedComplexity)
             FailedTransactionError.dAppExecution(error, storingComplexity, log)
-          else
+          } else
             ScriptExecutionError.dAppExecution(error, log)
       }
   }
