@@ -193,8 +193,8 @@ class SyncDAppComplexityCountTest
               (if (withThroughPayment) throughPaymentsPortfolios else emptyPortfolios)
           val totalPortfolios = if (!exceeding) basePortfolios |+| additionalPortfolios else basePortfolios
 
-          val actuallyEmptyPortfolio = Portfolio(assets = Map(asset -> 0))  // intermediate payments overlap each other
-          diff.portfolios.filter(_._2 != actuallyEmptyPortfolio) shouldBe totalPortfolios.filter(_._2 != actuallyEmptyPortfolio)
+          val overlappedPortfolio = Portfolio(assets = Map(asset -> 0))
+          diff.portfolios.filter(_._2 != overlappedPortfolio) shouldBe totalPortfolios.filter(_._2 != overlappedPortfolio)
       }
     }
 
