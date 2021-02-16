@@ -466,13 +466,13 @@ object Types {
       "MassTransferTransaction",
       addProofsIfNeeded(
         List(
-          "feeAssetId"    -> optionByteVector,
           "assetId"       -> optionByteVector,
           "totalAmount"   -> LONG,
           "transfers"     -> listTransfers,
           "transferCount" -> LONG,
           "attachment"    -> BYTESTR
-        ) ++ header ++ proven,
+        ) ++ (if (version < V5) List("feeAssetId" -> optionByteVector) else Nil)
+          ++ header ++ proven,
         proofsEnabled
       )
     )
