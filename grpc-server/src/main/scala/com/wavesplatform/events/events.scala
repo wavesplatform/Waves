@@ -3,12 +3,14 @@ package com.wavesplatform.events
 import cats.Monoid
 import cats.syntax.monoid._
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
+import com.wavesplatform.events.protobuf.TransactionMetadata
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
@@ -17,6 +19,8 @@ import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetScriptInfo, Blockchain, DataEntry, Diff, DiffToStateApplier, EmptyDataEntry, Height, LeaseBalance}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, Transaction, TxAmount}
 
 import scala.collection.mutable
@@ -324,7 +328,7 @@ object StateUpdate {
     }
   }
 
-  def atomic(blockchainBeforeWithMinerReward: Blockchain, diff: Diff): StateUpdate = {
+  def atomic(blockchainBeforeWithMinerReward: Blockchain, diff: Diff): (StateUpdate, TransactionMetadata) = {
     val blockchain      = blockchainBeforeWithMinerReward
     val blockchainAfter = CompositeBlockchain(blockchain, Some(diff))
 
@@ -378,7 +382,45 @@ object StateUpdate {
         )
     }.toVector
 
-    StateUpdate(balances.toVector, leaseBalanceUpdates, dataEntries, assets, updatedLeases)
+    val update = StateUpdate(balances.toVector, leaseBalanceUpdates, dataEntries, assets, updatedLeases)
+    val metadata = diff.transactions.values.map { tx =>
+      implicit class AddressResolver(addr: AddressOrAlias) {
+        def resolve: Address = blockchainAfter.resolveAlias(addr).explicitGet()
+      }
+
+      tx.transaction match {
+        case tt: TransferTransaction =>
+          TransactionMetadata.TransferMetadata(tt.recipient.resolve.toByteString)
+
+        case mtt: MassTransferTransaction =>
+          TransactionMetadata.MassTransferMetadata(mtt.transfers.map(_.address.resolve.toByteString))
+
+        case lt: LeaseTransaction =>
+          TransactionMetadata.LeaseMetadata(lt.recipient.resolve.toByteString)
+
+        case ist: InvokeScriptTransaction =>
+          import TransactionMetadata.InvokeScriptMetadata.Argument.Value
+          import TransactionMetadata.InvokeScriptMetadata.{Argument, Payment}
+
+          def argumentToPB(arg: Terms.EXPR): Value = arg match {
+            case Terms.CONST_LONG(t) => Value.IntegerValue(t)
+            case bs: Terms.CONST_BYTESTR => Value.BinaryValue(bs.bs.toByteString)
+            case str: Terms.CONST_STRING => Value.StringValue(str.s)
+            case Terms.CONST_BOOLEAN(b) => Value.BooleanValue(b)
+            case Terms.ARR(xs) => Value.List(Argument.List(xs.map(x => Argument(argumentToPB(x)))))
+            case _ => Value.Empty
+          }
+
+          TransactionMetadata.InvokeScriptMetadata(
+            ist.dAppAddressOrAlias.resolve.toByteString,
+            ist.funcCall.function.funcName,
+            ist.funcCall.args.map(x => Argument(argumentToPB(x))),
+            ist.payments.map(p => Payment(PBAmounts.toPBAssetId(p.assetId), p.amount)),
+
+          )
+      }
+    }
+    ???
   }
 
   def container(
@@ -386,7 +428,7 @@ object StateUpdate {
       diff: DetailedDiff,
       transactions: Seq[Transaction],
       minerAddress: Address
-  ): (StateUpdate, Seq[StateUpdate]) = {
+  ): (StateUpdate, Seq[StateUpdate], Seq[TransactionMetadata]) = {
     val DetailedDiff(parentDiff, txsDiffs) = diff
     val parentStateUpdate                  = atomic(blockchainBeforeWithMinerReward, parentDiff)
 
@@ -403,10 +445,11 @@ object StateUpdate {
 
     val (txsStateUpdates, _) = txsDiffs.reverse
       .zip(transactions)
-      .foldLeft((ArrayBuffer.empty[StateUpdate], parentDiff)) {
-        case ((updates, accDiff), (txDiff, tx)) =>
+      .foldLeft((ArrayBuffer.empty[StateUpdate], ArrayBuffer.empty[TransactionMetadata], parentDiff)) {
+        case ((updates, metadata, accDiff), (txDiff, tx)) =>
           (
             updates += atomic(CompositeBlockchain(blockchainBeforeWithMinerReward, Some(accDiff)), txDiff),
+            metadata += ???,
             accDiff.combine(txDiff)
           )
       }
@@ -437,7 +480,8 @@ final case class BlockAppended(
     block: Block,
     updatedWavesAmount: Long,
     blockStateUpdate: StateUpdate,
-    transactionStateUpdates: Seq[StateUpdate]
+    transactionStateUpdates: Seq[StateUpdate],
+    transactionMetaData: Seq[TransactionMetadata]
 ) extends BlockchainUpdated {
   def reverseStateUpdate: StateUpdate = Monoid.combineAll((blockStateUpdate +: transactionStateUpdates).map(_.reverse).reverse)
 }
@@ -465,6 +509,7 @@ final case class MicroBlockAppended(
     microBlock: MicroBlock,
     microBlockStateUpdate: StateUpdate,
     transactionStateUpdates: Seq[StateUpdate],
+    transactionMetaData: Seq[TransactionMetadata],
     totalTransactionsRoot: ByteStr
 ) extends BlockchainUpdated {
   def reverseStateUpdate: StateUpdate = Monoid.combineAll((microBlockStateUpdate +: transactionStateUpdates).map(_.reverse).reverse)
