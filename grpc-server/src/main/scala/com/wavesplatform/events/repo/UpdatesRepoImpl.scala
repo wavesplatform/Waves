@@ -132,7 +132,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
     }
   }
 
-  override def rollback(toId: ByteStr, toHeight: Int): Try[Unit] =
+  override def rollback(toId: ByteStr, toHeight: Int, sendEvent: Boolean): Try[Unit] =
     for {
       h <- this.height
       result <- if (toHeight > h) {
@@ -144,7 +144,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
       } else {
         doStateRollback(toHeight)
       }
-      _ <- sendRealTimeUpdate(RollbackCompleted(toId, toHeight, result))
+      _ <- if (sendEvent) sendRealTimeUpdate(RollbackCompleted(toId, toHeight, result)) else Success(())
     } yield ()
 
   private[this] def doFullLiquidRollback(): RollbackResult = writeLock {

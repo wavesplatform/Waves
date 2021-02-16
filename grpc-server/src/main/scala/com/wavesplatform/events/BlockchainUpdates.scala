@@ -42,7 +42,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       throw exception
     } else if (nodeHeight == 0) {
       if (extensionHeight > 0) log.warn("Data has been reset, dropping entire blockchain updates data")
-      repo.rollback(ByteStr.empty, 0).get
+      repo.rollback(ByteStr.empty, 0, sendEvent = false).get
     } else {
       (repo.updateForHeight(nodeHeight), context.blockchain.blockHeader(nodeHeight)) match {
         case (Success(extensionBlockAtNodeHeight), Some(lastNodeBlockHeader)) =>
@@ -61,7 +61,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
           if (extensionHeight > nodeHeight) {
             log.warn(s"BlockchainUpdates at height $extensionHeight is higher than node at height $nodeHeight, rolling back BlockchainUpdates")
             repo
-              .rollback(extensionBlockAtNodeHeight.id, extensionBlockAtNodeHeight.height)
+              .rollback(extensionBlockAtNodeHeight.id, extensionBlockAtNodeHeight.height, sendEvent = false)
               .recoverWith { case err: Throwable => Failure(new RuntimeException("BlockchainUpdates failed to rollback at startup", err)) }
               .get
           }

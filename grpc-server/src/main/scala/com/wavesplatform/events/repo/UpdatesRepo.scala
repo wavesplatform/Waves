@@ -21,7 +21,7 @@ object UpdatesRepo {
 
     def appendMicroBlock(microBlockAppended: MicroBlockAppended): Try[Unit]
     def appendBlock(blockAppended: BlockAppended): Try[Unit]
-    def rollback(toId: ByteStr, toHeight: Int): Try[Unit]
+    def rollback(toId: ByteStr, toHeight: Int, sendEvent: Boolean = true): Try[Unit]
     def rollbackMicroBlock(toId: ByteStr): Try[Unit]
   }
 
