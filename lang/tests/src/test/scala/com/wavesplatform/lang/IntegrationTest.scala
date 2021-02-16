@@ -2174,4 +2174,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     genericEval[Environment, EVALUATED](script2, ctxt = v5Ctx, version = V5, env = utils.environment) should
       produce("Alias name length=31 exceeds limit=30")
   }
+
+  property("unicode broken") {
+    val script1 = s"""take("x冬x", 2)"""
+
+    eval(script1, version = V4) shouldBe
+      Right(CONST_STRING("x\ud87e").explicitGet())
+  }
+
+  property("unicode support") {
+    val script1 = s"""take("x冬x", 2)"""
+
+    genericEval[Environment, EVALUATED](script1, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
+      Right(CONST_STRING("x冬").explicitGet())
+  }
 }

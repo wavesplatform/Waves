@@ -235,6 +235,11 @@ object PureContext {
     case xs                      => notImplemented[Id, EVALUATED]("size(xs: String)", xs)
   }
 
+  lazy val sizeStringV5: BaseFunction[NoContext] = NativeFunction("size", 1, SIZE_STRING, LONG, ("xs", STRING)) {
+    case CONST_STRING(bv) :: Nil => Right(CONST_LONG(bv.codePointCount(0,bv.length).toLong))
+    case xs                      => notImplemented[Id, EVALUATED]("size(xs: String)", xs)
+  }
+
   lazy val toStringBoolean: BaseFunction[NoContext] =
     NativeFunction("toString", 1, BOOLEAN_TO_STRING, STRING, ("b", BOOLEAN)) {
       case TRUE :: Nil  => CONST_STRING("true")
@@ -392,6 +397,18 @@ object PureContext {
       case xs                                            => notImplemented[Id, EVALUATED]("drop(xs: String, number: Int)", xs)
     }
 
+  lazy val dropStringV5: BaseFunction[NoContext] =
+    NativeFunction(
+      "drop",
+      Map[StdLibVersion, Long](V5 -> 20L),
+      DROP_STRING,
+      STRING,
+      ("xs", STRING), ("number", LONG)
+    ) {
+      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => CONST_STRING(xs.drop(xs.offsetByCodePoints(0, trimLongToInt(number))))
+      case xs                                            => notImplemented[Id, EVALUATED]("drop(xs: String, number: Int)", xs)
+    }
+
   lazy val takeRightString: BaseFunction[NoContext] =
     UserFunction(
       "takeRight",
@@ -413,6 +430,29 @@ object PureContext {
         )
       )
     }
+
+  lazy val takeRightStringV5: BaseFunction[NoContext] =
+    UserFunction(
+      "takeRight",
+      Map[StdLibVersion, Long](V5 -> 20L),
+      STRING,
+      ("@xs", STRING), ("@number", LONG)
+    ) {
+      FUNCTION_CALL(
+        dropStringV5,
+        List(
+          REF("@xs"),
+          FUNCTION_CALL(
+            subLong,
+            List(
+              FUNCTION_CALL(sizeStringV5, List(REF("@xs"))),
+              REF("@number")
+            )
+          )
+        )
+      )
+    }
+
 
   lazy val dropRightString: BaseFunction[NoContext] =
     UserFunction(
@@ -450,7 +490,7 @@ object PureContext {
           FUNCTION_CALL(
             subLong,
             List(
-              FUNCTION_CALL(sizeString, List(REF("@xs"))),
+              FUNCTION_CALL(sizeStringV5, List(REF("@xs"))),
               REF("@number")
             )
           )
@@ -1035,11 +1075,8 @@ object PureContext {
       dropBytes,
       takeRightBytes,
       dropRightBytes,
-      sizeString,
       toStringBoolean,
       toStringLong,
-      dropString,
-      takeRightString,
       isDefined,
       throwWithMessage,
       _isInstanceOf,
@@ -1047,7 +1084,7 @@ object PureContext {
     ) ++ operators
 
   private val v1V2V3CommonFunctions =
-    commonFunctions :+ takeString :+ dropRightString :+ extract
+    commonFunctions :+ takeString :+ dropRightString :+ extract  :+ sizeString :+ dropString :+ takeRightString
 
   private val v3V4CommonFunctions =
     Array(
@@ -1088,24 +1125,30 @@ object PureContext {
         listIndexOf,
         listLastIndexOf,
         listRemoveByIndex,
-          listContains,
-          listMin,
-          listMax,
-          makeString,
-        ) ++ (MinTupleSize to MaxTupleSize).map(i => createTupleN(i))
+        listContains,
+        listMin,
+        listMax,
+        makeString,
+      ) ++ (MinTupleSize to MaxTupleSize).map(i => createTupleN(i))
 
   private val v4Functions =
     v4V5Functions ++
     Array(
+      sizeString,
       takeString,
-      dropRightString
+      dropRightString,
+      dropString,
+      takeRightString
     )
 
   private val v5Functions =
     v4V5Functions ++
     Array(
+      sizeStringV5,
       takeStringV5,
-      dropRightStringV5
+      dropRightStringV5,
+      dropStringV5,
+      takeRightStringV5
     )
 
   private val v1V2Ctx =
