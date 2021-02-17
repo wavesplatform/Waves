@@ -21,7 +21,7 @@ package object serde {
 
     def protobuf: BlockchainUpdated =
       self match {
-        case ve.BlockAppended(id, height, block, updatedWavesAmount, blockStateUpdate, transactionStateUpdates) =>
+        case ve.BlockAppended(id, height, block, updatedWavesAmount, blockStateUpdate, transactionStateUpdates, transactionsMetadata) =>
           val blockUpdate = Some(blockStateUpdate).filterNot(_.isEmpty).map(_.protobuf)
           val txsUpdates  = transactionStateUpdates.map(_.protobuf)
 
@@ -33,6 +33,7 @@ package object serde {
                 transactionIds = getIds(block.transactionData),
                 stateUpdate = blockUpdate,
                 transactionStateUpdates = txsUpdates,
+                transactionsMetadata = transactionsMetadata,
                 body = Append.Body.Block(
                   Append.BlockAppend(
                     block = Some(PBBlocks.protobuf(block)),
@@ -42,7 +43,7 @@ package object serde {
               )
             )
           )
-        case ve.MicroBlockAppended(totalBlockId, height, microBlock, microBlockStateUpdate, transactionStateUpdates, totalTransactionsRoot) =>
+        case ve.MicroBlockAppended(totalBlockId, height, microBlock, microBlockStateUpdate, transactionStateUpdates, transactionsMetadata, totalTransactionsRoot) =>
           val microBlockUpdate = Some(microBlockStateUpdate).filterNot(_.isEmpty).map(_.protobuf)
           val txsUpdates       = transactionStateUpdates.map(_.protobuf)
 
@@ -54,6 +55,7 @@ package object serde {
                 transactionIds = getIds(microBlock.transactionData),
                 stateUpdate = microBlockUpdate,
                 transactionStateUpdates = txsUpdates,
+                transactionsMetadata = transactionsMetadata,
                 body = Append.Body.MicroBlock(
                   Append.MicroBlockAppend(
                     microBlock = Some(PBMicroBlocks.protobuf(microBlock, totalBlockId)),
@@ -109,7 +111,8 @@ package object serde {
                   block = body.block.map(PBBlocks.vanilla(_, unsafe = true).get).orNull,
                   updatedWavesAmount = body.updatedWavesAmount,
                   blockStateUpdate = append.stateUpdate.fold(Monoid[ve.StateUpdate].empty)(_.vanilla.get),
-                  transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get)
+                  transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get),
+                  transactionMetadata = append.transactionsMetadata
                 )
               case Body.MicroBlock(body) =>
                 ve.MicroBlockAppended(
@@ -118,7 +121,8 @@ package object serde {
                   microBlock = PBMicroBlocks.vanilla(body.microBlock.get, unsafe = true).get.microblock,
                   microBlockStateUpdate = append.stateUpdate.fold(Monoid[ve.StateUpdate].empty)(_.vanilla.get),
                   transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get),
-                  totalTransactionsRoot = body.updatedTransactionsRoot.toByteStr
+                  totalTransactionsRoot = body.updatedTransactionsRoot.toByteStr,
+                  transactionMetadata = append.transactionsMetadata
                 )
               case Body.Empty => throw new IllegalArgumentException("Empty append body")
             }
@@ -144,7 +148,10 @@ package object serde {
             }
           case Update.Empty => throw new IllegalArgumentException("Update body is empty")
         }
-      } recoverWith { case err: Throwable => Failure(new IllegalArgumentException(s"Invalid protobuf BlockchainUpdated at height ${self.height}, id ${self.id.toByteStr}", err)) }
+      } recoverWith {
+        case err: Throwable =>
+          Failure(new IllegalArgumentException(s"Invalid protobuf BlockchainUpdated at height ${self.height}, id ${self.id.toByteStr}", err))
+      }
   }
 
   implicit class StateUpdateVanilla(val self: StateUpdate) extends AnyVal {

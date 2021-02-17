@@ -268,7 +268,12 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
 
               case None =>
                 val lastPersistentUpdate = data.lastOption
-                realTimeUpdates.dropWhile(u => !lastPersistentUpdate.forall(u.references))
+                log.info(s"Last persistent: $lastPersistentUpdate")
+                realTimeUpdates.dropWhile { u =>
+                  val result = !lastPersistentUpdate.forall(u.references)
+                  if (result) log.info(s"Dropping: $result")
+                  result
+                }
             })
         }
         readBatchStream(fromHeight)

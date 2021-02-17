@@ -16,7 +16,7 @@ import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetScriptInfo, Blockchain, DataEntry, Diff, DiffToStateApplier, EmptyDataEntry, Height, LeaseBalance}
+import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetScriptInfo, Blockchain, DataEntry, Diff, DiffToStateApplier, EmptyDataEntry, Height, InvokeScriptResult, LeaseBalance}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -328,7 +328,7 @@ object StateUpdate {
     }
   }
 
-  def atomic(blockchainBeforeWithMinerReward: Blockchain, diff: Diff): (StateUpdate, TransactionMetadata) = {
+  def atomic(blockchainBeforeWithMinerReward: Blockchain, diff: Diff): StateUpdate = {
     val blockchain      = blockchainBeforeWithMinerReward
     val blockchainAfter = CompositeBlockchain(blockchain, Some(diff))
 
@@ -382,45 +382,54 @@ object StateUpdate {
         )
     }.toVector
 
-    val update = StateUpdate(balances.toVector, leaseBalanceUpdates, dataEntries, assets, updatedLeases)
-    val metadata = diff.transactions.values.map { tx =>
-      implicit class AddressResolver(addr: AddressOrAlias) {
-        def resolve: Address = blockchainAfter.resolveAlias(addr).explicitGet()
+    StateUpdate(balances.toVector, leaseBalanceUpdates, dataEntries, assets, updatedLeases)
+  }
+
+  private[this] def transactionsMetadata(blockchain: Blockchain, diff: Diff): Seq[TransactionMetadata] = {
+    val blockchainAfter = CompositeBlockchain(blockchain, Some(diff))
+
+    diff.transactions.values
+      .map[TransactionMetadata.Metadata] { tx =>
+        implicit class AddressResolver(addr: AddressOrAlias) {
+          def resolve: Address = blockchainAfter.resolveAlias(addr).explicitGet()
+        }
+
+        tx.transaction match {
+          case tt: TransferTransaction =>
+            TransactionMetadata.Metadata.Transfer(TransactionMetadata.TransferMetadata(tt.recipient.resolve.toByteString))
+
+          case mtt: MassTransferTransaction =>
+            TransactionMetadata.Metadata.MassTransfer(TransactionMetadata.MassTransferMetadata(mtt.transfers.map(_.address.resolve.toByteString)))
+
+          case lt: LeaseTransaction =>
+            TransactionMetadata.Metadata.LeaseMeta(TransactionMetadata.LeaseMetadata(lt.recipient.resolve.toByteString))
+
+          case ist: InvokeScriptTransaction =>
+            import TransactionMetadata.InvokeScriptMetadata.Argument
+            import TransactionMetadata.InvokeScriptMetadata.Argument.Value
+
+            def argumentToPB(arg: Terms.EXPR): Value = arg match {
+              case Terms.CONST_LONG(t)     => Value.IntegerValue(t)
+              case bs: Terms.CONST_BYTESTR => Value.BinaryValue(bs.bs.toByteString)
+              case str: Terms.CONST_STRING => Value.StringValue(str.s)
+              case Terms.CONST_BOOLEAN(b)  => Value.BooleanValue(b)
+              case Terms.ARR(xs)           => Value.List(Argument.List(xs.map(x => Argument(argumentToPB(x)))))
+              case _                       => Value.Empty
+            }
+
+            TransactionMetadata.Metadata.InvokeScript(
+              TransactionMetadata.InvokeScriptMetadata(
+                ist.dAppAddressOrAlias.resolve.toByteString,
+                ist.funcCall.function.funcName,
+                ist.funcCall.args.map(x => Argument(argumentToPB(x))),
+                ist.payments.map(p => Amount(PBAmounts.toPBAssetId(p.assetId), p.amount)),
+                Seq(InvokeScriptResult.toPB(diff.scriptResults.getOrElse(ist.id(), InvokeScriptResult.empty)))
+              )
+            )
+        }
       }
-
-      tx.transaction match {
-        case tt: TransferTransaction =>
-          TransactionMetadata.TransferMetadata(tt.recipient.resolve.toByteString)
-
-        case mtt: MassTransferTransaction =>
-          TransactionMetadata.MassTransferMetadata(mtt.transfers.map(_.address.resolve.toByteString))
-
-        case lt: LeaseTransaction =>
-          TransactionMetadata.LeaseMetadata(lt.recipient.resolve.toByteString)
-
-        case ist: InvokeScriptTransaction =>
-          import TransactionMetadata.InvokeScriptMetadata.Argument.Value
-          import TransactionMetadata.InvokeScriptMetadata.{Argument, Payment}
-
-          def argumentToPB(arg: Terms.EXPR): Value = arg match {
-            case Terms.CONST_LONG(t) => Value.IntegerValue(t)
-            case bs: Terms.CONST_BYTESTR => Value.BinaryValue(bs.bs.toByteString)
-            case str: Terms.CONST_STRING => Value.StringValue(str.s)
-            case Terms.CONST_BOOLEAN(b) => Value.BooleanValue(b)
-            case Terms.ARR(xs) => Value.List(Argument.List(xs.map(x => Argument(argumentToPB(x)))))
-            case _ => Value.Empty
-          }
-
-          TransactionMetadata.InvokeScriptMetadata(
-            ist.dAppAddressOrAlias.resolve.toByteString,
-            ist.funcCall.function.funcName,
-            ist.funcCall.args.map(x => Argument(argumentToPB(x))),
-            ist.payments.map(p => Payment(PBAmounts.toPBAssetId(p.assetId), p.amount)),
-
-          )
-      }
-    }
-    ???
+      .map(TransactionMetadata(_))
+      .toVector
   }
 
   def container(
@@ -443,18 +452,16 @@ object StateUpdate {
         parentStateUpdate.copy(balances = parentStateUpdate.balances :+ BalanceUpdate(minerAddress, Waves, minerBalance - reward, minerBalance))
     }
 
-    val (txsStateUpdates, _) = txsDiffs.reverse
-      .zip(transactions)
-      .foldLeft((ArrayBuffer.empty[StateUpdate], ArrayBuffer.empty[TransactionMetadata], parentDiff)) {
-        case ((updates, metadata, accDiff), (txDiff, tx)) =>
+    val (txsStateUpdates, totalDiff) = txsDiffs.reverse
+      .foldLeft((ArrayBuffer.empty[StateUpdate], parentDiff)) {
+        case ((updates, accDiff), txDiff) =>
           (
             updates += atomic(CompositeBlockchain(blockchainBeforeWithMinerReward, Some(accDiff)), txDiff),
-            metadata += ???,
             accDiff.combine(txDiff)
           )
       }
-
-    (parentStateUpdateWithMinerReward, txsStateUpdates.toSeq)
+    val metadata = transactionsMetadata(blockchainBeforeWithMinerReward, totalDiff)
+    (parentStateUpdateWithMinerReward, txsStateUpdates.toSeq, metadata)
   }
 }
 
@@ -481,14 +488,14 @@ final case class BlockAppended(
     updatedWavesAmount: Long,
     blockStateUpdate: StateUpdate,
     transactionStateUpdates: Seq[StateUpdate],
-    transactionMetaData: Seq[TransactionMetadata]
+    transactionMetadata: Seq[TransactionMetadata]
 ) extends BlockchainUpdated {
   def reverseStateUpdate: StateUpdate = Monoid.combineAll((blockStateUpdate +: transactionStateUpdates).map(_.reverse).reverse)
 }
 
 object BlockAppended {
   def from(block: Block, diff: DetailedDiff, blockchainBeforeWithMinerReward: Blockchain): BlockAppended = {
-    val (blockStateUpdate, txsStateUpdates) =
+    val (blockStateUpdate, txsStateUpdates, txsMetadata) =
       StateUpdate.container(blockchainBeforeWithMinerReward, diff, block.transactionData, block.sender.toAddress)
 
     // updatedWavesAmount can change as a result of either genesis transactions or miner rewards
@@ -499,7 +506,15 @@ object BlockAppended {
       case height => blockchainBeforeWithMinerReward.wavesAmount(height).toLong
     }
 
-    BlockAppended(block.id.value(), blockchainBeforeWithMinerReward.height + 1, block, updatedWavesAmount, blockStateUpdate, txsStateUpdates)
+    BlockAppended(
+      block.id.value(),
+      blockchainBeforeWithMinerReward.height + 1,
+      block,
+      updatedWavesAmount,
+      blockStateUpdate,
+      txsStateUpdates,
+      txsMetadata
+    )
   }
 }
 
@@ -509,7 +524,7 @@ final case class MicroBlockAppended(
     microBlock: MicroBlock,
     microBlockStateUpdate: StateUpdate,
     transactionStateUpdates: Seq[StateUpdate],
-    transactionMetaData: Seq[TransactionMetadata],
+    transactionMetadata: Seq[TransactionMetadata],
     totalTransactionsRoot: ByteStr
 ) extends BlockchainUpdated {
   def reverseStateUpdate: StateUpdate = Monoid.combineAll((microBlockStateUpdate +: transactionStateUpdates).map(_.reverse).reverse)
@@ -526,7 +541,7 @@ object MicroBlockAppended {
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr
   ): MicroBlockAppended = {
-    val (microBlockStateUpdate, txsStateUpdates) =
+    val (microBlockStateUpdate, txsStateUpdates, txsMetadata) =
       StateUpdate.container(blockchainBeforeWithMinerReward, diff, microBlock.transactionData, microBlock.sender.toAddress)
 
     MicroBlockAppended(
@@ -535,6 +550,7 @@ object MicroBlockAppended {
       microBlock,
       microBlockStateUpdate,
       txsStateUpdates,
+      txsMetadata,
       totalTransactionsRoot
     )
   }
