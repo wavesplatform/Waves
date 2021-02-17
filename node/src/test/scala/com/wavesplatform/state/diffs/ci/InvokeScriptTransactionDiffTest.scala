@@ -827,7 +827,8 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = paymentContractGen(a.toAddress, am) _
+      version <- Gen.oneOf(V3, V4, V5)
+      contractGen = paymentContractGen(a.toAddress, am, version = version) _
       invoker <- accountGen
       ts      <- timestampGen
       asset = IssueTransaction(
@@ -846,11 +847,12 @@ class InvokeScriptTransactionDiffTest
         contractGen,
         invokerGen = Gen.oneOf(Seq(invoker)),
         payment = Some(Payment(1, IssuedAsset(asset.id()))),
-        feeGen = ciFee(1)
+        feeGen = ciFee(1),
+        version = version
       )
-    } yield (a, am, r._1, r._2, r._3, r._4, asset, invoker)) {
-      case (acc, amount, genesis, setScript, ci, dAppAddress, asset, invoker) =>
-        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
+    } yield (a, am, r._1, r._2, r._3, r._4, asset, invoker, version)) {
+      case (acc, amount, genesis, setScript, ci, dAppAddress, asset, invoker, version) =>
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), (if(version < V4) { fs } else { fsWithV5 })) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 2
             newState.balance(acc.toAddress, Waves) shouldBe amount
@@ -3407,11 +3409,12 @@ class InvokeScriptTransactionDiffTest
                       | let startWavesBalance = this.issuer.getIntegerValue("startWavesBalance")
                       | let startInvokerBalance = this.issuer.getIntegerValue("startInvokerBalance")
                       | let resultInvokerBalance = wavesBalance(Address(base58'${invoker.toAddress.stringRepr}')).regular
+                      | let issuerBalance = wavesBalance(this.issuer)
                       |
                       | assetBalance(this.issuer, this.id) == $ENOUGH_AMT                                     &&
                       | assetBalance(this.issuer, paymentAsset) == $ENOUGH_AMT - $paymentFromClientDAppAmount &&
-                      | wavesBalance(this.issuer).regular == startWavesBalance + $paymentFromInvokerAmount    &&
-                      | resultInvokerBalance == startInvokerBalance - $fee - $paymentFromInvokerAmount
+                      | issuerBalance.regular == startWavesBalance                                            &&
+                      | resultInvokerBalance == startInvokerBalance - $fee
                     """.stripMargin
       ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
     }
@@ -3427,11 +3430,12 @@ class InvokeScriptTransactionDiffTest
              | @Callable(i)
              | func bar(startInvokerBalance: Int, startWavesBalance: Int, startPaymentAssetBalance: Int, paymentAsset: ByteVector) = {
              |   let resultInvokerBalance = wavesBalance(Address(base58'${invoker.toAddress.stringRepr}')).regular
+             |   let paymentAssetBalance = assetBalance(i.caller, paymentAsset)
              |
              |   if (
              |     startInvokerBalance == resultInvokerBalance         &&
              |     startWavesBalance == wavesBalance(i.caller).regular &&
-             |     startPaymentAssetBalance == assetBalance(i.caller, paymentAsset)
+             |     startPaymentAssetBalance == paymentAssetBalance + i.payments[0].amount
              |   )
              |     then
              |       ([IntegerEntry("bar", 1)], $returnValue)

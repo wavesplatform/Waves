@@ -213,10 +213,10 @@ class DAppEnvironment(
     currentDAppPk: com.wavesplatform.account.PublicKey,
     senderDApp: com.wavesplatform.account.Address,
     callsLimit: Int,
-    var remainingCalls: Int
+    var remainingCalls: Int,
+    var currentDiff: Diff
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
 
-  var currentDiff: Diff = Diff.empty
 
   var mutableBlockchain = blockchain
 

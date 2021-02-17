@@ -138,7 +138,8 @@ object InvokeScriptDiff {
                   pk,
                   tx.senderDApp,
                   callsLimit,
-                  remainingCalls - 1
+                  remainingCalls - 1,
+                  (if(version < V5) { Diff.empty } else { InvokeDiffsCommon.paymentsPart(tx, tx.dAppAddress, Map()) })
                 )
 
                 for {

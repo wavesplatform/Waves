@@ -118,7 +118,8 @@ object InvokeScriptTransactionDiff {
                   pk,
                   dAppAddress,
                   remainingCalls,
-                  remainingCalls
+                  remainingCalls,
+                  (if(version < V5) { Diff.empty } else { InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()) })
                 )
 
                 val paymentsComplexity = tx.checkedAssets.flatMap(blockchain.assetScript).map(_.complexity).sum.toInt
