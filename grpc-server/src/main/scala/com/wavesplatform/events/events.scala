@@ -426,6 +426,9 @@ object StateUpdate {
                 diff.scriptResults.get(ist.id()).map(InvokeScriptResult.toPB)
               )
             )
+
+          case _ =>
+            TransactionMetadata.Metadata.Empty
         }
       }
       .map(TransactionMetadata(_))
