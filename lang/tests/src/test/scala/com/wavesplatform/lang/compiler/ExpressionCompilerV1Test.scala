@@ -421,6 +421,33 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       }
   }
 
+  property("Field feeAssetId is unavailable for MassTransferTransaction") {
+    def expr(v: StdLibVersion) = {
+      val script =
+        s"""
+          | {-# STDLIB_VERSION ${v.id}    #-}
+          | {-# CONTENT_TYPE   EXPRESSION #-}
+          |
+          | match tx {
+          |   case m: MassTransferTransaction => m.feeAssetId == unit
+          |   case _                          => throw()
+          | }
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+
+    DirectiveDictionary[StdLibVersion].all
+      .foreach { version =>
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, expr(version))
+        if (version < V5)
+          result shouldBe Symbol("right")
+        else
+          result should produce(
+            "Compilation failed: [Undefined field `feeAssetId` of variable of type `MassTransferTransaction` in 116-128]"
+          )
+      }
+  }
+
   treeTypeTest("GETTER")(
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
