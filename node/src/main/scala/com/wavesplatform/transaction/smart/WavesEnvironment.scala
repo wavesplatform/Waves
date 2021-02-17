@@ -205,10 +205,10 @@ class DAppEnvironment(
     currentDAppPk: com.wavesplatform.account.PublicKey,
     senderDApp: com.wavesplatform.account.Address,
     var runsLimit: Int,
-    invokeDeep: Int
+    invokeDeep: Int,
+    var currentDiff: Diff
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
 
-  var currentDiff: Diff = Diff.empty
 
   override def currentBlockchain() = CompositeBlockchain(blockchain, Some(currentDiff))
 
