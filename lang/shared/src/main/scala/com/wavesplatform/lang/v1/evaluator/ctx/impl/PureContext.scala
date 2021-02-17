@@ -59,7 +59,8 @@ object PureContext {
         } else {
           Left(s"String length = ${a.length + b.length} exceeds ${Terms.DataEntryValueMax}")
         }
-      case _ => ???
+      case args =>
+        Left(s"Unexpected args $args for string concatenation operator")
     }
   lazy val sumByteStr: BaseFunction[NoContext] =
     createRawOp(
@@ -75,7 +76,8 @@ object PureContext {
         } else {
           Left(s"ByteVector size = ${a.arr.length + b.arr.length} bytes exceeds ${Terms.DataEntryValueMax}")
         }
-      case _ => ???
+      case args =>
+        Left(s"Unexpected args $args for bytes concatenation operator")
     }
   lazy val ge: BaseFunction[NoContext] = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)(_ >= _)
   lazy val gt: BaseFunction[NoContext] =
