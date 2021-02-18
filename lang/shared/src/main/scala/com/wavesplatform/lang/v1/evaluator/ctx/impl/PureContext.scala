@@ -568,6 +568,27 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED]("indexOf(str: String, substr: String)", xs)
     }
 
+  lazy val indexOfV5: BaseFunction[NoContext] =
+    NativeFunction(
+      "indexOf",
+      Map[StdLibVersion, Long](V5 -> 3L),
+      INDEXOF,
+      optionLong,
+      ("str", STRING),
+      ("substr", STRING)
+    ) {
+      case CONST_STRING(m) :: CONST_STRING(sub) :: Nil =>
+        Right({
+          val i = m.indexOf(sub)
+          if (i != -1) {
+            CONST_LONG(m.codePointCount(0, i).toLong)
+          } else {
+            unit
+          }
+        })
+      case xs => notImplemented[Id, EVALUATED]("indexOf(str: String, substr: String)", xs)
+    }
+
   lazy val indexOfN: BaseFunction[NoContext] =
     NativeFunction(
       "indexOf",
@@ -581,6 +602,29 @@ object PureContext {
           val i = m.indexOf(sub, off.toInt)
           if (i != -1) {
             CONST_LONG(i.toLong)
+          } else {
+            unit
+          }
+        } else {
+          unit
+        })
+      case xs => notImplemented[Id, EVALUATED]("indexOf(str: String, substr: String, offset: Int)", xs)
+    }
+
+  lazy val indexOfNV5: BaseFunction[NoContext] =
+    NativeFunction(
+      "indexOf",
+      Map[StdLibVersion, Long](V5 -> 3L),
+      INDEXOFN,
+      optionLong,
+      ("str", STRING), ("substr", STRING), ("offset", LONG)
+    ) {
+      case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil =>
+        val l = m.codePointCount(0, m.length)
+        Right(if (off >= 0 && off <= l) {
+          val i = m.indexOf(sub, m.offsetByCodePoints(0, off.toInt))
+          if (i != -1) {
+            CONST_LONG(m.codePointCount(0, i).toLong)
           } else {
             unit
           }
@@ -604,6 +648,27 @@ object PureContext {
           val i = m.lastIndexOf(sub)
           if (i != -1) {
             CONST_LONG(i.toLong)
+          } else {
+            unit
+          }
+        })
+      case xs => notImplemented[Id, EVALUATED]("lastIndexOf(str: String, substr: String)", xs)
+    }
+
+  lazy val lastIndexOfV5: BaseFunction[NoContext] =
+    NativeFunction(
+      "lastIndexOf",
+      Map[StdLibVersion, Long](V5 -> 3L),
+      LASTINDEXOF,
+      optionLong,
+      ("str", STRING),
+      ("substr", STRING)
+    ) {
+      case CONST_STRING(m) :: CONST_STRING(sub) :: Nil =>
+        Right({
+          val i = m.lastIndexOf(sub)
+          if (i != -1) {
+            CONST_LONG(m.codePointCount(0, i).toLong)
           } else {
             unit
           }
@@ -636,19 +701,58 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED]("lastIndexOf(str: String, substr: String, offset: Int)", xs)
     }
 
+  lazy val lastIndexOfWithOffsetV5: BaseFunction[NoContext] =
+    NativeFunction(
+      "lastIndexOf",
+      Map[StdLibVersion, Long](V5 -> 3L),
+      LASTINDEXOFN,
+      optionLong,
+      ("str", STRING),
+      ("substr", STRING),
+      ("offset", LONG)
+    ) {
+      case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil =>
+        Right(if (off >= 0) {
+          val offset = Math.min(off, Int.MaxValue.toLong).toInt
+          val i      = m.lastIndexOf(sub,  m.offsetByCodePoints(0, offset))
+          if (i != -1) {
+            CONST_LONG(m.codePointCount(0, i).toLong)
+          } else {
+            unit
+          }
+        } else {
+          unit
+        })
+      case xs => notImplemented[Id, EVALUATED]("lastIndexOf(str: String, substr: String, offset: Int)", xs)
+    }
+
   lazy val splitStr: BaseFunction[NoContext] =
     NativeFunction("split", Map(V3 -> 100L, V4 -> 75L), SPLIT, listString, ("str", STRING), ("separator", STRING)) {
       case CONST_STRING(str) :: CONST_STRING(sep) :: Nil =>
-          ARR(split(str, sep).toIndexedSeq, limited = true)
+          ARR(split(str, sep, false).toIndexedSeq, limited = true)
       case xs =>
         notImplemented[Id, EVALUATED]("split(str: String, separator: String)", xs)
     }
 
-  private def split(str: String, sep: String): Iterable[CONST_STRING] = {
+
+  lazy val splitStrV5: BaseFunction[NoContext] =
+    NativeFunction("split", Map(V3 -> 100L, V4 -> 75L), SPLIT, listString, ("str", STRING), ("separator", STRING)) {
+      case CONST_STRING(str) :: CONST_STRING(sep) :: Nil =>
+          ARR(split(str, sep, true).toIndexedSeq, limited = true)
+      case xs =>
+        notImplemented[Id, EVALUATED]("split(str: String, separator: String)", xs)
+    }
+
+  private def split(str: String, sep: String, unicode: Boolean): Iterable[CONST_STRING] = {
     if (str == "") listWithEmptyStr
     else if (sep == "")
-      (1 to str.length)
-        .map(i => CONST_STRING(String.valueOf(str.charAt(i - 1))).explicitGet())
+      if(unicode) {
+        (1 to str.codePointCount(0, str.length))
+          .map(i => CONST_STRING(str.substring(str.offsetByCodePoints(0, i-1), str.offsetByCodePoints(0, i))).explicitGet())
+      } else {
+        (1 to str.length)
+          .map(i => CONST_STRING(String.valueOf(str.charAt(i - 1))).explicitGet())
+      }
     else splitRec(str, sep)
   }
 
@@ -1094,11 +1198,6 @@ object PureContext {
       valueOrErrorMessage,
       toLong,
       toLongOffset,
-      indexOf,
-      indexOfN,
-      lastIndexOf,
-      lastIndexOfWithOffset,
-      splitStr,
       parseInt,
       parseIntVal,
       pow,
@@ -1109,6 +1208,11 @@ object PureContext {
     v1V2V3CommonFunctions ++
     v3V4CommonFunctions ++
       Array(
+        indexOf,
+        indexOfN,
+        lastIndexOf,
+        lastIndexOfWithOffset,
+        splitStr,
         toUtf8String(reduceLimit = false),
         listConstructor(checkSize = false)
       )
@@ -1136,6 +1240,11 @@ object PureContext {
   private val v4Functions =
     v4V5Functions ++
     Array(
+      indexOf,
+      indexOfN,
+      lastIndexOf,
+      lastIndexOfWithOffset,
+      splitStr,
       sizeString,
       takeString,
       dropRightString,
@@ -1146,6 +1255,11 @@ object PureContext {
   private val v5Functions =
     v4V5Functions ++
     Array(
+      indexOfV5,
+      indexOfNV5,
+      lastIndexOfV5,
+      lastIndexOfWithOffsetV5,
+      splitStrV5,
       sizeStringV5,
       takeStringV5,
       dropRightStringV5,
