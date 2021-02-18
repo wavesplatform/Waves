@@ -228,7 +228,7 @@ class BlockchainUpdaterImpl(
                     val height            = leveldb.unsafeHeightOf(ng.base.header.reference)
                     val miningConstraints = MiningConstraints(leveldb, height)
 
-                    blockchainUpdateTriggers.onRollback(ng.base.header.reference, leveldb.height)
+                    blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, leveldb.height)
 
                     val referencedBlockchain = CompositeBlockchain(leveldb, carry = leveldb.carryFee, reward = ng.reward)
                     BlockDiffer
@@ -257,7 +257,7 @@ class BlockchainUpdaterImpl(
                       val height            = leveldb.unsafeHeightOf(ng.base.header.reference)
                       val miningConstraints = MiningConstraints(leveldb, height)
 
-                      blockchainUpdateTriggers.onRollback(ng.base.header.reference, leveldb.height)
+                      blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, leveldb.height)
 
                       val referencedBlockchain = CompositeBlockchain(leveldb, carry = leveldb.carryFee, reward = ng.reward)
                       BlockDiffer
@@ -289,7 +289,7 @@ class BlockchainUpdaterImpl(
                         val height = leveldb.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
 
                         if (discarded.nonEmpty) {
-                          blockchainUpdateTriggers.onMicroBlockRollback(referencedForgedBlock.id(), this.height)
+                          blockchainUpdateTriggers.onMicroBlockRollback(this, block.header.reference)
                           metrics.microBlockForkStats.increment()
                           metrics.microBlockForkHeightStats.record(discarded.size)
                         }
@@ -414,16 +414,16 @@ class BlockchainUpdaterImpl(
     val result = prevNgState match {
       case Some(ng) if ng.contains(blockId) =>
         log.trace("Resetting liquid block, no rollback necessary")
-        blockchainUpdateTriggers.onMicroBlockRollback(blockId, this.height)
+        blockchainUpdateTriggers.onMicroBlockRollback(this, blockId)
         Right(Seq.empty)
       case Some(ng) if ng.base.id() == blockId =>
         log.trace("Discarding liquid block, no rollback necessary")
-        blockchainUpdateTriggers.onMicroBlockRollback(blockId, leveldb.height)
+        blockchainUpdateTriggers.onMicroBlockRollback(this, blockId)
         ngState = None
         Right(Seq((ng.bestLiquidBlock, ng.hitSource)))
       case maybeNg =>
         val blockHeight = leveldb.heightOf(blockId).getOrElse(throw new IllegalStateException(s"No such block $blockId"))
-        blockchainUpdateTriggers.onRollback(blockId, blockHeight)
+        blockchainUpdateTriggers.onRollback(this, blockId, blockHeight)
 
         leveldb
           .rollbackTo(blockId)

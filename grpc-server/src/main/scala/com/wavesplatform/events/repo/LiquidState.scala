@@ -16,6 +16,7 @@ case class LiquidState(
     val blockStateUpdate        = microBlocks.foldLeft(keyBlock.blockStateUpdate)((upd, mb) => upd.combine(mb.microBlockStateUpdate))
     val transactionStateUpdates = microBlocks.foldLeft(keyBlock.transactionStateUpdates)((upds, mb) => upds ++ mb.transactionStateUpdates)
     val transactionMetadata = microBlocks.foldLeft(keyBlock.transactionMetadata)((upds, mb) => upds ++ mb.transactionMetadata)
+    val referencedAssets = microBlocks.foldLeft(keyBlock.referencedAssets)((upds, mb) => upds ++ mb.referencedAssets)
 
     BlockAppended(
       id = toId,
@@ -28,7 +29,8 @@ case class LiquidState(
       updatedWavesAmount = keyBlock.updatedWavesAmount,
       blockStateUpdate = blockStateUpdate,
       transactionStateUpdates = transactionStateUpdates,
-      transactionMetadata = transactionMetadata
+      transactionMetadata = transactionMetadata,
+      referencedAssets = referencedAssets
     )
   }
 

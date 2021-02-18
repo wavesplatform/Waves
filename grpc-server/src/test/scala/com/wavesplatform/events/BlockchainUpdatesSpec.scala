@@ -8,9 +8,10 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
+import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
 import com.wavesplatform.events.api.grpc.BlockchainUpdatesApiGrpcImpl
 import com.wavesplatform.events.api.grpc.protobuf.{SubscribeEvent, SubscribeRequest}
+import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.repo.UpdatesRepoImpl
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
@@ -58,6 +59,32 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       result should have size 3
     }
 
+    "should return issued assets" in {
+      val issue = TxHelpers.issue()
+      val description = AssetDescription(
+        issue.assetId,
+        issue.sender,
+        issue.name,
+        issue.description,
+        issue.decimals,
+        issue.reissuable,
+        issue.quantity,
+        Height @@ 2,
+        None,
+        0L,
+        nft = false
+      )
+
+      withGenerateSubscription() { d =>
+        d.appendBlock(issue)
+      } { events =>
+        val event  = events.last.vanilla.get.asInstanceOf[BlockAppended]
+        val issued = event.transactionStateUpdates.head.assets
+        issued shouldBe Seq(AssetStateUpdate(None, Some(description)))
+        event.referencedAssets shouldBe Seq(AssetInfo(description.assetId, description.decimals, description.name.toStringUtf8))
+      }
+    }
+
     "should handle rollback properly" in {
       val transfer = TxHelpers.transfer()
       val lease    = TxHelpers.lease()
@@ -67,13 +94,13 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
 
       val description = AssetDescription(
         issue.assetId,
-        null,
+        issue.sender,
         issue.name,
         issue.description,
         issue.decimals,
         issue.reissuable,
         issue.quantity + reissue.quantity,
-        Height @@ 1,
+        Height @@ 2,
         None,
         0L,
         nft = false
@@ -85,7 +112,6 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
         d.appendKeyBlock()
         d.rollbackTo(1)
       } { events =>
-        import com.wavesplatform.events.protobuf.serde._
         val rollback: RollbackResult = events.last.vanilla.get.asInstanceOf[RollbackCompleted].rollbackResult
         rollback.removedTransactionIds shouldBe Seq(data, reissue, issue, lease, transfer).map(_.id())
         rollback.removedBlocks should have length 1
@@ -208,8 +234,8 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
         repo.appendMicroBlock(newMicroBlock)
       }
 
-      def onRollback(toBlockId: ByteStr, toHeight: Int): Unit         = repo.rollback(toBlockId, toHeight).get
-      def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit = repo.rollbackMicroBlock(toBlockId).get
+      def onRollback(blockchainBefore: Blockchain, toBlockId: ByteStr, toHeight: Int): Unit = repo.rollback(blockchainBefore, toBlockId, toHeight).get
+      def onMicroBlockRollback(blockchainBefore: Blockchain, toBlockId: ByteStr): Unit      = repo.rollbackMicroBlock(blockchainBefore, toBlockId).get
     }
     try f(repo, triggers)
     finally repo.shutdown()

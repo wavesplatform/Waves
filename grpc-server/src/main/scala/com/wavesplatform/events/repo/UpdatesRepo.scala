@@ -2,6 +2,7 @@ package com.wavesplatform.events.repo
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events._
+import com.wavesplatform.state.Blockchain
 import monix.reactive.Observable
 
 import scala.util.Try
@@ -21,8 +22,8 @@ object UpdatesRepo {
 
     def appendMicroBlock(microBlockAppended: MicroBlockAppended): Try[Unit]
     def appendBlock(blockAppended: BlockAppended): Try[Unit]
-    def rollback(toId: ByteStr, toHeight: Int, sendEvent: Boolean = true): Try[Unit]
-    def rollbackMicroBlock(toId: ByteStr): Try[Unit]
+    def rollback(blockchain: Blockchain, toId: ByteStr, toHeight: Int, sendEvent: Boolean = true): Try[Unit]
+    def rollbackMicroBlock(blockchain: Blockchain, toId: ByteStr): Try[Unit]
   }
 
   trait Stream {

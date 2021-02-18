@@ -15,8 +15,8 @@ trait BlockchainUpdateTriggers {
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr
   ): Unit
-  def onRollback(toBlockId: ByteStr, toHeight: Int): Unit
-  def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit
+  def onRollback(blockchainBefore: Blockchain, toBlockId: ByteStr, toHeight: Int): Unit
+  def onMicroBlockRollback(blockchainBefore: Blockchain, toBlockId: ByteStr): Unit
 }
 
 object BlockchainUpdateTriggers {
@@ -29,8 +29,8 @@ object BlockchainUpdateTriggers {
         totalBlockId: ByteStr,
         totalTransactionsRoot: ByteStr
     ): Unit                                                                  = {}
-    override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit         = {}
-    override def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit = {}
+    override def onRollback(blockchainBefore: Blockchain, toBlockId: ByteStr, toHeight: Int): Unit         = {}
+    override def onMicroBlockRollback(blockchainBefore: Blockchain, toBlockId: ByteStr): Unit = {}
   }
 
   def combined(triggers: => Seq[BlockchainUpdateTriggers]): BlockchainUpdateTriggers = new BlockchainUpdateTriggers {
@@ -51,10 +51,10 @@ object BlockchainUpdateTriggers {
     ): Unit =
       triggers.foreach(_.onProcessMicroBlock(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot))
 
-    override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit =
-      triggers.foreach(_.onRollback(toBlockId, toHeight))
+    override def onRollback(blockchainBefore: Blockchain, toBlockId: ByteStr, toHeight: Int): Unit =
+      triggers.foreach(_.onRollback(blockchainBefore, toBlockId, toHeight))
 
-    override def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit =
-      triggers.foreach(_.onMicroBlockRollback(toBlockId, height))
+    override def onMicroBlockRollback(blockchainBefore: Blockchain, toBlockId: ByteStr): Unit =
+      triggers.foreach(_.onMicroBlockRollback(blockchainBefore, toBlockId))
   }
 }

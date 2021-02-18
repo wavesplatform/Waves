@@ -3,6 +3,7 @@ package com.wavesplatform.events.protobuf
 import cats.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.events.RollbackResult
+import com.wavesplatform.events.StateUpdate.AssetInfo
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append, Rollback, Update}
@@ -21,7 +22,16 @@ package object serde {
 
     def protobuf: BlockchainUpdated =
       self match {
-        case ve.BlockAppended(id, height, block, updatedWavesAmount, blockStateUpdate, transactionStateUpdates, transactionsMetadata) =>
+        case ve.BlockAppended(
+            id,
+            height,
+            block,
+            updatedWavesAmount,
+            blockStateUpdate,
+            transactionStateUpdates,
+            transactionsMetadata,
+            referencedAssets
+            ) =>
           val blockUpdate = Some(blockStateUpdate).filterNot(_.isEmpty).map(_.protobuf)
           val txsUpdates  = transactionStateUpdates.map(_.protobuf)
 
@@ -41,9 +51,20 @@ package object serde {
                   )
                 )
               )
-            )
+            ),
+            referencedAssets = referencedAssets.map(AssetInfo.toPB)
           )
-        case ve.MicroBlockAppended(totalBlockId, height, microBlock, microBlockStateUpdate, transactionStateUpdates, transactionsMetadata, totalTransactionsRoot) =>
+
+        case ve.MicroBlockAppended(
+            totalBlockId,
+            height,
+            microBlock,
+            microBlockStateUpdate,
+            transactionStateUpdates,
+            transactionsMetadata,
+            totalTransactionsRoot,
+            referencedAssets
+            ) =>
           val microBlockUpdate = Some(microBlockStateUpdate).filterNot(_.isEmpty).map(_.protobuf)
           val txsUpdates       = transactionStateUpdates.map(_.protobuf)
 
@@ -63,9 +84,10 @@ package object serde {
                   )
                 )
               )
-            )
+            ),
+            referencedAssets = referencedAssets.map(AssetInfo.toPB)
           )
-        case ve.RollbackCompleted(to, height, result) =>
+        case ve.RollbackCompleted(to, height, result, referencedAssets) =>
           BlockchainUpdated(
             id = to.toByteString,
             height = height,
@@ -76,9 +98,10 @@ package object serde {
                 result.removedBlocks.map(PBBlocks.protobuf),
                 Some(result.stateUpdate.protobuf)
               )
-            )
+            ),
+            referencedAssets = referencedAssets.map(AssetInfo.toPB)
           )
-        case ve.MicroBlockRollbackCompleted(toSig, height, result) =>
+        case ve.MicroBlockRollbackCompleted(toSig, height, result, referencedAssets) =>
           BlockchainUpdated(
             id = toSig.toByteString,
             height = height,
@@ -89,7 +112,8 @@ package object serde {
                 Nil,
                 Some(result.stateUpdate.protobuf)
               )
-            )
+            ),
+            referencedAssets = referencedAssets.map(AssetInfo.toPB)
           )
       }
   }
@@ -112,7 +136,8 @@ package object serde {
                   updatedWavesAmount = body.updatedWavesAmount,
                   blockStateUpdate = append.stateUpdate.fold(Monoid[ve.StateUpdate].empty)(_.vanilla.get),
                   transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get),
-                  transactionMetadata = append.transactionsMetadata
+                  transactionMetadata = append.transactionsMetadata,
+                  referencedAssets = self.referencedAssets.map(AssetInfo.fromPB)
                 )
               case Body.MicroBlock(body) =>
                 ve.MicroBlockAppended(
@@ -122,10 +147,12 @@ package object serde {
                   microBlockStateUpdate = append.stateUpdate.fold(Monoid[ve.StateUpdate].empty)(_.vanilla.get),
                   transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get),
                   totalTransactionsRoot = body.updatedTransactionsRoot.toByteStr,
-                  transactionMetadata = append.transactionsMetadata
+                  transactionMetadata = append.transactionsMetadata,
+                  referencedAssets = self.referencedAssets.map(AssetInfo.fromPB)
                 )
               case Body.Empty => throw new IllegalArgumentException("Empty append body")
             }
+
           case Update.Rollback(rollback) =>
             rollback.`type` match {
               case RollbackType.BLOCK =>
@@ -136,13 +163,15 @@ package object serde {
                     rollback.removedBlocks.map(PBBlocks.vanilla(_).get),
                     rollback.removedTransactionIds.map(_.toByteStr),
                     rollback.getRollbackStateUpdate.vanilla.get
-                  )
+                  ),
+                  referencedAssets = self.referencedAssets.map(AssetInfo.fromPB)
                 )
               case RollbackType.MICROBLOCK =>
                 ve.MicroBlockRollbackCompleted(
                   id = self.id.toByteStr,
                   height = self.height,
-                  RollbackResult.micro(rollback.removedTransactionIds.map(_.toByteStr), rollback.getRollbackStateUpdate.vanilla.get)
+                  RollbackResult.micro(rollback.removedTransactionIds.map(_.toByteStr), rollback.getRollbackStateUpdate.vanilla.get),
+                  referencedAssets = self.referencedAssets.map(AssetInfo.fromPB)
                 )
               case RollbackType.Unrecognized(v) => throw new IllegalArgumentException(s"Unrecognized rollback type $v")
             }

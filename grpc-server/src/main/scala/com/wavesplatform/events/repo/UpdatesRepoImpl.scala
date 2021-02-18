@@ -11,6 +11,7 @@ import com.wavesplatform.database.openDB
 import com.wavesplatform.events._
 import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import monix.eval.Task
 import monix.execution.{Ack, Scheduler}
@@ -35,7 +36,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
   @volatile
   private[this] var liquidState: Option[LiquidState] = None
 
-  log.info(s"BlockchainUpdates extension opened db at ${directory}")
+  log.info(s"BlockchainUpdates extension opened db at $directory")
 
   override def shutdown(): Unit = db.close()
 
@@ -132,7 +133,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
     }
   }
 
-  override def rollback(toId: ByteStr, toHeight: Int, sendEvent: Boolean): Try[Unit] =
+  override def rollback(blockchain: Blockchain, toId: ByteStr, toHeight: Int, sendEvent: Boolean): Try[Unit] =
     for {
       h <- this.height
       result <- if (toHeight > h) {
@@ -144,7 +145,8 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
       } else {
         doStateRollback(toHeight)
       }
-      _ <- if (sendEvent) sendRealTimeUpdate(RollbackCompleted(toId, toHeight, result)) else Success(())
+      refAssets = StateUpdate.referencedAssets(blockchain, Seq(result.stateUpdate))
+      _ <- if (sendEvent) sendRealTimeUpdate(RollbackCompleted(toId, toHeight, result, refAssets)) else Success(())
     } yield ()
 
   private[this] def doFullLiquidRollback(): RollbackResult = writeLock {
@@ -178,6 +180,8 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
         }
 
         db.write(batch)
+        liquidState = None
+
         require(height.get == toHeight, s"Rollback doesn't succeed: ${height.get} != $toHeight")
         Monoid.combineAll(changes)
       } finally {
@@ -186,10 +190,10 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
       }
     })
 
-  override def rollbackMicroBlock(toId: ByteStr): Try[Unit] =
+  override def rollbackMicroBlock(blockchain: Blockchain, toId: ByteStr): Try[Unit] =
     for {
       height <- this.height
-      stateUpdate <- writeLock(liquidState match {
+      result <- writeLock(liquidState match {
         case Some(ls) =>
           if (toId == ls.keyBlock.id) {
             liquidState = Some(ls.copy(microBlocks = Seq.empty))
@@ -219,7 +223,8 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
           }
         case None => Failure(new IllegalStateException("BlockchainUpdates attempted to rollback microblock without liquid state present"))
       })
-      _ <- sendRealTimeUpdate(MicroBlockRollbackCompleted(toId, height, stateUpdate))
+      refAssets = StateUpdate.referencedAssets(blockchain, Seq(result.stateUpdate))
+      _ <- sendRealTimeUpdate(MicroBlockRollbackCompleted(toId, height, result, refAssets))
     } yield ()
 
   // UpdatesRepo.Stream impl

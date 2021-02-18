@@ -42,7 +42,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       throw exception
     } else if (nodeHeight == 0) {
       if (extensionHeight > 0) log.warn("Data has been reset, dropping entire blockchain updates data")
-      repo.rollback(ByteStr.empty, 0, sendEvent = false).get
+      repo.rollback(context.blockchain, ByteStr.empty, 0, sendEvent = false).get
     } else {
       (repo.updateForHeight(nodeHeight), context.blockchain.blockHeader(nodeHeight)) match {
         case (Success(extensionBlockAtNodeHeight), Some(lastNodeBlockHeader)) =>
@@ -61,7 +61,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
           if (extensionHeight > nodeHeight) {
             log.warn(s"BlockchainUpdates at height $extensionHeight is higher than node at height $nodeHeight, rolling back BlockchainUpdates")
             repo
-              .rollback(extensionBlockAtNodeHeight.id, extensionBlockAtNodeHeight.height, sendEvent = false)
+              .rollback(context.blockchain, extensionBlockAtNodeHeight.id, extensionBlockAtNodeHeight.height, sendEvent = false)
               .recoverWith { case err: Throwable => Failure(new RuntimeException("BlockchainUpdates failed to rollback at startup", err)) }
               .get
           }
@@ -150,11 +150,11 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     repo.appendMicroBlock(newMicroBlock).get
   }
 
-  override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit = {
-    repo.rollback(toBlockId, toHeight).get
+  override def onRollback(blockchainBefore: Blockchain, toBlockId: ByteStr, toHeight: Int): Unit = {
+    repo.rollback(blockchainBefore, toBlockId, toHeight).get
   }
 
-  override def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit = {
-    repo.rollbackMicroBlock(toBlockId).get
+  override def onMicroBlockRollback(blockchainBefore: Blockchain, toBlockId: ByteStr): Unit = {
+    repo.rollbackMicroBlock(blockchainBefore, toBlockId).get
   }
 }
