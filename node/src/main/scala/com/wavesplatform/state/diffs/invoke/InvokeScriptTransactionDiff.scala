@@ -115,7 +115,8 @@ object InvokeScriptTransactionDiff {
                   pk,
                   dAppAddress,
                   runsLimit,
-                  (if(invocationComplexity <= stepLimit) { 13 } else { 0 })
+                  (if(invocationComplexity <= stepLimit) { 13 } else { 0 }),
+                  (if(version < V5) { Diff.empty } else { InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()) })
                 )
 
                 //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
