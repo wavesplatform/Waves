@@ -2176,16 +2176,26 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("unicode broken") {
-    val script1 = s"""take("x冬x", 2)"""
+    val ver = V4
 
-    eval(script1, version = V4) shouldBe
+    val script1 = s"""take("x冬x", 2)"""
+    eval(script1, version = ver) shouldBe
       Right(CONST_STRING("x\ud87e").explicitGet())
+
+    val script2 = s"""size("x冬x")"""
+    eval(script2, version = ver) shouldBe
+      Right(CONST_LONG(4))
   }
 
   property("unicode support") {
-    val script1 = s"""take("x冬x", 2)"""
+    val ver = V5
 
-    genericEval[Environment, EVALUATED](script1, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
+    val script1 = s"""take("x冬x", 2)"""
+    genericEval[Environment, EVALUATED](script1, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
       Right(CONST_STRING("x冬").explicitGet())
+
+    val script2 = s"""size("x冬x")"""
+    genericEval[Environment, EVALUATED](script2, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
+      Right(CONST_LONG(3))
   }
 }
