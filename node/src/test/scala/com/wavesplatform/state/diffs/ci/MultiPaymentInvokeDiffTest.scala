@@ -46,6 +46,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
               .map(_.id())
               .map(IssuedAsset)
               .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
+              .filter(_._2 != 0)
               .toMap
 
             diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
@@ -75,6 +76,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
               .map(_.id())
               .map(IssuedAsset)
               .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
+              .filter(_._2 != 0)
               .toMap
 
             diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
@@ -168,6 +170,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
               .map(_.id())
               .map(IssuedAsset)
               .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
+              .filter(_._2 != 0)
               .toMap
 
             diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
