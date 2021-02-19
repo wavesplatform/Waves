@@ -1,12 +1,11 @@
 package com.wavesplatform.state.patch
 
 import com.wavesplatform.account.{Address, AddressScheme}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.state.patch.CancelAllLeases.CancelledLeases
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
+import com.wavesplatform.state.{Diff, Portfolio}
 
-case class CancelLeaseOverflow(blockchain: Blockchain) extends DiffPatchFactory {
+case object CancelLeaseOverflow extends DiffPatchFactory {
   val height: Int = AddressScheme.current.chainId.toChar match {
     case 'W' => 795000
     case _   => 0
@@ -18,11 +17,6 @@ case class CancelLeaseOverflow(blockchain: Blockchain) extends DiffPatchFactory 
       case (address, lb) =>
         Address.fromString(address).explicitGet() -> Portfolio(lease = lb)
     }
-    val cancelledLeases =
-      for {
-        id      <- patch.cancelledLeases.map(str => ByteStr.decodeBase58(str).get)
-        details <- blockchain.leaseDetails(id)
-      } yield (id, details.copy(isActive = false))
-    Diff.empty.copy(portfolios = pfs, leaseState = cancelledLeases.toMap)
+    Diff.empty.copy(portfolios =  pfs, leaseState = patch.leaseStates)
   }
 }

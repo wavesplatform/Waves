@@ -196,7 +196,7 @@ object BlockDiffer extends ScorexLogging {
             } else prevResult
         }
 
-        val (diffWithPatches, patchDiff) = applyAll(CancelAllLeases(blockchain), CancelLeaseOverflow(blockchain), CancelInvalidLeaseIn)
+        val (diffWithPatches, patchDiff) = applyAll(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn)
         result.copy(diff = diffWithPatches, detailedDiff = result.detailedDiff.copy(parentDiff = patchDiff))
       }
   }
