@@ -2185,6 +2185,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val script2 = s"""size("x冬x")"""
     eval(script2, version = ver) shouldBe
       Right(CONST_LONG(4))
+
+    val script3 = s"""drop("x冬x", 2)"""
+    eval(script3, version = ver) shouldBe
+      Right(CONST_STRING("\udc1ax").explicitGet())
+
+    val script4 = s"""takeRight("x冬x", 2)"""
+    eval(script4, version = ver) shouldBe
+      Right(CONST_STRING("\udc1ax").explicitGet())
+
+    val script5 = s"""dropRight("x冬x", 2)"""
+    eval(script5, version = ver) shouldBe
+      Right(CONST_STRING("x\ud87e").explicitGet())
   }
 
   property("unicode support") {
@@ -2197,5 +2209,17 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val script2 = s"""size("x冬x")"""
     genericEval[Environment, EVALUATED](script2, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
       Right(CONST_LONG(3))
+
+    val script3 = s"""drop("x冬x", 2)"""
+    genericEval[Environment, EVALUATED](script3, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
+      Right(CONST_STRING("x").explicitGet())
+
+    val script4 = s"""takeRight("x冬x", 2)"""
+    genericEval[Environment, EVALUATED](script4, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
+      Right(CONST_STRING("冬x").explicitGet())
+
+    val script5 = s"""dropRight("x冬x", 2)"""
+    genericEval[Environment, EVALUATED](script5, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
+      Right(CONST_STRING("x").explicitGet())
   }
 }
