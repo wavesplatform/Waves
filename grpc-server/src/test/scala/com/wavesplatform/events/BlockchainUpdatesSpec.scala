@@ -10,7 +10,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
 import com.wavesplatform.events.api.grpc.BlockchainUpdatesApiGrpcImpl
-import com.wavesplatform.events.api.grpc.protobuf.{SubscribeEvent, SubscribeRequest}
+import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdatesRangeRequest, SubscribeEvent, SubscribeRequest}
 import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.repo.UpdatesRepoImpl
 import com.wavesplatform.features.BlockchainFeatures
@@ -32,7 +32,7 @@ import scala.concurrent.Promise
 import scala.concurrent.duration._
 
 class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with ScalaFutures with PathMockFactory {
-  override implicit val patienceConfig: PatienceConfig = PatienceConfig(5 seconds, 100 millis)
+  override implicit val patienceConfig: PatienceConfig = PatienceConfig(10 seconds, 500 millis)
 
   "gRPC API" - {
     "return valid errors" in withRepo() { (repo, _) =>
@@ -175,12 +175,15 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
         )
       }
     }
+
+    "should get valid range" in withDomainAndRepo { (d, repo) =>
+      for (_ <- 1 to 10) d.appendBlock()
+      val blocks = repo.getBlockUpdatesRange(GetBlockUpdatesRangeRequest(3, 5)).futureValue.updates
+      blocks.map(_.height) shouldBe Seq(3, 4, 5)
+    }
   }
 
-  def withGenerateSubscription(request: SubscribeRequest = SubscribeRequest.of(1, Int.MaxValue))(generateBlocks: Domain => Unit)(
-      f: Seq[protobuf.BlockchainUpdated] => Unit
-  ): Unit = {
-
+  def withDomainAndRepo(f: (Domain, UpdatesRepoImpl) => Unit): Unit = {
     val fs = TestFunctionalitySettings.withFeatures(
       BlockchainFeatures.BlockReward,
       BlockchainFeatures.NG,
@@ -192,17 +195,24 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
     withDomain(domainSettingsWithFS(fs)) { d =>
       withRepo(d.blocksApi) { (repo, updateRepoTrigger) =>
         d.triggers = Seq(updateRepoTrigger)
-        d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
-
-        val subscription = repo.createSubscription(request)
-        generateBlocks(d)
-        Thread.sleep(1000)
-        subscription.cancel()
-
-        val result = subscription.futureValue
-        f(result.map(_.getUpdate))
+        f(d, repo)
       }
+    }
+  }
 
+  def withGenerateSubscription(request: SubscribeRequest = SubscribeRequest.of(1, Int.MaxValue))(generateBlocks: Domain => Unit)(
+      f: Seq[protobuf.BlockchainUpdated] => Unit
+  ): Unit = {
+    withDomainAndRepo { (d, repo) =>
+      d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
+
+      val subscription = repo.createSubscription(request)
+      generateBlocks(d)
+      Thread.sleep(1000)
+      subscription.cancel()
+
+      val result = subscription.futureValue
+      f(result.map(_.getUpdate))
     }
   }
 

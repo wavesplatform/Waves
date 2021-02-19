@@ -97,14 +97,10 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
         }
     })
 
-  override def updatesRange(from: Int, to: Int): Observable[BlockAppended] = height match {
-    case Success(h) =>
-      stream(from)
-        .collect { case u: BlockAppended => u }
-        .takeWhile(_.height <= h)
-
-    case Failure(exception) =>
-      Observable.raiseError(exception)
+  override def updatesRange(from: Int, to: Int): Observable[BlockAppended] = {
+    stream(from)
+      .collect { case u: BlockAppended => u }
+      .takeWhileInclusive(_.height < to)
   }
 
   // UpdatesRepo.Write impl
