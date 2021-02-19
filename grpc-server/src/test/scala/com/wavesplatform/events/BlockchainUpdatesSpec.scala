@@ -59,6 +59,20 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       result should have size 3
     }
 
+    "should handle stream from height 1" in {
+      withNEmptyBlocksSubscription(99, SubscribeRequest(1, 60)) { updates =>
+        updates.map(_.height) shouldBe (1 to 60)
+      }
+
+      withNEmptyBlocksSubscription(99, SubscribeRequest(1, 70)) { updates =>
+        updates.map(_.height) shouldBe (1 to 70)
+      }
+
+      withNEmptyBlocksSubscription(99, SubscribeRequest(1, 110)) { updates =>
+        updates.map(_.height) shouldBe (1 to 100)
+      }
+    }
+
     "should return issued assets" in {
       val issue = TxHelpers.issue()
       val description = AssetDescription(
