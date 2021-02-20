@@ -1,7 +1,6 @@
 package com.wavesplatform.state.patch
 
 import com.wavesplatform.account.{Address, AddressScheme}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.state.patch.CancelAllLeases.CancelledLeases
 import com.wavesplatform.state.{Diff, Portfolio}
@@ -18,7 +17,6 @@ case object CancelLeaseOverflow extends DiffPatchFactory {
       case (address, lb) =>
         Address.fromString(address).explicitGet() -> Portfolio(lease = lb)
     }
-    val leasesToCancel = patch.cancelledLeases.map(str => ByteStr.decodeBase58(str).get)
-    Diff.empty.copy(portfolios = pfs, leaseState = leasesToCancel.map((_, (false, None))).toMap)
+    Diff.empty.copy(portfolios =  pfs, leaseState = patch.leaseStates)
   }
 }
