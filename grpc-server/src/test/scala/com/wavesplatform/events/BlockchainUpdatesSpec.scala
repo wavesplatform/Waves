@@ -28,8 +28,8 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FreeSpec, Matchers}
 
-import scala.concurrent.Promise
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Promise}
 
 class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with ScalaFutures with PathMockFactory {
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(10 seconds, 500 millis)
@@ -71,6 +71,12 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       withNEmptyBlocksSubscription(99, SubscribeRequest(1, 110)) { updates =>
         updates.map(_.height) shouldBe (1 to 100)
       }
+    }
+
+    "should fail stream with invalid range" in {
+      intercept[StatusException](withNEmptyBlocksSubscription(99, SubscribeRequest(0, 60))(_ => ()))
+      intercept[StatusException](withNEmptyBlocksSubscription(99, SubscribeRequest(-1, 60))(_ => ()))
+      intercept[StatusException](withNEmptyBlocksSubscription(99, SubscribeRequest(300, 60))(_ => ()))
     }
 
     "should return issued assets" in {
@@ -225,7 +231,7 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       Thread.sleep(1000)
       subscription.cancel()
 
-      val result = subscription.futureValue
+      val result = Await.result(subscription, 20 seconds)
       f(result.map(_.getUpdate))
     }
   }
