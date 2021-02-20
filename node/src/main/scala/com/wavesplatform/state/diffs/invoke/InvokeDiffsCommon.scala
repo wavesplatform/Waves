@@ -533,13 +533,13 @@ object InvokeDiffsCommon {
               _         <- TracedResult(LeaseTxValidator.validateAmount(l.amount))
               recipient <- TracedResult(AddressOrAlias.fromRide(l.recipient))
               leaseId = Lease.calculateId(l, tx.root.id())
-              diff <- DiffsCommon.processLease(blockchain, l.amount, pk, recipient, fee = 0, leaseId, Some(tx.root.id.value()))
+              diff <- DiffsCommon.processLease(blockchain, l.amount, pk, recipient, fee = 0, leaseId, tx.root.id.value())
             } yield diff
 
           def applyLeaseCancel(l: LeaseCancel): TracedResult[ValidationError, Diff] =
             for {
               _    <- TracedResult(LeaseCancelTxValidator.checkLeaseId(l.leaseId))
-              diff <- DiffsCommon.processLeaseCancel(blockchain, pk, fee = 0, blockTime, l.leaseId, Some(tx.root.id.value()))
+              diff <- DiffsCommon.processLeaseCancel(blockchain, pk, fee = 0, blockTime, l.leaseId, tx.root.id.value())
             } yield diff
 
           def callAssetVerifierWithPseudoTx(
