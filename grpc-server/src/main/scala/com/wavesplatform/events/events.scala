@@ -3,7 +3,7 @@ package com.wavesplatform.events
 import cats.Monoid
 import cats.syntax.monoid._
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
+import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
@@ -408,23 +408,17 @@ object StateUpdate {
       .map[TransactionMetadata.Metadata] { tx =>
         implicit class AddressResolver(addr: AddressOrAlias) {
           def resolve: Address = blockchain.resolveAlias(addr).explicitGet()
-          def extractAlias: String = addr match {
-            case a: Alias => a.name
-            case _        => ""
-          }
         }
 
         tx.transaction match {
           case tt: TransferTransaction =>
-            TransactionMetadata.Metadata.Transfer(TransactionMetadata.TransferMetadata(tt.recipient.resolve.toByteString, tt.recipient.extractAlias))
+            TransactionMetadata.Metadata.Transfer(TransactionMetadata.TransferMetadata(tt.recipient.resolve.toByteString))
 
           case mtt: MassTransferTransaction =>
-            TransactionMetadata.Metadata.MassTransfer(
-              TransactionMetadata.MassTransferMetadata(mtt.transfers.map(_.address.resolve.toByteString), mtt.transfers.map(_.address.extractAlias))
-            )
+            TransactionMetadata.Metadata.MassTransfer(TransactionMetadata.MassTransferMetadata(mtt.transfers.map(_.address.resolve.toByteString)))
 
           case lt: LeaseTransaction =>
-            TransactionMetadata.Metadata.LeaseMeta(TransactionMetadata.LeaseMetadata(lt.recipient.resolve.toByteString, lt.recipient.extractAlias))
+            TransactionMetadata.Metadata.LeaseMeta(TransactionMetadata.LeaseMetadata(lt.recipient.resolve.toByteString))
 
           case ist: InvokeScriptTransaction =>
             import TransactionMetadata.InvokeScriptMetadata.Argument
@@ -442,7 +436,6 @@ object StateUpdate {
             TransactionMetadata.Metadata.InvokeScript(
               TransactionMetadata.InvokeScriptMetadata(
                 ist.dAppAddressOrAlias.resolve.toByteString,
-                ist.dAppAddressOrAlias.extractAlias,
                 ist.funcCall.function.funcName,
                 ist.funcCall.args.map(x => Argument(argumentToPB(x))),
                 ist.payments.map(p => Amount(PBAmounts.toPBAssetId(p.assetId), p.amount)),
