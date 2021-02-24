@@ -31,7 +31,7 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
     if (request.fromHeight <= 0) {
       Future.failed(new IllegalArgumentException("height must be a positive integer")).wrapErrors
     } else if (request.toHeight < request.fromHeight) {
-      Future.failed(new IllegalArgumentException("toHeight should be <= fromHeight")).wrapErrors
+      Future.failed(new IllegalArgumentException("toHeight should be >= fromHeight")).wrapErrors
     } else {
       repo
         .updatesRange(request.fromHeight, request.toHeight) // TODO: Use stream
@@ -47,7 +47,7 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
     if (request.fromHeight <= 0) {
       responseObserver.failWith(new IllegalArgumentException("height must be a positive integer"))
     } else if (request.toHeight != 0 && request.toHeight < request.fromHeight) {
-      responseObserver.failWith(new IllegalArgumentException("toHeight should be <= fromHeight"))
+      responseObserver.failWith(new IllegalArgumentException("toHeight should be >= fromHeight"))
     } else {
       val updatesPB = repo
         .stream(request.fromHeight)
