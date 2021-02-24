@@ -67,7 +67,12 @@ package object grpc extends ScorexLogging {
 
   private[this] def wrapObservable[A, B](source: Observable[A], dest: StreamObserver[B])(f: A => B)(implicit s: Scheduler): Unit = dest match {
     case cso: CallStreamObserver[B] @unchecked =>
-      val queue = AsyncQueue.bounded[B](32)
+      sealed trait QueueV {}
+      case class Element(e: B)       extends QueueV
+      case class Fail(ex: Throwable) extends QueueV
+      case object Complete           extends QueueV
+
+      val queue = AsyncQueue.bounded[QueueV](32)
 
       cso.setOnReadyHandler(() => drainQueue())
 
@@ -76,9 +81,15 @@ package object grpc extends ScorexLogging {
         def pushNext(): Unit =
           if (cso.isReady) queue.tryPoll() match {
             case None => // queue is empty
-            case Some(elem) =>
+            case Some(Element(elem)) =>
               cso.onNext(elem)
               pushNext()
+
+            case Some(Complete) =>
+              cso.onCompleted()
+
+            case Some(Fail(ex)) =>
+              cso.onError(ex)
           }
 
         cso.synchronized(pushNext())
@@ -87,13 +98,19 @@ package object grpc extends ScorexLogging {
       val cancelable = source.subscribe(
         (elem: A) =>
           queue
-            .offer(f(elem))
+            .offer(Element(f(elem)))
             .flatMap { _ =>
               drainQueue()
               Ack.Continue
             },
-        cso.failWith,
-        () => cso.onCompleted()
+        err =>
+          queue
+            .offer(Fail(err))
+            .map(_ => drainQueue()),
+        () =>
+          queue
+            .offer(Complete)
+            .map(_ => drainQueue())
       )
 
       cso match {
