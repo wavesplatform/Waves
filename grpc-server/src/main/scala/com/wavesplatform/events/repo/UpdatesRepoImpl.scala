@@ -109,10 +109,13 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
       liquidState.foreach { ls =>
         val solidBlock = ls.solidify()
         log.info(s"BlockchainUpdates persisting: ${solidBlock.height}")
+
+        if (solidBlock.height > 1) require(db.get(key(solidBlock.height - 1)) != null, s"Previous block missing: ${solidBlock.height - 1}")
         db.put(
           key(solidBlock.height),
           solidBlock.protobuf.update(_.append.block.optionalBlock := None).toByteArray
         )
+        require(db.get(key(solidBlock.height)) != null, s"Update isn't persisted: ${solidBlock.height}")
       }
       liquidState = Some(LiquidState(blockAppended, Seq.empty))
       sendRealTimeUpdate(blockAppended)
@@ -145,7 +148,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
       _ <- if (sendEvent) sendRealTimeUpdate(RollbackCompleted(toId, toHeight, result, refAssets)) else Success(())
     } yield ()
 
-  private[this] def doFullLiquidRollback(): RollbackResult = writeLock {
+  private[this] def doFullLiquidRollback(): RollbackResult = {
     val microBlocks = liquidState.toSeq.flatMap(_.microBlocks)
     val removedTxs  = microBlocks.flatMap(_.microBlock.transactionData).map(_.id())
     val stateUpdate = MicroBlockAppended.revertMicroBlocks(microBlocks)
@@ -155,25 +158,29 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
 
   private[this] def doStateRollback(toHeight: Int): Try[RollbackResult] =
     Try(writeLock {
+      log.info(s"Rolling back blockchain updates to $toHeight")
+
       val iter  = db.iterator()
       val batch = db.createWriteBatch()
       try {
         var changes = Seq.empty[RollbackResult]
 
-        iter.seek(key(toHeight + 1))
-        iter.asScala.foreach { next =>
-          val key = next.getKey
-          val update = protobuf.BlockchainUpdated.parseFrom(next.getValue).vanilla.map {
-            case ba: BlockAppended =>
-              val block        = Try(readBlock(ba.height)).toOption
-              val transactions = block.fold(Seq.empty[ByteStr])(_.transactionData.map(_.id()))
-              RollbackResult(block.toSeq, transactions.reverse, ba.reverseStateUpdate)
+        iter.seek(key(toHeight))
 
-            case _ => ???
+        iter.asScala
+          .map(e => (e.getKey, protobuf.BlockchainUpdated.parseFrom(e.getValue).vanilla.get.asInstanceOf[BlockAppended]))
+          .filter(_._2.height > toHeight)
+          .foreach {
+            case (key, ba) =>
+              val reverted = {
+                val block        = Try(readBlock(ba.height)).toOption
+                val transactions = block.fold(Seq.empty[ByteStr])(_.transactionData.map(_.id()))
+                RollbackResult(block.toSeq, transactions.reverse, ba.reverseStateUpdate)
+              }
+              log.info(s"Rolling back block at ${ba.height}: ${ba.id}")
+              changes = reverted +: changes
+              batch.delete(key)
           }
-          changes = update.get +: changes
-          batch.delete(key)
-        }
 
         db.write(batch)
         liquidState = None
@@ -189,7 +196,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
   override def rollbackMicroBlock(blockchain: Blockchain, toId: ByteStr): Try[Unit] =
     for {
       height <- this.height
-      result <- writeLock(liquidState match {
+      result <- liquidState match {
         case Some(ls) =>
           if (toId == ls.keyBlock.id) {
             liquidState = Some(ls.copy(microBlocks = Seq.empty))
@@ -218,7 +225,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
             }
           }
         case None => Failure(new IllegalStateException("BlockchainUpdates attempted to rollback microblock without liquid state present"))
-      })
+      }
       refAssets = StateUpdate.referencedAssets(blockchain, Seq(result.stateUpdate))
       _ <- sendRealTimeUpdate(MicroBlockRollbackCompleted(toId, height, result, refAssets))
     } yield ()
@@ -230,15 +237,21 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
         .blocksRange(from, from + LevelDBReadBatchSize)
         .map {
           case (meta, txs) =>
-            Try(PBBlockchainUpdated.parseFrom(db.get(key(meta.height)))).flatMap(_.vanilla) match {
-              case Success(ba: BlockAppended) => Some(ba.copy(block = Block(meta.header, meta.signature, txs.map(_._1))))
-              case _                          => None
-            }
+            val result = readLockCond(Option(db.get(key(meta.height))))(_.isEmpty)
+            if (result.isEmpty) log.info(s"Missing update on height ${meta.height}")
+            for {
+              bytes <- result
+              update = PBBlockchainUpdated.parseFrom(bytes)
+              ba     = update.vanilla.get.asInstanceOf[BlockAppended]
+            } yield ba.copy(block = Block(meta.header, meta.signature, txs.map(_._1)))
         }
         .takeWhile(_.isDefined)
         .flatMap(Observable.fromIterable(_))
         .toListL
         .map { data =>
+          if (data.nonEmpty) log.info(s"Read batch from ${data.head.height} to ${data.last.height} ($from)")
+          else log.info(s"Read empty batch ($from)")
+
           def isLastBatch(data: Seq[_]): Boolean = data.length < LevelDBReadBatchSize
 
           if (isLastBatch(data)) {
