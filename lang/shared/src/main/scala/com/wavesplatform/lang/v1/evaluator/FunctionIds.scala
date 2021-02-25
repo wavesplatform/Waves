@@ -28,6 +28,13 @@ object FunctionIds {
   val DROP_STRING: Short = 304
   val SIZE_STRING: Short = 305
 
+  val TO_BIGINT: Short  = 310
+  val SUM_BIGINT: Short = 311
+  val SUB_BIGINT: Short = 312
+  val MUL_BIGINT: Short = 313
+  val DIV_BIGINT: Short = 314
+  val MOD_BIGINT: Short = 315
+
   val SIZE_LIST: Short         = 400
   val GET_LIST: Short          = 401
   val MEDIAN_LIST: Short       = 405
@@ -36,8 +43,13 @@ object FunctionIds {
   val LONG_TO_BYTES: Short     = 410
   val STRING_TO_BYTES: Short   = 411
   val BOOLEAN_TO_BYTES: Short  = 412
+  val BIGINT_TO_BYTES: Short   = 413
+  val BYTES_TO_BIGINT: Short   = 414
   val LONG_TO_STRING: Short    = 420
   val BOOLEAN_TO_STRING: Short = 421
+  val BIGINT_TO_STRING: Short  = 422
+  val STRING_TO_BIGINT: Short  = 423
+  val STRING_TO_BIGINTOPT: Short  = 424
 
   val CREATE_LIST: Short             = 1100
   val APPEND_LIST: Short             = 1101

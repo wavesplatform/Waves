@@ -1,6 +1,20 @@
 {
   funcs : [
     {
+      name: "+"
+      params: [ "Int", "Int" ]
+      doc: "Sum integers."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 1
+    }
+    {
+      name: "-"
+      params: [ "Int", "Int" ]
+      doc: "Substitute integers."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 1
+    }
+    {
       name: "*"
       params: [ "Int", "Int" ]
       doc: "Multiply integers."
@@ -23,17 +37,38 @@
     }
     {
       name: "+"
-      params: [ "Int", "Int" ]
-      doc: "Sum integers."
+      params: [ "BigInt", "BigInt" ]
+      doc: "Sum big integers."
       paramsDoc: [ "First value", "Second value" ]
-      complexity: 1
+      complexity: 64
     }
     {
       name: "-"
-      params: [ "Int", "Int" ]
-      doc: "Substitute integers."
+      params: [ "BigInt", "BigInt" ]
+      doc: "Substitute big integers."
       paramsDoc: [ "First value", "Second value" ]
-      complexity: 1
+      complexity:64
+    }
+    {
+      name: "*"
+      params: [ "BigInt", "BigInt" ]
+      doc: "Multiply big integers."
+      paramsDoc: [ "Multiplier", "Multiplier" ]
+      complexity: 1024
+    }
+    {
+      name: "/"
+      params: [ "BigInt", "BigInt" ]
+      doc: "Divide big integers."
+      paramsDoc: [ "Divisible", "Divisor" ]
+      complexity: 1024
+    }
+    {
+      name: "%"
+      params: [ "BigInt", "BigInt" ]
+      doc: "Calculate big modulo."
+      paramsDoc: [ "Divisible", "Divisor" ]
+      complexity: 1024
     }
     {
       name: "+"

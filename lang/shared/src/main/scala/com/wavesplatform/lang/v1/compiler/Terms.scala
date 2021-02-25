@@ -165,7 +165,12 @@ object Terms {
     override def toString: String = t.toString
     override val weight: Long     = 8L
     override val getType: REAL = LONG
-}
+  }
+  case class CONST_BIGINT(t: BigInt) extends EVALUATED {
+    override def toString: String = t.toString
+    override val weight: Long     = 64L
+    override val getType: REAL = BIGINT
+  }
 
   class CONST_BYTESTR private (val bs: ByteStr) extends EVALUATED {
     override def toString: String = bs.toString

@@ -34,6 +34,8 @@ object PureContext {
 
   private val defaultThrowMessage      = "Explicit script termination"
   val MaxListLengthV4                  = 1000
+  val maxBigInt = BigInt(2).pow(511)-1
+  val minBigInt = -maxBigInt - 1
 
   lazy val mulLong: BaseFunction[NoContext] =
     createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => Math.multiplyExact(a, b))
@@ -63,7 +65,7 @@ object PureContext {
         Left(s"Unexpected args $args for string concatenation operator")
     }
   lazy val sumByteStr: BaseFunction[NoContext] =
-    createRawOp(
+     createRawOp(
       SUM_OP,
       BYTESTR,
       BYTESTR,
@@ -94,6 +96,79 @@ object PureContext {
     UserFunction(NE_OP.func, Map[StdLibVersion, Long](V1 -> 26, V2 -> 26, V3 -> 1, V4 -> 1), BOOLEAN, ("@a", TYPEPARAM('T')), ("@b", TYPEPARAM('T'))) {
       FUNCTION_CALL(uNot, List(FUNCTION_CALL(eq, List(REF("@a"), REF("@b")))))
     }
+
+  lazy val intToBigInt: BaseFunction[NoContext] =
+    NativeFunction("toBigInt", 1, TO_BIGINT, BIGINT, ("n", LONG)) {
+      case CONST_LONG(n) :: Nil => Right(CONST_BIGINT(BigInt(n)))
+      case xs => notImplemented[Id, EVALUATED]("toBigInt(n: Int)", xs)
+    }
+
+  lazy val bigIntToString: BaseFunction[NoContext] =
+    NativeFunction("toStringBigInt", 65, BIGINT_TO_STRING, STRING, ("n", BIGINT)) {
+      case CONST_BIGINT(n) :: Nil => CONST_STRING(n.toString)
+      case xs => notImplemented[Id, EVALUATED]("toString(n: BigInt)", xs)
+    }
+
+  lazy val stringToBigInt: BaseFunction[NoContext] =
+    NativeFunction("parseBigIntValue", 65, STRING_TO_BIGINT, BIGINT, ("n", STRING)) {
+      case CONST_STRING(n) :: Nil => Either.cond(n.length <= 155 ,BigInt(n), s"String too long for 512-bits big integers (${n.length} when max is 155)")
+        .filterOrElse(v => v <= maxBigInt && v >= minBigInt, "Value to big for 512-bits big integer")
+        .map(CONST_BIGINT.apply)
+      case xs => notImplemented[Id, EVALUATED]("parseBigIntValue(n: String)", xs)
+    }
+
+  lazy val stringToBigIntOpt: BaseFunction[NoContext] =
+    NativeFunction("parseBigInt", 65, STRING_TO_BIGINTOPT, BIGINT, ("n", STRING)) {
+      case CONST_STRING(n) :: Nil => Right((if(n.length <= 155) {
+        try {
+          val v = BigInt(n)
+          if(v <= maxBigInt && v >= minBigInt) {
+            CONST_BIGINT(v)
+          } else {
+            unit
+          }
+        } catch {
+          case e: java.lang.NumberFormatException => unit
+        }
+      } else {
+        unit
+      }))
+      case xs => notImplemented[Id, EVALUATED]("parseBigInt(n: String)", xs)
+    }
+
+  lazy val bigIntToBytes: BaseFunction[NoContext] =
+    NativeFunction("toBytesBigInt", 65, BIGINT_TO_BYTES, BYTESTR, ("n", BIGINT)) {
+      case CONST_BIGINT(n) :: Nil => CONST_BYTESTR(ByteStr(n.toByteArray))
+      case xs => notImplemented[Id, EVALUATED]("toBytesBigInt(n: BigInt)", xs)
+    }
+
+  lazy val bytesToBigInt: BaseFunction[NoContext] =
+    NativeFunction("toBigInt", 65, BYTES_TO_BIGINT, BIGINT, ("n", BYTESTR)) {
+      case CONST_BYTESTR(ByteStr(n)) :: Nil => Either.cond(n.size <= 64, CONST_BIGINT(BigInt(n)), s"ByteStr too long (s{n.size} > 64 bytes)")
+      case xs => notImplemented[Id, EVALUATED]("toBigInt(n: ByteStr)", xs)
+    }
+
+  def createBigOp(op: BinaryOperation, func: Short, complexity: Map[StdLibVersion, Long])(body: (BigInt, BigInt) => BigInt): BaseFunction[NoContext] = {
+    createRawOp(
+      op,
+      BIGINT,
+      BIGINT,
+      func,
+      complexity
+    ) {
+      case (CONST_BIGINT(a), CONST_BIGINT(b)) =>
+        val s = body(a, b)
+        Either.cond(s >= minBigInt && s <= maxBigInt, CONST_BIGINT(s), s"$a ${op.func} $b is out of range.")
+      case args =>
+        Left(s"Unexpected args $args for BigInt operator '${op.func}'")
+    }
+  }
+
+  lazy val sumToBigInt: BaseFunction[NoContext] = createBigOp(SUM_OP, SUM_BIGINT, Map[StdLibVersion, Long](V5 -> 64L)) { _ + _}
+  lazy val subToBigInt: BaseFunction[NoContext] = createBigOp(SUB_OP, SUB_BIGINT, Map[StdLibVersion, Long](V5 -> 64L)) { _ - _}
+  lazy val mulToBigInt: BaseFunction[NoContext] = createBigOp(MUL_OP, MUL_BIGINT, Map[StdLibVersion, Long](V5 -> 1024L)) { _ * _}
+  lazy val divToBigInt: BaseFunction[NoContext] = createBigOp(DIV_OP, DIV_BIGINT, Map[StdLibVersion, Long](V5 -> 1024L)) { _ / _}
+  lazy val modToBigInt: BaseFunction[NoContext] = createBigOp(MOD_OP, MOD_BIGINT, Map[StdLibVersion, Long](V5 -> 1024L)) { _ % _}
 
   lazy val throwWithMessage: BaseFunction[NoContext] = NativeFunction("throw", 1, THROW, NOTHING, ("err", STRING)) {
     case CONST_STRING(s) :: Nil => Left(s)
@@ -1064,6 +1139,21 @@ object PureContext {
           makeString,
         ) ++ (MinTupleSize to MaxTupleSize).map(i => createTupleN(i))
 
+  private val v5Functions =
+    v4Functions ++ Array(
+      intToBigInt,
+      bigIntToString,
+      stringToBigInt,
+      stringToBigIntOpt,
+      bigIntToBytes,
+      bytesToBigInt,
+      sumToBigInt,
+      subToBigInt,
+      mulToBigInt,
+      divToBigInt,
+      modToBigInt
+      )
+
   private val v1V2Ctx =
     CTX[NoContext](
       commonTypes,
@@ -1085,10 +1175,18 @@ object PureContext {
       v4Functions
     )
 
+  private val v5Ctx =
+    CTX[NoContext](
+      (commonTypes :+ BIGINT),
+      v3V4Vars,
+      v5Functions
+    )
+
   def build(version: StdLibVersion): CTX[NoContext] =
     version match {
       case V1 | V2 => v1V2Ctx
       case V3      => v3Ctx
-      case V4 | V5 => v4Ctx
+      case V4      => v4Ctx
+      case V5      => v5Ctx
     }
 }
