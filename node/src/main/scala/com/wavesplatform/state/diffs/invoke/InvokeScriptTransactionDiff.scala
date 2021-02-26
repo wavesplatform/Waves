@@ -64,20 +64,18 @@ object InvokeScriptTransactionDiff {
 
           stepLimit = ContractLimits.MaxComplexityByVersion(version)
 
-          _ <- TracedResult(
-            Either.cond(
-              invocationComplexity <= stepLimit,
-              (),
-              GenericError("Continuation is not allowed for Invoke Script Transaction")
-            )
-          )
+          fixedInvocationComplexity =
+            if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && callableComplexities.contains(ScriptEstimatorV2.version))
+              Math.min(invocationComplexity, stepLimit)
+            else
+              invocationComplexity
 
           (feeInWaves, totalFeePortfolio) <- InvokeDiffsCommon.calcAndCheckFee(
             (message, _) => GenericError(message),
             tx,
             blockchain,
             stepLimit,
-            invocationComplexity,
+            fixedInvocationComplexity,
             issueList = Nil,
             additionalScriptsInvoked = 0
           )
@@ -149,7 +147,7 @@ object InvokeScriptTransactionDiff {
                         evaluationCtx,
                         fullLimit - failFreeLimit + unusedComplexity,
                         tx.id(),
-                        invocationComplexity
+                        fixedInvocationComplexity
                       )
                     case _ =>
                       Right((failFreeResult, Nil))
@@ -175,7 +173,7 @@ object InvokeScriptTransactionDiff {
               version,
               dAppAddress,
               pk,
-              invocationComplexity,
+              fixedInvocationComplexity,
               tx,
               CompositeBlockchain(blockchain, Some(invocationDiff)),
               blockTime,
