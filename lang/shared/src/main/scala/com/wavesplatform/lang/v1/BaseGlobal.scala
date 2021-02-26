@@ -251,6 +251,8 @@ trait BaseGlobal {
 
   def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long]
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long]
+  def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, BigInt]
+  def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, BigInt]
 
   import RoundingMode._
 

@@ -992,6 +992,38 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED]("log(exponent: Int, ep: Int, base: Int, bp: Int, rp: Int, round: Rounds)", xs)
     }
 
+  val powBigInt: BaseFunction[NoContext] =
+    NativeFunction("powBigInt", 100, POW_BIGINT, BIGINT, ("base", BIGINT), ("bp", LONG), ("exponent", BIGINT), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
+      case CONST_BIGINT(b) :: CONST_LONG(bp) :: CONST_BIGINT(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
+        if (bp < 0
+          || bp > 12
+          || ep < 0
+          || ep > 12
+          || rp < 0
+          || rp > 12) {
+          Left("powBigInt: scale out of range 0-12")
+        } else {
+          global.powBigInt(b, bp, e, ep, rp, roundMode(round)).map(CONST_BIGINT)
+        }
+      case xs => notImplemented[Id, EVALUATED]("powBigInt(base: BigInt, bp: Int, exponent:Big Int, ep: Int, rp: Int, round: Rounds)", xs)
+    }
+
+  val logBigInt: BaseFunction[NoContext] =
+    NativeFunction("logBigInt", 100, LOG_BIGINT, BIGINT, ("base", BIGINT), ("bp", LONG), ("exponent", BIGINT), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
+      case CONST_BIGINT(b) :: CONST_LONG(bp) :: CONST_BIGINT(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
+        if (bp < 0
+          || bp > 12
+          || ep < 0
+          || ep > 12
+          || rp < 0
+          || rp > 12) {
+          Left("logBigInt: scale out of range 0-12")
+        } else {
+          global.logBigInt(b, bp, e, ep, rp, roundMode(round)).map(CONST_BIGINT)
+        }
+      case xs => notImplemented[Id, EVALUATED]("logBigInt(exponent: BigInt, ep: Int, base:Big Int, bp: Int, rp: Int, round: Rounds)", xs)
+    }
+
   val getListMedian: BaseFunction[NoContext] =
     NativeFunction("median", 20, MEDIAN_LIST, LONG, ("arr", PARAMETERIZEDLIST(LONG))) {
       case xs @ (ARR(arr) :: Nil) =>

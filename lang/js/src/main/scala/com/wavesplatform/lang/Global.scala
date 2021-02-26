@@ -1,6 +1,6 @@
 package com.wavesplatform.lang
 
-import java.math.{BigDecimal, BigInteger}
+import java.math.{BigDecimal => BD, BigInteger}
 
 import cats.implicits._
 import com.wavesplatform.lang.v1.BaseGlobal
@@ -87,24 +87,32 @@ object Global extends BaseGlobal {
   override def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean =
     impl.Global.merkleVerify(toBuffer(rootBytes), toBuffer(proofBytes), toBuffer(valueBytes))
 
+  def toLongExact(v: BigInt) = Either.cond(v.isValidLong, v.toLong, s"$v out of range")
+
   override def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long] =
-    calcScaled(Math.pow)(b, bp, e, ep, rp, round)
+    calcScaled(Math.pow)(b, bp, e, ep, rp, round).flatMap(toLongExact)
 
   override def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long] =
+    calcScaled(Math.log(_) / Math.log(_))(b, bp, e, ep, rp, round).flatMap(toLongExact)
+
+  override def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, BigInt] =
+    calcScaled(Math.pow)(b, bp, e, ep, rp, round)
+
+  override def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, BigInt] =
     calcScaled(Math.log(_) / Math.log(_))(b, bp, e, ep, rp, round)
 
   private def calcScaled(calc: (Double, Double) => Double)(
-      base: Long,
+      base: BigInt,
       baseScale: Long,
-      exponent: Long,
+      exponent: BigInt,
       exponentScale: Long,
       resultScale: Long,
       round: BaseGlobal.Rounds
-  ): Either[String, Long] =
+  ): Either[String, BigInt] =
     tryEi {
       val result = calc(
-        base * Math.pow(10, -baseScale.toDouble),
-        exponent * Math.pow(10, -exponentScale.toDouble)
+        base.toDouble * Math.pow(10, -baseScale.toDouble),
+        exponent.toDouble * Math.pow(10, -exponentScale.toDouble)
       )
       unscaled(result, resultScale, round)
     }
@@ -118,15 +126,14 @@ object Global extends BaseGlobal {
       value: Double,
       scale: Long,
       round: BaseGlobal.Rounds
-  ): Either[String, Long] = {
+  ): Either[String, BigInt] = {
     val decimal =
-      if (value.toLong.toDouble == value && value - 1 < Long.MaxValue) BigDecimal.valueOf(value.toLong)
-      else BigDecimal.valueOf(value)
+      if (value.toLong.toDouble == value && value - 1 < Long.MaxValue) BD.valueOf(value.toLong)
+      else BD.valueOf(value)
 
-    decimal
+    Right(BigInt(decimal
       .setScale(scale.toInt, roundMode(round))
-      .unscaledValue
-      .longExact
+      .unscaledValue))
   }
 
   implicit class BigIntOps(val v: BigInteger) extends AnyVal {

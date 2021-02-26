@@ -18,6 +18,9 @@ object FunctionIds {
   val POW: Short = 108
   val LOG: Short = 109
 
+  val POW_BIGINT: Short = 118
+  val LOG_BIGINT: Short = 119
+
   val SIZE_BYTES: Short = 200
   val TAKE_BYTES: Short = 201
   val DROP_BYTES: Short = 202
