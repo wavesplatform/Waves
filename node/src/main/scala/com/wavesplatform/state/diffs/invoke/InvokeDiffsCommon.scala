@@ -221,7 +221,7 @@ object InvokeDiffsCommon {
       totalLimit = ContractLimits.MaxTotalInvokeComplexity(version)
       _ <- TracedResult(
         Either.cond(
-          additionalComplexity <= remainingComplexity,
+          additionalComplexity <= remainingComplexity || limitedExecution, // limited execution has own restriction "complexityLimit"
           (),
           FailedTransactionError.feeForActions(s"Invoke complexity limit = $totalLimit is exceeded", totalLimit - remainingComplexity)
         )
