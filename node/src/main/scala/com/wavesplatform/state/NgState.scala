@@ -60,7 +60,7 @@ case class NgState(
 ) {
   def cancelExpiredLeases(diff: Diff): Diff =
     leasesToCancel
-      .collect { case (id, ld) if diff.leaseState.get(id).forall(_._1) => ld }
+      .collect { case (id, ld) if diff.leaseState.get(id).forall(_.isActive) => ld }
       .foldLeft(diff) {
         case (d, ld) =>
           Monoid.combine(d, ld)
