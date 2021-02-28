@@ -217,8 +217,7 @@ class DAppEnvironment(
     var currentDiff: Diff
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
 
-
-  var mutableBlockchain = blockchain
+  private var mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
 
   override def currentBlockchain() = mutableBlockchain
 
