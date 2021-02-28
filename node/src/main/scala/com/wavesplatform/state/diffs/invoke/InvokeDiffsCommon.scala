@@ -198,10 +198,10 @@ object InvokeDiffsCommon {
         burnList.map(b => IssuedAsset(b.assetId)) ++
         sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
 
-      actionScripts = actionAssets.flatMap(blockchain.assetScript(_).map(_.complexity)) ++
+      actionAndVerifierComplexities = actionAssets.flatMap(blockchain.assetScript(_).map(_.complexity)) ++
         (blockchain.accountScript(tx.sender.toAddress).map(_.verifierComplexity))
 
-      additonalScriptsCount = actionScripts.size + tx.checkedAssets.count(blockchain.hasAssetScript)
+      additonalScriptsCount = actionAndVerifierComplexities.size + tx.checkedAssets.count(blockchain.hasAssetScript)
 
       stepLimit = ContractLimits.MaxComplexityByVersion(version)
       feeDiff <- if (isSyncCall)
@@ -217,7 +217,7 @@ object InvokeDiffsCommon {
           additonalScriptsCount
         ).map(_._2)
 
-      additionalComplexity = actionScripts.sum
+      additionalComplexity = actionAndVerifierComplexities.sum
       totalLimit = ContractLimits.MaxTotalInvokeComplexity(version)
       _ <- TracedResult(
         Either.cond(
