@@ -69,7 +69,7 @@ object InvokeScriptTransactionDiff {
             )
           )
 
-          (feeInWaves, totalFeePortfolio) <- InvokeDiffsCommon.calcAndCheckFee(
+          (feeInWaves, _) <- InvokeDiffsCommon.calcAndCheckFee(
             (message, _) => GenericError(message),
             tx,
             blockchain,
@@ -83,8 +83,6 @@ object InvokeScriptTransactionDiff {
           invokeFee      = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
           paidCalls      = feeInWaves / invokeFee - 1
           remainingCalls = Math.min(maxCalls, paidCalls).toInt
-
-          remainingComplexity = ContractLimits.MaxTotalInvokeComplexity(version)
 
           directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
           payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
