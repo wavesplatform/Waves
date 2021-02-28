@@ -4,6 +4,7 @@ import cats.data.Chain
 import cats.implicits._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.ContractLimits.FreeVerifierComplexity
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -156,7 +157,7 @@ object FeeValidation {
 
   private def feeAfterSmartAccounts(blockchain: Blockchain, tx: Transaction)(inputFee: FeeInfo): FeeInfo = {
     val smartAccountScriptsCount: Int = tx match {
-      case tx: Transaction with Authorized => if (blockchain.hasAccountScript(tx.sender.toAddress)) 1 else 0
+      case tx: Transaction with Authorized => if (blockchain.hasPaidVerifier(tx.sender.toAddress)) 1 else 0
       case _                               => 0
     }
 

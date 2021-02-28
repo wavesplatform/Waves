@@ -14,6 +14,7 @@ object ContractLimits {
     _ => 2000
 
   val FailFreeInvokeComplexity = 1000
+  val FreeVerifierComplexity   = 200
 
   val MaxExprSizeInBytes     = 8 * 1024
   val MaxContractSizeInBytes = 32 * 1024
