@@ -53,6 +53,21 @@ class SyncDAppComplexityCountTest
   )
 
   property("counts complexity correctly") {
+    val verifierScript: Script = {
+      val script = s"""
+                      | {-# STDLIB_VERSION 5        #-}
+                      | {-# SCRIPT_TYPE ACCOUNT     #-}
+                      | {-# CONTENT_TYPE EXPRESSION #-}
+                      |
+                      | let key = base64'mY//hEITCBCZUJUN/wsOlw1iUSSOESL6PFSbN1abGK80t5jPNICNlPuSorio4mmWpf+4uOyv3gPZe54SYGM4pfhteqJpwFQxdlpwXWyYxMTNaSLDj8VtSn/EJaSu+P6nFmWsda3mTYUPYMZzWE4hMqpDgFPcJhw3prArMThDPbR3Hx7E6NRAAR0LqcrdtsbDqu2T0tto1rpnFILdvHL4PqEUfTmF2mkM+DKj7lKwvvZUbukqBwLrnnbdfyqZJryzGAMIa2JvMEMYszGsYyiPXZvYx6Luk54oWOlOrwEKrCY4NMPwch6DbFq6KpnNSQwOpgRYCz7wpjk57X+NGJmo85tYKc+TNa1rT4/DxG9v6SHkpXmmPeHhzIIW8MOdkFjxB5o6Qn8Fa0c6Tt6br2gzkrGr1eK5/+RiIgEzVhcRrqdY/p7PLmKXqawrEvIv9QZ3ijytPNwinlC8XdRLO/YvP33PjcI9WSMcHV6POP9KPMo1rngaIPMegKgAvTEouNFKp4v3wAXRXX5xEjwXAmM5wyB/SAOaPPCK/emls9kqolHsaj7nuTTbrvSV8bqzUwzQ'
+                      | let proof = base64'g53N8ecorvG2sDgNv8D7quVhKMIIpdP9Bqk/8gmV5cJ5Rhk9gKvb4F0ll8J/ZZJVqa27OyciJwx6lym6QpVK9q1ASrqio7rD5POMDGm64Iay/ixXXn+//F+uKgDXADj9AySri2J1j3qEkqqe3kxKthw94DzAfUBPncHfTPazVtE48AfzB1KWZA7Vf/x/3phYs4ckcP7ZrdVViJVLbUgFy543dpKfEH2MD30ZLLYRhw8SatRCyIJuTZcMlluEKG+d'
+                      | let input = base64'aZ8tqrOeEJKt4AMqiRF/WJhIKTDC0HeDTgiJVLZ8OEs='
+                      |
+                      | groth16Verify_1inputs(key, proof, input)
+                      """.stripMargin
+      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+    }
+
     val groth =
       s"""
          | let key = base64'hwk883gUlTKCyXYA6XWZa8H9/xKIYZaJ0xEs0M5hQOMxiGpxocuX/8maSDmeCk3bo5ViaDBdO7ZBxAhLSe5k/5TFQyF5Lv7KN2tLKnwgoWMqB16OL8WdbePIwTCuPtJNAFKoTZylLDbSf02kckMcZQDPF9iGh+JC99Pio74vDpwTEjUx5tQ99gNQwxULtztsqDRsPnEvKvLmsxHt8LQVBkEBm2PBJFY+OXf1MNW021viDBpR10mX4WQ6zrsGL5L0GY4cwf4tlbh+Obit+LnN/SQTnREf8fPpdKZ1sa/ui3pGi8lMT6io4D7Ujlwx2RdCkBF+isfMf77HCEGsZANw0hSrO2FGg14Sl26xLAIohdaW8O7gEaag8JdVAZ3OVLd5Df1NkZBEr753Xb8WwaXsJjE7qxwINL1KdqA4+EiYW4edb7+a9bbBeOPtb67ZxmFqgyTNS/4obxahezNkjk00ytswsENg//Ee6dWBJZyLH+QGsaU2jO/W4WvRyZhmKKPdipOhiz4Rlrd2XYgsfHsfWf5v4GOTL+13ZB24dW1/m39n2woJ+v686fXbNW85XP/r'
@@ -100,12 +115,12 @@ class SyncDAppComplexityCountTest
       ContractScript(V5, compileContractFromExpr(expr, V5)).explicitGet()
     }
 
-    def scenario(dAppCount: Int, withPayment: Boolean, withThroughPayment: Boolean, withThroughTransfer: Boolean) =
+    def scenario(dAppCount: Int, withPayment: Boolean, withThroughPayment: Boolean, withThroughTransfer: Boolean, withVerifier: Boolean) =
       for {
         invoker  <- accountGen
         dAppAccs <- Gen.listOfN(dAppCount, accountGen)
         ts       <- timestampGen
-        fee      <- ciFee(dApps = dAppCount)
+        fee      <- ciFee(dApps = dAppCount, sc = (if (withVerifier) 1 else 0) + (if (withPayment) 1 else 0))
 
         assetIssue = IssueTransaction
           .selfSigned(
@@ -141,6 +156,12 @@ class SyncDAppComplexityCountTest
             val nextTx      = SetScriptTransaction.selfSigned(1.toByte, currentAcc, callingDApp, fee, ts + 5).explicitGet()
             nextTx :: txs
         }
+
+        setVerifier = if (withVerifier)
+          List(SetScriptTransaction.selfSigned(1.toByte, invoker, Some(verifierScript), fee, ts + 5).explicitGet())
+        else
+          Nil
+
         invokeTx = InvokeScriptTransaction
           .selfSigned(
             TxVersion.V3,
@@ -154,7 +175,7 @@ class SyncDAppComplexityCountTest
           )
           .explicitGet()
       } yield (
-        Seq(invokerGenesis, assetIssue) ++ dAppGenesisTxs ++ setScriptTxs,
+        Seq(invokerGenesis, assetIssue) ++ setVerifier ++ dAppGenesisTxs ++ setScriptTxs,
         invokeTx,
         asset,
         dAppAccs.head.toAddress
@@ -166,9 +187,11 @@ class SyncDAppComplexityCountTest
         withPayment: Boolean = false,
         withThroughPayment: Boolean = false,
         withThroughTransfer: Boolean = false,
+        withVerifier: Boolean = false,
         exceeding: Boolean = false
     ): Unit = {
-      val (preparingTxs, invokeTx, asset, lastCallingDApp) = scenario(dAppCount, withPayment, withThroughPayment, withThroughTransfer).sample.get
+      val (preparingTxs, invokeTx, asset, lastCallingDApp) =
+        scenario(dAppCount, withPayment, withThroughPayment, withThroughTransfer, withVerifier).sample.get
       assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
         case (diff, _) =>
           diff.scriptsComplexity shouldBe complexity
@@ -186,14 +209,13 @@ class SyncDAppComplexityCountTest
             invokeTx.senderAddress -> Portfolio(assets = Map(asset -> -1)),
             dAppAddress            -> Portfolio(assets = Map(asset -> 1))
           )
-          val throughPaymentsPortfolios = Map(
-            lastCallingDApp -> Portfolio(assets = Map(asset -> 1)),
-            dAppAddress     -> Portfolio(assets = Map(asset -> -1))
-          )
           val throughTransfersPortfolios = Map(
             invokeTx.senderAddress -> Portfolio(assets = Map(asset -> 1)),
             lastCallingDApp        -> Portfolio(assets = Map(asset -> -1))
           )
+          val throughPaymentsPortfolios =
+            Map(lastCallingDApp -> Portfolio(assets = Map(asset -> 1))) |+|
+              Map(dAppAddress   -> Portfolio(assets = Map(asset -> -1)))
 
           val overlappedPortfolio = Portfolio(assets = Map(asset -> 0))
           val emptyPortfolios     = Map.empty[Address, Portfolio]
@@ -233,5 +255,13 @@ class SyncDAppComplexityCountTest
     assert(9, 49144, withThroughTransfer = true)
     assert(10, 51890, withThroughTransfer = true, exceeding = true)
     assert(100, 51973, withThroughTransfer = true, exceeding = true)
+
+    assert(1, 3915, withVerifier = true)
+    assert(18, 50665, withVerifier = true)
+    assert(19, 50475, withVerifier = true, exceeding = true)
+    assert(100, 50475, withVerifier = true, exceeding = true)
+
+    assert(1, 9336, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true)
+    assert(100, 52000, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true, exceeding = true)
   }
 }

@@ -117,10 +117,15 @@ object InvokeScriptTransactionDiff {
                   dAppAddress,
                   remainingCalls,
                   remainingCalls,
-                  (if(version < V5) { Diff.empty } else { InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()) })
+                  (if (version < V5) {
+                     Diff.empty
+                   } else {
+                     InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map())
+                   })
                 )
 
-                val paymentsComplexity = tx.checkedAssets.flatMap(blockchain.assetScript).map(_.complexity).sum.toInt
+                val paymentsComplexity = tx.checkedAssets.flatMap(blockchain.assetScript).map(_.complexity).sum
+                val verifierComplexity = blockchain.accountScript(invoker).map(_.verifierComplexity).getOrElse(0L)
 
                 val fullLimit =
                   if (blockchain.estimator == ScriptEstimatorV2)
@@ -142,10 +147,10 @@ object InvokeScriptTransactionDiff {
                     contract,
                     invocation,
                     environment,
-                    fullLimit,
+                    fullLimit - verifierComplexity.toInt,
                     failFreeLimit,
                     invocationComplexity.toInt,
-                    paymentsComplexity
+                    paymentsComplexity.toInt
                   )
                 } yield (environment.currentDiff, result, log)
               })
@@ -205,16 +210,16 @@ object InvokeScriptTransactionDiff {
       estimatedComplexity: Int,
       paymentsComplexity: Int
   ): Either[ValidationError with WithLog, (ScriptResult, Log[Id])] = {
-    val evaluationCtx      = CachedDAppCTX.forVersion(version).completeContext(environment)
-    val limitAfterPayments = limit - paymentsComplexity
+    val evaluationCtx = CachedDAppCTX.forVersion(version).completeContext(environment)
+    val startLimit    = limit - paymentsComplexity
     ContractEvaluator
-      .applyV2Coeval(evaluationCtx, Map(), contract, invocation, version, limitAfterPayments)
+      .applyV2Coeval(evaluationCtx, Map(), contract, invocation, version, startLimit)
       .runAttempt()
       .leftMap(error => (error.getMessage: ExecutionError, 0, Nil: Log[Id]))
       .flatten
       .leftMap {
         case (error, unusedComplexity, log) =>
-          val usedComplexity = limitAfterPayments - unusedComplexity.max(0)
+          val usedComplexity = startLimit - unusedComplexity.max(0)
           if (usedComplexity > failFreeLimit) {
             val storingComplexity = Math.max(usedComplexity, estimatedComplexity)
             FailedTransactionError.dAppExecution(error, storingComplexity + paymentsComplexity, log)
