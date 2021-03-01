@@ -103,15 +103,17 @@ object Global extends BaseGlobal {
   def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, BigInt] =
     (Try {
       val base = toJBig(b, bp)
-      val exp  = toJBig(e, bp)
+      val exp  = toJBig(e, ep)
       val res  = BigDecimalMath.pow(base, exp, bigMathContext)
-      BigInt(res.setScale(rp.toInt, roundMode(round)).unscaledValue)
+      val x = BigInt(res.setScale(rp.toInt, roundMode(round)).unscaledValue)
+      println(s"base=$base\nexp=$exp\nres=$res\nx=$x\n")
+      x
     }).toEither.left.map(_.toString)
 
   def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, BigInt] =
     (Try {
       val base = toJBig(b, bp)
-      val exp  = toJBig(e, bp)
+      val exp  = toJBig(e, ep)
       val res  = BigDecimalMath.log(base, bigMathContext).divide(BigDecimalMath.log(exp, bigMathContext), bigMathContext)
       BigInt(res.setScale(rp.toInt, roundMode(round)).unscaledValue)
     }).toEither.left.map(_.toString)
