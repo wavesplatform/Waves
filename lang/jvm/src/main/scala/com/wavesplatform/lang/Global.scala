@@ -96,7 +96,7 @@ object Global extends BaseGlobal {
       res.setScale(rp.toInt, roundMode(round)).unscaledValue.longValueExact
     }).toEither.left.map(_.toString)
 
-  val bigMathContext = new MathContext(156 + 20)
+  val bigMathContext = new MathContext(156 + 40)
 
   def toJBig(v: BigInt, p: Long) = BigDecimal(v).bigDecimal.multiply(BD.valueOf(1L, p.toInt))
 
@@ -105,9 +105,7 @@ object Global extends BaseGlobal {
       val base = toJBig(b, bp)
       val exp  = toJBig(e, ep)
       val res  = BigDecimalMath.pow(base, exp, bigMathContext)
-      val x = BigInt(res.setScale(rp.toInt, roundMode(round)).unscaledValue)
-      println(s"base=$base\nexp=$exp\nres=$res\nx=$x\n")
-      x
+      BigInt(res.setScale(rp.toInt, roundMode(round)).unscaledValue)
     }).toEither.left.map(_.toString)
 
   def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, BigInt] =
