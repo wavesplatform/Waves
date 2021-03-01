@@ -35,6 +35,20 @@ class SmartAccountFeeTest
 
   private val activationHeight = 3
 
+  private val scriptWithEmptyVerifier = {
+    val script =
+      """
+        | {-# STDLIB_VERSION 4       #-}
+        | {-# CONTENT_TYPE   DAPP    #-}
+        | {-# SCRIPT_TYPE    ACCOUNT #-}
+        |
+      """.stripMargin
+
+    val expr     = Parser.parseContract(script).get.value
+    val contract = compileContractFromExpr(expr, V4)
+    ContractScript(V4, contract).explicitGet()
+  }
+
   private val scriptWithSmallVerifier = {
     val script =
       """
@@ -104,15 +118,18 @@ class SmartAccountFeeTest
     for {
       accountWithPaidVerifier  <- accountGen
       accountWithSmallVerifier <- accountGen
+      accountWithEmptyVerifier <- accountGen
       transferFee  = FeeUnit * FeeConstants(TransferTransaction.typeId)
       setScriptFee = FeeUnit * FeeConstants(SetScriptTransaction.typeId)
       invokeFee <- ciFee()
     } yield {
       for {
-        genesis  <- GenesisTransaction.create(accountWithPaidVerifier.toAddress, ENOUGH_AMT, ts)
-        genesis2 <- GenesisTransaction.create(accountWithSmallVerifier.toAddress, ENOUGH_AMT, ts)
-        setDApp  <- SetScriptTransaction.selfSigned(1.toByte, accountWithPaidVerifier, Some(scriptWithPaidVerifier), setScriptFee, ts)
-        setDApp2 <- SetScriptTransaction.selfSigned(1.toByte, accountWithSmallVerifier, Some(scriptWithSmallVerifier), setScriptFee, ts)
+        genesis    <- GenesisTransaction.create(accountWithPaidVerifier.toAddress, ENOUGH_AMT, ts)
+        genesis2   <- GenesisTransaction.create(accountWithSmallVerifier.toAddress, ENOUGH_AMT, ts)
+        genesis3   <- GenesisTransaction.create(accountWithEmptyVerifier.toAddress, ENOUGH_AMT, ts)
+        setScript  <- SetScriptTransaction.selfSigned(1.toByte, accountWithPaidVerifier, Some(scriptWithPaidVerifier), setScriptFee, ts)
+        setScript2 <- SetScriptTransaction.selfSigned(1.toByte, accountWithSmallVerifier, Some(scriptWithSmallVerifier), setScriptFee, ts)
+        setScript3 <- SetScriptTransaction.selfSigned(1.toByte, accountWithEmptyVerifier, Some(scriptWithEmptyVerifier), setScriptFee, ts)
         invokeFromPaidVerifier = () =>
           InvokeScriptTransaction
             .selfSigned(
@@ -131,6 +148,19 @@ class SmartAccountFeeTest
             .selfSigned(
               1.toByte,
               accountWithSmallVerifier,
+              accountWithPaidVerifier.toAddress,
+              None,
+              Nil,
+              invokeFee,
+              Waves,
+              ts
+            )
+            .explicitGet()
+        invokeFromEmptyVerifier = () =>
+          InvokeScriptTransaction
+            .selfSigned(
+              1.toByte,
+              accountWithEmptyVerifier,
               accountWithPaidVerifier.toAddress,
               None,
               Nil,
@@ -167,6 +197,20 @@ class SmartAccountFeeTest
               ts
             )
             .explicitGet()
+        transferFromEmptyVerifier = () =>
+          TransferTransaction
+            .selfSigned(
+              2.toByte,
+              accountWithEmptyVerifier,
+              accountWithSmallVerifier.toAddress,
+              Waves,
+              1,
+              Waves,
+              transferFee,
+              ByteStr.empty,
+              ts
+            )
+            .explicitGet()
         dataFromSmallVerifier = () =>
           DataTransaction
             .selfSigned(
@@ -187,10 +231,27 @@ class SmartAccountFeeTest
               ts
             )
             .explicitGet()
+        dataFromEmptyVerifier = () =>
+          DataTransaction
+            .selfSigned(
+              2.toByte,
+              accountWithEmptyVerifier,
+              Seq(EmptyDataEntry("key")),
+              transferFee,
+              ts
+            )
+            .explicitGet()
       } yield (
-        List(genesis, genesis2, setDApp, setDApp2),
+        List(genesis, genesis2, genesis3, setScript, setScript2, setScript3),
         List(invokeFromPaidVerifier, transferFromPaidVerifier, dataFromPaidVerifier),
-        List(invokeFromSmallVerifier, transferFromSmallVerifier, dataFromSmallVerifier)
+        List(
+          invokeFromSmallVerifier,
+          transferFromSmallVerifier,
+          dataFromSmallVerifier,
+          invokeFromEmptyVerifier,
+          transferFromEmptyVerifier,
+          dataFromEmptyVerifier
+        )
       )
     }.explicitGet()
 
@@ -208,11 +269,11 @@ class SmartAccountFeeTest
 
   property(s"small verifier is free after ${BlockchainFeatures.SynchronousCalls} activation") {
     forAll(preconditions) {
-      case (preparingTxs, paidVerifierTxs, smallVerifierTxs) =>
+      case (preparingTxs, paidVerifierTxs, freeVerifierTxs) =>
         withDomain(domainSettingsWithFS(features)) { d =>
           d.appendBlock(preparingTxs: _*)
 
-          (paidVerifierTxs ::: smallVerifierTxs).foreach(tx => appendAndAssertNotEnoughFee(tx(), d))
+          (paidVerifierTxs ::: freeVerifierTxs).foreach(tx => appendAndAssertNotEnoughFee(tx(), d))
 
           d.appendBlock()
           d.appendBlock()
@@ -220,9 +281,9 @@ class SmartAccountFeeTest
           d.blockchain.bestLiquidDiff.get.scriptsRun shouldBe 0
 
           paidVerifierTxs.foreach(tx => appendAndAssertNotEnoughFee(tx(), d))
-          d.appendBlock(smallVerifierTxs.map(_()): _*)
-          smallVerifierTxs.foreach(tx => assertNoError(tx(), d))
-          d.blockchain.bestLiquidDiff.get.scriptsRun shouldBe smallVerifierTxs.size
+          d.appendBlock(freeVerifierTxs.map(_()): _*)
+          freeVerifierTxs.foreach(tx => assertNoError(tx(), d))
+          d.blockchain.bestLiquidDiff.get.scriptsRun shouldBe freeVerifierTxs.size
         }
     }
   }
