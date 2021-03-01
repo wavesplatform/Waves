@@ -993,7 +993,7 @@ object PureContext {
     }
 
   val powBigInt: BaseFunction[NoContext] =
-    NativeFunction("powBigInt", 100, POW_BIGINT, BIGINT, ("base", BIGINT), ("bp", LONG), ("exponent", BIGINT), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
+    NativeFunction("powBigInt", 200, POW_BIGINT, BIGINT, ("base", BIGINT), ("bp", LONG), ("exponent", BIGINT), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
       case CONST_BIGINT(b) :: CONST_LONG(bp) :: CONST_BIGINT(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
         if (bp < 0
           || bp > 12
@@ -1009,7 +1009,7 @@ object PureContext {
     }
 
   val logBigInt: BaseFunction[NoContext] =
-    NativeFunction("logBigInt", 100, LOG_BIGINT, BIGINT, ("base", BIGINT), ("bp", LONG), ("exponent", BIGINT), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
+    NativeFunction("logBigInt", 200, LOG_BIGINT, BIGINT, ("base", BIGINT), ("bp", LONG), ("exponent", BIGINT), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
       case CONST_BIGINT(b) :: CONST_LONG(bp) :: CONST_BIGINT(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
         if (bp < 0
           || bp > 12
@@ -1029,13 +1029,27 @@ object PureContext {
       case xs @ (ARR(arr) :: Nil) =>
         if (arr.headOption.forall(_.isInstanceOf[CONST_LONG])) {
           if (arr.nonEmpty)
-            Right(CONST_LONG(global.median(arr.asInstanceOf[IndexedSeq[CONST_LONG]].map(_.t))))
+            Right(CONST_LONG(global.median(arr.asInstanceOf[IndexedSeq[CONST_LONG]].map(_.t).toArray)))
           else
           Left(s"Can't find median for empty list")
         } else {
           notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
         }
       case xs => notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
+    }
+
+  val getListMedianBigInt: BaseFunction[NoContext] =
+    NativeFunction("medianBigInt", 20*64, MEDIAN_LISTBIGINT, BIGINT, ("arr", PARAMETERIZEDLIST(BIGINT))) {
+      case xs @ (ARR(arr) :: Nil) =>
+        if (arr.headOption.forall(_.isInstanceOf[CONST_BIGINT])) {
+          if (arr.nonEmpty)
+            Right(CONST_BIGINT(global.median(arr.asInstanceOf[IndexedSeq[CONST_BIGINT]].map(_.t).toArray)))
+          else
+          Left(s"Can't find medianBigInt for empty list")
+        } else {
+          notImplemented[Id, EVALUATED](s"medianBigInt(arr: List[BigInt])", xs)
+        }
+      case xs => notImplemented[Id, EVALUATED](s"medianBigInt(arr: List[BigInt])", xs)
     }
 
   val unitVarName = "unit"
@@ -1183,7 +1197,10 @@ object PureContext {
       subToBigInt,
       mulToBigInt,
       divToBigInt,
-      modToBigInt
+      modToBigInt,
+      getListMedianBigInt,
+      powBigInt,
+      logBigInt
       )
 
   private val v1V2Ctx =

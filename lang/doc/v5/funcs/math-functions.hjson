@@ -14,7 +14,7 @@
       ]
       complexity: 100
     }
-	 {
+    {
       name: "log"
       params: [ "Int", "Int", "Int", "Int", "Int", "Ceiling|Down|Floor|HalfDown|HalfEven|HalfUp|Up" ]
       doc: "Returns the logarithm of a number."
@@ -31,7 +31,38 @@
       ]
       complexity: 100
     }
-	 {
+    {
+      name: "powBigInt"
+      params: [ "BigInt", "Int", "BigInt", "Int", "Int", "Ceiling|Down|Floor|HalfDown|HalfEven|HalfUp|Up" ]
+      doc: "Returns a number raised to a power"
+      paramsDoc: [
+        "The base."
+        "The number of decimals of the base."
+        "The exponent."
+        "The number of decimals of the exponent."
+        "The number of decimals of the resulting value."
+        "One of the rounding functions. The HalfUp() function may be used as the default value."
+      ]
+      complexity: 200
+    }
+    {
+      name: "logBigInt"
+      params: [ "BigInt", "Int", "BigInt", "Int", "Int", "Ceiling|Down|Floor|HalfDown|HalfEven|HalfUp|Up" ]
+      doc: "Returns the logarithm of a number."
+      paramsDoc: [
+        "The base."
+        "The number of decimals of the base."
+        "The exponent."
+        "The number of decimals of the exponent."
+        "The number of decimals of the resulting value."
+        '''
+        The rounding function.
+        The HalfUp() function may be used as the default value.
+        '''
+      ]
+      complexity: 200
+    }
+    {
       name: "fraction"
       params: [ "Int", "Int", "Int" ]
       doc: "Multiply and division with big integer intermediate representation"

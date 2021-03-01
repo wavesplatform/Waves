@@ -1361,6 +1361,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(src, version = V4) should produce("Compilation failed: [Non-matching types: expected: Int, actual: String")
   }
 
+  property("List[Int] median - list with big elements - error") {
+    val src =
+      s"""[${Long.MaxValue}, ${Long.MaxValue-2}].median()"""
+    eval(src, version = V4) shouldBe Right(CONST_LONG(Long.MaxValue-1))
+  }
+
+  property("List[Int] median - list with MinValue - error") {
+    val src =
+      s"""[0, ${Long.MinValue}].median()"""
+    eval(src, version = V4) shouldBe Right(CONST_LONG(Long.MinValue/2))
+  }
+
   property("groth16Verify") {
     val src =
       s"""
@@ -2192,5 +2204,59 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     genericEval[Environment, EVALUATED]("""parseBigIntValue("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) should produce("to big")
     genericEval[Environment, EVALUATED]("""parseBigInt("-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(-BigInt(2).pow(511)))
     genericEval[Environment, EVALUATED]("""parseBigInt("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(unit)
+  }
+
+  ignore("BigInt math functions") {
+    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(12), 1, toBigInt(3456), 3, 2, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(187)))
+    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(12), 1, toBigInt(3456), 3, 2, UP)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(188)))
+    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(0), 1, toBigInt(3456), 3, 2, UP)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(0)))
+    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(20), 1, toBigInt(-1), 0, 4, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(5000)))
+    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(-20), 1, toBigInt(-1), 0, 4, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(-5000)))
+    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(0), 1, toBigInt(-1), 0, 4, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
+    genericEval[Environment, EVALUATED]("logBigInt(toBigInt(16), 0, toBigInt(2), 0, 0, CEILING)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(4)))
+    genericEval[Environment, EVALUATED]("logBigInt(toBigInt(16), 0, toBigInt(-2), 0, 0, CEILING)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
+    genericEval[Environment, EVALUATED]("logBigInt(toBigInt(-16), 0, toBigInt(2), 0, 0, CEILING)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
+  }
+
+  property("List[BigInt] median - 100 elements") {
+    val arr       = (1 to 100).map(_ => Random.nextLong())
+    val arrSorted = arr.sorted
+    val src =
+      s"[toBigInt(${arr.mkString("),toBigInt(")})].medianBigInt()"
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(Math.floorDiv(arrSorted(49) + arrSorted(50), 2))))
+  }
+
+  property("List[BigInt] median - 99 elements") {
+    val arr       = (1 to 99).map(_ => Random.nextLong())
+    val arrSorted = arr.sorted
+    val src =
+      s"[toBigInt(${arr.mkString("),toBigInt(")})].medianBigInt()"
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(arrSorted(49))))
+  }
+
+  property("List[BigInt] median - 1 elements") {
+    val arr = Seq(Random.nextLong())
+    val src =
+      s"[toBigInt(${arr.mkString("),toBigInt(")})].medianBigInt()"
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(arr.head)))
+  }
+
+  property("List[BigInt] median - negative rounding down") {
+    val arr = Seq(3, -8)
+    val src =
+      s"[toBigInt(${arr.mkString("),toBigInt(")})].medianBigInt()"
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(-3)))
+  }
+
+  property("List[BigInt] median - 1000 elements - success") {
+    val src =
+      s"[toBigInt(${(1 to 1000).mkString("),toBigInt(")})].medianBigInt()"
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(Math.floorDiv(500 + 501, 2))))
+  }
+
+  property("List[BigInt] median - empty list - error") {
+    val src =
+      s"[].medianBigInt()"
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) should produce("Can't find medianBigInt for empty list")
   }
 }

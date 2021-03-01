@@ -21,14 +21,21 @@
       paramsDoc: [ "The list.", "The index of the element." ]
       complexity: 2
     }
-	{
+    {
       name: "median"
       params: [ "List[Int]" ]
       doc: "Returns the median of the list."
       paramsDoc: [ "The list of integers." ]
       complexity: 20
     }
-	{
+    {
+      name: "medianBigInt"
+      params: [ "List[BigInt]" ]
+      doc: "Returns the median of the list."
+      paramsDoc: [ "The list of BigInt." ]
+      complexity: 1280
+    }
+    {
       name: "min"
       params: [ "List[Int]" ]
       doc: "Returns the minimum of the list."
