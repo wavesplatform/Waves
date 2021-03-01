@@ -7,14 +7,12 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.transaction.TxValidationError.InvalidAddress
 import com.wavesplatform.utils.{ScorexLogging, base58Length}
 import play.api.libs.json._
 
 sealed trait Address extends AddressOrAlias {
   lazy val stringRepr: String = Base58.encode(bytes)
-  def toRide: Recipient       = Recipient.Address(ByteStr(bytes))
 }
 
 //noinspection ScalaDeprecation
