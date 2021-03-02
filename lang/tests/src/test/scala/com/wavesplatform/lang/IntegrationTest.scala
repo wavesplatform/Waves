@@ -2199,6 +2199,42 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       Right(CONST_STRING("x\ud87e").explicitGet())
   }
 
+  property("unicode indexOf") {
+    val src =
+      """ "x冬xqweqwe".indexOf("we") """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(4L))
+  }
+
+  property("unicode indexOf with zero offset") {
+    val src =
+      """ "x冬xqweqwe".indexOf("x冬xqw", 0) """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(0L))
+  }
+
+  property("unicode indexOf with start offset") {
+    val src =
+      """ "冬weqwe".indexOf("we", 2) """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(4L))
+  }
+
+  property("unicode indexOf (not present)") {
+    val src =
+      """ "x冬xqweqwe".indexOf("ww") """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(unit)
+  }
+
+  property("unicode indexOf from empty string") {
+    val src =
+      """ "".indexOf("x冬x") """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(unit)
+  }
+
+  property("unicode indexOf from empty string with offset") {
+    val src =
+      """ "".indexOf("x冬x", 1) """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(unit)
+  }
+
   property("unicode support") {
     val ver = V5
 
