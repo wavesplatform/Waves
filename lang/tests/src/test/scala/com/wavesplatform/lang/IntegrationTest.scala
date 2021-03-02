@@ -2199,6 +2199,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       ${(0 to 7).map(n => "func f" ++ (n+1).toString ++ "(i: BigInt) = f" ++ n.toString ++ "(i*i)").mkString("\n")}
       f8(2.toBigInt())
       """, ctxt = v5Ctx, version = V5, env = utils.environment) should produce("is out of range")
+    genericEval[Environment, EVALUATED](s"""-toBigInt(1)""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(-1)))
     genericEval[Environment, EVALUATED]("toBigInt(base58'2Ana1pUpv2ZbMVkwF5FXapYeBEjdxDatLn7nvJkhgTSXbs59SyZSx866bXirPgj8QQVB57uxHJBG1YFvkRbFj4T').toStringBigInt()", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_STRING("52785833603464895924505196455835395749861094195642486808108138863402869537852026544579466671752822414281401856143643660416162921950916138504990605852480").explicitGet())
     genericEval[Environment, EVALUATED]("""parseBigIntValue("-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(-BigInt(2).pow(511)))
     genericEval[Environment, EVALUATED]("""parseBigIntValue("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) should produce("to big")
