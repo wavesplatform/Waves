@@ -164,11 +164,11 @@ object PureContext {
     }
   }
 
-  lazy val sumToBigInt: BaseFunction[NoContext] = createBigOp(SUM_OP, SUM_BIGINT, Map[StdLibVersion, Long](V5 -> 64L)) { _ + _}
-  lazy val subToBigInt: BaseFunction[NoContext] = createBigOp(SUB_OP, SUB_BIGINT, Map[StdLibVersion, Long](V5 -> 64L)) { _ - _}
-  lazy val mulToBigInt: BaseFunction[NoContext] = createBigOp(MUL_OP, MUL_BIGINT, Map[StdLibVersion, Long](V5 -> 1024L)) { _ * _}
-  lazy val divToBigInt: BaseFunction[NoContext] = createBigOp(DIV_OP, DIV_BIGINT, Map[StdLibVersion, Long](V5 -> 1024L)) { _ / _}
-  lazy val modToBigInt: BaseFunction[NoContext] = createBigOp(MOD_OP, MOD_BIGINT, Map[StdLibVersion, Long](V5 -> 1024L)) { _ % _}
+  lazy val sumToBigInt: BaseFunction[NoContext] = createBigOp(SUM_OP, SUM_BIGINT, Map[StdLibVersion, Long](V5 -> 8L)) { _ + _}
+  lazy val subToBigInt: BaseFunction[NoContext] = createBigOp(SUB_OP, SUB_BIGINT, Map[StdLibVersion, Long](V5 -> 8L)) { _ - _}
+  lazy val mulToBigInt: BaseFunction[NoContext] = createBigOp(MUL_OP, MUL_BIGINT, Map[StdLibVersion, Long](V5 -> 64L)) { _ * _}
+  lazy val divToBigInt: BaseFunction[NoContext] = createBigOp(DIV_OP, DIV_BIGINT, Map[StdLibVersion, Long](V5 -> 64L)) { _ / _}
+  lazy val modToBigInt: BaseFunction[NoContext] = createBigOp(MOD_OP, MOD_BIGINT, Map[StdLibVersion, Long](V5 -> 64L)) { _ % _}
 
   lazy val throwWithMessage: BaseFunction[NoContext] = NativeFunction("throw", 1, THROW, NOTHING, ("err", STRING)) {
     case CONST_STRING(s) :: Nil => Left(s)
@@ -262,13 +262,33 @@ object PureContext {
       ("denominator", LONG)
     ) {
       case CONST_LONG(v) :: CONST_LONG(n) :: CONST_LONG(d) :: Nil =>
-        lazy val result = BigInt(v) * n / d
+        val result = BigInt(v) * n / d
         for {
           _ <- Either.cond(result < Long.MaxValue, (), s"Long overflow: value `$result` greater than 2^63-1")
           _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^63-1")
         } yield CONST_LONG(result.toLong)
       case xs => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
     }
+
+  lazy val fractionBigInt: BaseFunction[NoContext] =
+    NativeFunction(
+      "fractionBigInt",
+      128,
+      FRACTION_BIGINT,
+      BIGINT,
+      ("value", BIGINT),
+      ("numerator", BIGINT),
+      ("denominator", BIGINT)
+    ) {
+      case CONST_BIGINT(v) :: CONST_BIGINT(n) :: CONST_BIGINT(d) :: Nil =>
+        val result = v * n / d
+        for {
+          _ <- Either.cond(result < maxBigInt, (), s"Long overflow: value `$result` greater than 2^511-1")
+          _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^511-1")
+        } yield CONST_BIGINT(result)
+      case xs => notImplemented[Id, EVALUATED]("fractionBigInt(value: BigInt, numerator: BigInt, denominator: BigInt)", xs)
+    }
+
 
   lazy val _isInstanceOf: BaseFunction[NoContext] =
     NativeFunction("_isInstanceOf", 1, ISINSTANCEOF, BOOLEAN, ("obj", TYPEPARAM('T')), ("of", STRING)) {
@@ -1039,7 +1059,7 @@ object PureContext {
     }
 
   val getListMedianBigInt: BaseFunction[NoContext] =
-    NativeFunction("medianBigInt", 20*64, MEDIAN_LISTBIGINT, BIGINT, ("arr", PARAMETERIZEDLIST(BIGINT))) {
+    NativeFunction("medianBigInt", 20*8, MEDIAN_LISTBIGINT, BIGINT, ("arr", PARAMETERIZEDLIST(BIGINT))) {
       case xs @ (ARR(arr) :: Nil) =>
         if (arr.headOption.forall(_.isInstanceOf[CONST_BIGINT])) {
           if (arr.nonEmpty)
@@ -1198,6 +1218,7 @@ object PureContext {
       mulToBigInt,
       divToBigInt,
       modToBigInt,
+      fractionBigInt,
       getListMedianBigInt,
       powBigInt,
       logBigInt

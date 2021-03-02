@@ -2204,6 +2204,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     genericEval[Environment, EVALUATED]("""parseBigIntValue("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) should produce("to big")
     genericEval[Environment, EVALUATED]("""parseBigInt("-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(-BigInt(2).pow(511)))
     genericEval[Environment, EVALUATED]("""parseBigInt("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(unit)
+    genericEval[Environment, EVALUATED](s"""fractionBigInt(parseBigInt("${BigInt(2).pow(511)-1}"), toBigInt(-2), toBigInt(-3))""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT((BigInt(2).pow(511)-1)*2/3))
   }
 
   property("BigInt math functions") {

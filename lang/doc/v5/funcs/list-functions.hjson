@@ -33,7 +33,7 @@
       params: [ "List[BigInt]" ]
       doc: "Returns the median of the list."
       paramsDoc: [ "The list of BigInt." ]
-      complexity: 1280
+      complexity: 160
     }
     {
       name: "min"

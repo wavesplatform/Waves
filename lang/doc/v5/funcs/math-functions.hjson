@@ -69,5 +69,12 @@
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]
       complexity: 1
     }
+    {
+      name: "fractionBigInt"
+      params: [ "BigInt", "BigInt", "BigInt" ]
+      doc: "Multiply and division with big integer intermediate representation"
+      paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]
+      complexity: 128
+    }
   ]
 }

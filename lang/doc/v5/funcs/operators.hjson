@@ -40,35 +40,35 @@
       params: [ "BigInt", "BigInt" ]
       doc: "Sum big integers."
       paramsDoc: [ "First value", "Second value" ]
-      complexity: 64
+      complexity: 8
     }
     {
       name: "-"
       params: [ "BigInt", "BigInt" ]
       doc: "Substitute big integers."
       paramsDoc: [ "First value", "Second value" ]
-      complexity:64
+      complexity: 8
     }
     {
       name: "*"
       params: [ "BigInt", "BigInt" ]
       doc: "Multiply big integers."
       paramsDoc: [ "Multiplier", "Multiplier" ]
-      complexity: 1024
+      complexity: 64
     }
     {
       name: "/"
       params: [ "BigInt", "BigInt" ]
       doc: "Divide big integers."
       paramsDoc: [ "Divisible", "Divisor" ]
-      complexity: 1024
+      complexity: 64
     }
     {
       name: "%"
       params: [ "BigInt", "BigInt" ]
       doc: "Calculate big modulo."
       paramsDoc: [ "Divisible", "Divisor" ]
-      complexity: 1024
+      complexity: 64
     }
     {
       name: "+"
