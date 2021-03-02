@@ -38,6 +38,7 @@ object FunctionIds {
   val DIV_BIGINT: Short = 314
   val MOD_BIGINT: Short = 315
   val FRACTION_BIGINT: Short = 316
+  val UMINUS_BIGINT: Short = 317
 
   val SIZE_LIST: Short         = 400
   val GET_LIST: Short          = 401

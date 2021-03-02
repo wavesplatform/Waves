@@ -120,6 +120,13 @@
       complexity: 1
     }
     {
+      name: "-"
+      params: [ "BigInt" ]
+      doc: "Change integer sign."
+      paramsDoc: [ "Value" ]
+      complexity: 8
+    }
+    {
       name: "!"
       params: [ "Boolean" ]
       doc: "Unary negation."

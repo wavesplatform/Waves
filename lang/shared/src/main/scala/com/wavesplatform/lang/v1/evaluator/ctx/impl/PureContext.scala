@@ -170,6 +170,12 @@ object PureContext {
   lazy val divToBigInt: BaseFunction[NoContext] = createBigOp(DIV_OP, DIV_BIGINT, Map[StdLibVersion, Long](V5 -> 64L)) { _ / _}
   lazy val modToBigInt: BaseFunction[NoContext] = createBigOp(MOD_OP, MOD_BIGINT, Map[StdLibVersion, Long](V5 -> 64L)) { _ % _}
 
+  lazy val negativeBigInt: BaseFunction[NoContext] =
+    NativeFunction("-", 8, UMINUS_BIGINT, BIGINT, ("n", BIGINT)) {
+      case CONST_BIGINT(n) :: Nil => Either.cond(n != minBigInt, CONST_BIGINT(-n), s"Positive BigInt overflow")
+      case xs => notImplemented[Id, EVALUATED]("-(n: BigInt)", xs)
+    }
+
   lazy val throwWithMessage: BaseFunction[NoContext] = NativeFunction("throw", 1, THROW, NOTHING, ("err", STRING)) {
     case CONST_STRING(s) :: Nil => Left(s)
     case _                      => Left(defaultThrowMessage)
@@ -1219,6 +1225,7 @@ object PureContext {
       divToBigInt,
       modToBigInt,
       fractionBigInt,
+      negativeBigInt,
       getListMedianBigInt,
       powBigInt,
       logBigInt
