@@ -2235,6 +2235,35 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(unit)
   }
 
+  property("split unicode") {
+    val src =
+      """ "strx冬x1;🤦;🤦strx冬x2;🤦strx冬x3".split(";🤦") """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(
+      ARR(
+        IndexedSeq(
+          CONST_STRING("strx冬x1").explicitGet(),
+          CONST_STRING("").explicitGet(),
+          CONST_STRING("strx冬x2").explicitGet(),
+          CONST_STRING("strx冬x3").explicitGet()
+        ),
+        false
+      ).explicitGet()
+    )
+    val src1 =
+      """ "冬x🤦冬".split("") """
+    genericEval[Environment, EVALUATED](src1, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(
+      ARR(
+        IndexedSeq(
+          CONST_STRING("冬").explicitGet(),
+          CONST_STRING("x").explicitGet(),
+          CONST_STRING("🤦").explicitGet(),
+          CONST_STRING("冬").explicitGet()
+        ),
+        false
+      ).explicitGet()
+    )
+  }
+
   property("unicode support") {
     val ver = V5
 

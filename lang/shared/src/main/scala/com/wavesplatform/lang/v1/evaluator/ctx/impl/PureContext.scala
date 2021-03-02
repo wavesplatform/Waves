@@ -736,7 +736,7 @@ object PureContext {
 
 
   lazy val splitStrV5: BaseFunction[NoContext] =
-    NativeFunction("split", Map(V3 -> 100L, V4 -> 75L), SPLIT, listString, ("str", STRING), ("separator", STRING)) {
+    NativeFunction("split", Map((V4:StdLibVersion) -> 75L), SPLIT, listString, ("str", STRING), ("separator", STRING)) {
       case CONST_STRING(str) :: CONST_STRING(sep) :: Nil =>
           ARR(split(str, sep, true).toIndexedSeq, limited = true)
       case xs =>
