@@ -2222,6 +2222,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       """ "x冬xqweqwe".indexOf("we") """
     genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(4L))
+    val src1 = """ "世界x冬x".take(4).indexOf("冬".take(1)) """
+    genericEval[Environment, EVALUATED](src1, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(3L))
+    eval[EVALUATED](src1) shouldBe Right(CONST_LONG(3L))
   }
 
   property("unicode indexOf with zero offset") {
