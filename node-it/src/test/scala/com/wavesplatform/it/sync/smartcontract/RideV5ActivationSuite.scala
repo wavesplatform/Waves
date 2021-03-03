@@ -20,6 +20,7 @@ class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.Ride4DApps.id, 0)))
       .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls.id, activationHeight - 1)))
       .buildNonConflicting()
 
@@ -129,8 +130,7 @@ class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
         |(this.quantity > 0)""".stripMargin
   }
 
-  //TODO enable in SC-695
-  ignore("script compiles as Ride V4 before the feature activation if STDLIB_VERSION isn't specified") {
+  test("script compiles as Ride V4 before the feature activation if STDLIB_VERSION isn't specified") {
     sender.scriptDecompile(sender.scriptCompile(scriptWithoutVersion).script).script should startWith("{-# STDLIB_VERSION 4 #-}")
   }
 
@@ -138,8 +138,7 @@ class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     sender.waitForHeight(activationHeight, 5.minutes)
   }
 
-  //TODO enable in SC-695
-  ignore("script compiles as Ride V5 before the feature activation if STDLIB_VERSION isn't specified") {
+  test("script compiles as Ride V5 before the feature activation if STDLIB_VERSION isn't specified") {
     sender.scriptDecompile(sender.scriptCompile(scriptWithoutVersion).script).script should startWith("{-# STDLIB_VERSION 5 #-}")
   }
 

@@ -1,7 +1,6 @@
 package com.wavesplatform.database
 
 import java.util
-
 import cats.data.Ior
 import cats.syntax.monoid._
 import cats.syntax.option._
@@ -13,6 +12,7 @@ import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state._
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
@@ -157,7 +157,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       balances: Map[AddressId, Map[Asset, Long]],
       leaseBalances: Map[AddressId, LeaseBalance],
       addressTransactions: Map[AddressId, Seq[TransactionId]],
-      leaseStates: Map[ByteStr, (Boolean, Option[LeaseActionInfo])],
+      leaseStates: Map[ByteStr, LeaseDetails],
       issuedAssets: Map[IssuedAsset, NewAssetInfo],
       reissuedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
       filledQuantity: Map[ByteStr, VolumeAndFee],
@@ -261,8 +261,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     } stateHash.addAssetScript(address, script)
 
     diff.leaseState.foreach {
-      case (leaseId, (status, _)) =>
-        stateHash.addLeaseStatus(TransactionId @@ leaseId, status)
+      case (leaseId, details) =>
+        stateHash.addLeaseStatus(TransactionId @@ leaseId, details.isActive)
     }
 
     diff.sponsorship.foreach {

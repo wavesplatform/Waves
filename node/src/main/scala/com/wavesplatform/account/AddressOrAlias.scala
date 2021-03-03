@@ -11,7 +11,6 @@ trait AddressOrAlias {
   def stringRepr: String
   def bytes: Array[Byte]
   def chainId: Byte
-  def toRide: Recipient
 
   override def toString: String = stringRepr
 
