@@ -173,16 +173,17 @@ object StateUpdate {
   }
 
   final case class AssetStateUpdate(
+      assetId: ByteStr,
       before: Option[AssetDescription],
       after: Option[AssetDescription]
   ) {
     require(before.isDefined || after.isDefined)
-
-    def assetId: ByteStr          = before.orElse(after).fold(ByteStr.empty)(_.assetId)
     def reverse: AssetStateUpdate = copy(before = after, after = before)
   }
 
   object AssetStateUpdate {
+    final case class AssetDetails(assetId: ByteStr, desc: AssetDescription)
+
     import com.wavesplatform.events.protobuf.StateUpdate.AssetDetails.{AssetScriptInfo => PBAssetScriptInfo}
     import com.wavesplatform.events.protobuf.StateUpdate.{AssetDetails => PBAssetDetails, AssetStateUpdate => PBAssetStateUpdate}
 
@@ -205,6 +206,7 @@ object StateUpdate {
       }
 
       AssetStateUpdate(
+        self.before.orElse(self.after).fold(ByteStr.empty)(_.assetId.toByteStr),
         self.before.map(detailsFromPB),
         self.after.map(detailsFromPB)
       )
@@ -213,7 +215,7 @@ object StateUpdate {
     def toPB(self: AssetStateUpdate): PBAssetStateUpdate = {
       def detailsToPB(v: AssetDescription): PBAssetDetails = {
         PBAssetDetails(
-          assetId = v.assetId.toByteString,
+          assetId = self.assetId.toByteString,
           issuer = v.issuer.toByteString,
           decimals = v.decimals,
           name = v.name.toStringUtf8,
@@ -372,10 +374,10 @@ object StateUpdate {
     }
 
     val assets: Seq[AssetStateUpdate] = for {
-      a <- (diff.issuedAssets.keySet ++ diff.updatedAssets.keySet ++ diff.assetScripts.keySet ++ diff.sponsorship.keySet).toSeq
-      assetBefore = blockchainBeforeWithMinerReward.assetDescription(a)
-      assetAfter  = blockchainAfter.assetDescription(a)
-    } yield AssetStateUpdate(assetBefore, assetAfter)
+      asset <- (diff.issuedAssets.keySet ++ diff.updatedAssets.keySet ++ diff.assetScripts.keySet ++ diff.sponsorship.keySet).toSeq
+      assetBefore = blockchainBeforeWithMinerReward.assetDescription(asset)
+      assetAfter  = blockchainAfter.assetDescription(asset)
+    } yield AssetStateUpdate(asset.id, assetBefore, assetAfter)
 
     val updatedLeases = diff.leaseState.map {
       case (leaseId, newState) =>
@@ -456,7 +458,7 @@ object StateUpdate {
       .flatMap(st => st.assets.map(_.assetId) ++ st.balances.flatMap(_.asset.compatId))
       .distinct
       .flatMap(id => blockchain.assetDescription(IssuedAsset(id)))
-      .map(ad => AssetInfo(ad.assetId, ad.decimals, ad.name.toStringUtf8))
+      .map(ad => AssetInfo(ad.originTransactionId, ad.decimals, ad.name.toStringUtf8))
   }
 
   def container(

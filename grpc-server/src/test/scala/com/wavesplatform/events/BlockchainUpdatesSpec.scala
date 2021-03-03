@@ -100,8 +100,8 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       } { events =>
         val event  = events.last.vanilla.get.asInstanceOf[BlockAppended]
         val issued = event.transactionStateUpdates.head.assets
-        issued shouldBe Seq(AssetStateUpdate(None, Some(description)))
-        event.referencedAssets shouldBe Seq(AssetInfo(description.assetId, description.decimals, description.name.toStringUtf8))
+        issued shouldBe Seq(AssetStateUpdate(issue.assetId, None, Some(description)))
+        event.referencedAssets shouldBe Seq(AssetInfo(issue.assetId, description.decimals, description.name.toStringUtf8))
       }
     }
 
@@ -156,7 +156,7 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
         )
 
         rollback.stateUpdate.assets shouldBe Seq(
-          AssetStateUpdate(Some(description), None)
+          AssetStateUpdate(issue.assetId, Some(description), None)
         )
       }
 
@@ -191,7 +191,7 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
         )
 
         rollback.stateUpdate.assets shouldBe Seq(
-          AssetStateUpdate(Some(description), None)
+          AssetStateUpdate(issue.assetId, Some(description), None)
         )
       }
     }
