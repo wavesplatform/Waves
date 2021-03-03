@@ -2208,6 +2208,22 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     genericEval[Environment, EVALUATED](s"""fractionBigInt(parseBigInt("${BigInt(2).pow(511)-1}"), toBigInt(-2), toBigInt(-3))""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT((BigInt(2).pow(511)-1)*2/3))
   }
 
+  property("BigInt fraction roundin") {
+    import scala.math.BigDecimal.RoundingMode._
+    for {
+      s1 <- List(-1, 0, 1)
+      s2 <- List(-1, 1)
+      r <- List(("DOWN", DOWN), ("UP", UP), ("CEILING", CEILING), ("FLOOR", FLOOR), ("HALFUP", HALF_UP), ("HALFDOWN", HALF_DOWN), ("HALFEVEN", HALF_EVEN))
+    } {
+      (s1, s2, r._1, genericEval[Environment, EVALUATED](s"""fractionBigInt(toBigInt(${10*s1}), toBigInt(1), toBigInt(${3*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment)) shouldBe
+      ((s1, s2, r._1, Right(CONST_BIGINT(BigInt(BigDecimal((10.0*s1)/(3.0*s2)).setScale(0, r._2).toLong)))))
+      (s1, s2, r._1, genericEval[Environment, EVALUATED](s"""fractionBigInt(toBigInt(${9*s1}), toBigInt(1), toBigInt(${2*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment)) shouldBe
+      ((s1, s2, r._1, Right(CONST_BIGINT(BigInt(BigDecimal((9.0*s1)/(2.0*s2)).setScale(0, r._2).toLong)))))
+      (s1, s2, r._1, genericEval[Environment, EVALUATED](s"""fractionBigInt(toBigInt(${11*s1}), toBigInt(1), toBigInt(${2*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment)) shouldBe
+      ((s1, s2, r._1, Right(CONST_BIGINT(BigInt(BigDecimal((11.0*s1)/(2.0*s2)).setScale(0, r._2).toLong)))))
+    }
+  }
+
   property("BigInt math functions") {
     genericEval[Environment, EVALUATED]("powBigInt(toBigInt(12), 1, toBigInt(3456), 3, 2, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(187)))
     genericEval[Environment, EVALUATED]("powBigInt(toBigInt(12), 1, toBigInt(3456), 3, 2, UP)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(188)))

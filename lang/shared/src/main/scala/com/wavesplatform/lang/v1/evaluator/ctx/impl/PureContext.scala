@@ -287,12 +287,70 @@ object PureContext {
       ("denominator", BIGINT)
     ) {
       case CONST_BIGINT(v) :: CONST_BIGINT(n) :: CONST_BIGINT(d) :: Nil =>
-        val result = v * n / d
         for {
+          _ <- Either.cond(d != 0, (), "fraction: division by zero")
+          result = v * n / d
           _ <- Either.cond(result < maxBigInt, (), s"Long overflow: value `$result` greater than 2^511-1")
           _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^511-1")
         } yield CONST_BIGINT(result)
       case xs => notImplemented[Id, EVALUATED]("fractionBigInt(value: BigInt, numerator: BigInt, denominator: BigInt)", xs)
+    }
+
+  lazy val fractionBigIntRounds: BaseFunction[NoContext] =
+    NativeFunction(
+      "fractionBigInt",
+      128,
+      FRACTION_BIGINT_ROUNDS,
+      BIGINT,
+      ("value", BIGINT),
+      ("numerator", BIGINT),
+      ("denominator", BIGINT),
+      ("round", rounds)
+    ) {
+      case CONST_BIGINT(v) :: CONST_BIGINT(n) :: CONST_BIGINT(d) :: (r: CaseObj) :: Nil =>
+        for {
+          _ <- Either.cond(d != 0, (), "fraction: division by zero")
+          p = v * n
+          s = p.sign * d.sign
+          rm = p.abs /% d.abs
+          presult = rm._1
+          m = rm._2
+          result <-  r.caseType match {
+            case RoundDown => Right(presult*s)
+            case RoundUp => Right((presult + m.sign)*s)
+            case RoundHalfUp =>
+              val x = d.abs - m*2
+              if(x < 0) {
+                Right((presult + 1)*s)
+              } else if(x > 0) {
+                Right(presult*s)
+              } else {
+                Right((presult + 1)*s)
+              }
+            case RoundHalfDown =>
+              val x = d.abs - m*2
+              if(x < 0) {
+                Right((presult + 1)*s)
+              } else {
+                Right(presult*s)
+              }
+            case RoundCeiling => Right((if(s > 0) { presult + m.sign } else { presult }) * s)
+            case RoundFloor => Right((if(s < 0) { presult + m.sign } else { presult }) * s)
+            case RoundHalfEven => Right(presult*s) // XXX
+              val x = d.abs - m*2
+              if(x < 0) {
+                Right((presult + 1)*s)
+              } else if(x > 0) {
+                Right(presult*s)
+              } else {
+                Right((presult + presult%2)*s)
+              }
+            case _  => Left(s"unsupported rounding $r")
+          }
+          _ <- Either.cond(result < maxBigInt, (), s"Long overflow: value `$result` greater than 2^511-1")
+          _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^511-1")
+        } yield CONST_BIGINT(result)
+      case xs => notImplemented[Id, EVALUATED]("fractionBigIntRounds(value: BigInt, numerator: BigInt, denominator: BigInt, round: rounds)", xs)
     }
 
 
@@ -960,14 +1018,14 @@ object PureContext {
       IF(REF("@p"), FALSE, TRUE)
     }
 
-  val roundCeiling  = CASETYPEREF("Ceiling", List.empty, true)
-  val roundFloor    = CASETYPEREF("Floor", List.empty, true)
-  val roundHalfEven = CASETYPEREF("HalfEven", List.empty, true)
-  val roundDown     = CASETYPEREF("Down", List.empty, true)
-  val roundUp       = CASETYPEREF("Up", List.empty, true)
-  val roundHalfUp   = CASETYPEREF("HalfUp", List.empty, true)
-  val roundHalfDown = CASETYPEREF("HalfDown", List.empty, true)
-  val rounds        = UNION(roundDown, roundUp, roundHalfUp, roundHalfDown, roundCeiling, roundFloor, roundHalfEven)
+  val RoundCeiling  = CASETYPEREF("Ceiling", List.empty, true)
+  val RoundFloor    = CASETYPEREF("Floor", List.empty, true)
+  val RoundHalfEven = CASETYPEREF("HalfEven", List.empty, true)
+  val RoundDown     = CASETYPEREF("Down", List.empty, true)
+  val RoundUp       = CASETYPEREF("Up", List.empty, true)
+  val RoundHalfUp   = CASETYPEREF("HalfUp", List.empty, true)
+  val RoundHalfDown = CASETYPEREF("HalfDown", List.empty, true)
+  val rounds        = UNION(RoundDown, RoundUp, RoundHalfUp, RoundHalfDown, RoundCeiling, RoundFloor, RoundHalfEven)
 
   private def roundMode(m: EVALUATED): BaseGlobal.Rounds = {
     m match {
@@ -1092,13 +1150,13 @@ object PureContext {
   private val commonVars: Map[String, (FINAL, ContextfulVal[NoContext])] =
     Map(
       (unitVarName, (UNIT, ContextfulVal.pure(unit))),
-      ("UP", singleObj(roundUp)),
-      ("HALFUP", singleObj(roundHalfUp)),
-      ("HALFDOWN", singleObj(roundHalfDown)),
-      ("DOWN", singleObj(roundDown)),
-      ("HALFEVEN", singleObj(roundHalfEven)),
-      ("CEILING", singleObj(roundCeiling)),
-      ("FLOOR", singleObj(roundFloor))
+      ("UP", singleObj(RoundUp)),
+      ("HALFUP", singleObj(RoundHalfUp)),
+      ("HALFDOWN", singleObj(RoundHalfDown)),
+      ("DOWN", singleObj(RoundDown)),
+      ("HALFEVEN", singleObj(RoundHalfEven)),
+      ("CEILING", singleObj(RoundCeiling)),
+      ("FLOOR", singleObj(RoundFloor))
     )
 
   private val commonTypes =
@@ -1108,13 +1166,13 @@ object PureContext {
       BOOLEAN,
       BYTESTR,
       STRING,
-      roundDown,
-      roundUp,
-      roundHalfUp,
-      roundHalfDown,
-      roundHalfEven,
-      roundCeiling,
-      roundFloor,
+      RoundDown,
+      RoundUp,
+      RoundHalfUp,
+      RoundHalfDown,
+      RoundHalfEven,
+      RoundCeiling,
+      RoundFloor,
       rounds
     )
 
@@ -1225,6 +1283,7 @@ object PureContext {
       divToBigInt,
       modToBigInt,
       fractionBigInt,
+      fractionBigIntRounds,
       negativeBigInt,
       getListMedianBigInt,
       powBigInt,
