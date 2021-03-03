@@ -49,5 +49,90 @@
       "out" : 0
     }
   },
-  "cancelledLeases" : [ "7517y2CZZZD6HUVy6bAV3R4EV4Zrd7ZtEW2WVawHiAgL", "4Hbi5w3kgh8nysJ31DavCrnnKecgV363MQ7TCDoqtgGV", "CAKWkcjwPD3df4QZr63cD2EjibsyqTf4pnKRQsjiSMam", "HhBunv6ncKgranbXVSV34fytKedw3bbw33PyJiAc98Nn", "CgBBk1LaYncvdmZYr1TLdT4KyLLjLaCXW391xtCHsZXA", "24GZaS72WsfkBewp21jwSQqEMBEzvwbHgkmKum4M64Wg", "D6YJmBUnLNvcEJ4ckdYduKprN78hCJLArkXKnd39Mofi", "9J3CRH94aoar5XrRi1m73SwZbTWx5xtSnR3Kcv8WBZUZ", "HFCeYLJ5LZ6GhwvmzNrBfejBos6xXG7Y37Hwop31y6jF", "yZnLyB9WUJAmYQw1poA5L3LK1kEtX8mAyTM8N9X7zTp", "H4dGT2ShWFzFZCD6q2KngjrTL8seUWhHJDkBwzfmQs25", "D4cYU5bgtsA1wNFSFose2zFEqKgdJX647byADFYnmkyr", "Dv19bBn7Mhc6B8DtepmhfFLTcoj6okYNThk7GSmoTZgv", "GW7dUbzDqbH9fkgXMa5kgJNTW2oCcRco5cAwWvCpfHKS" ]
+  "cancelledLeases": [
+    {
+      "senderPublicKey": "Bz3T6C1TM1dT5cejqsHVFhw1xnNw3v6u9MT62wYQ2Lwa",
+      "amount": 100000000,
+      "recipient": "3NBEheVJmcexzJ9itP9KiiC2K6qnGQwpqMg",
+      "id": "Dv19bBn7Mhc6B8DtepmhfFLTcoj6okYNThk7GSmoTZgv"
+    },
+    {
+      "senderPublicKey": "Bz3T6C1TM1dT5cejqsHVFhw1xnNw3v6u9MT62wYQ2Lwa",
+      "amount": 100000000,
+      "recipient": "3MqCsTH9y6nFJEFL81DubDrpKnvreR9M52p",
+      "id": "7517y2CZZZD6HUVy6bAV3R4EV4Zrd7ZtEW2WVawHiAgL"
+    },
+    {
+      "senderPublicKey": "26bxJSmBtFLrpKPidRmUV6vMdaDeKAmaARLfEgsiLCWf",
+      "amount": 100000000,
+      "recipient": "3N38yU3szhRyJfVaDRQL9m9BtGiYHf4pJvV",
+      "id": "D4cYU5bgtsA1wNFSFose2zFEqKgdJX647byADFYnmkyr"
+    },
+    {
+      "senderPublicKey": "Bz3T6C1TM1dT5cejqsHVFhw1xnNw3v6u9MT62wYQ2Lwa",
+      "amount": 3163,
+      "recipient": "3NBYqPnTDdGeXCBkegBQzzAVEjPxS478JVj",
+      "id": "CAKWkcjwPD3df4QZr63cD2EjibsyqTf4pnKRQsjiSMam"
+    },
+    {
+      "senderPublicKey": "Bz3T6C1TM1dT5cejqsHVFhw1xnNw3v6u9MT62wYQ2Lwa",
+      "amount": 1441900000000,
+      "recipient": "3NBEheVJmcexzJ9itP9KiiC2K6qnGQwpqMg",
+      "id": "24GZaS72WsfkBewp21jwSQqEMBEzvwbHgkmKum4M64Wg"
+    },
+    {
+      "senderPublicKey": "4fF6J7cRHcF72N7HAhscxRwiDCKzRbdRpmGHnxkKtDsi",
+      "amount": 500000000,
+      "recipient": "3MtMoVbAHSitzohEvd6dJGR3kmJZHSePUkS",
+      "id": "D6YJmBUnLNvcEJ4ckdYduKprN78hCJLArkXKnd39Mofi"
+    },
+    {
+      "senderPublicKey": "Bz3T6C1TM1dT5cejqsHVFhw1xnNw3v6u9MT62wYQ2Lwa",
+      "amount": 800000000000,
+      "recipient": "3NBEheVJmcexzJ9itP9KiiC2K6qnGQwpqMg",
+      "id": "HFCeYLJ5LZ6GhwvmzNrBfejBos6xXG7Y37Hwop31y6jF"
+    },
+    {
+      "senderPublicKey": "CRxqEuxhdZBEHX42MU4FfyJxuHmbDBTaHMhM3Uki7pLw",
+      "amount": 10000000000000,
+      "recipient": "3N5sUvKLnEUBwk7WFCSjJs8VoiLiuqTs29v",
+      "id": "yZnLyB9WUJAmYQw1poA5L3LK1kEtX8mAyTM8N9X7zTp"
+    },
+    {
+      "senderPublicKey": "Bz3T6C1TM1dT5cejqsHVFhw1xnNw3v6u9MT62wYQ2Lwa",
+      "amount": 200000000000,
+      "recipient": "3NBEheVJmcexzJ9itP9KiiC2K6qnGQwpqMg",
+      "id": "9J3CRH94aoar5XrRi1m73SwZbTWx5xtSnR3Kcv8WBZUZ"
+    },
+    {
+      "senderPublicKey": "D8zy3ozYSncN7CA95N8xd8JAGsCSRTUo1wvHs79YEMk6",
+      "amount": 1000,
+      "recipient": "3N9JoRvFqR5orj6v3s6NwPSmtPeM57yPRdh",
+      "id": "4Hbi5w3kgh8nysJ31DavCrnnKecgV363MQ7TCDoqtgGV"
+    },
+    {
+      "senderPublicKey": "Bz3T6C1TM1dT5cejqsHVFhw1xnNw3v6u9MT62wYQ2Lwa",
+      "amount": 1441900000000,
+      "recipient": "3NBEheVJmcexzJ9itP9KiiC2K6qnGQwpqMg",
+      "id": "H4dGT2ShWFzFZCD6q2KngjrTL8seUWhHJDkBwzfmQs25"
+    },
+    {
+      "senderPublicKey": "Bz3T6C1TM1dT5cejqsHVFhw1xnNw3v6u9MT62wYQ2Lwa",
+      "amount": 2000000000000,
+      "recipient": "3NBEheVJmcexzJ9itP9KiiC2K6qnGQwpqMg",
+      "id": "CgBBk1LaYncvdmZYr1TLdT4KyLLjLaCXW391xtCHsZXA"
+    },
+    {
+      "senderPublicKey": "FJuErRxhV9JaFUwcYLabFK5ENvDRfyJbRz8FeVfYpBLn",
+      "amount": 1000000000,
+      "recipient": "3MsiHfvFVUULdn8bpVoDQ7JLKKjtPXUrCLT",
+      "id": "HhBunv6ncKgranbXVSV34fytKedw3bbw33PyJiAc98Nn"
+    },
+    {
+      "senderPublicKey": "4fF6J7cRHcF72N7HAhscxRwiDCKzRbdRpmGHnxkKtDsi",
+      "amount": 300000000,
+      "recipient": "3MsiHfvFVUULdn8bpVoDQ7JLKKjtPXUrCLT",
+      "id": "GW7dUbzDqbH9fkgXMa5kgJNTW2oCcRco5cAwWvCpfHKS"
+    }
+  ]
 }

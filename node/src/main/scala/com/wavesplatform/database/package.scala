@@ -190,18 +190,18 @@ package object database extends ScorexLogging {
     pb.LeaseDetails(
       ByteString.copyFrom(ld.sender.arr),
       Some(PBRecipients.create(ld.recipient)),
-      ld.height,
+      ByteString.copyFrom(ld.sourceId.arr),
       ld.amount,
       ld.isActive
     ).toByteArray
   }
 
   def readLeaseDetails(data: Array[Byte]): LeaseDetails = {
-    val pb.LeaseDetails(sender, recipient, height, amount, isActive) = pb.LeaseDetails.parseFrom(data)
+    val pb.LeaseDetails(sender, recipient, sourceId, amount, isActive) = pb.LeaseDetails.parseFrom(data)
     LeaseDetails(
       sender.toPublicKey,
       PBRecipients.toAddressOrAlias(recipient.get, AddressScheme.current.chainId).explicitGet(),
-      height,
+      sourceId.toByteStr,
       amount,
       isActive
     )
@@ -621,9 +621,9 @@ package object database extends ScorexLogging {
 
   def loadActiveLeases(db: DB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = db.withResource { r =>
     (for {
-      id          <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
-      leaseStatus <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
-      if leaseStatus
+      id      <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
+      details <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
+      if details.map(_.isActive).getOrElse(false)
       pb.TransactionMeta(h, n, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
       tx                                <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
     } yield tx).collect {
@@ -645,7 +645,7 @@ package object database extends ScorexLogging {
     while (iterator.hasNext && keyInRange()) {
       val e       = iterator.next()
       val leaseId = ByteStr(e.getKey.drop(6))
-      if (includeCancelled || Option(e.getValue).exists(_(0) == 1))
+      if (includeCancelled || readLeaseDetails(e.getValue).isActive)
         leaseIds += leaseId
       else
         leaseIds -= leaseId

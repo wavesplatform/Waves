@@ -109,12 +109,15 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      def stdLib: StdLibVersion =
-        if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
+      def stdLib: StdLibVersion = {
+        if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls, blockchain.height)) {
+          V5
+        } else if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
           V4
         } else {
           StdLibVersion.VersionDic.default
         }
+      }
       executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), defaultStdLib = stdLib)) { result =>
         complete(
           result
@@ -140,7 +143,15 @@ case class UtilsApiRoute(
   def compileWithImports: Route = path("script" / "compileWithImports") {
     import ScriptWithImportsRequest._
     (post & entity(as[ScriptWithImportsRequest])) { req =>
-      executeLimited(ScriptCompiler.compile(req.script, estimator(), req.imports)) { result =>
+      def stdLib: StdLibVersion =
+        if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls, blockchain.height)) {
+          V5
+        } else if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
+          V4
+        } else {
+          StdLibVersion.VersionDic.default
+        }
+      executeLimited(ScriptCompiler.compile(req.script, estimator(), req.imports, stdLib)) { result =>
         complete(
           result
             .fold(
