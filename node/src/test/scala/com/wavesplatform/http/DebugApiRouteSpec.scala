@@ -569,7 +569,7 @@ class DebugApiRouteSpec
 
         (blockchain.leaseDetails _)
           .when(leaseCancelId)
-          .returns(Some(LeaseDetails(dAppPk, accountGen.sample.get.toAddress, 1, 100, true)))
+          .returns(Some(LeaseDetails(dAppPk, accountGen.sample.get.toAddress, leaseCancelId, 100, true)))
           .anyNumberOfTimes()
 
         (blockchain.leaseDetails _)

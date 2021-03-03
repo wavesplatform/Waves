@@ -45,8 +45,8 @@ final case class CompositeBlockchain(
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId)
-      .map(ld => ld.copy(isActive = diff.leaseState.get(leaseId).map(_._1).getOrElse(ld.isActive)))
-      .orElse(diff.leaseDetails(leaseId, height))
+      .map(ld => ld.copy(isActive = diff.leaseState.get(leaseId).map(_.isActive).getOrElse(ld.isActive)))
+      .orElse(diff.leaseState.get(leaseId))
   }
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = {

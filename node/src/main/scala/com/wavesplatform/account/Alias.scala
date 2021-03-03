@@ -2,7 +2,6 @@ package com.wavesplatform.account
 
 import com.google.common.primitives.Bytes
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils._
@@ -12,7 +11,6 @@ sealed trait Alias extends AddressOrAlias {
   lazy val bytes: Array[Byte] = Bytes.concat(Array(Alias.AddressVersion, chainId), Deser.serializeArrayWithLength(name.utf8Bytes))
 
   val name: String
-  def toRide: Recipient = Recipient.Alias(name)
 }
 
 object Alias {
