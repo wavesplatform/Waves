@@ -113,6 +113,20 @@
       complexity: 1
     }
     {
+      name: ">="
+      params: [ "BigInt", "BigInt" ]
+      doc: "Check if integer greater or equal comparison."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 8
+    }
+    {
+      name: ">"
+      params: [ "BigInt", "BigInt" ]
+      doc: "Check if integer greater comparison."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 8
+    }
+    {
       name: "-"
       params: [ "Int" ]
       doc: "Change integer sign."

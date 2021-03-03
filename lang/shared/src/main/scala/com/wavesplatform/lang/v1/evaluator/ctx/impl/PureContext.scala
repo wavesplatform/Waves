@@ -84,6 +84,8 @@ object PureContext {
   lazy val ge: BaseFunction[NoContext] = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)(_ >= _)
   lazy val gt: BaseFunction[NoContext] =
     createOp(GT_OP, LONG, BOOLEAN, GT_LONG)(_ > _)
+  lazy val ge_big: BaseFunction[NoContext] = createBigOp(GE_OP, GE_BIGINT)(_ >= _)
+  lazy val gt_big: BaseFunction[NoContext] = createBigOp(GT_OP, GT_BIGINT)(_ > _)
 
   lazy val eq: BaseFunction[NoContext] =
     NativeFunction(EQ_OP.func, 1, EQ, BOOLEAN, ("a", TYPEPARAM('T')), ("b", TYPEPARAM('T'))) {
@@ -851,6 +853,14 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED](s"${opsToFunctions(op)}(a: ${t.toString}, b: ${t.toString})", xs)
     }
 
+  def createBigOp(op: BinaryOperation, func: Short, complexity: Int = 8)(
+      body: (BigInt, BigInt) => Boolean
+  ): BaseFunction[NoContext] =
+    NativeFunction(opsToFunctions(op), complexity, func, BIGINT, ("a", BIGINT), ("b", BIGINT)) {
+      case CONST_BIGINT(a) :: CONST_BIGINT(b) :: Nil => Right(CONST_BOOLEAN(body(a, b)))
+      case xs                                    => notImplemented[Id, EVALUATED](s"${opsToFunctions(op)}(a: BIGINT, b: BIGINT)", xs)
+    }
+
   lazy val getElement: BaseFunction[NoContext] =
     NativeFunction(
       "getElement",
@@ -1282,6 +1292,8 @@ object PureContext {
       mulToBigInt,
       divToBigInt,
       modToBigInt,
+      ge_big,
+      gt_big,
       fractionBigInt,
       fractionBigIntRounds,
       negativeBigInt,

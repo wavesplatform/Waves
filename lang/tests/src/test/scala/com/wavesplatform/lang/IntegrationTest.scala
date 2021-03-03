@@ -2224,6 +2224,17 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }
   }
 
+  property("BigInt comparation") {
+    genericEval[Environment, EVALUATED]("toBigInt(16) > toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
+    genericEval[Environment, EVALUATED]("toBigInt(1) > toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(false))
+    genericEval[Environment, EVALUATED]("toBigInt(16) >= toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
+    genericEval[Environment, EVALUATED]("toBigInt(1) >= toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(false))
+    genericEval[Environment, EVALUATED]("toBigInt(16) >= toBigInt(16)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
+    genericEval[Environment, EVALUATED]("toBigInt(16) < toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(false))
+    genericEval[Environment, EVALUATED]("toBigInt(16) <= toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(false))
+    genericEval[Environment, EVALUATED]("toBigInt(16) <= toBigInt(16)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
   property("BigInt math functions") {
     genericEval[Environment, EVALUATED]("powBigInt(toBigInt(12), 1, toBigInt(3456), 3, 2, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(187)))
     genericEval[Environment, EVALUATED]("powBigInt(toBigInt(12), 1, toBigInt(3456), 3, 2, UP)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(188)))
