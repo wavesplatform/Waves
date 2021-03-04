@@ -242,6 +242,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(s"$longMin + 1 - 1") shouldBe evaluated(longMin)
     eval(s"$longMax / $longMin + 1") shouldBe evaluated(0)
     eval(s"($longMax / 2) * 2") shouldBe evaluated(longMax - 1)
+    eval[EVALUATED]("fraction(9223372036854775807, 3, 0)") shouldBe Left(
+      s"fraction: division by zero"
+    )
     eval[EVALUATED]("fraction(9223372036854775807, 3, 2)") shouldBe Left(
       s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1"
     )

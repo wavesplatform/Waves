@@ -19,14 +19,15 @@ object ScriptCompiler extends ScorexLogging {
       isAssetScript: Boolean,
       estimator: ScriptEstimator
   ): Either[String, (Script, Long)] =
-    applyAndEstimate(scriptText, isAssetScript, estimator, Script.estimate)
+    applyAndEstimate(scriptText, isAssetScript, estimator, Script.estimate, StdLibVersion.VersionDic.default)
 
   def compile(
       scriptText: String,
       estimator: ScriptEstimator,
-      libraries: Map[String, String] = Map()
+      libraries: Map[String, String] = Map(),
+      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default
   ): Either[String, (Script, Long)] =
-    compileAndEstimate(scriptText, estimator, libraries, Script.estimate)
+    compileAndEstimate(scriptText, estimator, libraries, Script.estimate, defaultStdLib)
 
   def compileAndEstimateCallables(
       scriptText: String,
@@ -47,19 +48,20 @@ object ScriptCompiler extends ScorexLogging {
       directives  <- DirectiveParser(scriptText)
       ds          <- Directive.extractDirectives(directives, defaultStdLib)
       linkedInput <- ScriptPreprocessor(scriptText, libraries, ds.imports)
-      result      <- applyAndEstimate(linkedInput, ds.scriptType == Asset, estimator, estimate)
+      result      <- applyAndEstimate(linkedInput, ds.scriptType == Asset, estimator, estimate, defaultStdLib)
     } yield result
 
   private def applyAndEstimate[C](
       scriptText: String,
       isAssetScript: Boolean,
       estimator: ScriptEstimator,
-      estimate: (Script, ScriptEstimator, Boolean) => Either[String, C]
+      estimate: (Script, ScriptEstimator, Boolean) => Either[String, C],
+      defaultStdLib: => StdLibVersion // = StdLibVersion.VersionDic.default
   ): Either[String, (Script, C)] =
     for {
       directives <- DirectiveParser(scriptText)
       contentType = extractValue(directives, CONTENT_TYPE)
-      version     = extractValue(directives, STDLIB_VERSION)
+      version     = extractValue(directives, STDLIB_VERSION)(Some(defaultStdLib))
       scriptType  = if (isAssetScript) Asset else Account
       _          <- DirectiveSet(version, scriptType, contentType)
       script     <- tryCompile(scriptText, contentType, version, isAssetScript)
