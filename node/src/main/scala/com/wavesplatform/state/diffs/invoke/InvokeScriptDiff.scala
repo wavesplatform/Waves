@@ -69,7 +69,6 @@ object InvokeScriptDiff {
 
           directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
           payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
-          _          <- TracedResult(Either.cond(payments.payments.size <= version.maxPayments, (), GenericError(s"Script payment amount=${payments.payments.size} should not exceed ${version.maxPayments}")))
           checkedPayments = payments.payments.flatMap {
             case (amount, Some(assetId)) => blockchain.assetScript(IssuedAsset(assetId)).flatMap(s => Some((s.script, amount, assetId)))
             case _ => None
