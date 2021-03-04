@@ -1091,11 +1091,11 @@ object PureContext {
     NativeFunction("powBigInt", 200, POW_BIGINT, BIGINT, ("base", BIGINT), ("bp", LONG), ("exponent", BIGINT), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
       case CONST_BIGINT(b) :: CONST_LONG(bp) :: CONST_BIGINT(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
         if (bp < 0
-          || bp > 12
+          || bp > 18
           || ep < 0
-          || ep > 12
+          || ep > 18
           || rp < 0
-          || rp > 12) {
+          || rp > 18) {
           Left("powBigInt: scale out of range 0-12")
         } else {
           global.powBigInt(b, bp, e, ep, rp, roundMode(round)).map(CONST_BIGINT)
@@ -1107,11 +1107,11 @@ object PureContext {
     NativeFunction("logBigInt", 200, LOG_BIGINT, BIGINT, ("base", BIGINT), ("bp", LONG), ("exponent", BIGINT), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
       case CONST_BIGINT(b) :: CONST_LONG(bp) :: CONST_BIGINT(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
         if (bp < 0
-          || bp > 12
+          || bp > 18
           || ep < 0
-          || ep > 12
+          || ep > 18
           || rp < 0
-          || rp > 12) {
+          || rp > 18) {
           Left("logBigInt: scale out of range 0-12")
         } else {
           global.logBigInt(b, bp, e, ep, rp, roundMode(round)).map(CONST_BIGINT)
