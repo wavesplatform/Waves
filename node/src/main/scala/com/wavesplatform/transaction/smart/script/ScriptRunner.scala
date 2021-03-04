@@ -32,6 +32,27 @@ object ScriptRunner {
       scriptContainerAddress: Environment.Tthis,
       complexityLimit: Int = Int.MaxValue,
       default: EVALUATED = TRUE
+  ): (Log[Id], Either[ExecutionError, EVALUATED]) =
+    applyGeneric(
+      in,
+      blockchain,
+      script,
+      isAssetScript,
+      scriptContainerAddress,
+      complexityLimit,
+      default,
+      blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction)
+    )
+
+  def applyGeneric(
+      in: TxOrd,
+      blockchain: Blockchain,
+      script: Script,
+      isAssetScript: Boolean,
+      scriptContainerAddress: Environment.Tthis,
+      complexityLimit: Int,
+      default: EVALUATED,
+      useCorrectScriptVersion: Boolean
   ): (Log[Id], Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(
@@ -79,7 +100,7 @@ object ScriptRunner {
           (directives, ctx) =>
             val verify = ContractEvaluator.verify(decls, vf, ctx, evaluate, _)
             val bindingsVersion =
-              if (blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction))
+              if (useCorrectScriptVersion)
                 directives.stdLibVersion
               else
                 V3

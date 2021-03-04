@@ -223,9 +223,20 @@ object CommonValidation {
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
 
+    val proofsValidate = tx match {
+      case s: ProvenTransaction =>
+        Proofs
+          .create(s.proofs.proofs)
+          .map(_ => tx)
+
+      case _ =>
+        Right(tx)
+    }
+
     for {
       _ <- versionsBarrier
       _ <- typedBarrier
+      _ <- proofsValidate
     } yield tx
   }
 
