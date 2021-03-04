@@ -503,10 +503,9 @@ sealed trait BlockchainUpdated {
 object BlockchainUpdated {
   implicit class BlockchainUpdatedExt(private val bu: BlockchainUpdated) extends AnyVal {
     def references(other: BlockchainUpdated): Boolean = bu match {
-      case b: BlockAppended                 => b.block.header.reference == other.id
-      case mb: MicroBlockAppended           => mb.microBlock.reference == other.id
-      case rb: RollbackCompleted            => rb.height < other.height
-      case mrb: MicroBlockRollbackCompleted => mrb.height == other.height
+      case b: BlockAppended       => b.block.header.reference == other.id
+      case mb: MicroBlockAppended => mb.microBlock.reference == other.id
+      case _                      => false
     }
   }
 }

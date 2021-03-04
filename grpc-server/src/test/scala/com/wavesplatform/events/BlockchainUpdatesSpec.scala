@@ -196,6 +196,21 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       }
     }
 
+    "should skip rollback in real time updates" in {
+      withDomainAndRepo { (d, repo) =>
+        d.appendKeyBlock()
+        d.appendKeyBlock()
+        d.rollbackTo(1)
+        d.appendKeyBlock()
+        d.appendKeyBlock()
+
+        val subscription = repo.createSubscription(SubscribeRequest(1))
+        Thread.sleep(1000)
+        subscription.cancel()
+        subscription.futureValue.map(_.getUpdate.height) shouldBe Seq(1, 2, 3)
+      }
+    }
+
     "should get valid range" in withDomainAndRepo { (d, repo) =>
       for (_ <- 1 to 10) d.appendBlock()
       val blocks = repo.getBlockUpdatesRange(GetBlockUpdatesRangeRequest(3, 5)).futureValue.updates
