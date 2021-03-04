@@ -72,7 +72,7 @@ message DataEntry {
 message LeaseDetails {
     bytes sender_public_key = 1;
     Recipient recipient = 2;
-    int32 height = 3;
+    bytes source_id = 3;
     int64 amount = 4;
     bool is_active = 5;
 }
