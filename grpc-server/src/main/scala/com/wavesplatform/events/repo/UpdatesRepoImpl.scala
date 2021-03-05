@@ -35,7 +35,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
 
   @volatile
   private[this] var lastRealTimeUpdates = Seq.empty[BlockchainUpdated]
-  private[this] val realTimeUpdates = ConcurrentSubject.publish[BlockchainUpdated]
+  private[this] val realTimeUpdates     = ConcurrentSubject.publish[BlockchainUpdated]
 
   private[this] def sendRealTimeUpdate(upd: BlockchainUpdated): Unit = {
     val currentUpdates = this.lastRealTimeUpdates
@@ -43,7 +43,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     this.lastRealTimeUpdates = currentUpdates.dropWhile(u => currentHeight.exists(_ - 5 > u.toHeight)) :+ upd
     realTimeUpdates.onNext(upd) match {
       case Ack.Continue => // OKs
-      case Ack.Stop => throw new IllegalStateException("Real time updates subject is stopped")
+      case Ack.Stop     => throw new IllegalStateException("Real time updates subject is stopped")
     }
   }
 
@@ -148,6 +148,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
                 batch.delete(iter.next.getKey)
               }
               db.write(batch)
+              liquidState = None
               Success(())
             } catch {
               case t: Throwable => Failure(t)
@@ -234,22 +235,22 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
             case Some(next) =>
               readBatchStream(next)
 
-              case None =>
-                val lastPersistentUpdate = data.lastOption
-                log.info(s"Last persistent: $lastPersistentUpdate")
-                Observable
-                  .fromIterable(lastRealTimeUpdates)
-                  .++(realTimeUpdates)
-                  .dropWhile { u =>
-                    val result = !lastPersistentUpdate.forall(u.references)
-                    if (result) log.info(s"Dropping: $u")
-                    result
-                  }
-                  .map { u =>
-                    log.info(s"Sending real time: $u")
-                    u
-                  }
-            })
+            case None =>
+              val lastPersistentUpdate = data.lastOption
+              log.info(s"Last persistent: $lastPersistentUpdate")
+              Observable
+                .fromIterable(lastRealTimeUpdates)
+                .++(realTimeUpdates)
+                .dropWhile { u =>
+                  val result = !lastPersistentUpdate.forall(u.references)
+                  if (result) log.info(s"Dropping: $u")
+                  result
+                }
+                .map { u =>
+                  log.info(s"Sending real time: $u")
+                  u
+                }
+          })
         }
         readBatchStream(fromHeight)
       }
