@@ -1,7 +1,6 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.evaluator
 
 import java.nio.ByteBuffer
-
 import cats.Id
 import cats.data.EitherT
 import cats.implicits._
@@ -10,6 +9,7 @@ import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.{Common, EvalF, ExecutionError, Global}
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
