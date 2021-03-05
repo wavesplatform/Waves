@@ -23,7 +23,6 @@ import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult,
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
-import com.wavesplatform.lang.v1.traits.domain.AttachedPayments._
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
