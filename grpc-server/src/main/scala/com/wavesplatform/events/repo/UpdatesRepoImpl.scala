@@ -42,7 +42,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
 
   @volatile
   private[this] var lastRealTimeUpdates = Seq.empty[BlockchainUpdated]
-  private[this] val realTimeUpdates = ConcurrentSubject.publish[BlockchainUpdated]
+  private[this] val realTimeUpdates     = ConcurrentSubject.publish[BlockchainUpdated]
 
   private[this] def sendRealTimeUpdate(upd: BlockchainUpdated): Unit = {
     val currentUpdates = this.lastRealTimeUpdates
@@ -50,7 +50,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
     this.lastRealTimeUpdates = currentUpdates.dropWhile(u => currentHeight.exists(_ - 5 > u.height)) :+ upd
     realTimeUpdates.onNext(upd) match {
       case Ack.Continue => // OK
-      case Ack.Stop => throw new IllegalStateException("Real time updates subject is stopped")
+      case Ack.Stop     => throw new IllegalStateException("Real time updates subject is stopped")
     }
   }
 
@@ -65,12 +65,17 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
       }
 
       try {
-        iter.seekToLast()
+        try iter.seekToLast()
+        catch {
+          case _: UnsupportedOperationException =>
+          // Skip to support test implementation
+        }
+
         iter.asScala
-          .map(e => parseHeight(e.getValue))
+          .map(_.getValue)
           .to(LazyList)
           .lastOption
-          .getOrElse(0)
+          .fold(0)(parseHeight)
       } finally iter.close()
     }
   }
