@@ -9,6 +9,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.{block => vb}
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
+import monix.execution.atomic.AtomicBoolean
 import monix.execution.{Ack, AsyncQueue, Scheduler}
 import monix.reactive.Observable
 
@@ -73,7 +74,7 @@ package object grpc extends ScorexLogging {
       case object Complete           extends QueueV
 
       val queue = AsyncQueue.bounded[QueueV](32)
-
+      val draining = AtomicBoolean(false)
       cso.setOnReadyHandler(() => drainQueue())
 
       def drainQueue(): Unit = {
@@ -89,10 +90,13 @@ package object grpc extends ScorexLogging {
               cso.onCompleted()
 
             case Some(Fail(ex)) =>
-              cso.onError(ex)
+              cso.failWith(ex)
           }
 
-        cso.synchronized(pushNext())
+        if (draining.flip(true)) {
+          pushNext()
+          draining.set(false)
+        }
       }
 
       val cancelable = source.subscribe(
