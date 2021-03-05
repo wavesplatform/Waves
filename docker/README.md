@@ -85,18 +85,7 @@ Once container is launched it will create:
 
 3. If you already have Waves Node configuration/data - place it in the corresponsing directories
 
-
-4. *Configure access permissions*. We use `waves` user with predefined uid/gid `143/143` to launch the container. As such, either change permissions of the created directories or change their owner:
-
-```
-sudo chmod -R 777 /docker/waves
-```
-or
-```
-sudo chown -R 143:143 /docker/waves      <-- prefered
-```
-
-5. Add the appropriate arguments to ```docker run``` command: 
+4. Add the appropriate arguments to ```docker run``` command: 
 ```
 docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-config:/etc/waves -e WAVES_NETWORK=stagenet -e WAVES_WALLET_PASSWORD=myWalletSuperPassword -ti wavesplatform/wavesnode
 ```
@@ -122,8 +111,6 @@ mkdir -p /docker/waves/waves-data
 
 wget -qO- http://blockchain-stagenet.wavesnodes.com/blockchain_last.tar --show-progress | tar -xvf - -C /docker/waves/waves-data
 
-chown -R 143:143 /docker/waves/waves-data
-
 docker run -v /docker/waves/waves-data:/var/lib/waves wavesplatform/Node -e WAVES_NETWORK=stagenet -e WAVES_WALLET_PASSWORD=myWalletSuperPassword -ti wavesplatform/wavesnode
 ```
 
@@ -141,7 +128,7 @@ Below command will launch a container:
 - Ports `6868` and `6870` mapped from the host to the container
 
 ```
-docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-config:/etc/waves -p 6870:6870 -p 6868:6868 -e JAVA_OPTS="-Dwaves.network.declared-address=0.0.0.0:6868 -Dwaves.rest-api.port=6870 -Dwaves.rest-api.bind-address=0.0.0.0 -Dwaves.rest-api.enable=yes" -e WAVES_WALLET_PASSWORD=myWalletSuperPassword -ti  wavesplatform/wavesnode
+docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-config:/etc/waves -p 6870:6870 -p 6868:6868 -e JAVA_OPTS="-Dwaves.network.declared-address=0.0.0.0:6868 -Dwaves.rest-api.port=6870 -Dwaves.rest-api.bind-address=0.0.0.0 -Dwaves.rest-api.enable=yes" -e WAVES_WALLET_PASSWORD=myWalletSuperPassword -e WAVES_NETWORK=stagenet -ti wavesplatform/wavesnode
 ```
 
 Check that REST API is up by navigating to the following URL from the host side:
