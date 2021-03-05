@@ -89,7 +89,7 @@ package object grpc extends ScorexLogging {
               cso.onCompleted()
 
             case Some(Fail(ex)) =>
-              cso.onError(ex)
+              cso.failWith(ex)
           }
 
         cso.synchronized(pushNext())
