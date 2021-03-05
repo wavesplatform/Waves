@@ -17,9 +17,6 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.ContractCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
@@ -35,7 +32,7 @@ import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
-import scala.util.{Right, Try}
+import scala.util.Right
 
 object InvokeScriptTransactionDiff {
 
@@ -72,7 +69,7 @@ object InvokeScriptTransactionDiff {
             )
           )
 
-          (feeInWaves, totalFeePortfolio) <- InvokeDiffsCommon.calcAndCheckFee(
+          (feeInWaves, _) <- InvokeDiffsCommon.calcAndCheckFee(
             (message, _) => GenericError(message),
             tx,
             blockchain,
@@ -81,7 +78,11 @@ object InvokeScriptTransactionDiff {
             issueList = Nil,
             additionalScriptsInvoked = 0
           )
-          runsLimit = BigDecimal((feeInWaves - FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit) / ScriptExtraFee).toIntExact
+
+          maxCalls       = ContractLimits.MaxSyncDAppCalls(version)
+          invokeFee      = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+          paidCalls      = feeInWaves / invokeFee - 1
+          remainingCalls = Math.min(maxCalls, paidCalls).toInt
 
           directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
           payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
@@ -89,7 +90,7 @@ object InvokeScriptTransactionDiff {
           input <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply))
 
           result <- for {
-            (invocationDiff, (scriptResult, fullLimit), _) <- {
+            (invocationDiff, scriptResult, _) <- {
               val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
                 val invoker = tx.sender.toAddress
                 val invocation = ContractEvaluator.Invocation(
@@ -114,17 +115,25 @@ object InvokeScriptTransactionDiff {
                   dAppAddress,
                   pk,
                   dAppAddress,
-                  runsLimit,
-                  (if(invocationComplexity <= stepLimit) { 13 } else { 0 }),
-                  (if(version < V5) { Diff.empty } else { InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()) })
+                  remainingCalls,
+                  remainingCalls,
+                  (if (version < V5) {
+                     Diff.empty
+                   } else {
+                     InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map())
+                   })
                 )
 
-                //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
+                val paymentsComplexity = tx.checkedAssets.flatMap(blockchain.assetScript).map(_.complexity).sum
+                val verifierComplexity = blockchain.accountScript(invoker).map(_.verifierComplexity).getOrElse(0L)
+
                 val fullLimit =
                   if (blockchain.estimator == ScriptEstimatorV2)
-                    Int.MaxValue
+                    Int.MaxValue //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
+                  else if (limitedExecution)
+                    ContractLimits.FailFreeInvokeComplexity
                   else
-                    ContractLimits.MaxComplexityByVersion(version)
+                    ContractLimits.MaxTotalInvokeComplexity(version)
 
                 val failFreeLimit =
                   if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5))
@@ -133,38 +142,29 @@ object InvokeScriptTransactionDiff {
                     fullLimit
 
                 for {
-                  (failFreeResult, evaluationCtx, failFreeLog) <- evaluateV2(
+                  (result, log) <- evaluateV2(
                     version,
                     contract,
-                    directives,
                     invocation,
                     environment,
-                    failFreeLimit
+                    fullLimit - verifierComplexity.toInt,
+                    failFreeLimit,
+                    invocationComplexity.toInt,
+                    paymentsComplexity.toInt
                   )
-                  (result, log) <- failFreeResult match {
-                    case IncompleteResult(expr, unusedComplexity) if !limitedExecution =>
-                      continueEvaluation(
-                        version,
-                        expr,
-                        evaluationCtx,
-                        fullLimit - failFreeLimit + unusedComplexity,
-                        tx.id(),
-                        invocationComplexity
-                      )
-                    case _ =>
-                      Right((failFreeResult, Nil))
-                  }
-                } yield (environment.currentDiff, (result, fullLimit), failFreeLog ::: log)
+                } yield (environment.currentDiff, result, log)
               })
               TracedResult(
                 scriptResultE,
-                List(InvokeScriptTrace(
-                  tx.id.value(),
-                  tx.dAppAddressOrAlias,
-                  functionCall,
-                  scriptResultE.map(_._2._1),
-                  scriptResultE.fold(_.log, _._3)
-                ))
+                List(
+                  InvokeScriptTrace(
+                    tx.id.value(),
+                    tx.dAppAddressOrAlias,
+                    functionCall,
+                    scriptResultE.map(_._2),
+                    scriptResultE.fold(_.log, _._3)
+                  )
+                )
               )
             }
 
@@ -179,16 +179,18 @@ object InvokeScriptTransactionDiff {
               tx,
               CompositeBlockchain(blockchain, Some(invocationDiff)),
               blockTime,
-              runsLimit - invocationDiff.scriptsRun,
+              _,
               isSyncCall = false,
               limitedExecution,
               otherIssues
             )
 
             resultDiff <- scriptResult match {
-              case ScriptResultV3(dataItems, transfers, _) => doProcessActions(dataItems ::: transfers)
-              case ScriptResultV4(actions, _, _)              => doProcessActions(actions)
-              case _: IncompleteResult if limitedExecution => doProcessActions(Nil)
+              case ScriptResultV3(dataItems, transfers, unusedComplexity) => doProcessActions(dataItems ::: transfers, unusedComplexity)
+              case ScriptResultV4(actions, unusedComplexity, _)           => doProcessActions(actions, unusedComplexity)
+              case _: IncompleteResult if limitedExecution                => doProcessActions(Nil, 0)
+              case i: IncompleteResult =>
+                TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
             }
           } yield invocationDiff |+| resultDiff
         } yield result
@@ -201,41 +203,30 @@ object InvokeScriptTransactionDiff {
   private def evaluateV2(
       version: StdLibVersion,
       contract: DApp,
-      directives: DirectiveSet,
       invocation: ContractEvaluator.Invocation,
       environment: Environment[Id],
-      limit: Int
-  ): Either[ScriptExecutionError, (ScriptResult, EvaluationContext[Environment, Id], Log[Id])] = {
-    val wavesContext = WavesContext.build(directives)
-    val ctx =
-      PureContext.build(version).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, version).withEnvironment[Environment] |+|
-        wavesContext.copy(vars = Map())
-
-    val freezingLets  = wavesContext.evaluationContext(environment).letDefs
-    val evaluationCtx = ctx.evaluationContext(environment)
-
-    Try(ContractEvaluator.applyV2(evaluationCtx, freezingLets, contract, invocation, version, limit))
-      .fold(
-        e => Left((e.getMessage, Nil)),
-        _.map { case (result, log) => (result, evaluationCtx, log) }
-      )
+      limit: Int,
+      failFreeLimit: Int,
+      estimatedComplexity: Int,
+      paymentsComplexity: Int
+  ): Either[ValidationError with WithLog, (ScriptResult, Log[Id])] = {
+    val evaluationCtx = CachedDAppCTX.forVersion(version).completeContext(environment)
+    val startLimit    = limit - paymentsComplexity
+    ContractEvaluator
+      .applyV2Coeval(evaluationCtx, Map(), contract, invocation, version, startLimit)
+      .runAttempt()
+      .leftMap(error => (error.getMessage: ExecutionError, 0, Nil: Log[Id]))
+      .flatten
       .leftMap {
-        case (error, log) => ScriptExecutionError.dAppExecution(error, log)
+        case (error, unusedComplexity, log) =>
+          val usedComplexity = startLimit - unusedComplexity.max(0)
+          if (usedComplexity > failFreeLimit) {
+            val storingComplexity = Math.max(usedComplexity, estimatedComplexity)
+            FailedTransactionError.dAppExecution(error, storingComplexity + paymentsComplexity, log)
+          } else
+            ScriptExecutionError.dAppExecution(error, log)
       }
   }
-
-  private def continueEvaluation(
-      version: StdLibVersion,
-      expr: EXPR,
-      evaluationCtx: EvaluationContext[Environment, Id],
-      limit: Int,
-      transactionId: ByteStr,
-      failComplexity: Long
-  ): Either[FailedTransactionError, (ScriptResult, Log[Id])] =
-    Try(ContractEvaluator.applyV2(evaluationCtx, Map[String, LazyVal[Id]](), expr, version, transactionId, limit))
-      .fold(e => Left((e.getMessage, Nil)), identity)
-      .leftMap { case (error, log) => FailedTransactionError.dAppExecution(error, failComplexity, log) }
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {
     val (check, expectedTypes) =
@@ -255,5 +246,4 @@ object InvokeScriptTransactionDiff {
       s"All arguments of InvokeScript must be one of the types: ${expectedTypes.mkString(", ")}"
     )
   }
-
 }

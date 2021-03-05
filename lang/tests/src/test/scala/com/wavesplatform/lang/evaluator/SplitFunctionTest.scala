@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.v1.evaluator
+package com.wavesplatform.lang.evaluator
 
 import cats.Id
 import cats.kernel.Monoid
@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.{ContextfulVal, EvaluatorV1}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.{Matchers, PropSpec}

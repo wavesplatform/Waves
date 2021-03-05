@@ -14,6 +14,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.{AttachedPayments, Recipient}
+import monix.eval.Coeval
 
 object ContractEvaluator {
 
@@ -110,41 +111,44 @@ object ContractEvaluator {
       result            <- ScriptResult.fromObj(ctx, i.transactionId, evaluation, version, unusedComplexity = 0).leftMap((_, log))
     } yield (result, log)
 
-  def applyV2(
+  def applyV2Coeval(
       ctx: EvaluationContext[Environment, Id],
       freezingLets: Map[String, LazyVal[Id]],
       dApp: DApp,
       i: Invocation,
       version: StdLibVersion,
       limit: Int
-  ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] =
-    buildExprFromInvocation(dApp, i, version)
-      .leftMap((_, Nil))
-      .flatMap(applyV2(ctx, freezingLets, _, version, i.transactionId, limit))
+  ): Coeval[Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])]] =
+    Coeval
+      .now(buildExprFromInvocation(dApp, i, version).leftMap((_, limit, Nil)))
+      .flatMap {
+        case Right(value) => applyV2Coeval(ctx, freezingLets, value, version, i.transactionId, limit)
+        case Left(error)  => Coeval.now(Left(error))
+      }
 
-  def applyV2(
+  def applyV2Coeval(
       ctx: EvaluationContext[Environment, Id],
       freezingLets: Map[String, LazyVal[Id]],
       expr: EXPR,
       version: StdLibVersion,
       transactionId: ByteStr,
       limit: Int
-  ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
+  ): Coeval[Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])]] = {
     val exprWithLets =
       freezingLets.foldLeft(expr) {
         case (buildingExpr, (letName, letValue)) =>
           BLOCK(LET(letName, letValue.value.value.explicitGet()), buildingExpr)
       }
     EvaluatorV2
-      .applyLimited(exprWithLets, limit, ctx, version)
-      .flatMap {
+      .applyLimitedCoeval(exprWithLets, limit, ctx, version)
+      .map(_.flatMap {
         case (expr, unusedComplexity, log) =>
           val result =
             expr match {
               case value: EVALUATED => ScriptResult.fromObj(ctx, transactionId, value, version, unusedComplexity)
               case expr: EXPR       => Right(IncompleteResult(expr, unusedComplexity))
             }
-          result.bimap((_, log), (_, log))
-      }
+          result.bimap((_, unusedComplexity, log), (_, log))
+      })
   }
 }
