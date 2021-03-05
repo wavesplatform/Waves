@@ -1,7 +1,7 @@
 # Waves Node in Docker
 
 ## About Waves
-Waves is a decentralized platform that allows any user to issue, transfer, swap and trade custom blockchain tokens on an integrated peer-to-peer exchange. You can find more information about Waves at [wavesplatform.com](https://wavesplatform.com) and in the official [documentation]((https://docs.wavesplatform.com)).
+Waves is a decentralized platform that allows any user to issue, transfer, swap and trade custom blockchain tokens on an integrated peer-to-peer exchange. You can find more information about Waves at [waves.tech](https://waves.tech/) and in the official [documentation](https://docs.waves.tech).
 
 
 ## About the image
@@ -11,7 +11,7 @@ The image is focused on fast and convenient deployment of Waves Node.
 GitHub repository: https://github.com/wavesplatform/Waves/tree/master/docker
 
 ## Prerequisites
-It is highly recommended to read more about [Waves Node configuration](https://docs.wavesplatform.com/en/waves-Node/Node-configuration.html) before running the container.
+It is highly recommended to read more about [Waves Node configuration](https://docs.waves.tech/en/waves-node/node-configuration) before running the container.
 
 ## Building Docker image
 `./build-with-docker.sh && docker build -t wavesplatform/wavesnode docker` (from the repository root) - builds an image with the current local repository
@@ -22,7 +22,7 @@ It is highly recommended to read more about [Waves Node configuration](https://d
 |Argument              | Default value |Description   |
 |----------------------|-------------------|--------------|
 |`WAVES_NETWORK`       | `mainnet`         | Waves Blockchain network. Available values are `mainnet`, `testnet`, `stagenet`. Can be overridden in a runtime using environment variable with the same name.|
-|`WAVES_LOG_LEVEL`     | `DEBUG`           | Default Waves Node log level. Available values: `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`. More details about logging are available [here](https://docs.wavesplatform.com/en/waves-Node/logging-configuration.html). Can be overridden in a runtime using environment variable with the same name. |
+|`WAVES_LOG_LEVEL`     | `DEBUG`           | Default Waves Node log level. Available values: `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`. More details about logging are available [here](https://docs.waves.tech/en/waves-node/logging-configuration). Can be overridden in a runtime using environment variable with the same name. |
 |`WAVES_HEAP_SIZE`     | `2g`              | Default Waves Node JVM Heap Size limit in -X Command-line Options notation (`-Xms=[your value]`). More details [here](https://docs.oracle.com/cd/E13150_01/jrockit_jvm/jrockit/jrdocs/refman/optionX.html). Can be overridden in a runtime using environment variable with the same name. |
 
 **Note: All build arguments are optional.**  
@@ -49,7 +49,7 @@ docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-con
 |-----------------------------------|--------------|
 | `WAVES_WALLET_SEED`        		| Base58 encoded seed. Overrides `-Dwaves.wallet.seed` JVM config option. |
 | `WAVES_WALLET_PASSWORD`           | Password for the wallet file. Overrides `-Dwaves.wallet.password` JVM config option. |
-| `WAVES_LOG_LEVEL`                 | Node logging level. Available values: `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`. More details about logging are available [here](https://docs.wavesplatform.com/en/waves-Node/logging-configuration.html).|
+| `WAVES_LOG_LEVEL`                 | Node logging level. Available values: `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`. More details about logging are available [here](https://docs.waves.tech/en/waves-node/logging-configuration).|
 | `WAVES_HEAP_SIZE`                 | Default Java Heap Size limit in -X Command-line Options notation (`-Xms=[your value]`). More details [here](https://docs.oracle.com/cd/E13150_01/jrockit_jvm/jrockit/jrdocs/refman/optionX.html). |
 |`WAVES_NETWORK`                    | Waves Blockchain network. Available values are `mainnet`, `testnet`, `stagenet`.|
 |`JAVA_OPTS`                        | Additional Waves Node JVM configuration options. 	|
@@ -111,16 +111,16 @@ You can speed this process up by downloading a compressed blockchain state from 
 
 |Network     |Link          |
 |------------|--------------|
-|`mainnet`   | http://blockchain.wavesplatform.com/blockchain_last.tar |
-|`testnet`   | http://blockchain-testnet.wavesplatform.com/blockchain_last.tar  |
-|`stagenet`  | http://blockchain-stagenet.wavesplatform.com/blockchain_last.tar |
+|`mainnet`   | http://blockchain.wavesnodes.com/blockchain_last.tar |
+|`testnet`   | http://blockchain-testnet.wavesnodes.com/blockchain_last.tar  |
+|`stagenet`  | http://blockchain-stagenet.wavesnodes.com/blockchain_last.tar |
 
 
 **Example:**
 ```
 mkdir -p /docker/waves/waves-data
 
-wget -qO- http://blockchain-stagenet.wavesplatform.com/blockchain_last.tar --show-progress | tar -xvf - -C /docker/waves/waves-data
+wget -qO- http://blockchain-stagenet.wavesnodes.com/blockchain_last.tar --show-progress | tar -xvf - -C /docker/waves/waves-data
 
 chown -R 143:143 /docker/waves/waves-data
 
@@ -129,9 +129,9 @@ docker run -v /docker/waves/waves-data:/var/lib/waves wavesplatform/Node -e WAVE
 
 ### Network Ports
 
-1. REST-API interaction with Node. Details are available [here](https://docs.wavesplatform.com/en/waves-Node/Node-configuration.html#section-530adfd0788eec3f856da976e4ce7ce7).
+1. REST-API interaction with Node. Details are available [here](https://docs.waves.tech/en/waves-node/node-configuration#rest-api-settings).
 
-2. Waves Node communication port for incoming connections. Details are available [here](https://docs.wavesplatform.com/en/waves-Node/Node-configuration.html#section-fd33d7a83e3b2854f614fd9d5ae733ba).
+2. Waves Node communication port for incoming connections. Details are available [here](https://docs.waves.tech/en/waves-node/node-configuration#network-settings).
 
 
 **Example:**
