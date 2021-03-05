@@ -4,15 +4,15 @@ import com.wavesplatform.lang.directives.values._
 
 sealed trait DirectiveKey {
   type Value <: DirectiveValue
-  val text: String
+  def text: String
 }
 
 trait PredefinedDirectiveKey extends DirectiveKey {
-  val valueDic: DirectiveDictionary[Value]
+  def valueDic: DirectiveDictionary[Value]
 }
 
 trait ArbitraryDirectiveKey extends DirectiveKey {
-  val valueMapper: String => Value
+  def valueMapper: String => Value
 }
 
 object DirectiveKey {
