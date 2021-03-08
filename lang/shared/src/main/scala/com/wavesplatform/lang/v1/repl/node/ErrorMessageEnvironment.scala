@@ -7,6 +7,7 @@ import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.ValidationError
+import monix.eval.Coeval
 
 import scala.concurrent.Future
 
@@ -30,7 +31,7 @@ object ErrorMessageEnvironment extends Environment[Future] {
   override def txId: ByteStr                                                                                           = unavailable
   override def transferTransactionFromProto(b: Array[Byte]): Future[Option[Tx.Transfer]]                               = unavailable
   override def addressFromString(address: String): Either[String, Recipient.Address]                                   = unavailable
-  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Future[Either[ValidationError, EVALUATED]] = unavailable
+  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], availableComplexity: Int): Coeval[Future[(Either[ValidationError, EVALUATED], Int)]] = unavailable
 }
 
 class BlockchainUnavailableException extends RuntimeException {

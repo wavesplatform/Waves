@@ -104,6 +104,8 @@ object InvokeScriptResult {
         burns = x.burns ++ y.burns,
         sponsorFees = x.sponsorFees ++ y.sponsorFees,
         invokes = x.invokes ++ y.invokes,
+        leases = x.leases ++ y.leases,
+        leaseCancels = x.leaseCancels ++ y.leaseCancels,
         error = x.error.orElse(y.error))
     }
   }

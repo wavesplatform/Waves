@@ -123,7 +123,7 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
         invoker   <- accountGen
         secondAcc <- accountGen
         ts        <- timestampGen
-        fee       <- ciFee(1)
+        fee       <- ciFee(dApps = 1)
         gTx1 = GenesisTransaction.create(mainAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(secondAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
@@ -223,7 +223,7 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
         mainAcc <- accountGen
         invoker <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(1)
+        fee     <- ciFee(dApps =1)
         gTx1 = GenesisTransaction.create(mainAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
