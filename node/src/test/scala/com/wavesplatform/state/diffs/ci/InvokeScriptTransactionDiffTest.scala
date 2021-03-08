@@ -915,7 +915,7 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE.explicitGet().scriptsRun shouldBe 3
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, 3997)), _),
+                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, _)), _),
                 AssetVerifierTrace(transferringAssetId, None, _),
                 AssetVerifierTrace(attachedAssetId, None, _)
                 ) =>
@@ -1065,7 +1065,7 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE should produce("Transaction is not allowed by script")
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, dAppAddress, functionCall, Right(ScriptResultV3(_, transfers, 3995)), _),
+                InvokeScriptTrace(_, dAppAddress, functionCall, Right(ScriptResultV3(_, transfers, _)), _),
                 AssetVerifierTrace(allowedAssetId, None, _),
                 AssetVerifierTrace(bannedAssetId, Some(_: FailedTransactionError), _)
                 ) =>
@@ -1130,7 +1130,7 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE should produce("TransactionValidationError")
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, 3997)), _),
+                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, _)), _),
                 AssetVerifierTrace(transferringAssetId, Some(_), _)
                 ) =>
               transferringAssetId shouldBe transferringAsset.id()
@@ -1668,7 +1668,10 @@ class InvokeScriptTransactionDiffTest
     val blockchain: Blockchain = mock[Blockchain]
     forAll(uniqueAssetIdScenario) {
       case (asset, invoke, master, script, funcBinding) =>
-        (() => blockchain.settings).expects().returning(TestSettings.Default.blockchainSettings)
+        (() => blockchain.settings)
+          .expects()
+          .returning(TestSettings.Default.blockchainSettings)
+          .anyNumberOfTimes()
         (blockchain.assetScript _)
           .expects(*)
           .returning(None)
@@ -2361,7 +2364,7 @@ class InvokeScriptTransactionDiffTest
         master  <- accountGen
         invoker <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(1)
+        fee     <- ciFee(dApps = 1)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
@@ -2442,7 +2445,7 @@ class InvokeScriptTransactionDiffTest
     forAll(scenario) {
       case (genesisTxs, invokeTx, dApp) =>
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
-          ei should produce("Too many scripts run while invoke")
+          ei should produce(s"DApp calls limit = 0 for attached fee = ${invokeTx.fee} is exceeded")
         }
     }
   }
@@ -2497,8 +2500,12 @@ class InvokeScriptTransactionDiffTest
              |     then
              |      if ob1.regular+14 == ob2.regular && b1.regular == b2.regular+14 && ab == 1
              |      then
+             |       let l = Lease(Address(base58'$otherAcc'), 23)
              |       [
-             |        IntegerEntry("key", 1)
+             |        IntegerEntry("key", 1),
+             |        Lease(Address(base58'$otherAcc'), 13),
+             |        l,
+             |        LeaseCancel(l.calculateLeaseId())
              |       ]
              |      else
              |       throw("Balance check failed")
@@ -2543,6 +2550,13 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, dApp, service) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
+            val List(l:InvokeScriptResult.Lease, l1:InvokeScriptResult.Lease) = diff.scriptResults(invokeTx.id()).leases
+            val List(l2) = diff.scriptResults(invokeTx.id()).leaseCancels
+            l.amount shouldBe 13
+            l.recipient shouldBe service
+            l1.amount shouldBe 23
+            l1.recipient shouldBe service
+            l1.leaseId shouldBe l2.leaseId
             bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
             bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
         }
@@ -2734,7 +2748,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(2)
+        fee     <- ciFee(dApps = 2)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
@@ -2838,7 +2852,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(2)
+        fee     <- ciFee(dApps = 2)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
@@ -2864,8 +2878,8 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-  property("Infilite recurcive crosscontract call") {
-    def contract(): DApp = {
+  property("Infinite recursive crosscontract call") {
+    val recursiveContract: DApp = {
       val expr = {
         val script =
           s"""
@@ -2889,30 +2903,37 @@ class InvokeScriptTransactionDiffTest
 
       compileContractFromExpr(expr, V5)
     }
-    val scenario =
+
+    def recursiveScenario(dAppsFee: Int) =
       for {
         master  <- accountGen
         invoker <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(240)
+        fee     <- ciFee(dApps = dAppsFee)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script   = ContractScript(V5, contract())
+        script   = ContractScript(V5, recursiveContract)
         ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 5).explicitGet()
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
           .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
           .explicitGet()
-      } yield (Seq(gTx1, gTx2, ssTx), invokeTx, master.toAddress)
+      } yield (Seq(gTx1, gTx2, ssTx), invokeTx)
 
-    forAll(scenario) {
-      case (genesisTxs, invokeTx, dApp) =>
-        assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
-          ei should produce("Too many scripts run while invoke")
-        }
+    def assertLimitByFee(limit: Int, dAppsFee: Int): Unit = {
+      val (genesisTxs, invokeTx) = recursiveScenario(dAppsFee).sample.get
+      assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
+        ei should produce(s"DApp calls limit = $limit for attached fee = ${invokeTx.fee} is exceeded")
+      }
     }
+
+    assertLimitByFee(100, 9999)
+    assertLimitByFee(100, 100)
+    assertLimitByFee(99, 99)
+    assertLimitByFee(1, 1)
+    assertLimitByFee(0, 0)
   }
 
   property("Smart asset transfer by nested contract actions") {
@@ -3004,7 +3025,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(3)
+        fee     <- ciFee(dApps = 3)
         iTx = IssueTransaction
           .selfSigned(2.toByte, service, "True asset", "", ENOUGH_AMT, 8, reissuable = true, Some(assetScript), fee, ts + 1)
           .explicitGet()
@@ -3121,7 +3142,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(3)
+        fee     <- ciFee(dApps = 3)
         iTx = IssueTransaction
           .selfSigned(2.toByte, service, "False asset", "", ENOUGH_AMT, 8, reissuable = true, Some(assetScript), fee, ts + 1)
           .explicitGet()

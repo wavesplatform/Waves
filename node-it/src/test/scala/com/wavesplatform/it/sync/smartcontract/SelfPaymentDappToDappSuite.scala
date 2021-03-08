@@ -94,10 +94,7 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
       sender.invokeScript(dApp1, dAppAddress2, Some("foo"), fee = 2 * invokeFee, waitForTx = true),
       AssertiveApiError(
         ScriptExecutionError.Id,
-        "Error while executing account-script: ScriptExecutionError(error = FailedTransactionError(code = 1," +
-          " error = DApp self-payment is forbidden since V4, log =), type = Account, log =\n\tthis = Address(\n\t\t" +
-          "bytes = base58'3HYcmZyisPSRCy23mi3WsDYpmF6PkFtB5AN'\n\t)\n\tinv = Left(FailedTransactionError(code = 1," +
-          " error = DApp self-payment is forbidden since V4, log =))\n)"
+        "Error while executing account-script: FailedTransactionError(code = 1, error = DApp self-payment is forbidden since V4, log =)"
       )
     )
     sender.balance(callerAddress).balance shouldBe callerBalanceBefore

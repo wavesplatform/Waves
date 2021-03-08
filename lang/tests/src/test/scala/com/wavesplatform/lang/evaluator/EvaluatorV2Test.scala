@@ -1,13 +1,15 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.evaluator
 
 import cats.implicits._
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.EvaluationException
 import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -514,7 +516,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
         )
       )
 
-    (the[NoSuchElementException] thrownBy eval(expr, limit = 100)).getMessage shouldBe "A definition of 'b' not found"
+    (the[EvaluationException] thrownBy eval(expr, limit = 100)).getMessage shouldBe "A definition of 'b' not found"
 
     val expr2 =
       BLOCK(
@@ -525,7 +527,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
         )
       )
 
-    (the[NoSuchElementException] thrownBy eval(expr2, limit = 100)).getMessage shouldBe "Function or type 'b' not found"
+    (the[EvaluationException] thrownBy eval(expr2, limit = 100)).getMessage shouldBe "Function or type 'b' not found"
   }
 
   property("function context leak") {
@@ -548,7 +550,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
       f() + x
     */
 
-    (the[NoSuchElementException] thrownBy eval(expr, limit = 100)).getMessage shouldBe "A definition of 'x' not found"
+    (the[EvaluationException] thrownBy eval(expr, limit = 100)).getMessage shouldBe "A definition of 'x' not found"
 
     val expr2 = BLOCK(
       FUNC("f", Nil, BLOCK(FUNC("g", Nil, CONST_LONG(1)), FUNCTION_CALL(FunctionHeader.User("g"), Nil))),
