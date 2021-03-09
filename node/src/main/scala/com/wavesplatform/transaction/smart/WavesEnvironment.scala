@@ -8,22 +8,24 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
-import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.FunctionHeader.User
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff}
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset._
+import com.wavesplatform.transaction.TxValidationError.FailedTransactionError
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import monix.eval.Coeval
 import shapeless._
 
@@ -190,7 +192,13 @@ class WavesEnvironment(
         address => Address(ByteStr(address.bytes))
       )
 
-  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Either[ValidationError, EVALUATED] = ???
+  override def callScript(
+      dApp: Address,
+      func: String,
+      args: List[EVALUATED],
+      payments: Seq[(Option[Array[Byte]], Long)],
+      availableComplexity: Int
+  ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
 }
 
 class DAppEnvironment(
@@ -204,27 +212,71 @@ class DAppEnvironment(
     currentDApp: com.wavesplatform.account.Address,
     currentDAppPk: com.wavesplatform.account.PublicKey,
     senderDApp: com.wavesplatform.account.Address,
-    var runsLimit: Int,
-    invokeDeep: Int,
+    callsLimit: Int,
+    var remainingCalls: Int,
     var currentDiff: Diff
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
 
+  private var mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
 
-  override def currentBlockchain() = CompositeBlockchain(blockchain, Some(currentDiff))
+  override def currentBlockchain() = mutableBlockchain
 
-  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Either[ValidationError, EVALUATED] = {
-    com.wavesplatform.account.Address.fromBytes(dApp.bytes.arr).flatMap { dApp =>
-      val inv: InvokeScript = InvokeScript(currentDApp, currentDAppPk, dApp, FUNCTION_CALL(User(func, func), args), payments.map(p => Payment(p._2, p._1.fold(Waves:Asset)(a => IssuedAsset(ByteStr(a))))), tx.root)
-      InvokeScriptDiff(currentBlockchain(), blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp+1, false, runsLimit, invokeDeep)(inv).resultE.map {
-        case (diff, res) =>
-          val fixedDiff = diff.copy(scriptResults = Map(tx.root.id() ->
-            InvokeScriptResult(invokes = Seq(InvokeScriptResult.Invocation(dApp,
-                                                                           InvokeScriptResult.Call(func, args),
-                                                                           payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves:Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
-                                                                           diff.scriptResults(tx.root.id()))))))
-          currentDiff = currentDiff combine fixedDiff
-          runsLimit = runsLimit - diff.scriptsRun
-          res
+  override def callScript(
+      dApp: Address,
+      func: String,
+      args: List[EVALUATED],
+      payments: Seq[(Option[Array[Byte]], Long)],
+      availableComplexity: Int
+  ): Coeval[(Either[ValidationError, EVALUATED], Int)] = {
+    val r = for {
+      invoke <- traced(
+        account.Address
+          .fromBytes(dApp.bytes.arr)
+          .map(
+            InvokeScript(
+              currentDApp,
+              currentDAppPk,
+              _,
+              FUNCTION_CALL(User(func, func), args),
+              payments.map(p => Payment(p._2, p._1.fold(Waves: Asset)(a => IssuedAsset(ByteStr(a))))),
+              tx.root
+            )
+          )
+      )
+      (diff, evaluated) <- InvokeScriptDiff(
+        mutableBlockchain,
+        blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
+        limitedExecution = false,
+        availableComplexity,
+        remainingCalls,
+        callsLimit
+      )(invoke)
+    } yield {
+      val fixedDiff = diff.copy(
+        scriptResults = Map(
+          tx.root.id() ->
+            InvokeScriptResult(
+              invokes = Seq(
+                InvokeScriptResult.Invocation(
+                  invoke.dAppAddress,
+                  InvokeScriptResult.Call(func, args),
+                  payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves: Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
+                  diff.scriptResults(tx.root.id())
+                )
+              )
+            )
+        )
+      )
+      currentDiff = currentDiff combine fixedDiff
+      mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
+      remainingCalls = remainingCalls - 1
+      (evaluated, diff.scriptsComplexity.toInt)
+    }
+    r.v.map {
+      _.resultE match {
+        case Left(f: FailedTransactionError) => (Left(f), f.spentComplexity.toInt)
+        case Left(e)                         => (Left(e), 0)
+        case Right((evaluated, complexity))  => (Right(evaluated), complexity)
       }
     }
   }
