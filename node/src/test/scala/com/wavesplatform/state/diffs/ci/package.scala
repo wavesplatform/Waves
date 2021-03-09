@@ -19,10 +19,10 @@ import org.scalacheck.Gen
 package object ci {
   private val invokeFee = FeeUnit * FeeConstants(InvokeScriptTransaction.typeId)
 
-  def ciFee(sc: Int = 0, nonNftIssue: Int = 0, dApps: Int = 0): Gen[Long] =
+  def ciFee(sc: Int = 0, nonNftIssue: Int = 0): Gen[Long] =
     Gen.choose(
-      invokeFee * (dApps + 1) + sc * ScriptExtraFee + nonNftIssue * FeeConstants(IssueTransaction.typeId) * FeeUnit,
-      invokeFee * (dApps + 1) + (sc + 1) * ScriptExtraFee - 1 + nonNftIssue * FeeConstants(IssueTransaction.typeId) * FeeUnit
+      invokeFee + sc * ScriptExtraFee + nonNftIssue * FeeConstants(IssueTransaction.typeId) * FeeUnit,
+      invokeFee + (sc + 1) * ScriptExtraFee - 1 + nonNftIssue * FeeConstants(IssueTransaction.typeId) * FeeUnit
     )
 
   def compileContractFromExpr(expr: DAPP, version: StdLibVersion = V3): DApp = {
