@@ -2529,7 +2529,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(sc = 1, nonNftIssue = 0)
+        fee     <- ciFee(sc = 2, nonNftIssue = 0)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
@@ -2551,12 +2551,18 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, dApp, service) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
+            val List(l:InvokeScriptResult.Lease, l1:InvokeScriptResult.Lease) = diff.scriptResults(invokeTx.id()).leases
+            val List(l2) = diff.scriptResults(invokeTx.id()).leaseCancels
+            l.amount shouldBe 13
+            l.recipient shouldBe service
+            l1.amount shouldBe 23
+            l1.recipient shouldBe service
+            l1.leaseId shouldBe l2.leaseId
             bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
             bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
         }
     }
   }
-
 
   property("non-NFT issue require extra fee") {
     def contract(): DApp = {
@@ -2632,7 +2638,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(sc = 1, nonNftIssue = 0)
+        fee     <- ciFee(sc = 2, nonNftIssue = 0)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
@@ -2759,13 +2765,6 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, dApp, service) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
-            val List(l:InvokeScriptResult.Lease, l1:InvokeScriptResult.Lease) = diff.scriptResults(invokeTx.id()).leases
-            val List(l2) = diff.scriptResults(invokeTx.id()).leaseCancels
-            l.amount shouldBe 13
-            l.recipient shouldBe service
-            l1.amount shouldBe 23
-            l1.recipient shouldBe service
-            l1.leaseId shouldBe l2.leaseId
             bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
             bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
         }
