@@ -45,6 +45,17 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
   }
 
   "BlockchainUpdates" - {
+    "should survive invalid rollback" in withDomain(
+      defaultDomainSettings.copy(dbSettings = defaultDomainSettings.dbSettings.copy(maxRollbackDepth = 0))
+    ) { d =>
+      withRepo(d.blocksApi) { (repo, updateRepoTrigger) =>
+        d.triggers = Seq(updateRepoTrigger)
+        for (_ <- 1 to 10) d.appendBlock()
+        intercept[RuntimeException](d.rollbackTo(1)) // Should fail
+        repo.getBlockUpdatesRange(GetBlockUpdatesRangeRequest.of(1, 10)).futureValue.updates.map(_.height) shouldBe (1 to 10)
+      }
+    }
+
     "should include correct waves amount" in withNEmptyBlocksSubscription() { result =>
       val balances = result.map(_.getAppend.getBlock.updatedWavesAmount)
       balances shouldBe Seq(10000000000000000L, 10000000600000000L, 10000001200000000L)

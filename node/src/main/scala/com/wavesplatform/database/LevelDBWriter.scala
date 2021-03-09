@@ -169,6 +169,8 @@ abstract class LevelDBWriter private[database] (
 
   private[this] val log = LoggerFacade(LoggerFactory.getLogger(classOf[LevelDBWriter]))
 
+  override def maxRollbackDepth: Int = dbSettings.maxRollbackDepth
+
   def orderFilter: BloomFilter
   def dataKeyFilter: BloomFilter
   def wavesBalanceFilter: BloomFilter
