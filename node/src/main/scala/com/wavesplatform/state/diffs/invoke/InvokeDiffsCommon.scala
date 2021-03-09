@@ -152,7 +152,7 @@ object InvokeDiffsCommon {
       tx: InvokeScriptLike,
       blockchain: Blockchain,
       blockTime: Long,
-      runsLimit: Int,
+      remainingComplexity: Long,
       isSyncCall: Boolean,
       limitedExecution: Boolean,
       otherIssues: Seq[Issue] = Seq()
@@ -192,14 +192,16 @@ object InvokeDiffsCommon {
       )
       _ <- TracedResult(checkOverflow(transferList.map(_.amount))).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
 
-      actionAssets = tx.checkedAssets ++
+      actionAssets =
         transferList.flatMap(_.assetId).map(IssuedAsset) ++
         reissueList.map(r => IssuedAsset(r.assetId)) ++
         burnList.map(b => IssuedAsset(b.assetId)) ++
         sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
 
-      additionalScriptsInvoked = actionAssets.count(blockchain.hasAssetScript) +
-        (if (blockchain.hasAccountScript(tx.sender.toAddress)) 1 else 0)
+      actionAndVerifierComplexities = actionAssets.flatMap(blockchain.assetScript(_).map(_.complexity)) ++
+        (blockchain.accountScript(tx.sender.toAddress).map(_.verifierComplexity))
+
+      additonalScriptsCount = actionAndVerifierComplexities.size + tx.checkedAssets.count(blockchain.hasAssetScript)
 
       stepLimit = ContractLimits.MaxComplexityByVersion(version)
       feeDiff <- if (isSyncCall)
@@ -212,19 +214,16 @@ object InvokeDiffsCommon {
           stepLimit,
           invocationComplexity,
           issueList ++ otherIssues,
-          additionalScriptsInvoked
+          additonalScriptsCount
         ).map(_._2)
 
-      // TODO there will be no failed tests if code block below would be commented
-      // is it useful?
+      additionalComplexity = actionAndVerifierComplexities.sum
+      totalLimit = ContractLimits.MaxTotalInvokeComplexity(version)
       _ <- TracedResult(
         Either.cond(
-          additionalScriptsInvoked <= runsLimit,
+          additionalComplexity <= remainingComplexity || limitedExecution, // limited execution has own restriction "complexityLimit"
           (),
-          FailedTransactionError.feeForActions(
-            s"Too many script runs: max: $runsLimit, actual: $additionalScriptsInvoked",
-            invocationComplexity
-          )
+          FailedTransactionError.feeForActions(s"Invoke complexity limit = $totalLimit is exceeded", totalLimit - remainingComplexity)
         )
       )
 
@@ -268,7 +267,7 @@ object InvokeDiffsCommon {
 
       resultDiff = compositeDiff.copy(
         transactions = updatedTxDiff,
-        scriptsRun = if (isSyncCall) 0 else additionalScriptsInvoked + 1,
+        scriptsRun = if (isSyncCall) 0 else additonalScriptsCount + 1,
         scriptResults = Map(tx.root.id() -> isr),
         scriptsComplexity = invocationComplexity + compositeDiff.scriptsComplexity
       )
