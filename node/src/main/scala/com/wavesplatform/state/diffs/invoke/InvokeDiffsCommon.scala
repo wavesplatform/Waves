@@ -199,7 +199,7 @@ object InvokeDiffsCommon {
         sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
 
       actionComplexities = actionAssets.flatMap(blockchain.assetScript(_).map(_.complexity))
-      verifierCount = if (blockchain.hasAccountScript(tx.senderAddress)) 1 else 0
+      verifierCount = if (blockchain.hasPaidVerifier(tx.senderAddress)) 1 else 0
       additionalScriptsCount = actionComplexities.size + verifierCount + tx.checkedAssets.count(blockchain.hasAssetScript)
 
       feeDiff <- if (isSyncCall)
