@@ -7,7 +7,7 @@ import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.BlockV5
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, SynchronousCalls}
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
 import com.wavesplatform.features.ScriptTransferValidationProvider._
@@ -198,15 +198,15 @@ object InvokeDiffsCommon {
         burnList.map(b => IssuedAsset(b.assetId)) ++
         sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
 
-      actionAndVerifierComplexities = actionAssets.flatMap(blockchain.assetScript(_).map(_.complexity)) ++
-        (blockchain.accountScript(tx.sender.toAddress).map(_.verifierComplexity))
+      actionComplexities = actionAssets.flatMap(blockchain.assetScript(_).map(_.complexity))
+      verifierCount = if (blockchain.hasAccountScript(tx.senderAddress)) 1 else 0
+      additionalScriptsCount = actionComplexities.size + verifierCount + tx.checkedAssets.count(blockchain.hasAssetScript)
 
-      additonalScriptsCount = actionAndVerifierComplexities.size + tx.checkedAssets.count(blockchain.hasAssetScript)
-
-      stepLimit = ContractLimits.MaxComplexityByVersion(version)
       feeDiff <- if (isSyncCall)
         TracedResult.wrapValue(Map[Address, Portfolio]())
-      else
+      else {
+        val feeActionsCount = if (blockchain.isFeatureActivated(SynchronousCalls)) verifierCount else additionalScriptsCount
+        val stepLimit = ContractLimits.MaxComplexityByVersion(version)
         calcAndCheckFee(
           FailedTransactionError.feeForActions,
           tx.root,
@@ -214,10 +214,12 @@ object InvokeDiffsCommon {
           stepLimit,
           invocationComplexity,
           issueList ++ otherIssues,
-          additonalScriptsCount
+          feeActionsCount
         ).map(_._2)
+      }
 
-      additionalComplexity = actionAndVerifierComplexities.sum
+      verifierComplexity = blockchain.accountScript(tx.senderAddress).map(_.verifierComplexity).getOrElse(0L)
+      additionalComplexity = actionComplexities.sum + verifierComplexity
       totalLimit = ContractLimits.MaxTotalInvokeComplexity(version)
       _ <- TracedResult(
         Either.cond(
@@ -267,7 +269,7 @@ object InvokeDiffsCommon {
 
       resultDiff = compositeDiff.copy(
         transactions = updatedTxDiff,
-        scriptsRun = if (isSyncCall) 0 else additonalScriptsCount + 1,
+        scriptsRun = if (isSyncCall) 0 else additionalScriptsCount + 1,
         scriptResults = Map(tx.root.id() -> isr),
         scriptsComplexity = invocationComplexity + compositeDiff.scriptsComplexity
       )
