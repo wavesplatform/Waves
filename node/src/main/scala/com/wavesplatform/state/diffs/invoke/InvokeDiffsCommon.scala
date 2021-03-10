@@ -198,10 +198,9 @@ object InvokeDiffsCommon {
         burnList.map(b => IssuedAsset(b.assetId)) ++
         sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
 
-      actionAndVerifierComplexities = actionAssets.flatMap(blockchain.assetScript(_).map(_.complexity)) ++
-        (blockchain.accountScript(tx.sender.toAddress).map(_.verifierComplexity))
-
-      additonalScriptsCount = actionAndVerifierComplexities.size + tx.checkedAssets.count(blockchain.hasAssetScript)
+      actionComplexities = actionAssets.flatMap(blockchain.assetScript(_).map(_.complexity))
+      verifierCount = if (blockchain.hasPaidVerifier(tx.senderAddress)) 1 else 0
+      additionalScriptsCount = actionComplexities.size + verifierCount + tx.checkedAssets.count(blockchain.hasAssetScript)
 
       stepLimit = ContractLimits.MaxComplexityByVersion(version)
       feeDiff <- if (isSyncCall)
@@ -214,10 +213,11 @@ object InvokeDiffsCommon {
           stepLimit,
           invocationComplexity,
           issueList ++ otherIssues,
-          additonalScriptsCount
+          additionalScriptsCount
         ).map(_._2)
 
-      additionalComplexity = actionAndVerifierComplexities.sum
+      verifierComplexity = blockchain.accountScript(tx.senderAddress).map(_.verifierComplexity).getOrElse(0L)
+      additionalComplexity = actionComplexities.sum + verifierComplexity
       totalLimit = ContractLimits.MaxTotalInvokeComplexity(version)
       _ <- TracedResult(
         Either.cond(
@@ -267,7 +267,7 @@ object InvokeDiffsCommon {
 
       resultDiff = compositeDiff.copy(
         transactions = updatedTxDiff,
-        scriptsRun = if (isSyncCall) 0 else additonalScriptsCount + 1,
+        scriptsRun = if (isSyncCall) 0 else additionalScriptsCount + 1,
         scriptResults = Map(tx.root.id() -> isr),
         scriptsComplexity = invocationComplexity + compositeDiff.scriptsComplexity
       )
