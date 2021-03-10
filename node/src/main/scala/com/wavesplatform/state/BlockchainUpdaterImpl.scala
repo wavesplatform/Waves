@@ -6,8 +6,8 @@ import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.Storage
 import com.wavesplatform.events.BlockchainUpdateTriggers
@@ -18,15 +18,15 @@ import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
+import com.wavesplatform.utils.{forceStopApplication, ScorexLogging, Time, UnsupportedFeature}
 import kamon.Kamon
-import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
+import monix.reactive.subjects.ReplaySubject
 
 class BlockchainUpdaterImpl(
     leveldb: Blockchain with Storage,
@@ -407,7 +407,7 @@ class BlockchainUpdaterImpl(
     )).toMap
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[(Block, ByteStr)]] = writeLock {
-    log.info(s"Removing blocks after ${blockId.trim} from blockchain")
+    log.info(s"Trying rollback blockchain to $blockId")
 
     val prevNgState = ngState
 
@@ -423,23 +423,30 @@ class BlockchainUpdaterImpl(
         Right(Seq((ng.bestLiquidBlock, ng.hitSource)))
       case maybeNg =>
         for {
-          blockHeight <- leveldb.heightOf(blockId).toRight(GenericError(s"No such block $blockId"))
+          height <- leveldb.heightOf(blockId).toRight(GenericError(s"No such block $blockId"))
           _ <- Either.cond(
-            blockHeight >= leveldb.height - leveldb.maxRollbackDepth,
+            height >= leveldb.safeRollbackHeight,
             (),
-            GenericError(s"Couldn't rollback past ${leveldb.height - leveldb.maxRollbackDepth}")
+            GenericError(s"Rollback is possible only to the block at the height ${leveldb.safeRollbackHeight}")
           )
-          _ = blockchainUpdateTriggers.onRollback(this, blockId, blockHeight)
-          blocks <- leveldb.rollbackTo(blockId).leftMap(GenericError(_))
+          _ = blockchainUpdateTriggers.onRollback(this, blockId, height)
+          blocks <- leveldb.rollbackTo(height).leftMap(GenericError(_))
         } yield {
           ngState = None
           blocks ++ maybeNg.map(ng => (ng.bestLiquidBlock, ng.hitSource)).toSeq
         }
     }
 
-    notifyChangedSpendable(prevNgState, ngState)
-    publishLastBlockInfo()
-    miner.scheduleMining()
+    result match {
+      case Right(_) =>
+        log.info(s"Blockchain rollback to $blockId succeeded")
+        notifyChangedSpendable(prevNgState, ngState)
+        publishLastBlockInfo()
+        miner.scheduleMining()
+
+      case Left(error) =>
+        log.error(s"Blockchain rollback to $blockId failed: ${error.err}")
+    }
     result
   }
 
