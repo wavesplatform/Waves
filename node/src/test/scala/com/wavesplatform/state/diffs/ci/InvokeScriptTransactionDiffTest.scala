@@ -2218,22 +2218,32 @@ class InvokeScriptTransactionDiffTest
         txs = Seq("throw", "insufficient fee", "negative amount", "overflow amount", "self payment", "max actions", "invalid data entries", "ok")
           .map { arg =>
             val fc = Terms.FUNCTION_CALL(FunctionHeader.User("sameComplexity"), List(CONST_STRING(arg).explicitGet()))
-            InvokeScriptTransaction
+            val tx = InvokeScriptTransaction
               .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 4)
               .explicitGet()
+            (arg, tx)
           }
       } yield (Seq(gTx1, gTx2, ssTx, iTx), master.toAddress, txs)
 
     forAll(scenario) {
       case (genesisTxs, dApp, txs) =>
-        txs.foreach { invokeTx =>
+        txs.foreach { case (name, invokeTx) =>
           assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
             case (diff, bc) =>
               val invocationComplexity =
                 InvokeDiffsCommon
                   .getInvocationComplexity(bc, invokeTx.funcCall, bc.accountScript(dApp).get.complexitiesByEstimator, dApp)
                   .explicitGet()
-              diff.scriptsComplexity shouldBe invocationComplexity
+
+              if (name == "overflow amount")
+                diff.scriptsComplexity shouldBe invocationComplexity + 1 // because if evaluating asset script "false"
+              else
+                diff.scriptsComplexity shouldBe invocationComplexity
+
+              if (name == "ok")
+                diff.errorMessage(invokeTx.id.value()) shouldBe empty
+              else
+                diff.errorMessage(invokeTx.id.value()) shouldBe defined
           }
         }
     }
