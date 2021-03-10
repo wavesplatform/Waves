@@ -48,11 +48,14 @@ object FunctionIds {
   val MEDIAN_LIST: Short       = 405
   val MAX_LIST: Short          = 406
   val MIN_LIST: Short          = 407
+  val MAX_LIST_BIGINT: Short   = 408
+  val MIN_LIST_BIGINT: Short   = 409
   val LONG_TO_BYTES: Short     = 410
   val STRING_TO_BYTES: Short   = 411
   val BOOLEAN_TO_BYTES: Short  = 412
   val BIGINT_TO_BYTES: Short   = 413
   val BYTES_TO_BIGINT: Short   = 414
+  val BIGINT_TO_INT: Short     = 415
   val LONG_TO_STRING: Short    = 420
   val BOOLEAN_TO_STRING: Short = 421
   val BIGINT_TO_STRING: Short  = 422

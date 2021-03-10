@@ -105,6 +105,12 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED]("toBigInt(n: Int)", xs)
     }
 
+  lazy val bigIntToInt: BaseFunction[NoContext] =
+    NativeFunction("toInt", 1, BIGINT_TO_INT, LONG, ("n", BIGINT)) {
+      case CONST_BIGINT(n) :: Nil => Either.cond(Long.MaxValue >= n && n >= Long.MinValue, CONST_LONG(n.toLong), s"toInt: BigInt $n out of integers range")
+      case xs => notImplemented[Id, EVALUATED]("toBigInt(n: Int)", xs)
+    }
+
   lazy val bigIntToString: BaseFunction[NoContext] =
     NativeFunction("toStringBigInt", 65, BIGINT_TO_STRING, STRING, ("n", BIGINT)) {
       case CONST_BIGINT(n) :: Nil => CONST_STRING(n.toString)
@@ -909,6 +915,31 @@ object PureContext {
         notImplemented[Id, EVALUATED]("min(list: List[Int])", xs)
     }
 
+  lazy val listMaxBigInt: BaseFunction[NoContext] =
+    NativeFunction("maxBigInt", 192, MAX_LIST_BIGINT, BIGINT, ("list", PARAMETERIZEDLIST(BIGINT))) {
+      case ARR(list) :: Nil =>
+        Either.cond(
+          list.nonEmpty,
+          list.asInstanceOf[IndexedSeq[CONST_BIGINT]].max,
+          "Can't find max for empty list"
+        )
+      case xs =>
+        notImplemented[Id, EVALUATED]("maxBigInt(list: List[BigInt])", xs)
+    }
+
+  lazy val listMinBigInt: BaseFunction[NoContext] =
+    NativeFunction("minBigInt", 192, MIN_LIST_BIGINT, BIGINT, ("list", PARAMETERIZEDLIST(BIGINT))) {
+      case ARR(list) :: Nil =>
+        Either.cond(
+          list.nonEmpty,
+          list.asInstanceOf[IndexedSeq[CONST_BIGINT]].min,
+          "Can't find min for empty list"
+        )
+      case xs =>
+        notImplemented[Id, EVALUATED]("minBigInt(list: List[BigInt])", xs)
+    }
+
+
   lazy val listIndexOf: BaseFunction[NoContext] =
     NativeFunction(
       "indexOf",
@@ -1283,6 +1314,7 @@ object PureContext {
   private val v5Functions =
     v4Functions ++ Array(
       intToBigInt,
+      bigIntToInt,
       bigIntToString,
       stringToBigInt,
       stringToBigIntOpt,
@@ -1295,6 +1327,8 @@ object PureContext {
       modToBigInt,
       ge_big,
       gt_big,
+      listMaxBigInt,
+      listMinBigInt,
       fractionBigInt,
       fractionBigIntRounds,
       negativeBigInt,

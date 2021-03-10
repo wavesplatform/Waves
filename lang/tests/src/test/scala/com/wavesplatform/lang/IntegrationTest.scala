@@ -2209,6 +2209,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     genericEval[Environment, EVALUATED]("""parseBigInt("-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(-BigInt(2).pow(511)))
     genericEval[Environment, EVALUATED]("""parseBigInt("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(unit)
     genericEval[Environment, EVALUATED](s"""fractionBigInt(parseBigInt("${BigInt(2).pow(511)-1}"), toBigInt(-2), toBigInt(-3))""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT((BigInt(2).pow(511)-1)*2/3))
+    genericEval[Environment, EVALUATED](s"""parseBigInt("${Long.MaxValue}").toInt()""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(Long.MaxValue))
+    genericEval[Environment, EVALUATED](s"""parseBigInt("${Long.MinValue}").toInt()""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(Long.MinValue))
+    genericEval[Environment, EVALUATED](s"""(parseBigInt("${Long.MaxValue}")+toBigInt(1)).toInt()""", ctxt = v5Ctx, version = V5, env = utils.environment) should produce("out of integers range")
   }
 
   property("BigInt fraction roundin") {
@@ -2236,6 +2239,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     genericEval[Environment, EVALUATED]("toBigInt(16) < toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(false))
     genericEval[Environment, EVALUATED]("toBigInt(16) <= toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(false))
     genericEval[Environment, EVALUATED]("toBigInt(16) <= toBigInt(16)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
+    genericEval[Environment, EVALUATED]("[toBigInt(16), toBigInt(8)].maxBigInt()", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(16)))
+    genericEval[Environment, EVALUATED]("[toBigInt(16), toBigInt(8)].minBigInt()", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(8)))
   }
 
   property("BigInt math functions") {

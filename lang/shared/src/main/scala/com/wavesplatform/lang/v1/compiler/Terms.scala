@@ -335,4 +335,7 @@ object Terms {
 
   implicit val orderingConstLong: Ordering[CONST_LONG] =
     (a, b) => a.t compare b.t
+
+  implicit val orderingConstBigInt: Ordering[CONST_BIGINT] =
+    (a, b) => a.t compare b.t
 }

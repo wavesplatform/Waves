@@ -42,12 +42,26 @@
       paramsDoc: [ "The list of integers." ]
       complexity: 3
     }
-	{
+    {
       name: "max"
       params: [ "List[Int]" ]
       doc: "Returns the maximum of the list."
       paramsDoc: [ "The list of integers." ]
       complexity: 3
+    }
+    {
+      name: "minBigInt"
+      params: [ "List[BigInt]" ]
+      doc: "Returns the minimum of the list."
+      paramsDoc: [ "The list of big integers." ]
+      complexity: 192
+    }
+    {
+      name: "maxBigInt"
+      params: [ "List[BigInt]" ]
+      doc: "Returns the maximum of the list."
+      paramsDoc: [ "The list of big integers." ]
+      complexity: 192
     }
     {
       name: "indexOf"
