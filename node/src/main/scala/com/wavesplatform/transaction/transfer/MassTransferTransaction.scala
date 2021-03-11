@@ -40,9 +40,6 @@ case class MassTransferTransaction(
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
   override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
 
-  def compactJson(recipients: Set[AddressOrAlias]): JsObject =
-    json() ++ Json.obj("transfers" -> MassTransferTxSerializer.transfersJson(transfers.filter(t => recipients.contains(t.address))))
-
   override def checkedAssets: Seq[IssuedAsset] = assetId match {
     case Waves          => Seq()
     case a: IssuedAsset => Seq(a)

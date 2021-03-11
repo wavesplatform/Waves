@@ -15,13 +15,16 @@ import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
@@ -211,7 +214,11 @@ case class TransactionsApiRoute(
       import com.wavesplatform.transaction.transfer._
       meta.transaction match {
         case mtt: MassTransferTransaction if mtt.sender.toAddress != address =>
-          aliasesOfAddress.map(mtt.compactJson(_) ++ serializer.transactionMetaJson(meta))
+          aliasesOfAddress.map { recipients =>
+            mtt.json() ++
+              serializer.resolvedAliasMassTransfers(mtt.transfers.filter(t => recipients.contains(t.address))) ++
+              serializer.transactionMetaJson(meta)
+          }
         case _ => Task.now(serializer.transactionWithMetaJson(meta))
       }
     }
@@ -300,8 +307,24 @@ object TransactionsApiRoute {
     }
 
     def transactionWithMetaJson(meta: TransactionMeta): JsObject = {
-      meta.transaction.json() ++ transactionMetaJson(meta)
+      meta.transaction.json() ++ resolvedAliasTxFields(meta.transaction) ++ transactionMetaJson(meta)
     }
+
+    def resolvedAliasTxFields(tx: Transaction): JsObject = {
+      tx match {
+        case tx: InvokeScriptTransaction => Json.obj("dApp" -> resolve(tx.dAppAddressOrAlias))
+        case tx: LeaseTransaction        => Json.obj("recipient" -> resolve(tx.recipient))
+        case tx: TransferTransaction     => Json.obj("recipient" -> resolve(tx.recipient))
+        case tx: MassTransferTransaction => Json.obj("transfers" -> resolvedAliasMassTransfers(tx.transfers))
+        case _                           => Json.obj()
+      }
+    }
+
+    def resolvedAliasMassTransfers(transfers: Seq[ParsedTransfer]): JsObject =
+      Json.obj("transfers" -> transfers.map { case ParsedTransfer(address, amount) => Transfer(resolve(address), amount) })
+
+    private[this] def resolve(a: AddressOrAlias): String =
+      blockchain.resolveAlias(a).explicitGet().stringRepr
 
     def unconfirmedTxExtendedJson(tx: Transaction): JsObject = tx match {
       case leaseCancel: LeaseCancelTransaction =>

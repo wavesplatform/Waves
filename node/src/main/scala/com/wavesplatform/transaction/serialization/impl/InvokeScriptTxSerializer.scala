@@ -43,7 +43,6 @@ object InvokeScriptTxSerializer {
   def toJson(tx: InvokeScriptTransaction): JsObject = {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
-      "dApp"    -> dAppAddressOrAlias.stringRepr,
       "payment" -> payments
     ) ++ (funcCallOpt match {
       case Some(fc) => Json.obj("call" -> this.functionCallToJson(fc))

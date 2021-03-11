@@ -16,7 +16,6 @@ object TransferTxSerializer {
   def toJson(tx: TransferTransaction): JsObject = {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
-      "recipient"  -> recipient.stringRepr,
       "assetId"    -> assetId.maybeBase58Repr,
       "feeAsset"   -> feeAssetId.maybeBase58Repr, // legacy v0.11.1 compat
       "amount"     -> amount,
