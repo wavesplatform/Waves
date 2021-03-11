@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.traits.domain.Issue
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
@@ -139,6 +140,11 @@ object Blockchain {
     def lastBlockReward: Option[Long] = blockchain.blockReward(blockchain.height)
 
     def hasAssetScript(asset: IssuedAsset): Boolean = blockchain.assetScript(asset).isDefined
+    def hasPaidVerifier(account: Address): Boolean =
+      if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls))
+        blockchain.accountScript(account).exists(_.verifierComplexity > ContractLimits.FreeVerifierComplexity)
+      else
+        blockchain.hasAccountScript(account)
 
     def vrf(atHeight: Int): Option[ByteStr] =
       blockchain
