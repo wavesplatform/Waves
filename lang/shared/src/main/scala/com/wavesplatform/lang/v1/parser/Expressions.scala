@@ -139,10 +139,48 @@ object Expressions {
   }
   case class FUNCTION_CALL(position: Pos, name: PART[String], args: List[EXPR], resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
 
+  sealed trait Pattern {
+    def isRest: Boolean = false
+    def subpatterns: Seq[(SimplePattern, Seq[PART[String]])]
+    def position: Pos
+  }
+
+  sealed trait SimplePattern extends Pattern {
+    def subpatterns: Seq[(SimplePattern, Seq[PART[String]])] = Seq((this, Seq()))
+  }
+
+  sealed trait CompositePattern extends Pattern {
+    def caseType: Option[Single]
+  }
+
+  case class TypedVar(newVarName: Option[PART[String]], caseType: Type) extends SimplePattern {
+    override def isRest: Boolean = caseType.isEmpty || caseType.isInstanceOf[AnyType]
+    def position: Pos = newVarName.fold(Pos.AnyPos: Pos)(_.position)
+  }
+
+  case class ConstsPat(constatns: Seq[EXPR], position: Pos) extends SimplePattern
+
+  case class TuplePat(patterns: Seq[Pattern], position: Pos) extends CompositePattern {
+    val subpatterns: Seq[(SimplePattern, Seq[PART[String]])] = patterns.zipWithIndex.flatMap {
+      case (p, i) => p.subpatterns.map {
+        case (sp, path) => (sp, Expressions.PART.VALID(p.position, s"_${i+1}") +: path)
+      }
+    }
+    val caseType: Option[Single] = None
+  }
+
+  case class ObjPat(patterns: Map[String, Pattern], objType: Single, position: Pos) extends CompositePattern {
+    val subpatterns: Seq[(SimplePattern, Seq[PART[String]])] = patterns.toSeq.flatMap {
+      case (i, p) => p.subpatterns.map {
+        case (sp, path) => (sp, Expressions.PART.VALID(p.position, i) +: path)
+      }
+    }
+    val caseType: Option[Single] = Some(objType)
+  }
+
   case class MATCH_CASE(
       position: Pos,
-      newVarName: Option[PART[String]],
-      caseType: Type,
+      pattern: Pattern,
       expr: EXPR,
       resultType: Option[FINAL] = None,
       ctxOpt: CtxOpt = None
@@ -155,7 +193,7 @@ object Expressions {
       types: Seq[PART[String]],
       expr: EXPR
     ): MATCH_CASE =
-      MATCH_CASE(position, newVarName, Union(types.map(Single(_, None))), expr)
+      MATCH_CASE(position, TypedVar(newVarName, Union(types.map(Single(_, None)))), expr)
   }
 
   case class MATCH(position: Pos, expr: EXPR, cases: Seq[MATCH_CASE], resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
