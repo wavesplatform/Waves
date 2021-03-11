@@ -55,7 +55,8 @@ object FunctionIds {
   val BOOLEAN_TO_BYTES: Short  = 412
   val BIGINT_TO_BYTES: Short   = 413
   val BYTES_TO_BIGINT: Short   = 414
-  val BIGINT_TO_INT: Short     = 415
+  val BYTES_TO_BIGINT_LIM: Short = 415
+  val BIGINT_TO_INT: Short     = 416
   val LONG_TO_STRING: Short    = 420
   val BOOLEAN_TO_STRING: Short = 421
   val BIGINT_TO_STRING: Short  = 422

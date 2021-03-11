@@ -96,10 +96,17 @@
       complexity: 65
     }
     {
+      name: "toBigInt"
+      params: [ "ByteVector", "Int", "Int" ]
+      doc: "Converts an array of bytes to an big integer."
+      paramsDoc: [ "The array of bytes to convert.", "Offset", "Size" ]
+      complexity: 65
+    }
+    {
       name: "toInt"
       params: [ "BigInt" ]
       doc: "Converts a BigInt to an integer."
-      paramsDoc: [ "The iBigInt to convert." ]
+      paramsDoc: [ "The BigInt to convert." ]
       complexity: 1
     }
     {
