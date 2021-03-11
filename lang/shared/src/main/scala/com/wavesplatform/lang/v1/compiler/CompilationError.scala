@@ -37,10 +37,6 @@ object CompilationError {
     val message = "No expressions"
   }
 
-  final case class MatchOnlyUnion(start: Int, end: Int) extends CompilationError {
-    val message = "Only union type can be matched"
-  }
-
   final case class MatchNotExhaustive(start: Int, end: Int, possible: List[TYPE], matched: List[TYPE]) extends CompilationError {
     val message = s"Matching not exhaustive: " +
       s"possibleTypes are ${possible.mkString(", ")}, " +
