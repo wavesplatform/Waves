@@ -8,7 +8,12 @@ jobs:
       - run: echo 'addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.10.0-RC1")' > project/dependency-graph.sbt
       - name: Run Snyk to check for vulnerabilities
         uses: snyk/actions/scala@master
+        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          json: true
+          args: --json-file-output=dependency-updates.json
+      - uses: actions/upload-artifact@v2
+        with:
+          name: dependency-updates.json
+          path: dependency-updates.json
