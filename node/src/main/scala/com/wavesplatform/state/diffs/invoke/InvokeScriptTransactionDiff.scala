@@ -95,6 +95,8 @@ object InvokeScriptTransactionDiff {
                   functionCall,
                   Recipient.Address(ByteStr(invoker.bytes)),
                   tx.sender,
+                  Recipient.Address(ByteStr(invoker.bytes)),
+                  tx.sender,
                   payments,
                   tx.id(),
                   tx.fee,

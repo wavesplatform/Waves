@@ -162,6 +162,8 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         Terms.FUNCTION_CALL(FunctionHeader.User(func), args),
         Recipient.Address(callerAddress),
         callerPublicKey,
+        Recipient.Address(callerAddress),
+        callerPublicKey,
         AttachedPayments.Single(None),
         transactionId,
         fee,
