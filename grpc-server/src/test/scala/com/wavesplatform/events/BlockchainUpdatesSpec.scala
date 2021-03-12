@@ -2,36 +2,49 @@ package com.wavesplatform.events
 
 import java.nio.file.Files
 
+import scala.concurrent.{Await, Promise}
+import scala.concurrent.duration._
+
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
+import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.api.grpc.BlockchainUpdatesApiGrpcImpl
 import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdatesRangeRequest, SubscribeEvent, SubscribeRequest}
 import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.repo.UpdatesRepoImpl
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
-import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
-import com.wavesplatform.state.diffs.BlockDiffer
+import com.wavesplatform.protobuf.Amount
+import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
+import com.wavesplatform.state.diffs.BlockDiffer
+import com.wavesplatform.transaction.{PaymentTransaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxHelpers
 import io.grpc.StatusException
 import io.grpc.stub.{CallStreamObserver, StreamObserver}
 import monix.execution.CancelableFuture
 import monix.execution.Scheduler.Implicits.global
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FreeSpec, Matchers}
-
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Promise}
+import org.scalatest.concurrent.ScalaFutures
 
 class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with ScalaFutures with PathMockFactory {
+  var currentSettings: WavesSettings = domainSettingsWithFS(TestFunctionalitySettings.withFeatures(
+    BlockchainFeatures.BlockReward,
+    BlockchainFeatures.NG,
+    BlockchainFeatures.SmartAccounts,
+    BlockchainFeatures.DataTransaction,
+    BlockchainFeatures.FeeSponsorship
+  ))
+
+  def currentFS: FunctionalitySettings = currentSettings.blockchainSettings.functionalitySettings
+
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(10 seconds, 500 millis)
 
   "gRPC API" - {
@@ -83,6 +96,24 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
         updates.map(_.height) shouldBe (1 to 100)
       }
     }
+
+    "should handle genesis and payment" in withFuncSettings(currentFS.copy(blockVersion3AfterHeight = 3))(withGenerateSubscription() { d =>
+      val tx =
+        PaymentTransaction.create(TxHelpers.defaultSigner, TxHelpers.secondAddress, 100, 100000, TxHelpers.timestamp).explicitGet()
+      d.appendBlock(tx)
+    } { results =>
+      val reward = 600000000
+      val genesisAmount = Constants.TotalWaves * Constants.UnitsInWave + reward
+      val genesis = results.head.getAppend.transactionStateUpdates.head.balances.head
+      genesis.address shouldBe ByteString.copyFrom(TxHelpers.defaultAddress.bytes)
+      genesis.getAmountAfter shouldBe Amount(ByteString.EMPTY, genesisAmount)
+      genesis.amountBefore shouldBe reward
+
+      val payment = results.last.getAppend.transactionStateUpdates.head.balances.last
+      payment.address shouldBe ByteString.copyFrom(TxHelpers.secondAddress.bytes)
+      payment.getAmountAfter shouldBe Amount(ByteString.EMPTY, 100)
+      payment.amountBefore shouldBe 0
+    })
 
     "should fail stream with invalid range" in {
       intercept[StatusException](withNEmptyBlocksSubscription(99, SubscribeRequest(0, 60))(_ => ()))
@@ -230,15 +261,7 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
   }
 
   def withDomainAndRepo(f: (Domain, UpdatesRepoImpl) => Unit): Unit = {
-    val fs = TestFunctionalitySettings.withFeatures(
-      BlockchainFeatures.BlockReward,
-      BlockchainFeatures.NG,
-      BlockchainFeatures.SmartAccounts,
-      BlockchainFeatures.DataTransaction,
-      BlockchainFeatures.FeeSponsorship
-    )
-
-    withDomain(domainSettingsWithFS(fs)) { d =>
+    withDomain(currentSettings) { d =>
       withRepo(d.blocksApi) { (repo, updateRepoTrigger) =>
         d.triggers = Seq(updateRepoTrigger)
         f(d, repo)
@@ -260,6 +283,20 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       val result = Await.result(subscription, 20 seconds)
       f(result.map(_.getUpdate))
     }
+  }
+
+  def withFuncSettings(settings: FunctionalitySettings)(f: => Unit): Unit = {
+    val oldSettings = currentSettings
+    currentSettings = oldSettings.copy(blockchainSettings = oldSettings.blockchainSettings.copy(functionalitySettings = settings))
+    f
+    currentSettings = oldSettings
+  }
+
+  def withSettings(settings: WavesSettings)(f: => Unit): Unit = {
+    val oldSettings = currentSettings
+    currentSettings = settings
+    f
+    currentSettings = oldSettings
   }
 
   def withNEmptyBlocksSubscription(count: Int = 2, request: SubscribeRequest = SubscribeRequest.of(1, Int.MaxValue))(
