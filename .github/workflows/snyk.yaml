@@ -10,3 +10,5 @@ jobs:
         uses: snyk/actions/scala@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          json: true
