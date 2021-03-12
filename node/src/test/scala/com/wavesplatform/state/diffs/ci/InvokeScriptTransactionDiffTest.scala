@@ -1444,7 +1444,7 @@ class InvokeScriptTransactionDiffTest
     }
 
     forAll(for {
-      proofsCount <- Gen.choose(2, 9)
+      proofsCount <- Gen.choose(2, 8)
       r           <- preconditionsAndSetContractWithVerifier(multiSigCheckDApp(proofsCount), writeSetWithKeyLength(_))
     } yield (r._1, r._2, r._3, r._4, proofsCount)) {
       case (genesis, setVerifier, setContract, ci, proofsCount) =>

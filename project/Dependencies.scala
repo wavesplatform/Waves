@@ -8,10 +8,10 @@ object Dependencies {
   def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.4"
 
   private def akkaHttpModule(module: String)               = "com.typesafe.akka"             %% module            % "10.1.12"
-  private def nettyModule(module: String)                  = "io.netty"                      % s"netty-$module"   % "4.1.51.Final"
+  private def nettyModule(module: String)                  = "io.netty"                      % s"netty-$module"   % "4.1.60.Final"
   private def kamonModule(module: String)                  = "io.kamon"                      %% s"kamon-$module"  % "2.1.0"
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.11.0"
-  private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
+  private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.61"
 
   private def catsModule(module: String, version: String = "2.1.0") = Def.setting("org.typelevel" %%% s"cats-$module"  % version)
   def monixModule(module: String)                                   = Def.setting("io.monix"      %%% s"monix-$module" % "3.3.0")
@@ -20,7 +20,7 @@ object Dependencies {
 
   val akkaHttp           = akkaHttpModule("akka-http")
   val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
-  val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
+  val googleGuava        = "com.google.guava" % "guava" % "30.0-jre"
   val kamonCore          = kamonModule("core")
   val machinist          = "org.typelevel" %% "machinist" % "0.6.8"
   val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
@@ -58,6 +58,8 @@ object Dependencies {
       "com.squareup.okio"    % "okio"        % "1.14.0",
       "com.lihaoyi"          %% "sourcecode" % "0.2.1",
       nettyModule("handler"),
+      nettyModule("codec-http"),
+      nettyModule("codec-http2"),
       bouncyCastle("bcpkix"),
       bouncyCastle("bcprov"),
       "org.apache.httpcomponents" % "httpcore"         % "4.4.5",
@@ -105,7 +107,7 @@ object Dependencies {
       "com.softwaremill.sttp" %%% "core"       % "1.6.4",
       "com.wavesplatform"     % "zwaves"       % "0.1.0-SNAPSHOT",
       "com.wavesplatform"     % "zwaves-bn256" % "0.1.5-SNAPSHOT",
-      "org.web3j"             % "crypto"       % "4.5.18"
+      "org.web3j"             % "crypto"       % "4.6.3"
     ) ++ scalapbRuntime.value ++ circe.value ++ protobuf.value
   )
 
@@ -146,7 +148,7 @@ object Dependencies {
       kamonCore,
       kamonModule("system-metrics"),
       kamonModule("influxdb"),
-      "org.influxdb" % "influxdb-java" % "2.14",
+      "org.influxdb" % "influxdb-java" % "2.21",
       googleGuava,
       "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs
       "com.typesafe.play"        %% "play-json"     % "2.9.0",
