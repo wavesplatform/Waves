@@ -333,7 +333,7 @@ object TransactionsApiRoute {
         }
         leaseCancel.json() ++ Json.obj("lease" -> leaseId)
 
-      case t => t.json()
+      case t => t.json() ++ resolvedAliasTxFields(tx)
     }
 
     def applicationStatus(height: Int, succeeded: Boolean): JsObject =
