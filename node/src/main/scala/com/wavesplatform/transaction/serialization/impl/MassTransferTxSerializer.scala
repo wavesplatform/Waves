@@ -1,5 +1,7 @@
 package com.wavesplatform.transaction.serialization.impl
 
+import java.nio.ByteBuffer
+
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
@@ -7,21 +9,24 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.utils.byteStrFormat
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsObject, JsValue, Json}
 
-import java.nio.ByteBuffer
 import scala.util.Try
 
 object MassTransferTxSerializer {
+  def transfersJson(transfers: Seq[ParsedTransfer]): JsValue =
+    Json.toJson(transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) })
+
   def toJson(tx: MassTransferTransaction): JsObject = {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"       -> assetId.maybeBase58Repr,
       "attachment"    -> attachment,
       "transferCount" -> transfers.size,
-      "totalAmount"   -> transfers.map(_.amount).sum
+      "totalAmount"   -> transfers.map(_.amount).sum,
+      "transfers"     -> transfersJson(transfers)
     )
   }
 

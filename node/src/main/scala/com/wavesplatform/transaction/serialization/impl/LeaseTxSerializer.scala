@@ -16,6 +16,7 @@ object LeaseTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "amount"    -> amount,
+      "recipient" -> recipient.stringRepr
     )
   }
 
