@@ -323,7 +323,7 @@ object TransactionsApiRoute {
     def resolvedAliasMassTransfers(transfers: Seq[ParsedTransfer]): JsObject =
       Json.obj("transfers" -> transfers.map { case ParsedTransfer(address, amount) => Transfer(resolve(address), amount) })
 
-    private[this] def resolve(a: AddressOrAlias): String =
+    private def resolve(a: AddressOrAlias): String =
       blockchain.resolveAlias(a).explicitGet().stringRepr
 
     def unconfirmedTxExtendedJson(tx: Transaction): JsObject = tx match {

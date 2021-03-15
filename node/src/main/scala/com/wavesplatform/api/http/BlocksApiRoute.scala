@@ -2,18 +2,20 @@ package com.wavesplatform.api.http
 
 import akka.http.scaladsl.server.{Route, StandardRoute}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.api.common.CommonBlocksApi
+import com.wavesplatform.api.common.{CommonBlocksApi, CommonTransactionsApi}
 import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, TooBigArrayAllocation}
 import com.wavesplatform.api.http.TransactionsApiRoute.TransactionJsonSerializer
 import com.wavesplatform.block.Block
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import play.api.libs.json._
 
-case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi) extends ApiRoute {
-  import BlocksApiRoute._
+case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi, transactionsApi: CommonTransactionsApi, blockchain: Blockchain) extends ApiRoute {
   private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
+
+  private[this] val serializer = TransactionJsonSerializer(blockchain, transactionsApi)
 
   override lazy val route: Route = (pathPrefix("blocks") & get) {
     path("at" / IntNumber) { height =>
@@ -87,9 +89,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
       complete(TooBigArrayAllocation)
     }
   }
-}
 
-object BlocksApiRoute {
   private def toJson(v: (BlockMeta, Seq[(Transaction, Boolean)])): JsObject = v match {
     case (meta, transactions) =>
       meta.json() ++ transactionField(meta.header.version, transactions)
@@ -99,7 +99,9 @@ object BlocksApiRoute {
     "fee" -> transactions.map(_._1.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum,
     "transactions" -> JsArray(transactions.map {
       case (transaction, succeeded) =>
-        transaction.json() ++ TransactionJsonSerializer.applicationStatus(blockVersion >= Block.ProtoBlockVersion, succeeded)
+        transaction.json() ++
+          serializer.resolvedAliasTxFields(transaction) ++
+          TransactionJsonSerializer.applicationStatus(blockVersion >= Block.ProtoBlockVersion, succeeded)
     })
   )
 }

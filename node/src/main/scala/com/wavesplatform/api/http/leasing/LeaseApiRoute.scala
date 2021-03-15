@@ -1,8 +1,9 @@
 package com.wavesplatform.api.http.leasing
 
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.api.common.CommonAccountsApi
+import com.wavesplatform.api.common.{CommonAccountsApi, CommonTransactionsApi}
 import com.wavesplatform.api.common.CommonAccountsApi.LeaseInfo
+import com.wavesplatform.api.http.TransactionsApiRoute.TransactionJsonSerializer
 import com.wavesplatform.api.http.leasing.LeaseApiRoute._
 import com.wavesplatform.api.http.requests.{LeaseCancelRequest, LeaseRequest}
 import com.wavesplatform.api.http.{BroadcastRoute, _}
@@ -23,10 +24,13 @@ case class LeaseApiRoute(
     blockchain: Blockchain,
     transactionPublisher: TransactionPublisher,
     time: Time,
-    commonAccountApi: CommonAccountsApi
+    commonAccountApi: CommonAccountsApi,
+    transactionsApi: CommonTransactionsApi
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
+
+  private val serializer = TransactionJsonSerializer(blockchain, transactionsApi)
 
   override val route: Route = pathPrefix("leasing") {
     active ~ deprecatedRoute
@@ -51,8 +55,8 @@ case class LeaseApiRoute(
           commonAccountApi
             .activeLeasesOld(address)
             .collect {
-              case (height, leaseTransaction: LeaseTransaction) =>
-                leaseTransaction.json() + ("height" -> JsNumber(height))
+              case (height, tx: LeaseTransaction) =>
+                tx.json() ++ serializer.resolvedAliasTxFields(tx) + ("height" -> JsNumber(height))
             }
 
       complete(leaseInfoJson.toListL.runToFuture)

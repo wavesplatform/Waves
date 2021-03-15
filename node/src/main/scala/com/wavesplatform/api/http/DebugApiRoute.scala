@@ -239,7 +239,7 @@ case class DebugApiRoute(
       }
 
       val transactionJson = parsedTransaction match {
-        case Right(tx) => tx.json()
+        case Right(tx) => tx.json() ++ serializer.resolvedAliasTxFields(tx)
         case Left(_)   => jsv
       }
 

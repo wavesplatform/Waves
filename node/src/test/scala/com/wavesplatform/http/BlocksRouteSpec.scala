@@ -1,13 +1,14 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.api.common.CommonBlocksApi
+import com.wavesplatform.api.common.{CommonBlocksApi, CommonTransactionsApi}
 import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.BlocksApiRoute
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.{NoShrink, TestWallet}
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
@@ -15,8 +16,10 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
 class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with PropertyChecks with RestAPISettingsHelper with TestWallet with NoShrink {
-  private val blocksApi = mock[CommonBlocksApi]
-  private val route     = BlocksApiRoute(restAPISettings, blocksApi).route
+  private val blocksApi       = mock[CommonBlocksApi]
+  private val transactionsApi = mock[CommonTransactionsApi]
+  private val blockcahin      = mock[Blockchain]
+  private val route           = BlocksApiRoute(restAPISettings, blocksApi, transactionsApi, blockcahin).route
 
   private val testBlock1 = TestBlock.create(Nil)
   private val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion)
