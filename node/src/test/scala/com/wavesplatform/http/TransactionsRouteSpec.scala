@@ -52,7 +52,10 @@ class TransactionsRouteSpec
     with NoShrink
     with BlockchainStubHelpers {
 
-  private val blockchain          = mock[Blockchain]
+  private val blockchain      = mock[Blockchain]
+  private val resolvedAddress = "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU"
+  (blockchain.resolveAlias _).expects(*).returning(Address.fromString(resolvedAddress)).anyNumberOfTimes()
+
   private val utxPoolSynchronizer = mock[TransactionPublisher]
   private val addressTransactions = mock[CommonTransactionsApi]
   private val utxPoolSize         = mockFunction[Int]
@@ -335,8 +338,6 @@ class TransactionsRouteSpec
             .expects()
             .returning(Map(BlockchainFeatures.BlockV5.id -> acceptFailedActivationHeight))
             .anyNumberOfTimes()
-          val resolvedAddress = "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU"
-          (blockchain.resolveAlias _).expects(*).returning(Address.fromString(resolvedAddress)).anyNumberOfTimes()
 
           def validateResponse(): Unit = {
             status shouldEqual StatusCodes.OK
@@ -345,7 +346,15 @@ class TransactionsRouteSpec
               if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height))
                 Json.obj("height"    -> height, "applicationStatus" -> JsString(if (succeed) "succeeded" else "script_execution_failed"))
               else Json.obj("height" -> height)
-            responseAs[JsValue] shouldEqual (tx.json() ++ extraFields)
+
+            val resolvedRecipientField = tx match {
+              case t: TransferTransaction if t.recipient.isInstanceOf[Alias] =>
+                Json.obj("recipient" -> resolvedAddress)
+              case _ =>
+                Json.obj()
+            }
+
+            responseAs[JsValue] shouldEqual (tx.json() ++ extraFields ++ resolvedRecipientField)
           }
 
           Get(routePath(s"/info/${tx.id().toString}")) ~> route ~> check(validateResponse())
@@ -492,8 +501,6 @@ class TransactionsRouteSpec
 
       forAll(g) { txs =>
         (() => addressTransactions.unconfirmedTransactions).expects().returning(txs).once()
-        val resolvedAddress = "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU"
-        (blockchain.resolveAlias _).expects(*).returning(Address.fromString(resolvedAddress)).anyNumberOfTimes()
 
         Get(routePath("/unconfirmed")) ~> route ~> check {
           val resp = responseAs[Seq[JsValue]]
@@ -539,10 +546,6 @@ class TransactionsRouteSpec
     "working properly otherwise" in {
       forAll(randomTransactionGen) { tx =>
         (addressTransactions.unconfirmedTransactionById _).expects(tx.id()).returns(Some(tx)).once()
-
-        val resolvedAddress = "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU"
-        (blockchain.resolveAlias _).expects(*).returning(Address.fromString(resolvedAddress)).anyNumberOfTimes()
-
         Get(routePath(s"/unconfirmed/info/${tx.id().toString}")) ~> route ~> check {
           val resolvedRecipientField = tx match {
             case t: TransferTransaction if t.recipient.isInstanceOf[Alias] =>
