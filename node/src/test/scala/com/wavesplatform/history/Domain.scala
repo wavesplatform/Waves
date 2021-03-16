@@ -3,17 +3,18 @@ package com.wavesplatform.history
 import cats.syntax.option._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{AddressPortfolio, AddressTransactions}
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{DBExt, LevelDBWriter}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{BlockchainUpdater, _}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import org.iq80.leveldb.DB
 
+//noinspection ScalaStyle
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
   import Domain._
 
@@ -71,8 +72,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     lastBlock
   }
 
-  def appendKeyBlock(): Block = {
-    val block = createBlock(Block.NgBlockVersion, Nil)
+  def appendKeyBlock(ref: ByteStr = null): Block = {
+    val block = createBlock(Block.NgBlockVersion, Nil, ref)
     appendBlock(block)
     lastBlock
   }
@@ -85,8 +86,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     blockchainUpdater.processMicroBlock(mb)
   }
 
-  def createBlock(version: Byte, txs: Seq[Transaction]): Block = {
-    val reference = blockchainUpdater.lastBlockId.getOrElse(randomSig)
+  def createBlock(version: Byte, txs: Seq[Transaction], ref: ByteStr = null): Block = {
+    val reference = Option(ref).orElse(blockchainUpdater.lastBlockId).getOrElse(randomSig)
     val timestamp = System.currentTimeMillis()
     Block
       .buildAndSign(
