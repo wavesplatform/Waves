@@ -671,6 +671,10 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.accountData(acc, key)
   }
 
+  override def hasData(acc: Address): Boolean = {
+    compositeBlockchain.hasData(acc)
+  }
+
   override def transactionMeta(id: ByteStr): Option[(Int, Boolean)] = readLock {
     compositeBlockchain.transactionMeta(id)
   }

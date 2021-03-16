@@ -108,6 +108,7 @@ object EnvironmentFunctionsBenchmark {
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
     override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer]                                   = ???
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
+    override def hasData(recipient: Recipient): Boolean                                                          = false
     override def resolveAlias(alias: String): Either[String, Recipient.Address]                                  = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
     override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
@@ -126,7 +127,7 @@ object EnvironmentFunctionsBenchmark {
           _.toString,
           address => Address(ByteStr(address.bytes))
         )
-    override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
+    override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], availableComplexity: Int): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
   }
 
   val environmentFunctions = new EnvironmentFunctions(defaultEnvironment)

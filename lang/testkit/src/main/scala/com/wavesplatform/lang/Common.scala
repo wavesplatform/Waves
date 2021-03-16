@@ -87,6 +87,7 @@ object Common {
     override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
     override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
+    override def hasData(recipient: Recipient): Boolean                                                          = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
