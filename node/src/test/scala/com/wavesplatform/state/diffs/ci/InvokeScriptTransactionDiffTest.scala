@@ -16,7 +16,7 @@ import com.wavesplatform.lang.{utils, Global}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.directives.values.{DApp ⇒ DAppType, _}
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.{compiler, ContractLimits, FunctionHeader}
@@ -49,7 +49,7 @@ import com.wavesplatform.utils._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks ⇒ PropertyChecks}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class InvokeScriptTransactionDiffTest
     extends PropSpec
