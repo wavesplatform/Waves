@@ -59,7 +59,7 @@ case class DebugApiRoute(
     configRoot: ConfigObject,
     loadBalanceHistory: Address => Seq[(Int, Long)],
     loadStateHash: Int => Option[StateHash],
-    priorityPoolBlockchain: () ⇒ Blockchain
+    priorityPoolBlockchain: () => Blockchain
 ) extends ApiRoute
     with AuthRoute
     with ScorexLogging {
