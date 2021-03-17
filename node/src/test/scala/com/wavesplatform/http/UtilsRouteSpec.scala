@@ -28,7 +28,7 @@ import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, IntegerDataEntry}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.{Schedulers, Time}
@@ -39,6 +39,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
 import scala.concurrent.duration._
+
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory {
   implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
   implicit val timeout          = routeTestTimeout.duration
@@ -684,11 +685,15 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   routePath("/script/evaluate/{address}") in {
+    val letFromContract = 1000
+
     val testScript = {
       val str = s"""
                    |{-# STDLIB_VERSION 4 #-}
                    |{-# CONTENT_TYPE DAPP #-}
                    |{-# SCRIPT_TYPE ACCOUNT #-}
+                   |
+                   |let letFromContract = $letFromContract
                    |
                    |func test(i: Int) = i * 10
                    |func testB() = true
@@ -785,6 +790,27 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         |  case _ => throw("")
         |}""".stripMargin) ~> route ~> check {
       responseJson shouldBe Json.obj("type" -> "Int", "value" -> 151290)
+    }
+
+    val expectingKey   = "some"
+    val expectingValue = 1234
+
+    (utilsApi.blockchain.accountData _)
+      .when(dAppAddress, expectingKey)
+      .returning(Some(IntegerDataEntry(expectingKey, expectingValue)))
+      .anyNumberOfTimes()
+
+    evalScript(
+      s"""
+         | this.getInteger("$expectingKey") == $expectingValue &&
+         | height == height
+       """.stripMargin
+    ) ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
+    }
+
+    evalScript("letFromContract - 1".stripMargin) ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Int", "value" -> (letFromContract - 1))
     }
   }
 

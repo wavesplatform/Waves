@@ -1,7 +1,6 @@
 package com.wavesplatform.api.http
 
 import java.security.SecureRandom
-
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.implicits._
 import com.wavesplatform.account.{Address, AddressScheme}
@@ -11,8 +10,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
@@ -20,7 +20,8 @@ import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
@@ -277,8 +278,13 @@ object UtilsApiRoute {
 
   private object ScriptCallEvaluator {
     def compile(stdLibVersion: StdLibVersion)(str: String): Either[GenericError, EXPR] = {
-      val ctx = PureContext.build(stdLibVersion).compilerContext.copy(arbitraryFunctions = true)
-      ExpressionCompiler.compileUntyped(str, ctx).leftMap(GenericError(_))
+      val ctx =
+        PureContext.build(stdLibVersion).withEnvironment[Environment] |+|
+        CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment] |+|
+        WavesContext.build(DirectiveSet(stdLibVersion, Account, Expression).explicitGet())
+
+      ExpressionCompiler.compileUntyped(str, ctx.compilerContext.copy(arbitraryDeclarations = true))
+        .leftMap(GenericError(_))
     }
 
     def parseBinaryCall(bs: ByteStr): Either[ValidationError, EXPR] = {

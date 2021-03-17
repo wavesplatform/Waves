@@ -600,8 +600,7 @@ object ExpressionCompiler {
     for {
       keyWithErr <- handlePart(keyPart).handleError()
       ctx        <- get[Id, CompilerContext, CompilationError]
-      typeWithErr = ctx.varDefs
-        .get(keyWithErr._1.getOrElse(""))
+      typeWithErr = ctx.resolveVar(keyWithErr._1.getOrElse(""))
         .fold[(Option[FINAL], Iterable[CompilationError])]((None, List(DefNotFound(p.start, p.end, keyWithErr._1.getOrElse("")))))(
           info => (Some(info.vType), List.empty)
         )
