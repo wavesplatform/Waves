@@ -2324,6 +2324,113 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
+  property("isDataStorageUntouched") {
+    def contract(): DApp = {
+      val expr = {
+        val script =
+          s"""
+             |{-# STDLIB_VERSION 5 #-}
+             |{-# CONTENT_TYPE DAPP #-}
+             |{-#SCRIPT_TYPE ACCOUNT#-}
+             |
+             | @Callable(i)
+             | func foo() = {
+             |   let check = isDataStorageUntouched(this)
+             |   [ BooleanEntry("virgin", check) ]
+             | }
+             |""".stripMargin
+        Parser.parseContract(script).get.value
+      }
+
+      compileContractFromExpr(expr, V5)
+    }
+    val scenario =
+      for {
+        master  <- accountGen
+        invoker <- accountGen
+        ts      <- timestampGen
+        fee     <- ciFee(dApps = 1)
+        gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+
+        script   = ContractScript(V5, contract())
+        ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 5).explicitGet()
+        fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments = List(Payment(10, Waves))
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .explicitGet()
+      } yield (Seq(gTx1, gTx2, ssTx), invokeTx, master.toAddress)
+
+    forAll(scenario) {
+      case (genesisTxs, invokeTx, dApp) =>
+        assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+          case (diff, bc) =>
+            diff.errorMessage(invokeTx.id.value()) shouldBe None
+            bc.accountData(dApp, "virgin") shouldBe Some(BooleanDataEntry("virgin", true))
+        }
+    }
+  }
+
+  property("isDataStorageUntouched false") {
+    def contract(): DApp = {
+      val expr = {
+        val script =
+          s"""
+             |{-# STDLIB_VERSION 5 #-}
+             |{-# CONTENT_TYPE DAPP #-}
+             |{-#SCRIPT_TYPE ACCOUNT#-}
+             |
+             | @Callable(i)
+             | func foo() = {
+             |   let check = isDataStorageUntouched(this)
+             |   [ BooleanEntry("virgin", check) ]
+             | }
+             |""".stripMargin
+        Parser.parseContract(script).get.value
+      }
+
+      compileContractFromExpr(expr, V5)
+    }
+    val scenario =
+      for {
+        master  <- accountGen
+        invoker <- accountGen
+        ts      <- timestampGen
+        fee     <- ciFee(dApps = 1)
+        gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+
+        dataTx   = DataTransaction.selfSigned(TxVersion.V2, master, Seq(BooleanDataEntry("q", true)), 15000000, ts).explicitGet()
+        script   = ContractScript(V5, contract())
+        ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 5).explicitGet()
+        fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments = List(Payment(10, Waves))
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .explicitGet()
+      } yield (Seq(gTx1, gTx2, ssTx), dataTx, invokeTx, master.toAddress)
+
+    forAll(scenario) {
+      case (genesisTxs, dataTx, invokeTx, dApp) =>
+        assertDiffAndState(Seq(TestBlock.create(genesisTxs ++ Seq(dataTx))), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+          case (diff, bc) =>
+            diff.errorMessage(invokeTx.id.value()) shouldBe None
+            bc.accountData(dApp, "virgin") shouldBe Some(BooleanDataEntry("virgin", false))
+        }
+    }
+
+    forAll(scenario) {
+      case (genesisTxs, dataTx, invokeTx, dApp) =>
+        assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(dataTx, invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+          case (diff, bc) =>
+            diff.errorMessage(invokeTx.id.value()) shouldBe None
+            bc.accountData(dApp, "virgin") shouldBe Some(BooleanDataEntry("virgin", false))
+        }
+    }
+  }
+
+
   property("Crosscontract call (same accaunt)") {
     def contract(): DApp = {
       val expr = {
