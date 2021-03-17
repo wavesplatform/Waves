@@ -219,5 +219,10 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
       val delay = (responseAs[JsObject] \ "delay").as[Int]
       delay shouldBe 1000
     }
+
+    Get(routePath(s"/delay/${blocks.last.id()}/1")) ~> route ~> check {
+      val delay = (responseAs[JsObject] \ "delay").as[Int]
+      delay shouldBe 1000
+    }
   }
 }
