@@ -2,6 +2,10 @@ package com.wavesplatform.events.repo
 
 import java.nio.{ByteBuffer, ByteOrder}
 
+import scala.annotation.tailrec
+import scala.jdk.CollectionConverters._
+import scala.util.{Failure, Success, Try}
+
 import cats.kernel.Monoid
 import com.wavesplatform.Shutdownable
 import com.wavesplatform.api.common.CommonBlocksApi
@@ -9,18 +13,14 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events._
-import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
+import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import monix.eval.Task
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
-
-import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success, Try}
 
 class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val scheduler: Scheduler)
     extends UpdatesRepo.Read
@@ -116,8 +116,6 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
     Try {
       liquidState.foreach { ls =>
         val solidBlock = ls.solidify()
-        log.info(s"BlockchainUpdates persisting: ${solidBlock.height}")
-
         if (solidBlock.height > 1) require(db.get(key(solidBlock.height - 1)) != null, s"Previous block missing: ${solidBlock.height - 1}")
         db.put(
           key(solidBlock.height),
@@ -184,7 +182,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
                 val transactions = block.fold(Seq.empty[ByteStr])(_.transactionData.map(_.id()))
                 RollbackResult(block.toSeq, transactions.reverse, ba.reverseStateUpdate)
               }
-              log.info(s"Rolling back block at ${ba.height}: ${ba.id}")
+              log.trace(s"Rolling back block update at ${ba.height}: ${ba.id}")
               changes = reverted +: changes
               batch.delete(key)
           }
@@ -244,10 +242,8 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
         .blocksRange(from, from + LevelDBReadBatchSize)
         .map {
           case (meta, txs) =>
-            val result = readLockCond(Option(db.get(key(meta.height))))(_.isEmpty)
-            if (result.isEmpty) log.info(s"Missing update on height ${meta.height}")
             for {
-              bytes <- result
+              bytes <- readLockCond(Option(db.get(key(meta.height))))(_.isEmpty)
               update = PBBlockchainUpdated.parseFrom(bytes)
               ba     = update.vanilla.get.asInstanceOf[BlockAppended]
             } yield ba.copy(block = Block(meta.header, meta.signature, txs.map(_._1)))
@@ -256,9 +252,6 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
         .flatMap(Observable.fromIterable(_))
         .toListL
         .map { data =>
-          if (data.nonEmpty) log.info(s"Read batch from ${data.head.height} to ${data.last.height} ($from)")
-          else log.info(s"Read empty batch ($from)")
-
           def isLastBatch(data: Seq[_]): Boolean = data.length < LevelDBReadBatchSize
 
           if (isLastBatch(data)) {
@@ -289,19 +282,10 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
 
               case None =>
                 val lastPersistentUpdate = data.lastOption
-                log.info(s"Last persistent: $lastPersistentUpdate")
                 Observable
                   .fromIterable(lastRealTimeUpdates)
                   .++(realTimeUpdates)
-                  .dropWhile { u =>
-                    val result = !lastPersistentUpdate.forall(u.references)
-                    if (result) log.info(s"Dropping: $u")
-                    result
-                  }
-                  .map { u =>
-                    log.info(s"Sending real time: $u")
-                    u
-                  }
+                  .dropWhile(u => !lastPersistentUpdate.forall(u.references))
             })
         }
         readBatchStream(fromHeight)
