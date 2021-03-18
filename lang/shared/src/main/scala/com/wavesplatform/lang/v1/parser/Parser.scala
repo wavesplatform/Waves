@@ -265,7 +265,7 @@ object Parser {
       }
 
     def restMatchCaseInvalidP(implicit c: fastparse.P[Any]): P[String] = P((!P("=>") ~~ AnyChar.!).repX.map(_.mkString))
-    def varDefP(implicit c: fastparse.P[Any]): P[Option[PART[String]]] = anyVarName.map(Some(_)) | P("_").!.map(_ => None)
+    def varDefP(implicit c: fastparse.P[Any]): P[Option[PART[String]]] = (anyVarName ~~ !("'"|"(")).map(Some(_)) | P("_").!.map(_ => None)
 
     def typesDefP(implicit c: fastparse.P[Any]) = (
       ":" ~ comment ~
@@ -274,28 +274,41 @@ object Parser {
         })
     ).?.map(_.getOrElse(Union(Seq())))
 
+    def pattern(implicit c: fastparse.P[Any]): P[Pattern] =
+                 (varDefP ~ comment ~ typesDefP).map { case (v, t) => TypedVar(v, t) } |
+                 (Index ~ "(" ~ pattern.rep(min=2, sep=",") ~ ")" ~ Index).map(p => TuplePat(p._2, Pos(p._1, p._3))) |
+                 (Index ~ anyVarName ~ "(" ~ (anyVarName ~ "=" ~ pattern).rep(sep=",") ~ ")" ~ Index).map(p => ObjPat(p._3.map(kp => (PART.toOption(kp._1).get, kp._2)).toMap, Single(p._2, None), Pos(p._1, p._4))) |
+                 (Index ~ baseExpr.rep(min=1, sep="|") ~ Index).map(p => ConstsPat(p._2, Pos(p._1, p._3)))
+
+    def checkPattern(p: Pattern): Either[INVALID, Option[Pos]] = p match {
+      case TypedVar(_, t) => checkForGenericAndGetLastPos(t)
+      case ConstsPat(_, pos) => Right(Some(pos))
+      case TuplePat(ps, pos) => ps.toList traverse checkPattern map { _ => Some(pos) }
+      case ObjPat(ps, _, pos) => ps.values.toList traverse checkPattern map { _ => Some(pos) }
+    }
+
     P(
       Index ~~ "case" ~~ &(border) ~ comment ~/ (
-        (varDefP ~ comment ~ typesDefP) |
+        pattern |
           (Index ~~ restMatchCaseInvalidP ~~ Index).map {
             case (start, _, end) =>
-              (
+              TypedVar(
                 Some(PART.INVALID(Pos(start, end), "invalid syntax, should be: `case varName: Type => expr` or `case _ => expr`")),
                 Union(Seq())
               )
           }
       ) ~ comment ~ "=>" ~/ baseExpr.? ~~ Index
     ).map {
-      case (caseStart, (v, types), e, end) =>
-        checkForGenericAndGetLastPos(types)
+      case (caseStart, p, e, end) =>
+        checkPattern(p)
           .fold(
-            error => MATCH_CASE(error.position, newVarName = v, caseType = types, expr = error),
+            error => MATCH_CASE(error.position, pattern = p, expr = error),
             { pos =>
-              val exprStart = pos.orElse(v.map(_.position)).fold(caseStart)(_.end)
+              val cPos = Pos(caseStart, end)
+              val exprStart = pos.fold(caseStart)(_.end)
               MATCH_CASE(
-                Pos(caseStart, end),
-                newVarName = v,
-                caseType = types,
+                cPos,
+                pattern = p,
                 expr = e.getOrElse(INVALID(Pos(exprStart, end), "expected expression"))
               )
             }
