@@ -80,6 +80,10 @@ class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Event
     utx.size shouldBe 1
 
     utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe Some(Seq(tx))
+    d.appendBlock(tx)
+
+    val meta = d.blockchain.transactionMeta(tx.id())
+    meta shouldBe Some((3, false))
   }
 
   it should s"drop failed Invoke with asset script with complexity <= ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
