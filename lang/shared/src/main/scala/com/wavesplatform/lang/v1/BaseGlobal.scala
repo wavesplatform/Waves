@@ -22,7 +22,6 @@ import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
-import java.math.RoundingMode
 import scala.annotation.tailrec
 import scala.concurrent.Future
 import scala.util.Random
