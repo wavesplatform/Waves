@@ -9,14 +9,13 @@ import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.settings.SynchronizationSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{BaseTargetReachedMaximum, ScorexLogging, forceStopApplication}
 
 import scala.concurrent.duration.FiniteDuration
 
-case class PoSSelector(blockchain: Blockchain, syncSettings: SynchronizationSettings) extends ScorexLogging {
+case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) extends ScorexLogging {
   import PoSCalculator._
   import blockchain.{settings => blockchainSettings}
 
@@ -97,7 +96,7 @@ case class PoSSelector(blockchain: Blockchain, syncSettings: SynchronizationSett
   def checkBaseTargetLimit(baseTarget: Long, height: Int): Either[ValidationError, Unit] = {
     def stopNode(): ValidationError = {
       log.error(
-        s"Base target reached maximum value (settings: synchronization.max-base-target=${syncSettings.maxBaseTargetOpt.getOrElse(-1)}). Anti-fork protection."
+        s"Base target reached maximum value (settings: synchronization.max-base-target=${maxBaseTarget.getOrElse(-1)}). Anti-fork protection."
       )
       log.error("FOR THIS REASON THE NODE WAS STOPPED AUTOMATICALLY")
       forceStopApplication(BaseTargetReachedMaximum)
@@ -106,7 +105,7 @@ case class PoSSelector(blockchain: Blockchain, syncSettings: SynchronizationSett
 
     Either.cond(
       // We need to choose some moment with stable baseTarget value in case of loading blockchain from beginning.
-      !fairPosActivated(height) || syncSettings.maxBaseTargetOpt.forall(baseTarget < _),
+      !fairPosActivated(height) || maxBaseTarget.forall(baseTarget < _),
       (),
       stopNode()
     )

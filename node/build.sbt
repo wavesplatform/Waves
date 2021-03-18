@@ -22,28 +22,6 @@ inConfig(Compile)(
   )
 )
 
-val aopMerge: MergeStrategy = new MergeStrategy {
-  import scala.xml._
-  import scala.xml.dtd._
-
-  override val name = "aopMerge"
-  override def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] = {
-    val dt                         = DocType("aspectj", PublicID("-//AspectJ//DTD//EN", "http://www.eclipse.org/aspectj/dtd/aspectj.dtd"), Nil)
-    val file                       = MergeStrategy.createMergeTarget(tempDir, path)
-    val xmls: Seq[Elem]            = files.map(XML.loadFile)
-    val aspectsChildren: Seq[Node] = xmls.flatMap(_ \\ "aspectj" \ "aspects" \ "_")
-    val weaverChildren: Seq[Node]  = xmls.flatMap(_ \\ "aspectj" \ "weaver" \ "_")
-    val options: String            = xmls.map(x => (x \\ "aspectj" \ "weaver" \ "@options").text).mkString(" ").trim
-    val weaverAttr                 = if (options.isEmpty) Null else new UnprefixedAttribute("options", options, Null)
-    val aspects                    = new Elem(null, "aspects", Null, TopScope, false, aspectsChildren: _*)
-    val weaver                     = new Elem(null, "weaver", weaverAttr, TopScope, false, weaverChildren: _*)
-    val aspectj                    = new Elem(null, "aspectj", Null, TopScope, false, aspects, weaver)
-    XML.save(file.toString, aspectj, "UTF-8", xmlDecl = false, dt)
-    IO.append(file, IO.Newline.getBytes(IO.defaultCharset))
-    Right(Seq(file -> path))
-  }
-}
-
 inTask(assembly)(
   Seq(
     test := {},
@@ -51,18 +29,46 @@ inTask(assembly)(
     assemblyMergeStrategy := {
       case "module-info.class"                                  => MergeStrategy.discard
       case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.concat
-      case PathList("META-INF", "aop.xml")                      => aopMerge
       case other                                                => (assemblyMergeStrategy in assembly).value(other)
     }
   )
 )
 
-scriptClasspath += "*" // adds "$lib_dir/*" to app_classpath in the executable file
+// Adds "$lib_dir/*" to app_classpath in the executable file
 // Logback creates a "waves.directory_UNDEFINED" without this option.
+scriptClasspath += "*"
+
 bashScriptExtraDefines ++= Seq(
   s"""addJava "-Dwaves.defaults.blockchain.type=${network.value}"""",
   s"""addJava "-Dwaves.defaults.directory=/var/lib/${(Universal / normalizedName).value}"""",
-  s"""addJava "-Dwaves.defaults.config.directory=/etc/${(Universal / normalizedName).value}""""
+  s"""addJava "-Dwaves.defaults.config.directory=/etc/${(Universal / normalizedName).value}"""",
+  // Workaround to ignore the -h option
+  """process_args() {
+    |  local no_more_snp_opts=0
+    |  while [[ $# -gt 0 ]]; do
+    |    case "$1" in
+    |    --) shift && no_more_snp_opts=1 && break ;;
+    |    -no-version-check) no_version_check=1 && shift ;;
+    |    -java-home) require_arg path "$1" "$2" && jre=$(eval echo $2) && java_cmd="$jre/bin/java" && shift 2 ;;
+    |    -D* | -agentlib* | -XX*) addJava "$1" && shift ;;
+    |    -J*) addJava "${1:2}" && shift ;;
+    |    *) addResidual "$1" && shift ;;
+    |    esac
+    |  done
+    |
+    |  if [[ no_more_snp_opts ]]; then
+    |    while [[ $# -gt 0 ]]; do
+    |      addResidual "$1" && shift
+    |    done
+    |  fi
+    |
+    |  is_function_defined process_my_args && {
+    |    myargs=("${residual_args[@]}")
+    |    residual_args=()
+    |    process_my_args "${myargs[@]}"
+    |  }
+    |}
+    |""".stripMargin
 )
 
 inConfig(Universal)(
