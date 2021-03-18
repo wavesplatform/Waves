@@ -120,7 +120,7 @@ object PureContext {
   lazy val stringToBigInt: BaseFunction[NoContext] =
     NativeFunction("parseBigIntValue", 65, STRING_TO_BIGINT, BIGINT, ("n", STRING)) {
       case CONST_STRING(n) :: Nil => Either.cond(n.length <= 155 ,BigInt(n), s"String too long for 512-bits big integers (${n.length} when max is 155)")
-        .filterOrElse(v => v <= maxBigInt && v >= minBigInt, "Value to big for 512-bits big integer")
+        .filterOrElse(v => v <= maxBigInt && v >= minBigInt, "Value too big for 512-bits big integer")
         .map(CONST_BIGINT.apply)
       case xs => notImplemented[Id, EVALUATED]("parseBigIntValue(n: String)", xs)
     }
