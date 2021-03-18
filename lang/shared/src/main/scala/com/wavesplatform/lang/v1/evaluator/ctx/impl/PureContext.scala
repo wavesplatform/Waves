@@ -126,7 +126,7 @@ object PureContext {
     }
 
   lazy val stringToBigIntOpt: BaseFunction[NoContext] =
-    NativeFunction("parseBigInt", 65, STRING_TO_BIGINTOPT, BIGINT, ("n", STRING)) {
+    NativeFunction("parseBigInt", 65, STRING_TO_BIGINTOPT, UNION(BIGINT, UNIT), ("n", STRING)) {
       case CONST_STRING(n) :: Nil => Right((if(n.length <= 155) {
         try {
           val v = BigInt(n)
