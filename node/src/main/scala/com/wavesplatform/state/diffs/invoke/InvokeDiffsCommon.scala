@@ -201,18 +201,18 @@ object InvokeDiffsCommon {
         TracedResult.wrapValue(Map[Address, Portfolio]())
       else {
         val feeActionsCount = if (blockchain.isFeatureActivated(SynchronousCalls)) verifierCount else additionalScriptsCount
-        val stepLimit = ContractLimits.MaxComplexityByVersion(version)
+        val stepLimit       = ContractLimits.MaxComplexityByVersion(version)
         tx.root
           .map(
-        calcAndCheckFee(
-          FailedTransactionError.feeForActions,
-          _,
-          blockchain,
-          stepLimit,
-          invocationComplexity,
-          issueList ++ otherIssues,
-          feeActionsCount
-        ).map(_._2)
+            calcAndCheckFee(
+              FailedTransactionError.feeForActions,
+              _,
+              blockchain,
+              stepLimit,
+              invocationComplexity,
+              issueList ++ otherIssues,
+              feeActionsCount
+            ).map(_._2)
           )
           .getOrElse(TracedResult(Right(Map[Address, Portfolio]())))
       }

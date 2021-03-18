@@ -43,7 +43,6 @@ object InvokeScriptDiff {
     blockchain.accountScript(dAppAddress) match {
       case Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities)) =>
         val limit = ContractLimits.MaxTotalInvokeComplexity(version)
-        val fee   = tx.root.map(_.fee).getOrElse(0L)
         for {
           _ <- traced(
             Either.cond(
@@ -132,7 +131,7 @@ object InvokeScriptDiff {
                   ByteStr(tx.sender.arr),
                   payments,
                   tx.txId,
-                  fee,
+                  tx.root.map(_.fee).getOrElse(0L),
                   tx.root.flatMap(_.feeAssetId.compatId)
                 )
                 val height = blockchain.height

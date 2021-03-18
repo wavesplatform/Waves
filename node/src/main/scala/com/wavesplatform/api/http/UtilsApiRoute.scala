@@ -315,8 +315,7 @@ object UtilsApiRoute {
               PublicKey(ByteStr.fill(KeyLength)(1)),
               address,
               10,
-              10,
-              Diff.empty
+               Diff.empty
             )
           )
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
