@@ -279,6 +279,7 @@ class InvokeScriptTransactionDiffTest
             PureContext.build(V3).withEnvironment[Environment],
             CryptoContext.build(Global, V3).withEnvironment[Environment],
             WavesContext.build(
+              Global,
               DirectiveSet(V3, Account, Expression).explicitGet()
             )
           )
@@ -350,6 +351,7 @@ class InvokeScriptTransactionDiffTest
             PureContext.build(stdLibVersion).withEnvironment[Environment],
             CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment],
             WavesContext.build(
+              Global,
               DirectiveSet(stdLibVersion, Account, DAppType).explicitGet()
             )
           )
