@@ -3,6 +3,10 @@ package com.wavesplatform.events
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
 
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
+
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.api.grpc.BlockchainUpdatesApiGrpcImpl
@@ -13,14 +17,10 @@ import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.utils.{Schedulers, ScorexLogging}
-import io.grpc.netty.NettyServerBuilder
 import io.grpc.{Metadata, Server, ServerStreamTracer, Status}
+import io.grpc.netty.NettyServerBuilder
 import monix.execution.Scheduler
 import net.ceedubs.ficus.Ficus._
-
-import scala.concurrent.Future
-import scala.concurrent.duration._
-import scala.util.{Failure, Success}
 
 class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging with BlockchainUpdateTriggers {
   private[this] implicit val scheduler = Schedulers.fixedPool(sys.runtime.availableProcessors(), "blockchain-updates")
@@ -88,6 +88,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
     grpcServer = NettyServerBuilder
       .forAddress(bindAddress)
+      .permitKeepAliveTime(settings.minKeepAlive.toNanos, TimeUnit.NANOSECONDS)
       .addStreamTracerFactory(
         (fullMethodName: String, headers: Metadata) =>
           new ServerStreamTracer {
