@@ -152,7 +152,7 @@ object PureContext {
 
   lazy val bytesToBigIntLim: BaseFunction[NoContext] =
     NativeFunction("toBigInt", 65, BYTES_TO_BIGINT_LIM, BIGINT, ("n", BYTESTR), ("off", LONG), ("size", LONG)) {
-      case CONST_BYTESTR(ByteStr(n)) :: CONST_LONG(off) :: CONST_LONG(s) :: Nil => Either.cond(off >= 0 && off <= n.size && s <= 64 && s > 0, CONST_BIGINT(BigInt(n.slice(off.toInt, (off+s).toInt))), s"ByteStr too long (s{s} > 64 bytes)")
+      case CONST_BYTESTR(ByteStr(n)) :: CONST_LONG(off) :: CONST_LONG(s) :: Nil => Either.cond(off >= 0 && off <= n.size && s <= 64 && s > 0, CONST_BIGINT(BigInt(n.slice(off.toInt, (off+s).toInt))), s"ByteStr too long ($s > 64 bytes)")
       case xs => notImplemented[Id, EVALUATED]("toBigInt(n: ByteStr, offset: Int, size: Int)", xs)
     }
   lazy val bytesToBigInt: BaseFunction[NoContext] =
