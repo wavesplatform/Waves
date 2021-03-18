@@ -13,7 +13,6 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{V2, V3}
@@ -28,7 +27,6 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, IntegerDataEntry}
 import com.wavesplatform.transaction.TxHelpers
