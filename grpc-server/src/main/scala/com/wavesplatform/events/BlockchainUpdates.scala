@@ -3,6 +3,10 @@ package com.wavesplatform.events
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
 
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
+
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.api.grpc.BlockchainUpdatesApiGrpcImpl
@@ -13,14 +17,10 @@ import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.utils.{Schedulers, ScorexLogging}
-import io.grpc.netty.NettyServerBuilder
 import io.grpc.{Metadata, Server, ServerStreamTracer, Status}
+import io.grpc.netty.NettyServerBuilder
 import monix.execution.Scheduler
 import net.ceedubs.ficus.Ficus._
-
-import scala.concurrent.Future
-import scala.concurrent.duration._
-import scala.util.{Failure, Success}
 
 class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging with BlockchainUpdateTriggers {
   private[this] implicit val scheduler = Schedulers.fixedPool(sys.runtime.availableProcessors(), "blockchain-updates")
@@ -91,19 +91,23 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
     grpcServer = NettyServerBuilder
       .forAddress(bindAddress)
-        .addStreamTracerFactory((fullMethodName: String, headers: Metadata) => new ServerStreamTracer {
-          var callInfo = Option.empty[ServerStreamTracer.ServerCallInfo[_, _]]
-          private[this] def callId = callInfo.fold("???")(ci => Integer.toHexString(System.identityHashCode(ci)))
+      .permitKeepAliveTime(settings.minKeepAlive.toNanos, TimeUnit.NANOSECONDS)
+      .addStreamTracerFactory(
+        (fullMethodName: String, headers: Metadata) =>
+          new ServerStreamTracer {
+            var callInfo             = Option.empty[ServerStreamTracer.ServerCallInfo[_, _]]
+            private[this] def callId = callInfo.fold("???")(ci => Integer.toHexString(System.identityHashCode(ci)))
 
-          override def serverCallStarted(callInfo: ServerStreamTracer.ServerCallInfo[_, _]): Unit = {
-            this.callInfo = Some(callInfo)
-            log.trace(s"[$callId] gRPC call started: $fullMethodName, headers: $headers")
-          }
+            override def serverCallStarted(callInfo: ServerStreamTracer.ServerCallInfo[_, _]): Unit = {
+              this.callInfo = Some(callInfo)
+              log.trace(s"[$callId] gRPC call started: $fullMethodName, headers: $headers")
+            }
 
-          override def streamClosed(status: Status): Unit = {
-            log.trace(s"[$callId] gRPC call closed with status: $status")
+            override def streamClosed(status: Status): Unit = {
+              log.trace(s"[$callId] gRPC call closed with status: $status")
+            }
           }
-        })
+      )
       .addService(BlockchainUpdatesApiGrpc.bindService(new BlockchainUpdatesApiGrpcImpl(repo)(scheduler), scheduler))
       .build()
       .start()
