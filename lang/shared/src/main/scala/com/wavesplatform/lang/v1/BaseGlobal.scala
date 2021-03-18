@@ -1,7 +1,5 @@
 package com.wavesplatform.lang.v1
 
-import java.math.RoundingMode
-
 import cats.implicits._
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.meta.{FunctionSignatures, MetaMapper, ParsedMeta}
@@ -18,11 +16,13 @@ import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
+import java.math.RoundingMode
 import scala.annotation.tailrec
 import scala.concurrent.Future
 import scala.util.Random
@@ -249,21 +249,8 @@ trait BaseGlobal {
 
   // Math functions
 
-  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long]
-  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long]
-
-  import RoundingMode._
-
-  protected def roundMode(round: BaseGlobal.Rounds): RoundingMode =
-    round match {
-      case BaseGlobal.RoundUp()       => UP
-      case BaseGlobal.RoundHalfUp()   => HALF_UP
-      case BaseGlobal.RoundHalfDown() => HALF_DOWN
-      case BaseGlobal.RoundDown()     => DOWN
-      case BaseGlobal.RoundHalfEven() => HALF_EVEN
-      case BaseGlobal.RoundCeiling()  => CEILING
-      case BaseGlobal.RoundFloor()    => FLOOR
-    }
+  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long]
+  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long]
 
   def requestNode(url: String): Future[NodeResponse]
 
@@ -302,15 +289,6 @@ trait BaseGlobal {
 }
 
 object BaseGlobal {
-  sealed trait Rounds
-  case class RoundDown()     extends Rounds
-  case class RoundUp()       extends Rounds
-  case class RoundHalfDown() extends Rounds
-  case class RoundHalfUp()   extends Rounds
-  case class RoundHalfEven() extends Rounds
-  case class RoundCeiling()  extends Rounds
-  case class RoundFloor()    extends Rounds
-
   private case class ArrayView(arr: Array[Long], from: Int, until: Int) {
     def apply(n: Int): Long =
       if (from + n < until) arr(from + n)
