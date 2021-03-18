@@ -43,12 +43,13 @@ object InvokeScriptDiff {
     blockchain.accountScript(dAppAddress) match {
       case Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities)) =>
         val limit = ContractLimits.MaxTotalInvokeComplexity(version)
+        val fee   = tx.root.map(_.fee).getOrElse(0L)
         for {
           _ <- traced(
             Either.cond(
               remainingCalls > 0,
               (),
-              ValidationError.ScriptRunsLimitError(s"DApp calls limit = $callsLimit for attached fee = ${tx.root.fee} is exceeded")
+              ValidationError.ScriptRunsLimitError(s"DApp calls limit = $callsLimit for attached fee = $fee is exceeded")
             )
           )
           invocationComplexity <- traced {
@@ -84,8 +85,8 @@ object InvokeScriptDiff {
                     tx.sender,
                     Recipient.Address(ByteStr(tx.dAppAddress.bytes)),
                     amount,
-                    tx.root.timestamp,
-                    tx.root.id()
+                    tx.timestamp,
+                    tx.txId
                   )
                   ScriptRunner(
                     Coproduct[TxOrd](pseudoTx),
@@ -116,7 +117,9 @@ object InvokeScriptDiff {
 
           tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
           input <- traced(
-            buildThisValue(Coproduct[TxOrd](tx.root: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply)
+            tx.root
+              .map(t => buildThisValue(Coproduct[TxOrd](t: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply))
+              .getOrElse(Right(null))
           )
 
           result <- for {
@@ -128,9 +131,9 @@ object InvokeScriptDiff {
                   Recipient.Address(ByteStr(invoker.bytes)),
                   ByteStr(tx.sender.arr),
                   payments,
-                  tx.root.id(),
-                  tx.root.fee,
-                  tx.root.feeAssetId.compatId
+                  tx.txId,
+                  fee,
+                  tx.root.flatMap(_.feeAssetId.compatId)
                 )
                 val height = blockchain.height
 

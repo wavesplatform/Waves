@@ -109,7 +109,7 @@ object InvokeScriptTransactionDiff {
                   blockchain,
                   tthis,
                   directives,
-                  tx,
+                  Some(tx),
                   dAppAddress,
                   pk,
                   dAppAddress,
