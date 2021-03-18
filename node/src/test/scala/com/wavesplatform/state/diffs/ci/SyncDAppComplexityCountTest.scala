@@ -120,7 +120,7 @@ class SyncDAppComplexityCountTest
         invoker  <- accountGen
         dAppAccs <- Gen.listOfN(dAppCount, accountGen)
         ts       <- timestampGen
-        fee      <- ciFee(dApps = dAppCount, sc = (if (withVerifier) 1 else 0) + (if (withPayment) 1 else 0))
+        fee      <- ciFee(sc = (if (withVerifier) 1 else 0) + (if (withPayment) 1 else 0) + (if (withThroughTransfer) 1 else 0))
 
         assetIssue = IssueTransaction
           .selfSigned(
@@ -232,34 +232,32 @@ class SyncDAppComplexityCountTest
     }
 
     assert(1, 2709)
-    assert(2, 5459)
-    assert(18, 49459)
-    assert(19, 52000, exceeding = true)
-    assert(20, 51973, exceeding = true)
-    assert(100, 51973, exceeding = true)
+    assert(2, 5504)
+    assert(18, 50224)
+    assert(19, 50079, exceeding = true)
+    assert(100, 50079, exceeding = true)
 
     assert(1, 5415, withPayment = true)
-    assert(2, 8165, withPayment = true)
-    assert(17, 49415, withPayment = true)
-    assert(18, 52000, withPayment = true, exceeding = true)
-    assert(19, 51975, withPayment = true, exceeding = true)
-    assert(100, 51975, withPayment = true, exceeding = true)
+    assert(2, 8210, withPayment = true)
+    assert(17, 50135, withPayment = true)
+    assert(18, 50003, withPayment = true, exceeding = true)
+    assert(100, 50003, withPayment = true, exceeding = true)
 
-    assert(2, 8170, withThroughPayment = true)
-    assert(10, 51858, withThroughPayment = true)
-    assert(11, 52000, withThroughPayment = true, exceeding = true)
-    assert(100, 52000, withThroughPayment = true, exceeding = true)
+    assert(2, 8215, withThroughPayment = true)
+    assert(9, 46757, withThroughPayment = true)
+    assert(10, 49404, withThroughPayment = true, exceeding = true)
+    assert(100, 49404, withThroughPayment = true, exceeding = true)
 
     assert(1, 5424, withThroughTransfer = true)
-    assert(2, 10889, withThroughTransfer = true)
-    assert(9, 49144, withThroughTransfer = true)
-    assert(10, 51890, withThroughTransfer = true, exceeding = true)
-    assert(100, 51973, withThroughTransfer = true, exceeding = true)
+    assert(2, 10934, withThroughTransfer = true)
+    assert(9, 49504, withThroughTransfer = true)
+    assert(10, 52000, withThroughTransfer = true, exceeding = true)
+    assert(100, 50079, withThroughTransfer = true, exceeding = true)
 
     assert(1, 3915, withVerifier = true)
-    assert(18, 50665, withVerifier = true)
-    assert(19, 50475, withVerifier = true, exceeding = true)
-    assert(100, 50475, withVerifier = true, exceeding = true)
+    assert(17, 48635, withVerifier = true)
+    assert(18, 52629, withVerifier = true, exceeding = true)
+    assert(100, 51285, withVerifier = true, exceeding = true)
 
     assert(1, 9336, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true)
     assert(100, 52000, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true, exceeding = true)
