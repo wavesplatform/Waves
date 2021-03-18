@@ -17,12 +17,11 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.ContractCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
+import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError._
@@ -77,11 +76,6 @@ object InvokeScriptTransactionDiff {
             additionalScriptsInvoked = 0
           )
 
-          maxCalls       = ContractLimits.MaxSyncDAppCalls(version)
-          invokeFee      = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-          paidCalls      = feeInWaves / invokeFee - 1
-          remainingCalls = Math.min(maxCalls, paidCalls).toInt
-
           directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
           payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
           tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
@@ -101,6 +95,7 @@ object InvokeScriptTransactionDiff {
                   tx.feeAssetId.compatId
                 )
                 val height = blockchain.height
+                val remainingCalls = ContractLimits.MaxSyncDAppCalls(version)
 
                 val environment = new DAppEnvironment(
                   AddressScheme.current.chainId,
@@ -113,7 +108,6 @@ object InvokeScriptTransactionDiff {
                   dAppAddress,
                   pk,
                   dAppAddress,
-                  remainingCalls,
                   remainingCalls,
                   (if (version < V5) {
                      Diff.empty
