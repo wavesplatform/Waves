@@ -5,7 +5,6 @@ import com.wavesplatform.state.diffs.invoke.InvokeScriptLike
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments._
 import com.wavesplatform.state.Blockchain
@@ -27,8 +26,8 @@ object AttachedPaymentExtractor {
         Left("Multiple payments isn't allowed now")
       else if (!version.supportsMultiPayment)
         Left(scriptErrorMessage(targetScript, version))
-      else if (tx.payments.size > ContractLimits.MaxAttachedPaymentAmount)
-        Left(s"Script payment amount=${tx.payments.size} should not exceed ${ContractLimits.MaxAttachedPaymentAmount}")
+      else if (tx.payments.size > version.maxPayments)
+        Left(s"Script payment amount=${tx.payments.size} should not exceed ${version.maxPayments}")
       else
         multiple(tx)
 

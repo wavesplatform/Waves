@@ -7,7 +7,7 @@ import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.BlockV5
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, SynchronousCalls}
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
 import com.wavesplatform.features.ScriptTransferValidationProvider._
@@ -202,10 +202,11 @@ object InvokeDiffsCommon {
       verifierCount = if (blockchain.hasPaidVerifier(tx.senderAddress)) 1 else 0
       additionalScriptsCount = actionComplexities.size + verifierCount + tx.checkedAssets.count(blockchain.hasAssetScript)
 
-      stepLimit = ContractLimits.MaxComplexityByVersion(version)
       feeDiff <- if (isSyncCall)
         TracedResult.wrapValue(Map[Address, Portfolio]())
-      else
+      else {
+        val feeActionsCount = if (blockchain.isFeatureActivated(SynchronousCalls)) verifierCount else additionalScriptsCount
+        val stepLimit = ContractLimits.MaxComplexityByVersion(version)
         calcAndCheckFee(
           FailedTransactionError.feeForActions,
           tx.root,
@@ -213,8 +214,9 @@ object InvokeDiffsCommon {
           stepLimit,
           invocationComplexity,
           issueList ++ otherIssues,
-          additionalScriptsCount
+          feeActionsCount
         ).map(_._2)
+      }
 
       verifierComplexity = blockchain.accountScript(tx.senderAddress).map(_.verifierComplexity).getOrElse(0L)
       additionalComplexity = actionComplexities.sum + verifierComplexity

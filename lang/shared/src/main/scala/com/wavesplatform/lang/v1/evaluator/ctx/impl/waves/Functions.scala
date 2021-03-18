@@ -511,7 +511,7 @@ object Functions {
   def callDAppF(version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "Invoke",
-      Map[StdLibVersion, Long](V4 -> 30L),
+      Map[StdLibVersion, Long](V4 -> 75L),
       CALLDAPP,
       ANY,
       ("dapp", addressOrAliasType),
