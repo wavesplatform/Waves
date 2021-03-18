@@ -7,7 +7,7 @@
  */
 
 import sbt.Keys._
-import sbt.{Project, _}
+import sbt.{File, IO, Project, _}
 import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
 
 val langPublishSettings = Seq(
@@ -147,17 +147,15 @@ git.useGitDescribe := true
 git.uncommittedSignifier := Some("DIRTY")
 
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
-packageAll := Def
-  .sequential(
-    root / clean,
-    Def.task {
-      (node / assembly).value
-      (node / Debian / packageBin).value
-      (`grpc-server` / Universal / packageZipTarball).value
-      (`grpc-server` / Debian / packageBin).value
-    }
-  )
-  .value
+packageAll := {
+  (node / assembly).value
+  (`grpc-server` / Universal / packageZipTarball).value
+
+  val nodeDebFile = (node / Debian / packageBin).value
+  val grpcDebFile = (`grpc-server` / Debian / packageBin).value
+  IO.copyFile(nodeDebFile, new File(baseDirectory.value, "docker/target/waves.deb"))
+  IO.copyFile(grpcDebFile, new File(baseDirectory.value, "docker/target/grpc-server.deb"))
+}
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw := Def
