@@ -41,7 +41,7 @@ case class MultiDimensionalMiningConstraint(constraints: NonEmptyList[MiningCons
   override def put(blockchain: Blockchain, x: Transaction, diff: Diff): MultiDimensionalMiningConstraint =
     MultiDimensionalMiningConstraint(constraints.map(_.put(blockchain, x, diff)))
 
-  override def toString: String = s"Constraint([${constraints.head}${constraints.tail.mkString(",", ",", "")}])"
+  override def toString: String = s"[${constraints.head}${constraints.tail.mkString(",", ",", "")}]"
 }
 
 object MultiDimensionalMiningConstraint {
