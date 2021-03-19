@@ -2362,7 +2362,7 @@ class InvokeScriptTransactionDiffTest
         master  <- accountGen
         invoker <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(dApps = 1)
+        fee     <- ciFee(sc = 1)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
@@ -2410,7 +2410,7 @@ class InvokeScriptTransactionDiffTest
         master  <- accountGen
         invoker <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(dApps = 1)
+        fee     <- ciFee(sc = 1)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
@@ -2468,7 +2468,7 @@ class InvokeScriptTransactionDiffTest
         master  <- accountGen
         invoker <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(dApps = 1)
+        fee     <- ciFee(sc = 1)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
