@@ -518,10 +518,6 @@ object Application extends ScorexLogging {
     Security.setProperty("networkaddress.cache.ttl", "0")
     Security.setProperty("networkaddress.cache.negative.ttl", "0")
 
-    // specify aspectj to use it's build-in infrastructure
-    // http://www.eclipse.org/aspectj/doc/released/pdguide/trace.html
-    System.setProperty("org.aspectj.tracing.factory", "default")
-
     args.headOption.getOrElse("") match {
       case "export"                 => Exporter.main(args.tail)
       case "import"                 => Importer.main(args.tail)

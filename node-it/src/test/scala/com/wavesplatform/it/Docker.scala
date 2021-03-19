@@ -33,10 +33,10 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.io.IOUtils
 import org.asynchttpclient.Dsl._
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, blocking}
+import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 import scala.util.{Random, Try}
 
@@ -210,18 +210,14 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
         .withFallback(nodeConfig)
         .withFallback(suiteConfig)
         .withFallback(genesisOverride)
+        .withFallback(configTemplate)
 
       val actualConfig = overrides
-        .withFallback(configTemplate)
         .withFallback(defaultApplication())
         .withFallback(defaultReference())
         .resolve()
 
       val networkPort = actualConfig.getString("waves.network.port")
-      val hostConfig = HostConfig
-        .builder()
-        .publishAllPorts(true)
-        .build()
 
       val nodeNumber = nodeName.replace("node", "").toInt
       val ip         = ipForNode(nodeNumber)
@@ -240,22 +236,25 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
             s"sampling,monitors,sessionname=WavesNode,dir=$ContainerRoot/profiler,logdir=$ContainerRoot,onexit=snapshot "
         }
 
-        val withAspectJ = Option(System.getenv("WITH_ASPECTJ")).fold(false)(_.toBoolean)
-        if (withAspectJ) config += s"-javaagent:$ContainerRoot/aspectjweaver.jar "
         config
       }
+
+      val hostConfig = HostConfig
+        .builder()
+        .publishAllPorts(true)
+        .build()
 
       val containerConfig = ContainerConfig
         .builder()
         .image(imageName)
         .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(wavesNetwork.name() -> endpointConfigFor(nodeName)).asJava))
         .hostConfig(hostConfig)
-        .env(s"WAVES_OPTS=$configOverrides")
+        .env(s"JAVA_OPTS=$configOverrides")
         .build()
 
       val containerId = {
         val jenkinsJobIdFromEnv = sys.env.get("JENKINS_JOB_ID").fold("")(s => s"-$s")
-        val containerName = s"${wavesNetwork.name()}-$nodeName$jenkinsJobIdFromEnv"
+        val containerName       = s"${wavesNetwork.name()}-$nodeName$jenkinsJobIdFromEnv"
         dumpContainers(
           client.listContainers(DockerClient.ListContainersParam.filter("name", containerName)),
           "Containers with same name"
@@ -349,10 +348,11 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     if (configUpdates != empty) {
       val renderedConfig = renderProperties(asProperties(configUpdates))
 
-      log.debug("Set new config directly in the script for starting node")
-      val shPath = "/opt/waves/start-waves.sh"
+      // Docker do not allow updating ENV https://github.com/moby/moby/issues/8838 :(
+      log.debug("Set new config directly in the entrypoint.sh script")
+      val shPath = "/usr/share/waves/bin/entrypoint.sh"
       val scriptCmd: Array[String] =
-        Array("sh", "-c", s"sed -i 's|$$WAVES_OPTS.*-cp|$$WAVES_OPTS $renderedConfig -cp|' $shPath && chmod +x $shPath")
+        Array("sh", "-c", s"sed -i 's|$${JAVA_OPTS}|$${JAVA_OPTS} $renderedConfig|' $shPath && cat $shPath")
 
       val execScriptCmd = client.execCreate(node.containerId, scriptCmd).id()
       client.execStart(execScriptCmd)
@@ -525,7 +525,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 object Docker {
   val NodeImageName: String = "com.wavesplatform/node-it:latest"
 
-  private val ContainerRoot = Paths.get("/opt/waves")
+  private val ContainerRoot = Paths.get("/usr/share/waves")
   private val ProfilerPort  = 10001
 
   private val RunId = Option(System.getenv("RUN_ID")).getOrElse(DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss").format(LocalDateTime.now()))
@@ -557,7 +557,7 @@ object Docker {
   def apply(owner: Class[_]): Docker = new Docker(tag = owner.getSimpleName)
 
   private def asProperties(config: Config): Properties = {
-    val jsonConfig = config.root().render(ConfigRenderOptions.concise())
+    val jsonConfig = config.resolve().root().render(ConfigRenderOptions.concise())
     propsMapper.writeValueAsProperties(jsonMapper.readTree(jsonConfig))
   }
 

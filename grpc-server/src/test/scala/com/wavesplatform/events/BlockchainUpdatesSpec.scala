@@ -56,6 +56,7 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
 
         val subscription = repo.createSubscription(request)
         for (_ <- 1 until count) d.appendBlock()
+        Thread.sleep(1000)
         subscription.cancel()
 
         val result = subscription.futureValue

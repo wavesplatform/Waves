@@ -13,7 +13,7 @@ Seq(
   "com.typesafe.sbt"   % "sbt-native-packager"       % "1.3.25",
   "org.scalastyle"     %% "scalastyle-sbt-plugin"    % "1.0.0",
   "org.scoverage"      % "sbt-scoverage"             % "1.6.1",
-  "se.marcuslonnberg"  % "sbt-docker"                % "1.4.1",
+  "se.marcuslonnberg"  % "sbt-docker"                % "1.8.1",
   "com.typesafe.sbt"   % "sbt-git"                   % "1.0.0",
   "org.scala-js"       % "sbt-scalajs"               % "0.6.33",
   "org.portable-scala" % "sbt-scalajs-crossproject"  % "0.6.0",
@@ -24,7 +24,7 @@ Seq(
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(
-  "com.fasterxml.jackson.module" % "jackson-module-scala_2.12" % "2.9.9",
+  "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.12.1",
   "org.hjson"                    % "hjson"                     % "3.0.0",
   "org.vafer"                    % "jdeb"                      % "1.5" artifacts Artifact("jdeb", "jar", "jar"),
   "org.slf4j"                    % "jcl-over-slf4j"            % "1.7.30",
