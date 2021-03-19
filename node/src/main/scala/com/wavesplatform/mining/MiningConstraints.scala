@@ -10,7 +10,6 @@ case class MiningConstraints(total: MiningConstraint, keyBlock: MiningConstraint
 
 object MiningConstraints {
   val MaxScriptRunsInBlock = 100
-  val MaxScriptsComplexityInBlock = 1000000
   val ClassicAmountOfTxsInBlock = 100
   val MaxTxsSizeInBytes = 1 * 1024 * 1024 // 1 megabyte
 
@@ -33,7 +32,7 @@ object MiningConstraints {
         if (isDAppsEnabled)
           MultiDimensionalMiningConstraint(
             NonEmptyList
-              .of(OneDimensionalMiningConstraint(MaxScriptsComplexityInBlock, TxEstimators.scriptsComplexity, "MaxScriptsComplexityInBlock"), total))
+              .of(OneDimensionalMiningConstraint(blockchain.settings.functionalitySettings.maxComplexityInBlock, TxEstimators.scriptsComplexity, "MaxScriptsComplexityInBlock"), total))
         else if (isScriptEnabled)
           MultiDimensionalMiningConstraint(
             NonEmptyList.of(OneDimensionalMiningConstraint(MaxScriptRunsInBlock, TxEstimators.scriptRunNumber, "MaxScriptRunsInBlock"), total))
