@@ -3,15 +3,15 @@ package com.wavesplatform.history
 import cats.syntax.option._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{AddressPortfolio, AddressTransactions}
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{DBExt, LevelDBWriter}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{BlockchainUpdater, _}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import org.iq80.leveldb.DB
 
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
