@@ -1,20 +1,20 @@
 package com.wavesplatform.events
 
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
-
 import cats.Monoid
 import cats.syntax.monoid._
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf._
-import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetScriptInfo, Blockchain, DataEntry, Diff, DiffToStateApplier, LeaseBalance}
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.{Asset, GenesisTransaction, Transaction}
+import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetScriptInfo, Blockchain, DataEntry, Diff, DiffToStateApplier, LeaseBalance}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, Transaction}
+
+import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 final case class AssetStateUpdate(
     asset: IssuedAsset,
@@ -176,8 +176,7 @@ object BlockchainUpdated {
     def references(other: BlockchainUpdated): Boolean = bu match {
       case b: BlockAppended                 => b.block.header.reference == other.toId
       case mb: MicroBlockAppended           => mb.microBlock.reference == other.toId
-      case rb: RollbackCompleted            => rb.toHeight < other.toHeight
-      case mrb: MicroBlockRollbackCompleted => mrb.toHeight == other.toHeight
+      case _                      => false
     }
   }
 }
