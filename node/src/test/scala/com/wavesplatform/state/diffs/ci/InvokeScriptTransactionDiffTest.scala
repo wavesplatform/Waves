@@ -2351,9 +2351,11 @@ class InvokeScriptTransactionDiffTest
              | @Callable(i)
              | func foo() = {
              |  let h = hashScriptAtAddress(this)
-             |  [
-             |   BinaryEntry("hash", h.value())
-             |  ]
+             |  if hashScriptAtAddress(i.caller) == unit
+             |  then
+             |    [ BinaryEntry("hash", h.value()) ]
+             |  else
+             |    throw("Unexpected script was found.")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
