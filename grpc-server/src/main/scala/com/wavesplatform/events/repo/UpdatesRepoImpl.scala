@@ -33,14 +33,17 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
 
   override def shutdown(): Unit = db.close()
 
-  private[this] val realTimeUpdates = ConcurrentSubject.replayLimited[BlockchainUpdated](100)
+  @volatile
+  private[this] var lastRealTimeUpdates = Seq.empty[BlockchainUpdated]
+  private[this] val realTimeUpdates     = ConcurrentSubject.publish[BlockchainUpdated]
 
-  private[this] def sendRealTimeUpdate(ba: BlockchainUpdated): Try[Unit] = {
-    realTimeUpdates.onNext(ba) match {
-      case Ack.Continue =>
-        Success(())
-      case Ack.Stop =>
-        Failure(new IllegalStateException("realTimeUpdates stream sent Ack.Stop"))
+  private[this] def sendRealTimeUpdate(upd: BlockchainUpdated): Unit = {
+    val currentUpdates = this.lastRealTimeUpdates
+    val currentHeight  = height.toOption
+    this.lastRealTimeUpdates = currentUpdates.dropWhile(u => currentHeight.exists(_ - 5 > u.toHeight)) :+ upd
+    realTimeUpdates.onNext(upd) match {
+      case Ack.Continue => // OKs
+      case Ack.Stop     => throw new IllegalStateException("Real time updates subject is stopped")
     }
   }
 
@@ -113,13 +116,12 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     }
   }
 
-  override def appendMicroBlock(microBlockAppended: MicroBlockAppended): Try[Unit] = {
+  override def appendMicroBlock(microBlockAppended: MicroBlockAppended): Try[Unit] = Try {
     liquidState match {
       case Some(LiquidState(keyBlock, microBlocks)) =>
         liquidState = Some(LiquidState(keyBlock, microBlocks :+ microBlockAppended))
         sendRealTimeUpdate(microBlockAppended)
-      case None =>
-        Failure(new IllegalStateException("BlockchainUpdates attempted to insert a microblock without a keyblock"))
+      case None => throw new IllegalStateException("BlockchainUpdates attempted to insert a microblock without a keyblock")
     }
   }
 
@@ -146,6 +148,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
                 batch.delete(iter.next.getKey)
               }
               db.write(batch)
+              liquidState = None
               Success(())
             } catch {
               case t: Throwable => Failure(t)
@@ -155,7 +158,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
             }
           }
       }
-      .flatMap(_ => sendRealTimeUpdate(rollback))
+      .map(_ => sendRealTimeUpdate(rollback))
 
   override def rollbackMicroBlock(microBlockRollback: MicroBlockRollbackCompleted): Try[Unit] =
     height
@@ -181,7 +184,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
           }
         }
       }
-      .flatMap(_ => sendRealTimeUpdate(microBlockRollback))
+      .map(_ => sendRealTimeUpdate(microBlockRollback))
 
   // UpdatesRepo.Stream impl
   override def stream(fromHeight: Int): Observable[BlockchainUpdated] = {
@@ -234,7 +237,19 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
 
             case None =>
               val lastPersistentUpdate = data.lastOption
-              realTimeUpdates.dropWhile(u => !lastPersistentUpdate.forall(u.references))
+              log.info(s"Last persistent: $lastPersistentUpdate")
+              Observable
+                .fromIterable(lastRealTimeUpdates)
+                .++(realTimeUpdates)
+                .dropWhile { u =>
+                  val result = !lastPersistentUpdate.forall(u.references)
+                  if (result) log.info(s"Dropping: $u")
+                  result
+                }
+                .map { u =>
+                  log.info(s"Sending real time: $u")
+                  u
+                }
           })
         }
         readBatchStream(fromHeight)
