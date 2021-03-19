@@ -36,7 +36,7 @@ object InvokeScriptDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
-  def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean, remainingComplexity: Int, remainingCalls: Int, callsLimit: Int)(
+  def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean, remainingComplexity: Int, remainingCalls: Int)(
       tx: InvokeScript
   ): CoevalR[(Diff, EVALUATED)] = {
     val dAppAddress = tx.dAppAddress
@@ -48,7 +48,7 @@ object InvokeScriptDiff {
             Either.cond(
               remainingCalls > 0,
               (),
-              ValidationError.ScriptRunsLimitError(s"DApp calls limit = $callsLimit for attached fee = ${tx.root.fee} is exceeded")
+              ValidationError.ScriptRunsLimitError(s"DApp calls limit = ${ContractLimits.MaxSyncDAppCalls(version)} is exceeded")
             )
           )
           invocationComplexity <- traced {
@@ -145,7 +145,6 @@ object InvokeScriptDiff {
                   tx.dAppAddress,
                   pk,
                   tx.senderDApp,
-                  callsLimit,
                   remainingCalls - 1,
                   (if (version < V5) {
                      Diff.empty
@@ -156,7 +155,7 @@ object InvokeScriptDiff {
 
                 for {
                   result <- CoevalR(
-                    evaluateV2(version, contract, invocation, environment, complexityAfterPayments).map(TracedResult(_))
+                    evaluateV2(version, contract, invocation, environment, complexityAfterPayments, remainingComplexity).map(TracedResult(_))
                   )
                 } yield (environment.currentDiff, result)
               })
@@ -189,7 +188,7 @@ object InvokeScriptDiff {
               case ScriptResultV4(actions, unusedComplexity, ret) => doProcessActions(actions, unusedComplexity).map((_, ret))
               case _: IncompleteResult if limitedExecution        => doProcessActions(Nil, 0).map((_, unit))
               case r: IncompleteResult =>
-                val usedComplexity = complexityAfterPayments - r.unusedComplexity
+                val usedComplexity = remainingComplexity - r.unusedComplexity
                 val error          = FailedTransactionError.dAppExecution(s"Invoke complexity limit = $limit is exceeded", usedComplexity, log)
                 traced(error.asLeft[(Diff, EVALUATED)])
             }
@@ -206,7 +205,8 @@ object InvokeScriptDiff {
       contract: DApp,
       invocation: ContractEvaluator.Invocation,
       environment: Environment[Id],
-      limit: Int
+      limit: Int,
+      startComplexity: Int
   ): Coeval[Either[ValidationError, (ScriptResult, Log[Id])]] = {
     val evaluationCtx = CachedDAppCTX.forVersion(version).completeContext(environment)
     ContractEvaluator
@@ -215,7 +215,7 @@ object InvokeScriptDiff {
         _.leftMap(
           {
             case (error, unusedComplexity, log) =>
-              val usedComplexity = limit - unusedComplexity
+              val usedComplexity = startComplexity - unusedComplexity
               FailedTransactionError.dAppExecution(error, usedComplexity, log)
           }
         )
