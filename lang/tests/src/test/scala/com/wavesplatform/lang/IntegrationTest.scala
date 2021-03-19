@@ -916,6 +916,25 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     )
   }
 
+  property("split empty separator") {
+    val src =
+      """ "冬x🤦冬".split("") """
+    eval[EVALUATED](src) shouldBe Right(
+      ARR(
+        IndexedSeq(
+          CONST_STRING("\ud87e").explicitGet(),
+          CONST_STRING("\udc1a").explicitGet(),
+          CONST_STRING("\u0078").explicitGet(),
+          CONST_STRING("\ud83e").explicitGet(),
+          CONST_STRING("\udd26").explicitGet(),
+          CONST_STRING("\ud87e").explicitGet(),
+          CONST_STRING("\udc1a").explicitGet()
+        ),
+        false
+      ).explicitGet()
+    )
+  }
+
   property("parseInt") {
     val src =
       """ "42".parseInt() """
@@ -2274,5 +2293,121 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
     eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
     eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(6)
+  }
+
+  property("unicode broken") {
+    val ver = V4
+
+    val script1 = s"""take("x冬x", 2)"""
+    eval(script1, version = ver) shouldBe
+      Right(CONST_STRING("x\ud87e").explicitGet())
+
+    val script2 = s"""size("x冬x")"""
+    eval(script2, version = ver) shouldBe
+      Right(CONST_LONG(4))
+
+    val script3 = s"""drop("x冬x", 2)"""
+    eval(script3, version = ver) shouldBe
+      Right(CONST_STRING("\udc1ax").explicitGet())
+
+    val script4 = s"""takeRight("x冬x", 2)"""
+    eval(script4, version = ver) shouldBe
+      Right(CONST_STRING("\udc1ax").explicitGet())
+
+    val script5 = s"""dropRight("x冬x", 2)"""
+    eval(script5, version = ver) shouldBe
+      Right(CONST_STRING("x\ud87e").explicitGet())
+  }
+
+  property("unicode indexOf") {
+    val src =
+      """ "x冬xqweqwe".indexOf("we") """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(4L))
+    val src1 = """ "世界x冬x".take(4).indexOf("冬".take(1)) """
+    genericEval[Environment, EVALUATED](src1, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(3L))
+    eval[EVALUATED](src1) shouldBe Right(CONST_LONG(3L))
+  }
+
+  property("unicode indexOf with zero offset") {
+    val src =
+      """ "x冬xqweqwe".indexOf("x冬xqw", 0) """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(0L))
+  }
+
+  property("unicode indexOf with start offset") {
+    val src =
+      """ "冬weqwe".indexOf("we", 2) """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(4L))
+  }
+
+  property("unicode indexOf (not present)") {
+    val src =
+      """ "x冬xqweqwe".indexOf("ww") """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(unit)
+  }
+
+  property("unicode indexOf from empty string") {
+    val src =
+      """ "".indexOf("x冬x") """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(unit)
+  }
+
+  property("unicode indexOf from empty string with offset") {
+    val src =
+      """ "".indexOf("x冬x", 1) """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(unit)
+  }
+
+  property("split unicode") {
+    val src =
+      """ "strx冬x1;🤦;🤦strx冬x2;🤦strx冬x3".split(";🤦") """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(
+      ARR(
+        IndexedSeq(
+          CONST_STRING("strx冬x1").explicitGet(),
+          CONST_STRING("").explicitGet(),
+          CONST_STRING("strx冬x2").explicitGet(),
+          CONST_STRING("strx冬x3").explicitGet()
+        ),
+        false
+      ).explicitGet()
+    )
+    val src1 =
+      """ "冬x🤦冬".split("") """
+    genericEval[Environment, EVALUATED](src1, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(
+      ARR(
+        IndexedSeq(
+          CONST_STRING("冬").explicitGet(),
+          CONST_STRING("x").explicitGet(),
+          CONST_STRING("🤦").explicitGet(),
+          CONST_STRING("冬").explicitGet()
+        ),
+        false
+      ).explicitGet()
+    )
+  }
+
+  property("unicode support") {
+    val ver = V5
+
+    val script1 = s"""take("x冬x", 2)"""
+    genericEval[Environment, EVALUATED](script1, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
+      Right(CONST_STRING("x冬").explicitGet())
+
+    val script2 = s"""size("x冬x")"""
+    genericEval[Environment, EVALUATED](script2, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
+      Right(CONST_LONG(3))
+
+    val script3 = s"""drop("x冬x", 2)"""
+    genericEval[Environment, EVALUATED](script3, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
+      Right(CONST_STRING("x").explicitGet())
+
+    val script4 = s"""takeRight("x冬x", 2)"""
+    genericEval[Environment, EVALUATED](script4, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
+      Right(CONST_STRING("冬x").explicitGet())
+
+    val script5 = s"""dropRight("x冬x", 2)"""
+    genericEval[Environment, EVALUATED](script5, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
+      Right(CONST_STRING("x").explicitGet())
   }
 }
