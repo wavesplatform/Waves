@@ -58,14 +58,14 @@ class MicroBlockMinerSpec extends FlatSpec with Matchers with PathMockFactory wi
         utxPool.putIfNew(tx).resultE.explicitGet()
         val result = task.runSyncUnsafe()
         result match {
-          case res @ MicroBlockMinerImpl.Success(b, totalConstraint) =>
+          case MicroBlockMinerImpl.Success(b, totalConstraint, nanoTime) =>
             val isFirstBlock = block.transactionData.isEmpty
-            val elapsed      = (res.nanoTime - startTime).nanos.toMillis
+            val elapsed      = (nanoTime - startTime).nanos.toMillis
 
             if (isFirstBlock) elapsed should be < 1000L
             else elapsed shouldBe settings.minerSettings.microBlockInterval.toMillis +- 1000
 
-            generateBlocks(b, totalConstraint, res.nanoTime)
+            generateBlocks(b, totalConstraint, nanoTime)
           case MicroBlockMinerImpl.Stop =>
             d.blockchainUpdater.liquidBlock(d.blockchainUpdater.lastBlockId.get).get
           case MicroBlockMinerImpl.Retry =>

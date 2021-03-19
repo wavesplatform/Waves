@@ -15,8 +15,8 @@ object MiningConstraints {
     val AfterRideV5  = 2500000
   }
 
-  val ClassicAmountOfTxsInBlock = 100
-  val MaxTxsSizeInBytes         = 1 * 1024 * 1024 // 1 megabyte
+  val ClassicAmountOfTxsInBlock: Int = 100
+  val MaxTxsSizeInBytes: Int         = 1 * 1024 * 1024 // 1 megabyte
 
   def apply(blockchain: Blockchain, height: Int, minerSettings: Option[MinerSettings] = None): MiningConstraints = {
     val activatedFeatures     = blockchain.activatedFeaturesAt(height)
@@ -32,17 +32,24 @@ object MiningConstraints {
         OneDimensionalMiningConstraint(maxTxs, TxEstimators.one, "MaxTxs")
       }
 
-    new MiningConstraints(
+    MiningConstraints(
       total =
-        if (isDAppsEnabled) {
-          val complexityLimit =
-            if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) MaxScriptsComplexityInBlock.AfterRideV5
-            else MaxScriptsComplexityInBlock.BeforeRideV5
+        if (isDAppsEnabled)
           MultiDimensionalMiningConstraint(
             NonEmptyList
-              .of(OneDimensionalMiningConstraint(complexityLimit, TxEstimators.scriptsComplexity, "MaxScriptsComplexityInBlock"), total)
+              .of(
+                OneDimensionalMiningConstraint(
+                  blockchain.settings.functionalitySettings.maxComplexityInBlock.getOrElse[Int] {
+                    if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) MaxScriptsComplexityInBlock.AfterRideV5
+                    else MaxScriptsComplexityInBlock.BeforeRideV5
+                  },
+                  TxEstimators.scriptsComplexity,
+                  "MaxScriptsComplexityInBlock"
+                ),
+                total
+              )
           )
-        } else if (isScriptEnabled)
+        else if (isScriptEnabled)
           MultiDimensionalMiningConstraint(
             NonEmptyList.of(OneDimensionalMiningConstraint(MaxScriptRunsInBlock, TxEstimators.scriptRunNumber, "MaxScriptRunsInBlock"), total)
           )
