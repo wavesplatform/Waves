@@ -14,7 +14,6 @@ import com.wavesplatform.transaction.{BlockchainUpdater, _}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import org.iq80.leveldb.DB
 
-//noinspection ScalaStyle
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
   import Domain._
 
@@ -72,8 +71,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     lastBlock
   }
 
-  def appendKeyBlock(ref: ByteStr = null): Block = {
-    val block = createBlock(Block.NgBlockVersion, Nil, ref)
+  def appendKeyBlock(): Block = {
+    val block = createBlock(Block.NgBlockVersion, Nil)
     appendBlock(block)
     lastBlock
   }
@@ -86,8 +85,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     blockchainUpdater.processMicroBlock(mb)
   }
 
-  def createBlock(version: Byte, txs: Seq[Transaction], ref: ByteStr = null): Block = {
-    val reference = Option(ref).orElse(blockchainUpdater.lastBlockId).getOrElse(randomSig)
+  def createBlock(version: Byte, txs: Seq[Transaction]): Block = {
+    val reference = blockchainUpdater.lastBlockId.getOrElse(randomSig)
     val timestamp = System.currentTimeMillis()
     Block
       .buildAndSign(
