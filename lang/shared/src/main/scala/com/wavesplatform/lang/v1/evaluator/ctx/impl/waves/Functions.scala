@@ -138,7 +138,7 @@ object Functions {
       ("@publicKey", BYTESTR)
     )(
       new ContextfulUserFunction[Environment] {
-        override def apply[F[_]: Monad](env: Environment[F]): EXPR =
+        override def apply[F[_]: Monad](env: Environment[F], startArgs: List[EXPR]): EXPR =
           FUNCTION_CALL(
             FunctionHeader.User("Address"),
             List(
@@ -214,7 +214,7 @@ object Functions {
   def addressFromStringF(version: StdLibVersion): BaseFunction[Environment] =
     UserFunction.withEnvironment("addressFromString", 124, optionAddress, ("@string", STRING)) {
       new ContextfulUserFunction[Environment] {
-        override def apply[F[_]: Monad](env: Environment[F]): EXPR =
+        override def apply[F[_]: Monad](env: Environment[F], startArgs: List[EXPR]): EXPR =
           LET_BLOCK(
             LET(
               "@afs_addrBytes",

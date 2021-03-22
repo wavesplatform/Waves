@@ -1,7 +1,5 @@
 package com.wavesplatform.lang
 
-import java.nio.charset.StandardCharsets
-
 import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
@@ -33,6 +31,7 @@ import org.web3j.crypto.Keys
 import scorex.crypto.hash.Keccak256
 import scorex.util.encode.Base16
 
+import java.nio.charset.StandardCharsets
 import scala.util.{Random, Try}
 
 class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
@@ -2409,5 +2408,30 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val script5 = s"""dropRight("x冬x", 2)"""
     genericEval[Environment, EVALUATED](script5, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
       Right(CONST_STRING("x").explicitGet())
+  }
+
+  property("value() error message") {
+    val script =
+      s"""
+         | let a = if (true) then unit else 7
+         | a.value()
+       """.stripMargin
+    eval(script) should produce("value() called on unit value by reference 'a'")
+
+    val script2 =
+      s"""
+         | func a() = if (true) then unit else 7
+         | a().value()
+       """.stripMargin
+    eval(script2) should produce("value() called on unit value on function 'a' call")
+
+    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    val script3 = "SponsorFee(base58'', unit).minSponsoredAssetFee.value()"
+    genericEval(script3, ctxt = ctx, version = V4, env = utils.environment) should produce("value() called on unit value while accessing field 'minSponsoredAssetFee'")
+    val script4 = """ getIntegerValue(Address(base58''), "") """
+    genericEval(script4, ctxt = ctx, version = V4, env = utils.environment) should produce("value() called on unit value on function '1050' call")
+
+    eval("(if (true) then unit else 7).value()") should produce("value() called on unit value after condition evaluation")
+    eval("(let a = 1; if (true) then unit else 7).value()") should produce("value() called on unit value after let block evaluation")
   }
 }
