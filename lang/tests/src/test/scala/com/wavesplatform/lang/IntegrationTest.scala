@@ -2429,7 +2429,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val script3 = "SponsorFee(base58'', unit).minSponsoredAssetFee.value()"
     genericEval(script3, ctxt = ctx, version = V4, env = utils.environment) should produce("value() called on unit value while accessing field 'minSponsoredAssetFee'")
     val script4 = """ getIntegerValue(Address(base58''), "") """
-    genericEval(script4, ctxt = ctx, version = V4, env = utils.environment) should produce("value() called on unit value on function '1050' call")
+    genericEval(script4, ctxt = ctx, version = V4, env = utils.environment) should produce("value() called on unit value on function 'getInteger' call")
 
     eval("(if (true) then unit else 7).value()") should produce("value() called on unit value after condition evaluation")
     eval("(let a = 1; if (true) then unit else 7).value()") should produce("value() called on unit value after let block evaluation")
