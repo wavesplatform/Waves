@@ -5,7 +5,9 @@ import cats.{Id, Monad}
 import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.utils.getDecompilerContext
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -17,7 +19,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.{ContextfulUserFunction, ContextfulVal}
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
+import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
 
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.charset.{MalformedInputException, StandardCharsets}
@@ -225,16 +227,23 @@ object PureContext {
     ) {
     new ContextfulUserFunction[NoContext] {
       override def apply[F[_]: Monad](env: NoContext[F], startArgs: List[EXPR]): EXPR = {
-        lazy val errorMessageDetails =
+        lazy val errorMessageDetails = {
+          val ctx = getDecompilerContext(DirectiveDictionary[StdLibVersion].all.last, Expression)
+          def functionName(h: FunctionHeader) =
+            h match {
+              case Native(id) => ctx.opCodes.get(id).orElse(ctx.binaryOps.get(id)).getOrElse(id.toString)
+              case u: User    => u.name
+            }
           startArgs.head match {
-            case GETTER(_, field)           => s" while accessing field '$field'"
-            case REF(key)                   => s" by reference '$key'"
-            case FUNCTION_CALL(function, _) => s" on function '${function.funcName}' call"
-            case LET_BLOCK(_, _)            => " after let block evaluation"
-            case BLOCK(_, _)                => " after block evaluation"
-            case IF(_, _, _)                => " after condition evaluation"
-            case _                          => " "
+            case GETTER(_, field)         => s" while accessing field '$field'"
+            case REF(key)                 => s" by reference '$key'"
+            case FUNCTION_CALL(header, _) => s" on function '${functionName(header)}' call"
+            case LET_BLOCK(_, _)          => " after let block evaluation"
+            case BLOCK(_, _)              => " after block evaluation"
+            case IF(_, _, _)              => " after condition evaluation"
+            case _                        => ""
           }
+        }
         IF(
           FUNCTION_CALL(PureContext.eq, List(REF("@a"), REF("unit"))),
           FUNCTION_CALL(throwWithMessage, List(CONST_STRING(s"value() called on unit value$errorMessageDetails").explicitGet())),
