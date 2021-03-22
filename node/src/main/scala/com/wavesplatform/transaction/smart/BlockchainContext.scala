@@ -1,7 +1,5 @@
 package com.wavesplatform.transaction.smart
 
-import java.util
-
 import cats.Id
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
@@ -15,6 +13,8 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{ExecutionError, Global}
 import com.wavesplatform.state._
 import monix.eval.Coeval
+
+import java.util
 
 object BlockchainContext {
 
@@ -32,23 +32,28 @@ object BlockchainContext {
       isContract: Boolean,
       address: Environment.Tthis,
       txId: ByteStr
-  ): Either[ExecutionError, EvaluationContext[Environment, Id]] = {
+  ): Either[ExecutionError, EvaluationContext[Environment, Id]] =
     DirectiveSet(
       version,
       ScriptType.isAssetScript(isTokenContext),
       ContentType.isDApp(isContract)
-    ).map { ds =>
-      cache
-        .synchronized(
-          cache.computeIfAbsent(
-            (version, ds), { _ =>
-              PureContext.build(version).withEnvironment[Environment] |+|
-                CryptoContext.build(Global, version).withEnvironment[Environment] |+|
-                WavesContext.build(ds)
-            }
-          )
+    ).map(
+      ds => build(ds, new WavesEnvironment(nByte, in, h, blockchain, address, ds, txId))
+    )
+
+  def build(
+      ds: DirectiveSet,
+      environment: Environment[Id]
+  ): EvaluationContext[Environment, Id] =
+    cache
+      .synchronized(
+        cache.computeIfAbsent(
+          (ds.stdLibVersion, ds), { _ =>
+            PureContext.build(ds.stdLibVersion).withEnvironment[Environment] |+|
+              CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment] |+|
+              WavesContext.build(ds)
+          }
         )
-        .evaluationContext(new WavesEnvironment(nByte, in, h, blockchain, address, ds, txId))
-    }
-  }
+      )
+      .evaluationContext(environment)
 }
