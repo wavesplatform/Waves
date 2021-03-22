@@ -26,7 +26,7 @@ case class InvokeScriptTransaction(
     payments: Seq[Payment],
     fee: TxAmount,
     feeAssetId: Asset,
-    timestamp: TxTimestamp,
+    override val timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
 ) extends ProvenTransaction
@@ -44,7 +44,7 @@ case class InvokeScriptTransaction(
   val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
   val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
 
-  override def root : InvokeScriptTransaction = this
+  override def root: Option[InvokeScriptTransaction] = Some(this)
   def senderAddress: Address = sender.toAddress
   override def checkedAssets: Seq[IssuedAsset] = super[InvokeScriptLike].checkedAssets
 }
