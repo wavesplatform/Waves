@@ -1,41 +1,44 @@
 package com.wavesplatform.api.http
 
-import java.security.SecureRandom
-
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.implicits._
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, ScriptCompilerError, TooBigArrayAllocation}
 import com.wavesplatform.api.http.requests.{ScriptWithImportsRequest, byteStrFormat}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
+import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
-import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment}
 import com.wavesplatform.utils.Time
 import monix.eval.Coeval
 import monix.execution.Scheduler
 import play.api.libs.json._
 import shapeless.Coproduct
+
+import java.security.SecureRandom
 
 case class UtilsApiRoute(
     timeService: Time,
@@ -277,8 +280,13 @@ object UtilsApiRoute {
 
   private object ScriptCallEvaluator {
     def compile(stdLibVersion: StdLibVersion)(str: String): Either[GenericError, EXPR] = {
-      val ctx = PureContext.build(stdLibVersion).compilerContext.copy(arbitraryFunctions = true)
-      ExpressionCompiler.compileUntyped(str, ctx).leftMap(GenericError(_))
+      val ctx =
+        PureContext.build(stdLibVersion).withEnvironment[Environment] |+|
+        CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment] |+|
+        WavesContext.build(Global, DirectiveSet(stdLibVersion, Account, Expression).explicitGet())
+
+      ExpressionCompiler.compileUntyped(str, ctx.compilerContext.copy(arbitraryDeclarations = true))
+        .leftMap(GenericError(_))
     }
 
     def parseBinaryCall(bs: ByteStr): Either[ValidationError, EXPR] = {
@@ -291,21 +299,25 @@ object UtilsApiRoute {
 
     def executeExpression(blockchain: Blockchain, script: Script, address: Address, limit: Int)(expr: EXPR): Either[ValidationError, EVALUATED] = {
       for {
-        ctx <- BlockchainContext
+        ds <- DirectiveSet(script.stdLibVersion, Account, DAppType).leftMap(GenericError(_))
+        ctx = BlockchainContext
           .build(
-            script.stdLibVersion,
-            AddressScheme.current.chainId,
-            Coeval.raiseError(new IllegalStateException("No input entity available")),
-            Coeval.evalOnce(blockchain.height),
-            blockchain,
-            isTokenContext = false,
-            isContract = true,
-            Coproduct[Environment.Tthis](Recipient.Address(ByteStr(address.bytes))),
-            ByteStr.empty
+            ds,
+            new DAppEnvironment(
+              AddressScheme.current.chainId,
+              Coeval.raiseError(new IllegalStateException("No input entity available")),
+              Coeval.evalOnce(blockchain.height),
+              blockchain,
+              Coproduct[Environment.Tthis](Recipient.Address(ByteStr(address.bytes))),
+              ds,
+              tx = None,
+              address,
+              PublicKey(ByteStr.fill(KeyLength)(1)),
+              address,
+              10,
+               Diff.empty
+            )
           )
-          .left
-          .map(GenericError(_))
-
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
         limitedResult <- EvaluatorV2
           .applyLimited(call, limit, ctx, script.stdLibVersion)
