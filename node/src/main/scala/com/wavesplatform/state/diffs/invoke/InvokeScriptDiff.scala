@@ -84,8 +84,8 @@ object InvokeScriptDiff {
                     tx.sender,
                     Recipient.Address(ByteStr(tx.dAppAddress.bytes)),
                     amount,
-                    tx.root.timestamp,
-                    tx.root.id()
+                    tx.timestamp,
+                    tx.txId
                   )
                   ScriptRunner(
                     Coproduct[TxOrd](pseudoTx),
@@ -116,7 +116,9 @@ object InvokeScriptDiff {
 
           tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
           input <- traced(
-            buildThisValue(Coproduct[TxOrd](tx.root: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply)
+            tx.root
+              .map(t => buildThisValue(Coproduct[TxOrd](t: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply))
+              .getOrElse(Right(null))
           )
 
           result <- for {
@@ -130,9 +132,9 @@ object InvokeScriptDiff {
                   Recipient.Address(ByteStr(tx.root.senderAddress.bytes)),
                   ByteStr(tx.root.sender.arr),
                   payments,
-                  tx.root.id(),
-                  tx.root.fee,
-                  tx.root.feeAssetId.compatId
+                  tx.txId,
+                  tx.root.map(_.fee).getOrElse(0L),
+                  tx.root.flatMap(_.feeAssetId.compatId)
                 )
                 val height = blockchain.height
 

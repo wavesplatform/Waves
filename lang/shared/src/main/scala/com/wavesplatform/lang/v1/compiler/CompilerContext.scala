@@ -15,7 +15,7 @@ case class CompilerContext(
     varDefs: VariableTypes,
     functionDefs: FunctionTypes,
     tmpArgsIdx: Int = 0,
-    arbitraryFunctions: Boolean = false
+    arbitraryDeclarations: Boolean = false
 ) {
   private lazy val allFuncDefs: FunctionTypes =
     predefTypes.collect {
@@ -25,7 +25,7 @@ case class CompilerContext(
     } ++ functionDefs
 
   private def resolveFunction(name: String): FunctionInfo =
-    if (arbitraryFunctions) {
+    if (arbitraryDeclarations) {
       val primitives = List(LONG, BYTESTR, BOOLEAN, STRING)
       val maybeAllTypes = UNION(
         UNION(primitives),
@@ -44,6 +44,13 @@ case class CompilerContext(
 
   def functionTypeSignaturesByName(name: String): List[FunctionTypeSignature] =
     resolveFunction(name).fSigList
+
+  def resolveVar(name: String): Option[VariableInfo] =
+    if (arbitraryDeclarations) {
+      Some(varDefs.getOrElse(name, VariableInfo(AnyPos, NOTHING)))
+    } else {
+      varDefs.get(name)
+    }
 
   def getSimpleContext(): Map[String, Pos] = {
     (varDefs.map(el => el._1 -> el._2.pos) ++ functionDefs.map(el => el._1 -> el._2.pos))
