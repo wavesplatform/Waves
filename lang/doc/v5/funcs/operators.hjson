@@ -10,7 +10,7 @@
     {
       name: "-"
       params: [ "Int", "Int" ]
-      doc: "Substitute integers."
+      doc: "Subtract integers."
       paramsDoc: [ "First value", "Second value" ]
       complexity: 1
     }
@@ -45,7 +45,7 @@
     {
       name: "-"
       params: [ "BigInt", "BigInt" ]
-      doc: "Substitute big integers."
+      doc: "Subtract big integers."
       paramsDoc: [ "First value", "Second value" ]
       complexity: 8
     }
