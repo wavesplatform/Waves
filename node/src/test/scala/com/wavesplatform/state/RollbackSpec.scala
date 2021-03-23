@@ -1012,6 +1012,7 @@ object RollbackSpec {
             PureContext.build(stdLibVersion).withEnvironment[Environment],
             CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment],
             WavesContext.build(
+              Global,
               DirectiveSet(stdLibVersion, Account, DAppType).explicitGet()
             )
           )

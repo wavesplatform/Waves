@@ -279,6 +279,7 @@ class InvokeScriptTransactionDiffTest
             PureContext.build(V3).withEnvironment[Environment],
             CryptoContext.build(Global, V3).withEnvironment[Environment],
             WavesContext.build(
+              Global,
               DirectiveSet(V3, Account, Expression).explicitGet()
             )
           )
@@ -350,6 +351,7 @@ class InvokeScriptTransactionDiffTest
             PureContext.build(stdLibVersion).withEnvironment[Environment],
             CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment],
             WavesContext.build(
+              Global,
               DirectiveSet(stdLibVersion, Account, DAppType).explicitGet()
             )
           )
@@ -2336,6 +2338,59 @@ class InvokeScriptTransactionDiffTest
         }
     }
   }
+
+  property("hashScriptAtAddress") {
+    def contract(): DApp = {
+      val expr = {
+        val script =
+          s"""
+             |{-# STDLIB_VERSION 5 #-}
+             |{-# CONTENT_TYPE DAPP #-}
+             |{-#SCRIPT_TYPE ACCOUNT#-}
+             |
+             | @Callable(i)
+             | func foo() = {
+             |  let h = hashScriptAtAddress(this)
+             |  if hashScriptAtAddress(i.caller) == unit
+             |  then
+             |    [ BinaryEntry("hash", h.value()) ]
+             |  else
+             |    throw("Unexpected script was found.")
+             | }
+             |""".stripMargin
+        Parser.parseContract(script).get.value
+      }
+
+      compileContractFromExpr(expr, V5)
+    }
+    val scenario =
+      for {
+        master  <- accountGen
+        invoker <- accountGen
+        ts      <- timestampGen
+        fee     <- ciFee()
+        gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+
+        script   = ContractScript(V5, contract()).explicitGet()
+        ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), fee, ts + 5).explicitGet()
+        fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments = List(Payment(10, Waves))
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .explicitGet()
+      } yield (Seq(gTx1, gTx2, ssTx), invokeTx, master.toAddress, script)
+
+    forAll(scenario) {
+      case (genesisTxs, invokeTx, dApp, script) =>
+        assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+          case (diff, bc) =>
+            diff.errorMessage(invokeTx.id.value()) shouldBe None
+            bc.accountData(dApp, "hash") shouldBe Some(BinaryDataEntry("hash", ByteStr(com.wavesplatform.lang.Global.blake2b256(script.bytes().arr))))
+        }
+    }
+  }
+
 
   property("Crosscontract call (same accaunt)") {
     def contract(): DApp = {

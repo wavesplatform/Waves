@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1.traits
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain._
@@ -47,6 +48,7 @@ trait Environment[F[_]] {
   def transferTransactionFromProto(b: Array[Byte]): F[Option[Tx.Transfer]]
   def addressFromString(address: String): Either[String, Address]
   def dAppAlias: Boolean = false
+  def accountScript(addressOrAlias: Recipient): F[Option[Script]]
   def callScript(
       dApp: Address,
       func: String,

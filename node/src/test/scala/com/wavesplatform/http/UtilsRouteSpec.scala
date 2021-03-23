@@ -617,7 +617,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       val directives = DirectiveSet.contractDirectiveSet
       PureContext.build(V3).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V3).withEnvironment[Environment] |+|
-        WavesContext.build(directives)
+        WavesContext.build(Global, directives)
     }
 
     def dAppToBase64(dApp: String) = {

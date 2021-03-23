@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
@@ -23,6 +24,7 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
       compilerContext,
       WavesContext
         .build(
+          Global, 
           DirectiveSet(V3, Account, DAppType).explicitGet()
         )
         .compilerContext
@@ -94,6 +96,7 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
       compilerContext,
       WavesContext
         .build(
+          Global,
           DirectiveSet(V3, Account, DAppType).explicitGet()
         )
         .compilerContext
@@ -130,7 +133,7 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
   property("meta v2 supporting list parameters") {
     val ctx = Monoid.combine(
       compilerContext,
-      WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
+      WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
         .compilerContext
     )
 
@@ -184,6 +187,7 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
       compilerContext,
       WavesContext
         .build(
+          Global,
           DirectiveSet(V4, Account, DAppType).explicitGet()
         )
         .compilerContext

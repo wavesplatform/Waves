@@ -27,6 +27,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease}
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
+import com.wavesplatform.lang.Global
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.web3j.crypto.Keys
@@ -103,7 +104,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     )
   }
 
-  val v5Ctx = WavesContext.build(DirectiveSet(V5, Account, DApp).explicitGet())
+  val v5Ctx = WavesContext.build(Global, DirectiveSet(V5, Account, DApp).explicitGet())
 
   property("simple let") {
     val src =
@@ -1311,7 +1312,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |
        """.stripMargin
 
-    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
 
     genericEval[Environment, EVALUATED](
       writeSetScript,
@@ -1570,7 +1571,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         | calculateAssetId(issue)
       """.stripMargin
 
-    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
 
     genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
       CONST_BYTESTR(issue.id)
@@ -1583,7 +1584,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
        | Issue("name", "description", 1234567, 100, true, unit, 0)
      """.stripMargin
 
-    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
 
     genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
       Right(CONST_BOOLEAN(true))
@@ -2135,7 +2136,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         | entries[0] == deleteEntry
       """.stripMargin
 
-    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
     genericEval(script, ctxt = ctx, version = V4, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
   }
 
