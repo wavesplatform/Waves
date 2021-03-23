@@ -15,7 +15,7 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
-import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
@@ -315,7 +315,9 @@ object UtilsApiRoute {
               PublicKey(ByteStr.fill(KeyLength)(1)),
               address,
               10,
-               Diff.empty
+              ContractLimits.MaxCallableActionsAmount(V5),
+              ContractLimits.MaxWriteSetSize(V5),
+              Diff.empty
             )
           )
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)

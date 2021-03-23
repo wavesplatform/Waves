@@ -111,6 +111,8 @@ object InvokeScriptTransactionDiff {
                   pk,
                   dAppAddress,
                   remainingCalls,
+                  ContractLimits.MaxCallableActionsAmount(version),
+                  ContractLimits.MaxWriteSetSize(version),
                   (if (version < V5) {
                      Diff.empty
                    } else {

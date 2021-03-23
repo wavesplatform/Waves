@@ -172,10 +172,10 @@ object InvokeDiffsCommon {
       _ <- TracedResult(checkLeaseCancels(leaseCancelList)).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
       _ <- TracedResult(
         Either.cond(
-          actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
+          actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount(version),
           (),
           FailedTransactionError.dAppExecution(
-            s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount}, actual: ${actions.length}",
+            s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount(version)}, actual: ${actions.length}",
             invocationComplexity
           )
         )
@@ -353,9 +353,9 @@ object InvokeDiffsCommon {
   ): Either[String, Unit] =
     for {
       _ <- Either.cond(
-        dataEntries.length <= ContractLimits.MaxWriteSetSize,
+        dataEntries.length <= ContractLimits.MaxWriteSetSize(stdLibVersion),
         (),
-        s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"
+        s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize(stdLibVersion)} entries"
       )
       _ <- Either.cond(
         !tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),

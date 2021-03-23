@@ -10,7 +10,7 @@ object ContractLimits {
   }
 
   val MaxTotalInvokeComplexity: StdLibVersion => Int =
-    v => MaxComplexityByVersion(v) * (MaxAttachedPaymentAmount + MaxCallableActionsAmount + 1)
+    v => MaxComplexityByVersion(v) * (MaxAttachedPaymentAmount + MaxCallableActionsAmount(V4) + 1)
 
   val MaxSyncDAppCalls: StdLibVersion => Int =
     _ => 100
@@ -34,14 +34,14 @@ object ContractLimits {
   // Data	0.001 per kilobyte, rounded up, fee for CI is 0.005
   val MaxInvokeScriptSizeInBytes = 5 * 1024
   val MaxWriteSetSizeInBytes     = 5 * 1024
-  val MaxWriteSetSize            = 100
+  def MaxWriteSetSize(v: StdLibVersion) = 100
 
   // should conform DataEntry limits
   val MaxKeySizeInBytesByVersion: StdLibVersion => Int =
     v => if (v >= V4) 400 else 100
 
   // Mass Transfer	0.001 + 0.0005*N, rounded up to 0.001, fee for CI is 0.005
-  val MaxCallableActionsAmount = 10
+  def MaxCallableActionsAmount(v: StdLibVersion) = if (v < V5) { 10 } else { 20 }
   val MaxAttachedPaymentAmount = 2
   val MaxAttachedPaymentAmountV5 = 10
 
