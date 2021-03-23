@@ -23,7 +23,7 @@ class FoldTest extends PropSpec with PropertyChecks with Matchers with NoShrink 
       Monoid.combineAll(
         Seq(
           PureContext.build(V3).withEnvironment[Environment],
-          WavesContext.build(DirectiveSet.contractDirectiveSet),
+          WavesContext.build(Global, DirectiveSet.contractDirectiveSet),
           CryptoContext.build(Global, V3).withEnvironment[Environment]
         )
       )

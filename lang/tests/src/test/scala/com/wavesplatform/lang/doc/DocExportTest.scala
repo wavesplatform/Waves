@@ -16,7 +16,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class DocExportTest extends PropSpec with PropertyChecks with Matchers {
 
   def buildFullContext(ds: DirectiveSet): CTX[Environment] = {
-    val wavesCtx  = WavesContext.build(ds)
+    val wavesCtx  = WavesContext.build(Global, ds)
     val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment]
     val pureCtx = PureContext.build(ds.stdLibVersion).withEnvironment[Environment]
     pureCtx |+| cryptoCtx |+| wavesCtx

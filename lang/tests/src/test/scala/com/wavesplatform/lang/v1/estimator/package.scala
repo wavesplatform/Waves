@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1
 
 import cats.implicits._
-import com.wavesplatform.lang.Common
+import com.wavesplatform.lang.{Global, Common}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -16,7 +16,7 @@ package object estimator {
   private val version = V3
   private val ctx =
     PureContext.build(version).withEnvironment[Environment] |+|
-    WavesContext.build(DirectiveSet.contractDirectiveSet)
+    WavesContext.build(Global, DirectiveSet.contractDirectiveSet)
 
   private val environment = Common.emptyBlockchainEnvironment()
   private val evaluator =
