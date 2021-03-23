@@ -36,7 +36,7 @@ object InvokeScriptDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
-  def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean, remainingComplexity: Int, remainingCalls: Int)(
+  def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean, remainingComplexity: Int, remainingCalls: Int, callChain: Set[Address])(
       tx: InvokeScript
   ): CoevalR[(Diff, EVALUATED)] = {
     val dAppAddress = tx.dAppAddress
@@ -147,6 +147,7 @@ object InvokeScriptDiff {
                   tx.dAppAddress,
                   pk,
                   tx.senderDApp,
+                  callChain + dAppAddress,
                   remainingCalls - 1,
                   (if (version < V5) {
                      Diff.empty

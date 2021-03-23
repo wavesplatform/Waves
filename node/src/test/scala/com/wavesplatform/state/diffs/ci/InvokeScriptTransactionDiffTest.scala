@@ -2462,7 +2462,7 @@ class InvokeScriptTransactionDiffTest
           case (diff, _) =>
             diff.errorMessage(invokeTx.id.value()) shouldBe None
             diff.scriptsComplexity shouldBe 113
-            diff.scriptsRun shouldBe 1
+            diff.scriptsRun shouldBe 2
         }
     }
   }
