@@ -1,6 +1,6 @@
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
-import sbt.Keys._
 import sbt._
+import sbt.Keys._
 
 //noinspection TypeAnnotation
 object Dependencies {
@@ -165,7 +165,7 @@ object Dependencies {
   )
 
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.2.11-N2293-SNAPSHOT" classifier "proto" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.2.11" classifier "proto" intransitive ()
 
   lazy val scalapbRuntime = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion
