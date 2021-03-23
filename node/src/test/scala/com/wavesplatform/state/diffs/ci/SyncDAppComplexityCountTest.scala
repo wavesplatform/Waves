@@ -53,7 +53,7 @@ class SyncDAppComplexityCountTest
   )
 
   property("counts complexity correctly") {
-    val verifierScript: Script = {
+    val verifierScript: Script = {  // ~ 2000 complexity
       val script = s"""
                       | {-# STDLIB_VERSION 5        #-}
                       | {-# SCRIPT_TYPE ACCOUNT     #-}
@@ -63,7 +63,7 @@ class SyncDAppComplexityCountTest
                       | let proof = base64'g53N8ecorvG2sDgNv8D7quVhKMIIpdP9Bqk/8gmV5cJ5Rhk9gKvb4F0ll8J/ZZJVqa27OyciJwx6lym6QpVK9q1ASrqio7rD5POMDGm64Iay/ixXXn+//F+uKgDXADj9AySri2J1j3qEkqqe3kxKthw94DzAfUBPncHfTPazVtE48AfzB1KWZA7Vf/x/3phYs4ckcP7ZrdVViJVLbUgFy543dpKfEH2MD30ZLLYRhw8SatRCyIJuTZcMlluEKG+d'
                       | let input = base64'aZ8tqrOeEJKt4AMqiRF/WJhIKTDC0HeDTgiJVLZ8OEs='
                       |
-                      | groth16Verify_1inputs(key, proof, input)
+                      | groth16Verify_8inputs(key, proof, input)
                       """.stripMargin
       ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
     }
@@ -254,12 +254,13 @@ class SyncDAppComplexityCountTest
     assert(10, 52000, withThroughTransfer = true, exceeding = true)
     assert(100, 50079, withThroughTransfer = true, exceeding = true)
 
-    assert(1, 3915, withVerifier = true)
-    assert(17, 48635, withVerifier = true)
-    assert(18, 52629, withVerifier = true, exceeding = true)
-    assert(100, 51285, withVerifier = true, exceeding = true)
+    assert(1, 4615, withVerifier = true)
+    assert(17, 49335, withVerifier = true)
+    assert(18, 52130, withVerifier = true)
+    assert(19, 51985, withVerifier = true, exceeding = true)
+    assert(100, 51985, withVerifier = true, exceeding = true)
 
-    assert(1, 9336, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true)
-    assert(100, 52000, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true, exceeding = true)
+    assert(1, 10036, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true)
+    assert(100, 53906, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true, exceeding = true)
   }
 }
