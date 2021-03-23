@@ -30,6 +30,7 @@ package object ci {
       PureContext.build(version).withEnvironment[Environment] |+|
         CryptoContext.build(Global, version).withEnvironment[Environment] |+|
         WavesContext.build(
+          Global,
           DirectiveSet(version, Account, DAppType).explicitGet()
         )
     ContractCompiler(ctx.compilerContext, expr, version).explicitGet()
@@ -40,6 +41,7 @@ package object ci {
       PureContext.build(version).withEnvironment[Environment] |+|
         CryptoContext.build(Global, version).withEnvironment[Environment] |+|
         WavesContext.build(
+          Global,
           DirectiveSet(version, scriptType, Expression).explicitGet()
         )
     ExpressionCompiler(ctx.compilerContext, expr).explicitGet()._1

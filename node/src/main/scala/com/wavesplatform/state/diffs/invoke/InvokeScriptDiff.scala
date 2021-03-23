@@ -129,6 +129,8 @@ object InvokeScriptDiff {
                   tx.funcCall,
                   Recipient.Address(ByteStr(invoker.bytes)),
                   ByteStr(tx.sender.arr),
+                  Recipient.Address(ByteStr(tx.root.fold(invoker)(_.senderAddress).bytes)),
+                  ByteStr(tx.root.getOrElse(tx).sender.arr),
                   payments,
                   tx.txId,
                   tx.root.map(_.fee).getOrElse(0L),
