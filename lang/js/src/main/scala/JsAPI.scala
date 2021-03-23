@@ -28,6 +28,7 @@ object JsAPI {
 
   private def wavesContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean) =
     WavesContext.build(
+      Global,
       DirectiveSet(v, ScriptType.isAssetScript(isTokenContext), if (isContract) DAppType else Expression)
         .explicitGet()
     )

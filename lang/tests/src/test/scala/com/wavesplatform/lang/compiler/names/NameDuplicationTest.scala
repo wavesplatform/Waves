@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
@@ -23,6 +24,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
       compilerContext,
       WavesContext
         .build(
+          Global,
           DirectiveSet(V3, Account, DAppType).explicitGet()
         )
         .compilerContext

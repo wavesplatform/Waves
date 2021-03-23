@@ -87,7 +87,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
       val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
       PureContext.build(V4).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-        WavesContext.build(directives)
+        WavesContext.build(Global, directives)
     }
 
     val script =
@@ -145,7 +145,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
         PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
+          WavesContext.build(Global, directives)
       }
 
       val script =
@@ -166,7 +166,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
         val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
         PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
+          WavesContext.build(Global, directives)
       }
 
       val script =
@@ -238,7 +238,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
         PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
+          WavesContext.build(Global, directives)
       }
 
       val script =
@@ -259,7 +259,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
         val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
         PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
+          WavesContext.build(Global, directives)
       }
 
       val script =

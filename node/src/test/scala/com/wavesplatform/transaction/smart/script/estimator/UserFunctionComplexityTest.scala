@@ -36,6 +36,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
           PureContext.build(V1).withEnvironment[Environment],
           CryptoContext.build(Global, V1).withEnvironment[Environment],
           WavesContext.build(
+            Global,
             DirectiveSet(V1, Account, Expression).explicitGet()
           )
         ))
@@ -100,6 +101,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
           PureContext.build(V2).withEnvironment[Environment],
           CryptoContext.build(Global, V2).withEnvironment[Environment],
           WavesContext.build(
+            Global,
             DirectiveSet(V2, Account, Expression).explicitGet()
           )
         ))
@@ -164,6 +166,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
           PureContext.build(V3).withEnvironment[Environment],
           CryptoContext.build(Global, V3).withEnvironment[Environment],
           WavesContext.build(
+            Global,
             DirectiveSet(V3, Account, Expression).explicitGet()
           )
         ))

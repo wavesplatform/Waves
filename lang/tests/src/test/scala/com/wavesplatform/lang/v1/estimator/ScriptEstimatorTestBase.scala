@@ -46,7 +46,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*)
       .combineAll(Seq(
         PureContext.build(version).withEnvironment[Environment],
         CryptoContext.build(Global, version).withEnvironment[Environment],
-        WavesContext.build(DirectiveSet.contractDirectiveSet),
+        WavesContext.build(Global, DirectiveSet.contractDirectiveSet),
         CTX[NoContext](
           Seq(transactionType),
           Map(("tx", (transactionType, ContextfulVal.pure[NoContext](tx)))),

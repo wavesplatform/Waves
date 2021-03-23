@@ -50,6 +50,13 @@
       complexity: 5
     }
     {
+      name: "hashScriptAtAddress"
+      params: [ "Address|Alias" ]
+      doc: "blake2b hash of account's script"
+      paramsDoc: [ "account" ]
+      complexity: 200
+    }
+    {
       name: "Invoke"
       params: [ "Address|Alias", "String|Unit", "List[Any]", "List[AttachedPayment]" ]
       doc: "Invoke function from other dApp."
