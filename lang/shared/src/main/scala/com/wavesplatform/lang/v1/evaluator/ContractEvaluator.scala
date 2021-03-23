@@ -24,6 +24,8 @@ object ContractEvaluator {
       funcCall: FUNCTION_CALL,
       caller: Recipient.Address,
       callerPk: ByteStr,
+      originalCaller: Recipient.Address,
+      originalCallerPublicKey: ByteStr,
       payments: AttachedPayments,
       transactionId: ByteStr,
       fee: Long,
@@ -35,6 +37,8 @@ object ContractEvaluator {
       val argName = cf.annotation.invocationArgName
       val invocation = Invocation(
         null,
+        Recipient.Address(ByteStr(new Array[Byte](26))),
+        ByteStr(new Array[Byte](32)),
         Recipient.Address(ByteStr(new Array[Byte](26))),
         ByteStr(new Array[Byte](32)),
         AttachedPayments.Single(None),
