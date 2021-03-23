@@ -360,7 +360,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           scoreStatsReporter,
           configRoot,
           loadBalanceHistory,
-          levelDB.loadStateHash
+          levelDB.loadStateHash,
+          () => utxStorage.priorityPool.compositeBlockchain
         ),
         AssetsApiRoute(
           settings.restAPISettings,
@@ -529,10 +530,6 @@ object Application extends ScorexLogging {
     System.setProperty("sun.net.inetaddr.negative.ttl", "0")
     Security.setProperty("networkaddress.cache.ttl", "0")
     Security.setProperty("networkaddress.cache.negative.ttl", "0")
-
-    // specify aspectj to use it's build-in infrastructure
-    // http://www.eclipse.org/aspectj/doc/released/pdguide/trace.html
-    System.setProperty("org.aspectj.tracing.factory", "default")
 
     args.headOption.getOrElse("") match {
       case "export"                 => Exporter.main(args.tail)

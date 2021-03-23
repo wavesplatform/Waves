@@ -5,8 +5,9 @@ import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Transaction, _}
+import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import play.api.libs.json._
 
 case class ApiErrorResponse(error: Int, message: String)
@@ -291,6 +292,12 @@ object ApiError {
     override val id: Int         = 312
     override val code            = StatusCodes.NotImplemented
     override val message: String = "transaction type not supported"
+  }
+
+  case class AssetDoesNotExist(assetId: IssuedAsset) extends ApiError {
+    val id: Int = 313
+    val message: String = s"Asset does not exist: $assetId"
+    val code: StatusCode = StatusCodes.NotFound
   }
 
   final case class NegativeAmount(msg: String) extends ApiError {

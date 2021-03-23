@@ -58,7 +58,8 @@ case class DebugApiRoute(
     scoreReporter: Coeval[RxScoreObserver.Stats],
     configRoot: ConfigObject,
     loadBalanceHistory: Address => Seq[(Int, Long)],
-    loadStateHash: Int => Option[StateHash]
+    loadStateHash: Int => Option[StateHash],
+    priorityPoolBlockchain: () => Blockchain
 ) extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -224,13 +225,14 @@ case class DebugApiRoute(
 
   def validate: Route =
     path("validate")(jsonPost[JsObject] { jsv =>
-      val startTime = System.nanoTime()
-
+      val blockchain = priorityPoolBlockchain()
+      val startTime  = System.nanoTime()
+      
       val parsedTransaction = TransactionFactory.fromSignedRequest(jsv)
 
       val tracedDiff = for {
         tx   <- TracedResult(parsedTransaction)
-        diff <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
+        diff <- TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
       } yield (tx, diff)
 
       val error = tracedDiff.resultE match {

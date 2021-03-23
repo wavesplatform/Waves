@@ -1,30 +1,33 @@
 package com.wavesplatform.http
 
+import scala.util.Random
+
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet}
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.api.http.DebugApiRoute
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.util._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.Issue
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, NG, StateHash}
+import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
-
-import scala.util.Random
+import play.api.libs.json.{JsArray, JsObject, Json, JsValue}
 
 //noinspection ScalaStyle
 class DebugApiRouteSpec
@@ -33,7 +36,8 @@ class DebugApiRouteSpec
     with TestWallet
     with NTPTime
     with PathMockFactory
-    with BlockchainStubHelpers {
+    with BlockchainStubHelpers
+    with WithDomain {
 
   val wavesSettings = WavesSettings.default()
   val configObject  = wavesSettings.config.root()
@@ -68,7 +72,8 @@ class DebugApiRouteSpec
       _ => Seq.empty, {
         case 2 => Some(testStateHash)
         case _ => None
-      }
+      },
+      () => blockchain
     )
   import debugApiRoute._
 
@@ -94,14 +99,34 @@ class DebugApiRouteSpec
   }
 
   routePath("/validate") - {
+    def routeWithBlockchain(blockchain: Blockchain with NG) =
+      debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => blockchain).route
+    
+
+    def validatePost(tx: TransferTransaction) =
+      Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString()))
+
+    "takes the priority pool into account" in withDomain(domainSettingsWithFeatures(BlockchainFeatures.NG)) { d =>
+      d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
+      d.appendBlock(TxHelpers.transfer(to = TxHelpers.secondAddress, amount = 1.waves + TestValues.fee))
+
+      val route = debugApiRoute.copy(priorityPoolBlockchain = () => d.blockchain).route
+      val tx = TxHelpers.transfer(TxHelpers.secondSigner, TestValues.address, 1.waves)
+      validatePost(tx) ~> route ~> check {
+        val json = Json.parse(responseAs[String])
+        (json \ "valid").as[Boolean] shouldBe true
+        (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
+      }
+    }
+
     "valid tx" in {
       val blockchain = createBlockchainStub()
       (blockchain.balance _).when(TxHelpers.defaultSigner.publicKey.toAddress, *).returns(Long.MaxValue)
 
-      val route = debugApiRoute.copy(blockchain = blockchain).route
+      val route = routeWithBlockchain(blockchain)
 
       val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, 1.waves)
-      Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString())) ~> route ~> check {
+      validatePost(tx) ~> route ~> check {
         val json = Json.parse(responseAs[String])
         (json \ "valid").as[Boolean] shouldBe true
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
@@ -112,10 +137,10 @@ class DebugApiRouteSpec
       val blockchain = createBlockchainStub()
       (blockchain.balance _).when(TxHelpers.defaultSigner.publicKey.toAddress, *).returns(0)
 
-      val route = debugApiRoute.copy(blockchain = blockchain).route
+      val route = routeWithBlockchain(blockchain)
 
       val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, Long.MaxValue)
-      Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString())) ~> route ~> check {
+      validatePost(tx) ~> route ~> check {
         val json = Json.parse(responseAs[String])
         (json \ "valid").as[Boolean] shouldBe false
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
@@ -150,7 +175,7 @@ class DebugApiRouteSpec
           )
       }
 
-      val route = debugApiRoute.copy(blockchain = blockchain).route
+      val route = routeWithBlockchain(blockchain)
       val tx    = TxHelpers.exchange(TxHelpers.order(OrderType.BUY, TestValues.asset), TxHelpers.order(OrderType.SELL, TestValues.asset))
       jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
         val json = Json.parse(responseAs[String])
@@ -249,8 +274,7 @@ class DebugApiRouteSpec
         (blockchain.hasAccountScript _).when(*).returns(true)
       }
 
-      val route = debugApiRoute.copy(blockchain = blockchain).route
-
+      val route = routeWithBlockchain(blockchain)
       def testFunction(name: String, result: InvokeScriptTransaction => String) = withClue(s"function $name") {
         val tx = TxHelpers.invoke(TxHelpers.defaultAddress, name, fee = 102500000)
 
@@ -518,7 +542,7 @@ class DebugApiRouteSpec
             )
           )
       }
-      val route = debugApiRoute.copy(blockchain = blockchain).route
+      val route = routeWithBlockchain(blockchain)
       val tx    = TxHelpers.transfer(TxHelpers.defaultSigner, TxHelpers.defaultAddress, 1, TestValues.asset)
 
       jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
