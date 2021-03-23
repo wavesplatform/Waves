@@ -9,6 +9,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, DApp, V4}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, EVALUATED, EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
@@ -127,6 +128,7 @@ object EnvironmentFunctionsBenchmark {
           _.toString,
           address => Address(ByteStr(address.bytes))
         )
+    override def accountScript(addressOrAlias: Recipient): Option[Script]                                        = ???
     override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], availableComplexity: Int): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
   }
 
@@ -156,7 +158,7 @@ object EnvironmentFunctionsBenchmark {
 @State(Scope.Benchmark)
 class AddressFromString {
   val ctx: EvaluationContext[Environment, Id] =
-    WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
       .evaluationContext(defaultEnvironment)
 
   val expr: Array[EXPR] =

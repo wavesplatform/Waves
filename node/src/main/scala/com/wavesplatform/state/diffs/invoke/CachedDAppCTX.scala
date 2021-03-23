@@ -17,7 +17,7 @@ object CachedDAppCTX {
       .map { version =>
         val ctx = PureContext.build(version).withEnvironment[Environment] |+|
           CryptoContext.build(Global, version).withEnvironment[Environment] |+|
-          WavesContext.build(DirectiveSet(version, Account, DApp).explicitGet())
+          WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet())
 
         (version, InvariableContext(ctx))
       }

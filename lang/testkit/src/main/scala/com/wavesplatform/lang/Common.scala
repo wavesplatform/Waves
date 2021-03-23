@@ -17,6 +17,7 @@ import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAsse
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import monix.eval.Coeval
 import org.scalacheck.ShrinkLowPriority
 
@@ -96,6 +97,7 @@ object Common {
     override def txId: ByteStr                                                                                   = ???
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
     override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
+    def accountScript(addressOrAlias: Recipient): Option[Script]                                                 = ???
     override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], remainingComplexity: Int): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
     }
 

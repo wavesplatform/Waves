@@ -98,6 +98,7 @@ object FunctionIds {
   val TRANSFERTRANSACTIONBYID: Short = 1006
   val ACCOUNTWAVESBALANCE: Short     = 1007
   val ACCOUNTASSETONLYBALANCE: Short = 1008
+  val ACCOUNTSCRIPTHASH: Short       = 1009
 
   val CALLDAPP: Short                = 1020
 
