@@ -316,7 +316,7 @@ object UtilsApiRoute {
               address,
               Set(),
               ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
-               Diff.empty
+              Diff.empty
             )
           )
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
