@@ -334,12 +334,10 @@ object PureContext {
             case RoundUp => Right((presult + m.sign)*s)
             case RoundHalfUp =>
               val x = d.abs - m*2
-              if(x < 0) {
+              if(x <= 0) {
                 Right((presult + 1)*s)
-              } else if(x > 0) {
-                Right(presult*s)
               } else {
-                Right((presult + 1)*s)
+                Right(presult*s)
               }
             case RoundHalfDown =>
               val x = d.abs - m*2
@@ -350,7 +348,7 @@ object PureContext {
               }
             case RoundCeiling => Right((if(s > 0) { presult + m.sign } else { presult }) * s)
             case RoundFloor => Right((if(s < 0) { presult + m.sign } else { presult }) * s)
-            case RoundHalfEven => Right(presult*s) // XXX
+            case RoundHalfEven =>
               val x = d.abs - m*2
               if(x < 0) {
                 Right((presult + 1)*s)
@@ -1312,7 +1310,7 @@ object PureContext {
           || rp > 18) {
           Left("powBigInt: scale out of range 0-12")
         } else {
-          global.powBigInt(b, bp, e, ep, rp, roundMode(round)).map(CONST_BIGINT)
+          global.powBigInt(b, bp, e, ep, rp, roundMode(round)).filterOrElse(v => v <= maxBigInt && v >= minBigInt, "powBigInt: result out of range.").map(CONST_BIGINT)
         }
       case xs => notImplemented[Id, EVALUATED]("powBigInt(base: BigInt, bp: Int, exponent:Big Int, ep: Int, rp: Int, round: Rounds)", xs)
     }
