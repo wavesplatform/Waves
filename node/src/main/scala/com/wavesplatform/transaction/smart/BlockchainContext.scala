@@ -51,7 +51,7 @@ object BlockchainContext {
           (ds.stdLibVersion, ds), { _ =>
             PureContext.build(ds.stdLibVersion).withEnvironment[Environment] |+|
               CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment] |+|
-              WavesContext.build(ds)
+              WavesContext.build(Global, ds)
           }
         )
       )

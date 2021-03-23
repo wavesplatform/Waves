@@ -800,7 +800,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val ctx =
       Monoid.combine(
         PureContext.build(V4).withEnvironment[Environment],
-        WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
+        WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
       )
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4).explicitGet()
@@ -862,7 +862,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         Seq(
           PureContext.build(V4).withEnvironment[Environment],
           CryptoContext.build(Global, V4).withEnvironment[Environment],
-          WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
+          WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
         )
       )
 
@@ -903,7 +903,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         Seq(
           PureContext.build(V4).withEnvironment[Environment],
           CryptoContext.build(Global, V4).withEnvironment[Environment],
-          WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
+          WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
         )
       )
 

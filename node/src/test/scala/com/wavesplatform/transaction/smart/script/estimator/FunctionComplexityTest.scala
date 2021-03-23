@@ -45,6 +45,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
           PureContext.build(version).withEnvironment[Environment],
           CryptoContext.build(Global, version).withEnvironment[Environment],
           WavesContext.build(
+            Global,
             DirectiveSet(version, Account, Expression).explicitGet()
           )
         )
