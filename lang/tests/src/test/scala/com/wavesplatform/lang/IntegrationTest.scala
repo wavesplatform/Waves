@@ -2386,7 +2386,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
        """.stripMargin
     eval(script2) should produce("value() called on unit value on function 'a' call")
 
-    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
     val script3 = "SponsorFee(base58'', unit).minSponsoredAssetFee.value()"
     genericEval(script3, ctxt = ctx, version = V4, env = utils.environment) should produce("value() called on unit value while accessing field 'minSponsoredAssetFee'")
     val script4 = """ getIntegerValue(Address(base58''), "") """
