@@ -2370,8 +2370,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     genericEval[Environment, EVALUATED]("powBigInt(toBigInt(0), 1, toBigInt(-1), 0, 4, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
     genericEval[Environment, EVALUATED]("powBigInt(toBigInt(2), 0, toBigInt(512), 0, 0, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
     genericEval[Environment, EVALUATED]("logBigInt(toBigInt(16), 0, toBigInt(2), 0, 0, CEILING)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(4)))
+    genericEval[Environment, EVALUATED]("logBigInt(toBigInt(1), 4, toBigInt(1), 1, 0, HALFEVEN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(4)))
     genericEval[Environment, EVALUATED]("logBigInt(toBigInt(16), 0, toBigInt(-2), 0, 0, CEILING)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
     genericEval[Environment, EVALUATED]("logBigInt(toBigInt(-16), 0, toBigInt(2), 0, 0, CEILING)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
+    genericEval[Environment, EVALUATED]("""logBigInt(toBigInt(1), 16, parseBigIntValue("10"), 0, 0, CEILING)""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(-16)))
   }
 
   property("List[BigInt] median - 100 elements") {
