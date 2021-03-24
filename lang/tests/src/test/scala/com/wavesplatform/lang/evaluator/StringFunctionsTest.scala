@@ -6,7 +6,7 @@ import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONST_STRING, EVALUATED}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING, EVALUATED}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, unit}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
