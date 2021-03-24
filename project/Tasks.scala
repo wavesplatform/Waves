@@ -2,8 +2,7 @@ import java.io.File
 import java.nio.file.{Files, Paths}
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
+import com.fasterxml.jackson.module.scala.{DefaultScalaModule, ScalaObjectMapper}
 import org.hjson.JsonValue
 import sbt.Keys.{baseDirectory, sourceManaged}
 import sbt.{Def, IO, _}

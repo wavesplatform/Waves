@@ -1,5 +1,7 @@
 package com
 
+import java.time.Instant
+
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -13,7 +15,8 @@ package object wavesplatform extends ScorexLogging {
   private def checkOrAppend(block: Block, blockchainUpdater: Blockchain with BlockchainUpdater): Either[ValidationError, Unit] = {
     if (blockchainUpdater.isEmpty) {
       blockchainUpdater.processBlock(block, block.header.generationSignature).map { _ =>
-        log.info(s"Genesis block ${blockchainUpdater.blockHeader(1).get.header} has been added to the state")
+        val genesisHeader = blockchainUpdater.blockHeader(1).get
+        log.info(s"Genesis block ${genesisHeader.id()} (generated at ${Instant.ofEpochMilli(genesisHeader.header.timestamp)}) has been added to the state")
       }
     } else {
       val existingGenesisBlockId: Option[ByteStr] = blockchainUpdater.blockHeader(1).map(_.id())

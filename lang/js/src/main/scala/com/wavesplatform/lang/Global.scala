@@ -1,9 +1,9 @@
 package com.wavesplatform.lang
 
 import java.math.{BigDecimal, BigInteger}
+
 import cats.implicits._
 import com.wavesplatform.lang.v1.BaseGlobal
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
@@ -87,10 +87,10 @@ object Global extends BaseGlobal {
   override def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean =
     impl.Global.merkleVerify(toBuffer(rootBytes), toBuffer(proofBytes), toBuffer(valueBytes))
 
-  override def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long] =
+  override def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long] =
     calcScaled(Math.pow)(b, bp, e, ep, rp, round)
 
-  override def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long] =
+  override def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long] =
     calcScaled(Math.log(_) / Math.log(_))(b, bp, e, ep, rp, round)
 
   private def calcScaled(calc: (Double, Double) => Double)(
@@ -99,7 +99,7 @@ object Global extends BaseGlobal {
       exponent: Long,
       exponentScale: Long,
       resultScale: Long,
-      round: Rounding
+      round: BaseGlobal.Rounds
   ): Either[String, Long] =
     tryEi {
       val result = calc(
@@ -117,14 +117,14 @@ object Global extends BaseGlobal {
   private def unscaled(
       value: Double,
       scale: Long,
-      round: Rounding
+      round: BaseGlobal.Rounds
   ): Either[String, Long] = {
     val decimal =
       if (value.toLong.toDouble == value && value - 1 < Long.MaxValue) BigDecimal.valueOf(value.toLong)
       else BigDecimal.valueOf(value)
 
     decimal
-      .setScale(scale.toInt, round.mode)
+      .setScale(scale.toInt, roundMode(round))
       .unscaledValue
       .longExact
   }

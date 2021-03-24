@@ -118,6 +118,9 @@ object InvokeScriptTransactionDiff {
                    })
                 )
 
+                val paymentsComplexity = tx.checkedAssets.flatMap(blockchain.assetScript).map(_.complexity).sum
+                val verifierComplexity = blockchain.accountScript(invoker).map(_.verifierComplexity).getOrElse(0L)
+
                 val fullLimit =
                   if (blockchain.estimator == ScriptEstimatorV2)
                     Int.MaxValue //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
@@ -132,15 +135,13 @@ object InvokeScriptTransactionDiff {
                   else
                     fullLimit
 
-                val paymentsComplexity = tx.checkedAssets.flatMap(blockchain.assetScript).map(_.complexity).sum
-
                 for {
                   (result, log) <- evaluateV2(
                     version,
                     contract,
                     invocation,
                     environment,
-                    fullLimit,
+                    fullLimit - verifierComplexity.toInt,
                     failFreeLimit,
                     invocationComplexity.toInt,
                     paymentsComplexity.toInt

@@ -19,9 +19,9 @@ import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 
 //noinspection ScalaStyle
@@ -36,7 +36,7 @@ object Explorer extends ScorexLogging {
     )
 
   def main(argsRaw: Array[String]): Unit = {
-    if (argsRaw.isEmpty) {
+    if (argsRaw.isEmpty || Seq("-h", "--help").exists(argsRaw.contains)) {
       System.err.println("Usage: waves explore <command> [args] [--config|-c <cfg file>]")
       return
     }

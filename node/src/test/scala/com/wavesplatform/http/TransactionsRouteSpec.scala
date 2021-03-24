@@ -207,6 +207,30 @@ class TransactionsRouteSpec
     val bytes32StrGen = bytes32gen.map(Base58.encode)
     val addressGen    = accountGen.map(_.toAddress.toString)
 
+    "returns lease tx for lease cancel tx" in {
+      val lease       = TxHelpers.lease()
+      val leaseCancel = TxHelpers.leaseCancel(lease.id())
+
+      val blockchain = createBlockchainStub { blockchain =>
+        (blockchain.transactionInfo _).when(lease.id()).returns(Some((1, lease, true)))
+        (blockchain.transactionInfo _).when(leaseCancel.id()).returns(Some((1, leaseCancel, true)))
+      }
+
+      val transactionsApi = stub[CommonTransactionsApi]
+      (transactionsApi.transactionById _).when(lease.id()).returns(Some(TransactionMeta.Default(Height(1), lease, succeeded = true)))
+      (transactionsApi.transactionById _).when(leaseCancel.id()).returns(Some(TransactionMeta.Default(Height(1), leaseCancel, succeeded = true)))
+      (transactionsApi.transactionsByAddress _)
+        .when(TxHelpers.secondAddress, None, *, None)
+        .returns(Observable(TransactionMeta.Default(Height(1), leaseCancel, succeeded = true)))
+      (transactionsApi.aliasesOfAddress _).when(*).returns(Observable.empty)
+
+      val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
+      Get(routePath(s"/address/${TxHelpers.secondAddress}/limit/10")) ~> route ~> check {
+        val json = (responseAs[JsArray] \ 0 \ 0).as[JsObject]
+        json shouldBe leaseCancel.json() ++ Json.obj("lease" -> lease.json(), "height" -> 1, "applicationStatus" -> "succeeded")
+      }
+    }
+
     "handles parameter errors with corresponding responses" - {
       "invalid address" in {
         forAll(bytes32StrGen) { badAddress =>
@@ -311,6 +335,26 @@ class TransactionsRouteSpec
   }
 
   routePath("/info/{id}") - {
+    "returns lease tx for lease cancel tx" in {
+      val lease       = TxHelpers.lease()
+      val leaseCancel = TxHelpers.leaseCancel(lease.id())
+
+      val blockchain = createBlockchainStub { blockchain =>
+        (blockchain.transactionInfo _).when(lease.id()).returns(Some((1, lease, true)))
+        (blockchain.transactionInfo _).when(leaseCancel.id()).returns(Some((1, leaseCancel, true)))
+      }
+
+      val transactionsApi = stub[CommonTransactionsApi]
+      (transactionsApi.transactionById _).when(lease.id()).returns(Some(TransactionMeta.Default(Height(1), lease, succeeded = true)))
+      (transactionsApi.transactionById _).when(leaseCancel.id()).returns(Some(TransactionMeta.Default(Height(1), leaseCancel, succeeded = true)))
+
+      val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
+      Get(routePath(s"/info/${leaseCancel.id()}")) ~> route ~> check {
+        val json = responseAs[JsObject]
+        json shouldBe leaseCancel.json() ++ Json.obj("lease" -> lease.json(), "height" -> 1, "applicationStatus" -> "succeeded")
+      }
+    }
+
     "handles invalid signature" in {
       forAll(invalidBase58Gen) { invalidBase58 =>
         Get(routePath(s"/info/$invalidBase58")) ~> route should produce(InvalidTransactionId("Wrong char"), matchMsg = true)
@@ -482,6 +526,35 @@ class TransactionsRouteSpec
   }
 
   routePath("/unconfirmed") - {
+    "returns lease tx for lease cancel tx" in {
+      val lease       = TxHelpers.lease()
+      val leaseCancel = TxHelpers.leaseCancel(lease.id())
+
+      val blockchain = createBlockchainStub { blockchain =>
+        (blockchain.transactionInfo _).when(lease.id()).returns(Some((1, lease, true)))
+        (blockchain.transactionInfo _).when(leaseCancel.id()).returns(Some((1, leaseCancel, true)))
+      }
+
+      val transactionsApi = stub[CommonTransactionsApi]
+      (transactionsApi.transactionById _).when(lease.id()).returns(Some(TransactionMeta.Default(Height(1), lease, succeeded = true)))
+      (transactionsApi.transactionById _).when(leaseCancel.id()).returns(Some(TransactionMeta.Default(Height(1), leaseCancel, succeeded = true)))
+      (() => transactionsApi.unconfirmedTransactions).when().returns(Seq(leaseCancel))
+      (transactionsApi.unconfirmedTransactionById _).when(leaseCancel.id()).returns(Some(leaseCancel))
+      (transactionsApi.aliasesOfAddress _).when(*).returns(Observable.empty)
+
+      val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
+
+      Get(routePath(s"/unconfirmed")) ~> route ~> check {
+        val json = (responseAs[JsArray] \ 0).as[JsObject]
+        json shouldBe leaseCancel.json() ++ Json.obj("lease" -> lease.json())
+      }
+
+      Get(routePath(s"/unconfirmed/info/${leaseCancel.id()}")) ~> route ~> check {
+        val json = responseAs[JsObject]
+        json shouldBe leaseCancel.json() ++ Json.obj("lease" -> lease.json())
+      }
+    }
+
     "returns the list of unconfirmed transactions" in {
       val g = for {
         i <- chooseNum(0, 20)
