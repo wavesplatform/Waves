@@ -92,6 +92,8 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
       filteredResult = entity.filter(_.`type` == dataType).map(_.value)
     } yield filteredResult
 
+  override def hasData(recipient: Recipient): Future[Boolean] = Future.failed(new Exception("Not implemented"))
+
   implicit val addressResponseDecoder: Decoder[AddressResponse] = new Decoder[AddressResponse] {
     final def apply(c: HCursor): Decoder.Result[AddressResponse] =
       for {

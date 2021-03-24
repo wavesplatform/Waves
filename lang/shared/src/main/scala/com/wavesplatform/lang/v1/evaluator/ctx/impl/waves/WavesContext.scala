@@ -77,7 +77,8 @@ object WavesContext {
       simplifiedLeaseActionConstructor,
       detailedLeaseActionConstructor,
       calculateLeaseId,
-      callDAppF(version)
+      callDAppF(version),
+      isDataStorageUntouchedF
     )
 
   private def variableFuncs(global: BaseGlobal, version: StdLibVersion, c: ContentType, proofsEnabled: Boolean) = {
