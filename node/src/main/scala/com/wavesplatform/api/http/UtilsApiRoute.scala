@@ -283,7 +283,7 @@ object UtilsApiRoute {
       val ctx =
         PureContext.build(stdLibVersion).withEnvironment[Environment] |+|
         CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment] |+|
-        WavesContext.build(DirectiveSet(stdLibVersion, Account, Expression).explicitGet())
+        WavesContext.build(Global, DirectiveSet(stdLibVersion, Account, Expression).explicitGet())
 
       ExpressionCompiler.compileUntyped(str, ctx.compilerContext.copy(arbitraryDeclarations = true))
         .leftMap(GenericError(_))

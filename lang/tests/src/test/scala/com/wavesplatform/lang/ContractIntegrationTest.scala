@@ -19,6 +19,7 @@ import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
+import com.wavesplatform.lang.Global
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -28,6 +29,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       PureContext.build(V3).withEnvironment[Environment] |+|
       CTX[Environment](sampleTypes, Map.empty, Array.empty) |+|
       WavesContext.build(
+        Global,
         DirectiveSet(V3, Account, DApp).explicitGet()
       )
 
@@ -160,6 +162,8 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       compiled,
       Invocation(
         Terms.FUNCTION_CALL(FunctionHeader.User(func), args),
+        Recipient.Address(callerAddress),
+        callerPublicKey,
         Recipient.Address(callerAddress),
         callerPublicKey,
         AttachedPayments.Single(None),

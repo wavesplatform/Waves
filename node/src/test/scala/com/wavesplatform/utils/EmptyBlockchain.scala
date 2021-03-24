@@ -70,6 +70,8 @@ trait EmptyBlockchain extends Blockchain {
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = None
 
+  override def hasData(acc: Address): Boolean = false
+
   override def balance(address: Address, mayBeAssetId: Asset): Long = 0
 
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
