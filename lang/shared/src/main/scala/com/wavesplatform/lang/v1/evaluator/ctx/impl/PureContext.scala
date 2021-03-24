@@ -515,8 +515,11 @@ object PureContext {
       STRING,
       ("xs", STRING), ("number", LONG)
     ) {
-      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => CONST_STRING(xs.take(xs.offsetByCodePoints(0, trimLongToInt(number))))
-      case xs                                            => notImplemented[Id, EVALUATED]("take(xs: String, number: Int)", xs)
+      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil =>
+        val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
+        CONST_STRING(xs.take(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
+      case xs =>
+        notImplemented[Id, EVALUATED]("take(xs: String, number: Int)", xs)
     }
 
   def listConstructor(checkSize: Boolean): NativeFunction[NoContext] =
@@ -578,8 +581,11 @@ object PureContext {
       STRING,
       ("xs", STRING), ("number", LONG)
     ) {
-      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => CONST_STRING(xs.drop(xs.offsetByCodePoints(0, trimLongToInt(number))))
-      case xs                                            => notImplemented[Id, EVALUATED]("drop(xs: String, number: Int)", xs)
+      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil =>
+        val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
+        CONST_STRING(xs.drop(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
+      case xs =>
+        notImplemented[Id, EVALUATED]("drop(xs: String, number: Int)", xs)
     }
 
   lazy val takeRightString: BaseFunction[NoContext] =
@@ -884,7 +890,7 @@ object PureContext {
     ) {
       case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil =>
         Right(if (off >= 0) {
-          val offset = Math.min(off, Int.MaxValue.toLong).toInt
+          val offset = Math.min(off, m.codePointCount(0, m.length)).toInt
           val i      = m.lastIndexOf(sub,  m.offsetByCodePoints(0, offset))
           if (i != -1) {
             CONST_LONG(m.codePointCount(0, i).toLong)
