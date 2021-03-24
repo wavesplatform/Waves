@@ -40,6 +40,7 @@ trait Environment[F[_]] {
   def lastBlockOpt(): F[Option[BlockInfo]]
   def blockInfoByHeight(height: Int): F[Option[BlockInfo]]
   def data(addressOrAlias: Recipient, key: String, dataType: DataType): F[Option[Any]]
+  def hasData(addressOrAlias: Recipient): F[Boolean]
   def resolveAlias(name: String): F[Either[String, Recipient.Address]]
   def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): F[Either[String, Long]]
   def accountWavesBalanceOf(addressOrAlias: Recipient): F[Either[String, Environment.BalanceDetails]]
