@@ -9,6 +9,7 @@ import cats.syntax.either._
 import cats.syntax.functor._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.ContractLimits
@@ -70,7 +71,10 @@ object TransactionDiffer {
       transactionDiff <- transactionDiff(blockchain, tx, verifierDiff, currentBlockTimestamp, limitedExecution)
       remainingComplexity = if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - transactionDiff.scriptsComplexity.toInt else Int.MaxValue
       _ <- validateBalance(blockchain, tx.typeId, transactionDiff).traced.leftMap { err =>
-        if (transactionDiff.scriptsComplexity > ContractLimits.FailFreeInvokeComplexity && transactionMayFail(tx) && acceptFailed(blockchain))
+        def acceptFailedByBalance() =
+          acceptFailed(blockchain) && blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+
+        if (transactionDiff.scriptsComplexity > ContractLimits.FailFreeInvokeComplexity && transactionMayFail(tx) && acceptFailedByBalance())
           FailedTransactionError(FailedTransactionError.Cause.DAppExecution, transactionDiff.scriptsComplexity, Nil, Some(err.toString), None)
         else
           err

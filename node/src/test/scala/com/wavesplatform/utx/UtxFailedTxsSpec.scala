@@ -10,7 +10,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
-import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers
@@ -56,7 +56,39 @@ class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Event
     utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe Some(Seq(tx))
   }
 
-  it should s"accept failed Invoke with complexity > ${ContractLimits.FailFreeInvokeComplexity} and failed transfer" in utxTest { (d, utx) =>
+  it should s"accept reject Invoke with complexity > ${ContractLimits.FailFreeInvokeComplexity} and failed transfer" in utxTest { (d, utx) =>
+    val scriptText = s"""{-# STDLIB_VERSION 4 #-}
+                        |{-# CONTENT_TYPE DAPP #-}
+                        |{-# SCRIPT_TYPE ACCOUNT #-}
+                        |
+                        |@Callable(i)
+                        |func test() = {    
+                        |  if (${genExpr(1500, result = true)}) then [
+                        |    ScriptTransfer(i.caller, 15, base58'${TestValues.asset}')
+                        |  ] else []
+                        |}
+                        |""".stripMargin
+    d.appendBlock(TxHelpers.setScript(dApp, TxHelpers.script(scriptText)))
+
+    val tx = TxHelpers.invoke(dApp.toAddress, "test")
+
+    utx.putIfNew(tx, forceValidate = true).resultE should produce("negative asset balance")
+    utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
+
+    utx.addAndCleanup(Nil)
+    Thread.sleep(5000)
+    utx.size shouldBe 1
+
+    utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
+    intercept[RuntimeException](d.appendBlock(tx))
+
+    d.blockchain.transactionMeta(tx.id()) shouldBe None
+  }
+
+  it should s"accept failed Invoke with complexity > ${ContractLimits.FailFreeInvokeComplexity} and failed transfer after SC activation" in withFS(
+    TestFunctionalitySettings
+      .withFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.Ride4DApps, BlockchainFeatures.SynchronousCalls, BlockchainFeatures.SmartAccounts)
+  )(utxTest { (d, utx) =>
     val scriptText = s"""{-# STDLIB_VERSION 4 #-}
                         |{-# CONTENT_TYPE DAPP #-}
                         |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -82,9 +114,8 @@ class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Event
     utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe Some(Seq(tx))
     d.appendBlock(tx)
 
-    val meta = d.blockchain.transactionMeta(tx.id())
-    meta shouldBe Some((3, false))
-  }
+    d.blockchain.transactionMeta(tx.id()) shouldBe Some((3, false))
+  })
 
   it should s"drop failed Invoke with asset script with complexity <= ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
     val issue = TxHelpers.issue(script = genAssetScript(800))
@@ -243,18 +274,25 @@ class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Event
     script
   }
 
-  private[this] def utxTest(f: (Domain, UtxPoolImpl) => Unit): Unit = {
-    val settings = domainSettingsWithFS(
-      TestFunctionalitySettings.withFeatures(
-        BlockchainFeatures.SmartAssets,
-        BlockchainFeatures.SmartAccounts,
-        BlockchainFeatures.SmartAccountTrading,
-        BlockchainFeatures.Ride4DApps,
-        BlockchainFeatures.BlockV5,
-        BlockchainFeatures.OrderV3
-      )
+  private[this] var settings = domainSettingsWithFS(
+    TestFunctionalitySettings.withFeatures(
+      BlockchainFeatures.SmartAssets,
+      BlockchainFeatures.SmartAccounts,
+      BlockchainFeatures.SmartAccountTrading,
+      BlockchainFeatures.Ride4DApps,
+      BlockchainFeatures.BlockV5,
+      BlockchainFeatures.OrderV3
     )
+  )
 
+  private[this] def withFS(fs: FunctionalitySettings)(f: => Unit): Unit = {
+    val oldSettings = settings
+    settings = domainSettingsWithFS(fs)
+    try f
+    finally settings = oldSettings
+  }
+
+  private[this] def utxTest(f: (Domain, UtxPoolImpl) => Unit): Unit = {
     withDomain(settings) { d =>
       d.appendBlock(
         TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, Long.MaxValue / 3),
