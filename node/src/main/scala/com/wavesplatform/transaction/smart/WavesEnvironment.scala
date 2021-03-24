@@ -301,6 +301,7 @@ class DAppEnvironment(
             )
         )
       )
+      println(s"call: $avaliableActions $remainingActions")
       currentDiff = currentDiff combine fixedDiff
       mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
       remainingCalls = remainingCalls - 1

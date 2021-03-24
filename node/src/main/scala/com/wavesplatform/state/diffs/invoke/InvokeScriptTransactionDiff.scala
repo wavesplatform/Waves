@@ -82,7 +82,7 @@ object InvokeScriptTransactionDiff {
           input <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply))
 
           result <- for {
-            (invocationDiff, scriptResult, _) <- {
+            (invocationDiff, scriptResult, log, avaliableActions, avaliableData) <- {
               val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
                 val invoker = tx.sender.toAddress
                 val invocation = ContractEvaluator.Invocation(
@@ -148,7 +148,7 @@ object InvokeScriptTransactionDiff {
                     invocationComplexity.toInt,
                     paymentsComplexity.toInt
                   )
-                } yield (environment.currentDiff, result, log)
+                } yield (environment.currentDiff, result, log, environment.avaliableActions, environment.avaliableData)
               })
               TracedResult(
                 scriptResultE,
@@ -182,8 +182,30 @@ object InvokeScriptTransactionDiff {
             )
 
             resultDiff <- scriptResult match {
-              case ScriptResultV3(dataItems, transfers, unusedComplexity) => doProcessActions(dataItems ::: transfers, unusedComplexity)
-              case ScriptResultV4(actions, unusedComplexity, _)           => doProcessActions(actions, unusedComplexity)
+              case ScriptResultV3(dataItems, transfers, unusedComplexity) =>
+                val dataCount = dataItems.length
+                if(dataCount > avaliableData) {
+                  TracedResult(Left(GenericError("Stored data count limit is exceeded")))
+                } else {
+                  val actionsCount = transfers.length
+                  if(actionsCount > avaliableActions) {
+                    TracedResult(Left(GenericError("Actions count limit is exceeded")))
+                  } else {
+                    doProcessActions(dataItems ::: transfers, unusedComplexity)
+                  }
+                }
+              case ScriptResultV4(actions, unusedComplexity, _) =>
+                val dataCount = actions.count(_.isInstanceOf[DataOp])
+                if(dataCount > avaliableData) {
+                  TracedResult(Left(GenericError("Stored data count limit is exceeded")))
+                } else {
+                  val actionsCount = actions.length - dataCount
+                  if(actionsCount > avaliableActions) {
+                    TracedResult(Left(GenericError("Actions count limit is exceeded")))
+                  } else {
+                    doProcessActions(actions, unusedComplexity)
+                  }
+                }
               case _: IncompleteResult if limitedExecution                => doProcessActions(Nil, 0)
               case i: IncompleteResult =>
                 TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
