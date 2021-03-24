@@ -56,7 +56,7 @@ class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Event
     utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe Some(Seq(tx))
   }
 
-  it should s"accept reject Invoke with complexity > ${ContractLimits.FailFreeInvokeComplexity} and failed transfer" in utxTest { (d, utx) =>
+  it should s"reject Invoke with complexity > ${ContractLimits.FailFreeInvokeComplexity} and failed transfer" in utxTest { (d, utx) =>
     val scriptText = s"""{-# STDLIB_VERSION 4 #-}
                         |{-# CONTENT_TYPE DAPP #-}
                         |{-# SCRIPT_TYPE ACCOUNT #-}
