@@ -134,7 +134,7 @@ case class DebugApiRoute(
       implicit ec: ExecutionContext
   ): Future[Either[ValidationError, JsObject]] = {
     rollbackTask(blockId, returnTransactionsToUtx)
-      .map(_ => Right(Json.obj("BlockId" -> blockId.toString)))
+      .map(_.map(_ => Json.obj("BlockId" -> blockId.toString)))
       .runAsyncLogErr(Scheduler(ec))
   }
 

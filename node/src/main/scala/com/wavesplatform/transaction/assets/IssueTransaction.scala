@@ -6,6 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.IssueTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
@@ -152,6 +153,7 @@ object IssueTransaction extends TransactionParser {
   override def parseBytes(bytes: Array[TxType]): Try[IssueTransaction] = serializer.parseBytes(bytes)
 
   implicit class IssueTransactionExt(private val tx: IssueTransaction) extends AnyVal {
+    def asset: IssuedAsset = IssuedAsset(assetId)
     def assetId: ByteStr = tx.id()
   }
 }

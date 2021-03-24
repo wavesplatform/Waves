@@ -1,6 +1,6 @@
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
-import sbt.Keys._
 import sbt._
+import sbt.Keys._
 
 //noinspection TypeAnnotation
 object Dependencies {
@@ -8,7 +8,7 @@ object Dependencies {
   def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.4"
 
   private def akkaHttpModule(module: String)               = "com.typesafe.akka"             %% module            % "10.1.12"
-  private def nettyModule(module: String)                  = "io.netty"                      % s"netty-$module"   % "4.1.51.Final"
+  private def nettyModule(module: String)                  = "io.netty"                      % s"netty-$module"   % "4.1.59.Final"
   private def kamonModule(module: String)                  = "io.kamon"                      %% s"kamon-$module"  % "2.1.0"
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.11.0"
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
@@ -165,7 +165,7 @@ object Dependencies {
   )
 
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.2.10" classifier "proto" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.2.11" classifier "proto" intransitive ()
 
   lazy val scalapbRuntime = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion
@@ -181,7 +181,7 @@ object Dependencies {
   }
 
   lazy val grpc: Seq[ModuleID] = Seq(
-    "io.grpc"              % "grpc-netty" % "1.31.1" /* scalapb.compiler.Version.grpcJavaVersion */,
+    "io.grpc"              % "grpc-netty" % "1.35.0" /* scalapb.compiler.Version.grpcJavaVersion */,
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
     protoSchemasLib        % "protobuf"
   )

@@ -241,8 +241,8 @@ class BlockchainUpdaterImplSpec
 
             // rollback microblock
             (triggersMock.onMicroBlockRollback _)
-              .expects(where { (toSig, height) =>
-                height == 1 && toSig == microBlocks1And2.head.totalResBlockSig
+              .expects(where { (_, toSig) =>
+                toSig == microBlocks1And2.head.totalResBlockSig
               })
               .once()
 

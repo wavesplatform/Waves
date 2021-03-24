@@ -25,7 +25,7 @@ import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -322,7 +322,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
               .signed(
                 TxVersion.V1,
                 masterAcc.publicKey,
-                IssuedAsset(issueTx.assetId),
+                issueTx.asset,
                 Some(sponsoredFee),
                 MinIssueFee,
                 dataTransaction.timestamp + 6,

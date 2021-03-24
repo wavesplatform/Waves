@@ -10,7 +10,6 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -65,7 +64,7 @@ class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Event
       issue
     )
 
-    val tx = TxHelpers.invoke(dApp.toAddress, "test", payments = Seq(Payment(1L, IssuedAsset(issue.assetId))))
+    val tx = TxHelpers.invoke(dApp.toAddress, "test", payments = Seq(Payment(1L, issue.asset)))
     assert(utx.putIfNew(tx, forceValidate = false).resultE.isLeft)
     assert(utx.putIfNew(tx, forceValidate = true).resultE.isLeft)
     utx.putIfNew(tx, forceValidate = false).resultE should produce("reached err")
@@ -81,7 +80,7 @@ class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Event
     val issue = TxHelpers.issue(script = genAssetScript(ContractLimits.FailFreeInvokeComplexity * 2))
     d.appendBlock(TxHelpers.setScript(dApp, genScript(0, result = true)), issue)
 
-    val tx = TxHelpers.invoke(dApp.toAddress, "test", payments = Seq(Payment(1L, IssuedAsset(issue.assetId))))
+    val tx = TxHelpers.invoke(dApp.toAddress, "test", payments = Seq(Payment(1L, issue.asset)))
     assert(utx.putIfNew(tx, forceValidate = false).resultE.isRight)
     utx.removeAll(Seq(tx))
     assert(utx.putIfNew(tx, forceValidate = true).resultE.isLeft)
@@ -101,7 +100,7 @@ class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Event
     d.appendBlock(issue)
 
     val tx =
-      TxHelpers.exchange(TxHelpers.order(OrderType.BUY, IssuedAsset(issue.assetId)), TxHelpers.order(OrderType.SELL, IssuedAsset(issue.assetId)))
+      TxHelpers.exchange(TxHelpers.order(OrderType.BUY, issue.asset), TxHelpers.order(OrderType.SELL, issue.asset))
     assert(utx.putIfNew(tx, forceValidate = false).resultE.isLeft)
     assert(utx.putIfNew(tx, forceValidate = true).resultE.isLeft)
     utx.putIfNew(tx, forceValidate = false).resultE should produce("reached err")
@@ -118,7 +117,7 @@ class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Event
     d.appendBlock(issue)
 
     val tx =
-      TxHelpers.exchange(TxHelpers.order(OrderType.BUY, IssuedAsset(issue.assetId)), TxHelpers.order(OrderType.SELL, IssuedAsset(issue.assetId)))
+      TxHelpers.exchange(TxHelpers.order(OrderType.BUY, issue.asset), TxHelpers.order(OrderType.SELL, issue.asset))
 
     assert(utx.putIfNew(tx, forceValidate = false).resultE.isRight)
     utx.removeAll(Seq(tx))
