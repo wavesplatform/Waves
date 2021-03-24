@@ -62,6 +62,32 @@ object Functions {
   val getBinaryFromStateF: BaseFunction[Environment]  = getDataFromStateF("getBinary", DATA_BYTES_FROM_STATE, DataType.ByteArray)
   val getStringFromStateF: BaseFunction[Environment]  = getDataFromStateF("getString", DATA_STRING_FROM_STATE, DataType.String)
 
+  val isDataStorageUntouchedF: BaseFunction[Environment] = {
+    val name = "isDataStorageUntouched"
+    val resultType = BOOLEAN
+    val arg = ("addressOrAlias", addressOrAliasType)
+    NativeFunction.withEnvironment[Environment](
+      name,
+      Map[StdLibVersion, Long](V5 -> 10L),
+      IS_UNTOUCHED,
+      resultType,
+      arg
+    ) {
+      new ContextfulNativeFunction[Environment](name, resultType, List(arg)) {
+        override def ev[F[_]: Monad](input: (Environment[F], List[Terms.EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+          input match {
+            case (env, (addressOrAlias: CaseObj) :: Nil) =>
+              val environmentFunctions = new EnvironmentFunctions[F](env)
+              environmentFunctions
+                .hasData(addressOrAlias)
+                .map(_.map(v => CONST_BOOLEAN(!v)))
+
+            case (_, xs) => notImplemented[F, EVALUATED](s"$name(s: AddressOrAlias)", xs)
+          }
+      }
+    }
+  }
+
   private def getDataFromArrayF(name: String, internalName: Short, dataType: DataType, version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction(
       name,

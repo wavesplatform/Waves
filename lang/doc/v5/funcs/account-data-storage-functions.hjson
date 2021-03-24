@@ -57,6 +57,13 @@
       complexity: 10
     }
     {
+      name: "isDataStorageUntouched"
+      params: [ "Address|Alias" ]
+      doc: "Check that any data was stored on account."
+      paramsDoc: [ "[Address](/blockchain/address.md) or [alias](/blockchain/alias.md) of the account." ]
+      complexity: 10
+    }
+    {
       name: "getStringValue"
       params: [ "Address|Alias", "String" ]
       doc: "Gets a string by key. Throws an exception if there is no data."

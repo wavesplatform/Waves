@@ -97,6 +97,25 @@ class WavesEnvironment(
         }
     } yield data
   }
+ 
+  override def hasData(recipient: Recipient): Boolean = {
+    (for {
+      address <- recipient match {
+        case Address(bytes) =>
+          com.wavesplatform.account.Address
+            .fromBytes(bytes.arr)
+            .toOption
+        case Alias(name) =>
+          com.wavesplatform.account.Alias
+            .create(name)
+            .flatMap(blockchain.resolveAlias)
+            .toOption
+      }
+    } yield
+      currentBlockchain()
+        .hasData(address)
+    ).getOrElse(false)
+  }
 
   override def resolveAlias(name: String): Either[String, Recipient.Address] =
     // There are no new aliases in currentBlockchain
