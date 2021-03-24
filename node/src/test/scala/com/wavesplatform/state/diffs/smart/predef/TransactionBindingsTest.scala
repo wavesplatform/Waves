@@ -720,7 +720,7 @@ class TransactionBindingsTest
     val ctx =
       PureContext.build(V2).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
-        WavesContext.build(DirectiveSet(V2, Asset, Expression).explicitGet())
+        WavesContext.build(Global, DirectiveSet(V2, Asset, Expression).explicitGet())
 
     val environment = new WavesEnvironment(
       chainId,
@@ -751,7 +751,7 @@ class TransactionBindingsTest
     val ctx =
       PureContext.build(V2).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
-        WavesContext.build(directives)
+        WavesContext.build(Global, directives)
 
     val env = new WavesEnvironment(
       chainId,

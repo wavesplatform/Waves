@@ -52,6 +52,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
         defaultCryptoContext(version).withEnvironment[Environment],
         pureContext(version).withEnvironment[Environment],
         WavesContext.build(
+          Global,
           DirectiveSet(version, Account, Expression).explicitGet()
         )
       )

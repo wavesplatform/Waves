@@ -230,6 +230,14 @@ abstract class LevelDBWriter private[database] (
       } yield e
     }
 
+  override def hasData(address: Address): Boolean = {
+    writableDB.readOnly { ro =>
+      ro.get(Keys.addressId(address)).fold(false) { addressId =>
+        ro.prefixExists(KeyTags.ChangedDataKeys.prefixBytes ++ addressId.toByteArray)
+      }
+    }
+  }
+
   protected override def loadBalance(req: (Address, Asset)): Long =
     addressId(req._1).fold(0L) { addressId =>
       req._2 match {

@@ -125,7 +125,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
         val directives = DirectiveSet(V3, Account, Expression).explicitGet()
         PureContext.build(V3).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V3).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
+          WavesContext.build(Global, directives)
       }
 
       val script =
@@ -152,7 +152,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
         val directives = DirectiveSet(V3, Account, DAppType).explicitGet()
         PureContext.build(V3).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V3).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
+          WavesContext.build(Global, directives)
       }
 
       val script =
@@ -181,7 +181,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
         val directives = DirectiveSet(V4, Account, Expression).explicitGet()
         PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
+          WavesContext.build(Global, directives)
       }
 
       val script =
@@ -202,7 +202,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
         val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
         PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
+          WavesContext.build(Global, directives)
       }
 
       val script =
@@ -226,7 +226,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
         val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
         PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
+          WavesContext.build(Global, directives)
       }
 
       val script =

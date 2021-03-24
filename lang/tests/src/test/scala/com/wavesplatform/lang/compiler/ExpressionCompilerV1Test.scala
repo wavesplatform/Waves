@@ -309,6 +309,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
           PureContext.build(V4).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
           WavesContext.build(
+            Global,
             DirectiveSet(V4, Account, Expression).explicitGet()
           )
         )

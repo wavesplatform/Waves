@@ -116,6 +116,8 @@ object Bindings {
     val fields: Map[String, EVALUATED] = Map(
       "caller"          -> mapRecipient(i.caller)._2,
       "callerPublicKey" -> i.callerPk,
+      "originalCaller"  -> mapRecipient(i.originalCaller)._2,
+      "originalCallerPublicKey" -> i.originalCallerPublicKey,
       "transactionId"   -> i.transactionId,
       "fee"             -> i.fee,
       "feeAssetId"      -> i.feeAssetId

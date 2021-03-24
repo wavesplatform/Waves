@@ -11,6 +11,7 @@ import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
+import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
@@ -28,7 +29,7 @@ import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, IntegerDataEntry}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.{Schedulers, Time}
@@ -39,6 +40,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
 import scala.concurrent.duration._
+
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory {
   implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
   implicit val timeout          = routeTestTimeout.duration
@@ -615,7 +617,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       val directives = DirectiveSet.contractDirectiveSet
       PureContext.build(V3).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V3).withEnvironment[Environment] |+|
-        WavesContext.build(directives)
+        WavesContext.build(Global, directives)
     }
 
     def dAppToBase64(dApp: String) = {
@@ -684,11 +686,14 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   routePath("/script/evaluate/{address}") in {
+    val letFromContract = 1000
     val testScript = {
       val str = s"""
-                   |{-# STDLIB_VERSION 4 #-}
+                   |{-# STDLIB_VERSION 5 #-}
                    |{-# CONTENT_TYPE DAPP #-}
                    |{-# SCRIPT_TYPE ACCOUNT #-}
+                   |
+                   |let letFromContract = $letFromContract
                    |
                    |func test(i: Int) = i * 10
                    |func testB() = true
@@ -701,10 +706,16 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                    |
                    |@Callable(i)
                    |func testCallable() = [BinaryEntry("test", i.caller.bytes)]
+                   |
+                   |@Callable(i)
+                   |func testSyncInvoke() = {
+                   |  strict r = Invoke(this, "testCallable", [], [AttachedPayment(unit, 100)])
+                   |  [BinaryEntry("testSyncInvoke", i.caller.bytes)]
+                   |}
                    |""".stripMargin
 
       val (script, _) = ScriptCompiler.compile(str, ScriptEstimatorV2).explicitGet()
-      AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map.empty)
+      AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map(1 -> Map("testCallable" -> 10)))
     }
 
     val dAppAddress = TxHelpers.defaultSigner.toAddress
@@ -738,7 +749,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
 
     evalScript("testCallable()") ~> route ~> check {
-      responseAs[String] shouldBe "{\"result\":{\"type\":\"Array\",\"value\":[{\"type\":\"BinaryEntry\",\"value\":{\"key\":{\"type\":\"String\",\"value\":\"test\"},\"value\":{\"type\":\"ByteVector\",\"value\":\"11111111111111111111111111\"}}}]},\"expr\":\"testCallable()\",\"address\":\"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9\"}"
+      responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"test"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"expr":"testCallable()","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
     }
 
     evalScript("testThis()") ~> route ~> check {
@@ -785,6 +796,36 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         |  case _ => throw("")
         |}""".stripMargin) ~> route ~> check {
       responseJson shouldBe Json.obj("type" -> "Int", "value" -> 151290)
+    }
+
+    val expectingKey   = "some"
+    val expectingValue = 1234
+
+    (utilsApi.blockchain.accountData _)
+      .when(dAppAddress, expectingKey)
+      .returning(Some(IntegerDataEntry(expectingKey, expectingValue)))
+      .anyNumberOfTimes()
+
+    evalScript(
+      s"""
+         | this.getInteger("$expectingKey") == $expectingValue &&
+         | height == height
+       """.stripMargin
+    ) ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
+    }
+
+    evalScript("letFromContract - 1".stripMargin) ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Int", "value" -> (letFromContract - 1))
+    }
+
+    (() => utilsApi.blockchain.settings)
+      .when()
+      .returning(DefaultBlockchainSettings)
+      .anyNumberOfTimes()
+
+    evalScript(""" testSyncInvoke() """.stripMargin) ~> route ~> check {
+      responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"expr":" testSyncInvoke() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
     }
   }
 

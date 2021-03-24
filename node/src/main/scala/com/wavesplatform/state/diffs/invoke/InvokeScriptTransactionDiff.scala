@@ -89,6 +89,8 @@ object InvokeScriptTransactionDiff {
                   functionCall,
                   Recipient.Address(ByteStr(invoker.bytes)),
                   tx.sender,
+                  Recipient.Address(ByteStr(invoker.bytes)),
+                  tx.sender,
                   payments,
                   tx.id(),
                   tx.fee,
@@ -104,7 +106,7 @@ object InvokeScriptTransactionDiff {
                   blockchain,
                   tthis,
                   directives,
-                  tx,
+                  Some(tx),
                   dAppAddress,
                   pk,
                   dAppAddress,
@@ -115,9 +117,6 @@ object InvokeScriptTransactionDiff {
                      InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map())
                    })
                 )
-
-                val paymentsComplexity = tx.checkedAssets.flatMap(blockchain.assetScript).map(_.complexity).sum
-                val verifierComplexity = blockchain.accountScript(invoker).map(_.verifierComplexity).getOrElse(0L)
 
                 val fullLimit =
                   if (blockchain.estimator == ScriptEstimatorV2)
@@ -133,13 +132,15 @@ object InvokeScriptTransactionDiff {
                   else
                     fullLimit
 
+                val paymentsComplexity = tx.checkedAssets.flatMap(blockchain.assetScript).map(_.complexity).sum
+
                 for {
                   (result, log) <- evaluateV2(
                     version,
                     contract,
                     invocation,
                     environment,
-                    fullLimit - verifierComplexity.toInt,
+                    fullLimit,
                     failFreeLimit,
                     invocationComplexity.toInt,
                     paymentsComplexity.toInt

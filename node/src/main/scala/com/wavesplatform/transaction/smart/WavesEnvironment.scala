@@ -9,6 +9,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
@@ -67,9 +68,8 @@ class WavesEnvironment(
       .transferById(ByteStr(id))
       .map(t => RealTransactionWrapper.mapTransferTx(t._2))
 
-  override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any] = {
-    for {
-      address <- recipient match {
+  def toAddress(recipient: Recipient): Option[com.wavesplatform.account.Address] = {
+    recipient match {
         case Address(bytes) =>
           com.wavesplatform.account.Address
             .fromBytes(bytes.arr)
@@ -79,7 +79,12 @@ class WavesEnvironment(
             .create(name)
             .flatMap(blockchain.resolveAlias)
             .toOption
-      }
+    }
+  }
+
+  override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any] = {
+    for {
+      address <- toAddress(recipient)
       data <- currentBlockchain()
         .accountData(address, key)
         .map((_, dataType))
@@ -92,6 +97,26 @@ class WavesEnvironment(
         }
     } yield data
   }
+ 
+  override def hasData(recipient: Recipient): Boolean = {
+    (for {
+      address <- recipient match {
+        case Address(bytes) =>
+          com.wavesplatform.account.Address
+            .fromBytes(bytes.arr)
+            .toOption
+        case Alias(name) =>
+          com.wavesplatform.account.Alias
+            .create(name)
+            .flatMap(blockchain.resolveAlias)
+            .toOption
+      }
+    } yield
+      currentBlockchain()
+        .hasData(address)
+    ).getOrElse(false)
+  }
+
   override def resolveAlias(name: String): Either[String, Recipient.Address] =
     // There are no new aliases in currentBlockchain
     blockchain
@@ -192,6 +217,13 @@ class WavesEnvironment(
         address => Address(ByteStr(address.bytes))
       )
 
+  override def accountScript(addressOrAlias: Recipient): Option[Script] = {
+    for {
+      address <- toAddress(addressOrAlias)
+      si <- blockchain.accountScript(address)
+    } yield si.script
+  }
+
   override def callScript(
       dApp: Address,
       func: String,
@@ -208,13 +240,13 @@ class DAppEnvironment(
     blockchain: Blockchain,
     tthis: Environment.Tthis,
     ds: DirectiveSet,
-    tx: InvokeScriptTransaction,
+    tx: Option[InvokeScriptTransaction],
     currentDApp: com.wavesplatform.account.Address,
     currentDAppPk: com.wavesplatform.account.PublicKey,
     senderDApp: com.wavesplatform.account.Address,
     var remainingCalls: Int,
     var currentDiff: Diff
-) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
+) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.map(_.id()).getOrElse(ByteStr.empty)) {
 
   private var mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
 
@@ -238,7 +270,7 @@ class DAppEnvironment(
               _,
               FUNCTION_CALL(User(func, func), args),
               payments.map(p => Payment(p._2, p._1.fold(Waves: Asset)(a => IssuedAsset(ByteStr(a))))),
-              tx.root
+              tx
             )
           )
       )
@@ -252,14 +284,14 @@ class DAppEnvironment(
     } yield {
       val fixedDiff = diff.copy(
         scriptResults = Map(
-          tx.root.id() ->
+          txId ->
             InvokeScriptResult(
               invokes = Seq(
                 InvokeScriptResult.Invocation(
                   invoke.dAppAddress,
                   InvokeScriptResult.Call(func, args),
                   payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves: Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
-                  diff.scriptResults(tx.root.id())
+                  diff.scriptResults(txId)
                 )
               )
             )

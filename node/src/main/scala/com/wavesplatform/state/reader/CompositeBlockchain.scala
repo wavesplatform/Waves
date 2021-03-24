@@ -125,6 +125,10 @@ final case class CompositeBlockchain(
     diffData.data.get(key).orElse(inner.accountData(acc, key)).filterNot(_.isEmpty)
   }
 
+  override def hasData(acc: Address): Boolean = {
+    diff.accountData.get(acc).nonEmpty || inner.hasData(acc)
+  }
+
   override def carryFee: Long = carry
 
   override def score: BigInt = newBlock.fold(BigInt(0))(_.blockScore()) + inner.score
