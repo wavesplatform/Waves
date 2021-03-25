@@ -714,10 +714,10 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
     }
   }
 
-  property(s"21 Lease actions") {
+  property(s"31 Lease actions") {
     val recipient = accountGen.sample.get.toAddress
     val amount    = positiveLongGen.sample.get
-    val dApp      = multipleActionsDApp(recipient.toRide, amount, leaseCount = 21, leaseCancelCount = 0, transfersCount = 0)
+    val dApp      = multipleActionsDApp(recipient.toRide, amount, leaseCount = 31, leaseCancelCount = 0, transfersCount = 0)
     forAll(leasePreconditions(customDApp = Some(dApp))) {
       case (preparingTxs, invoke, _, _, _, _, _) =>
         assertDiffAndState(
@@ -889,8 +889,8 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
     }
   }
 
-  property(s"21 LeaseCancel actions") {
-    forAll(leasePreconditions(useLeaseCancelDApp = true, leaseCancelCount = 21)) {
+  property(s"31 LeaseCancel actions") {
+    forAll(leasePreconditions(useLeaseCancelDApp = true, leaseCancelCount = 31)) {
       case (preparingTxs, invoke, _, _, _, leaseTxs :+ _, _) =>
         assertDiffAndState(
           Seq(TestBlock.create(preparingTxs ++ leaseTxs)),
@@ -927,12 +927,12 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
     }
   }
 
-  property(s"21 multiple actions") {
+  property(s"31 multiple actions") {
     val recipient        = accountGen.sample.get.toAddress
     val amount           = positiveLongGen.sample.get
-    val leaseCount       = Random.nextInt(21) + 1
-    val leaseCancelCount = Random.nextInt(leaseCount).min(21 - leaseCount)
-    val transfersCount   = 21 - leaseCancelCount - leaseCount
+    val leaseCount       = Random.nextInt(31) + 1
+    val leaseCancelCount = Random.nextInt(leaseCount).min(31 - leaseCount)
+    val transfersCount   = 31 - leaseCancelCount - leaseCount
     val dApp             = multipleActionsDApp(recipient.toRide, amount, leaseCount, leaseCancelCount, transfersCount)
     forAll(leasePreconditions(customDApp = Some(dApp))) {
       case (preparingTxs, invoke, _, _, _, _, _) =>

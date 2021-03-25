@@ -41,7 +41,7 @@ object ContractLimits {
     v => if (v >= V4) 400 else 100
 
   // Mass Transfer	0.001 + 0.0005*N, rounded up to 0.001, fee for CI is 0.005
-  def MaxCallableActionsAmount(v: StdLibVersion) = if (v < V5) { 10 } else { 20 }
+  def MaxCallableActionsAmount(v: StdLibVersion) = if (v < V5) { 10 } else { 30 }
   val MaxAttachedPaymentAmount = 2
   val MaxAttachedPaymentAmountV5 = 10
 

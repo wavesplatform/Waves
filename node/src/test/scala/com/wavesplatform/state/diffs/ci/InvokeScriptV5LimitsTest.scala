@@ -583,7 +583,7 @@ class InvokeScriptV5LimitsTest
         .explicitGet()
     } yield (List(genesis, genesis2), master, setContract, ciWithAlias, ciWithFakeAlias, aliasTx)
 
-  property("Allow not more 20 non-data actions") {
+  property("Allow not more 30 non-data actions") {
     def contract(): DApp = {
       val expr = {
         val script =
@@ -597,7 +597,7 @@ class InvokeScriptV5LimitsTest
              |   if i.caller.bytes == a && addressFromPublicKey(i.callerPublicKey).bytes == a
              |   then
              |     let n = Issue(an, an, 1, 0, false, unit, 0)
-             |     ([IntegerEntry("bar", 1), ${"ScriptTransfer(Address(a), 1, unit), " * 8} BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
+             |     ([IntegerEntry("bar", 1), ${"ScriptTransfer(Address(a), 1, unit), " * 13} BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
              |   else
              |     throw("Bad caller")
              | }
@@ -632,7 +632,7 @@ class InvokeScriptV5LimitsTest
              |     let ab = assetBalance(this, getBinaryValue(Address(base58'$otherAcc'), "asset"))
              |     if data == 1
              |     then
-             |      if ob1.regular+18 == ob2.regular && b1.regular == b2.regular+18 && ab == 1
+             |      if ob1.regular+8 == ob2.regular && b1.regular == b2.regular+8 && ab == 1
              |      then
              |       let l = Lease(Address(base58'$otherAcc'), 23)
              |       [
@@ -688,7 +688,7 @@ class InvokeScriptV5LimitsTest
     }
   }
 
-  property("Allow 20 non-data actions") {
+  property("Allow 30 non-data actions") {
     def contract(): DApp = {
       val expr = {
         val script =
@@ -702,7 +702,7 @@ class InvokeScriptV5LimitsTest
              |   if i.caller.bytes == a && addressFromPublicKey(i.callerPublicKey).bytes == a
              |   then
              |     let n = Issue(an, an, 1, 0, false, unit, 0)
-             |     ([IntegerEntry("bar", 1), ${"ScriptTransfer(Address(a), 1, unit), " * 8} BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
+             |     ([IntegerEntry("bar", 1), ${"ScriptTransfer(Address(a), 1, unit), " * 13} BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
              |   else
              |     throw("Bad caller")
              | }
@@ -737,7 +737,7 @@ class InvokeScriptV5LimitsTest
              |     let ab = assetBalance(this, getBinaryValue(Address(base58'$otherAcc'), "asset"))
              |     if data == 1
              |     then
-             |      if ob1.regular+18 == ob2.regular && b1.regular == b2.regular+18 && ab == 1
+             |      if ob1.regular+8 == ob2.regular && b1.regular == b2.regular+8 && ab == 1
              |      then
              |       [
              |        IntegerEntry("key", 1)
