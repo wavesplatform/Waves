@@ -37,7 +37,7 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
       val issue = IssueTransaction(TxVersion.V1, sender.publicKey, assetName, description, quantity, decimals, reissuable = true, script = None, iFee, timestamp)
         .signWith(sender.privateKey)
       val reissue1 = ReissueTransaction
-        .selfSigned(2.toByte, sender, IssuedAsset(issue.assetId), quantity, reissuable = reissuable, fee, timestamp)
+        .selfSigned(2.toByte, sender, issue.asset, quantity, reissuable = reissuable, fee, timestamp)
         .explicitGet()
       (Seq(issue), reissue1)
     }

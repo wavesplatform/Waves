@@ -3,6 +3,11 @@ package com.wavesplatform.api.http
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
 
+import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
+import scala.util.control.NonFatal
+
 import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.Accept
@@ -12,18 +17,18 @@ import cats.implicits._
 import cats.kernel.Monoid
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi}
+import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.http.TransactionsApiRoute.TransactionJsonSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
-import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, Portfolio, StateHash}
-import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
+import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
@@ -31,13 +36,8 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
-import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
-
-import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.control.NonFatal
-import scala.util.{Failure, Success}
+import play.api.libs.json.Json.JsValueWrapper
 
 case class DebugApiRoute(
     ws: WavesSettings,
@@ -58,7 +58,8 @@ case class DebugApiRoute(
     scoreReporter: Coeval[RxScoreObserver.Stats],
     configRoot: ConfigObject,
     loadBalanceHistory: Address => Seq[(Int, Long)],
-    loadStateHash: Int => Option[StateHash]
+    loadStateHash: Int => Option[StateHash],
+    priorityPoolBlockchain: () => Blockchain
 ) extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -133,7 +134,7 @@ case class DebugApiRoute(
       implicit ec: ExecutionContext
   ): Future[Either[ValidationError, JsObject]] = {
     rollbackTask(blockId, returnTransactionsToUtx)
-      .map(_ => Right(Json.obj("BlockId" -> blockId.toString)))
+      .map(_.map(_ => Json.obj("BlockId" -> blockId.toString)))
       .runAsyncLogErr(Scheduler(ec))
   }
 
@@ -224,13 +225,14 @@ case class DebugApiRoute(
 
   def validate: Route =
     path("validate")(jsonPost[JsObject] { jsv =>
-      val startTime = System.nanoTime()
-
+      val blockchain = priorityPoolBlockchain()
+      val startTime  = System.nanoTime()
+      
       val parsedTransaction = TransactionFactory.fromSignedRequest(jsv)
 
       val tracedDiff = for {
         tx   <- TracedResult(parsedTransaction)
-        diff <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
+        diff <- TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
       } yield (tx, diff)
 
       val error = tracedDiff.resultE match {

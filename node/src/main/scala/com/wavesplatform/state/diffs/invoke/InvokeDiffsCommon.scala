@@ -217,10 +217,12 @@ object InvokeDiffsCommon {
           .getOrElse(TracedResult(Right(Map[Address, Portfolio]())))
       }
 
-      totalLimit = ContractLimits.MaxTotalInvokeComplexity(version)
+      verifierComplexity   = blockchain.accountScript(tx.senderAddress).map(_.verifierComplexity).getOrElse(0L)
+      additionalComplexity = actionComplexities.sum + verifierComplexity
+      totalLimit           = ContractLimits.MaxTotalInvokeComplexity(version)
       _ <- TracedResult(
         Either.cond(
-          actionComplexities.sum <= remainingComplexity || limitedExecution, // limited execution has own restriction "complexityLimit"
+          additionalComplexity <= remainingComplexity || limitedExecution, // limited execution has own restriction "complexityLimit"
           (),
           FailedTransactionError.feeForActions(s"Invoke complexity limit = $totalLimit is exceeded", totalLimit - remainingComplexity)
         )

@@ -5,14 +5,11 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.{GenericError, ToBigProof, TooManyProofs, UsupportedProofVersion}
 import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 
 import scala.util.Try
-import com.wavesplatform.transaction.TxValidationError.UsupportedProofVersion
-import com.wavesplatform.transaction.TxValidationError.TooManyProofs
-import com.wavesplatform.transaction.TxValidationError.ToBigProof
 
 case class Proofs(proofs: Seq[ByteStr]) {
   val bytes: Coeval[Array[Byte]]  = Coeval.evalOnce(Bytes.concat(Array(Proofs.Version), Deser.serializeArrays(proofs.map(_.arr))))
@@ -29,7 +26,7 @@ object Proofs {
 
   lazy val empty = new Proofs(Nil)
 
-  protected def validate(proofs: Seq[ByteStr]): Either[ValidationError, Unit] = {
+  private[this] def validate(proofs: Seq[ByteStr]): Either[ValidationError, Unit] = {
     for {
       _ <- Either.cond(proofs.lengthCompare(MaxProofs) <= 0, (), TooManyProofs(MaxProofs, proofs.length))
       biggestProofSize = if (proofs.nonEmpty) proofs.map(_.arr.length).max else 0

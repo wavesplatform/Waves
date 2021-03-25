@@ -2,18 +2,13 @@ package com.wavesplatform.events.protobuf
 
 import cats.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.Address
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.events.RollbackResult
+import com.wavesplatform.events.StateUpdate.AssetInfo
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append, Rollback, Update}
-import com.wavesplatform.events.protobuf.StateUpdate.AssetStateUpdate.AssetScriptInfo
-import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeasingUpdate}
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
-import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
-import com.wavesplatform.state.{LeaseBalance, AssetScriptInfo => VanillaAssetScriptInfo}
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.{events => ve}
 
@@ -21,15 +16,22 @@ import scala.util.{Failure, Try}
 
 package object serde {
 
-  import com.wavesplatform.protobuf.utils.PBImplicitConversions._
-
   implicit class BlockchainUpdatedProtobuf(val self: ve.BlockchainUpdated) extends AnyVal {
 
     import BlockchainUpdatedProtobuf._
 
     def protobuf: BlockchainUpdated =
       self match {
-        case ve.BlockAppended(id, height, block, updatedWavesAmount, blockStateUpdate, transactionStateUpdates) =>
+        case ve.BlockAppended(
+            id,
+            height,
+            block,
+            updatedWavesAmount,
+            blockStateUpdate,
+            transactionStateUpdates,
+            transactionsMetadata,
+            referencedAssets
+            ) =>
           val blockUpdate = Some(blockStateUpdate).filterNot(_.isEmpty).map(_.protobuf)
           val txsUpdates  = transactionStateUpdates.map(_.protobuf)
 
@@ -41,6 +43,7 @@ package object serde {
                 transactionIds = getIds(block.transactionData),
                 stateUpdate = blockUpdate,
                 transactionStateUpdates = txsUpdates,
+                transactionsMetadata = transactionsMetadata,
                 body = Append.Body.Block(
                   Append.BlockAppend(
                     block = Some(PBBlocks.protobuf(block)),
@@ -48,9 +51,20 @@ package object serde {
                   )
                 )
               )
-            )
+            ),
+            referencedAssets = referencedAssets.map(AssetInfo.toPB)
           )
-        case ve.MicroBlockAppended(totalBlockId, height, microBlock, microBlockStateUpdate, transactionStateUpdates, totalTransactionsRoot) =>
+
+        case ve.MicroBlockAppended(
+            totalBlockId,
+            height,
+            microBlock,
+            microBlockStateUpdate,
+            transactionStateUpdates,
+            transactionsMetadata,
+            totalTransactionsRoot,
+            referencedAssets
+            ) =>
           val microBlockUpdate = Some(microBlockStateUpdate).filterNot(_.isEmpty).map(_.protobuf)
           val txsUpdates       = transactionStateUpdates.map(_.protobuf)
 
@@ -62,6 +76,7 @@ package object serde {
                 transactionIds = getIds(microBlock.transactionData),
                 stateUpdate = microBlockUpdate,
                 transactionStateUpdates = txsUpdates,
+                transactionsMetadata = transactionsMetadata,
                 body = Append.Body.MicroBlock(
                   Append.MicroBlockAppend(
                     microBlock = Some(PBMicroBlocks.protobuf(microBlock, totalBlockId)),
@@ -69,23 +84,36 @@ package object serde {
                   )
                 )
               )
-            )
+            ),
+            referencedAssets = referencedAssets.map(AssetInfo.toPB)
           )
-        case ve.RollbackCompleted(to, height) =>
+        case ve.RollbackCompleted(to, height, result, referencedAssets) =>
           BlockchainUpdated(
             id = to.toByteString,
             height = height,
             update = BlockchainUpdated.Update.Rollback(
-              Rollback(Rollback.RollbackType.BLOCK)
-            )
+              Rollback(
+                Rollback.RollbackType.BLOCK,
+                result.removedTransactionIds.map(_.toByteString),
+                result.removedBlocks.map(PBBlocks.protobuf),
+                Some(result.stateUpdate.protobuf)
+              )
+            ),
+            referencedAssets = referencedAssets.map(AssetInfo.toPB)
           )
-        case ve.MicroBlockRollbackCompleted(toSig, height) =>
+        case ve.MicroBlockRollbackCompleted(toSig, height, result, referencedAssets) =>
           BlockchainUpdated(
             id = toSig.toByteString,
             height = height,
             update = BlockchainUpdated.Update.Rollback(
-              Rollback(Rollback.RollbackType.MICROBLOCK)
-            )
+              Rollback(
+                Rollback.RollbackType.MICROBLOCK,
+                result.removedTransactionIds.map(_.toByteString),
+                Nil,
+                Some(result.stateUpdate.protobuf)
+              )
+            ),
+            referencedAssets = referencedAssets.map(AssetInfo.toPB)
           )
       }
   }
@@ -95,11 +123,6 @@ package object serde {
   }
 
   implicit class BlockchainUpdatedVanilla(val self: BlockchainUpdated) extends AnyVal {
-    private def throwError() = {
-      val base58Id = self.id.toByteStr.toString
-      throw new IllegalArgumentException(s"Invalid protobuf BlockchainUpdated at height ${self.height}, id $base58Id")
-    }
-
     def vanilla: Try[ve.BlockchainUpdated] =
       Try {
         self.update match {
@@ -107,151 +130,67 @@ package object serde {
             append.body match {
               case Body.Block(body) =>
                 ve.BlockAppended(
-                  toId = self.id.toByteStr,
-                  toHeight = self.height,
-                  block = PBBlocks.vanilla(body.block.get, unsafe = true).get,
+                  id = self.id.toByteStr,
+                  height = self.height,
+                  block = body.block.map(PBBlocks.vanilla(_, unsafe = true).get).orNull,
                   updatedWavesAmount = body.updatedWavesAmount,
                   blockStateUpdate = append.stateUpdate.fold(Monoid[ve.StateUpdate].empty)(_.vanilla.get),
-                  transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get)
+                  transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get),
+                  transactionMetadata = append.transactionsMetadata,
+                  referencedAssets = self.referencedAssets.map(AssetInfo.fromPB)
                 )
               case Body.MicroBlock(body) =>
                 ve.MicroBlockAppended(
-                  toId = self.id.toByteStr,
-                  toHeight = self.height,
+                  id = self.id.toByteStr,
+                  height = self.height,
                   microBlock = PBMicroBlocks.vanilla(body.microBlock.get, unsafe = true).get.microblock,
                   microBlockStateUpdate = append.stateUpdate.fold(Monoid[ve.StateUpdate].empty)(_.vanilla.get),
                   transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get),
-                  totalTransactionsRoot = body.updatedTransactionsRoot.toByteStr
+                  totalTransactionsRoot = body.updatedTransactionsRoot.toByteStr,
+                  transactionMetadata = append.transactionsMetadata,
+                  referencedAssets = self.referencedAssets.map(AssetInfo.fromPB)
                 )
-              case Body.Empty => throwError()
+              case Body.Empty => throw new IllegalArgumentException("Empty append body")
             }
+
           case Update.Rollback(rollback) =>
             rollback.`type` match {
               case RollbackType.BLOCK =>
                 ve.RollbackCompleted(
-                  toId = self.id.toByteStr,
-                  toHeight = self.height
+                  self.id.toByteStr,
+                  self.height,
+                  RollbackResult(
+                    rollback.removedBlocks.map(PBBlocks.vanilla(_).get),
+                    rollback.removedTransactionIds.map(_.toByteStr),
+                    rollback.getRollbackStateUpdate.vanilla.get
+                  ),
+                  referencedAssets = self.referencedAssets.map(AssetInfo.fromPB)
                 )
               case RollbackType.MICROBLOCK =>
                 ve.MicroBlockRollbackCompleted(
-                  toId = self.id.toByteStr,
-                  toHeight = self.height
+                  id = self.id.toByteStr,
+                  height = self.height,
+                  RollbackResult.micro(rollback.removedTransactionIds.map(_.toByteStr), rollback.getRollbackStateUpdate.vanilla.get),
+                  referencedAssets = self.referencedAssets.map(AssetInfo.fromPB)
                 )
-              case RollbackType.Unrecognized(_) => throwError()
+              case RollbackType.Unrecognized(v) => throw new IllegalArgumentException(s"Unrecognized rollback type $v")
             }
-          case Update.Empty => throwError()
+          case Update.Empty => throw new IllegalArgumentException("Update body is empty")
         }
-      } recoverWith { case _: Throwable => Try(throwError()) }
-  }
-
-  implicit class AssetStateUpdateProtobuf(val self: ve.AssetStateUpdate) extends AnyVal {
-    def protobuf: AssetStateUpdate = AssetStateUpdate(
-      assetId = self.asset.id.toByteString,
-      decimals = self.decimals,
-      name = self.name.toUTF8String,
-      description = self.description.toUTF8String,
-      reissuable = self.reissuable,
-      volume = self.volume.longValue,
-      scriptInfo = self.scriptInfo.map(_.protobuf),
-      sponsorship = self.sponsorship.getOrElse(0),
-      nft = self.nft,
-      assetExistedBefore = self.assetExistedBefore,
-      safeVolume = ByteString.copyFrom(self.volume.toByteArray)
-    )
-  }
-
-  implicit class AssetStateUpdateVanilla(val self: AssetStateUpdate) extends AnyVal {
-    import AssetStateUpdateVanilla._
-    def vanilla: Try[ve.AssetStateUpdate] =
-      Try {
-        PBAmounts.toVanillaAssetId(self.assetId) match {
-          case a: IssuedAsset =>
-            ve.AssetStateUpdate(
-              asset = a,
-              decimals = self.decimals,
-              name = ByteStr(self.name.getBytes()),
-              description = ByteStr(self.description.getBytes()),
-              reissuable = self.reissuable,
-              volume = BigInt(self.safeVolume.toByteArray),
-              scriptInfo = self.scriptInfo.map(_.vanilla.get),
-              sponsorship = if (self.sponsorship == 0) None else Some(self.sponsorship),
-              nft = self.nft,
-              assetExistedBefore = self.assetExistedBefore
-            )
-          case _ => throw error
-        }
-      } recoverWith { case _: Throwable => Failure(error) }
-  }
-
-  object AssetStateUpdateVanilla {
-    private lazy val error = new IllegalArgumentException(s"Invalid protobuf AssetStateUpdate")
-  }
-
-  implicit class AssetScriptInfoProtobuf(val self: VanillaAssetScriptInfo) extends AnyVal {
-    def protobuf: AssetScriptInfo = AssetScriptInfo(
-      script = PBTransactions.toPBScript(Some(self.script)),
-      complexity = self.complexity
-    )
-  }
-
-  implicit class AssetScriptInfoVanilla(val self: AssetScriptInfo) extends AnyVal {
-    import AssetScriptInfoVanilla._
-    def vanilla: Try[VanillaAssetScriptInfo] =
-      Try {
-        VanillaAssetScriptInfo(
-          script = PBTransactions.toVanillaScript(self.script).get,
-          complexity = self.complexity
-        )
-      } recoverWith { case _: Throwable => Failure(error) }
-  }
-
-  object AssetScriptInfoVanilla {
-    private lazy val error = new IllegalArgumentException(s"Invalid protobuf AssetScriptInfo")
-  }
-
-  implicit class StateUpdateProtobuf(val self: ve.StateUpdate) extends AnyVal {
-    def protobuf: StateUpdate = StateUpdate(
-      balances = self.balances.map {
-        case (addr, assetId, amt) =>
-          BalanceUpdate(address = addr, amount = Some((assetId, amt)))
-      },
-      leases = self.leases.map {
-        case (addr, leaseBalance) =>
-          LeasingUpdate(address = addr, in = leaseBalance.in, out = leaseBalance.out)
-      },
-      dataEntries = self.dataEntries.map {
-        case (addr, entry) => DataEntryUpdate(address = addr, dataEntry = Some(PBTransactions.toPBDataEntry(entry)))
-      },
-      assets = self.assets.map(_.protobuf)
-    )
+      } recoverWith {
+        case err: Throwable =>
+          Failure(new IllegalArgumentException(s"Invalid protobuf BlockchainUpdated at height ${self.height}, id ${self.id.toByteStr}", err))
+      }
   }
 
   implicit class StateUpdateVanilla(val self: StateUpdate) extends AnyVal {
-    import StateUpdateVanilla._
     def vanilla: Try[ve.StateUpdate] =
       Try {
-        ve.StateUpdate(
-          balances = self.balances.map { b =>
-            val (asset, balance) = PBAmounts.toAssetAndAmount(b.amount.get)
-            val address          = toAddress(b.address).get
-            (address, asset, balance)
-          },
-          leases = self.leases.map { l =>
-            val address = toAddress(l.address).get
-            (address, LeaseBalance(l.in, l.out))
-          },
-          dataEntries = self.dataEntries.map {
-            case DataEntryUpdate(addr, entry) =>
-              (toAddress(addr).get, PBTransactions.toVanillaDataEntry(entry.get))
-          },
-          assets = self.assets.map(_.vanilla.get)
-        )
-      } recoverWith { case _: Throwable => Failure(error) }
+        ve.StateUpdate.fromPB(self)
+      } recoverWith { case err: Throwable => Failure(new IllegalArgumentException(s"Invalid protobuf StateUpdate", err)) }
   }
 
-  object StateUpdateVanilla {
-    private lazy val error = new IllegalArgumentException(s"Invalid protobuf StateUpdate")
-
-    def toAddress(bs: ByteString): Try[Address] = Address.fromBytes(bs.toByteArray).left.map(_ => error).toTry
+  implicit class StateUpdateProtobuf(val self: ve.StateUpdate) extends AnyVal {
+    def protobuf: StateUpdate = ve.StateUpdate.toPB(self)
   }
 }

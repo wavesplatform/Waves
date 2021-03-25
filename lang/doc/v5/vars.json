@@ -9,6 +9,9 @@
     "name" : "this",
     "doc" : "Script address"
   }, {
+    "name" : "HALFDOWN",
+    "doc" : "'HALF_DOWN' rounding mode"
+  }, {
     "name" : "SHA3256",
     "doc" : "SHA3-256 digest algorithm"
   }, {
@@ -41,6 +44,9 @@
   }, {
     "name" : "SHA3512",
     "doc" : "SHA3-512 digest algorithm"
+  }, {
+    "name" : "UP",
+    "doc" : "'UP' rounding mode"
   }, {
     "name" : "HALFEVEN",
     "doc" : "'HALF_EVEN' rounding mode"
