@@ -12,8 +12,10 @@ import com.wavesplatform.it.api.{TransactionInfo, UnexpectedStatusCodeException}
 import com.wavesplatform.it.sync.{calcDataFee, minFee, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.{DataTransaction, TxVersion}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.{DataTransaction, Proofs, TxVersion}
 import org.scalatest.{Assertion, Assertions, EitherValues}
 import play.api.libs.json._
 
@@ -40,6 +42,35 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     sender.postForm("/addresses")
     sender.postForm("/addresses")
     sender.transfer(firstKeyPair, fourthAddress, 10.waves, minFee, waitForTx = true)
+  }
+
+  test("should not put 65-sized proof") {
+    val keyPair = sender.createKeyPair()
+    sender.transfer(sender.keyPair, keyPair.toAddress.stringRepr, 1.waves, waitForTx = true)
+    sender.setScript(
+      keyPair,
+      Some(
+        ScriptCompiler
+          .compile(
+            """{-# STDLIB_VERSION 2 #-}
+        |{-# CONTENT_TYPE EXPRESSION #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |true""".stripMargin,
+            ScriptEstimatorV1
+          )
+          .explicitGet()
+          ._1
+          .bytes()
+          .base64
+      ),
+      waitForTx = true
+    )
+    val dataTx =
+      DataTransaction.selfSigned(TxVersion.V1, keyPair, Seq(StringDataEntry("1", "test")), 700000L, System.currentTimeMillis()).explicitGet()
+
+    val brokenProofs = dataTx.copy(proofs = Proofs(dataTx.proofs.proofs :+ ByteStr(new Array[Byte](65))))
+    assertBadRequestAndResponse(sender.signedBroadcast(brokenProofs.json(), waitForTx = true), "Too large proof")
   }
 
   test("put and remove keys") {

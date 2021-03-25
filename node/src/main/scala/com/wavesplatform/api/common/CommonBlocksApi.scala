@@ -34,11 +34,14 @@ object CommonBlocksApi {
       metaAt: Int => Option[BlockMeta],
       blockInfoAt: Int => Option[(BlockMeta, Seq[(Transaction, Boolean)])]
   ): CommonBlocksApi = new CommonBlocksApi {
-    private def fixHeight(h: Int)                  = if (h <= 0) blockchain.height + h else h
-    private def heightOf(id: ByteStr): Option[Int] = blockchain.heightOf(id)
+    private def fixHeight(h: Int) = if (h <= 0) blockchain.height + h else h
 
     def blocksRange(fromHeight: Int, toHeight: Int): Observable[(BlockMeta, Seq[(Transaction, Boolean)])] =
-      Observable.fromIterable((fixHeight(fromHeight) to fixHeight(toHeight)).flatMap(h => blockInfoAt(h)))
+      Observable
+        .fromIterable(fixHeight(fromHeight) to fixHeight(toHeight))
+        .map(blockInfoAt)
+        .takeWhile(_.isDefined)
+        .flatMap(Observable.fromIterable(_))
 
     def blocksRange(fromHeight: Int, toHeight: Int, generatorAddress: Address): Observable[(BlockMeta, Seq[(Transaction, Boolean)])] =
       Observable.fromIterable(
@@ -49,7 +52,8 @@ object CommonBlocksApi {
       )
 
     def blockDelay(blockId: BlockId, blockNum: Int): Option[Long] =
-      heightOf(blockId)
+      blockchain
+        .heightOf(blockId)
         .map { maxHeight =>
           val minHeight  = maxHeight - blockNum.max(1)
           val allHeaders = (minHeight to maxHeight).flatMap(h => metaAt(h))
@@ -59,7 +63,7 @@ object CommonBlocksApi {
               pair(1).header.timestamp - pair(0).header.timestamp
             }
             .sum
-          totalPeriod / allHeaders.size
+          totalPeriod / (allHeaders.size - 1).max(1)
         }
 
     def currentHeight: Int = blockchain.height
@@ -68,11 +72,11 @@ object CommonBlocksApi {
 
     def metaAtHeight(height: Int): Option[BlockMeta] = metaAt(height)
 
-    def meta(id: ByteStr): Option[BlockMeta] = heightOf(id).flatMap(metaAt)
+    def meta(id: ByteStr): Option[BlockMeta] = blockchain.heightOf(id).flatMap(metaAt)
 
     def metaRange(fromHeight: Int, toHeight: Int): Observable[BlockMeta] =
       Observable.fromIterable((fixHeight(fromHeight) to fixHeight(toHeight)).flatMap(h => metaAt(h)))
 
-    def block(blockId: BlockId): Option[(BlockMeta, Seq[(Transaction, Boolean)])] = heightOf(blockId).flatMap(h => blockInfoAt(h))
+    def block(blockId: BlockId): Option[(BlockMeta, Seq[(Transaction, Boolean)])] = blockchain.heightOf(blockId).flatMap(h => blockInfoAt(h))
   }
 }

@@ -149,18 +149,12 @@ object Terms {
     def prettyString(level: Int): String = toString
     def toStr: Coeval[String]            = Coeval.now(toString)
     def weight: Long
-
-    // FIXME: Do not use global mutable state
-    @volatile var wasLogged: Boolean = false
-
     val getType: REAL // used for _isInstanceOf and therefore for match
 
     override def deepCopy: Eval[EXPR] =
-      Eval.later {
-        this.wasLogged = false
-        this
-      }
+      Eval.now(this)
   }
+
   case class CONST_LONG(t: Long) extends EVALUATED {
     override def toString: String = t.toString
     override val weight: Long     = 8L
