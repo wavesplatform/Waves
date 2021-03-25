@@ -1,7 +1,7 @@
 # Waves Node in Docker
 
 ## About Waves
-Waves is a decentralized platform that allows any user to issue, transfer, swap and trade custom blockchain tokens on an integrated peer-to-peer exchange. You can find more information about Waves at [wavesplatform.com](https://wavesplatform.com) and in the official [documentation]((https://docs.wavesplatform.com)).
+Waves is a decentralized platform that allows any user to issue, transfer, swap and trade custom blockchain tokens on an integrated peer-to-peer exchange. You can find more information about Waves at [waves.tech](https://waves.tech/) and in the official [documentation](https://docs.waves.tech).
 
 
 ## About the image
@@ -11,15 +11,10 @@ The image is focused on fast and convenient deployment of Waves Node.
 GitHub repository: https://github.com/wavesplatform/Waves/tree/master/docker
 
 ## Prerequisites
-It is highly recommended to read more about [Waves Node configuration](https://docs.wavesplatform.com/en/waves-Node/Node-configuration.html) before running the container.
+It is highly recommended to read more about [Waves Node configuration](https://docs.waves.tech/en/waves-node/node-configuration) before running the container.
 
 ## Building Docker image
-
-Dockerfile supports 3 main scenarios:
-1. Basic scenario `docker build -t wavesplatform/wavesnode .` - build an image with the latest Waves Node release available
-*Note*: pre-releases are skipped
-2. Existing Version scenario `docker build --build-arg WAVES_VERSION=1.1.1` - specify the version of Waves Node available in GitHub Releases. If this version does not exist, this is the next scenario.
-3. Build scenario `docker build --build-arg WAVES_VERSION=99.99.99 --build-arg BRANCH=version-0.17.x` - this scenario assumes that you want to build Waves Node from sources. Use `WAVES_VERSION` build argument to specify a Git tag ('v' is added automatically) and `BRANCH` to specify a Git branch to checkout to. Make sure you specify a tag that does not exist in the repo, otherwise it is the previous scenario.
+`./build-with-docker.sh && docker build -t wavesplatform/wavesnode docker` (from the repository root) - builds an image with the current local repository
 
 **You can specify following arguments when building the image:**
 
@@ -27,10 +22,7 @@ Dockerfile supports 3 main scenarios:
 |Argument              | Default value |Description   |
 |----------------------|-------------------|--------------|
 |`WAVES_NETWORK`       | `mainnet`         | Waves Blockchain network. Available values are `mainnet`, `testnet`, `stagenet`. Can be overridden in a runtime using environment variable with the same name.|
-|`WAVES_VERSION`       | `latest`            | A node version which corresponds to the Git tag we want to use/create. |
-|`BRANCH`              | `version-0.17.x`    | Relevant if Git tag 'v`WAVES_VERSION`' does not exist in the public repository. This option represents a Git branch we will use to compile Waves node and set a Git tag on.|
-|`SBT_VERSION`         | `1.2.8` 	       | Scala build tool version.|
-|`WAVES_LOG_LEVEL`     | `DEBUG`           | Default Waves Node log level. Available values: `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`. More details about logging are available [here](https://docs.wavesplatform.com/en/waves-Node/logging-configuration.html). Can be overridden in a runtime using environment variable with the same name. |
+|`WAVES_LOG_LEVEL`     | `DEBUG`           | Default Waves Node log level. Available values: `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`. More details about logging are available [here](https://docs.waves.tech/en/waves-node/logging-configuration). Can be overridden in a runtime using environment variable with the same name. |
 |`WAVES_HEAP_SIZE`     | `2g`              | Default Waves Node JVM Heap Size limit in -X Command-line Options notation (`-Xms=[your value]`). More details [here](https://docs.oracle.com/cd/E13150_01/jrockit_jvm/jrockit/jrdocs/refman/optionX.html). Can be overridden in a runtime using environment variable with the same name. |
 
 **Note: All build arguments are optional.**  
@@ -57,7 +49,7 @@ docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-con
 |-----------------------------------|--------------|
 | `WAVES_WALLET_SEED`        		| Base58 encoded seed. Overrides `-Dwaves.wallet.seed` JVM config option. |
 | `WAVES_WALLET_PASSWORD`           | Password for the wallet file. Overrides `-Dwaves.wallet.password` JVM config option. |
-| `WAVES_LOG_LEVEL`                 | Node logging level. Available values: `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`. More details about logging are available [here](https://docs.wavesplatform.com/en/waves-Node/logging-configuration.html).|
+| `WAVES_LOG_LEVEL`                 | Node logging level. Available values: `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`. More details about logging are available [here](https://docs.waves.tech/en/waves-node/logging-configuration).|
 | `WAVES_HEAP_SIZE`                 | Default Java Heap Size limit in -X Command-line Options notation (`-Xms=[your value]`). More details [here](https://docs.oracle.com/cd/E13150_01/jrockit_jvm/jrockit/jrdocs/refman/optionX.html). |
 |`WAVES_NETWORK`                    | Waves Blockchain network. Available values are `mainnet`, `testnet`, `stagenet`.|
 |`JAVA_OPTS`                        | Additional Waves Node JVM configuration options. 	|
@@ -93,18 +85,7 @@ Once container is launched it will create:
 
 3. If you already have Waves Node configuration/data - place it in the corresponsing directories
 
-
-4. *Configure access permissions*. We use `waves` user with predefined uid/gid `143/143` to launch the container. As such, either change permissions of the created directories or change their owner:
-
-```
-sudo chmod -R 777 /docker/waves
-```
-or
-```
-sudo chown -R 143:143 /docker/waves      <-- prefered
-```
-
-5. Add the appropriate arguments to ```docker run``` command: 
+4. Add the appropriate arguments to ```docker run``` command: 
 ```
 docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-config:/etc/waves -e WAVES_NETWORK=stagenet -e WAVES_WALLET_PASSWORD=myWalletSuperPassword -ti wavesplatform/wavesnode
 ```
@@ -119,27 +100,25 @@ You can speed this process up by downloading a compressed blockchain state from 
 
 |Network     |Link          |
 |------------|--------------|
-|`mainnet`   | http://blockchain.wavesplatform.com/blockchain_last.tar |
-|`testnet`   | http://blockchain-testnet.wavesplatform.com/blockchain_last.tar  |
-|`stagenet`  | http://blockchain-stagenet.wavesplatform.com/blockchain_last.tar |
+|`mainnet`   | http://blockchain.wavesnodes.com/blockchain_last.tar |
+|`testnet`   | http://blockchain-testnet.wavesnodes.com/blockchain_last.tar  |
+|`stagenet`  | http://blockchain-stagenet.wavesnodes.com/blockchain_last.tar |
 
 
 **Example:**
 ```
 mkdir -p /docker/waves/waves-data
 
-wget -qO- http://blockchain-stagenet.wavesplatform.com/blockchain_last.tar --show-progress | tar -xvf - -C /docker/waves/waves-data
-
-chown -R 143:143 /docker/waves/waves-data
+wget -qO- http://blockchain-stagenet.wavesnodes.com/blockchain_last.tar --show-progress | tar -xvf - -C /docker/waves/waves-data
 
 docker run -v /docker/waves/waves-data:/var/lib/waves wavesplatform/Node -e WAVES_NETWORK=stagenet -e WAVES_WALLET_PASSWORD=myWalletSuperPassword -ti wavesplatform/wavesnode
 ```
 
 ### Network Ports
 
-1. REST-API interaction with Node. Details are available [here](https://docs.wavesplatform.com/en/waves-Node/Node-configuration.html#section-530adfd0788eec3f856da976e4ce7ce7).
+1. REST-API interaction with Node. Details are available [here](https://docs.waves.tech/en/waves-node/node-configuration#rest-api-settings).
 
-2. Waves Node communication port for incoming connections. Details are available [here](https://docs.wavesplatform.com/en/waves-Node/Node-configuration.html#section-fd33d7a83e3b2854f614fd9d5ae733ba).
+2. Waves Node communication port for incoming connections. Details are available [here](https://docs.waves.tech/en/waves-node/node-configuration#network-settings).
 
 
 **Example:**
@@ -149,7 +128,7 @@ Below command will launch a container:
 - Ports `6868` and `6870` mapped from the host to the container
 
 ```
-docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-config:/etc/waves -p 6870:6870 -p 6868:6868 -e JAVA_OPTS="-Dwaves.network.declared-address=0.0.0.0:6868 -Dwaves.rest-api.port=6870 -Dwaves.rest-api.bind-address=0.0.0.0 -Dwaves.rest-api.enable=yes" -e WAVES_WALLET_PASSWORD=myWalletSuperPassword -ti  wavesplatform/wavesnode
+docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-config:/etc/waves -p 6870:6870 -p 6868:6868 -e JAVA_OPTS="-Dwaves.network.declared-address=0.0.0.0:6868 -Dwaves.rest-api.port=6870 -Dwaves.rest-api.bind-address=0.0.0.0 -Dwaves.rest-api.enable=yes" -e WAVES_WALLET_PASSWORD=myWalletSuperPassword -e WAVES_NETWORK=stagenet -ti wavesplatform/wavesnode
 ```
 
 Check that REST API is up by navigating to the following URL from the host side:

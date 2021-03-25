@@ -68,11 +68,11 @@ class ProtoVersionTransactionsSpec extends FreeSpec with TransactionGen with Mat
       val base64IssueStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(issueTx)))
 
       val reissueTx = ReissueTransaction
-        .selfSigned(TxVersion.V3, Account, IssuedAsset(issueTx.assetId), quantity, reissuable, MinIssueFee, Now)
+        .selfSigned(TxVersion.V3, Account, issueTx.asset, quantity, reissuable, MinIssueFee, Now)
         .explicitGet()
       val base64reissueStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(reissueTx)))
 
-      val burnTx        = BurnTransaction.selfSigned(TxVersion.V3, Account, IssuedAsset(issueTx.assetId), quantity, MinIssueFee, Now).explicitGet()
+      val burnTx        = BurnTransaction.selfSigned(TxVersion.V3, Account, issueTx.asset, quantity, MinIssueFee, Now).explicitGet()
       val base64BurnStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(burnTx)))
 
       decode(base64IssueStr) shouldBe issueTx

@@ -1,22 +1,27 @@
 package com.wavesplatform.http
 
+import scala.util.Random
+
+import com.wavesplatform.{NoShrink, TestWallet}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.BlocksApiRoute
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.{NoShrink, TestWallet}
+import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.TxHelpers
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
 class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with PropertyChecks with RestAPISettingsHelper with TestWallet with NoShrink {
-  private val blocksApi = mock[CommonBlocksApi]
-  private val route     = BlocksApiRoute(restAPISettings, blocksApi).route
+  private val blocksApi                      = mock[CommonBlocksApi]
+  private val blocksApiRoute: BlocksApiRoute = BlocksApiRoute(restAPISettings, blocksApi)
+  private val route                          = blocksApiRoute.route
 
   private val testBlock1 = TestBlock.create(Nil)
   private val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion)
@@ -89,7 +94,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
 
     Get(routePath(s"/signature/$invalidBlockId")) ~> route ~> check {
       response.status.isFailure() shouldBe true
-      responseAs[String] should include ("block does not exist")
+      responseAs[String] should include("block does not exist")
     }
   }
 
@@ -109,7 +114,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
 
     Get(routePath(s"/$invalidBlockId")) ~> route ~> check {
       response.status.isFailure() shouldBe true
-      responseAs[String] should include ("block does not exist")
+      responseAs[String] should include("block does not exist")
     }
   }
 
@@ -157,7 +162,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
 
     Get(routePath(s"/headers/$invalidBlockId")) ~> route ~> check {
       response.status.isFailure() shouldBe true
-      responseAs[String] should include ("block does not exist")
+      responseAs[String] should include("block does not exist")
     }
   }
 
@@ -190,6 +195,34 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     Get(routePath("/headers/seq/1/2")) ~> route ~> check {
       val response = responseAs[Seq[JsObject]]
       response shouldBe Seq(testBlock1HeaderJson, testBlock2HeaderJson)
+    }
+  }
+
+  routePath("/delay/{blockId}/{number}") in {
+    val blocks = Vector(
+      Block(BlockHeader(1, 0, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty), ByteStr(Random.nextBytes(64)), Nil),
+      Block(BlockHeader(1, 1000, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty), ByteStr(Random.nextBytes(64)), Nil),
+      Block(BlockHeader(1, 2000, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty), ByteStr(Random.nextBytes(64)), Nil)
+    )
+
+    val blockchain = stub[Blockchain]
+    (blockchain.heightOf _).when(blocks.last.id()).returning(Some(3))
+
+    def metaAt(height: Int): Option[BlockMeta] =
+      if (height >= 1 && height <= 3)
+        Some(BlockMeta(blocks(height - 1).header, ByteStr.empty, None, 1, 0, 0, 0, None, None))
+      else None
+
+    val blocksApi = CommonBlocksApi(blockchain, metaAt, _ => None)
+    val route = blocksApiRoute.copy(commonApi = blocksApi).route
+    Get(routePath(s"/delay/${blocks.last.id()}/3")) ~> route ~> check {
+      val delay = (responseAs[JsObject] \ "delay").as[Int]
+      delay shouldBe 1000
+    }
+
+    Get(routePath(s"/delay/${blocks.last.id()}/1")) ~> route ~> check {
+      val delay = (responseAs[JsObject] \ "delay").as[Int]
+      delay shouldBe 1000
     }
   }
 }

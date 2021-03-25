@@ -10,7 +10,6 @@
     <logger name="kamon.influxdb.InfluxDBReporter" level="INFO"/>
     <logger name="org.apache.kafka" level="INFO"/>
     <logger name="org.apache.kafka.common.network.Selector" level="DEBUG"/> <!-- https://issues.apache.org/jira/browse/KAFKA-5133 -->
-    <logger name="org.aspectj" level="INFO"/>
     <logger name="org.asynchttpclient" level="INFO"/>
     <logger name="oshi.hardware.platform.linux.LinuxDisks" level="INFO"/>
 
