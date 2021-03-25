@@ -115,7 +115,7 @@ class RemoveEntrySuite extends BaseSuite {
 
       assertApiError(
         invokeScript(keyPair, s"delete101Entries"),
-        AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: WriteSet can't contain more than 100 entries")
+        AssertiveApiError(ScriptExecutionError.Id, "Stored data count limit is exceeded")
       )
 
       miner.getData(keyPair.toAddress.toString) should have size 101

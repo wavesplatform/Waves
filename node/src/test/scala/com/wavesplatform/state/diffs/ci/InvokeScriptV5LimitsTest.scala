@@ -17,7 +17,6 @@ import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{CREATE_LIST, THROW}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -35,10 +34,9 @@ import com.wavesplatform.state._
 //import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionDiff}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
+//import com.wavesplatform.transaction.smart.script.ScriptCompiler
 //import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 //import com.wavesplatform.transaction.transfer.TransferTransaction
