@@ -45,8 +45,8 @@ final case class CompositeBlockchain(
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId)
-      .map(ld => ld.copy(isActive = diff.leaseState.get(leaseId).map(_._1).getOrElse(ld.isActive)))
-      .orElse(diff.leaseDetails(leaseId, height))
+      .map(ld => ld.copy(isActive = diff.leaseState.get(leaseId).map(_.isActive).getOrElse(ld.isActive)))
+      .orElse(diff.leaseState.get(leaseId))
   }
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = {
@@ -123,6 +123,10 @@ final case class CompositeBlockchain(
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = {
     val diffData = diff.accountData.get(acc).orEmpty
     diffData.data.get(key).orElse(inner.accountData(acc, key)).filterNot(_.isEmpty)
+  }
+
+  override def hasData(acc: Address): Boolean = {
+    diff.accountData.get(acc).nonEmpty || inner.hasData(acc)
   }
 
   override def carryFee: Long = carry

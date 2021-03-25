@@ -11,7 +11,6 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 import play.api.libs.json._
 
@@ -68,7 +67,7 @@ object AssetVolumeInfo {
 case class AssetScriptInfo(script: Script, complexity: Long)
 
 case class AssetDescription(
-    assetId: ByteStr,
+    originTransactionId: ByteStr,
     issuer: PublicKey,
     name: ByteString,
     description: ByteString,
@@ -153,7 +152,7 @@ case class Diff(
     updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
     aliases: Map[Alias, Address],
     orderFills: Map[ByteStr, VolumeAndFee],
-    leaseState: Map[ByteStr, (Boolean, Option[LeaseActionInfo])],
+    leaseState: Map[ByteStr, LeaseDetails],
     scripts: Map[Address, Option[AccountScriptInfo]],
     assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
     accountData: Map[Address, AccountDataInfo],
@@ -164,20 +163,6 @@ case class Diff(
 ) {
   def bindTransaction(tx: Transaction): Diff =
     copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
-
-  def leaseDetails(leaseId: ByteStr, height: Int): Option[LeaseDetails] =
-    leaseState.get(leaseId).flatMap {
-      case (isActive, None) =>
-        transactions.get(leaseId).collect {
-          case NewTransactionInfo(lt: LeaseTransaction, _, true) =>
-            LeaseDetails(lt.sender, lt.recipient, height, lt.amount, isActive)
-        }
-      case (isActive, Some(LeaseActionInfo(invokeId, dAppPublicKey, recipient, amount))) =>
-        transactions.get(invokeId).collect {
-          case NewTransactionInfo(_, _, true) =>
-            LeaseDetails(dAppPublicKey, recipient, height, amount, isActive)
-        }
-    }
 }
 
 object Diff {
@@ -187,7 +172,7 @@ object Diff {
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
-      leaseState: Map[ByteStr, (Boolean, Option[LeaseActionInfo])] = Map.empty,
+      leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
       scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
       assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
       accountData: Map[Address, AccountDataInfo] = Map.empty,
@@ -219,7 +204,7 @@ object Diff {
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
-      leaseState: Map[ByteStr, (Boolean, Option[LeaseActionInfo])] = Map.empty,
+      leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
       scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
       assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
       accountData: Map[Address, AccountDataInfo] = Map.empty,

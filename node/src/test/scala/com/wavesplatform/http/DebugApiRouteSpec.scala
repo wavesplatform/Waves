@@ -8,6 +8,8 @@ import com.wavesplatform.api.http.DebugApiRoute
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.util._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
@@ -22,12 +24,14 @@ import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet, TransactionGen}
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json._
+import play.api.libs.json.{JsArray, JsObject, JsValue, Json, _}
 
 import scala.util.Random
+
 //noinspection ScalaStyle
 class DebugApiRouteSpec
     extends RouteSpec("/debug")
@@ -36,7 +40,8 @@ class DebugApiRouteSpec
     with NTPTime
     with PathMockFactory
     with BlockchainStubHelpers
-    with TransactionGen {
+    with TransactionGen
+    with WithDomain {
 
   val wavesSettings = WavesSettings.default()
   val configObject  = wavesSettings.config.root()
@@ -71,7 +76,8 @@ class DebugApiRouteSpec
       _ => Seq.empty, {
         case 2 => Some(testStateHash)
         case _ => None
-      }
+      },
+      () => blockchain
     )
   import debugApiRoute._
 
@@ -97,14 +103,33 @@ class DebugApiRouteSpec
   }
 
   routePath("/validate") - {
+    def routeWithBlockchain(blockchain: Blockchain with NG) =
+      debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => blockchain).route
+
+    def validatePost(tx: TransferTransaction) =
+      Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString()))
+
+    "takes the priority pool into account" in withDomain(domainSettingsWithFeatures(BlockchainFeatures.NG)) { d =>
+      d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
+      d.appendBlock(TxHelpers.transfer(to = TxHelpers.secondAddress, amount = 1.waves + TestValues.fee))
+
+      val route = debugApiRoute.copy(priorityPoolBlockchain = () => d.blockchain).route
+      val tx    = TxHelpers.transfer(TxHelpers.secondSigner, TestValues.address, 1.waves)
+      validatePost(tx) ~> route ~> check {
+        val json = Json.parse(responseAs[String])
+        (json \ "valid").as[Boolean] shouldBe true
+        (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
+      }
+    }
+
     "valid tx" in {
       val blockchain = createBlockchainStub()
       (blockchain.balance _).when(TxHelpers.defaultSigner.publicKey.toAddress, *).returns(Long.MaxValue)
 
-      val route = debugApiRoute.copy(blockchain = blockchain).route
+      val route = routeWithBlockchain(blockchain)
 
       val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, 1.waves)
-      Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString())) ~> route ~> check {
+      validatePost(tx) ~> route ~> check {
         val json = Json.parse(responseAs[String])
         (json \ "valid").as[Boolean] shouldBe true
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
@@ -115,10 +140,10 @@ class DebugApiRouteSpec
       val blockchain = createBlockchainStub()
       (blockchain.balance _).when(TxHelpers.defaultSigner.publicKey.toAddress, *).returns(0)
 
-      val route = debugApiRoute.copy(blockchain = blockchain).route
+      val route = routeWithBlockchain(blockchain)
 
       val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, Long.MaxValue)
-      Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString())) ~> route ~> check {
+      validatePost(tx) ~> route ~> check {
         val json = Json.parse(responseAs[String])
         (json \ "valid").as[Boolean] shouldBe false
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
@@ -153,7 +178,7 @@ class DebugApiRouteSpec
           )
       }
 
-      val route = debugApiRoute.copy(blockchain = blockchain).route
+      val route = routeWithBlockchain(blockchain)
       val tx    = TxHelpers.exchange(TxHelpers.order(OrderType.BUY, TestValues.asset), TxHelpers.order(OrderType.SELL, TestValues.asset))
       jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
         val json = Json.parse(responseAs[String])
@@ -217,7 +242,7 @@ class DebugApiRouteSpec
                |     StringEntry("key", "str"),
                |     BinaryEntry("key", base58''),
                |     DeleteEntry("key"),
-               |     ScriptTransfer(Address(base58'${TxHelpers.signer(1).toAddress}'), 1, base58'${TestValues.asset}')
+               |     ScriptTransfer(Address(base58'${TxHelpers.secondAddress}'), 1, base58'${TestValues.asset}')
                |]
                |
                |@Callable(i)
@@ -252,8 +277,7 @@ class DebugApiRouteSpec
         (blockchain.hasAccountScript _).when(*).returns(true)
       }
 
-      val route = debugApiRoute.copy(blockchain = blockchain).route
-
+      val route = routeWithBlockchain(blockchain)
       def testFunction(name: String, result: InvokeScriptTransaction => String) = withClue(s"function $name") {
         val tx = TxHelpers.invoke(TxHelpers.defaultAddress, name, fee = 102500000)
 
@@ -270,7 +294,7 @@ class DebugApiRouteSpec
       }
 
       def testPayment(result: String) = withClue("payment") {
-        val tx = TxHelpers.invoke(TxHelpers.signer(1).toAddress, "test", fee = 1300000, payments = Seq(Payment(1L, TestValues.asset)))
+        val tx = TxHelpers.invoke(TxHelpers.secondAddress, "test", fee = 1300000, payments = Seq(Payment(1L, TestValues.asset)))
 
         jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
           val json = Json.parse(responseAs[String])
@@ -569,7 +593,7 @@ class DebugApiRouteSpec
 
         (blockchain.leaseDetails _)
           .when(leaseCancelId)
-          .returns(Some(LeaseDetails(dAppPk, accountGen.sample.get.toAddress, 1, 100, true)))
+          .returns(Some(LeaseDetails(dAppPk, accountGen.sample.get.toAddress, leaseCancelId, 100, true)))
           .anyNumberOfTimes()
 
         (blockchain.leaseDetails _)
@@ -582,7 +606,10 @@ class DebugApiRouteSpec
           .returns(Right(accountGen.sample.get.toAddress))
           .anyNumberOfTimes()
       }
-      val route = debugApiRoute.copy(blockchain = blockchain).route
+      val route = debugApiRoute.copy(
+        blockchain = blockchain,
+        priorityPoolBlockchain = () => blockchain
+      ).route
 
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, invoke.json().toString())) ~> route ~> check {
         val json = Json.parse(responseAs[String])
@@ -670,7 +697,7 @@ class DebugApiRouteSpec
             )
           )
       }
-      val route = debugApiRoute.copy(blockchain = blockchain).route
+      val route = routeWithBlockchain(blockchain)
       val tx    = TxHelpers.transfer(TxHelpers.defaultSigner, TxHelpers.defaultAddress, 1, TestValues.asset)
 
       jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {

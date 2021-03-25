@@ -11,27 +11,31 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
 class EnvironmentFunctions[F[_]: Monad](environment: Environment[F]) {
 
-  def getData(addressOrAlias: CaseObj, key: String, dataType: DataType): F[Either[String, Option[Any]]] = {
+  def toScala(addressOrAlias: CaseObj) = {
     val objTypeName = addressOrAlias.caseType.name
+    if (objTypeName == Types.addressType.name) {
+      addressOrAlias.fields
+        .get("bytes")
+        .toRight("Can't find 'bytes'")
+        .map(_.asInstanceOf[CONST_BYTESTR])
+        .map(a => Address(a.bs))
+    } else if (objTypeName == Types.aliasType.name) {
+      addressOrAlias.fields
+        .get("alias")
+        .toRight("Can't find alias")
+        .map(_.asInstanceOf[CONST_STRING])
+        .map(a => Alias(a.s))
+    } else {
+      Left(s"$addressOrAlias neither Address nor alias")
+    }
+  }
 
-    val recipientEi =
-      if (objTypeName == Types.addressType.name) {
-        addressOrAlias.fields
-          .get("bytes")
-          .toRight("Can't find 'bytes'")
-          .map(_.asInstanceOf[CONST_BYTESTR])
-          .map(a => Address(a.bs))
-      } else if (objTypeName == Types.aliasType.name) {
-        addressOrAlias.fields
-          .get("alias")
-          .toRight("Can't find alias")
-          .map(_.asInstanceOf[CONST_STRING])
-          .map(a => Alias(a.s))
-      } else {
-        Left(s"$addressOrAlias neither Address nor alias")
-      }
+  def getData(addressOrAlias: CaseObj, key: String, dataType: DataType): F[Either[String, Option[Any]]] = {
+    toScala(addressOrAlias).traverse(environment.data(_, key, dataType))
+  }
 
-    recipientEi.traverse(environment.data(_, key, dataType))
+  def hasData(addressOrAlias: CaseObj): F[Either[String, Boolean]] = {
+    toScala(addressOrAlias).traverse(environment.hasData(_))
   }
 
   def addressFromAlias(name: String): F[Either[ExecutionError, Recipient.Address]] =

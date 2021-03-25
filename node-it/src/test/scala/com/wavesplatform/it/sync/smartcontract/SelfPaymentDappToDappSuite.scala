@@ -94,24 +94,25 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
       sender.invokeScript(dApp1, dAppAddress2, Some("foo"), fee = 2 * invokeFee, waitForTx = true),
       AssertiveApiError(
         ScriptExecutionError.Id,
-        "Error while executing account-script: ScriptExecutionError(error = FailedTransactionError(code = 1," +
-          " error = DApp self-payment is forbidden since V4, log =), type = Account, log =\n\tthis = Address(\n\t\t" +
-          "bytes = base58'3HYcmZyisPSRCy23mi3WsDYpmF6PkFtB5AN'\n\t)\n\tinv = Left(FailedTransactionError(code = 1," +
-          " error = DApp self-payment is forbidden since V4, log =))\n)"
+        s"Error while executing account-script: " +
+          s"GenericError(Complex dApp recursion is prohibited, but dApp at address $dAppAddress1 was called twice)"
       )
     )
     sender.balance(callerAddress).balance shouldBe callerBalanceBefore
     sender.balance(dAppAddress1).balance shouldBe dApp1BalanceBefore
   }
 
-  test("self payment doesn't fail if invoked dApp calls caller dApp with payment") {
+  test("self payment fails including if invoked dApp calls caller dApp with payment") {
     val callerBalanceBefore = sender.balance(dAppAddress1).balance
     val invFee = 2 * invokeFee + smartFee
-    val invoke = sender.invokeScript(dApp1, dAppAddress2, Some("bar"), fee = invFee, waitForTx = true)
-    sender.balance(dAppAddress1).balance shouldBe callerBalanceBefore - invFee + 100
-    val st = sender.debugStateChanges(invoke._1.id)
-    val invokes = st.stateChanges.get.invokes
-    invokes.size shouldBe 1
-    invokes(0).call.function shouldBe "bar"
+    assertApiError(
+      sender.invokeScript(dApp1, dAppAddress2, Some("bar"), fee = invFee, waitForTx = true),
+      AssertiveApiError(
+        ScriptExecutionError.Id,
+        s"Error while executing account-script: " +
+          s"GenericError(Complex dApp recursion is prohibited, but dApp at address $dAppAddress1 was called twice)"
+      )
+    )
+    sender.balance(dAppAddress1).balance shouldBe callerBalanceBefore
   }
 }

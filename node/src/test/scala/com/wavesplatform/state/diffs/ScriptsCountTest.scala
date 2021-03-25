@@ -152,8 +152,8 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
       mt2 = MassTransferTransaction
         .selfSigned(1.toByte, master, IssuedAsset(issueScr.id()), List(ParsedTransfer(acc.toAddress, 1)), fee, timestamp, ByteStr.empty)
         .explicitGet()
-      l  = LeaseTransaction.selfSigned(2.toByte, master, acc.toAddress, 1, fee, timestamp).explicitGet()
-      lc = LeaseCancelTransaction.signed(2.toByte, master.publicKey, l.id(), fee, timestamp + 1, master.privateKey).explicitGet()
+      l  = LeaseTransaction.selfSigned(2.toByte, master, acc.toAddress, 1L, fee, timestamp).explicitGet()
+      lc = LeaseCancelTransaction.selfSigned(2.toByte, master, l.id(), fee, timestamp + 1).explicitGet()
 
       assetPair = AssetPair(IssuedAsset(issueScr.id()), IssuedAsset(issueSp.id()))
       o1        = Order.buy(2: Byte, master, master.publicKey, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
@@ -295,7 +295,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
         .selfSigned(1.toByte, master, IssuedAsset(issueScr.id()), List(ParsedTransfer(acc.toAddress, 1)), fee, timestamp, ByteStr.empty)
         .explicitGet()
       l  = LeaseTransaction.selfSigned(2.toByte, master, acc.toAddress, 1, fee, timestamp).explicitGet()
-      lc = LeaseCancelTransaction.signed(2.toByte, master.publicKey, l.id(), fee, timestamp + 1, master.privateKey).explicitGet()
+      lc = LeaseCancelTransaction.selfSigned(2.toByte, master, l.id(), fee, timestamp + 1).explicitGet()
 
       assetPair = AssetPair(IssuedAsset(issueScr.id()), IssuedAsset(issueSp.id()))
       o1        = Order.buy(2: Byte, master, master.publicKey, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)

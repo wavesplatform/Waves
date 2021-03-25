@@ -2,12 +2,12 @@ package com.wavesplatform.lang
 
 import java.math.{MathContext, BigDecimal => BD}
 import java.security.spec.InvalidKeySpecException
-
 import cats.implicits._
 import ch.obermuhlner.math.big.BigDecimalMath
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.v1.BaseGlobal
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
@@ -80,20 +80,20 @@ object Global extends BaseGlobal {
     Merkle.verify(rootBytes, proofBytes, valueBytes)
 
   // Math functions
-  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long] =
+  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long] =
     (Try {
       val base = BD.valueOf(b, bp.toInt)
       val exp  = BD.valueOf(e, ep.toInt)
       val res  = BigDecimalMath.pow(base, exp, MathContext.DECIMAL128)
-      res.setScale(rp.toInt, roundMode(round)).unscaledValue.longValueExact
+      res.setScale(rp.toInt, round.mode).unscaledValue.longValueExact
     }).toEither.left.map(_.toString)
 
-  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long] =
+  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long] =
     (Try {
       val base = BD.valueOf(b, bp.toInt)
       val exp  = BD.valueOf(e, ep.toInt)
       val res  = BigDecimalMath.log(base, MathContext.DECIMAL128).divide(BigDecimalMath.log(exp, MathContext.DECIMAL128), MathContext.DECIMAL128)
-      res.setScale(rp.toInt, roundMode(round)).unscaledValue.longValueExact
+      res.setScale(rp.toInt, round.mode).unscaledValue.longValueExact
     }).toEither.left.map(_.toString)
 
   private val client = new SttpClient()

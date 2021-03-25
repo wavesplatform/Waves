@@ -27,6 +27,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease}
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
+import com.wavesplatform.lang.Global
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.web3j.crypto.Keys
@@ -103,7 +104,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     )
   }
 
-  val v5Ctx = WavesContext.build(DirectiveSet(V5, Account, DApp).explicitGet())
+  val v5Ctx = WavesContext.build(Global, DirectiveSet(V5, Account, DApp).explicitGet())
 
   property("simple let") {
     val src =
@@ -242,6 +243,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(s"$longMin + 1 - 1") shouldBe evaluated(longMin)
     eval(s"$longMax / $longMin + 1") shouldBe evaluated(0)
     eval(s"($longMax / 2) * 2") shouldBe evaluated(longMax - 1)
+    eval[EVALUATED]("fraction(9223372036854775807, 3, 0)") shouldBe Left(
+      s"fraction: division by zero"
+    )
     eval[EVALUATED]("fraction(9223372036854775807, 3, 2)") shouldBe Left(
       s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1"
     )
@@ -913,6 +917,25 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     )
   }
 
+  property("split empty separator") {
+    val src =
+      """ "冬x🤦冬".split("") """
+    eval[EVALUATED](src) shouldBe Right(
+      ARR(
+        IndexedSeq(
+          CONST_STRING("\ud87e").explicitGet(),
+          CONST_STRING("\udc1a").explicitGet(),
+          CONST_STRING("\u0078").explicitGet(),
+          CONST_STRING("\ud83e").explicitGet(),
+          CONST_STRING("\udd26").explicitGet(),
+          CONST_STRING("\ud87e").explicitGet(),
+          CONST_STRING("\udc1a").explicitGet()
+        ),
+        false
+      ).explicitGet()
+    )
+  }
+
   property("parseInt") {
     val src =
       """ "42".parseInt() """
@@ -1289,7 +1312,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |
        """.stripMargin
 
-    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
 
     genericEval[Environment, EVALUATED](
       writeSetScript,
@@ -1548,7 +1571,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         | calculateAssetId(issue)
       """.stripMargin
 
-    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
 
     genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
       CONST_BYTESTR(issue.id)
@@ -1561,7 +1584,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
        | Issue("name", "description", 1234567, 100, true, unit, 0)
      """.stripMargin
 
-    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
 
     genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
       Right(CONST_BOOLEAN(true))
@@ -2113,7 +2136,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         | entries[0] == deleteEntry
       """.stripMargin
 
-    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
     genericEval(script, ctxt = ctx, version = V4, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
   }
 
@@ -2173,5 +2196,219 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       produce("Address bytes length=27 exceeds limit=26")
     genericEval[Environment, EVALUATED](script2, ctxt = v5Ctx, version = V5, env = utils.environment) should
       produce("Alias name length=31 exceeds limit=30")
+  }
+
+  property("integer case") {
+    val sampleScript =
+      """match 2 {
+        |  case 1 => 7
+        |  case 3 | 2 => 8
+        |  case _ => 9
+        |}""".stripMargin
+    eval[EVALUATED](sampleScript, None) shouldBe evaluated(8)
+  }
+
+  property("string case") {
+    val sampleScript =
+      """match "qq" {
+        |  case "1" => 7
+        |  case "qq" | "2" => 8
+        |  case _ => 9
+        |}""".stripMargin
+    eval[EVALUATED](sampleScript, None) shouldBe evaluated(8)
+  }
+
+  property("binary case") {
+    val sampleScript =
+      """match base64'TElLRQ==' {
+        |  case base64'TElLRQ==' => 7
+        |  case base64'ZGdnZHMK' | base64'ZGdnZHMJ' => 8
+        |  case _ => 9
+        |}""".stripMargin
+    eval[EVALUATED](sampleScript, None) shouldBe evaluated(7)
+  }
+  property("tuple destruct") {
+    val sampleScript =
+      """|
+         |match (5, "qqq") {
+         |  case (n, "qqq") => n
+         |  case _  => (1, "ggg")
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, version=V4) shouldBe evaluated(5)
+  }
+
+  property("typed tuple destruct") {
+    val sampleScript =
+      """|
+         |match (5, if true then "qqq" else base64'') {
+         |  case (5, n : ByteVector) => "ttt"
+         |  case (5|4, n : String) => n
+         |  case _  => "ggg"
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, version=V4) shouldBe evaluated("qqq")
+  }
+
+  property("caseType destruct") {
+    val sampleScript =
+      """|
+         |match p {
+         |  case _: PointA => 0
+         |  case PointC(YB=n) => n
+         |  case _  => 1
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
+    eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(42)
+  }
+
+  property("caseType destruct with type checking") {
+    val sampleScript =
+      """|
+         |match p {
+         |  case _: PointA => 0
+         |  case PointC(YB=n:Int) => n
+         |  case _  => 1
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
+    eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(42)
+  }
+
+
+  property("caseType constant field") {
+    val sampleScript =
+      """|
+         |match p {
+         |  case _: PointA => 0
+         |  case PointC(YB=24) => 2
+         |  case PointC(YB=42) => 6
+         |  case _  => 1
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
+    eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(6)
+  }
+
+  property("unicode broken") {
+    val ver = V4
+
+    val script1 = s"""take("x冬x", 2)"""
+    eval(script1, version = ver) shouldBe
+      Right(CONST_STRING("x\ud87e").explicitGet())
+
+    val script2 = s"""size("x冬x")"""
+    eval(script2, version = ver) shouldBe
+      Right(CONST_LONG(4))
+
+    val script3 = s"""drop("x冬x", 2)"""
+    eval(script3, version = ver) shouldBe
+      Right(CONST_STRING("\udc1ax").explicitGet())
+
+    val script4 = s"""takeRight("x冬x", 2)"""
+    eval(script4, version = ver) shouldBe
+      Right(CONST_STRING("\udc1ax").explicitGet())
+
+    val script5 = s"""dropRight("x冬x", 2)"""
+    eval(script5, version = ver) shouldBe
+      Right(CONST_STRING("x\ud87e").explicitGet())
+  }
+
+  property("unicode indexOf") {
+    val src =
+      """ "x冬xqweqwe".indexOf("we") """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(4L))
+    val src1 = """ "世界x冬x".take(4).indexOf("冬".take(1)) """
+    genericEval[Environment, EVALUATED](src1, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(3L))
+    eval[EVALUATED](src1) shouldBe Right(CONST_LONG(3L))
+  }
+
+  property("unicode indexOf with zero offset") {
+    val src =
+      """ "x冬xqweqwe".indexOf("x冬xqw", 0) """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(0L))
+  }
+
+  property("unicode indexOf with start offset") {
+    val src =
+      """ "冬weqwe".indexOf("we", 2) """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(4L))
+  }
+
+  property("unicode indexOf (not present)") {
+    val src =
+      """ "x冬xqweqwe".indexOf("ww") """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(unit)
+  }
+
+  property("unicode indexOf from empty string") {
+    val src =
+      """ "".indexOf("x冬x") """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(unit)
+  }
+
+  property("unicode indexOf from empty string with offset") {
+    val src =
+      """ "".indexOf("x冬x", 1) """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(unit)
+  }
+
+  property("split unicode") {
+    val src =
+      """ "strx冬x1;🤦;🤦strx冬x2;🤦strx冬x3".split(";🤦") """
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(
+      ARR(
+        IndexedSeq(
+          CONST_STRING("strx冬x1").explicitGet(),
+          CONST_STRING("").explicitGet(),
+          CONST_STRING("strx冬x2").explicitGet(),
+          CONST_STRING("strx冬x3").explicitGet()
+        ),
+        false
+      ).explicitGet()
+    )
+    val src1 =
+      """ "冬x🤦冬".split("") """
+    genericEval[Environment, EVALUATED](src1, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(
+      ARR(
+        IndexedSeq(
+          CONST_STRING("冬").explicitGet(),
+          CONST_STRING("x").explicitGet(),
+          CONST_STRING("🤦").explicitGet(),
+          CONST_STRING("冬").explicitGet()
+        ),
+        false
+      ).explicitGet()
+    )
+  }
+
+  property("unicode support") {
+    val ver = V5
+
+    val script1 = s"""take("x冬x", 2)"""
+    genericEval[Environment, EVALUATED](script1, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
+      Right(CONST_STRING("x冬").explicitGet())
+
+    val script2 = s"""size("x冬x")"""
+    genericEval[Environment, EVALUATED](script2, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
+      Right(CONST_LONG(3))
+
+    val script3 = s"""drop("x冬x", 2)"""
+    genericEval[Environment, EVALUATED](script3, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
+      Right(CONST_STRING("x").explicitGet())
+
+    val script4 = s"""takeRight("x冬x", 2)"""
+    genericEval[Environment, EVALUATED](script4, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
+      Right(CONST_STRING("冬x").explicitGet())
+
+    val script5 = s"""dropRight("x冬x", 2)"""
+    genericEval[Environment, EVALUATED](script5, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
+      Right(CONST_STRING("x").explicitGet())
   }
 }

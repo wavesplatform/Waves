@@ -36,6 +36,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         PureContext.build(V3).withEnvironment[Environment],
         CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
         WavesContext.build(
+          Global,
           DirectiveSet(V3, Account, DAppType).explicitGet()
         )
       )
@@ -47,6 +48,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         PureContext.build(V4).withEnvironment[Environment],
         CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
         WavesContext.build(
+          Global,
           DirectiveSet(V4, Account, DAppType).explicitGet()
         )
       )
@@ -57,6 +59,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid.combine(
       compilerContext,
       WavesContext.build(
+          Global,
           DirectiveSet(V3, Account, DAppType).explicitGet()
         )
         .compilerContext
@@ -152,6 +155,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       compilerContext,
       WavesContext
         .build(
+          Global,
           DirectiveSet(V3, Account, DAppType).explicitGet()
         )
         .compilerContext
@@ -358,6 +362,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           PureContext.build(V3).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
+            Global,
             DirectiveSet(V3, Account, DAppType).explicitGet()
           )
         ))
@@ -493,6 +498,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           PureContext.build(V3).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
+            Global,
             DirectiveSet(V3, Account, DAppType).explicitGet()
           )
         ))
@@ -923,7 +929,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     val ctx =
       PureContext.build(V4).withEnvironment[Environment] |+|
-      WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
+      WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("right")
   }
@@ -935,6 +941,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           PureContext.build(V3).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
+            Global,
             DirectiveSet(V3, Account, DAppType).explicitGet()
           )
         ))
@@ -1013,7 +1020,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     val ctx =
       PureContext.build(V5).withEnvironment[Environment] |+|
-      WavesContext.build(DirectiveSet(V5, Account, DAppType).explicitGet())
+      WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V5) shouldBe Symbol("right")
   }
@@ -1051,7 +1058,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     val ctx =
       PureContext.build(V4).withEnvironment[Environment] |+|
-      WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
+      WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("left")
   }

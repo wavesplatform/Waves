@@ -74,7 +74,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
     lease1    = LeaseTransaction.selfSigned(2.toByte, acc1, dapp.toAddress, 10 * Constants.UnitsInWave, MinFee, ts + 2).explicitGet()
     lease2    = LeaseTransaction.selfSigned(2.toByte, acc1, dapp.toAddress, 10 * Constants.UnitsInWave, MinFee, ts + 3).explicitGet()
     leaseD    = LeaseTransaction.selfSigned(2.toByte, dapp, acc1.toAddress, 1 * Constants.UnitsInWave, MinFee, ts + 3).explicitGet()
-    cancel1   = LeaseCancelTransaction.signed(1.toByte, acc1.publicKey, lease1.id(), MinFee, ts + 4, acc1.privateKey).explicitGet()
+    cancel1   = LeaseCancelTransaction.selfSigned(1.toByte, acc1, lease1.id(), MinFee, ts + 4).explicitGet()
     t = TransferTransaction
       .selfSigned(TxVersion.V2, dapp, acc1.toAddress, Waves, 1 * Constants.UnitsInWave + MinFee, Waves, InvokeScriptTxFee, ByteStr.empty, ts + 5)
       .explicitGet()
@@ -87,7 +87,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
       val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
       PureContext.build(V4).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-        WavesContext.build(directives)
+        WavesContext.build(Global, directives)
     }
 
     val script =
@@ -145,7 +145,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
         PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
+          WavesContext.build(Global, directives)
       }
 
       val script =
@@ -166,7 +166,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
         val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
         PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
+          WavesContext.build(Global, directives)
       }
 
       val script =
@@ -238,7 +238,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
         PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
+          WavesContext.build(Global, directives)
       }
 
       val script =
@@ -259,7 +259,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
         val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
         PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
+          WavesContext.build(Global, directives)
       }
 
       val script =

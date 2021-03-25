@@ -69,6 +69,8 @@ object Types {
         List(
           "caller"          -> addressType,
           "callerPublicKey" -> BYTESTR,
+          "originalCaller"          -> addressType,
+          "originalCallerPublicKey" -> BYTESTR,
           "transactionId"   -> BYTESTR,
           "fee"             -> LONG,
           "feeAssetId"      -> optionByteVector
@@ -466,13 +468,13 @@ object Types {
       "MassTransferTransaction",
       addProofsIfNeeded(
         List(
-          "feeAssetId"    -> optionByteVector,
           "assetId"       -> optionByteVector,
           "totalAmount"   -> LONG,
           "transfers"     -> listTransfers,
           "transferCount" -> LONG,
           "attachment"    -> BYTESTR
-        ) ++ header ++ proven,
+        ) ++ (if (version < V5) List("feeAssetId" -> optionByteVector) else Nil)
+          ++ header ++ proven,
         proofsEnabled
       )
     )
