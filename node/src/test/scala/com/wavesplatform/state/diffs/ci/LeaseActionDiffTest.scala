@@ -726,7 +726,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "Too many script actions: max: 20, actual: 21"
+            diff.errorMessage(invoke.id.value()).get.text shouldBe "Actions count limit is exceeded"
         }
     }
   }
@@ -898,7 +898,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "Too many script actions: max: 20, actual: 21"
+            diff.errorMessage(invoke.id.value()).get.text shouldBe "Actions count limit is exceeded"
         }
     }
   }
@@ -942,7 +942,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "Too many script actions: max: 20, actual: 21"
+            diff.errorMessage(invoke.id.value()).get.text shouldBe "Actions count limit is exceeded"
         }
     }
   }
