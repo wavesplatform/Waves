@@ -162,12 +162,21 @@ trait WithDomain extends WithState { _: Suite =>
   def domainSettingsWithFeatures(fs: BlockchainFeature*): WavesSettings =
     domainSettingsWithFS(defaultDomainSettings.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap))
 
-  def withDomain[A](settings: WavesSettings = defaultDomainSettings, triggers: BlockchainUpdateTriggers = ignoreBlockchainUpdateTriggers)(
+  def withDomain[A](settings: WavesSettings = defaultDomainSettings)(
       test: Domain => A
   ): A =
     withLevelDBWriter(settings) { blockchain =>
-      val bcu = new BlockchainUpdaterImpl(blockchain, Observer.stopped, settings, ntpTime, triggers, loadActiveLeases(db, _, _))
-      try test(Domain(db, bcu, blockchain))
+      var domain: Domain = null
+      val bcu = new BlockchainUpdaterImpl(
+        blockchain,
+        Observer.stopped,
+        settings,
+        ntpTime,
+        BlockchainUpdateTriggers.combined(domain.triggers),
+        loadActiveLeases(db, _, _)
+      )
+      domain = Domain(db, bcu, blockchain)
+      try test(domain)
       finally bcu.shutdown()
     }
 }

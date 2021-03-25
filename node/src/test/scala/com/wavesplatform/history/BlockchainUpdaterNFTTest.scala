@@ -123,7 +123,7 @@ class BlockchainUpdaterNFTTest
         secondAccount <- accountGen
         blockTime = ntpNow
         issue    <- QuickTX.nftIssue(richAccount, Gen.const(blockTime))
-        transfer <- QuickTX.transferAsset(IssuedAsset(issue.assetId), richAccount, secondAccount.toAddress, 1, Gen.const(blockTime))
+        transfer <- QuickTX.transferAsset(issue.asset, richAccount, secondAccount.toAddress, 1, Gen.const(blockTime))
       } yield {
         val genesisBlock = unsafeBlock(
           reference = randomSig,
@@ -199,7 +199,7 @@ class BlockchainUpdaterNFTTest
             richAccount,
             secondAccount.toAddress,
             fc,
-            Seq(InvokeScriptTransaction.Payment(1, IssuedAsset(issue.assetId))),
+            Seq(InvokeScriptTransaction.Payment(1, issue.asset)),
             Gen.const(blockTime)
           )
         }
@@ -250,8 +250,8 @@ class BlockchainUpdaterNFTTest
         secondAccount <- accountGen
         blockTime = ntpNow
         issue     <- QuickTX.nftIssue(firstAccount, Gen.const(blockTime))
-        transfer1 <- QuickTX.transferAsset(IssuedAsset(issue.assetId), firstAccount, secondAccount.toAddress, 1, Gen.const(blockTime))
-        transfer2 <- QuickTX.transferAsset(IssuedAsset(issue.assetId), secondAccount, firstAccount.toAddress, 1, Gen.const(blockTime))
+        transfer1 <- QuickTX.transferAsset(issue.asset, firstAccount, secondAccount.toAddress, 1, Gen.const(blockTime))
+        transfer2 <- QuickTX.transferAsset(issue.asset, secondAccount, firstAccount.toAddress, 1, Gen.const(blockTime))
       } yield {
         val genesisBlock = unsafeBlock(
           reference = randomSig,

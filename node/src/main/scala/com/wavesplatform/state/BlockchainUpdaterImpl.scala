@@ -6,8 +6,8 @@ import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.Storage
 import com.wavesplatform.events.BlockchainUpdateTriggers
@@ -18,15 +18,15 @@ import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
+import com.wavesplatform.utils.{forceStopApplication, ScorexLogging, Time, UnsupportedFeature}
 import kamon.Kamon
-import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
+import monix.reactive.subjects.ReplaySubject
 
 class BlockchainUpdaterImpl(
     leveldb: Blockchain with Storage,
@@ -52,7 +52,7 @@ class BlockchainUpdaterImpl(
 
   private val lock                     = new ReentrantReadWriteLock(true)
   private def writeLock[B](f: => B): B = inLock(lock.writeLock(), f)
-  private def readLock[B](f: => B): B  = inLock(lock.readLock(), f)
+  def readLock[B](f: => B): B          = inLock(lock.readLock(), f)
 
   private lazy val maxBlockReadinessAge = wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
 
@@ -228,7 +228,7 @@ class BlockchainUpdaterImpl(
                     val height            = leveldb.unsafeHeightOf(ng.base.header.reference)
                     val miningConstraints = MiningConstraints(leveldb, height)
 
-                    blockchainUpdateTriggers.onRollback(ng.base.header.reference, leveldb.height)
+                    blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, leveldb.height)
 
                     val referencedBlockchain = CompositeBlockchain(leveldb, carry = leveldb.carryFee, reward = ng.reward)
                     BlockDiffer
@@ -257,7 +257,7 @@ class BlockchainUpdaterImpl(
                       val height            = leveldb.unsafeHeightOf(ng.base.header.reference)
                       val miningConstraints = MiningConstraints(leveldb, height)
 
-                      blockchainUpdateTriggers.onRollback(ng.base.header.reference, leveldb.height)
+                      blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, leveldb.height)
 
                       val referencedBlockchain = CompositeBlockchain(leveldb, carry = leveldb.carryFee, reward = ng.reward)
                       BlockDiffer
@@ -289,7 +289,7 @@ class BlockchainUpdaterImpl(
                         val height = leveldb.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
 
                         if (discarded.nonEmpty) {
-                          blockchainUpdateTriggers.onMicroBlockRollback(referencedForgedBlock.id(), this.height)
+                          blockchainUpdateTriggers.onMicroBlockRollback(this, block.header.reference)
                           metrics.microBlockForkStats.increment()
                           metrics.microBlockForkHeightStats.record(discarded.size)
                         }
@@ -407,34 +407,46 @@ class BlockchainUpdaterImpl(
     )).toMap
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[(Block, ByteStr)]] = writeLock {
-    log.info(s"Removing blocks after ${blockId.trim} from blockchain")
+    log.info(s"Trying rollback blockchain to $blockId")
 
     val prevNgState = ngState
 
     val result = prevNgState match {
       case Some(ng) if ng.contains(blockId) =>
         log.trace("Resetting liquid block, no rollback necessary")
-        blockchainUpdateTriggers.onMicroBlockRollback(blockId, this.height)
+        blockchainUpdateTriggers.onMicroBlockRollback(this, blockId)
         Right(Seq.empty)
       case Some(ng) if ng.base.id() == blockId =>
         log.trace("Discarding liquid block, no rollback necessary")
-        blockchainUpdateTriggers.onRollback(blockId, leveldb.height)
+        blockchainUpdateTriggers.onMicroBlockRollback(this, blockId)
         ngState = None
         Right(Seq((ng.bestLiquidBlock, ng.hitSource)))
       case maybeNg =>
-        leveldb
-          .rollbackTo(blockId)
-          .map { bs =>
-            ngState = None
-            blockchainUpdateTriggers.onRollback(blockId, leveldb.height)
-            bs ++ maybeNg.map(ng => (ng.bestLiquidBlock, ng.hitSource)).toSeq
-          }
-          .leftMap(err => GenericError(err))
+        for {
+          height <- leveldb.heightOf(blockId).toRight(GenericError(s"No such block $blockId"))
+          _ <- Either.cond(
+            height >= leveldb.safeRollbackHeight,
+            (),
+            GenericError(s"Rollback is possible only to the block at the height ${leveldb.safeRollbackHeight}")
+          )
+          _ = blockchainUpdateTriggers.onRollback(this, blockId, height)
+          blocks <- leveldb.rollbackTo(height).leftMap(GenericError(_))
+        } yield {
+          ngState = None
+          blocks ++ maybeNg.map(ng => (ng.bestLiquidBlock, ng.hitSource)).toSeq
+        }
     }
 
-    notifyChangedSpendable(prevNgState, ngState)
-    publishLastBlockInfo()
-    miner.scheduleMining()
+    result match {
+      case Right(_) =>
+        log.info(s"Blockchain rollback to $blockId succeeded")
+        notifyChangedSpendable(prevNgState, ngState)
+        publishLastBlockInfo()
+        miner.scheduleMining()
+
+      case Left(error) =>
+        log.error(s"Blockchain rollback to $blockId failed: ${error.err}")
+    }
     result
   }
 

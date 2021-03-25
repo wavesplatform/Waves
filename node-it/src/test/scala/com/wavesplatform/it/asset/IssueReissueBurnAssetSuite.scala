@@ -1,22 +1,23 @@
 package com.wavesplatform.it.asset
 
+import scala.concurrent.duration._
+
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, TransactionDoesNotExist}
+import com.wavesplatform.api.http.ApiError.{AssetDoesNotExist, TransactionDoesNotExist}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.BaseSuite
-import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{AssetInfo, BurnInfoResponse, IssueInfoResponse, ReissueInfoResponse, StateChangesDetails, Transaction}
+import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.TxVersion
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-
-import scala.concurrent.duration._
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.Asset.IssuedAsset
 
 class IssueReissueBurnAssetSuite extends BaseSuite {
   override val nodeConfigs: Seq[Config] =
@@ -334,8 +335,8 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
         ai.quantity shouldBe simpleReissuableAsset.quantity
         ai.reissuable shouldBe true
       }
-      assertApiError(sender.assetsDetails(assetB), CustomValidationError("Failed to get description of the asset"))
-      assertApiError(sender.assetsDetails(assetNft), CustomValidationError("Failed to get description of the asset"))
+      assertApiError(sender.assetsDetails(assetB), AssetDoesNotExist(IssuedAsset(ByteStr.decodeBase58(assetB).get)))
+      assertApiError(sender.assetsDetails(assetNft), AssetDoesNotExist(IssuedAsset(ByteStr.decodeBase58(assetNft).get)))
 
       sender.assertAssetBalance(addressStr, assetA, simpleReissuableAsset.quantity)
       sender.assetBalance(addressStr, assetB).balance shouldBe 0L

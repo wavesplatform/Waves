@@ -67,7 +67,7 @@ object AssetVolumeInfo {
 case class AssetScriptInfo(script: Script, complexity: Long)
 
 case class AssetDescription(
-    assetId: ByteStr,
+    originTransactionId: ByteStr,
     issuer: PublicKey,
     name: ByteString,
     description: ByteString,

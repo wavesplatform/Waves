@@ -41,7 +41,7 @@ object Exporter extends ScorexLogging {
       case ExporterOptions(configFile, outputFileNamePrefix, exportHeight, format) =>
         implicit val reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.default
 
-        val settings = Application.loadApplicationConfig(Some(configFile))
+        val settings = Application.loadApplicationConfig(configFile)
 
         val time             = new NTP(settings.ntpServer)
         val db               = openDB(settings.dbSettings.directory)
@@ -127,7 +127,7 @@ object Exporter extends ScorexLogging {
   }
 
   private[this] final case class ExporterOptions(
-      configFileName: File = new File("waves-testnet.conf"),
+      configFileName: Option[File] = None,
       outputFileNamePrefix: String = "blockchain",
       exportHeight: Option[Int] = None,
       format: String = Formats.Binary
@@ -144,7 +144,7 @@ object Exporter extends ScorexLogging {
       head("Waves Blockchain Exporter", Version.VersionString),
       opt[File]('c', "config")
         .text("Node config file path")
-        .action((f, c) => c.copy(configFileName = f)),
+        .action((f, c) => c.copy(configFileName = Some(f))),
       opt[String]('o', "output-prefix")
         .text("Output file name prefix")
         .action((p, c) => c.copy(outputFileNamePrefix = p)),
