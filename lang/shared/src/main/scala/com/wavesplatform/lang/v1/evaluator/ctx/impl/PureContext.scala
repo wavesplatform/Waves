@@ -290,7 +290,7 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
     }
 
-  lazy val fractionBigInt: BaseFunction[NoContext] =
+  val fractionBigInt: BaseFunction[NoContext] =
     NativeFunction(
       "fractionBigInt",
       128,
@@ -310,7 +310,7 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED]("fractionBigInt(value: BigInt, numerator: BigInt, denominator: BigInt)", xs)
     }
 
-  lazy val fractionBigIntRounds: BaseFunction[NoContext] =
+  def fractionBigIntRounds(roundTypes: UNION): BaseFunction[NoContext] =
     NativeFunction(
       "fractionBigInt",
       128,
@@ -319,7 +319,7 @@ object PureContext {
       ("value", BIGINT),
       ("numerator", BIGINT),
       ("denominator", BIGINT),
-      ("round", rounds)
+      ("round", roundTypes)
     ) {
       case CONST_BIGINT(v) :: CONST_BIGINT(n) :: CONST_BIGINT(d) :: (r: CaseObj) :: Nil =>
         for {
@@ -648,7 +648,7 @@ object PureContext {
         )
       )
     }
- 
+
   lazy val dropRightStringV5: BaseFunction[NoContext] =
     UserFunction(
       "dropRight",
@@ -1250,25 +1250,25 @@ object PureContext {
   val RoundHalfDown = CASETYPEREF("HalfDown", List.empty, true)
   val rounds        = UNION(RoundDown, RoundUp, RoundHalfUp, RoundHalfDown, RoundCeiling, RoundFloor, RoundHalfEven)
 
-  private def roundMode(m: EVALUATED): BaseGlobal.Rounds = {
-    m match {
-      case (p: CaseObj) =>
-        p.caseType.name match {
-          case "Down"     => BaseGlobal.RoundDown()
-          case "Up"       => BaseGlobal.RoundUp()
-          case "HalfUp"   => BaseGlobal.RoundHalfUp()
-          case "HalfDown" => BaseGlobal.RoundHalfDown()
-          case "HalfEven" => BaseGlobal.RoundHalfEven()
-          case "Ceiling"  => BaseGlobal.RoundCeiling()
-          case "Floor"    => BaseGlobal.RoundFloor()
-          case v          => throw new Exception(s"Type error: $v isn't in $rounds")
-        }
-      case v => throw new Exception(s"Type error: $v isn't rounds CaseObj")
-    }
-  }
+//  private def roundMode(m: EVALUATED): BaseGlobal.Rounds = {
+//    m match {
+//      case (p: CaseObj) =>
+//        p.caseType.name match {
+//          case "Down"     => BaseGlobal.RoundDown()
+//          case "Up"       => BaseGlobal.RoundUp()
+//          case "HalfUp"   => BaseGlobal.RoundHalfUp()
+//          case "HalfDown" => BaseGlobal.RoundHalfDown()
+//          case "HalfEven" => BaseGlobal.RoundHalfEven()
+//          case "Ceiling"  => BaseGlobal.RoundCeiling()
+//          case "Floor"    => BaseGlobal.RoundFloor()
+//          case v          => throw new Exception(s"Type error: $v isn't in $rounds")
+//        }
+//      case v => throw new Exception(s"Type error: $v isn't rounds CaseObj")
+//    }
+//  }
 
-  val pow: BaseFunction[NoContext] =
-    NativeFunction("pow", 100, POW, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
+  def pow(roundTypes: UNION): BaseFunction[NoContext] = {
+    NativeFunction("pow", 100, POW, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", roundTypes)) {
       case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
         if (bp < 0
           || bp > 8
@@ -1278,13 +1278,14 @@ object PureContext {
           || rp > 8) {
           Left("pow: scale out of range 0-8")
         } else {
-          global.pow(b, bp, e, ep, rp, roundMode(round)).map(CONST_LONG)
+          global.pow(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_LONG)
         }
       case xs => notImplemented[Id, EVALUATED]("pow(base: Int, bp: Int, exponent: Int, ep: Int, rp: Int, round: Rounds)", xs)
     }
+  }
 
-  val log: BaseFunction[NoContext] =
-    NativeFunction("log", 100, LOG, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
+  def log(roundTypes: UNION): BaseFunction[NoContext] = {
+    NativeFunction("log", 100, LOG, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", roundTypes)) {
       case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
         if (bp < 0
           || bp > 8
@@ -1294,13 +1295,14 @@ object PureContext {
           || rp > 8) {
           Left("log: scale out of range 0-8")
         } else {
-          global.log(b, bp, e, ep, rp, roundMode(round)).map(CONST_LONG)
+          global.log(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_LONG)
         }
       case xs => notImplemented[Id, EVALUATED]("log(exponent: Int, ep: Int, base: Int, bp: Int, rp: Int, round: Rounds)", xs)
     }
+  }
 
-  val powBigInt: BaseFunction[NoContext] =
-    NativeFunction("powBigInt", 200, POW_BIGINT, BIGINT, ("base", BIGINT), ("bp", LONG), ("exponent", BIGINT), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
+  def powBigInt(roundTypes: UNION): BaseFunction[NoContext] =
+    NativeFunction("powBigInt", 200, POW_BIGINT, BIGINT, ("base", BIGINT), ("bp", LONG), ("exponent", BIGINT), ("ep", LONG), ("rp", LONG), ("round", roundTypes)) {
       case CONST_BIGINT(b) :: CONST_LONG(bp) :: CONST_BIGINT(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
         if (bp < 0
           || bp > 18
@@ -1310,13 +1312,13 @@ object PureContext {
           || rp > 18) {
           Left("powBigInt: scale out of range 0-12")
         } else {
-          global.powBigInt(b, bp, e, ep, rp, roundMode(round)).filterOrElse(v => v <= maxBigInt && v >= minBigInt, "powBigInt: result out of range.").map(CONST_BIGINT)
+          global.powBigInt(b, bp, e, ep, rp, Rounding.byValue(round)).filterOrElse(v => v <= maxBigInt && v >= minBigInt, "powBigInt: result out of range.").map(CONST_BIGINT)
         }
       case xs => notImplemented[Id, EVALUATED]("powBigInt(base: BigInt, bp: Int, exponent:Big Int, ep: Int, rp: Int, round: Rounds)", xs)
     }
 
-  val logBigInt: BaseFunction[NoContext] =
-    NativeFunction("logBigInt", 200, LOG_BIGINT, BIGINT, ("base", BIGINT), ("bp", LONG), ("exponent", BIGINT), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
+  def logBigInt(roundTypes: UNION): BaseFunction[NoContext] =
+    NativeFunction("logBigInt", 200, LOG_BIGINT, BIGINT, ("base", BIGINT), ("bp", LONG), ("exponent", BIGINT), ("ep", LONG), ("rp", LONG), ("round", roundTypes)) {
       case CONST_BIGINT(b) :: CONST_LONG(bp) :: CONST_BIGINT(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
         if (bp < 0
           || bp > 18
@@ -1326,7 +1328,7 @@ object PureContext {
           || rp > 18) {
           Left("logBigInt: scale out of range 0-12")
         } else {
-          global.logBigInt(b, bp, e, ep, rp, roundMode(round)).map(CONST_BIGINT)
+          global.logBigInt(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_BIGINT)
         }
       case xs => notImplemented[Id, EVALUATED]("logBigInt(exponent: BigInt, ep: Int, base:Big Int, bp: Int, rp: Int, round: Rounds)", xs)
     }
@@ -1361,45 +1363,32 @@ object PureContext {
 
   val unitVarName = "unit"
 
-  private def singleObj(
-      ty: CASETYPEREF,
-      v: Map[String, EVALUATED] = Map.empty
-  ): (CASETYPEREF, ContextfulVal[NoContext]) =
-    ty -> ContextfulVal.pure(CaseObj(ty, v))
-
   private val nil: (String, (LIST, ContextfulVal[NoContext])) =
     ("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED], EMPTYARR_WEIGHT, limited = false).explicitGet())))
 
   private val commonVars: Map[String, (FINAL, ContextfulVal[NoContext])] =
     Map(
-      (unitVarName, (UNIT, ContextfulVal.pure(unit))),
-      ("UP", singleObj(RoundUp)),
-      ("HALFUP", singleObj(RoundHalfUp)),
-      ("HALFDOWN", singleObj(RoundHalfDown)),
-      ("DOWN", singleObj(RoundDown)),
-      ("HALFEVEN", singleObj(RoundHalfEven)),
-      ("CEILING", singleObj(RoundCeiling)),
-      ("FLOOR", singleObj(RoundFloor))
+      (unitVarName, (UNIT, ContextfulVal.pure(unit)))
     )
 
-  private val commonTypes =
+  private val v1V2Vars: Map[String, (FINAL, ContextfulVal[NoContext])] = commonVars ++ Rounding.all.map(_.definition)
+  private val v3V4Vars: Map[String, (FINAL, ContextfulVal[NoContext])] = v1V2Vars + nil
+  private val v5Vars: Map[String, (FINAL, ContextfulVal[NoContext])]   = commonVars ++ Rounding.fromV5.map(_.definition) + nil
+
+  private val commonTypes: Seq[REAL] =
     Seq(
       UNIT,
       LONG,
       BOOLEAN,
       BYTESTR,
-      STRING,
-      RoundDown,
-      RoundUp,
-      RoundHalfUp,
-      RoundHalfDown,
-      RoundHalfEven,
-      RoundCeiling,
-      RoundFloor,
-      rounds
+      STRING
     )
 
-  private val v3V4Vars = commonVars + nil
+  private val allRoundTypes: List[CASETYPEREF]    = Rounding.all.map(_.`type`)
+  private val fromV5RoundTypes: List[CASETYPEREF] = Rounding.fromV5.map(_.`type`)
+
+  private val v1v2v3v4Types: Seq[REAL] = commonTypes ++ allRoundTypes
+  private val v5Types: Seq[REAL]       = commonTypes ++ fromV5RoundTypes ++ Seq(BIGINT)
 
   private val operators: Array[BaseFunction[NoContext]] =
     Array(
@@ -1442,21 +1431,26 @@ object PureContext {
   private val v1V2V3CommonFunctions =
     commonFunctions :+ takeString :+ dropRightString :+ extract  :+ sizeString :+ dropString :+ takeRightString
 
-  private val v3V4CommonFunctions =
+  private val fromV3V4Functions =
     Array(
       value,
       valueOrErrorMessage,
       toLong,
       toLongOffset,
       parseInt,
-      parseIntVal,
-      pow,
-      log
+      parseIntVal
+    )
+
+  private val v3V4Functions =
+    Array(
+      pow(UNION(allRoundTypes)),
+      log(UNION(allRoundTypes))
     )
 
   private val v3Functions =
     v1V2V3CommonFunctions ++
-    v3V4CommonFunctions ++
+    fromV3V4Functions ++
+      v3V4Functions ++
       Array(
         indexOf,
         indexOfN,
@@ -1469,7 +1463,7 @@ object PureContext {
 
   private val v4V5Functions =
     commonFunctions ++
-    v3V4CommonFunctions ++
+    fromV3V4Functions ++
       Array(
         contains,
         valueOrElse,
@@ -1489,6 +1483,7 @@ object PureContext {
 
   private val v4Functions =
     v4V5Functions ++
+      v3V4Functions ++
     Array(
       indexOf,
       indexOfN,
@@ -1515,7 +1510,6 @@ object PureContext {
       dropRightStringV5,
       dropStringV5,
       takeRightStringV5,
-
       intToBigInt,
       bigIntToInt,
       bigIntToString,
@@ -1534,38 +1528,40 @@ object PureContext {
       listMaxBigInt,
       listMinBigInt,
       fractionBigInt,
-      fractionBigIntRounds,
+      fractionBigIntRounds(UNION(fromV5RoundTypes)),
       negativeBigInt,
       getListMedianBigInt,
-      powBigInt,
-      logBigInt
-      )
+      powBigInt(UNION(fromV5RoundTypes)),
+      logBigInt(UNION(fromV5RoundTypes)),
+      pow(UNION(fromV5RoundTypes)),
+      log(UNION(fromV5RoundTypes))
+    )
 
   private val v1V2Ctx =
     CTX[NoContext](
-      commonTypes,
-      commonVars,
+      v1v2v3v4Types,
+      v1V2Vars,
       v1V2V3CommonFunctions
     )
 
   private val v3Ctx =
     CTX[NoContext](
-      commonTypes,
+      v1v2v3v4Types,
       v3V4Vars,
       v3Functions
     )
 
   private val v4Ctx =
     CTX[NoContext](
-      commonTypes,
+      v1v2v3v4Types,
       v3V4Vars,
       v4Functions
     )
 
   private val v5Ctx =
     CTX[NoContext](
-      (commonTypes :+ BIGINT),
-      v3V4Vars,
+      v5Types,
+      v5Vars,
       v5Functions
     )
 

@@ -2,7 +2,7 @@
   funcs: [
     {
       name: "pow"
-      params: [ "Int", "Int", "Int", "Int", "Int", "Ceiling|Down|Floor|HalfDown|HalfEven|HalfUp|Up" ]
+      params: [ "Int", "Int", "Int", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Returns a number raised to a power"
       paramsDoc: [
         "The base."
@@ -16,7 +16,7 @@
     }
     {
       name: "log"
-      params: [ "Int", "Int", "Int", "Int", "Int", "Ceiling|Down|Floor|HalfDown|HalfEven|HalfUp|Up" ]
+      params: [ "Int", "Int", "Int", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Returns the logarithm of a number."
       paramsDoc: [
         "The base."
@@ -33,7 +33,7 @@
     }
     {
       name: "powBigInt"
-      params: [ "BigInt", "Int", "BigInt", "Int", "Int", "Ceiling|Down|Floor|HalfDown|HalfEven|HalfUp|Up" ]
+      params: [ "BigInt", "Int", "BigInt", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Returns a number raised to a power"
       paramsDoc: [
         "The base."
@@ -47,7 +47,7 @@
     }
     {
       name: "logBigInt"
-      params: [ "BigInt", "Int", "BigInt", "Int", "Int", "Ceiling|Down|Floor|HalfDown|HalfEven|HalfUp|Up" ]
+      params: [ "BigInt", "Int", "BigInt", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Returns the logarithm of a number."
       paramsDoc: [
         "The base."
@@ -78,7 +78,7 @@
     }
     {
       name: "fractionBigInt"
-      params: [ "BigInt", "BigInt", "BigInt", "Ceiling|Down|Floor|HalfDown|HalfEven|HalfUp|Up" ]
+      params: [ "BigInt", "BigInt", "BigInt", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Multiply and division with big integer intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor", "Rounding mode" ]
       complexity: 128
