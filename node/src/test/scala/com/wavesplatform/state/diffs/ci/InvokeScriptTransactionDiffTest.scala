@@ -817,7 +817,7 @@ class InvokeScriptTransactionDiffTest
     } yield (a, am, r._1, r._2, r._3)) {
       case (_, _, genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produce("Too many script actions")
+          _ should produce("Actions count limit is exceeded")
         }
     }
   }
@@ -1348,7 +1348,7 @@ class InvokeScriptTransactionDiffTest
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produce("can't contain more than")
+          _ should produce("Stored data count limit is exceeded")
         }
     }
   }
