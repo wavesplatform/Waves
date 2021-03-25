@@ -10,6 +10,10 @@ package object protobuf {
     def toByteString: ByteString = ByteString.copyFrom(bs.arr)
   }
 
+  implicit class AddressExt(val a: Address) extends AnyVal {
+    def toByteString: ByteString = ByteString.copyFrom(a.bytes)
+  }
+
   implicit class ByteStringExt(val bs: ByteString) extends AnyVal {
     def toByteStr: ByteStr     = ByteStr(bs.toByteArray)
     def toPublicKey: PublicKey = PublicKey(bs.toByteArray)

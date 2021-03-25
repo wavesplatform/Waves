@@ -2,6 +2,8 @@ package com.wavesplatform.api.http.assets
 
 import java.util.concurrent._
 
+import scala.concurrent.Future
+
 import akka.NotUsed
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.headers.Accept
@@ -13,8 +15,8 @@ import cats.syntax.alternative._
 import cats.syntax.either._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
-import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
@@ -35,8 +37,6 @@ import io.netty.util.concurrent.DefaultThreadFactory
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import play.api.libs.json._
-
-import scala.concurrent.Future
 
 case class AssetsApiRoute(
     settings: RestAPISettings,
@@ -253,10 +253,10 @@ case class AssetsApiRoute(
     )
 
   private def assetDetails(assetId: IssuedAsset, full: Boolean): Either[ApiError, JsObject] = {
-    (for {
-      description <- blockchain.assetDescription(assetId).toRight("Failed to get description of the asset")
-      result      <- AssetsApiRoute.jsonDetails(blockchain)(assetId, description, full)
-    } yield result).left.map(m => CustomValidationError(m))
+    for {
+      description <- blockchain.assetDescription(assetId).toRight(AssetDoesNotExist(assetId))
+      result      <- AssetsApiRoute.jsonDetails(blockchain)(assetId, description, full).leftMap(CustomValidationError(_))
+    } yield result
   }
 }
 
@@ -328,7 +328,7 @@ object AssetsApiRoute {
       } yield (ts, h)
 
     for {
-      tsh <- additionalInfo(description.assetId)
+      tsh <- additionalInfo(description.originTransactionId)
       (timestamp, height) = tsh
       script              = description.script.filter(_ => full)
       name                = description.name.toStringUtf8
@@ -350,7 +350,7 @@ object AssetsApiRoute {
           case 0           => JsNull
           case sponsorship => JsNumber(sponsorship)
         }),
-        "originTransactionId" -> JsString(description.assetId.toString)
+        "originTransactionId" -> JsString(description.originTransactionId.toString)
       ) ++ script.toSeq.map {
         case AssetScriptInfo(script, complexity) =>
           "scriptDetails" -> Json.obj(

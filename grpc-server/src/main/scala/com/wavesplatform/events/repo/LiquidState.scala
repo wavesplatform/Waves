@@ -8,17 +8,19 @@ case class LiquidState(
     microBlocks: Seq[MicroBlockAppended]
 ) {
   def solidify(): BlockAppended = {
-    val toId             = microBlocks.lastOption.fold(keyBlock.toId)(_.toId)
+    val toId             = microBlocks.lastOption.fold(keyBlock.id)(_.id)
     val signature        = microBlocks.lastOption.fold(keyBlock.block.signature)(_.microBlock.totalResBlockSig)
     val transactionsRoot = microBlocks.lastOption.fold(keyBlock.block.header.transactionsRoot)(_.totalTransactionsRoot)
 
     val transactionData         = microBlocks.foldLeft(keyBlock.block.transactionData)((txs, mb) => txs ++ mb.microBlock.transactionData)
     val blockStateUpdate        = microBlocks.foldLeft(keyBlock.blockStateUpdate)((upd, mb) => upd.combine(mb.microBlockStateUpdate))
     val transactionStateUpdates = microBlocks.foldLeft(keyBlock.transactionStateUpdates)((upds, mb) => upds ++ mb.transactionStateUpdates)
+    val transactionMetadata = microBlocks.foldLeft(keyBlock.transactionMetadata)((upds, mb) => upds ++ mb.transactionMetadata)
+    val referencedAssets = microBlocks.foldLeft(keyBlock.referencedAssets)((upds, mb) => upds ++ mb.referencedAssets)
 
     BlockAppended(
-      toId = toId,
-      toHeight = keyBlock.toHeight,
+      id = toId,
+      height = keyBlock.height,
       block = keyBlock.block.copy(
         header = keyBlock.block.header.copy(transactionsRoot = transactionsRoot),
         signature = signature,
@@ -26,7 +28,9 @@ case class LiquidState(
       ),
       updatedWavesAmount = keyBlock.updatedWavesAmount,
       blockStateUpdate = blockStateUpdate,
-      transactionStateUpdates = transactionStateUpdates
+      transactionStateUpdates = transactionStateUpdates,
+      transactionMetadata = transactionMetadata,
+      referencedAssets = referencedAssets
     )
   }
 

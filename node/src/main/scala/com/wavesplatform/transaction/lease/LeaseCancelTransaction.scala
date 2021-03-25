@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.lease
 
-import com.wavesplatform.account.{AddressScheme, PrivateKey, PublicKey}
+import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -66,4 +66,13 @@ object LeaseCancelTransaction extends TransactionParser {
       signer: PrivateKey
   ): Either[ValidationError, TransactionT] =
     create(version, sender, leaseId, fee, timestamp, Nil).map(_.signWith(signer))
+
+  def selfSigned(
+      version: TxVersion,
+      sender: KeyPair,
+      leaseId: ByteStr,
+      fee: TxAmount,
+      timestamp: TxTimestamp
+  ): Either[ValidationError, TransactionT] =
+    signed(version, sender.publicKey, leaseId, fee, timestamp, sender.privateKey).map(_.signWith(sender.privateKey))
 }

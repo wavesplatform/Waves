@@ -205,7 +205,7 @@ class NarrowTransactionGenerator(
               for {
                 lease  <- activeLeaseTransactions.headOption
                 sender <- accountByAddress(lease.sender.toAddress.toString)
-                tx     <- logOption(LeaseCancelTransaction.signed(2.toByte, sender.publicKey, lease.id(), 500000L, timestamp, sender.privateKey))
+                tx     <- logOption(LeaseCancelTransaction.selfSigned(2.toByte, sender, lease.id(), 500000L, timestamp))
               } yield tx
             ).logNone("There is no active lease transactions, may be you need to increase lease transaction's probability")
 
