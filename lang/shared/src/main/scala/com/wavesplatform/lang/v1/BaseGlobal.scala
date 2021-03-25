@@ -177,10 +177,11 @@ trait BaseGlobal {
       input: String,
       ctx: CompilerContext,
       stdLibVersion: StdLibVersion,
-      estimator: ScriptEstimator
+      estimator: ScriptEstimator,
+      needCompaction: Boolean
   ): Either[String, DAppInfo] =
     for {
-      dApp                                   <- ContractCompiler.compile(input, ctx, stdLibVersion)
+      dApp                                   <- ContractCompiler.compile(input, ctx, stdLibVersion, needCompaction)
       userFunctionComplexities               <- ContractScript.estimateUserFunctions(stdLibVersion, dApp, estimator)
       globalVariableComplexities             <- ContractScript.estimateGlobalVariables(stdLibVersion, dApp, estimator)
       (maxComplexity, annotatedComplexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator)
