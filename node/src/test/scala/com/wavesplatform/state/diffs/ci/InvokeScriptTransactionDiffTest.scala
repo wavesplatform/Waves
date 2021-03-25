@@ -2682,7 +2682,7 @@ class InvokeScriptTransactionDiffTest
           case (diff, _) =>
             diff.errorMessage(invokeTx.id.value()) shouldBe None
             diff.scriptsComplexity shouldBe 113
-            diff.scriptsRun shouldBe 1
+            diff.scriptsRun shouldBe 2
         }
     }
   }
@@ -2751,7 +2751,7 @@ class InvokeScriptTransactionDiffTest
              |   else
              |    throw("Bad returned value")
              |  else
-             |   throw("Imposible")
+             |   throw("Impossible")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -2979,7 +2979,7 @@ class InvokeScriptTransactionDiffTest
              |   else
              |    throw("Bad returned value")
              |  else
-             |   throw("Imposible")
+             |   throw("Impossible")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -3098,7 +3098,7 @@ class InvokeScriptTransactionDiffTest
              |   else
              |    throw("Bad returned value")
              |  else
-             |   throw("Imposible")
+             |   throw("Impossible")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -3210,7 +3210,7 @@ class InvokeScriptTransactionDiffTest
              |   else
              |    throw("Bad returned value")
              |  else
-             |   throw("Imposible")
+             |   throw("Impossible")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -3320,7 +3320,7 @@ class InvokeScriptTransactionDiffTest
              |   else
              |    throw("Bad returned value")
              |  else
-             |   throw("Imposible")
+             |   throw("Impossible")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -3425,7 +3425,7 @@ class InvokeScriptTransactionDiffTest
              |   else
              |    throw("Bad returned value")
              |  else
-             |   throw("Imposible")
+             |   throw("Impossible")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -3524,7 +3524,7 @@ class InvokeScriptTransactionDiffTest
              |        else
              |         throw("Bad balance after second invoke")
              |      else
-             |       throw("Imposible")
+             |       throw("Impossible")
              |     else
              |      throw("Balance check failed")
              |    else
@@ -3532,7 +3532,7 @@ class InvokeScriptTransactionDiffTest
              |  else
              |   throw("Bad returned value")
              |   else
-             |    throw("Imposible")
+             |    throw("Impossible")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -3573,7 +3573,7 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-  property("Crosscontract nested call (two accaunts)") {
+  property("Crosscontract nested call (two accounts)") {
     def contract(): DApp = {
       val expr = {
         val script =
@@ -3584,12 +3584,7 @@ class InvokeScriptTransactionDiffTest
              |
              | @Callable(i)
              | func bar(a: ByteVector) = {
-             |   let r = Invoke(Address(a), "back", [], [])
-             |   if r == r
-             |   then
-             |    ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit)], 17)
-             |   else
-             |    throw("Imposible")
+             |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit)], 17)
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -3621,12 +3616,11 @@ class InvokeScriptTransactionDiffTest
              |    if r == 17
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
-             |     let tdata = getIntegerValue(this, "key")
              |     let b2 = wavesBalance(this)
              |     let ob2 = wavesBalance(Address(base58'$otherAcc'))
-             |     if data == 1 && tdata == 0
+             |     if data == 1
              |     then
-             |      if ob1.regular+16 == ob2.regular && b1.regular == b2.regular+16
+             |      if ob1.regular + 14 == ob2.regular && b1.regular == b2.regular + 14
              |      then
              |       [
              |        IntegerEntry("key", 1)
@@ -3638,7 +3632,7 @@ class InvokeScriptTransactionDiffTest
              |   else
              |    throw("Bad returned value")
              |  else
-             |   throw("Imposible")
+             |   throw("Impossible")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -3678,7 +3672,7 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-  property("Crosscontract callback with payment") {
+  property("Crosscontract with payment") {
     def contract(): DApp = {
       val expr = {
         val script =
@@ -3689,12 +3683,7 @@ class InvokeScriptTransactionDiffTest
              |
              | @Callable(i)
              | func bar(a: ByteVector) = {
-             |   let r = Invoke(Address(a), "back", [], [AttachedPayment(unit, 3)])
-             |   if r == r
-             |   then
-             |    ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit)], 17)
-             |   else
-             |    throw("Imposible")
+             |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit)], 17)
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -3730,19 +3719,19 @@ class InvokeScriptTransactionDiffTest
              |     let ob2 = wavesBalance(Address(base58'$otherAcc'))
              |     if data == 1
              |     then
-             |      if ob1.regular+13 == ob2.regular && b1.regular == b2.regular+13
+             |      if ob1.regular + 14 == ob2.regular && b1.regular == b2.regular + 14
              |      then
              |       [
              |        IntegerEntry("key", 1)
              |       ]
              |      else
-             |       throw("Balance check failed")
+             |       throw("Balance check failed: " + ob1.regular.toString() + " " + ob2.regular.toString())
              |    else
              |     throw("Bad state")
              |   else
              |    throw("Bad returned value")
              |  else
-             |   throw("Imposible")
+             |   throw("Impossible")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -3799,7 +3788,7 @@ class InvokeScriptTransactionDiffTest
              |    [
              |    ]
              |  else
-             |   throw("Imposible")
+             |   throw("Impossible")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -3852,12 +3841,7 @@ class InvokeScriptTransactionDiffTest
              |
              | @Callable(i)
              | func bar(a: ByteVector) = {
-             |   let r = Invoke(Address(a), "back", [], [])
-             |   if r == r
-             |   then
-             |    ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, base58'$asset')], 17)
-             |   else
-             |    throw("Imposible")
+             |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, base58'$asset')], 17)
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -3889,25 +3873,24 @@ class InvokeScriptTransactionDiffTest
              |    if r == 17
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
-             |     let tdata = getIntegerValue(this, "key")
              |     let b2 = wavesBalance(this)
              |     let ob2 = wavesBalance(Address(base58'$otherAcc'))
              |     let ab = assetBalance(this, base58'$asset')
-             |     if data == 1 && tdata == 0
+             |     if data == 1
              |     then
-             |      if ob1.regular+19 == ob2.regular && b1.regular == b2.regular+19 && ab == 3
+             |      if ob1.regular + 17 == ob2.regular && b1.regular == b2.regular + 17 && ab == 3
              |      then
              |       [
              |        IntegerEntry("key", 1)
              |       ]
              |      else
-             |       throw("Balance check failed")
+             |       throw("Balance check failed " + ob1.regular.toString() + " " + ob2.regular.toString())
              |    else
              |     throw("Bad state")
              |   else
              |    throw("Bad returned value")
              |  else
-             |   throw("Imposible")
+             |   throw("Impossible")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -3970,12 +3953,7 @@ class InvokeScriptTransactionDiffTest
              |
              | @Callable(i)
              | func bar(a: ByteVector) = {
-             |   let r = Invoke(Address(a), "back", [], [])
-             |   if r == r
-             |   then
-             |    ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, base58'$asset')], 17)
-             |   else
-             |    throw("Imposible")
+             |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, base58'$asset')], 17)
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -4024,7 +4002,7 @@ class InvokeScriptTransactionDiffTest
              |   else
              |    throw("Bad returned value")
              |  else
-             |   throw("Imposible")
+             |   throw("Impossible")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -4090,7 +4068,7 @@ class InvokeScriptTransactionDiffTest
              |   then
              |    ([IntegerEntry("bar", 1)], 17)
              |   else
-             |    throw("Imposible")
+             |    throw("Impossible")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -4139,7 +4117,7 @@ class InvokeScriptTransactionDiffTest
              |   else
              |    throw("Bad returned value")
              |  else
-             |   throw("Imposible")
+             |   throw("Impossible")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -4197,7 +4175,7 @@ class InvokeScriptTransactionDiffTest
              |   then
              |    ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, base58'$asset')], 17)
              |   else
-             |    throw("Imposible")
+             |    throw("Impossible")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -4246,7 +4224,7 @@ class InvokeScriptTransactionDiffTest
              |   else
              |    throw("Bad returned value")
              |  else
-             |   throw("Imposible")
+             |   throw("Impossible")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value

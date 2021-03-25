@@ -20,7 +20,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset._
-import com.wavesplatform.transaction.TxValidationError.FailedTransactionError
+import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -244,6 +244,7 @@ class DAppEnvironment(
     currentDApp: com.wavesplatform.account.Address,
     currentDAppPk: com.wavesplatform.account.PublicKey,
     senderDApp: com.wavesplatform.account.Address,
+    callChain: Set[com.wavesplatform.account.Address],
     var remainingCalls: Int,
     var avaliableActions: Int,
     var avaliableData: Int,
@@ -265,6 +266,11 @@ class DAppEnvironment(
       invoke <- traced(
         account.Address
           .fromBytes(dApp.bytes.arr)
+          .ensureOr(
+            address => GenericError(s"Complex dApp recursion is prohibited, but dApp at address $address was called twice")
+          )(
+            address => currentDApp == address || !callChain.contains(address)
+          )
           .map(
             InvokeScript(
               currentDApp,
@@ -283,7 +289,8 @@ class DAppEnvironment(
         availableComplexity,
         remainingCalls,
         avaliableActions,
-        avaliableData
+        avaliableData,
+        callChain
       )(invoke)
     } yield {
       val fixedDiff = diff.copy(
@@ -299,7 +306,8 @@ class DAppEnvironment(
                 )
               )
             )
-        )
+        ),
+        scriptsRun = diff.scriptsRun + 1
       )
       println(s"call: $avaliableActions $remainingActions")
       currentDiff = currentDiff combine fixedDiff

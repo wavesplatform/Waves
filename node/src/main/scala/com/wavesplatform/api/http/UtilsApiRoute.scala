@@ -314,7 +314,8 @@ object UtilsApiRoute {
               address,
               PublicKey(ByteStr.fill(KeyLength)(1)),
               address,
-              10,
+              Set(),
+              ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
               ContractLimits.MaxCallableActionsAmount(V5),
               ContractLimits.MaxWriteSetSize(V5),
               Diff.empty
