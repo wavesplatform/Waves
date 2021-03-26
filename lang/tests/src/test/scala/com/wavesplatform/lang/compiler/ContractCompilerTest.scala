@@ -1137,7 +1137,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
 
     val ctx =
       PureContext.build(V5).withEnvironment[Environment] |+|
-        WavesContext.build(DirectiveSet(V5, Account, DAppType).explicitGet())
+        WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
 
     val compilationResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = true)
     compilationResult shouldBe expectedResult
@@ -1169,7 +1169,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
 
     val ctx =
       PureContext.build(V5).withEnvironment[Environment] |+|
-        WavesContext.build(DirectiveSet(V5, Account, DAppType).explicitGet())
+        WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
 
     val compilationCompactedResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = true)
     val decompactedResult = ContractScriptCompactor.decompact(compilationCompactedResult.explicitGet())
@@ -1269,7 +1269,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
 
     val ctx =
       PureContext.build(V5).withEnvironment[Environment] |+|
-        WavesContext.build(DirectiveSet(V5, Account, DAppType).explicitGet())
+        WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
 
     val compilationResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = true)
     compilationResult shouldBe expectedResult
