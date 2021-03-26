@@ -12,6 +12,6 @@ object LeaseTransactionsDiff {
 
   def leaseCancel(blockchain: Blockchain, time: Long)(tx: LeaseCancelTransaction): Either[ValidationError, Diff] =
     DiffsCommon
-      .processLeaseCancel(blockchain, tx.sender, tx.fee, time, tx.leaseId, tx.leaseId)
+      .processLeaseCancel(blockchain, tx.sender, tx.fee, time, tx.leaseId)
       .map(_.bindTransaction(tx).copy(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
 }

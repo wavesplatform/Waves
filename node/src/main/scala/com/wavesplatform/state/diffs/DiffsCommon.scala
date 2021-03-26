@@ -188,8 +188,7 @@ object DiffsCommon {
       sender: PublicKey,
       fee: Long,
       time: Long,
-      leaseId: ByteStr,
-      txId: ByteStr
+      leaseId: ByteStr
   ): Either[ValidationError, Diff] = {
     val allowedTs     = blockchain.settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp
     for {
