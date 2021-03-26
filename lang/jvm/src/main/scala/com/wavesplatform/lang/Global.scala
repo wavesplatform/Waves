@@ -96,6 +96,27 @@ object Global extends BaseGlobal {
       res.setScale(rp.toInt, round.mode).unscaledValue.longValueExact
     }).toEither.left.map(_.toString)
 
+  val bigMathContext = new MathContext(156 + 40)
+
+  def toJBig(v: BigInt, p: Long) = BigDecimal(v).bigDecimal.multiply(BD.valueOf(1L, p.toInt))
+
+  def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =
+    (Try {
+      val base = toJBig(b, bp)
+      val exp  = toJBig(e, ep)
+      val res  = BigDecimalMath.pow(base, exp, bigMathContext)
+      BigInt(res.setScale(rp.toInt, round.mode).unscaledValue)
+    }).toEither.left.map(_.toString)
+
+  def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =
+    (Try {
+      val base = toJBig(b, bp)
+      val exp  = toJBig(e, ep)
+      val res  = BigDecimalMath.log(base, bigMathContext).divide(BigDecimalMath.log(exp, bigMathContext), bigMathContext)
+      BigInt(res.setScale(rp.toInt, round.mode).unscaledValue)
+    }).toEither.left.map(_.toString)
+
+
   private val client = new SttpClient()
   override def requestNode(url: String): Future[NodeResponse] =
     client.requestNode(url)

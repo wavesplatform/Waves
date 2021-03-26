@@ -250,6 +250,8 @@ trait BaseGlobal {
 
   def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long]
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long]
+  def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt]
+  def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt]
 
   def requestNode(url: String): Future[NodeResponse]
 
@@ -259,9 +261,10 @@ trait BaseGlobal {
 
   def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte]
 
-  def median(seq: Seq[Long]): Long = {
+  def median[@specialized T](seq: Array[T])(implicit num: Integral[T]): T = {
+    import num._
     @tailrec
-    def findKMedianInPlace(arr: ArrayView, k: Int)(implicit choosePivot: ArrayView => Long): Long = {
+    def findKMedianInPlace(arr: ArrayView[T], k: Int)(implicit choosePivot: ArrayView[T] => T): T = {
       val a = choosePivot(arr)
       val (s, b) = arr partitionInPlace (a >)
       if (s.size == k) a
@@ -275,25 +278,41 @@ trait BaseGlobal {
     }
 
     val pivot =
-      (arr: ArrayView) => arr(Random.nextInt(arr.size))
+      (arr: ArrayView[T]) => arr(Random.nextInt(arr.size))
 
     if (seq.length % 2 == 1)
-      findKMedianInPlace(ArrayView(seq.toArray), (seq.size - 1) / 2)(pivot)
+      findKMedianInPlace(ArrayView[T](seq), (seq.size - 1) / 2)(pivot)
     else {
-      val r1 = findKMedianInPlace(ArrayView(seq.toArray), seq.size / 2 - 1)(pivot)
-      val r2 = findKMedianInPlace(ArrayView(seq.toArray), seq.size / 2)(pivot)
-      Math.floorDiv(r1 + r2, 2)
+      val r1 = findKMedianInPlace(ArrayView[T](seq), seq.size / 2 - 1)(pivot)
+      val r2 = findKMedianInPlace(ArrayView[T](seq), seq.size / 2)(pivot)
+      // save Math.floorDiv(r1 + r2, 2) semantic and avoid overflow
+      if(num.sign(r1) == num.sign(r2)) {
+        if(r1 < r2) {
+          num.abs(r2-r1)/num.fromInt(2) + r1
+        } else {
+          num.abs(r1-r2)/num.fromInt(2) + r2
+        }
+      } else {
+        val d = r1 + r2
+        val two = num.fromInt(2)
+        if(d >= num.zero || d % two == 0) {   // handle Long.MinValue for T=Long
+          d/two
+        } else {
+          (d-num.one)/two
+        }
+      }
     }
   }
 }
 
 object BaseGlobal {
-  private case class ArrayView(arr: Array[Long], from: Int, until: Int) {
-    def apply(n: Int): Long =
+
+  private case class ArrayView[@specialized T](arr: Array[T], from: Int, until: Int)(implicit num: Integral[T]) {
+    def apply(n: Int): T =
       if (from + n < until) arr(from + n)
       else throw new ArrayIndexOutOfBoundsException(n)
 
-    def partitionInPlace(p: Long => Boolean): (ArrayView, ArrayView) = {
+    def partitionInPlace(p: T => Boolean): (ArrayView[T], ArrayView[T]) = {
       var upper = until - 1
       var lower = from
       while (lower < upper) {
@@ -309,7 +328,7 @@ object BaseGlobal {
   }
 
   private object ArrayView {
-    def apply(arr: Array[Long]) =
+    def apply[@specialized T](arr: Array[T])(implicit num: Integral[T]) =
       new ArrayView(arr, 0, arr.length)
   }
 

@@ -1,6 +1,20 @@
 {
   funcs : [
     {
+      name: "+"
+      params: [ "Int", "Int" ]
+      doc: "Sum integers."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 1
+    }
+    {
+      name: "-"
+      params: [ "Int", "Int" ]
+      doc: "Subtract integers."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 1
+    }
+    {
       name: "*"
       params: [ "Int", "Int" ]
       doc: "Multiply integers."
@@ -23,17 +37,38 @@
     }
     {
       name: "+"
-      params: [ "Int", "Int" ]
-      doc: "Sum integers."
+      params: [ "BigInt", "BigInt" ]
+      doc: "Sum big integers."
       paramsDoc: [ "First value", "Second value" ]
-      complexity: 1
+      complexity: 8
     }
     {
       name: "-"
-      params: [ "Int", "Int" ]
-      doc: "Substitute integers."
+      params: [ "BigInt", "BigInt" ]
+      doc: "Subtract big integers."
       paramsDoc: [ "First value", "Second value" ]
-      complexity: 1
+      complexity: 8
+    }
+    {
+      name: "*"
+      params: [ "BigInt", "BigInt" ]
+      doc: "Multiply big integers."
+      paramsDoc: [ "Multiplier", "Multiplier" ]
+      complexity: 64
+    }
+    {
+      name: "/"
+      params: [ "BigInt", "BigInt" ]
+      doc: "Divide big integers."
+      paramsDoc: [ "Divisible", "Divisor" ]
+      complexity: 64
+    }
+    {
+      name: "%"
+      params: [ "BigInt", "BigInt" ]
+      doc: "Calculate big modulo."
+      paramsDoc: [ "Divisible", "Divisor" ]
+      complexity: 64
     }
     {
       name: "+"
@@ -78,11 +113,32 @@
       complexity: 1
     }
     {
+      name: ">="
+      params: [ "BigInt", "BigInt" ]
+      doc: "Check if integer greater or equal comparison."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 8
+    }
+    {
+      name: ">"
+      params: [ "BigInt", "BigInt" ]
+      doc: "Check if integer greater comparison."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 8
+    }
+    {
       name: "-"
       params: [ "Int" ]
       doc: "Change integer sign."
       paramsDoc: [ "Value" ]
       complexity: 1
+    }
+    {
+      name: "-"
+      params: [ "BigInt" ]
+      doc: "Change integer sign."
+      paramsDoc: [ "Value" ]
+      complexity: 8
     }
     {
       name: "!"
