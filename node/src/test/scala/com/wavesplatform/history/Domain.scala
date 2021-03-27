@@ -20,6 +20,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{BlockchainUpdater, _}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.utils.SystemTime
 import org.iq80.leveldb.DB
 
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
@@ -113,7 +114,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     blockchainUpdater.removeAfter(blockId).explicitGet()
   }
 
-  def createBlock(version: Byte, txs: Seq[Transaction], ref: Option[ByteStr] = blockchainUpdater.lastBlockId): Block = {
+  def createBlock(version: Byte, txs: Seq[Transaction], ref: Option[ByteStr] = blockchainUpdater.lastBlockId, strictTime: Boolean = false): Block = {
     val reference = ref.getOrElse(randomSig)
     val parent = ref.flatMap { bs =>
       val height = blockchain.heightOf(bs)
@@ -128,7 +129,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     val timestamp =
       if (blockchain.height > 0)
         parent.timestamp + posSelector
-          .getValidBlockDelay(blockchain.height, defaultSigner, parent.baseTarget, blockchain.balance(defaultSigner.toAddress))
+          .getValidBlockDelay(blockchain.height, defaultSigner, parent.baseTarget, blockchain.balance(defaultSigner.toAddress) max 1e12.toLong)
           .explicitGet()
       else
         System.currentTimeMillis() - (1 hour).toMillis
@@ -150,8 +151,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
     Block
       .buildAndSign(
-        version = version,
-        timestamp = timestamp,
+        version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
+        timestamp = if (strictTime) timestamp else SystemTime.getTimestamp(),
         reference = reference,
         baseTarget = consensus.baseTarget,
         generationSignature = consensus.generationSignature,

@@ -1,7 +1,10 @@
 package com.wavesplatform.http
 
+import scala.concurrent.duration._
+
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
+import com.wavesplatform.{crypto, NoShrink, TestTime, TestWallet}
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.AddressApiRoute
@@ -10,8 +13,6 @@ import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.it.util.DoubleExt
-import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
@@ -19,18 +20,15 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.Schedulers
-import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
 import io.netty.util.HashedWheelTimer
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
-
-import scala.concurrent.duration._
 
 class AddressRouteSpec
     extends RouteSpec("/addresses")
@@ -79,7 +77,7 @@ class AddressRouteSpec
       addressApiRoute.copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(d.liquidDiff, d.db, d.blockchainUpdater)).route
     val address = TxHelpers.signer(1).toAddress
 
-    d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, 10000.waves))
+    d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress))
     for (_ <- 1 until 10) d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, address))
 
     Get(routePath(s"/balance/$address/10")) ~> route ~> check {

@@ -351,7 +351,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
 
     ScriptCompiler.compile(script, estimator) should produce(
       "Compilation failed: Match case variables should not be named as RIDE types, " +
-      "but `InvokeScriptTransaction`, `DataTransaction` found in 91-239"
+      "but `InvokeScriptTransaction`, `DataTransaction` found in"
     )
   }
 
