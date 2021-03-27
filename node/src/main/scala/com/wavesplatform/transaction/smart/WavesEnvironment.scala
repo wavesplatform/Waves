@@ -20,7 +20,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset._
-import com.wavesplatform.transaction.TxValidationError.FailedTransactionError
+import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -244,6 +244,7 @@ class DAppEnvironment(
     currentDApp: com.wavesplatform.account.Address,
     currentDAppPk: com.wavesplatform.account.PublicKey,
     senderDApp: com.wavesplatform.account.Address,
+    callChain: Set[com.wavesplatform.account.Address],
     var remainingCalls: Int,
     var currentDiff: Diff
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.map(_.id()).getOrElse(ByteStr.empty)) {
@@ -263,6 +264,11 @@ class DAppEnvironment(
       invoke <- traced(
         account.Address
           .fromBytes(dApp.bytes.arr)
+          .ensureOr(
+            address => GenericError(s"Complex dApp recursion is prohibited, but dApp at address $address was called twice")
+          )(
+            address => currentDApp == address || !callChain.contains(address)
+          )
           .map(
             InvokeScript(
               currentDApp,
@@ -279,7 +285,8 @@ class DAppEnvironment(
         blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
         limitedExecution = false,
         availableComplexity,
-        remainingCalls
+        remainingCalls,
+        callChain
       )(invoke)
     } yield {
       val fixedDiff = diff.copy(
@@ -295,7 +302,8 @@ class DAppEnvironment(
                 )
               )
             )
-        )
+        ),
+        scriptsRun = diff.scriptsRun + 1
       )
       currentDiff = currentDiff combine fixedDiff
       mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
