@@ -21,26 +21,47 @@
       paramsDoc: [ "The list.", "The index of the element." ]
       complexity: 2
     }
-	{
+    {
       name: "median"
       params: [ "List[Int]" ]
       doc: "Returns the median of the list."
       paramsDoc: [ "The list of integers." ]
       complexity: 20
     }
-	{
+    {
+      name: "medianBigInt"
+      params: [ "List[BigInt]" ]
+      doc: "Returns the median of the list."
+      paramsDoc: [ "The list of BigInt." ]
+      complexity: 160
+    }
+    {
       name: "min"
       params: [ "List[Int]" ]
       doc: "Returns the minimum of the list."
       paramsDoc: [ "The list of integers." ]
       complexity: 3
     }
-	{
+    {
       name: "max"
       params: [ "List[Int]" ]
       doc: "Returns the maximum of the list."
       paramsDoc: [ "The list of integers." ]
       complexity: 3
+    }
+    {
+      name: "minBigInt"
+      params: [ "List[BigInt]" ]
+      doc: "Returns the minimum of the list."
+      paramsDoc: [ "The list of big integers." ]
+      complexity: 192
+    }
+    {
+      name: "maxBigInt"
+      params: [ "List[BigInt]" ]
+      doc: "Returns the maximum of the list."
+      paramsDoc: [ "The list of big integers." ]
+      complexity: 192
     }
     {
       name: "indexOf"
