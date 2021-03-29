@@ -1,28 +1,29 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import java.nio.charset.StandardCharsets.UTF_8
-import java.nio.charset.{MalformedInputException, StandardCharsets}
-import java.nio.{BufferUnderflowException, ByteBuffer}
-
-import cats.Id
 import cats.implicits._
+import cats.{Id, Monad}
 import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.utils.getDecompilerContext
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.ContextfulVal
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
+import com.wavesplatform.lang.v1.evaluator.{ContextfulUserFunction, ContextfulVal}
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
+import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
 
+import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.charset.{MalformedInputException, StandardCharsets}
+import java.nio.{BufferUnderflowException, ByteBuffer}
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.util.{Success, Try}
@@ -217,18 +218,40 @@ object PureContext {
     }
 
   lazy val value: BaseFunction[NoContext] =
-    UserFunction(
+    UserFunction.withEnvironment[NoContext](
+      "value",
       "value",
       Map[StdLibVersion, Long](V1 -> 13, V2 -> 13, V3 -> 13, V4 -> 2),
       TYPEPARAM('T'),
       ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)): TYPE)
     ) {
-      IF(
-        FUNCTION_CALL(eq, List(REF("@a"), REF("unit"))),
-        FUNCTION_CALL(throwWithMessage, List(CONST_STRING("value() called on unit value").explicitGet())),
-        REF("@a")
-      )
+    new ContextfulUserFunction[NoContext] {
+      override def apply[F[_]: Monad](env: NoContext[F], startArgs: List[EXPR]): EXPR = {
+        lazy val errorMessageDetails = {
+          val ctx = getDecompilerContext(DirectiveDictionary[StdLibVersion].all.last, Expression)
+          def functionName(h: FunctionHeader) =
+            h match {
+              case Native(id) => ctx.opCodes.get(id).orElse(ctx.binaryOps.get(id)).getOrElse(id.toString)
+              case u: User    => u.name
+            }
+          startArgs.head match {
+            case GETTER(_, field)         => s" while accessing field '$field'"
+            case REF(key)                 => s" by reference '$key'"
+            case FUNCTION_CALL(header, _) => s" on function '${functionName(header)}' call"
+            case LET_BLOCK(_, _)          => " after let block evaluation"
+            case BLOCK(_, _)              => " after block evaluation"
+            case IF(_, _, _)              => " after condition evaluation"
+            case _                        => ""
+          }
+        }
+        IF(
+          FUNCTION_CALL(PureContext.eq, List(REF("@a"), REF("unit"))),
+          FUNCTION_CALL(throwWithMessage, List(CONST_STRING(s"value() called on unit value$errorMessageDetails").explicitGet())),
+          REF("@a")
+        )
+      }
     }
+  }
 
   lazy val valueOrElse: BaseFunction[NoContext] =
     UserFunction(
@@ -515,8 +538,11 @@ object PureContext {
       STRING,
       ("xs", STRING), ("number", LONG)
     ) {
-      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => CONST_STRING(xs.take(xs.offsetByCodePoints(0, trimLongToInt(number))))
-      case xs                                            => notImplemented[Id, EVALUATED]("take(xs: String, number: Int)", xs)
+      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil =>
+        val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
+        CONST_STRING(xs.take(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
+      case xs =>
+        notImplemented[Id, EVALUATED]("take(xs: String, number: Int)", xs)
     }
 
   def listConstructor(checkSize: Boolean): NativeFunction[NoContext] =
@@ -578,8 +604,11 @@ object PureContext {
       STRING,
       ("xs", STRING), ("number", LONG)
     ) {
-      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => CONST_STRING(xs.drop(xs.offsetByCodePoints(0, trimLongToInt(number))))
-      case xs                                            => notImplemented[Id, EVALUATED]("drop(xs: String, number: Int)", xs)
+      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil =>
+        val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
+        CONST_STRING(xs.drop(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
+      case xs =>
+        notImplemented[Id, EVALUATED]("drop(xs: String, number: Int)", xs)
     }
 
   lazy val takeRightString: BaseFunction[NoContext] =
@@ -884,7 +913,7 @@ object PureContext {
     ) {
       case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil =>
         Right(if (off >= 0) {
-          val offset = Math.min(off, Int.MaxValue.toLong).toInt
+          val offset = Math.min(off, m.codePointCount(0, m.length)).toInt
           val i      = m.lastIndexOf(sub,  m.offsetByCodePoints(0, offset))
           if (i != -1) {
             CONST_LONG(m.codePointCount(0, i).toLong)
