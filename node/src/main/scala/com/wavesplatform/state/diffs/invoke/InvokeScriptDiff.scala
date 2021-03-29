@@ -150,6 +150,7 @@ object InvokeScriptDiff {
                   pk,
                   tx.senderDApp,
                   callChain + dAppAddress,
+                  limitedExecution,
                   remainingCalls - 1,
                   remainingActions,
                   remainingData,

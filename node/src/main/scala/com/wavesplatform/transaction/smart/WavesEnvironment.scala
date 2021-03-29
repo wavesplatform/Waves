@@ -245,6 +245,7 @@ class DAppEnvironment(
     currentDAppPk: com.wavesplatform.account.PublicKey,
     senderDApp: com.wavesplatform.account.Address,
     callChain: Set[com.wavesplatform.account.Address],
+    limitedExecution: Boolean,
     var remainingCalls: Int,
     var avaliableActions: Int,
     var avaliableData: Int,
@@ -285,7 +286,7 @@ class DAppEnvironment(
       (diff, evaluated, remainingActions, remainingData) <- InvokeScriptDiff(
         mutableBlockchain,
         blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
-        limitedExecution = false,
+        limitedExecution,
         availableComplexity,
         remainingCalls,
         avaliableActions,

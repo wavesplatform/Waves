@@ -75,11 +75,11 @@ class EvaluatorV2(
       }
     }
 
-    def evaluateUserFunction(fc: FUNCTION_CALL, limit: Int, name: String): Option[Coeval[Int]] = {
+    def evaluateUserFunction(fc: FUNCTION_CALL, limit: Int, name: String, startArgs: List[EXPR]): Option[Coeval[Int]] = {
       ctx.ec.functions
         .get(fc.function)
         .map(_.asInstanceOf[UserFunction[Environment]])
-        .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment)))
+        .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment, startArgs)))
         .orElse(findUserFunction(name, parentBlocks))
         .map { signature =>
           val argsWithExpr =
@@ -185,6 +185,7 @@ class EvaluatorV2(
         }
 
       case fc: FUNCTION_CALL =>
+        val startArgs = fc.args
         evaluateFunctionArgs(fc)
           .flatMap { unusedArgsComplexity =>
             val argsEvaluated = fc.args.forall(_.isInstanceOf[EVALUATED])
@@ -193,7 +194,7 @@ class EvaluatorV2(
                 case FunctionHeader.Native(_) =>
                   evaluateNativeFunction(fc, unusedArgsComplexity)
                 case FunctionHeader.User(_, name) =>
-                  evaluateUserFunction(fc, unusedArgsComplexity, name)
+                  evaluateUserFunction(fc, unusedArgsComplexity, name, startArgs)
                     .getOrElse(evaluateConstructor(fc, unusedArgsComplexity, name))
               } else
               Coeval.now(unusedArgsComplexity)
