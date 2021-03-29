@@ -906,7 +906,7 @@ class UtxPoolSpecification
                  |      throw("Error raised")
                  |    }
                  | }
-         """.stripMargin,
+               """.stripMargin,
               ScriptEstimatorV3
             )
             .explicitGet()
