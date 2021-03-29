@@ -190,39 +190,30 @@ object InvokeScriptDiff {
                 )
               )
 
+            process = { (actions: List[CallableAction], unusedComplexity: Int, actionsCount: Int, dataCount: Int, ret: EVALUATED) =>
+              if(dataCount > avaliableData) {
+                val usedComplexity = remainingComplexity - unusedComplexity
+                val error          = FailedTransactionError.dAppExecution("Stored data count limit is exceeded", usedComplexity, log)
+                traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
+              } else {
+                if(actionsCount > avaliableActions) {
+                  val usedComplexity = remainingComplexity - unusedComplexity
+                  val error          = FailedTransactionError.dAppExecution("Actions count limit is exceeded", usedComplexity, log)
+                  traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
+                } else {
+                  doProcessActions(actions, unusedComplexity).map((_, ret, avaliableActions - actionsCount, avaliableData - dataCount))
+                }
+              }
+            }
             (actionsDiff, evaluated, remainingActions1, remainingData1) <- scriptResult match {
               case ScriptResultV3(dataItems, transfers, unusedComplexity) =>
                 val dataCount = dataItems.length
-                if(dataCount > avaliableData) {
-                  val usedComplexity = remainingComplexity - unusedComplexity
-                  val error          = FailedTransactionError.dAppExecution("Stored data count limit is exceeded", usedComplexity, log)
-                  traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
-                } else {
-                  val actionsCount = transfers.length
-                  if(actionsCount > avaliableActions) {
-                    val usedComplexity = remainingComplexity - unusedComplexity
-                    val error          = FailedTransactionError.dAppExecution("Actions count limit is exceeded", usedComplexity, log)
-                    traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
-                  } else {
-                    doProcessActions(dataItems ::: transfers, unusedComplexity).map((_, unit, avaliableActions - actionsCount, avaliableData - dataCount))
-                  }
-                }
+                val actionsCount = transfers.length
+                process(dataItems ::: transfers,  unusedComplexity, actionsCount, dataCount, unit) 
               case ScriptResultV4(actions, unusedComplexity, ret) =>
                 val dataCount = actions.count(_.isInstanceOf[DataOp])
-                if(dataCount > avaliableData) {
-                  val usedComplexity = remainingComplexity - unusedComplexity
-                  val error          = FailedTransactionError.dAppExecution("Stored data count limit is exceeded", usedComplexity, log)
-                  traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
-                } else {
-                  val actionsCount = actions.length - dataCount
-                  if(actionsCount > avaliableActions) {
-                    val usedComplexity = remainingComplexity - unusedComplexity
-                    val error          = FailedTransactionError.dAppExecution("Actions count limit is exceeded", usedComplexity, log)
-                    traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
-                  } else {
-                    doProcessActions(actions, unusedComplexity).map((_, ret, avaliableActions - actionsCount, avaliableData - dataCount))
-                  }
-                }
+                val actionsCount = actions.length - dataCount
+                process(actions,  unusedComplexity, actionsCount, dataCount, ret) 
               case _: IncompleteResult if limitedExecution        => doProcessActions(Nil, 0).map((_, unit,  avaliableActions, avaliableData))
               case r: IncompleteResult =>
                 val usedComplexity = remainingComplexity - r.unusedComplexity
