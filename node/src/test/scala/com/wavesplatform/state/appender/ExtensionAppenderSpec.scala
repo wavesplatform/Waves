@@ -22,11 +22,14 @@ class ExtensionAppenderSpec extends FlatSpec with Matchers with WithDomain with 
     d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
     val tx = TxHelpers.transfer()
     val block1 = d.createBlock(Block.PlainBlockVersion, Seq(tx), strictTime = true)
+    utx.putIfNew(tx).resultE.explicitGet()
     d.appendBlock(tx)
+    utx.all shouldBe Seq(tx)
 
     time.setTime(block1.header.timestamp)
     extensionAppender(Seq(block1)).runSyncUnsafe().explicitGet()
     d.blockchain.height shouldBe 2
+    utx.all shouldBe Nil
   }
 
 }
