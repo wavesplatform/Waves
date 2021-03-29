@@ -182,20 +182,7 @@ object InvokeScriptTransactionDiff {
               otherIssues
             )
 
-            resultDiff <- scriptResult match {
-              case ScriptResultV3(dataItems, transfers, unusedComplexity) =>
-                val dataCount = dataItems.length
-                if(dataCount > avaliableData) {
-                  TracedResult(Left(FailedTransactionError.dAppExecution("Stored data count limit is exceeded", fixedInvocationComplexity, log)))
-                } else {
-                  val actionsCount = transfers.length
-                  if(actionsCount > avaliableActions) {
-                    TracedResult(Left(FailedTransactionError.dAppExecution("Actions count limit is exceeded", fixedInvocationComplexity, log)))
-                  } else {
-                    doProcessActions(dataItems ::: transfers, unusedComplexity)
-                  }
-                }
-              case ScriptResultV4(actions, unusedComplexity, _) =>
+            process = { (actions: List[CallableAction], unusedComplexity: Long) =>
                 val dataCount = actions.count(_.isInstanceOf[DataOp])
                 if(dataCount > avaliableData) {
                   TracedResult(Left(FailedTransactionError.dAppExecution("Stored data count limit is exceeded", fixedInvocationComplexity, log)))
@@ -207,6 +194,12 @@ object InvokeScriptTransactionDiff {
                     doProcessActions(actions, unusedComplexity)
                   }
                 }
+            }
+            resultDiff <- scriptResult match {
+              case ScriptResultV3(dataItems, transfers, unusedComplexity) =>
+                process(dataItems ::: transfers, unusedComplexity)
+              case ScriptResultV4(actions, unusedComplexity, _) =>
+                process(actions, unusedComplexity)
               case _: IncompleteResult if limitedExecution                => doProcessActions(Nil, 0)
               case i: IncompleteResult =>
                 TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
