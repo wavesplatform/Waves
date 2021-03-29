@@ -111,6 +111,7 @@ object InvokeScriptTransactionDiff {
                   pk,
                   dAppAddress,
                   Set(tx.senderAddress, dAppAddress),
+                  limitedExecution,
                   remainingCalls,
                   (if (version < V5) {
                      Diff.empty
