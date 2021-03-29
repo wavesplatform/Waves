@@ -47,6 +47,13 @@
       complexity: 1
     }
     {
+      name: "toBytesBigInt"
+      params: [ "BigInt" ]
+      doc: "Converts an BigInt to an array of bytes."
+      paramsDoc: [ "The BigInt to convert." ]
+      complexity: 65
+    }
+    {
       name: "toBytes"
       params: [ "String" ]
       doc: "Converts a string to an array of bytes."
@@ -65,6 +72,48 @@
       params: [ "ByteVector", "Int" ]
       doc: "Converts an array of bytes to an integer starting from a certain index."
       paramsDoc: [ "The array of bytes to convert.", "The index to start from." ]
+      complexity: 1
+    }
+    {
+      name: "parseBigInt"
+      params: [ "String" ]
+      doc: "Converts an string to an integer."
+      paramsDoc: [ "The string to convert." ]
+      complexity: 65
+    }
+    {
+      name: "parseBigIntValue"
+      params: [ "String" ]
+      doc: "Converts an string to an integer."
+      paramsDoc: [ "The string to convert." ]
+      complexity: 65
+    }
+    {
+      name: "toBigInt"
+      params: [ "ByteVector" ]
+      doc: "Converts an array of bytes to an big integer."
+      paramsDoc: [ "The array of bytes to convert." ]
+      complexity: 65
+    }
+    {
+      name: "toBigInt"
+      params: [ "ByteVector", "Int", "Int" ]
+      doc: "Converts an array of bytes to an big integer."
+      paramsDoc: [ "The array of bytes to convert.", "Offset", "Size" ]
+      complexity: 65
+    }
+    {
+      name: "toInt"
+      params: [ "BigInt" ]
+      doc: "Converts a BigInt to an integer."
+      paramsDoc: [ "The BigInt to convert." ]
+      complexity: 1
+    }
+    {
+      name: "toBigInt"
+      params: [ "Int" ]
+      doc: "Converts an integer to an integer."
+      paramsDoc: [ "The integer to convert." ]
       complexity: 1
     }
     {
@@ -87,6 +136,13 @@
       doc: "Converts an integer to a string."
       paramsDoc: [ "The integer to convert." ]
       complexity: 1
+    }
+    {
+      name: "toStringBigInt"
+      params: [ "BigInt" ]
+      doc: "Convert BigInt to string"
+      paramsDoc: [ "The BigInt to convert" ]
+      complexity: 65
     }
     {
       name: "toUtf8String"
