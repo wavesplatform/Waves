@@ -309,7 +309,6 @@ class DAppEnvironment(
         ),
         scriptsRun = diff.scriptsRun + 1
       )
-      println(s"call: $avaliableActions $remainingActions")
       currentDiff = currentDiff combine fixedDiff
       mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
       remainingCalls = remainingCalls - 1

@@ -9,8 +9,10 @@ object ContractLimits {
     case V3 | V4 | V5 => 4000
   }
 
-  val MaxTotalInvokeComplexity: StdLibVersion => Int =
-    v => MaxComplexityByVersion(v) * (MaxAttachedPaymentAmount + MaxCallableActionsAmount(V4) + 1)
+  val MaxTotalInvokeComplexity: StdLibVersion => Int = {
+    case V5 => 26000
+    case v => MaxComplexityByVersion(v) * (MaxAttachedPaymentAmount + MaxCallableActionsAmount(V4) + 1)
+  }
 
   val MaxSyncDAppCalls: StdLibVersion => Int =
     _ => 100

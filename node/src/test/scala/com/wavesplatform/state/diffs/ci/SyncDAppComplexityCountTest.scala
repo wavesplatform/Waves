@@ -210,7 +210,7 @@ class SyncDAppComplexityCountTest
         val diff = diffE.explicitGet()
         diff.scriptsComplexity shouldBe complexity
         if (exceeding)
-          diff.errorMessage(invokeTx.id.value()).get.text should include("Invoke complexity limit = 52000 is exceeded")
+          diff.errorMessage(invokeTx.id.value()).get.text should include("Invoke complexity limit = 26000 is exceeded")
         else if (raiseError)
           diff.errorMessage(invokeTx.id.value()).get.text should include("Error raised")
         else
@@ -251,35 +251,35 @@ class SyncDAppComplexityCountTest
   property("counts complexity correctly") {
     assert(1, 2709)
     assert(2, 5504)
-    assert(18, 50224)
-    assert(19, 50079, exceeding = true)
-    assert(100, 50079, exceeding = true)
+    assert(18, 25041, exceeding = true)
+    assert(19, 25041, exceeding = true)
+    assert(100, 25041, exceeding = true)
 
     assert(1, 5415, withPayment = true)
     assert(2, 8210, withPayment = true)
-    assert(17, 50135, withPayment = true)
-    assert(18, 50003, withPayment = true, exceeding = true)
-    assert(100, 50003, withPayment = true, exceeding = true)
+    assert(17, 24965, withPayment = true, exceeding = true)
+    assert(18, 24965, withPayment = true, exceeding = true)
+    assert(100, 24965, withPayment = true, exceeding = true)
 
     assert(2, 8215, withThroughPayment = true)
-    assert(9, 46757, withThroughPayment = true)
-    assert(10, 49404, withThroughPayment = true, exceeding = true)
-    assert(100, 49404, withThroughPayment = true, exceeding = true)
+    assert(9, 26000, withThroughPayment = true, exceeding = true)
+    assert(10, 26000, withThroughPayment = true, exceeding = true)
+    assert(100, 26000, withThroughPayment = true, exceeding = true)
 
     assert(1, 5424, withThroughTransfer = true)
     assert(2, 10934, withThroughTransfer = true)
-    assert(9, 49504, withThroughTransfer = true)
-    assert(10, 52000, withThroughTransfer = true, exceeding = true)
-    assert(100, 50079, withThroughTransfer = true, exceeding = true)
+    assert(9, 26000, withThroughTransfer = true, exceeding = true)
+    assert(10, 25041, withThroughTransfer = true, exceeding = true)
+    assert(100, 25041, withThroughTransfer = true, exceeding = true)
 
     assert(1, 4615, withVerifier = true)
-    assert(17, 49335, withVerifier = true)
-    assert(18, 52130, withVerifier = true)
-    assert(19, 51985, withVerifier = true, exceeding = true)
-    assert(100, 51985, withVerifier = true, exceeding = true)
+    assert(17, 26947, withVerifier = true, exceeding = true)
+    assert(18, 26947, withVerifier = true, exceeding = true)
+    assert(19, 26947, withVerifier = true, exceeding = true)
+    assert(100, 26947, withVerifier = true, exceeding = true)
 
     assert(1, 10036, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true)
-    assert(100, 53906, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true, exceeding = true)
+    assert(100, 26571, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true, exceeding = true)
   }
 
   property("rejects and fails correctly") {
