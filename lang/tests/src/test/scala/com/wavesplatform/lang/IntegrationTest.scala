@@ -1,7 +1,5 @@
 package com.wavesplatform.lang
 
-import java.nio.charset.StandardCharsets
-
 import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
@@ -13,7 +11,7 @@ import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG, STRING}
+import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -27,13 +25,13 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease}
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
-import com.wavesplatform.lang.Global
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.web3j.crypto.Keys
 import scorex.crypto.hash.Keccak256
 import scorex.util.encode.Base16
 
+import java.nio.charset.StandardCharsets
 import scala.util.{Random, Try}
 
 class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
@@ -692,168 +690,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       """ "".toBytes().toInt(1) """
     eval[EVALUATED](src) should produce("IndexOutOfBounds")
-  }
-
-  property("indexOf") {
-    val src =
-      """ "qweqwe".indexOf("we") """
-    eval[EVALUATED](src) shouldBe Right(CONST_LONG(1L))
-  }
-
-  property("indexOf with zero offset") {
-    val src =
-      """ "qweqwe".indexOf("qw", 0) """
-    eval[EVALUATED](src) shouldBe Right(CONST_LONG(0L))
-  }
-
-  property("indexOf with start offset") {
-    val src =
-      """ "qweqwe".indexOf("we", 2) """
-    eval[EVALUATED](src) shouldBe Right(CONST_LONG(4L))
-  }
-
-  property("indexOf from end of max sized string") {
-    val str = "a" * 32766 + "z"
-    val src =
-      """ str.indexOf("z", 32766) """
-    eval[EVALUATED](
-      src,
-      ctxt = CTX[NoContext](
-        Seq(),
-        Map("str" -> (STRING -> ContextfulVal.pure[NoContext](CONST_STRING(str).explicitGet()))),
-        Array()
-      )
-    ) shouldBe Right(CONST_LONG(32766L))
-  }
-
-  property("indexOf (not present)") {
-    val src =
-      """ "qweqwe".indexOf("ww") """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf from empty string") {
-    val src =
-      """ "".indexOf("!") """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf from empty string with offset") {
-    val src =
-      """ "".indexOf("!", 1) """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf from string with Long.MaxValue offset") {
-    val src =
-      s""" "abc".indexOf("c", ${Long.MaxValue}) """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf from string with negative offset") {
-    val src =
-      """ "abc".indexOf("a", -1) """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf from string with negative Long.MinValue offset") {
-    val src =
-      s""" "abc".indexOf("a", ${Long.MinValue}) """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf empty string from non-empty string") {
-    val src =
-      """ "abc".indexOf("") """
-    eval[EVALUATED](src) shouldBe Right(CONST_LONG(0))
-  }
-
-  property("indexOf empty string from empty string") {
-    val src =
-      """ "".indexOf("") """
-    eval[EVALUATED](src) shouldBe Right(CONST_LONG(0))
-  }
-
-  property("lastIndexOf") {
-    val src =
-      """ "qweqwe".lastIndexOf("we") """
-    eval(src) shouldBe Right(CONST_LONG(4))
-  }
-
-  property("lastIndexOf with zero offset") {
-    val src =
-      """ "qweqwe".lastIndexOf("qw", 0) """
-    eval(src) shouldBe Right(CONST_LONG(0))
-  }
-
-  property("lastIndexOf with start offset") {
-    val src =
-      """ "qweqwe".lastIndexOf("we", 4) """
-    eval(src) shouldBe Right(CONST_LONG(4L))
-  }
-
-  property("lastIndexOf from end of max sized string") {
-    val str = "a" * 32766 + "z"
-    val src =
-      """ str.lastIndexOf("z", 32766) """
-    eval(src, ctxt = CTX[NoContext](Seq(), Map("str" -> (STRING -> ContextfulVal.pure[NoContext](CONST_STRING(str).explicitGet()))), Array())) shouldBe Right(
-      CONST_LONG(32766L)
-    )
-  }
-
-  property("lastIndexOf (not present)") {
-    val src =
-      """ "qweqwe".lastIndexOf("ww") """
-    eval(src) shouldBe Right(unit)
-  }
-
-  property("lastIndexOf from empty string") {
-    val src =
-      """ "".lastIndexOf("!") """
-    eval(src) shouldBe Right(unit)
-  }
-
-  property("lastIndexOf from empty string with offset") {
-    val src =
-      """ "".lastIndexOf("!", 1) """
-    eval(src) shouldBe Right(unit)
-  }
-
-  property("lastIndexOf from string with Int.MaxValue offset") {
-    val src =
-      s""" "abc".lastIndexOf("c", ${Int.MaxValue}) """
-    eval(src) shouldBe Right(CONST_LONG(2))
-  }
-
-  property("lastIndexOf from string with Long.MaxValue offset") {
-    val src =
-      s""" "abc".lastIndexOf("c", ${Long.MaxValue}) """
-    eval(src) shouldBe Right(CONST_LONG(2))
-  }
-
-  property("lastIndexOf from string with negative offset") {
-    val src =
-      """ "abc".lastIndexOf("a", -1) """
-    eval(src) shouldBe Right(unit)
-  }
-
-  property("lastIndexOf from string with negative Long.MinValue offset") {
-    val src =
-      s""" "abc".lastIndexOf("a", ${Long.MinValue}) """
-    eval(src) shouldBe Right(unit)
-  }
-
-  property("lastIndexOf empty string from non-empty string") {
-    val str = "abcde"
-    val src =
-      s""" "$str".lastIndexOf("") """
-    eval(src) shouldBe Right(CONST_LONG(str.length))
-  }
-
-  property("lastIndexOf empty string from empty string") {
-    val src =
-      """ "".lastIndexOf("") """
-    eval(src) shouldBe Right(CONST_LONG(0))
   }
 
   property("split") {
@@ -2533,5 +2369,30 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val script5 = s"""dropRight("x冬x", 2)"""
     genericEval[Environment, EVALUATED](script5, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
       Right(CONST_STRING("x").explicitGet())
+  }
+
+  property("value() error message") {
+    val script =
+      s"""
+         | let a = if (true) then unit else 7
+         | a.value()
+       """.stripMargin
+    eval(script) should produce("value() called on unit value by reference 'a'")
+
+    val script2 =
+      s"""
+         | func a() = if (true) then unit else 7
+         | a().value()
+       """.stripMargin
+    eval(script2) should produce("value() called on unit value on function 'a' call")
+
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
+    val script3 = "SponsorFee(base58'', unit).minSponsoredAssetFee.value()"
+    genericEval(script3, ctxt = ctx, version = V4, env = utils.environment) should produce("value() called on unit value while accessing field 'minSponsoredAssetFee'")
+    val script4 = """ getIntegerValue(Address(base58''), "") """
+    genericEval(script4, ctxt = ctx, version = V4, env = utils.environment) should produce("value() called on unit value on function 'getInteger' call")
+
+    eval("(if (true) then unit else 7).value()") should produce("value() called on unit value after condition evaluation")
+    eval("(let a = 1; if (true) then unit else 7).value()") should produce("value() called on unit value after let block evaluation")
   }
 }

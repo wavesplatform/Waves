@@ -39,7 +39,7 @@ package object utils {
     override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
     override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
     override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
-    override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
+    override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = None
     override def hasData(addressOrAlias: Recipient): Boolean                                                     = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
