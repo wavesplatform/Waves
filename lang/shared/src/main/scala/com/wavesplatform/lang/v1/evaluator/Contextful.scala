@@ -37,13 +37,13 @@ abstract class ContextfulNativeFunction[C[_[_]]](name: String, resultType: TYPE,
 }
 
 trait ContextfulUserFunction[C[_[_]]] {
-  def apply[F[_]: Monad](context: C[F]): EXPR
+  def apply[F[_]: Monad](context: C[F], startArgs: List[EXPR]): EXPR
 }
 
 object ContextfulUserFunction {
   def pure[C[_[_]]](expr: EXPR): ContextfulUserFunction[C] =
     new ContextfulUserFunction[C] {
-      override def apply[F[_]: Monad](context: C[F]): EXPR = expr
+      override def apply[F[_]: Monad](context: C[F], startArgs: List[EXPR]): EXPR = expr
     }
 }
 
@@ -76,6 +76,6 @@ object ContextfulVal {
 }
 
 object Contextful {
-  type NoContext[_[_]] = Unit
+  type NoContext[_[_]] = Any
   def empty[F[_]]: NoContext[F] = ()
 }
