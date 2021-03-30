@@ -123,7 +123,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
     val grandParent = ref.flatMap { bs =>
       val height = blockchain.heightOf(bs)
-      height.flatMap(h => blockchain.blockHeader(h - 1)).map(_.header)
+      height.flatMap(h => blockchain.blockHeader(h - 2)).map(_.header)
     }
 
     val timestamp =
