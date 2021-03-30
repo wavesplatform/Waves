@@ -208,7 +208,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     "Issue more than 10 assets should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
       assertApiError(invokeScript(acc, "issue11Assets").id) { e =>
-        e.message should include("Too many script actions: max: 10, actual: 11")
+        e.message should include("Actions count limit is exceeded")
       }
     }
 
@@ -218,14 +218,14 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
       assertApiError(invokeScript(acc, "process11actions", assetId = assetId).id) { e =>
-        e.message should include("Too many script actions: max: 10, actual: 11")
+        e.message should include("Actions count limit is exceeded")
       }
     }
 
     "More than 10 issue action in one invocation should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
       assertApiError(invokeScript(acc, "issue11Assets").id) { e =>
-        e.message should include("Too many script actions: max: 10, actual: 11")
+        e.message should include("Actions count limit is exceeded")
       }
     }
   }

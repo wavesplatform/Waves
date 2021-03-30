@@ -1,7 +1,5 @@
 package com.wavesplatform.utx
 
-import java.nio.file.{Files, Path}
-
 import cats.data.NonEmptyList
 import com.wavesplatform
 import com.wavesplatform._
@@ -15,13 +13,14 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
-import com.wavesplatform.history.randomSig
+import com.wavesplatform.history.{DefaultWavesSettings, randomSig, settingsWithFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state._
@@ -45,6 +44,7 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.{EitherValues, FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
+import java.nio.file.{Files, Path}
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.util.Random
@@ -875,6 +875,61 @@ class UtxPoolSpecification
           result shouldBe None
           (System.nanoTime() - startTime).nanos.toMillis shouldBe 3000L +- 1000
         }
+      }
+
+      "dApp to dApp call chain in force validate mode" in withDomain(
+        settingsWithFeatures(
+          BlockchainFeatures.Ride4DApps,
+          BlockchainFeatures.BlockV5,
+          BlockchainFeatures.SynchronousCalls
+        )
+      ) { d =>
+        def dApp(otherDApp: Option[Address]): Script =
+          ScriptCompiler
+            .compile(
+              s"""
+                 | {-# STDLIB_VERSION 5       #-}
+                 | {-# CONTENT_TYPE   DAPP    #-}
+                 | {-# SCRIPT_TYPE    ACCOUNT #-}
+                 |
+                 | @Callable(i)
+                 | func default() = {
+                 |    if (
+                 |      let key = base64'LDCJzjgi5HtcHEXHfU8TZz+ZUHD2ZwsQ7JIEvzdMPYKYs9SoGkKUmg1yya4TE0Ms7x+KOJ4Ze/CPfKp2s5jbniFNM71N/YlHVbNkytLtQi1DzReSh9SNBsvskdY5mavQJe+67PuPVEYnx+lJ97qIG8243njZbGWPqUJ2Vqj49NAunhqX+eIkK3zAB3IPWls3gruzX2t9wrmyE9cVVvf1kgWx63PsQV37qdH0KcFRpCH89k4TPS6fLmqdFxX3YGHCGFTpr6tLogvjbUFJPT98kJ/xck0C0B/s8PTVKdao4VQHT4DBIO8+GB3CQVh6VV4EcMLtDWWNxF4yloAlKcFT0Q4AzJSimpFqd/SwSz9Pb7uk5srte3nwphVamC+fHlJt'
+                 |      let proof = base64'GQPBoHuCPcIosF+WZKE5jZV13Ib4EdjLnABncpSHcMKBZl0LhllnPxcuzExIQwhxcfXvFFAjlnDGpKauQ9OQsjBKUBsdBZnGiV2Sg4TSdyHuLo2AbRRqJN0IV3iH3On8I4ngnL30ZAxVyGQH2EK58aUZGxMbbXGR9pQdh99QaiE='
+                 |      let input = base64'IfZhAypdtgvecKDWzVyRuvXatmFf2ZYcMWVkCJ0/MQo='
+                 |      bn256Groth16Verify_1inputs(key, proof, input)
+                 |    ) then {
+                 |      ${otherDApp.fold("")(address => s""" strict r = Invoke(Address(base58'$address'), "default", [], []) """)}
+                 |      []
+                 |    } else {
+                 |      throw("Error raised")
+                 |    }
+                 | }
+               """.stripMargin,
+              ScriptEstimatorV3
+            )
+            .explicitGet()
+            ._1
+
+        val (genesisTxs, setScripts) = (1 to 25).foldLeft((List.empty[GenesisTransaction], List.empty[SetScriptTransaction])) {
+          case ((genesisTxs, setScripts), i) =>
+            val account   = TxHelpers.signer(i)
+            val script    = dApp(genesisTxs.headOption.map(_.recipient))
+            val genesis   = TxHelpers.genesis(account.toAddress, ENOUGH_AMT)
+            val setScript = TxHelpers.setScript(account, script)
+            (genesis :: genesisTxs, setScript :: setScripts)
+        }
+
+        d.appendBlock(genesisTxs: _*)
+        d.appendBlock(setScripts: _*)
+
+        val invoke = TxHelpers.invoke(genesisTxs.head.recipient, "default")
+        val utx    = new UtxPoolImpl(ntpTime, d.blockchainUpdater, PublishSubject(), DefaultWavesSettings.utxSettings)
+        utx.putIfNew(invoke, forceValidate = true).resultE.explicitGet() shouldBe true
+        utx.removeAll(Seq(invoke))
+        utx.putIfNew(invoke, forceValidate = false).resultE.explicitGet() shouldBe true
+        utx.close()
       }
     }
 

@@ -245,7 +245,10 @@ class DAppEnvironment(
     currentDAppPk: com.wavesplatform.account.PublicKey,
     senderDApp: com.wavesplatform.account.Address,
     callChain: Set[com.wavesplatform.account.Address],
+    limitedExecution: Boolean,
     var remainingCalls: Int,
+    var avaliableActions: Int,
+    var avaliableData: Int,
     var currentDiff: Diff
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.map(_.id()).getOrElse(ByteStr.empty)) {
 
@@ -280,12 +283,14 @@ class DAppEnvironment(
             )
           )
       )
-      (diff, evaluated) <- InvokeScriptDiff(
+      (diff, evaluated, remainingActions, remainingData) <- InvokeScriptDiff(
         mutableBlockchain,
         blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
-        limitedExecution = false,
+        limitedExecution,
         availableComplexity,
         remainingCalls,
+        avaliableActions,
+        avaliableData,
         callChain
       )(invoke)
     } yield {
@@ -308,6 +313,8 @@ class DAppEnvironment(
       currentDiff = currentDiff combine fixedDiff
       mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
       remainingCalls = remainingCalls - 1
+      avaliableActions = remainingActions
+      avaliableData = remainingData
       (evaluated, diff.scriptsComplexity.toInt)
     }
     r.v.map {

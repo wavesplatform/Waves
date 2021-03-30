@@ -183,7 +183,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
 
     "Issue more than 10 assets should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
-      assertGrpcError(invokeScript(acc, "issue11Assets"), "Too many script actions: max: 10, actual: 11")
+      assertGrpcError(invokeScript(acc, "issue11Assets"), "Actions count limit is exceeded")
     }
 
     "More than 10 actions Issue/Reissue/Burn should produce an error" in {
@@ -191,12 +191,12 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
-      assertGrpcError(invokeScript(acc, "process11actions", assetId = assetId), "Too many script actions: max: 10, actual: 11")
+      assertGrpcError(invokeScript(acc, "process11actions", assetId = assetId), "Actions count limit is exceeded")
     }
 
     "More than 10 issue action in one invocation should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
-      assertGrpcError(invokeScript(acc, "issue11Assets", fee = invocationCost(1)), "Too many script actions: max: 10, actual: 11")
+      assertGrpcError(invokeScript(acc, "issue11Assets", fee = invocationCost(1)), "Actions count limit is exceeded")
     }
   }
 

@@ -315,8 +315,11 @@ object UtilsApiRoute {
               PublicKey(ByteStr.fill(KeyLength)(1)),
               address,
               Set(),
-              ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
-              Diff.empty
+              limitedExecution = false,
+              remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
+              avaliableActions = ContractLimits.MaxCallableActionsAmount(script.stdLibVersion),
+              avaliableData = ContractLimits.MaxWriteSetSize(script.stdLibVersion),
+              currentDiff = Diff.empty
             )
           )
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)

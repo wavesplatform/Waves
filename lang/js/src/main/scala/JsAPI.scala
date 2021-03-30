@@ -96,7 +96,7 @@ object JsAPI {
       "MaxInvokeScriptArgs"                   -> MaxInvokeScriptArgs,
       "MaxInvokeScriptSizeInBytes"            -> MaxInvokeScriptSizeInBytes,
       "MaxWriteSetSizeInBytes"                -> MaxWriteSetSizeInBytes,
-      "MaxPaymentAmount"                      -> MaxCallableActionsAmount,
+      "MaxPaymentAmount"                      -> MaxCallableActionsAmount(V4),
       "MaxAttachedPaymentAmount"              -> MaxAttachedPaymentAmount
     )
   }
