@@ -912,7 +912,7 @@ class UtxPoolSpecification
             .explicitGet()
             ._1
 
-        val (genesisTxs, setScripts) = (1 to 50).foldLeft((List.empty[GenesisTransaction], List.empty[SetScriptTransaction])) {
+        val (genesisTxs, setScripts) = (1 to 25).foldLeft((List.empty[GenesisTransaction], List.empty[SetScriptTransaction])) {
           case ((genesisTxs, setScripts), i) =>
             val account   = TxHelpers.signer(i)
             val script    = dApp(genesisTxs.headOption.map(_.recipient))

@@ -1,20 +1,26 @@
 package com.wavesplatform.history
 
+import scala.concurrent.duration._
+
 import cats.syntax.option._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.{AddressPortfolio, AddressTransactions, CommonBlocksApi}
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.database
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{BlockchainUpdater, _}
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.utils.SystemTime
 import org.iq80.leveldb.DB
 
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
@@ -23,13 +29,15 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   @volatile
   var triggers: Seq[BlockchainUpdateTriggers] = Nil
 
+  val posSelector: PoSSelector = PoSSelector(blockchainUpdater, None)
+
   def blockchain: BlockchainUpdaterImpl = blockchainUpdater
 
   def lastBlock: Block = {
-    blockchainUpdater
-      .liquidBlock(blockchainUpdater.lastBlockId.get)
+    blockchainUpdater.lastBlockId
+      .flatMap(blockchainUpdater.liquidBlock)
       .orElse(levelDBWriter.lastBlock)
-      .get
+      .getOrElse(TestBlock.create(Nil))
   }
 
   def liquidDiff: Diff =
@@ -106,16 +114,48 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     blockchainUpdater.removeAfter(blockId).explicitGet()
   }
 
-  def createBlock(version: Byte, txs: Seq[Transaction]): Block = {
-    val reference = blockchainUpdater.lastBlockId.getOrElse(randomSig)
-    val timestamp = System.currentTimeMillis()
+  def createBlock(version: Byte, txs: Seq[Transaction], ref: Option[ByteStr] = blockchainUpdater.lastBlockId, strictTime: Boolean = false): Block = {
+    val reference = ref.getOrElse(randomSig)
+    val parent = ref.flatMap { bs =>
+      val height = blockchain.heightOf(bs)
+      height.flatMap(blockchain.blockHeader).map(_.header)
+    } getOrElse (lastBlock.header)
+
+    val grandParent = ref.flatMap { bs =>
+      val height = blockchain.heightOf(bs)
+      height.flatMap(h => blockchain.blockHeader(h - 2)).map(_.header)
+    }
+
+    val timestamp =
+      if (blockchain.height > 0)
+        parent.timestamp + posSelector
+          .getValidBlockDelay(blockchain.height, defaultSigner, parent.baseTarget, blockchain.balance(defaultSigner.toAddress) max 1e12.toLong)
+          .explicitGet()
+      else
+        System.currentTimeMillis() - (1 hour).toMillis
+
+    val consensus =
+      if (blockchain.height > 0)
+        posSelector
+          .consensusData(
+            defaultSigner,
+            blockchain.height,
+            settings.blockchainSettings.genesisSettings.averageBlockDelay,
+            parent.baseTarget,
+            parent.timestamp,
+            grandParent.map(_.timestamp),
+            timestamp
+          )
+          .explicitGet()
+      else NxtLikeConsensusBlockData(60, generationSignature)
+
     Block
       .buildAndSign(
-        version = version,
-        timestamp = timestamp,
+        version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
+        timestamp = if (strictTime) timestamp else SystemTime.getTimestamp(),
         reference = reference,
-        baseTarget = blockchainUpdater.lastBlockHeader.fold(60L)(_.header.baseTarget),
-        generationSignature = com.wavesplatform.history.generationSignature,
+        baseTarget = consensus.baseTarget,
+        generationSignature = consensus.generationSignature,
         txs = txs,
         featureVotes = Nil,
         rewardVote = -1L,
