@@ -1,6 +1,7 @@
 package com.wavesplatform.api.http
 
 import akka.http.scaladsl.server.{Route, StandardRoute}
+import cats.syntax.either._
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, TooBigArrayAllocation}
@@ -9,6 +10,9 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.TxValidationError.GenericError
+import monix.eval.Task
+import monix.reactive.Observable
 import play.api.libs.json._
 
 case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi) extends ApiRoute {
@@ -61,6 +65,13 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
       } ~ path(BlockId) { id =>
         complete(commonApi.meta(id).map(_.json()).toRight(BlockDoesNotExist))
       }
+    } ~ path("heightByTimestamp" / LongNumber) { timestamp =>
+      val task = for {
+        _      <- Task(Either.cond(timestamp > System.currentTimeMillis(), (), "Indicated timestamp belongs to the future"))
+        result <- heightByTimestamp(timestamp)
+      } yield result.leftMap(GenericError(_))
+
+      extractScheduler(implicit sc => complete(task.runToFuture))
     } ~ path(BlockId) { id =>
       complete(commonApi.block(id).map(toJson).toRight(BlockDoesNotExist))
     }
@@ -86,6 +97,35 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
     } else {
       complete(TooBigArrayAllocation)
     }
+  }
+
+  private[this] def heightByTimestamp(target: Long): Task[Either[String, Int]] = {
+    sealed trait State
+    case object Starting                 extends State
+    case class Scanning(prevHeight: Int) extends State
+    sealed trait Result                  extends State
+    case class HeightFound(height: Int)  extends Result
+    case class Error(message: String)    extends Result
+
+    commonApi
+      .metaRange(1, commonApi.currentHeight)
+      .map(b => (b.header.timestamp, b.height))
+      .++(Observable((Long.MaxValue, Int.MaxValue)))
+      .scan(Starting: State) {
+        case (Starting, (blockTimestamp, genesisHeight)) =>
+          assert(genesisHeight == 1, "Blockchain should start from 1")
+          if (target < blockTimestamp) Error("Indicated timestamp is before the start of the blockchain")
+          else Scanning(genesisHeight)
+
+        case (Scanning(prevHeight), (blockTimestamp, blockHeight)) =>
+          if (blockTimestamp > target) HeightFound(prevHeight)
+          else Scanning(blockHeight)
+      }
+      .collect {
+        case HeightFound(height) => Right(height)
+        case Error(err)          => Left(err)
+      }
+      .firstL
   }
 }
 
