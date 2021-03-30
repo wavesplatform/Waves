@@ -817,7 +817,7 @@ class InvokeScriptTransactionDiffTest
     } yield (a, am, r._1, r._2, r._3)) {
       case (_, _, genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produce("Too many script actions")
+          _ should produce("Actions count limit is exceeded")
         }
     }
   }
@@ -1344,18 +1344,18 @@ class InvokeScriptTransactionDiffTest
 
   property("can't write more than 100 entries") {
     forAll(for {
-      r <- preconditionsAndSetContract(s => writeSet(s, ContractLimits.MaxWriteSetSize + 1))
+      r <- preconditionsAndSetContract(s => writeSet(s, ContractLimits.MaxWriteSetSize(V4) + 1))
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produce("can't contain more than")
+          _ should produce("Stored data count limit is exceeded")
         }
     }
   }
 
   property("can write 100 entries") {
     forAll(for {
-      r <- preconditionsAndSetContract(s => writeSet(s, ContractLimits.MaxWriteSetSize))
+      r <- preconditionsAndSetContract(s => writeSet(s, ContractLimits.MaxWriteSetSize(V4)))
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
@@ -2181,7 +2181,7 @@ class InvokeScriptTransactionDiffTest
              | if (i == "throw" && check) then
              |   throw("Some error")
              | else if (i == "insufficient fee" && check) then
-             |   [ ${(1 to ContractLimits.MaxCallableActionsAmount).map(i => s"""Issue("Asset $i", "", 100, 8, true, unit, $i)""").mkString(",")} ]
+             |   [ ${(1 to ContractLimits.MaxCallableActionsAmount(V4)).map(i => s"""Issue("Asset $i", "", 100, 8, true, unit, $i)""").mkString(",")} ]
              | else if (i == "negative amount" && check) then
              |   [ ScriptTransfer(inv.caller, -1, a) ]
              | else if (i == "overflow amount" && check) then
@@ -2189,9 +2189,9 @@ class InvokeScriptTransactionDiffTest
              | else if (i == "self payment" && check) then
              |   [ ScriptTransfer(this, 10, unit) ]
              | else if (i == "max actions" && check) then
-             |   [ ${(0 to ContractLimits.MaxCallableActionsAmount).map(_ => "ScriptTransfer(inv.caller, 10, a)").mkString(",")} ]
+             |   [ ${(0 to ContractLimits.MaxCallableActionsAmount(V4)).map(_ => "ScriptTransfer(inv.caller, 10, a)").mkString(",")} ]
              | else if (i == "invalid data entries" && check) then
-             |   [ ${(0 to ContractLimits.MaxWriteSetSize).map(x => s"""IntegerEntry("val", $x)""").mkString(",")},ScriptTransfer(inv.caller, 10, a)]
+             |   [ ${(0 to ContractLimits.MaxWriteSetSize(V4)).map(x => s"""IntegerEntry("val", $x)""").mkString(",")},ScriptTransfer(inv.caller, 10, a)]
              | else []
              |}
              |

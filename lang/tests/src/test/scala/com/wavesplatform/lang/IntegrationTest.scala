@@ -1,7 +1,5 @@
 package com.wavesplatform.lang
 
-import java.nio.charset.StandardCharsets
-
 import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
@@ -13,7 +11,7 @@ import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG, STRING}
+import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -27,13 +25,13 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease}
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
-import com.wavesplatform.lang.Global
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.web3j.crypto.Keys
 import scorex.crypto.hash.Keccak256
 import scorex.util.encode.Base16
 
+import java.nio.charset.StandardCharsets
 import scala.util.{Random, Try}
 
 class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
@@ -694,168 +692,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) should produce("IndexOutOfBounds")
   }
 
-  property("indexOf") {
-    val src =
-      """ "qweqwe".indexOf("we") """
-    eval[EVALUATED](src) shouldBe Right(CONST_LONG(1L))
-  }
-
-  property("indexOf with zero offset") {
-    val src =
-      """ "qweqwe".indexOf("qw", 0) """
-    eval[EVALUATED](src) shouldBe Right(CONST_LONG(0L))
-  }
-
-  property("indexOf with start offset") {
-    val src =
-      """ "qweqwe".indexOf("we", 2) """
-    eval[EVALUATED](src) shouldBe Right(CONST_LONG(4L))
-  }
-
-  property("indexOf from end of max sized string") {
-    val str = "a" * 32766 + "z"
-    val src =
-      """ str.indexOf("z", 32766) """
-    eval[EVALUATED](
-      src,
-      ctxt = CTX[NoContext](
-        Seq(),
-        Map("str" -> (STRING -> ContextfulVal.pure[NoContext](CONST_STRING(str).explicitGet()))),
-        Array()
-      )
-    ) shouldBe Right(CONST_LONG(32766L))
-  }
-
-  property("indexOf (not present)") {
-    val src =
-      """ "qweqwe".indexOf("ww") """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf from empty string") {
-    val src =
-      """ "".indexOf("!") """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf from empty string with offset") {
-    val src =
-      """ "".indexOf("!", 1) """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf from string with Long.MaxValue offset") {
-    val src =
-      s""" "abc".indexOf("c", ${Long.MaxValue}) """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf from string with negative offset") {
-    val src =
-      """ "abc".indexOf("a", -1) """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf from string with negative Long.MinValue offset") {
-    val src =
-      s""" "abc".indexOf("a", ${Long.MinValue}) """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf empty string from non-empty string") {
-    val src =
-      """ "abc".indexOf("") """
-    eval[EVALUATED](src) shouldBe Right(CONST_LONG(0))
-  }
-
-  property("indexOf empty string from empty string") {
-    val src =
-      """ "".indexOf("") """
-    eval[EVALUATED](src) shouldBe Right(CONST_LONG(0))
-  }
-
-  property("lastIndexOf") {
-    val src =
-      """ "qweqwe".lastIndexOf("we") """
-    eval(src) shouldBe Right(CONST_LONG(4))
-  }
-
-  property("lastIndexOf with zero offset") {
-    val src =
-      """ "qweqwe".lastIndexOf("qw", 0) """
-    eval(src) shouldBe Right(CONST_LONG(0))
-  }
-
-  property("lastIndexOf with start offset") {
-    val src =
-      """ "qweqwe".lastIndexOf("we", 4) """
-    eval(src) shouldBe Right(CONST_LONG(4L))
-  }
-
-  property("lastIndexOf from end of max sized string") {
-    val str = "a" * 32766 + "z"
-    val src =
-      """ str.lastIndexOf("z", 32766) """
-    eval(src, ctxt = CTX[NoContext](Seq(), Map("str" -> (STRING -> ContextfulVal.pure[NoContext](CONST_STRING(str).explicitGet()))), Array())) shouldBe Right(
-      CONST_LONG(32766L)
-    )
-  }
-
-  property("lastIndexOf (not present)") {
-    val src =
-      """ "qweqwe".lastIndexOf("ww") """
-    eval(src) shouldBe Right(unit)
-  }
-
-  property("lastIndexOf from empty string") {
-    val src =
-      """ "".lastIndexOf("!") """
-    eval(src) shouldBe Right(unit)
-  }
-
-  property("lastIndexOf from empty string with offset") {
-    val src =
-      """ "".lastIndexOf("!", 1) """
-    eval(src) shouldBe Right(unit)
-  }
-
-  property("lastIndexOf from string with Int.MaxValue offset") {
-    val src =
-      s""" "abc".lastIndexOf("c", ${Int.MaxValue}) """
-    eval(src) shouldBe Right(CONST_LONG(2))
-  }
-
-  property("lastIndexOf from string with Long.MaxValue offset") {
-    val src =
-      s""" "abc".lastIndexOf("c", ${Long.MaxValue}) """
-    eval(src) shouldBe Right(CONST_LONG(2))
-  }
-
-  property("lastIndexOf from string with negative offset") {
-    val src =
-      """ "abc".lastIndexOf("a", -1) """
-    eval(src) shouldBe Right(unit)
-  }
-
-  property("lastIndexOf from string with negative Long.MinValue offset") {
-    val src =
-      s""" "abc".lastIndexOf("a", ${Long.MinValue}) """
-    eval(src) shouldBe Right(unit)
-  }
-
-  property("lastIndexOf empty string from non-empty string") {
-    val str = "abcde"
-    val src =
-      s""" "$str".lastIndexOf("") """
-    eval(src) shouldBe Right(CONST_LONG(str.length))
-  }
-
-  property("lastIndexOf empty string from empty string") {
-    val src =
-      """ "".lastIndexOf("") """
-    eval(src) shouldBe Right(CONST_LONG(0))
-  }
-
   property("split") {
     val src =
       """ "q:we:.;q;we:x;q.we".split(":.;") """
@@ -1382,6 +1218,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       s"""["1", "2"].median()"""
     eval(src, version = V4) should produce("Compilation failed: [Non-matching types: expected: Int, actual: String")
+  }
+
+  property("List[Int] median - list with big elements - error") {
+    val src =
+      s"""[${Long.MaxValue}, ${Long.MaxValue-2}].median()"""
+    eval(src, version = V4) shouldBe Right(CONST_LONG(Long.MaxValue-1))
+  }
+
+  property("List[Int] median - list with MinValue - error") {
+    val src =
+      s"""[0, ${Long.MinValue}].median()"""
+    eval(src, version = V4) shouldBe Right(CONST_LONG(Long.MinValue/2))
   }
 
   property("groth16Verify") {
@@ -2198,7 +2046,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       produce("Alias name length=31 exceeds limit=30")
   }
 
-  property("integer case") {
+    property("integer case") {
     val sampleScript =
       """match 2 {
         |  case 1 => 7
@@ -2280,7 +2128,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(42)
   }
 
-
   property("caseType constant field") {
     val sampleScript =
       """|
@@ -2294,6 +2141,118 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
     eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
     eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(6)
+  }
+
+  property("Big Integers") {
+    genericEval[Environment, EVALUATED]("toBigInt(fraction(9223372036854775807, -2, -4)) == (toBigInt(9223372036854775807) * toBigInt(-2)) / toBigInt(-4)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
+    genericEval[Environment, EVALUATED](s"""
+      func f0(i: BigInt) = i*i
+      ${(0 to 6).map(n => "func f" ++ (n+1).toString ++ "(i: BigInt) = f" ++ n.toString ++ "(i*i)").mkString("\n")}
+      f7(2.toBigInt())
+      """, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(2).pow(256)))
+    genericEval[Environment, EVALUATED](s"""
+      func f0(i: BigInt) = i*i
+      ${(0 to 7).map(n => "func f" ++ (n+1).toString ++ "(i: BigInt) = f" ++ n.toString ++ "(i*i)").mkString("\n")}
+      f8(2.toBigInt())
+      """, ctxt = v5Ctx, version = V5, env = utils.environment) should produce("is out of range")
+    genericEval[Environment, EVALUATED](s"""-toBigInt(1)""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(-1)))
+    genericEval[Environment, EVALUATED]("toBigInt(base58'2Ana1pUpv2ZbMVkwF5FXapYeBEjdxDatLn7nvJkhgTSXbs59SyZSx866bXirPgj8QQVB57uxHJBG1YFvkRbFj4T').toStringBigInt()", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_STRING("52785833603464895924505196455835395749861094195642486808108138863402869537852026544579466671752822414281401856143643660416162921950916138504990605852480").explicitGet())
+    genericEval[Environment, EVALUATED]("let bin = base58'2Ana1pUpv2ZbMVkwF5FXapYeBEjdxDatLn7nvJkhgTSXbs59SyZSx866bXirPgj8QQVB57uxHJBG1YFvkRbFj4T' ; toBytesBigInt(toBigInt(bin)) == bin", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
+    genericEval[Environment, EVALUATED]("toBigInt(base58'a' + base58'2Ana1pUpv2ZbMVkwF5FXapYeBEjdxDatLn7nvJkhgTSXbs59SyZSx866bXirPgj8QQVB57uxHJBG1YFvkRbFj4T' + base58'a', base58'a'.size(), 64).toStringBigInt()", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_STRING("52785833603464895924505196455835395749861094195642486808108138863402869537852026544579466671752822414281401856143643660416162921950916138504990605852480").explicitGet())
+    genericEval[Environment, EVALUATED]("""parseBigIntValue("-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(-BigInt(2).pow(511)))
+    genericEval[Environment, EVALUATED]("""parseBigIntValue("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) should produce("too big")
+    genericEval[Environment, EVALUATED]("""parseBigInt("-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(-BigInt(2).pow(511)))
+    genericEval[Environment, EVALUATED]("""parseBigInt("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(unit)
+    genericEval[Environment, EVALUATED](s"""fractionBigInt(parseBigIntValue("${BigInt(2).pow(511)-1}"), toBigInt(-2), toBigInt(-3))""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT((BigInt(2).pow(511)-1)*2/3))
+    genericEval[Environment, EVALUATED](s"""parseBigIntValue("${Long.MaxValue}").toInt()""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(Long.MaxValue))
+    genericEval[Environment, EVALUATED](s"""parseBigIntValue("${Long.MinValue}").toInt()""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(Long.MinValue))
+    genericEval[Environment, EVALUATED](s"""(parseBigIntValue("${Long.MaxValue}")+toBigInt(1)).toInt()""", ctxt = v5Ctx, version = V5, env = utils.environment) should produce("out of integers range")
+  }
+
+  property("BigInt fraction roundin") {
+    import scala.math.BigDecimal.RoundingMode._
+    for {
+      s1 <- List(-1, 0, 1)
+      s2 <- List(-1, 1)
+      r <- List(("DOWN", DOWN), /*("UP", UP),*/ ("CEILING", CEILING), ("FLOOR", FLOOR), ("HALFUP", HALF_UP), /*("HALFDOWN", HALF_DOWN),*/ ("HALFEVEN", HALF_EVEN))
+    } {
+      (s1, s2, r._1, genericEval[Environment, EVALUATED](s"""fractionBigInt(toBigInt(${10*s1}), toBigInt(1), toBigInt(${3*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment)) shouldBe
+      ((s1, s2, r._1, Right(CONST_BIGINT(BigInt(BigDecimal((10.0*s1)/(3.0*s2)).setScale(0, r._2).toLong)))))
+      (s1, s2, r._1, genericEval[Environment, EVALUATED](s"""fractionBigInt(toBigInt(${9*s1}), toBigInt(1), toBigInt(${2*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment)) shouldBe
+      ((s1, s2, r._1, Right(CONST_BIGINT(BigInt(BigDecimal((9.0*s1)/(2.0*s2)).setScale(0, r._2).toLong)))))
+      (s1, s2, r._1, genericEval[Environment, EVALUATED](s"""fractionBigInt(toBigInt(${11*s1}), toBigInt(1), toBigInt(${2*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment)) shouldBe
+      ((s1, s2, r._1, Right(CONST_BIGINT(BigInt(BigDecimal((11.0*s1)/(2.0*s2)).setScale(0, r._2).toLong)))))
+    }
+  }
+
+  property("BigInt comparation") {
+    genericEval[Environment, EVALUATED]("toBigInt(16) > toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
+    genericEval[Environment, EVALUATED]("toBigInt(1) > toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(false))
+    genericEval[Environment, EVALUATED]("toBigInt(16) >= toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
+    genericEval[Environment, EVALUATED]("toBigInt(1) >= toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(false))
+    genericEval[Environment, EVALUATED]("toBigInt(16) >= toBigInt(16)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
+    genericEval[Environment, EVALUATED]("toBigInt(16) < toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(false))
+    genericEval[Environment, EVALUATED]("toBigInt(16) <= toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(false))
+    genericEval[Environment, EVALUATED]("toBigInt(16) <= toBigInt(16)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
+    genericEval[Environment, EVALUATED]("[toBigInt(16), toBigInt(8)].maxBigInt()", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(16)))
+    genericEval[Environment, EVALUATED]("[toBigInt(16), toBigInt(8)].minBigInt()", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(8)))
+  }
+
+  property("BigInt math functions") {
+    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(12), 1, toBigInt(3456), 3, 2, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(187)))
+//    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(12), 1, toBigInt(3456), 3, 2, UP)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(188)))
+//    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(0), 1, toBigInt(3456), 3, 2, UP)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(0)))
+    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(20), 1, toBigInt(-1), 0, 4, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(5000)))
+    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(-20), 1, toBigInt(-1), 0, 4, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(-5000)))
+    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(0), 1, toBigInt(-1), 0, 4, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
+    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(2), 0, toBigInt(512), 0, 0, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
+    genericEval[Environment, EVALUATED]("logBigInt(toBigInt(16), 0, toBigInt(2), 0, 0, CEILING)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(4)))
+    genericEval[Environment, EVALUATED]("logBigInt(toBigInt(1), 4, toBigInt(1), 1, 0, HALFEVEN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(4)))
+    genericEval[Environment, EVALUATED]("logBigInt(toBigInt(16), 0, toBigInt(-2), 0, 0, CEILING)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
+    genericEval[Environment, EVALUATED]("logBigInt(toBigInt(-16), 0, toBigInt(2), 0, 0, CEILING)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
+    genericEval[Environment, EVALUATED]("""logBigInt(toBigInt(1), 16, parseBigIntValue("10"), 0, 0, CEILING)""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(-16)))
+  }
+
+  property("List[BigInt] median - 100 elements") {
+    val arr       = (1 to 100).map(_ => Random.nextLong())
+    val arrSorted = arr.sorted
+    val src =
+      s"[toBigInt(${arr.mkString("),toBigInt(")})].medianBigInt()"
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(Math.floorDiv(arrSorted(49) + arrSorted(50), 2))))
+  }
+
+  property("List[BigInt] median - 99 elements") {
+    val arr       = (1 to 99).map(_ => Random.nextLong())
+    val arrSorted = arr.sorted
+    val src =
+      s"[toBigInt(${arr.mkString("),toBigInt(")})].medianBigInt()"
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(arrSorted(49))))
+  }
+
+  property("List[BigInt] median - 1 elements") {
+    val arr = Seq(Random.nextLong())
+    val src =
+      s"[toBigInt(${arr.mkString("),toBigInt(")})].medianBigInt()"
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(arr.head)))
+  }
+
+  property("List[BigInt] median - negative rounding down") {
+    val arr = Seq(3, -8)
+    val src =
+      s"[toBigInt(${arr.mkString("),toBigInt(")})].medianBigInt()"
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(-3)))
+  }
+
+  property("List[BigInt] median - 1000 elements - success") {
+    val src =
+      s"[toBigInt(${(1 to 1000).mkString("),toBigInt(")})].medianBigInt()"
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(BigInt(Math.floorDiv(500 + 501, 2))))
+  }
+
+  property("List[BigInt] median - empty list - error") {
+    val src =
+      s"[].medianBigInt()"
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) should produce("Can't find medianBigInt for empty list")
   }
 
   property("unicode broken") {
@@ -2410,5 +2369,30 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val script5 = s"""dropRight("x冬x", 2)"""
     genericEval[Environment, EVALUATED](script5, ctxt = v5Ctx, version = ver, env = utils.environment) shouldBe
       Right(CONST_STRING("x").explicitGet())
+  }
+
+  property("value() error message") {
+    val script =
+      s"""
+         | let a = if (true) then unit else 7
+         | a.value()
+       """.stripMargin
+    eval(script) should produce("value() called on unit value by reference 'a'")
+
+    val script2 =
+      s"""
+         | func a() = if (true) then unit else 7
+         | a().value()
+       """.stripMargin
+    eval(script2) should produce("value() called on unit value on function 'a' call")
+
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
+    val script3 = "SponsorFee(base58'', unit).minSponsoredAssetFee.value()"
+    genericEval(script3, ctxt = ctx, version = V4, env = utils.environment) should produce("value() called on unit value while accessing field 'minSponsoredAssetFee'")
+    val script4 = """ getIntegerValue(Address(base58''), "") """
+    genericEval(script4, ctxt = ctx, version = V4, env = utils.environment) should produce("value() called on unit value on function 'getInteger' call")
+
+    eval("(if (true) then unit else 7).value()") should produce("value() called on unit value after condition evaluation")
+    eval("(let a = 1; if (true) then unit else 7).value()") should produce("value() called on unit value after let block evaluation")
   }
 }

@@ -393,7 +393,7 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
 
       assertBadRequestAndMessage(
         miner.invokeScript(miner.keyPair, dappAddress, Some("sponsor11assets"), fee = smartMinFee),
-        "Too many script actions: max: 10, actual: 11"
+        "Actions count limit is exceeded"
       )
     }
 

@@ -82,7 +82,7 @@ object InvokeScriptTransactionDiff {
           input <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply))
 
           result <- for {
-            (invocationDiff, scriptResult, _) <- {
+            (invocationDiff, scriptResult, log, avaliableActions, avaliableData) <- {
               val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
                 val invoker = tx.sender.toAddress
                 val invocation = ContractEvaluator.Invocation(
@@ -111,7 +111,10 @@ object InvokeScriptTransactionDiff {
                   pk,
                   dAppAddress,
                   Set(tx.senderAddress, dAppAddress),
+                  limitedExecution,
                   remainingCalls,
+                  ContractLimits.MaxCallableActionsAmount(version),
+                  ContractLimits.MaxWriteSetSize(version),
                   (if (version < V5) {
                      Diff.empty
                    } else {
@@ -146,7 +149,7 @@ object InvokeScriptTransactionDiff {
                     invocationComplexity.toInt,
                     paymentsComplexity.toInt
                   )
-                } yield (environment.currentDiff, result, log)
+                } yield (environment.currentDiff, result, log, environment.avaliableActions, environment.avaliableData)
               })
               TracedResult(
                 scriptResultE,
@@ -179,9 +182,24 @@ object InvokeScriptTransactionDiff {
               otherIssues
             )
 
+            process = { (actions: List[CallableAction], unusedComplexity: Long) =>
+                val dataCount = actions.count(_.isInstanceOf[DataOp])
+                if(dataCount > avaliableData) {
+                  TracedResult(Left(FailedTransactionError.dAppExecution("Stored data count limit is exceeded", fixedInvocationComplexity, log)))
+                } else {
+                  val actionsCount = actions.length - dataCount
+                  if(actionsCount > avaliableActions) {
+                    TracedResult(Left(FailedTransactionError.dAppExecution("Actions count limit is exceeded", fixedInvocationComplexity, log)))
+                  } else {
+                    doProcessActions(actions, unusedComplexity)
+                  }
+                }
+            }
             resultDiff <- scriptResult match {
-              case ScriptResultV3(dataItems, transfers, unusedComplexity) => doProcessActions(dataItems ::: transfers, unusedComplexity)
-              case ScriptResultV4(actions, unusedComplexity, _)           => doProcessActions(actions, unusedComplexity)
+              case ScriptResultV3(dataItems, transfers, unusedComplexity) =>
+                process(dataItems ::: transfers, unusedComplexity)
+              case ScriptResultV4(actions, unusedComplexity, _) =>
+                process(actions, unusedComplexity)
               case _: IncompleteResult if limitedExecution                => doProcessActions(Nil, 0)
               case i: IncompleteResult =>
                 TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))

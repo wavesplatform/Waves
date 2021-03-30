@@ -92,7 +92,7 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, ?]]) {
               }
               local {
                 val newState: EvalM[F, C, Unit] = set[F, LoggedEvaluationContext[C, F], ExecutionError](lets.set(ctx)(letDefsWithArgs)).map(_.pure[F])
-                Monad[EvalM[F, C, ?]].flatMap(newState)(_ => evalExpr(func.ev(ctx.ec.environment)))
+                Monad[EvalM[F, C, ?]].flatMap(newState)(_ => evalExpr(func.ev(ctx.ec.environment, args)))
               }
             }: EvalM[F, C, EVALUATED]
           case func: NativeFunction[C] =>
