@@ -1,5 +1,8 @@
 package com.wavesplatform.api.http
 
+import scala.annotation.tailrec
+import scala.concurrent.duration.{FiniteDuration, _}
+
 import akka.http.scaladsl.server.{Route, StandardRoute}
 import cats.syntax.either._
 import com.wavesplatform.api.BlockMeta
@@ -12,10 +15,9 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import monix.eval.Task
-import monix.reactive.Observable
 import play.api.libs.json._
 
-case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi) extends ApiRoute {
+case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi, avgBlockTime: FiniteDuration = 1 minute) extends ApiRoute {
   import BlocksApiRoute._
   private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
 
@@ -67,7 +69,9 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
       }
     } ~ path("heightByTimestamp" / LongNumber) { timestamp =>
       val task = for {
-        _      <- Task(Either.cond(timestamp > System.currentTimeMillis(), (), "Indicated timestamp belongs to the future"))
+        _ <- Task(Either.cond(timestamp > System.currentTimeMillis(), (), "Indicated timestamp belongs to the future"))
+        genesisTimestamp = commonApi.metaAtHeight(1).fold(0L)(_.header.timestamp)
+        _      <- Task(Either.cond(timestamp <= genesisTimestamp, (), "Indicated timestamp belongs to the future"))
         result <- heightByTimestamp(timestamp)
       } yield result.leftMap(GenericError(_))
 
@@ -107,15 +111,26 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
     case class HeightFound(height: Int)  extends Result
     case class Error(message: String)    extends Result
 
+    @tailrec
+    def heuristicStartHeight(seekHeight: Int): Int = {
+      assert(seekHeight >= 1)
+
+      val timestamp = commonApi.metaAtHeight(seekHeight).fold(0L)(_.header.timestamp)
+      if (timestamp <= target || seekHeight == 1) seekHeight
+      else {
+        val predicted = seekHeight - ((timestamp - target) / avgBlockTime.toMillis).toInt.max(1)
+        heuristicStartHeight(predicted max 1)
+      }
+    }
+
+    val startHeight = heuristicStartHeight(commonApi.currentHeight)
     commonApi
-      .metaRange(1, commonApi.currentHeight)
+      .metaRange(startHeight, commonApi.currentHeight)
       .map(b => (b.header.timestamp, b.height))
-      .++(Observable((Long.MaxValue, Int.MaxValue)))
+      .:+((Long.MaxValue, 1))
       .scan(Starting: State) {
-        case (Starting, (blockTimestamp, genesisHeight)) =>
-          assert(genesisHeight == 1, "Blockchain should start from 1")
-          if (target < blockTimestamp) Error("Indicated timestamp is before the start of the blockchain")
-          else Scanning(genesisHeight)
+        case (Starting, (_, firstHeight)) =>
+          Scanning(firstHeight)
 
         case (Scanning(prevHeight), (blockTimestamp, blockHeight)) =>
           if (blockTimestamp > target) HeightFound(prevHeight)
