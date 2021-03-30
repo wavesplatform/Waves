@@ -1,5 +1,7 @@
 package com.wavesplatform.consensus
 
+import scala.concurrent.duration.FiniteDuration
+
 import cats.syntax.either._
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -11,9 +13,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.utils.{BaseTargetReachedMaximum, ScorexLogging, forceStopApplication}
-
-import scala.concurrent.duration.FiniteDuration
+import com.wavesplatform.utils.{forceStopApplication, BaseTargetReachedMaximum, ScorexLogging}
 
 case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) extends ScorexLogging {
   import PoSCalculator._
@@ -111,24 +111,30 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
     )
   }
 
-  def validateBaseTarget(height: Int, block: Block, parent: BlockHeader, grandParent: Option[BlockHeader]): Either[ValidationError, Unit] = {
-    val blockBT = block.header.baseTarget
-    val blockTS = block.header.timestamp
-
-    val expectedBT = posCalculator(height).calculateBaseTarget(
+  private[this] def calculateBaseTarget(height: Int, timestamp: Long, parent: BlockHeader, grandParent: Option[BlockHeader]): Long = {
+    posCalculator(height).calculateBaseTarget(
       blockchainSettings.genesisSettings.averageBlockDelay.toSeconds,
       height,
       parent.baseTarget,
       parent.timestamp,
       grandParent.map(_.timestamp),
-      blockTS
+      timestamp
     )
+  }
 
-    Either.cond(
-      expectedBT == blockBT,
-      checkBaseTargetLimit(blockBT, height),
-      GenericError(s"declared baseTarget $blockBT does not match calculated baseTarget $expectedBT")
-    )
+  def validateBaseTarget(height: Int, block: Block, parent: BlockHeader, grandParent: Option[BlockHeader]): Either[ValidationError, Unit] = {
+    val blockBT    = block.header.baseTarget
+    val expectedBT = calculateBaseTarget(height, block.header.timestamp, parent, grandParent)
+
+    for {
+      _ <- Either.cond(
+        expectedBT == blockBT,
+        (),
+        GenericError(s"declared baseTarget $blockBT does not match calculated baseTarget $expectedBT")
+      )
+
+      _ <- checkBaseTargetLimit(blockBT, height)
+    } yield ()
   }
 
   private def getHitSource(height: Int): Either[ValidationError, ByteStr] = {
