@@ -13,7 +13,7 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractScriptCompactor, Terms}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types, WavesContext}
@@ -26,6 +26,8 @@ import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+
+import scala.collection.immutable.HashMap
 
 class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
   private val dAppV3Ctx: CompilerContext =
@@ -982,7 +984,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         |
       """.stripMargin
 
-    Global.compileContract(dApp, dAppV4Ctx, V4, ScriptEstimatorV3) should produce("Script is too large: 37551 bytes > 32768 bytes")
+    Global.compileContract(dApp, dAppV4Ctx, V4, ScriptEstimatorV3, false) should produce("Script is too large: 37551 bytes > 32768 bytes")
   }
 
   property("@Callable Invoke") {
@@ -1059,5 +1061,217 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("left")
+  }
+
+  property("contract script compaction") {
+    val expr = {
+      val script =
+        """
+          | {-# STDLIB_VERSION 5 #-}
+          | {-# CONTENT_TYPE DAPP #-}
+          |
+          | let fooVar = 42
+          |
+          | func barFunc(barFuncArg1: Int) = 100500 + barFuncArg1
+          |
+          | @Callable(invocation)
+          | func bazCallableFunc(bazCallableFuncArg1: Int, bazCallableFuncArg2: String) = {
+          |   let result = barFunc(fooVar) + bazCallableFuncArg1
+          |   [
+          |     IntegerEntry("integerEntryKey", result),
+          |     StringEntry("stringEntryKey", bazCallableFuncArg2)
+          |   ]
+          | }
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    val expectedResult = Right(
+      DApp(
+        DAppMeta(
+          version = 2,
+          List(
+            CallableFuncSignature(ByteString.copyFrom(Array[Byte](1, 8)))
+          ),
+          HashMap("a6" -> "bazCallableFuncArg2", "a5" -> "bazCallableFuncArg1", "a4" -> "invocation", "a3" -> "barFuncArg1", "a1" -> "fooVar", "a7" -> "result", "a2" -> "barFunc")
+        ),
+        List(
+          LET("a1", CONST_LONG(42L)),
+          Terms.FUNC(
+            "a2",
+            List("a3"),
+            FUNCTION_CALL(Native(100), List(CONST_LONG(100500L), REF("a3")))
+          )
+        ),
+        List(
+          CallableFunction(
+            CallableAnnotation("a4"),
+            Terms.FUNC(
+              "bazCallableFunc",
+              List("a5", "a6"),
+              LET_BLOCK(
+                LET(
+                  "a7",
+                  FUNCTION_CALL(Native(100), List(FUNCTION_CALL(User("a2"), List(REF("a1"))), REF("a5")))
+                ),
+                FUNCTION_CALL(
+                  Native(1100),
+                  List(
+                    FUNCTION_CALL(User("IntegerEntry"), List(CONST_STRING("integerEntryKey").explicitGet(), REF("a7"))),
+                    FUNCTION_CALL(
+                      Native(1100),
+                      List(
+                        FUNCTION_CALL(User("StringEntry"),List(CONST_STRING("stringEntryKey").explicitGet(), REF("a6"))),
+                        REF("nil")
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        ),
+        None
+      ))
+
+    val ctx =
+      PureContext.build(V5).withEnvironment[Environment] |+|
+        WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
+
+    val compilationResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = true)
+    compilationResult shouldBe expectedResult
+  }
+
+  property("contract script decompaction - decompacted result equal to common compiled result") {
+    val expr = {
+      val script =
+        """
+          | {-# STDLIB_VERSION 5 #-}
+          | {-# CONTENT_TYPE DAPP #-}
+          |
+          | let fooVar = 42
+          |
+          | func barFunc(barFuncArg1: Int) = 100500 + barFuncArg1
+          |
+          | @Callable(invocation)
+          | func bazCallableFunc(bazCallableFuncArg1: Int, bazCallableFuncArg2: String) = {
+          |   let result = barFunc(fooVar) + bazCallableFuncArg1
+          |   [
+          |     IntegerEntry("integerEntryKey", result),
+          |     StringEntry("stringEntryKey", bazCallableFuncArg2)
+          |   ]
+          | }
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    val ctx =
+      PureContext.build(V5).withEnvironment[Environment] |+|
+        WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
+
+    val compilationCompactedResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = true)
+    val decompactedResult = ContractScriptCompactor.decompact(compilationCompactedResult.explicitGet())
+
+    val compilationResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = false)
+
+    decompactedResult shouldBe compilationResult.explicitGet()
+  }
+
+  property("contract script compaction - remove unused code") {
+    val expr = {
+      val script =
+        """
+          |{-# STDLIB_VERSION 5 #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |
+          |let varX = 111
+          |let varY = 222
+          |let varZ = 333
+          |
+          |func func3() = varZ * 444
+          |func func2() = 100500 - varY
+          |func func1() = func2() + 42
+          |
+          |@Callable(i)
+          |func call() = {
+          |  let tmp1 = func1() + varX
+          |  [IntegerEntry("somekey", tmp1)]
+          |}
+          |
+          |@Verifier(tx)
+          |func verify() = {
+          |  func2() != varX
+          |}
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    val expectedResult = Right(
+      DApp(
+        DAppMeta(
+          version = 2,
+          List(
+            CallableFuncSignature(ByteString.copyFrom(Array[Byte]()))
+          ),
+          HashMap("a6" -> "tmp1", "a5" -> "i", "a4" -> "func1", "a3" -> "func2", "a8" -> "verify", "a1" -> "varX", "a7" -> "tx", "a2" -> "varY")
+        ),
+        List(
+          LET("a1", CONST_LONG(111L)),
+          LET("a2", CONST_LONG(222L)),
+          Terms.FUNC(
+            "a3",
+            List(),
+            FUNCTION_CALL(Native(101), List(CONST_LONG(100500L), REF("a2")))
+          ),
+          Terms.FUNC(
+            "a4",
+            List(),
+            FUNCTION_CALL(Native(100), List(FUNCTION_CALL(User("a3"), List()), CONST_LONG(42L)))
+          )
+        ),
+        List(
+          CallableFunction(
+            CallableAnnotation("a5"),
+            Terms.FUNC(
+              "call",
+              List(),
+              LET_BLOCK(
+                LET(
+                  "a6",
+                  FUNCTION_CALL(Native(100), List(FUNCTION_CALL(User("a4"), List()), REF("a1")))
+                ),
+                FUNCTION_CALL(
+                  Native(1100),
+                  List(
+                    FUNCTION_CALL(User("IntegerEntry"), List(CONST_STRING("somekey").explicitGet(), REF("a6"))),
+                    REF("nil")
+                  )
+                )
+              )
+            )
+          )
+        ),
+        Some(
+          VerifierFunction(
+            VerifierAnnotation("a7"),
+            Terms.FUNC(
+              "a8",
+              List(),
+              FUNCTION_CALL(User("!="), List(FUNCTION_CALL(User("a3"), List()), REF("a1")))
+            )
+          )
+        )
+      )
+    )
+
+    val ctx =
+      PureContext.build(V5).withEnvironment[Environment] |+|
+        WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
+
+    val compilationResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = true)
+    compilationResult shouldBe expectedResult
   }
 }
