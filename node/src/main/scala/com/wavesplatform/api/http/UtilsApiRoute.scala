@@ -317,6 +317,8 @@ object UtilsApiRoute {
               Set(),
               limitedExecution = false,
               remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
+              avaliableActions = ContractLimits.MaxCallableActionsAmount(script.stdLibVersion),
+              avaliableData = ContractLimits.MaxWriteSetSize(script.stdLibVersion),
               currentDiff = Diff.empty
             )
           )

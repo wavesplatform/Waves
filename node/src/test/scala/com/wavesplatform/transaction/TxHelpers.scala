@@ -9,13 +9,15 @@ import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
 object TxHelpers {
@@ -33,7 +35,7 @@ object TxHelpers {
     lastTimestamp
   }
 
-  def genesis(address: Address, amount: Long = 1000.waves): GenesisTransaction =
+  def genesis(address: Address, amount: Long = 100_000_000.waves): GenesisTransaction =
     GenesisTransaction.create(address, amount, timestamp).explicitGet()
 
   def transfer(from: KeyPair = defaultSigner, to: AddressOrAlias = secondAddress, amount: Long = 1.waves, asset: Asset = Waves): TransferTransaction =
@@ -90,6 +92,11 @@ object TxHelpers {
         timestamp
       )
       .explicitGet()
+  }
+
+  def script(scriptText: String): Script = {
+    val (script, _) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()
+    script
   }
 
   def setScript(acc: KeyPair, script: Script): SetScriptTransaction = {
