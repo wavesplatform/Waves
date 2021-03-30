@@ -60,14 +60,6 @@ object ContractSerDe {
     } yield DApp(meta, decs, callableFuncs, verifierFuncOpt)
   }
 
-  private def checkMetaSize(metaSize: Int): Either[String, Unit] = {
-    Either.cond(
-      metaSize <= ContractLimits.MaxContractMetaSizeInBytes,
-      (),
-      s"Script meta size in bytes must be not greater than ${ContractLimits.MaxContractMetaSizeInBytes}. Actually: $metaSize"
-    )
-  }
-
   private[lang] def deserializeMeta(bb: ByteBuffer): Either[String, DAppMeta] =
     for {
       size <- tryEi(bb.getInt)
