@@ -52,7 +52,7 @@ class SyncDAppComplexityCountTest
     )
   )
 
-  def dApp(otherDApp: Option[Address], paymentAsset: Option[IssuedAsset], transferAsset: Option[IssuedAsset], condition: String): Script = {
+  def dApp(otherDApps: List[Address], paymentAsset: Option[IssuedAsset], transferAsset: Option[IssuedAsset], condition: String): Script = {
     val expr = {
       val script =
         s"""
@@ -67,7 +67,7 @@ class SyncDAppComplexityCountTest
            |    ) then {
            |      let payment = ${paymentAsset.fold("[]")(id => s"[AttachedPayment(base58'$id', 1)]")}
            |      let transfer = ${transferAsset.fold("[]")(id => s"[ScriptTransfer(i.caller, 1, base58'$id')]")}
-           |      ${otherDApp.fold("")(address => s""" strict r = Invoke(Address(base58'$address'), "default", [], payment) """)}
+           |      ${otherDApps.mapWithIndex((a, i) => s""" strict r$i = Invoke(Address(base58'$a'), "default", [], payment) """).mkString("\n")}
            |      transfer
            |    } else {
            |      throw("Error raised")
@@ -122,7 +122,8 @@ class SyncDAppComplexityCountTest
       withThroughPayment: Boolean,
       withThroughTransfer: Boolean,
       withVerifier: Boolean,
-      raiseError: Boolean
+      raiseError: Boolean,
+      sequentialCalls: Boolean
   ): Gen[(Seq[Transaction], InvokeScriptTransaction, IssuedAsset, Address)] =
     for {
       invoker  <- accountGen
@@ -160,8 +161,16 @@ class SyncDAppComplexityCountTest
           val callPayment = if (withThroughPayment) Some(asset) else None
           val transfer    = if (withThroughTransfer) Some(asset) else None
           val condition   = if (raiseError) if (txs.nonEmpty) "true" else "false" else groth
-          val callingDApp = Some(dApp(txs.headOption.map(_.sender.toAddress), callPayment, transfer, condition))
-          val nextTx      = SetScriptTransaction.selfSigned(1.toByte, currentAcc, callingDApp, fee, ts + 5).explicitGet()
+          val script =
+            if (sequentialCalls)
+              if (txs.size == dAppAccs.size - 1)
+                Some(dApp(txs.map(_.sender.toAddress), callPayment, transfer, condition))
+              else
+                Some(dApp(Nil, callPayment, transfer, condition))
+            else
+              Some(dApp(txs.headOption.map(_.sender.toAddress).toList, callPayment, transfer, condition))
+
+          val nextTx = SetScriptTransaction.selfSigned(1.toByte, currentAcc, script, fee, ts + 5).explicitGet()
           nextTx :: txs
       }
 
@@ -198,10 +207,11 @@ class SyncDAppComplexityCountTest
       withVerifier: Boolean = false,
       exceeding: Boolean = false,
       raiseError: Boolean = false,
-      reject: Boolean = false
+      reject: Boolean = false,
+      sequentialCalls: Boolean = false
   ): Unit = {
     val (preparingTxs, invokeTx, asset, lastCallingDApp) =
-      scenario(dAppCount, withPayment, withThroughPayment, withThroughTransfer, withVerifier, raiseError).sample.get
+      scenario(dAppCount, withPayment, withThroughPayment, withThroughTransfer, withVerifier, raiseError, sequentialCalls).sample.get
     assertDiffEi(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { diffE =>
       if (reject) {
         diffE shouldBe Symbol("left")
@@ -281,8 +291,11 @@ class SyncDAppComplexityCountTest
     assert(100, 26571, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true, exceeding = true)
   }
 
-  property("rejects and fails correctly") {
+  property("fail-free complexity border") {
     assert(13, 0, raiseError = true, reject = true)
     assert(14, 1029, raiseError = true)
+
+    assert(12, 0, raiseError = true, sequentialCalls = true, reject = true)
+    assert(13, 1016, raiseError = true, sequentialCalls = true)
   }
 }
