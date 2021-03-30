@@ -104,13 +104,17 @@ class SyncDAppComplexityCountTest
        | groth16Verify(key, proof, input)
     """.stripMargin
 
-  val assetScript: Script = {
+  // ~70 complexity
+  val sigVerify: String =
+    """ !sigVerify_32Kb(base58'', base58'', base58'') """
+
+  def assetScript(condition: String): Script = {
     val script = s"""
                     | {-# STDLIB_VERSION 5        #-}
                     | {-# SCRIPT_TYPE ASSET       #-}
                     | {-# CONTENT_TYPE EXPRESSION #-}
                     |
-                    | $groth
+                    | $condition
                     |
                   """.stripMargin
     ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
@@ -139,7 +143,7 @@ class SyncDAppComplexityCountTest
           ENOUGH_AMT,
           8,
           reissuable = true,
-          Some(assetScript),
+          Some(assetScript(if (raiseError) sigVerify else groth)),
           fee,
           ts + 1
         )
@@ -251,7 +255,7 @@ class SyncDAppComplexityCountTest
             (if (withThroughPayment) throughPaymentsPortfolios else emptyPortfolios) |+|
             (if (withThroughTransfer) throughTransfersPortfolios else emptyPortfolios)
 
-        val totalPortfolios = if (!exceeding) basePortfolios |+| additionalPortfolios else basePortfolios
+        val totalPortfolios = if (exceeding || raiseError) basePortfolios else basePortfolios |+| additionalPortfolios
 
         diff.portfolios.filter(_._2 != overlappedPortfolio) shouldBe totalPortfolios.filter(_._2 != overlappedPortfolio)
       }
@@ -297,5 +301,8 @@ class SyncDAppComplexityCountTest
 
     assert(12, 0, raiseError = true, sequentialCalls = true, reject = true)
     assert(13, 1016, raiseError = true, sequentialCalls = true)
+
+    assert(7, 0, raiseError = true, withThroughPayment = true, reject = true)
+    assert(8, 1080, raiseError = true, withThroughPayment = true)
   }
 }
