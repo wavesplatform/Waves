@@ -25,6 +25,7 @@ package object ci {
       invokeFee + (sc + 1) * ScriptExtraFee - 1 + nonNftIssue * FeeConstants(IssueTransaction.typeId) * FeeUnit
     )
 
+  @deprecated("use TestCompiler instead", "1.3.1")
   def compileContractFromExpr(expr: DAPP, version: StdLibVersion = V3): DApp = {
     val ctx =
       PureContext.build(version).withEnvironment[Environment] |+|
@@ -36,6 +37,7 @@ package object ci {
     ContractCompiler(ctx.compilerContext, expr, version).explicitGet()
   }
 
+  @deprecated("use TestCompiler instead", "1.3.1")
   def compileExpr(expr: EXPR, version: StdLibVersion, scriptType: ScriptType): Terms.EXPR = {
     val ctx =
       PureContext.build(version).withEnvironment[Environment] |+|
