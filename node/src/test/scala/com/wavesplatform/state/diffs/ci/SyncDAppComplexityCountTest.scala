@@ -304,5 +304,8 @@ class SyncDAppComplexityCountTest
 
     assert(7, 0, raiseError = true, withThroughPayment = true, reject = true)
     assert(8, 1080, raiseError = true, withThroughPayment = true)
+
+    assert(13, 0, raiseError = true, withThroughTransfer = true, reject = true)
+    assert(14, 1029, raiseError = true, withThroughTransfer = true)
   }
 }
