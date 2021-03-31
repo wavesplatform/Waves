@@ -115,6 +115,7 @@ object ContractCompiler {
       ctx: CompilerContext,
       parsedDapp: Expressions.DAPP,
       version: StdLibVersion,
+      needCompaction: Boolean,
       saveExprContext: Boolean = false
   ): CompileM[(Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
     for {
@@ -195,7 +196,11 @@ object ContractCompiler {
       parsedDappResult = parsedDapp.copy(decs = parsedNodeDecs, fs = parsedNodeAFuncs)
 
       result = if (errorList.isEmpty && !compiledAnnFuncsWithErr.exists(_._1.isEmpty)) {
-        (Some(DApp(metaWithErr._1.get, decs, callableFuncs, verifierFuncOptWithErr._1.get)), parsedDappResult, subExprErrorList)
+        var resultDApp = DApp(metaWithErr._1.get, decs, callableFuncs, verifierFuncOptWithErr._1.get)
+        if (needCompaction) {
+          resultDApp = ContractScriptCompactor.compact(resultDApp)
+        }
+        (Some(resultDApp), parsedDappResult, subExprErrorList)
       } else {
         (None, parsedDappResult, errorList ++ subExprErrorList)
       }
@@ -308,8 +313,8 @@ object ContractCompiler {
     } yield ()
   }
 
-  def apply(c: CompilerContext, contract: Expressions.DAPP, version: StdLibVersion): Either[String, DApp] = {
-    compileContract(c, contract, version)
+  def apply(c: CompilerContext, contract: Expressions.DAPP, version: StdLibVersion, needCompaction: Boolean = false): Either[String, DApp] = {
+    compileContract(c, contract, version, needCompaction)
       .run(c)
       .map(
         _._2
@@ -321,10 +326,10 @@ object ContractCompiler {
       .value
   }
 
-  def compile(input: String, ctx: CompilerContext, version: StdLibVersion): Either[String, DApp] = {
+  def compile(input: String, ctx: CompilerContext, version: StdLibVersion, needCompaction: Boolean = false): Either[String, DApp] = {
     Parser.parseContract(input) match {
       case fastparse.Parsed.Success(xs, _) =>
-        ContractCompiler(ctx, xs, version) match {
+        ContractCompiler(ctx, xs, version, needCompaction) match {
           case Left(err) => Left(err.toString)
           case Right(c)  => Right(c)
         }
@@ -336,11 +341,12 @@ object ContractCompiler {
       input: String,
       ctx: CompilerContext,
       version: StdLibVersion,
+      needCompaction: Boolean = false,
       saveExprContext: Boolean = true
   ): Either[String, (Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
     Parser.parseDAPPWithErrorRecovery(input) match {
       case Right((parseResult, removedCharPosOpt)) =>
-        compileContract(ctx, parseResult, version, saveExprContext)
+        compileContract(ctx, parseResult, version, needCompaction, saveExprContext)
           .run(ctx)
           .map(
             _._2
