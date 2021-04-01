@@ -6,6 +6,7 @@ option csharp_namespace = "Waves";
 message DAppMeta {
     int32 version = 1;
     repeated CallableFuncSignature funcs = 2;
+    map<string, string> compactNameToOriginalNameMap = 3;
 
     message CallableFuncSignature {
         bytes types = 1;

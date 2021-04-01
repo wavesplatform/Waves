@@ -187,13 +187,14 @@ object JsAPI {
   def compile(
       input: String,
       estimatorVersion: Int,
+      needCompaction: Boolean = false,
       libraries: Dictionary[String] = Dictionary.empty
   ): js.Dynamic = {
     val r = for {
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
-      compiled    <- compileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVersion - 1))
+      compiled    <- compileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVersion - 1), needCompaction)
     } yield compiled
     r.fold(
       e => js.Dynamic.literal("error" -> e),
@@ -201,7 +202,7 @@ object JsAPI {
     )
   }
 
-  private def compileScript(ds: DirectiveSet, input: String, estimator: ScriptEstimator): Either[String, js.Object with js.Dynamic] = {
+  private def compileScript(ds: DirectiveSet, input: String, estimator: ScriptEstimator, needCompaction: Boolean): Either[String, js.Object with js.Dynamic] = {
     val version = ds.stdLibVersion
     val isAsset = ds.scriptType == Asset
     ds.contentType match {
@@ -239,7 +240,7 @@ object JsAPI {
       case DAppType =>
         // Just ignore stdlib version here
         Global
-          .compileContract(input, fullDAppContext(ds.stdLibVersion).compilerContext, version, estimator)
+          .compileContract(input, fullDAppContext(ds.stdLibVersion).compilerContext, version, estimator, needCompaction)
           .map {
             case DAppInfo(
               bytes,

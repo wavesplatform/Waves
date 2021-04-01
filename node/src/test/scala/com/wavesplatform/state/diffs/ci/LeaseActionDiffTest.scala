@@ -234,7 +234,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
             Seq(),
             TestBlock.create(preparingTxs),
             v4Features
-          )(_ should produce("Synchronous DAPP Calls feature has not been activated yet"))
+          )(_ should produce("Ride V5, dApp-to-dApp invocations feature has not been activated yet"))
     }
   }
 
