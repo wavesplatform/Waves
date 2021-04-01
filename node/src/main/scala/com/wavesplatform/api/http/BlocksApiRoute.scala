@@ -103,21 +103,37 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
   }
 
   private[this] def heightByTimestamp(target: Long): Int = {
+    def timestampOf(height: Int, default: => Long = throw new IllegalStateException("State was altered")): Long =
+      commonApi.metaAtHeight(height).fold(default)(_.header.timestamp)
+
     @tailrec
-    def findHeightRec(seekHeight: Int = 1): Int = {
-      val timestamp      = commonApi.metaAtHeight(seekHeight).fold(throw new IllegalStateException("State was altered"))(_.header.timestamp)
-      val rightTimestmap = commonApi.metaAtHeight(seekHeight + 1).fold(Long.MaxValue)(_.header.timestamp)
+    def findHeightRec(seekHeight: Int = 1, lowerBound: Int = 1, upperBound: Int = commonApi.currentHeight): Int = {
+      val averageBlockTime = {
+        val lowerTimestamp = timestampOf(lowerBound)
+        val upperTimestamp = timestampOf(upperBound)
+        (upperTimestamp - lowerTimestamp) / (upperBound - lowerBound).max(1)
+      }
+
+      val timestamp      = timestampOf(seekHeight)
+      val rightTimestmap = timestampOf(seekHeight + 1, Long.MaxValue)
       val leftHit        = timestamp <= target
       val rightHit       = rightTimestmap <= target
       val offset = {
-        val blocksBetween = ((target - timestamp) / avgBlockTime.toMillis).toInt
+        val blocksBetween = ((target - timestamp) / averageBlockTime).toInt
         if (leftHit) blocksBetween.max(1) else blocksBetween.min(-1)
       }
 
-      if (!leftHit || rightHit) {
-        val height = (seekHeight + offset).max(1).min(commonApi.currentHeight)
-        findHeightRec(height)
-      } else seekHeight
+      val (newLower, newUpper) = {
+        if (!leftHit) (lowerBound, seekHeight)
+        else if (rightHit) (seekHeight, upperBound)
+        else (lowerBound, upperBound)
+      }
+
+      if ((leftHit && !rightHit) || lowerBound == upperBound) seekHeight
+      else {
+        val predictedHeight = (seekHeight + offset).max(lowerBound).min(upperBound)
+        findHeightRec(predictedHeight, newLower, newUpper)
+      }
     }
 
     findHeightRec()
