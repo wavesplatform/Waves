@@ -107,33 +107,32 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
       commonApi.metaAtHeight(height).fold(default)(_.header.timestamp)
 
     @tailrec
-    def findHeightRec(seekHeight: Int = 1, lowerBound: Int = 1, upperBound: Int = commonApi.currentHeight): Int = {
-      val averageBlockTime = {
-        val lowerTimestamp = timestampOf(lowerBound)
-        val upperTimestamp = timestampOf(upperBound)
-        (upperTimestamp - lowerTimestamp) / (upperBound - lowerBound).max(1)
+    def findHeightRec(lowerBound: Int = 1, upperBound: Int = commonApi.currentHeight): Int = {
+      val lowerTimestamp = timestampOf(lowerBound)
+      val upperTimestamp = timestampOf(upperBound)
+
+      require(lowerTimestamp <= target)
+
+      val averageBlockTime = (upperTimestamp - lowerTimestamp) / (upperBound - lowerBound).max(1)
+      val offset = {
+        val blocksBetween = ((target - lowerTimestamp) / averageBlockTime).toInt
+        blocksBetween
       }
 
-      val timestamp      = timestampOf(seekHeight)
-      val rightTimestmap = timestampOf(seekHeight + 1, Long.MaxValue)
+      val predictedHeight = (lowerBound + offset).max(lowerBound).min(upperBound)
+
+      val timestamp      = timestampOf(predictedHeight)
+      val rightTimestmap = timestampOf(predictedHeight + 1, Long.MaxValue)
       val leftHit        = timestamp <= target
       val rightHit       = rightTimestmap <= target
-      val offset = {
-        val blocksBetween = ((target - timestamp) / averageBlockTime).toInt
-        if (leftHit) blocksBetween.max(1) else blocksBetween.min(-1)
-      }
 
       val (newLower, newUpper) = {
-        if (!leftHit) (lowerBound, seekHeight)
-        else if (rightHit) (seekHeight, upperBound)
-        else (lowerBound, upperBound)
+        if (!leftHit) (lowerBound, (predictedHeight - 1).max(lowerBound))
+        else if (rightHit) ((predictedHeight + 1).min(upperBound), upperBound)
+        else (predictedHeight, predictedHeight)
       }
 
-      if ((leftHit && !rightHit) || lowerBound == upperBound) seekHeight
-      else {
-        val predictedHeight = (seekHeight + offset).max(lowerBound).min(upperBound)
-        findHeightRec(predictedHeight, newLower, newUpper)
-      }
+      if (newLower == newUpper) predictedHeight else findHeightRec(newLower, newUpper)
     }
 
     findHeightRec()
