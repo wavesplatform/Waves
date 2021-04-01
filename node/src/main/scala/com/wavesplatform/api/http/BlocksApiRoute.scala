@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http
 
 import scala.annotation.tailrec
-import scala.concurrent.duration.{FiniteDuration, _}
+import scala.concurrent.duration.FiniteDuration
 
 import akka.http.scaladsl.server.{Route, StandardRoute}
 import cats.syntax.either._
@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import play.api.libs.json._
 
-case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi, avgBlockTime: FiniteDuration = 1 minute) extends ApiRoute {
+case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi, avgBlockTime: FiniteDuration) extends ApiRoute {
   import BlocksApiRoute._
   private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
 
