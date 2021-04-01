@@ -1,6 +1,5 @@
 package com.wavesplatform.http
 
-import scala.concurrent.duration._
 import scala.util.Random
 
 import com.wavesplatform.{NoShrink, TestWallet}
@@ -15,6 +14,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.utils.SystemTime
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -29,7 +29,7 @@ class BlocksRouteSpec
     with NoShrink
     with WithDomain {
   private val blocksApi                      = mock[CommonBlocksApi]
-  private val blocksApiRoute: BlocksApiRoute = BlocksApiRoute(restAPISettings, blocksApi, 10.millis)
+  private val blocksApiRoute: BlocksApiRoute = BlocksApiRoute(restAPISettings, blocksApi, SystemTime)
   private val route                          = blocksApiRoute.route
 
   private val testBlock1 = TestBlock.create(Nil)

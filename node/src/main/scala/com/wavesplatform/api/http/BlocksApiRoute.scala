@@ -1,7 +1,6 @@
 package com.wavesplatform.api.http
 
 import scala.annotation.tailrec
-import scala.concurrent.duration.FiniteDuration
 
 import akka.http.scaladsl.server.{Route, StandardRoute}
 import cats.syntax.either._
@@ -14,9 +13,10 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.utils.Time
 import play.api.libs.json._
 
-case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi, avgBlockTime: FiniteDuration) extends ApiRoute {
+case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi, time: Time) extends ApiRoute {
   import BlocksApiRoute._
   private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
 
@@ -68,7 +68,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
       }
     } ~ path("heightByTimestamp" / LongNumber) { timestamp =>
       val heightE = (for {
-        _ <- Either.cond(timestamp <= System.currentTimeMillis(), (), "Indicated timestamp belongs to the future")
+        _ <- Either.cond(timestamp <= time.correctedTime(), (), "Indicated timestamp belongs to the future")
         genesisTimestamp = commonApi.metaAtHeight(1).fold(0L)(_.header.timestamp)
         _ <- Either.cond(timestamp >= genesisTimestamp, (), "Indicated timestamp is before the start of the blockchain")
         result = heightByTimestamp(timestamp)
