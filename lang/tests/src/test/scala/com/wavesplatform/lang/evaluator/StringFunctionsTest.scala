@@ -1,6 +1,5 @@
 package com.wavesplatform.lang.evaluator
 
-import cats.implicits._
 import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.directives.DirectiveDictionary
