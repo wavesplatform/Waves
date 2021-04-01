@@ -186,26 +186,34 @@ package object database extends ScorexLogging {
     LeaseBalance(ndi.readLong(), ndi.readLong())
   }
 
-  def writeLeaseDetails(ld: LeaseDetails): Array[Byte] = {
-    pb.LeaseDetails(
-      ByteString.copyFrom(ld.sender.arr),
-      Some(PBRecipients.create(ld.recipient)),
-      ByteString.copyFrom(ld.sourceId.arr),
-      ld.amount,
-      ld.isActive
-    ).toByteArray
-  }
-
-  def readLeaseDetails(data: Array[Byte]): LeaseDetails = {
-    val pb.LeaseDetails(sender, recipient, sourceId, amount, isActive) = pb.LeaseDetails.parseFrom(data)
-    LeaseDetails(
-      sender.toPublicKey,
-      PBRecipients.toAddressOrAlias(recipient.get, AddressScheme.current.chainId).explicitGet(),
-      sourceId.toByteStr,
-      amount,
-      isActive
+  def writeLeaseDetails(lde: Either[Boolean, LeaseDetails]): Array[Byte] =
+    lde.fold(
+      _ => throw new IllegalArgumentException("Can not write boolean flag instead of LeaseDetails"),
+      ld =>
+        pb.LeaseDetails(
+            ByteString.copyFrom(ld.sender.arr),
+            Some(PBRecipients.create(ld.recipient)),
+            ByteString.copyFrom(ld.sourceId.arr),
+            ld.amount,
+            ld.isActive
+          )
+          .toByteArray
     )
-  }
+
+  def readLeaseDetails(data: Array[Byte]): Either[Boolean, LeaseDetails] =
+    if (data.length == 1) Left(data(0) == 1)
+    else {
+      val d = pb.LeaseDetails.parseFrom(data)
+      Right(
+        LeaseDetails(
+          d.senderPublicKey.toPublicKey,
+          PBRecipients.toAddressOrAlias(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
+          d.sourceId.toByteStr,
+          d.amount,
+          d.isActive
+        )
+      )
+    }
 
   def readVolumeAndFee(data: Array[Byte]): VolumeAndFee = Option(data).fold(VolumeAndFee.empty) { d =>
     val ndi = newDataInput(d)
@@ -622,10 +630,10 @@ package object database extends ScorexLogging {
   def loadActiveLeases(db: DB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = db.withResource { r =>
     (for {
       id      <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
-      details <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
-      if details.map(_.isActive).getOrElse(false)
+      details <- fromHistory(r, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id))
+      if details.exists(_.fold(identity, _.isActive))
       pb.TransactionMeta(h, n, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
-      tx                                <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
+      tx                             <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
     } yield tx).collect {
       case (lt: LeaseTransaction, true) => lt
     }.toSeq
@@ -638,14 +646,14 @@ package object database extends ScorexLogging {
     @inline
     def keyInRange(): Boolean = {
       val actualKey = iterator.peekNext().getKey
-      actualKey.startsWith(KeyTags.LeaseStatus.prefixBytes) && Ints.fromByteArray(actualKey.slice(2, 6)) <= toHeight
+      actualKey.startsWith(KeyTags.LeaseDetails.prefixBytes) && Ints.fromByteArray(actualKey.slice(2, 6)) <= toHeight
     }
 
-    iterator.seek(KeyTags.LeaseStatus.prefixBytes ++ Ints.toByteArray(fromHeight))
+    iterator.seek(KeyTags.LeaseDetails.prefixBytes ++ Ints.toByteArray(fromHeight))
     while (iterator.hasNext && keyInRange()) {
       val e       = iterator.next()
       val leaseId = ByteStr(e.getKey.drop(6))
-      if (includeCancelled || readLeaseDetails(e.getValue).isActive)
+      if (includeCancelled || readLeaseDetails(e.getValue).fold(identity, _.isActive))
         leaseIds += leaseId
       else
         leaseIds -= leaseId

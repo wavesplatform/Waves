@@ -7,7 +7,7 @@ import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.protobuf.dapp.DAppMeta
 
 object MetaMapper {
-  def toProto[V <: MetaVersion](version: V)(data: List[List[FINAL]]): Either[String, DAppMeta] =
+  def toProto[V <: MetaVersion](version: V)(data: List[List[FINAL]], nameMap: Map[String, String] = Map.empty): Either[String, DAppMeta] =
     version.strategy.toProto(data)
 
   def dicFromProto(dApp: DApp): Either[String, ParsedMeta] =
