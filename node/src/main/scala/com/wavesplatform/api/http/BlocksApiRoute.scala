@@ -14,7 +14,6 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import monix.eval.Task
 import play.api.libs.json._
 
 case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi, avgBlockTime: FiniteDuration = 1 minute) extends ApiRoute {
@@ -68,14 +67,14 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
         complete(commonApi.meta(id).map(_.json()).toRight(BlockDoesNotExist))
       }
     } ~ path("heightByTimestamp" / LongNumber) { timestamp =>
-      val task = for {
-        _ <- Task(Either.cond(timestamp > System.currentTimeMillis(), (), "Indicated timestamp belongs to the future"))
+      val heightE = (for {
+        _ <- Either.cond(timestamp <= System.currentTimeMillis(), (), "Indicated timestamp belongs to the future")
         genesisTimestamp = commonApi.metaAtHeight(1).fold(0L)(_.header.timestamp)
-        _      <- Task(Either.cond(timestamp <= genesisTimestamp, (), "Indicated timestamp belongs to the future"))
-        result <- heightByTimestamp(timestamp)
-      } yield result.leftMap(GenericError(_))
+        _ <- Either.cond(timestamp >= genesisTimestamp, (), "Indicated timestamp is before the start of the blockchain")
+        result = heightByTimestamp(timestamp)
+      } yield result)
 
-      extractScheduler(implicit sc => complete(task.runToFuture))
+      complete(heightE.bimap(GenericError(_), h => Json.obj("height" -> h)))
     } ~ path(BlockId) { id =>
       complete(commonApi.block(id).map(toJson).toRight(BlockDoesNotExist))
     }
@@ -103,44 +102,25 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
     }
   }
 
-  private[this] def heightByTimestamp(target: Long): Task[Either[String, Int]] = {
-    sealed trait State
-    case object Starting                 extends State
-    case class Scanning(prevHeight: Int) extends State
-    sealed trait Result                  extends State
-    case class HeightFound(height: Int)  extends Result
-    case class Error(message: String)    extends Result
-
+  private[this] def heightByTimestamp(target: Long): Int = {
     @tailrec
-    def heuristicStartHeight(seekHeight: Int): Int = {
-      assert(seekHeight >= 1)
-
-      val timestamp = commonApi.metaAtHeight(seekHeight).fold(0L)(_.header.timestamp)
-      if (timestamp <= target || seekHeight == 1) seekHeight
-      else {
-        val predicted = seekHeight - ((timestamp - target) / avgBlockTime.toMillis).toInt.max(1)
-        heuristicStartHeight(predicted max 1)
+    def findHeightRec(seekHeight: Int = 1): Int = {
+      val timestamp      = commonApi.metaAtHeight(seekHeight).fold(throw new IllegalStateException("State was altered"))(_.header.timestamp)
+      val rightTimestmap = commonApi.metaAtHeight(seekHeight + 1).fold(Long.MaxValue)(_.header.timestamp)
+      val leftHit        = timestamp <= target
+      val rightHit       = rightTimestmap <= target
+      val offset = {
+        val blocksBetween = ((target - timestamp) / avgBlockTime.toMillis).toInt
+        if (leftHit) blocksBetween.max(1) else blocksBetween.min(-1)
       }
+
+      if (!leftHit || rightHit) {
+        val height = (seekHeight + offset).max(1).min(commonApi.currentHeight)
+        findHeightRec(height)
+      } else seekHeight
     }
 
-    val startHeight = heuristicStartHeight(commonApi.currentHeight)
-    commonApi
-      .metaRange(startHeight, commonApi.currentHeight)
-      .map(b => (b.header.timestamp, b.height))
-      .:+((Long.MaxValue, 1))
-      .scan(Starting: State) {
-        case (Starting, (_, firstHeight)) =>
-          Scanning(firstHeight)
-
-        case (Scanning(prevHeight), (blockTimestamp, blockHeight)) =>
-          if (blockTimestamp > target) HeightFound(prevHeight)
-          else Scanning(blockHeight)
-      }
-      .collect {
-        case HeightFound(height) => Right(height)
-        case Error(err)          => Left(err)
-      }
-      .firstL
+    findHeightRec()
   }
 }
 
