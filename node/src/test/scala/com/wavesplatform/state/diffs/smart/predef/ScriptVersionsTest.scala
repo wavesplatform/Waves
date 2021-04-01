@@ -45,7 +45,7 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
       tx: Transaction,
       blockchain: Blockchain
   ): Either[String, EVALUATED] =
-    ScriptRunner(Coproduct(tx), blockchain, script, isAssetScript = false, null)._2
+    ScriptRunner(Coproduct(tx), blockchain, script, isAssetScript = false, null)._3
 
   private val duplicateNames =
     """

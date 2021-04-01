@@ -185,7 +185,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       ctx.evaluationContext(environment),
       EvaluatorV2.applyCompleted(_, _, V3),
       txObject
-    ).bimap(_._1, _._1)
+    )._3
   }
 
   property("Simple verify") {

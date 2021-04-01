@@ -2236,10 +2236,7 @@ class InvokeScriptTransactionDiffTest
                   .getInvocationComplexity(bc, invokeTx.funcCall, bc.accountScript(dApp).get.complexitiesByEstimator, dApp)
                   .explicitGet()
 
-              if (name == "overflow amount")
-                diff.scriptsComplexity shouldBe invocationComplexity + 1 // because if evaluating asset script "false"
-              else
-                diff.scriptsComplexity shouldBe invocationComplexity
+              diff.scriptsComplexity shouldBe invocationComplexity
 
               if (name == "ok")
                 diff.errorMessage(invokeTx.id.value()) shouldBe empty
@@ -2332,9 +2329,8 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, dApp, assetsComplexity) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
-            val invocationComplexity =
-              InvokeDiffsCommon.getInvocationComplexity(bc, invokeTx.funcCall, bc.accountScript(dApp).get.complexitiesByEstimator, dApp).explicitGet()
-            invocationComplexity + assetsComplexity shouldBe diff.scriptsComplexity
+            diff.errorMessage(invokeTx.id.value()) shouldBe defined
+            diff.scriptsComplexity should be > 0L
         }
     }
   }

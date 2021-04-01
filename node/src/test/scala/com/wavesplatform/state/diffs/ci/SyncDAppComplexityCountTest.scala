@@ -255,8 +255,8 @@ class SyncDAppComplexityCountTest
     assert(19, 25041, exceeding = true)
     assert(100, 25041, exceeding = true)
 
-    assert(1, 5415, withPayment = true)
-    assert(2, 8210, withPayment = true)
+    assert(1, 5412, withPayment = true)
+    assert(2, 8207, withPayment = true)
     assert(17, 24965, withPayment = true, exceeding = true)
     assert(18, 24965, withPayment = true, exceeding = true)
     assert(100, 24965, withPayment = true, exceeding = true)
@@ -266,20 +266,20 @@ class SyncDAppComplexityCountTest
     assert(10, 26000, withThroughPayment = true, exceeding = true)
     assert(100, 26000, withThroughPayment = true, exceeding = true)
 
-    assert(1, 5424, withThroughTransfer = true)
-    assert(2, 10934, withThroughTransfer = true)
+    assert(1, 5421, withThroughTransfer = true)
+    assert(2, 10928, withThroughTransfer = true)
     assert(9, 26000, withThroughTransfer = true, exceeding = true)
     assert(10, 25041, withThroughTransfer = true, exceeding = true)
     assert(100, 25041, withThroughTransfer = true, exceeding = true)
 
-    assert(1, 4615, withVerifier = true)
-    assert(17, 26947, withVerifier = true, exceeding = true)
-    assert(18, 26947, withVerifier = true, exceeding = true)
-    assert(19, 26947, withVerifier = true, exceeding = true)
-    assert(100, 26947, withVerifier = true, exceeding = true)
+    assert(1, 4612, withVerifier = true)
+    assert(17, 26944, withVerifier = true, exceeding = true)
+    assert(18, 26944, withVerifier = true, exceeding = true)
+    assert(19, 26944, withVerifier = true, exceeding = true)
+    assert(100, 26944, withVerifier = true, exceeding = true)
 
-    assert(1, 10036, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true)
-    assert(100, 26571, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true, exceeding = true)
+    assert(1, 10027, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true)
+    assert(100, 26556, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true, exceeding = true)
   }
 
   property("rejects and fails correctly") {

@@ -598,11 +598,11 @@ object InvokeDiffsCommon {
       assetId: ByteStr,
       nextDiff: Diff,
       script: Script,
-      complexity: Long,
+      estimatedComplexity: Long,
       complexityLimit: Int
   ): Either[FailedTransactionError, Diff] =
     Try {
-      ScriptRunner(
+      val (log, evaluatedComplexity, result) = ScriptRunner(
         Coproduct[TxOrd](pseudoTx),
         blockchain,
         script,
@@ -611,18 +611,20 @@ object InvokeDiffsCommon {
           if (blockchain.passCorrectAssetId) Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr))
           else Coproduct[Environment.Tthis](Environment.AssetId(tx.dAppAddressOrAlias.bytes)),
         complexityLimit
-      ) match {
-        case (log, Left(error))  => Left(FailedTransactionError.assetExecutionInAction(error, complexity, log, assetId))
-        case (log, Right(FALSE)) => Left(FailedTransactionError.notAllowedByAssetInAction(complexity, log, assetId))
-        case (_, Right(TRUE))    => Right(nextDiff.copy(scriptsComplexity = nextDiff.scriptsComplexity + complexity))
-        case (log, Right(x)) =>
+      )
+      val complexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else estimatedComplexity
+      result match {
+        case Left(error)  => Left(FailedTransactionError.assetExecutionInAction(error, complexity, log, assetId))
+        case Right(FALSE) => Left(FailedTransactionError.notAllowedByAssetInAction(complexity, log, assetId))
+        case Right(TRUE)  => Right(nextDiff.copy(scriptsComplexity = nextDiff.scriptsComplexity + complexity))
+        case Right(x) =>
           Left(FailedTransactionError.assetExecutionInAction(s"Script returned not a boolean result, but $x", complexity, log, assetId))
       }
     } match {
       case Failure(e) =>
         Left(
           FailedTransactionError
-            .assetExecutionInAction(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", complexity, List.empty, assetId)
+            .assetExecutionInAction(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", estimatedComplexity, List.empty, assetId)
         )
       case Success(s) => s
     }

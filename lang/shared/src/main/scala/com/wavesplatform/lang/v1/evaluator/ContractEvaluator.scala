@@ -91,9 +91,9 @@ object ContractEvaluator {
       decls: List[DECLARATION],
       v: VerifierFunction,
       ctx: EvaluationContext[Environment, Id],
-      evaluate: (EvaluationContext[Environment, Id], EXPR) => Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])],
+      evaluate: (EvaluationContext[Environment, Id], EXPR) => (Log[Id], Int, Either[ExecutionError, EVALUATED]),
       entity: CaseObj
-  ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
+  ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
     val verifierBlock =
       BLOCK(
         LET(v.annotation.invocationArgName, entity),
