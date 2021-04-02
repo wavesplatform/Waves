@@ -16,8 +16,8 @@ object KeyTags extends Enumeration {
   AssetDetails,
   LeaseBalanceHistory,
   LeaseBalance,
-  LeaseStatusHistory,
-  LeaseStatus,
+  LeaseDetailsHistory,
+  LeaseDetails,
   FilledVolumeAndFeeHistory,
   FilledVolumeAndFee,
   ChangedAddresses,
@@ -57,8 +57,7 @@ object KeyTags extends Enumeration {
   IssuedAssets,
   UpdatedAssets,
   SponsoredAssets,
-  StateHash,
-  LeaseActionDetails = Value
+  StateHash = Value
 
   final implicit class KeyTagExt(val t: KeyTag) extends AnyVal {
     @inline def prefixBytes: Array[Byte] = Shorts.toByteArray(t.id.toShort)
