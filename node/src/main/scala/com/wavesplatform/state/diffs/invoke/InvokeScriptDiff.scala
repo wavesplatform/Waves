@@ -134,7 +134,7 @@ object InvokeScriptDiff {
           )
 
           result <- for {
-            (diff, (scriptResult, log), avaliableActions, avaliableData) <- {
+            (diff, (scriptResult, log), availableActions, availableData) <- {
               val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
                 val invoker = tx.senderDApp
                 val invocation = ContractEvaluator.Invocation(
@@ -204,17 +204,17 @@ object InvokeScriptDiff {
             }
 
             process = { (actions: List[CallableAction], unusedComplexity: Int, actionsCount: Int, dataCount: Int, ret: EVALUATED) =>
-              if (dataCount > avaliableData) {
+              if (dataCount > availableData) {
                 val usedComplexity = remainingComplexity - unusedComplexity
                 val error          = FailedTransactionError.dAppExecution("Stored data count limit is exceeded", usedComplexity, log)
                 traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
               } else {
-                if (actionsCount > avaliableActions) {
+                if (actionsCount > availableActions) {
                   val usedComplexity = remainingComplexity - unusedComplexity
                   val error          = FailedTransactionError.dAppExecution("Actions count limit is exceeded", usedComplexity, log)
                   traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
                 } else {
-                  doProcessActions(actions, unusedComplexity).map((_, ret, avaliableActions - actionsCount, avaliableData - dataCount))
+                  doProcessActions(actions, unusedComplexity).map((_, ret, availableActions - actionsCount, availableData - dataCount))
                 }
               }
             }
@@ -227,13 +227,13 @@ object InvokeScriptDiff {
                 val dataCount    = actions.count(_.isInstanceOf[DataOp])
                 val actionsCount = actions.length - dataCount
                 process(actions, unusedComplexity, actionsCount, dataCount, ret)
-              case _: IncompleteResult if limitedExecution => doProcessActions(Nil, 0).map((_, unit, avaliableActions, avaliableData))
+              case _: IncompleteResult if limitedExecution => doProcessActions(Nil, 0).map((_, unit, availableActions, availableData))
               case r: IncompleteResult =>
                 val usedComplexity = remainingComplexity - r.unusedComplexity
                 val error          = FailedTransactionError.dAppExecution(s"Invoke complexity limit = $limit is exceeded", usedComplexity, log)
                 traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
             }
-            resultDiff = diff |+| actionsDiff |+| Diff.empty.copy(scriptsComplexity = paymentsComplexity)
+            resultDiff = diff.copy(scriptsComplexity = 0) |+| actionsDiff |+| Diff.empty.copy(scriptsComplexity = paymentsComplexity)
           } yield (resultDiff, evaluated, remainingActions1, remainingData1)
         } yield result
 

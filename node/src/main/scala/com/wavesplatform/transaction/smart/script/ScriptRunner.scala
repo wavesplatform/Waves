@@ -86,7 +86,7 @@ object ScriptRunner {
         if (complexityLimit == Int.MaxValue)
           EvaluatorV2.applyCompleted(ctx, expr, script.stdLibVersion)
         else
-          EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, complexityLimit, Right(default))
+          EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, complexityLimit, _ => Right(default))
       (log, complexityLimit - unusedComplexity, result)
     }
 

@@ -295,7 +295,7 @@ object EvaluatorV2 {
       expr: EXPR,
       stdLibVersion: StdLibVersion,
       complexityLimit: Int,
-      default: Either[ExecutionError, EVALUATED]
+      handleExpr: EXPR => Either[ExecutionError, EVALUATED]
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
     EvaluatorV2
       .applyLimitedCoeval(expr, complexityLimit, ctx, stdLibVersion)
@@ -305,7 +305,7 @@ object EvaluatorV2 {
           case (expr, complexity, log) =>
             expr match {
               case evaluated: EVALUATED => (log, complexity, Right(evaluated))
-              case _                    => (log, complexity, default)
+              case expr: EXPR           => (log, complexity, handleExpr(expr))
             }
         }
       )
@@ -315,7 +315,7 @@ object EvaluatorV2 {
       expr: EXPR,
       stdLibVersion: StdLibVersion
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, Left(s"Unexpected incomplete evaluation result $expr"))
+    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, expr => Left(s"Unexpected incomplete evaluation result $expr"))
 
   case class EvaluationException(message: String, unusedComplexity: Int) extends RuntimeException(message)
 }
