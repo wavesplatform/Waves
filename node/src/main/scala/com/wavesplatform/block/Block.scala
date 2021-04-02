@@ -54,10 +54,7 @@ case class Block(
 
   val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
     val publicKey = header.generator
-    if (!crypto.verify(signature, bodyBytes(), publicKey)) {
-      println(s"\n\t${this.json()}\n")
-    }
-    crypto.verify(signature, bodyBytes(), publicKey)
+    !crypto.isWeakPublicKey(publicKey.arr) && crypto.verify(signature, bodyBytes(), publicKey)
   }
 
   protected val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
