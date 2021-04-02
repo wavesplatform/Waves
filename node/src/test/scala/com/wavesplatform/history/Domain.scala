@@ -93,9 +93,20 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def appendMicroBlock(txs: Transaction*): Unit = {
     val lastBlock = this.lastBlock
-    val block     = lastBlock.copy(transactionData = lastBlock.transactionData ++ txs)
-    val signature = com.wavesplatform.crypto.sign(defaultSigner.privateKey, block.bodyBytes())
-    val mb        = MicroBlock.buildAndSign(lastBlock.header.version, defaultSigner, txs, blockchainUpdater.lastBlockId.get, signature).explicitGet()
+    val block = Block
+      .buildAndSign(
+        lastBlock.header.version,
+        lastBlock.header.timestamp,
+        lastBlock.header.reference,
+        lastBlock.header.baseTarget,
+        lastBlock.header.generationSignature,
+        lastBlock.transactionData ++ txs,
+        defaultSigner,
+        lastBlock.header.featureVotes,
+        lastBlock.header.rewardVote
+      )
+      .explicitGet()
+    val mb = MicroBlock.buildAndSign(lastBlock.header.version, defaultSigner, txs, blockchainUpdater.lastBlockId.get, block.signature).explicitGet()
     blockchainUpdater.processMicroBlock(mb).explicitGet()
   }
 

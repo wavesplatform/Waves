@@ -138,7 +138,7 @@ object CommonValidation {
 
       def scriptVersionActivation(sc: Script): Either[ActivationError, T] = sc.stdLibVersion match {
         case V1 | V2 | V3 if sc.containsArray      => v4Activation
-        case V1 | V2 if sc.containsBlockV2.value() => v3Activation
+        case V1 | V2 if sc.containsBlockV2() => v3Activation
         case V1 | V2                               => Right(tx)
         case V3                                    => v3Activation
         case V4                                    => v4Activation

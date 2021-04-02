@@ -60,13 +60,14 @@ object InvokeScriptTransactionDiff {
 
           stepLimit = ContractLimits.MaxComplexityByVersion(version)
 
-          fixedInvocationComplexity =
-            if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && callableComplexities.contains(ScriptEstimatorV2.version))
-              Math.min(invocationComplexity, stepLimit)
-            else
-              invocationComplexity
+          fixedInvocationComplexity = if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && callableComplexities.contains(
+                                            ScriptEstimatorV2.version
+                                          ))
+            Math.min(invocationComplexity, stepLimit)
+          else
+            invocationComplexity
 
-          (feeInWaves, _) <- InvokeDiffsCommon.calcAndCheckFee(
+          (_, _) <- InvokeDiffsCommon.calcAndCheckFee(
             (message, _) => GenericError(message),
             tx,
             blockchain,
@@ -82,44 +83,37 @@ object InvokeScriptTransactionDiff {
           input <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply))
 
           result <- for {
-            (invocationDiff, scriptResult, log, avaliableActions, avaliableData) <- {
-              val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
-                val invoker = tx.sender.toAddress
+            (invocationDiff, scriptResult, log, availableActions, availableData) <- {
+              val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId) {
+                val invoker = Recipient.Address(ByteStr(tx.sender.toAddress.bytes))
                 val invocation = ContractEvaluator.Invocation(
                   functionCall,
-                  Recipient.Address(ByteStr(invoker.bytes)),
+                  invoker,
                   tx.sender,
-                  Recipient.Address(ByteStr(invoker.bytes)),
+                  invoker,
                   tx.sender,
                   payments,
                   tx.id(),
                   tx.fee,
                   tx.feeAssetId.compatId
                 )
-                val height = blockchain.height
-                val remainingCalls = ContractLimits.MaxSyncDAppCalls(version)
 
                 val environment = new DAppEnvironment(
                   AddressScheme.current.chainId,
                   Coeval.evalOnce(input),
-                  Coeval(height),
+                  Coeval.evalOnce(blockchain.height),
                   blockchain,
                   tthis,
                   directives,
                   Some(tx),
                   dAppAddress,
                   pk,
-                  dAppAddress,
                   Set(tx.senderAddress, dAppAddress),
                   limitedExecution,
-                  remainingCalls,
+                  ContractLimits.MaxSyncDAppCalls(version),
                   ContractLimits.MaxCallableActionsAmount(version),
                   ContractLimits.MaxWriteSetSize(version),
-                  (if (version < V5) {
-                     Diff.empty
-                   } else {
-                     InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map())
-                   })
+                  if (version < V5) Diff.empty else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map())
                 )
 
                 val fullLimit =
@@ -150,12 +144,12 @@ object InvokeScriptTransactionDiff {
                     paymentsComplexity.toInt
                   )
                 } yield (environment.currentDiff, result, log, environment.avaliableActions, environment.avaliableData)
-              })
+              }
               TracedResult(
                 scriptResultE,
                 List(
                   InvokeScriptTrace(
-                    tx.id.value(),
+                    tx.id(),
                     tx.dAppAddressOrAlias,
                     functionCall,
                     scriptResultE.map(_._2),
@@ -183,29 +177,25 @@ object InvokeScriptTransactionDiff {
             )
 
             process = { (actions: List[CallableAction], unusedComplexity: Long) =>
-                val dataCount = actions.count(_.isInstanceOf[DataOp])
-                if(dataCount > avaliableData) {
-                  TracedResult(Left(FailedTransactionError.dAppExecution("Stored data count limit is exceeded", fixedInvocationComplexity, log)))
-                } else {
-                  val actionsCount = actions.length - dataCount
-                  if(actionsCount > avaliableActions) {
-                    TracedResult(Left(FailedTransactionError.dAppExecution("Actions count limit is exceeded", fixedInvocationComplexity, log)))
-                  } else {
-                    doProcessActions(actions, unusedComplexity)
-                  }
-                }
+              val dataCount = actions.count(_.isInstanceOf[DataOp])
+              if (dataCount > availableData)
+                TracedResult(Left(FailedTransactionError.dAppExecution("Stored data count limit is exceeded", fixedInvocationComplexity, log)))
+              else if (actions.length - dataCount > availableActions)
+                TracedResult(Left(FailedTransactionError.dAppExecution("Actions count limit is exceeded", fixedInvocationComplexity, log)))
+              else
+                doProcessActions(actions, unusedComplexity)
             }
             resultDiff <- scriptResult match {
               case ScriptResultV3(dataItems, transfers, unusedComplexity) =>
                 process(dataItems ::: transfers, unusedComplexity)
               case ScriptResultV4(actions, unusedComplexity, _) =>
                 process(actions, unusedComplexity)
-              case _: IncompleteResult if limitedExecution                => doProcessActions(Nil, 0)
+              case _: IncompleteResult if limitedExecution => doProcessActions(Nil, 0)
               case i: IncompleteResult =>
                 TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
             }
           } yield invocationDiff |+| resultDiff
-        } yield result
+        } yield result.bindTransaction(tx)
 
       case Left(l) => TracedResult(Left(l))
       case _       => TracedResult(Left(GenericError(s"No contract at address ${tx.dAppAddressOrAlias}")))
