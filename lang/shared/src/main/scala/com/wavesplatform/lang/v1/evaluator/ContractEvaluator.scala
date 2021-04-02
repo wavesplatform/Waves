@@ -103,18 +103,6 @@ object ContractEvaluator {
     evaluate(ctx, foldDeclarations(decls, verifierBlock))
   }
 
-  def apply(
-      ctx: EvaluationContext[Environment, Id],
-      dApp: DApp,
-      i: Invocation,
-      version: StdLibVersion
-  ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] =
-    for {
-      expr              <- buildExprFromInvocation(dApp, i, version).leftMap((_, Nil))
-      (evaluation, log) <- EvaluatorV1().applyWithLogging[EVALUATED](ctx, expr)
-      result            <- ScriptResult.fromObj(ctx, i.transactionId, evaluation, version, unusedComplexity = 0).leftMap((_, log))
-    } yield (result, log)
-
   def applyV2Coeval(
       ctx: EvaluationContext[Environment, Id],
       freezingLets: Map[String, LazyVal[Id]],
@@ -130,7 +118,7 @@ object ContractEvaluator {
         case Left(error)  => Coeval.now(Left(error))
       }
 
-  def applyV2Coeval(
+  private def applyV2Coeval(
       ctx: EvaluationContext[Environment, Id],
       freezingLets: Map[String, LazyVal[Id]],
       expr: EXPR,

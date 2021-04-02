@@ -144,17 +144,16 @@ object InvokeDiffsCommon {
       version: StdLibVersion,
       dAppAddress: Address,
       dAppPublicKey: PublicKey,
-      invocationComplexity: Long,
+      storingComplexity: Int,
       tx: InvokeScriptLike,
       blockchain: Blockchain,
       blockTime: Long,
-      remainingComplexity: Long,
       isSyncCall: Boolean,
       limitedExecution: Boolean,
       otherIssues: Seq[Issue] = Seq()
   ): TracedResult[ValidationError, Diff] = {
     val complexityLimit =
-      if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - invocationComplexity.toInt
+      if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - storingComplexity
       else Int.MaxValue
 
     val actionsByType   = actions.groupBy(a => if (classOf[DataOp].isAssignableFrom(a.getClass)) classOf[DataOp] else a.getClass).withDefaultValue(Nil)
@@ -168,25 +167,25 @@ object InvokeDiffsCommon {
     val dataEntries     = actionsByType(classOf[DataOp]).asInstanceOf[List[DataOp]].map(dataItemToEntry)
 
     for {
-      _ <- TracedResult(checkDataEntries(tx, dataEntries, version)).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
-      _ <- TracedResult(checkLeaseCancels(leaseCancelList)).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
+      _ <- TracedResult(checkDataEntries(tx, dataEntries, version)).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
+      _ <- TracedResult(checkLeaseCancels(leaseCancelList)).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
       _ <- TracedResult(
         Either.cond(
           actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount(version),
           (),
           FailedTransactionError.dAppExecution(
             s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount(version)}, actual: ${actions.length}",
-            invocationComplexity
+            storingComplexity
           )
         )
       )
 
       _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transferList))
-        .leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
+        .leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
       _ <- TracedResult(
-        Either.cond(transferList.map(_.amount).forall(_ >= 0), (), FailedTransactionError.dAppExecution("Negative amount", invocationComplexity))
+        Either.cond(transferList.map(_.amount).forall(_ >= 0), (), FailedTransactionError.dAppExecution("Negative amount", storingComplexity))
       )
-      _ <- TracedResult(checkOverflow(transferList.map(_.amount))).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
+      _ <- TracedResult(checkOverflow(transferList.map(_.amount))).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
 
       actionAssets = transferList.flatMap(_.assetId).map(IssuedAsset) ++
         reissueList.map(r => IssuedAsset(r.assetId)) ++
@@ -209,7 +208,7 @@ object InvokeDiffsCommon {
               _,
               blockchain,
               stepLimit,
-              invocationComplexity,
+              storingComplexity.min(stepLimit), // complexity increased by sync calls should not require fee for additional steps
               issueList ++ otherIssues,
               feeActionsCount
             ).map(_._2)
@@ -220,9 +219,9 @@ object InvokeDiffsCommon {
       totalLimit = ContractLimits.MaxTotalInvokeComplexity(version)
       _ <- TracedResult(
         Either.cond(
-          actionComplexities.sum <= remainingComplexity || limitedExecution, // limited execution has own restriction "complexityLimit"
+          actionComplexities.sum + storingComplexity <= totalLimit || limitedExecution, // limited execution has own restriction "complexityLimit"
           (),
-          FailedTransactionError.feeForActions(s"Invoke complexity limit = $totalLimit is exceeded", totalLimit - remainingComplexity)
+          FailedTransactionError.feeForActions(s"Invoke complexity limit = $totalLimit is exceeded", storingComplexity)
         )
       )
 
@@ -235,7 +234,7 @@ object InvokeDiffsCommon {
       }
 
       compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff, complexityLimit)
-        .leftMap(_.addComplexity(invocationComplexity))
+        .leftMap(_.addComplexity(storingComplexity))
 
       transfers = compositeDiff.portfolios |+| feeDiff.view.mapValues(_.negate).toMap
 
@@ -271,7 +270,7 @@ object InvokeDiffsCommon {
         transactions = updatedTxDiff,
         scriptsRun = if (isSyncCall) 0 else additionalScriptsCount + 1,
         scriptResults = Map(tx.txId -> isr),
-        scriptsComplexity = invocationComplexity + compositeDiff.scriptsComplexity
+        scriptsComplexity = storingComplexity + compositeDiff.scriptsComplexity
       )
     } yield resultDiff
   }

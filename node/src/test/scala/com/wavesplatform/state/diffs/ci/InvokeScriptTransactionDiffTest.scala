@@ -2227,17 +2227,10 @@ class InvokeScriptTransactionDiffTest
       } yield (Seq(gTx1, gTx2, ssTx, iTx), master.toAddress, txs)
 
     forAll(scenario) {
-      case (genesisTxs, dApp, txs) =>
+      case (genesisTxs, _, txs) =>
         txs.foreach { case (name, invokeTx) =>
           assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
-            case (diff, bc) =>
-              val invocationComplexity =
-                InvokeDiffsCommon
-                  .getInvocationComplexity(bc, invokeTx.funcCall, bc.accountScript(dApp).get.complexitiesByEstimator, dApp)
-                  .explicitGet()
-
-              diff.scriptsComplexity shouldBe invocationComplexity
-
+            case (diff, _) =>
               if (name == "ok")
                 diff.errorMessage(invokeTx.id.value()) shouldBe empty
               else
@@ -2677,7 +2670,7 @@ class InvokeScriptTransactionDiffTest
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, _) =>
             diff.errorMessage(invokeTx.id.value()) shouldBe None
-            diff.scriptsComplexity shouldBe 113
+            diff.scriptsComplexity shouldBe 108
             diff.scriptsRun shouldBe 2
         }
     }

@@ -249,36 +249,36 @@ class SyncDAppComplexityCountTest
   }
 
   property("counts complexity correctly") {
-    assert(1, 2709)
-    assert(2, 5504)
+    assert(1, 2706)
+    assert(2, 5494)
     assert(18, 25041, exceeding = true)
     assert(19, 25041, exceeding = true)
     assert(100, 25041, exceeding = true)
 
-    assert(1, 5412, withPayment = true)
-    assert(2, 8207, withPayment = true)
+    assert(1, 5409, withPayment = true)
+    assert(2, 8197, withPayment = true)
     assert(17, 24965, withPayment = true, exceeding = true)
     assert(18, 24965, withPayment = true, exceeding = true)
     assert(100, 24965, withPayment = true, exceeding = true)
 
-    assert(2, 8215, withThroughPayment = true)
+    assert(2, 8201, withThroughPayment = true)
     assert(9, 26000, withThroughPayment = true, exceeding = true)
     assert(10, 26000, withThroughPayment = true, exceeding = true)
     assert(100, 26000, withThroughPayment = true, exceeding = true)
 
-    assert(1, 5421, withThroughTransfer = true)
-    assert(2, 10928, withThroughTransfer = true)
+    assert(1, 5412, withThroughTransfer = true)
+    assert(2, 10906, withThroughTransfer = true)
     assert(9, 26000, withThroughTransfer = true, exceeding = true)
     assert(10, 25041, withThroughTransfer = true, exceeding = true)
     assert(100, 25041, withThroughTransfer = true, exceeding = true)
 
-    assert(1, 4612, withVerifier = true)
+    assert(1, 4609, withVerifier = true)
     assert(17, 26944, withVerifier = true, exceeding = true)
     assert(18, 26944, withVerifier = true, exceeding = true)
     assert(19, 26944, withVerifier = true, exceeding = true)
     assert(100, 26944, withVerifier = true, exceeding = true)
 
-    assert(1, 10027, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true)
+    assert(1, 10018, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true)
     assert(100, 26556, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true, exceeding = true)
   }
 

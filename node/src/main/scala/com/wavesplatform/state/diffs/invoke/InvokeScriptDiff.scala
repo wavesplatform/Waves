@@ -182,7 +182,8 @@ object InvokeScriptDiff {
               scriptResultE
             }
 
-            doProcessActions = (actions: List[CallableAction], unusedComplexity: Int) =>
+            doProcessActions = (actions: List[CallableAction], unusedComplexity: Int) => {
+              val storingComplexity = if (blockchain.storeEvaluatedComplexity) complexityAfterPayments - unusedComplexity else invocationComplexity
               CoevalR(
                 Coeval.now(
                   InvokeDiffsCommon.processActions(
@@ -190,17 +191,17 @@ object InvokeScriptDiff {
                     version,
                     dAppAddress,
                     pk,
-                    invocationComplexity,
+                    storingComplexity.toInt,
                     tx,
                     CompositeBlockchain(blockchain, Some(diff)),
                     blockTime,
-                    unusedComplexity,
                     isSyncCall = true,
                     limitedExecution,
                     Seq()
                   )
                 )
               )
+            }
 
             process = { (actions: List[CallableAction], unusedComplexity: Int, actionsCount: Int, dataCount: Int, ret: EVALUATED) =>
               if (dataCount > avaliableData) {
