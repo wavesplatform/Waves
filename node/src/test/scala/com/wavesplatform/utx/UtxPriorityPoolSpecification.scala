@@ -57,7 +57,7 @@ class UtxPriorityPoolSpecification
               tt.sender.toAddress                -> -(tt.fee + tt.amount),
               tt.recipient.asInstanceOf[Address] -> tt.amount
             ).view.mapValues(Portfolio.waves).toMap
-            Diff(portfolios = pfs)
+            Diff(portfolios = pfs).bindTransaction(tt)
 
           case _ => Diff.empty
         }

@@ -22,6 +22,7 @@ import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.{NTPTime, NoShrink, TestWallet, TransactionGen}
+import org.scalacheck.Gen
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.libs.json.JsObject
 
@@ -122,11 +123,18 @@ class LeaseRouteSpec
 
   private def toDetails(lt: LeaseTransaction) = LeaseDetails(lt.sender, lt.recipient, lt.id(), lt.amount, isActive = true)
 
+  private def leaseGen(sender: KeyPair, maxAmount: Long, timestamp: Long): Gen[LeaseTransaction] = for {
+    fee <- smallFeeGen
+    recipient <- accountGen
+    amount <- Gen.chooseNum(1, maxAmount)
+    version <- Gen.oneOf(1.toByte, 2.toByte, 3.toByte)
+  } yield LeaseTransaction.selfSigned(version, sender, recipient.toAddress, amount, fee, timestamp).explicitGet()
+
   "returns active leases which were" - {
     val genesisWithLease = for {
       sender  <- accountGen
       genesis <- genesisGeneratorP(sender.toAddress)
-      leaseTx <- leaseGen(sender, ntpTime.correctedTime())
+      leaseTx <- leaseGen(sender, genesis.amount, ntpTime.correctedTime())
     } yield (sender, genesis, leaseTx)
 
     "created and cancelled by Lease/LeaseCancel transactions" in forAll(genesisWithLease) {
