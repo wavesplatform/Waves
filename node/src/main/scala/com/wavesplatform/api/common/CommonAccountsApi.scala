@@ -137,17 +137,7 @@ object CommonAccountsApi extends ScorexLogging {
         case TransactionMeta(height, lt: LeaseTransaction, true) if leaseIsActive(lt.id()) =>
           val recipient = blockchain.resolveAlias(lt.recipient).explicitGet()
           Seq(
-            LeaseInfo(
-              lt.id.value(),
-              lt.id.value(),
-              lt.sender.toAddress,
-              recipient,
-              lt.amount,
-              height,
-              LeaseInfo.Status.Active,
-              Some(LeaseInfo.TransactionRef(lt.id(), height)),
-              None
-            )
+            LeaseInfo(lt.id.value(), lt.id.value(), lt.sender.toAddress, recipient, lt.amount, height, LeaseInfo.Status.Active)
           )
 
         case TransactionMeta.Invoke(height, invoke, true, scriptResult) =>
@@ -156,24 +146,15 @@ object CommonAccountsApi extends ScorexLogging {
             .map { lease =>
               val sender    = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
               val recipient = blockchain.resolveAlias(lease.recipient).explicitGet()
-              LeaseInfo(
-                lease.leaseId,
-                invoke.id.value(),
-                sender,
-                recipient,
-                lease.amount,
-                height,
-                LeaseInfo.Status.Active,
-                Some(LeaseInfo.TransactionRef(invoke.id(), height)),
-                None
-              )
+              LeaseInfo(lease.leaseId, invoke.id.value(), sender, recipient, lease.amount, height, LeaseInfo.Status.Active)
             }
         case _ => Seq()
       }
     }
 
     def leaseInfo(leaseId: ByteStr): Option[LeaseInfo] = blockchain.leaseDetails(leaseId) map { ld =>
-      val Some((height, tx, true)) = blockchain.transactionInfo(ld.sourceId)
+      val Some((height, true)) = blockchain.transactionMeta(ld.sourceId)
+      
       LeaseInfo(
         leaseId,
         ld.sourceId,
@@ -181,15 +162,12 @@ object CommonAccountsApi extends ScorexLogging {
         blockchain.resolveAlias(ld.recipient).explicitGet(),
         ld.amount,
         height,
-        if (ld.isActive) LeaseInfo.Status.Active else LeaseInfo.Status.Cancelled,
-        Some(LeaseInfo.TransactionRef(ld.sourceId, height)),
-        None // TODO: Lease cancel ref
+        if (ld.isActive) LeaseInfo.Status.Active else LeaseInfo.Status.Cancelled
       )
     }
 
     private[this] def leaseIsActive(id: ByteStr): Boolean =
       blockchain.leaseDetails(id).exists(_.isActive)
   }
-
 
 }

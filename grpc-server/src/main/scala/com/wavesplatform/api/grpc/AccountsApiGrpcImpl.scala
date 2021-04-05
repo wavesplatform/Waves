@@ -1,10 +1,11 @@
 package com.wavesplatform.api.grpc
 
+import scala.concurrent.Future
+
 import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.{BytesValue, StringValue}
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.api.common.CommonAccountsApi
-import com.wavesplatform.api.common.CommonAccountsApi.LeaseInfo
+import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.fromAssetIdAndAmount
@@ -12,8 +13,6 @@ import com.wavesplatform.transaction.Asset
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
 import monix.reactive.Observable
-
-import scala.concurrent.Future
 
 class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) extends AccountsApiGrpc.AccountsApi {
 
@@ -64,13 +63,15 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
     }
   }
 
+  // TODO: Lease info route?
   override def getActiveLeases(request: AccountRequest, responseObserver: StreamObserver[LeaseResponse]): Unit =
     responseObserver.interceptErrors {
       val result =
         commonApi
           .activeLeases(request.address.toAddress)
           .map {
-            case LeaseInfo(leaseId, originTransactionId, sender, recipient, amount, height) =>
+            case LeaseInfo(leaseId, originTransactionId, sender, recipient, amount, height, status) =>
+              assert(status == LeaseInfo.Status.Active)
               LeaseResponse(
                 leaseId.toByteString,
                 originTransactionId.toByteString,

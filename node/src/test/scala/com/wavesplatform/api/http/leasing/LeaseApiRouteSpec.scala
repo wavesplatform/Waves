@@ -28,17 +28,7 @@ class LeaseApiRouteSpec extends RouteSpec("/leasing") with PathMockFactory with 
       .when(lease.id())
       .returning(
         Some(
-          LeaseInfo(
-            lease.id(),
-            lease.id(),
-            lease.sender.toAddress,
-            lease.recipient.asInstanceOf[Address],
-            lease.amount,
-            1,
-            LeaseInfo.Status.Active,
-            Some(LeaseInfo.TransactionRef(lease.id(), 1)),
-            Some(LeaseInfo.TransactionRef(leaseCancel.id(), 2))
-          )
+          LeaseInfo(lease.id(), lease.id(), lease.sender.toAddress, lease.recipient.asInstanceOf[Address], lease.amount, 1, LeaseInfo.Status.Active)
         )
       )
     (commonApi.leaseInfo _).when(*).returning(None)
