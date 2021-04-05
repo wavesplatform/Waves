@@ -67,13 +67,13 @@ object Types {
       "Invocation",
       payments(v.supportsMultiPayment) ::
         List(
-          "caller"          -> addressType,
-          "callerPublicKey" -> BYTESTR,
-          "originalCaller"          -> addressType,
-          "originalCallerPublicKey" -> BYTESTR,
-          "transactionId"   -> BYTESTR,
-          "fee"             -> LONG,
-          "feeAssetId"      -> optionByteVector
+          "caller"                -> addressType,
+          "callerPublicKey"       -> BYTESTR,
+          "originCaller"          -> addressType,
+          "originCallerPublicKey" -> BYTESTR,
+          "transactionId"         -> BYTESTR,
+          "fee"                   -> LONG,
+          "feeAssetId"            -> optionByteVector
         )
     )
 

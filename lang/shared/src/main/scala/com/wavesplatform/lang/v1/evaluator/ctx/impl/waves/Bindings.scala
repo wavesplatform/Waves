@@ -114,13 +114,13 @@ object Bindings {
 
   def buildInvocation(i: Invocation, version: StdLibVersion): CaseObj = {
     val fields: Map[String, EVALUATED] = Map(
-      "caller"          -> mapRecipient(i.caller)._2,
-      "callerPublicKey" -> i.callerPk,
-      "originalCaller"  -> mapRecipient(i.originalCaller)._2,
-      "originalCallerPublicKey" -> i.originalCallerPublicKey,
-      "transactionId"   -> i.transactionId,
-      "fee"             -> i.fee,
-      "feeAssetId"      -> i.feeAssetId
+      "caller"                -> mapRecipient(i.caller)._2,
+      "callerPublicKey"       -> i.callerPk,
+      "originCaller"          -> mapRecipient(i.originCaller)._2,
+      "originCallerPublicKey" -> i.originCallerPublicKey,
+      "transactionId"         -> i.transactionId,
+      "fee"                   -> i.fee,
+      "feeAssetId"            -> i.feeAssetId
     )
     CaseObj(invocationType(version), fields + buildPayments(i.payments))
   }
