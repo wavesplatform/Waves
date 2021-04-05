@@ -1025,7 +1025,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx.compilerContext, expr, V5) shouldBe Symbol("right")
   }
 
-  property("@Callable Invoke isn't avalable for V4") {
+  property("@Callable Invoke isn't available for V4") {
     val expr = {
       val script =
         """
@@ -1061,6 +1061,32 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("left")
+  }
+
+  property("originCaller and originCallerPublicKey fields isn't available for V4") {
+    val expr = {
+      val script =
+        """
+          | {-# STDLIB_VERSION 4    #-}
+          | {-#CONTENT_TYPE    DAPP #-}
+          |
+          | @Callable(i)
+          | func foo() = {
+          |   let a = i.originCaller
+          |   let b = i.originCallerPublicKey
+          |   []
+          | }
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    val ctx =
+      PureContext.build(V4).withEnvironment[Environment] |+|
+      WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
+
+    compiler.ContractCompiler(ctx.compilerContext, expr, V4) should produce(
+      "Undefined field `originCaller` of variable of type `Invocation` in 101-115; " +
+        "Undefined field `originCallerPublicKey` of variable of type `Invocation` in 127-150"
+    )
   }
 
   property("contract script compaction") {
