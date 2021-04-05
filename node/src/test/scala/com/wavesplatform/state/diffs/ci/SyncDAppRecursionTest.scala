@@ -120,7 +120,11 @@ class SyncDAppRecursionTest
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       features
-    )(_ should produce(s"Complex dApp recursion is prohibited, but dApp at address ${invoke.senderAddress} was called twice"))
+    )(
+      _ should produce(
+        s"The invocation stack contains multiple invocations of the dApp at address ${invoke.senderAddress} with invocations of another dApp between them"
+      )
+    )
   }
 
   // A -> B -> C -> B
@@ -147,7 +151,11 @@ class SyncDAppRecursionTest
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       features
-    )(_ should produce(s"Complex dApp recursion is prohibited, but dApp at address ${invoke.dAppAddressOrAlias} was called twice"))
+    )(
+      _ should produce(
+        s"The invocation stack contains multiple invocations of the dApp at address ${invoke.dAppAddressOrAlias} with invocations of another dApp between them"
+      )
+    )
   }
 
   // A -> B -> C -> D -> C
@@ -177,6 +185,10 @@ class SyncDAppRecursionTest
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       features
-    )(_ should produce(s"Complex dApp recursion is prohibited, but dApp at address ${setDApp3.sender.toAddress} was called twice"))
+    )(
+      _ should produce(
+        s"The invocation stack contains multiple invocations of the dApp at address ${setDApp3.sender.toAddress} with invocations of another dApp between them"
+      )
+    )
   }
 }
