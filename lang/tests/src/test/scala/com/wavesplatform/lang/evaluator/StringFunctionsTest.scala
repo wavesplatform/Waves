@@ -42,6 +42,7 @@ class StringFunctionsTest extends PropSpec with ScalaCheckPropertyChecks with Sc
     eval(""" take("abc", 2) """)    shouldBe CONST_STRING("ab")
     eval(""" take("abc", 100) """)  shouldBe CONST_STRING("abc")
     eval(""" take("abc", -100) """) shouldBe CONST_STRING("")
+    eval(s"""take("${"a" * Short.MaxValue}", ${Short.MaxValue}) """) shouldBe CONST_STRING("a" * Short.MaxValue)
   }
 
   property("takeRight") {
@@ -49,6 +50,7 @@ class StringFunctionsTest extends PropSpec with ScalaCheckPropertyChecks with Sc
     eval(""" takeRight("abc", 2) """)    shouldBe CONST_STRING("bc")
     eval(""" takeRight("abc", 100) """)  shouldBe CONST_STRING("abc")
     eval(""" takeRight("abc", -100) """) shouldBe CONST_STRING("")
+    eval(s"""takeRight("${"a" * Short.MaxValue}", ${Short.MaxValue}) """) shouldBe CONST_STRING("a" * Short.MaxValue)
   }
 
   property("drop") {
@@ -56,6 +58,7 @@ class StringFunctionsTest extends PropSpec with ScalaCheckPropertyChecks with Sc
     eval(""" drop("abc", 2) """)    shouldBe CONST_STRING("c")
     eval(""" drop("abc", 100) """)  shouldBe CONST_STRING("")
     eval(""" drop("abc", -100) """) shouldBe CONST_STRING("abc")
+    eval(s"""drop("${"a" * Short.MaxValue}", ${Short.MaxValue}) """) shouldBe CONST_STRING("")
   }
 
   property("dropRight") {
@@ -63,11 +66,13 @@ class StringFunctionsTest extends PropSpec with ScalaCheckPropertyChecks with Sc
     eval(""" dropRight("abc", 2) """)    shouldBe CONST_STRING("a")
     eval(""" dropRight("abc", 100) """)  shouldBe CONST_STRING("")
     eval(""" dropRight("abc", -100) """) shouldBe CONST_STRING("abc")
+    eval(s"""dropRight("${"a" * Short.MaxValue}", ${Short.MaxValue}) """) shouldBe CONST_STRING("")
   }
 
   property("size") {
     eval(""" "".size() """)    shouldBe Right(CONST_LONG(0))
     eval(""" "abc".size() """) shouldBe Right(CONST_LONG(3))
+    eval(s""" "${"a" * Short.MaxValue}".size() """) shouldBe Right(CONST_LONG(Short.MaxValue))
   }
 
   property("indexOf") {
