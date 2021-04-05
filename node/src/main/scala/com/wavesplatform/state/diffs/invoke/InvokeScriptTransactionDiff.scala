@@ -195,7 +195,7 @@ object InvokeScriptTransactionDiff {
                 TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
             }
           } yield invocationDiff |+| resultDiff
-        } yield result.bindTransaction(tx)
+        } yield result
 
       case Left(l) => TracedResult(Left(l))
       case _       => TracedResult(Left(GenericError(s"No contract at address ${tx.dAppAddressOrAlias}")))
