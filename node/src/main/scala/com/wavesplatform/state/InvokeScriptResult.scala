@@ -19,20 +19,27 @@ import com.wavesplatform.utils._
 import play.api.libs.json._
 
 final case class InvokeScriptResult(
-    data: Seq[DataEntry[_]] = Nil,
+    data: Seq[R.DataEntry] = Nil,
     transfers: Seq[R.Payment] = Nil,
-    issues: Seq[Issue] = Nil,
-    reissues: Seq[Reissue] = Nil,
-    burns: Seq[Burn] = Nil,
-    sponsorFees: Seq[SponsorFee] = Nil,
+    issues: Seq[R.Issue] = Nil,
+    reissues: Seq[R.Reissue] = Nil,
+    burns: Seq[R.Burn] = Nil,
+    sponsorFees: Seq[R.SponsorFee] = Nil,
     leases: Seq[R.Lease] = Nil,
-    leaseCancels: Seq[LeaseCancel] = Nil,
+    leaseCancels: Seq[R.LeaseCancel] = Nil,
     invokes: Seq[R.Invocation] = Nil,
     error: Option[R.ErrorMessage] = None
 )
 
 //noinspection TypeAnnotation
 object InvokeScriptResult {
+  type LeaseCancel = com.wavesplatform.lang.v1.traits.domain.LeaseCancel
+  type SponsorFee = com.wavesplatform.lang.v1.traits.domain.SponsorFee
+  type Issue = com.wavesplatform.lang.v1.traits.domain.Issue
+  type Reissue = com.wavesplatform.lang.v1.traits.domain.Reissue
+  type Burn = com.wavesplatform.lang.v1.traits.domain.Burn
+  type DataEntry = com.wavesplatform.state.DataEntry[_]
+
   val empty = InvokeScriptResult()
 
   final case class AttachedPayment(asset: Asset, amount: Long)
