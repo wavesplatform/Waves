@@ -1,6 +1,7 @@
 package com.wavesplatform.api.http
 
 import scala.annotation.tailrec
+import scala.util.Try
 
 import akka.http.scaladsl.server.{Route, StandardRoute}
 import cats.syntax.either._
@@ -71,7 +72,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
         _ <- Either.cond(timestamp <= time.correctedTime(), (), "Indicated timestamp belongs to the future")
         genesisTimestamp = commonApi.metaAtHeight(1).fold(0L)(_.header.timestamp)
         _ <- Either.cond(timestamp >= genesisTimestamp, (), "Indicated timestamp is before the start of the blockchain")
-        result = heightByTimestamp(timestamp)
+        result <- Try(heightByTimestamp(timestamp)).toEither.leftMap(_.getMessage)
       } yield result)
 
       complete(heightE.bimap(GenericError(_), h => Json.obj("height" -> h)))
@@ -102,6 +103,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
     }
   }
 
+  @throws[IllegalStateException]("if the state is altered while executing")
   private[this] def heightByTimestamp(target: Long): Int = {
     def timestampOf(height: Int, default: => Long = throw new IllegalStateException("State was altered")): Long =
       commonApi.metaAtHeight(height).fold(default)(_.header.timestamp)

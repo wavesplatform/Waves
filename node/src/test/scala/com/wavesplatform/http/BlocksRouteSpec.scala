@@ -250,6 +250,12 @@ class BlocksRouteSpec
   routePath("/heightByTimestamp") in {
     val blocks = (1 to 10).map(i => TestBlock.create(i * 10, Nil))
     (() => blocksApi.currentHeight).expects().returning(10).anyNumberOfTimes()
+
+    (blocksApi.metaAtHeight _).expects(1).returning(None).repeat(2)
+    Get(routePath(s"/heightByTimestamp/1")) ~> route ~> check {
+      responseAs[JsObject] shouldBe Json.parse("{\"error\":199,\"message\":\"State was altered\"}")
+    }
+
     (blocksApi.metaAtHeight _)
       .expects(*)
       .onCall { (height: Int) =>
@@ -287,13 +293,11 @@ class BlocksRouteSpec
     }
 
     Get(routePath(s"/heightByTimestamp/9")) ~> route ~> check {
-      val result = (responseAs[JsObject] \ "message").as[String]
-      result shouldBe "Indicated timestamp is before the start of the blockchain"
+      responseAs[JsObject] shouldBe Json.parse("{\"error\":199,\"message\":\"Indicated timestamp is before the start of the blockchain\"}")
     }
 
     Get(routePath(s"/heightByTimestamp/${System.currentTimeMillis() + 10000}")) ~> route ~> check {
-      val result = (responseAs[JsObject] \ "message").as[String]
-      result shouldBe "Indicated timestamp belongs to the future"
+      responseAs[JsObject] shouldBe Json.parse("{\"error\":199,\"message\":\"Indicated timestamp belongs to the future\"}")
     }
   }
 }
