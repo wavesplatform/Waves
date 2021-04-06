@@ -153,7 +153,7 @@ object CommonAccountsApi extends ScorexLogging {
     }
 
     def leaseInfo(leaseId: ByteStr): Option[LeaseInfo] = blockchain.leaseDetails(leaseId) map { ld =>
-      val Some((height, true)) = blockchain.transactionMeta(ld.sourceId)
+      val (height, _) = blockchain.transactionMeta(ld.sourceId).get
       
       LeaseInfo(
         leaseId,
