@@ -70,7 +70,7 @@ object InvokeScriptDiff {
             case _                       => None
           }
           complexityAfterPayments <- checkedPayments.foldLeft(traced(Right(remainingComplexity): TxValidationError.Validation[Int])) { (prev, a) =>
-            (prev.v.value(), a) match {
+            (prev.v(), a) match {
               case (TracedResult(Left(_), _), _) => prev
               case (TracedResult(Right(nextRemainingComplexity), _), (script, amount, assetId)) =>
                 val usedComplexity = limit - nextRemainingComplexity
@@ -148,7 +148,6 @@ object InvokeScriptDiff {
                   tx.root,
                   tx.dAppAddress,
                   pk,
-                  tx.senderDApp,
                   callChain + dAppAddress,
                   limitedExecution,
                   remainingCalls - 1,

@@ -5,19 +5,17 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.V4
-import com.wavesplatform.lang.script.ContractScript
-import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
 import com.wavesplatform.state.EmptyDataEntry
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
-import com.wavesplatform.state.diffs.ci.{ciFee, compileContractFromExpr}
+import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, Transaction, TxWithFee}
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
-import org.scalacheck.Gen
 import org.scalatest.{EitherValues, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
@@ -35,63 +33,42 @@ class SmartAccountFeeTest
 
   private val activationHeight = 3
 
-  private val scriptWithEmptyVerifier = {
-    val script =
-      """
-        | {-# STDLIB_VERSION 4       #-}
-        | {-# CONTENT_TYPE   DAPP    #-}
-        | {-# SCRIPT_TYPE    ACCOUNT #-}
-        |
-      """.stripMargin
+  private val scriptWithEmptyVerifier = TestCompiler(V4).compileContract("""
+    | {-# STDLIB_VERSION 4       #-}
+    | {-# CONTENT_TYPE   DAPP    #-}
+    | {-# SCRIPT_TYPE    ACCOUNT #-}
+    |
+    |""".stripMargin)
 
-    val expr     = Parser.parseContract(script).get.value
-    val contract = compileContractFromExpr(expr, V4)
-    ContractScript(V4, contract).explicitGet()
-  }
+  private val scriptWithSmallVerifier = TestCompiler(V4).compileContract("""
+    | {-# STDLIB_VERSION 4       #-}
+    | {-# CONTENT_TYPE   DAPP    #-}
+    | {-# SCRIPT_TYPE    ACCOUNT #-}
+    |
+    | @Verifier(tx)
+    | func verify() =
+    |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) &&
+    |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) &&
+    |   sigVerify_8Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
+    |
+    | @Callable(i)
+    | func default() = []
+    |""".stripMargin)
 
-  private val scriptWithSmallVerifier = {
-    val script =
-      """
-        | {-# STDLIB_VERSION 4       #-}
-        | {-# CONTENT_TYPE   DAPP    #-}
-        | {-# SCRIPT_TYPE    ACCOUNT #-}
-        |
-        | @Verifier(tx)
-        | func verify() =
-        |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) &&
-        |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) &&
-        |   sigVerify_8Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
-        |
-        | @Callable(i)
-        | func default() = []
-      """.stripMargin
-
-    val expr     = Parser.parseContract(script).get.value
-    val contract = compileContractFromExpr(expr, V4)
-    ContractScript(V4, contract).explicitGet()
-  }
-
-  private val scriptWithPaidVerifier = {
-    val script =
-      """
-        | {-# STDLIB_VERSION 4       #-}
-        | {-# CONTENT_TYPE   DAPP    #-}
-        | {-# SCRIPT_TYPE    ACCOUNT #-}
-        |
-        | @Verifier(tx)
-        | func verify() =
-        |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) &&
-        |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) &&
-        |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
-        |
-        | @Callable(i)
-        | func default() = []
-      """.stripMargin
-
-    val expr     = Parser.parseContract(script).get.value
-    val contract = compileContractFromExpr(expr, V4)
-    ContractScript(V4, contract).explicitGet()
-  }
+  private val scriptWithPaidVerifier = TestCompiler(V4).compileContract("""
+    | {-# STDLIB_VERSION 4       #-}
+    | {-# CONTENT_TYPE   DAPP    #-}
+    | {-# SCRIPT_TYPE    ACCOUNT #-}
+    |
+    | @Verifier(tx)
+    | func verify() =
+    |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) &&
+    |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) &&
+    |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
+    |
+    | @Callable(i)
+    | func default() = []
+    |""".stripMargin)
 
   private val features = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -108,13 +85,7 @@ class SmartAccountFeeTest
     blocksForFeatureActivation = 1
   )
 
-  private val preconditions: Gen[
-    (
-        List[Transaction],
-        List[() => Transaction with TxWithFee],
-        List[() => Transaction with TxWithFee]
-    )
-  ] =
+  private val preconditions =
     for {
       accountWithPaidVerifier  <- accountGen
       accountWithSmallVerifier <- accountGen

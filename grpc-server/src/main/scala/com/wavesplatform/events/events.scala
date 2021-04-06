@@ -538,7 +538,7 @@ object BlockAppended {
     }
 
     BlockAppended(
-      block.id.value(),
+      block.id(),
       blockchainBeforeWithMinerReward.height + 1,
       block,
       updatedWavesAmount,

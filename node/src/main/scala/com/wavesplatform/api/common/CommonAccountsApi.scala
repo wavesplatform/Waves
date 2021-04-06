@@ -11,9 +11,10 @@ import com.wavesplatform.database
 import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.reactive.Observable
@@ -123,24 +124,29 @@ object CommonAccountsApi extends ScorexLogging {
       common.activeLeases(db, Some(Height(blockchain.height) -> diff), address, leaseIsActive)
     }
 
-    override def activeLeases(address: Address): Observable[LeaseInfo] = {
-      addressTransactions(db, Some(Height(blockchain.height) -> diff), address, None, Set(), None)
-        .flatMapIterable {
-          case TransactionMeta(h, lt: LeaseTransaction, true) if leaseIsActive(lt.id()) =>
-            val recipient = blockchain.resolveAlias(lt.recipient).explicitGet()
-            Seq(LeaseInfo(lt.id.value(), lt.id.value(), lt.sender.toAddress, recipient, lt.amount, h))
-          case Invoke(height, invoke, true, scriptResult) =>
-            scriptResult
-              .toSeq
-              .flatMap(_.leases.filter(l => leaseIsActive(l.leaseId)))
-              .map { lease =>
-                val sender = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
-                val recipient = blockchain.resolveAlias(lease.recipient).explicitGet()
-                LeaseInfo(lease.leaseId, invoke.id.value(), sender, recipient, lease.amount, height)
-              }
-          case _ => Seq()
-        }
-    }
+    override def activeLeases(address: Address): Observable[LeaseInfo] =
+      addressTransactions(
+        db,
+        Some(Height(blockchain.height) -> diff),
+        address,
+        None,
+        Set(LeaseTransaction.typeId, InvokeScriptTransaction.typeId),
+        None
+      ).flatMapIterable {
+        case TransactionMeta(h, lt: LeaseTransaction, true) if leaseIsActive(lt.id()) =>
+          Seq(LeaseInfo(lt.id(), lt.id(), lt.sender.toAddress, blockchain.resolveAlias(lt.recipient).explicitGet(), lt.amount, h))
+        case Invoke(height, originTransaction, true, Some(scriptResult)) =>
+          def extractLeases(sender: Address, result: InvokeScriptResult): Seq[LeaseInfo] =
+            result.leases.collect {
+              case lease if leaseIsActive(lease.leaseId) =>
+                LeaseInfo(lease.leaseId, originTransaction.id(), sender, blockchain.resolveAlias(lease.recipient).explicitGet(), lease.amount, height)
+            } ++ {
+              result.invokes.flatMap(i => extractLeases(i.dApp, i.stateChanges))
+            }
+
+          extractLeases(blockchain.resolveAlias(originTransaction.dAppAddressOrAlias).explicitGet(), scriptResult)
+        case _ => Seq()
+      }
 
     private def leaseIsActive(id: ByteStr): Boolean =
       blockchain.leaseDetails(id).exists(_.isActive)

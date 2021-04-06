@@ -57,9 +57,9 @@ class UtxPriorityPoolSpecification
               tt.sender.toAddress                -> -(tt.fee + tt.amount),
               tt.recipient.asInstanceOf[Address] -> tt.amount
             ).view.mapValues(Portfolio.waves).toMap
-            Diff(tt, pfs)
+            Diff(portfolios = pfs).bindTransaction(tt)
 
-          case tx => Diff(tx)
+          case _ => Diff.empty
         }
         utx.setPriorityDiffs(asDiffs)
       }
@@ -192,7 +192,7 @@ class UtxPriorityPoolSpecification
         new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
 
       def createDiff(): Diff =
-        Monoid.combineAll((1 to 5).map(_ => Diff(TxHelpers.issue())))
+        Monoid.combineAll((1 to 5).map(_ => Diff.empty.bindTransaction(TxHelpers.issue())))
 
       utx.setPriorityDiffs(Seq(createDiff(), createDiff())) // 10 total
       utx.priorityPool.nextMicroBlockSize(3) shouldBe 5
