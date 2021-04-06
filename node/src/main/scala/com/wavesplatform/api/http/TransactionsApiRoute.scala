@@ -226,9 +226,14 @@ case class TransactionsApiRoute(
 }
 
 object TransactionsApiRoute {
-  object LeaseStatus {
-    val Active   = "active"
-    val Canceled = "canceled"
+  type LeaseStatus = LeaseStatus.Value
+
+  //noinspection TypeAnnotation
+  object LeaseStatus extends Enumeration {
+    val Active = Value(1)
+    val Cancelled = Value(0)
+
+    def apply(bool: Boolean): LeaseStatus = if (bool) Active else Cancelled
   }
 
   object Status {
@@ -275,7 +280,7 @@ object TransactionsApiRoute {
       val specificInfo = meta.transaction match {
         case lease: LeaseTransaction =>
           import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus._
-          Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
+          Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Cancelled))
 
         case leaseCancel: LeaseCancelTransaction =>
           Json.obj("lease" -> leaseIdToLeaseRef(leaseCancel.leaseId))
@@ -320,7 +325,7 @@ object TransactionsApiRoute {
       val ld          = blockchain.leaseDetails(leaseId).get
       val (height, _) = blockchain.transactionMeta(ld.sourceId).get
       val recipient   = blockchain.resolveAlias(ld.recipient).explicitGet()
-      LeaseRef(leaseId, ld.sourceId, ld.sender.toAddress, recipient, ld.amount, height, LeaseRef.Status(ld.isActive))
+      LeaseRef(leaseId, ld.sourceId, ld.sender.toAddress, recipient, ld.amount, height, LeaseStatus(ld.isActive))
     }
 
     private[http] implicit val leaseFormat: OWrites[InvokeScriptResult.Lease] =
@@ -330,22 +335,13 @@ object TransactionsApiRoute {
       LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.LeaseCancel) => leaseIdToLeaseRef(l.leaseId))
 
     private[http] implicit val invokeScriptResultWrites: OWrites[InvokeScriptResult] = {
+      import InvokeScriptResult.{issueFormat, reissueFormat, burnFormat, sponsorFeeFormat}
       Json.writes[InvokeScriptResult]
     }
   }
 
-  private[this] final case class LeaseRef(leaseId: ByteStr, originTransactionId: ByteStr, sender: Address, recipient: Address, amount: TxAmount, height: Int, status: LeaseRef.Status = LeaseRef.Status.Active)
+  private[this] final case class LeaseRef(leaseId: ByteStr, originTransactionId: ByteStr, sender: Address, recipient: Address, amount: TxAmount, height: Int, status: LeaseStatus = LeaseStatus.Active)
   private[this] object LeaseRef {
-    type Status = Status.Value
-
-    //noinspection TypeAnnotation
-    final object Status extends Enumeration {
-      val Active = Value(1)
-      val Cancelled = Value(0)
-
-      def apply(bool: Boolean): Status = if (bool) Active else Cancelled
-    }
-
     implicit val jsonWrites: OWrites[LeaseRef] = {
       import com.wavesplatform.utils.byteStrFormat
       Json.writes[LeaseRef]
