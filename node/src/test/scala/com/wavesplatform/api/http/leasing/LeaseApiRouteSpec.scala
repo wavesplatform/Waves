@@ -35,64 +35,35 @@ class LeaseApiRouteSpec extends RouteSpec("/leasing") with PathMockFactory with 
 
     Get(routePath(s"/info/${lease.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
-      response shouldBeJson s"""
-                               |{
+      response shouldBeJson s"""{
                                |  "leaseId" : "${lease.id()}",
                                |  "originTransactionId" : "${lease.id()}",
-                               |  "sender" : "${lease.sender.toAddress}",
-                               |  "recipient" : "${lease.recipient.stringRepr}",
+                               |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                               |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                                |  "amount" : 1000000000,
                                |  "height" : 1,
-                               |  "status" : "active",
-                               |  "leaseTransactionRef" : {
-                               |    "originTransactionId" : "${lease.id()}",
-                               |    "height" : 1
-                               |  },
-                               |  "leaseCancelTransactionRef" : {
-                               |    "originTransactionId" : "${leaseCancel.id()}",
-                               |    "height" : 2
-                               |  }
-                               |}
-                               |""".stripMargin
+                               |  "status" : "active"
+                               |}""".stripMargin
     }
 
-    val leasesListJson = Json.parse(s"""[
-                                       |{
+    val leasesListJson = Json.parse(s"""[{
                                        |  "leaseId" : "${lease.id()}",
                                        |  "originTransactionId" : "${lease.id()}",
-                                       |  "sender" : "${lease.sender.toAddress}",
-                                       |  "recipient" : "${lease.recipient.stringRepr}",
+                                       |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                       |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                                        |  "amount" : 1000000000,
                                        |  "height" : 1,
-                                       |  "status" : "active",
-                                       |  "leaseTransactionRef" : {
-                                       |    "originTransactionId" : "${lease.id()}",
-                                       |    "height" : 1
-                                       |  },
-                                       |  "leaseCancelTransactionRef" : {
-                                       |    "originTransactionId" : "${leaseCancel.id()}",
-                                       |    "height" : 2
-                                       |  }
+                                       |  "status" : "active"
                                        |},
-                                       |{
+                                       {
                                        |  "leaseId" : "${lease.id()}",
                                        |  "originTransactionId" : "${lease.id()}",
-                                       |  "sender" : "${lease.sender.toAddress}",
-                                       |  "recipient" : "${lease.recipient.stringRepr}",
+                                       |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                       |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                                        |  "amount" : 1000000000,
                                        |  "height" : 1,
-                                       |  "status" : "active",
-                                       |  "leaseTransactionRef" : {
-                                       |    "originTransactionId" : "${lease.id()}",
-                                       |    "height" : 1
-                                       |  },
-                                       |  "leaseCancelTransactionRef" : {
-                                       |    "originTransactionId" : "${leaseCancel.id()}",
-                                       |    "height" : 2
-                                       |  }
-                                       |}
-                                       |]
-                                       |""".stripMargin)
+                                       |  "status" : "active"
+                                       |}]""".stripMargin)
 
     Get(routePath(s"/info?id=${lease.id()}&id=${lease.id()}")) ~> route ~> check {
       val response = responseAs[JsArray]
