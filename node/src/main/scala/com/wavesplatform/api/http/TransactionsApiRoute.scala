@@ -1,5 +1,8 @@
 package com.wavesplatform.api.http
 
+import scala.concurrent.Future
+import scala.util.Success
+
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import cats.instances.either._
@@ -15,11 +18,11 @@ import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.{Base58, _}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, InvokeScriptResult}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.utils.Time
@@ -27,9 +30,6 @@ import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json._
-
-import scala.concurrent.Future
-import scala.util.Success
 
 case class TransactionsApiRoute(
     settings: RestAPISettings,
@@ -317,5 +317,41 @@ object TransactionsApiRoute {
       TransactionJsonSerializer.applicationStatus(isBlockV5(height), succeeded)
 
     private[this] def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)
+
+    // Extended lease format. Overrides default
+    private[this] def leaseIdToLeaseRef(leaseId: ByteStr): LeaseRef = {
+      val ld          = blockchain.leaseDetails(leaseId).get
+      val (height, _) = blockchain.transactionMeta(ld.sourceId).get
+      val recipient   = blockchain.resolveAlias(ld.recipient).explicitGet()
+      LeaseRef(leaseId, ld.sourceId, ld.sender.toAddress, recipient, ld.amount, height, LeaseRef.Status(ld.isActive))
+    }
+
+    private[http] implicit val leaseFormat: OWrites[InvokeScriptResult.Lease] =
+      LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.Lease) => leaseIdToLeaseRef(l.leaseId))
+
+    private[http] implicit val leaseCancelFormat: OWrites[InvokeScriptResult.LeaseCancel] =
+      LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.LeaseCancel) => leaseIdToLeaseRef(l.leaseId))
+
+    private[http] implicit val invokeScriptResultWrites: OWrites[InvokeScriptResult] = {
+      Json.writes[InvokeScriptResult]
+    }
+  }
+
+  private[this] final case class LeaseRef(leaseId: ByteStr, originTransactionId: ByteStr, sender: Address, recipient: Address, amount: TxAmount, height: Int, status: LeaseRef.Status = LeaseRef.Status.Active)
+  private[this] object LeaseRef {
+    type Status = Status.Value
+
+    //noinspection TypeAnnotation
+    final object Status extends Enumeration {
+      val Active = Value(1)
+      val Cancelled = Value(0)
+
+      def apply(bool: Boolean): Status = if (bool) Active else Cancelled
+    }
+
+    implicit val jsonWrites: OWrites[LeaseRef] = {
+      import com.wavesplatform.utils.byteStrFormat
+      Json.writes[LeaseRef]
+    }
   }
 }
