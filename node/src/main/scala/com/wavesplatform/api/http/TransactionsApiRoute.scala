@@ -278,10 +278,7 @@ object TransactionsApiRoute {
           Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
 
         case leaseCancel: LeaseCancelTransaction =>
-          val leaseTx = blockchain.transactionInfo(leaseCancel.leaseId) map {
-            case (_, tx, _) => tx
-          }
-          Json.obj("lease" -> leaseTx)
+          Json.obj("lease" -> leaseIdToLeaseRef(leaseCancel.leaseId))
 
         case _ => JsObject.empty
       }
