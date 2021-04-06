@@ -42,7 +42,7 @@ class LeaseApiRouteSpec extends RouteSpec("/leasing") with PathMockFactory with 
                                |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                                |  "amount" : 1000000000,
                                |  "height" : 1,
-                               |  "status" : "active"
+                               |  "status" : "Active"
                                |}""".stripMargin
     }
 
@@ -53,7 +53,7 @@ class LeaseApiRouteSpec extends RouteSpec("/leasing") with PathMockFactory with 
                                        |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                                        |  "amount" : 1000000000,
                                        |  "height" : 1,
-                                       |  "status" : "active"
+                                       |  "status" : "Active"
                                        |},
                                        {
                                        |  "leaseId" : "${lease.id()}",
@@ -62,7 +62,7 @@ class LeaseApiRouteSpec extends RouteSpec("/leasing") with PathMockFactory with 
                                        |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                                        |  "amount" : 1000000000,
                                        |  "height" : 1,
-                                       |  "status" : "active"
+                                       |  "status" : "Active"
                                        |}]""".stripMargin)
 
     Get(routePath(s"/info?id=${lease.id()}&id=${lease.id()}")) ~> route ~> check {
