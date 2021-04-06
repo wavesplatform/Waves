@@ -2788,7 +2788,7 @@ class InvokeScriptTransactionDiffTest
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
             diff.scriptResults(invokeTx.id()).error shouldBe None
-            val List(l: InvokeScriptResult.Lease, l1: InvokeScriptResult.Lease) = diff.scriptResults(invokeTx.id()).leases
+            val List(l: InvokeScriptResult.LeaseRef, l1: InvokeScriptResult.LeaseRef) = diff.scriptResults(invokeTx.id()).leases
             val List(l2)                                                        = diff.scriptResults(invokeTx.id()).leaseCancels
             l.amount shouldBe 13
             l.recipient shouldBe service
@@ -2902,7 +2902,7 @@ class InvokeScriptTransactionDiffTest
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
             diff.scriptResults(invokeTx.id()).error shouldBe None
-            val List(l:InvokeScriptResult.Lease, l1:InvokeScriptResult.Lease) = diff.scriptResults(invokeTx.id()).leases
+            val List(l:InvokeScriptResult.LeaseRef, l1:InvokeScriptResult.LeaseRef) = diff.scriptResults(invokeTx.id()).leases
             val List(l2) = diff.scriptResults(invokeTx.id()).leaseCancels
             l.amount shouldBe 13
             l.recipient shouldBe service
@@ -3025,7 +3025,7 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, dApp, service) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
-            val List(l:InvokeScriptResult.Lease, l1:InvokeScriptResult.Lease) = diff.scriptResults(invokeTx.id()).leases
+            val List(l:InvokeScriptResult.LeaseRef, l1:InvokeScriptResult.LeaseRef) = diff.scriptResults(invokeTx.id()).leases
             val List(l2) = diff.scriptResults(invokeTx.id()).leaseCancels
             l.amount shouldBe 13
             l.recipient shouldBe service
