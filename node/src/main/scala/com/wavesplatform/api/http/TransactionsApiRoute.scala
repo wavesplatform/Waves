@@ -230,10 +230,10 @@ object TransactionsApiRoute {
 
   //noinspection TypeAnnotation
   object LeaseStatus extends Enumeration {
-    val Active = Value(1)
-    val Cancelled = Value(0)
+    val active = Value(1)
+    val canceled = Value(0)
 
-    def apply(bool: Boolean): LeaseStatus = if (bool) Active else Cancelled
+    def apply(bool: Boolean): LeaseStatus = if (bool) active else canceled
   }
 
   object Status {
@@ -280,7 +280,7 @@ object TransactionsApiRoute {
       val specificInfo = meta.transaction match {
         case lease: LeaseTransaction =>
           import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus._
-          Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Cancelled))
+          Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) active else canceled))
 
         case leaseCancel: LeaseCancelTransaction =>
           Json.obj("lease" -> leaseIdToLeaseRef(leaseCancel.leaseId))
@@ -340,7 +340,7 @@ object TransactionsApiRoute {
     }
   }
 
-  private[this] final case class LeaseRef(leaseId: ByteStr, originTransactionId: ByteStr, sender: Address, recipient: Address, amount: TxAmount, height: Int, status: LeaseStatus = LeaseStatus.Active)
+  private[this] final case class LeaseRef(leaseId: ByteStr, originTransactionId: ByteStr, sender: Address, recipient: Address, amount: TxAmount, height: Int, status: LeaseStatus = LeaseStatus.active)
   private[this] object LeaseRef {
     implicit val jsonWrites: OWrites[LeaseRef] = {
       import com.wavesplatform.utils.byteStrFormat

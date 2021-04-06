@@ -84,7 +84,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       miner.assertBalances(secondAddress, balance2, eff2 + leasingAmount)
 
       val status1 = getStatus(createdLeaseTxId)
-      status1 shouldBe LeaseStatus.Active
+      status1 shouldBe LeaseStatus.active
 
       val activeLeases = sender.activeLeasesOld(secondAddress)
       assert(activeLeases.forall(!_.sender.contains(secondAddress)))
