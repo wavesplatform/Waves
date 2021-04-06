@@ -1,6 +1,10 @@
 package com.wavesplatform.http
 
+import scala.concurrent.Future
+import scala.util.Random
+
 import akka.http.scaladsl.model._
+import com.wavesplatform.{BlockchainStubHelpers, BlockGen, NoShrink, TestTime, TestWallet, TransactionGen}
 import com.wavesplatform.account.{AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
@@ -18,6 +22,7 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.{Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
+import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -25,19 +30,14 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxVersion}
-import com.wavesplatform.{BlockGen, BlockchainStubHelpers, NoShrink, TestTime, TestWallet, TransactionGen}
 import monix.reactive.Observable
-import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, OptionValues}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
-
-import scala.concurrent.Future
-import scala.util.Random
+import play.api.libs.json.Json.JsValueWrapper
 
 class TransactionsRouteSpec
     extends RouteSpec("/transactions")
@@ -320,16 +320,33 @@ class TransactionsRouteSpec
 
       Get(routePath(s"/address/${invokeAddress}/limit/1")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges").as[JsObject] shouldBe Json.toJsObject(scriptResult)
-        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leases" \ 0 \ "recipient").get shouldBe JsString(recipientAddress.stringRepr)
-        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leases" \ 0 \ "amount").get shouldBe JsNumber(100)
-        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leases" \ 0 \ "nonce").get shouldBe JsNumber(1)
-        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leases" \ 0 \ "leaseId").get shouldBe JsString(leaseId1.toString)
-        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leases" \ 1 \ "recipient").get shouldBe JsString(recipientAlias.stringRepr)
-        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leases" \ 1 \ "amount").get shouldBe JsNumber(200)
-        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leases" \ 1 \ "nonce").get shouldBe JsNumber(3)
-        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leases" \ 1 \ "leaseId").get shouldBe JsString(leaseId2.toString)
-        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leaseCancels" \ 0 \ "leaseId").get shouldBe JsString(leaseCancelId.toString)
+        val json = (responseAs[JsArray] \ 0 \ 0 \ "stateChanges").as[JsObject]
+        json shouldBe Json.parse(
+          s"""
+            |{
+            |  "data" : [ ],
+            |  "transfers" : [ ],
+            |  "issues" : [ ],
+            |  "reissues" : [ ],
+            |  "burns" : [ ],
+            |  "sponsorFees" : [ ],
+            |  "leases" : [ {
+            |    "recipient" : "$recipientAddress",
+            |    "amount" : 100,
+            |    "nonce" : 1,
+            |    "leaseId" : "$leaseId1"
+            |  }, {
+            |    "recipient" : "$recipientAlias",
+            |    "amount" : 200,
+            |    "nonce" : 3,
+            |    "leaseId" : "$leaseId2"
+            |  } ],
+            |  "leaseCancels" : [ {
+            |    "leaseId" : "$leaseCancelId"
+            |  } ],
+            |  "invokes" : [ ]
+            |}
+            |""".stripMargin)
       }
     }
   }
