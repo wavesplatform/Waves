@@ -224,11 +224,37 @@ class TransactionsRouteSpec
         .when(TxHelpers.secondAddress, None, *, None)
         .returns(Observable(TransactionMeta.Default(Height(1), leaseCancel, succeeded = true)))
       (transactionsApi.aliasesOfAddress _).when(*).returns(Observable.empty)
+      (blockchain.transactionMeta _).when(lease.id()).returns(Some((1, true)))
+      (blockchain.leaseDetails _).when(lease.id()).returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.id(), lease.amount, isActive = false)))
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
       Get(routePath(s"/address/${TxHelpers.secondAddress}/limit/10")) ~> route ~> check {
         val json = (responseAs[JsArray] \ 0 \ 0).as[JsObject]
-        json shouldBe leaseCancel.json() ++ Json.obj("lease" -> lease.json(), "height" -> 1, "applicationStatus" -> "succeeded")
+        println(Json.prettyPrint(json))
+        json shouldBe Json.parse(s"""{
+                                   |  "type" : 9,
+                                   |  "id" : "${leaseCancel.id()}",
+                                   |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                   |  "fee" : 1000000,
+                                   |  "feeAssetId" : null,
+                                   |  "timestamp" : ${leaseCancel.timestamp},
+                                   |  "proofs" : [ "${leaseCancel.signature}" ],
+                                   |  "version" : 2,
+                                   |  "leaseId" : "${lease.id()}",
+                                   |  "chainId" : 84,
+                                   |  "height" : 1,
+                                   |  "applicationStatus" : "succeeded",
+                                   |  "lease" : {
+                                   |    "leaseId" : "${lease.id()}",
+                                   |    "originTransactionId" : "${lease.id()}",
+                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                                   |    "amount" : 1000000000,
+                                   |    "height" : 1,
+                                   |    "status" : "Cancelled"
+                                   |  }
+                                   |}""".stripMargin)
       }
     }
 
@@ -395,11 +421,36 @@ class TransactionsRouteSpec
       val transactionsApi = stub[CommonTransactionsApi]
       (transactionsApi.transactionById _).when(lease.id()).returns(Some(TransactionMeta.Default(Height(1), lease, succeeded = true)))
       (transactionsApi.transactionById _).when(leaseCancel.id()).returns(Some(TransactionMeta.Default(Height(1), leaseCancel, succeeded = true)))
+      (blockchain.transactionMeta _).when(lease.id()).returns(Some((1, true)))
+      (blockchain.leaseDetails _).when(lease.id()).returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.id(), lease.amount, isActive = false)))
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
       Get(routePath(s"/info/${leaseCancel.id()}")) ~> route ~> check {
         val json = responseAs[JsObject]
-        json shouldBe leaseCancel.json() ++ Json.obj("lease" -> lease.json(), "height" -> 1, "applicationStatus" -> "succeeded")
+        json shouldBe Json.parse(s"""{
+                                   |  "type" : 9,
+                                   |  "id" : "${leaseCancel.id()}",
+                                   |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                   |  "fee" : 1000000,
+                                   |  "feeAssetId" : null,
+                                   |  "timestamp" : ${leaseCancel.timestamp},
+                                   |  "proofs" : [ "${leaseCancel.signature}" ],
+                                   |  "version" : 2,
+                                   |  "leaseId" : "${lease.id()}",
+                                   |  "chainId" : 84,
+                                   |  "height" : 1,
+                                   |  "applicationStatus" : "succeeded",
+                                   |  "lease" : {
+                                   |    "leaseId" : "${lease.id()}",
+                                   |    "originTransactionId" : "${lease.id()}",
+                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                                   |    "amount" : 1000000000,
+                                   |    "height" : 1,
+                                   |    "status" : "Cancelled"
+                                   |  }
+                                   |}""".stripMargin)
       }
     }
 
