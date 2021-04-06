@@ -230,7 +230,6 @@ class TransactionsRouteSpec
       val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
       Get(routePath(s"/address/${TxHelpers.secondAddress}/limit/10")) ~> route ~> check {
         val json = (responseAs[JsArray] \ 0 \ 0).as[JsObject]
-        println(Json.prettyPrint(json))
         json shouldBe Json.parse(s"""{
                                    |  "type" : 9,
                                    |  "id" : "${leaseCancel.id()}",
@@ -252,7 +251,7 @@ class TransactionsRouteSpec
                                    |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                                    |    "amount" : 1000000000,
                                    |    "height" : 1,
-                                   |    "status" : "Cancelled"
+                                   |    "status" : "canceled"
                                    |  }
                                    |}""".stripMargin)
       }
@@ -379,7 +378,7 @@ class TransactionsRouteSpec
                                     |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                     |      "amount": 123,
                                     |      "height": 1,
-                                    |      "status":"Active"
+                                    |      "status":"active"
                                     |    },
                                     |    {
                                     |      "leaseId": "$leaseId2",
@@ -388,7 +387,7 @@ class TransactionsRouteSpec
                                     |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                     |      "amount": 123,
                                     |      "height": 1,
-                                    |      "status":"Active"
+                                    |      "status":"active"
                                     |    }
                                     |  ],
                                     |  "leaseCancels": [
@@ -399,7 +398,7 @@ class TransactionsRouteSpec
                                     |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                     |      "amount": 123,
                                     |      "height": 1,
-                                    |      "status":"Cancelled"
+                                    |      "status":"canceled"
                                     |    }
                                     |  ],
                                     |  "invokes": []
@@ -448,7 +447,7 @@ class TransactionsRouteSpec
                                    |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                                    |    "amount" : 1000000000,
                                    |    "height" : 1,
-                                   |    "status" : "Cancelled"
+                                   |    "status" : "canceled"
                                    |  }
                                    |}""".stripMargin)
       }
@@ -560,7 +559,7 @@ class TransactionsRouteSpec
                                    |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                    |    "amount" : 123,
                                    |    "height" : 1,
-                                   |    "status" : "Active"
+                                   |    "status" : "active"
                                    |  }, {
                                    |    "leaseId" : "$leaseId2",
                                    |    "originTransactionId" : "$leaseId2",
@@ -568,7 +567,7 @@ class TransactionsRouteSpec
                                    |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                    |    "amount" : 123,
                                    |    "height" : 1,
-                                   |    "status" : "Active"
+                                   |    "status" : "active"
                                    |  } ],
                                    |  "leaseCancels" : [ {
                                    |    "leaseId" : "$leaseCancelId",
@@ -577,7 +576,7 @@ class TransactionsRouteSpec
                                    |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                    |    "amount" : 123,
                                    |    "height" : 1,
-                                   |    "status" : "Cancelled"
+                                   |    "status" : "canceled"
                                    |  } ],
                                    |  "invokes" : [ ]
                                    |}
