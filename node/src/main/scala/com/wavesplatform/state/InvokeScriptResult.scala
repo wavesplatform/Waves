@@ -2,7 +2,7 @@ package com.wavesplatform.state
 
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme}
+import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.Serde
@@ -25,8 +25,8 @@ final case class InvokeScriptResult(
     reissues: Seq[Reissue] = Nil,
     burns: Seq[Burn] = Nil,
     sponsorFees: Seq[SponsorFee] = Nil,
-    leases: Seq[R.LeaseRef] = Nil,
-    leaseCancels: Seq[R.LeaseRef] = Nil,
+    leases: Seq[R.Lease] = Nil,
+    leaseCancels: Seq[LeaseCancel] = Nil,
     invokes: Seq[R.Invocation] = Nil,
     error: Option[R.ErrorMessage] = None
 )
@@ -48,9 +48,14 @@ object InvokeScriptResult {
     implicit val jsonWrites = Json.writes[Payment]
   }
 
-  case class LeaseRef(recipient: Address, amount: Long, nonce: Long, leaseId: ByteStr, originTransactionId: ByteStr, height: Int = 0)
-  object LeaseRef {
-    implicit val jsonWrites = Json.writes[LeaseRef]
+  case class Lease(recipient: AddressOrAlias, amount: Long, nonce: Long, leaseId: ByteStr)
+  object Lease {
+    implicit val recipientWrites = Writes[AddressOrAlias] {
+      case address: Address => implicitly[Writes[Address]].writes(address)
+      case alias: Alias     => JsString(alias.stringRepr)
+      case _                => JsNull
+    }
+    implicit val jsonWrites = Json.writes[Lease]
   }
 
   def paymentsFromPortfolio(addr: Address, portfolio: Portfolio): Seq[Payment] = {
@@ -131,8 +136,8 @@ object InvokeScriptResult {
       isr.burns.map(toPbBurn),
       isr.error.map(toPbErrorMessage),
       isr.sponsorFees.map(toPbSponsorFee),
-      isr.leases.map(toPbLeaseRef),
-      isr.leaseCancels.map(toPbLeaseRef),
+      isr.leases.map(toPbLease),
+      isr.leaseCancels.map(toPbLeaseCancel),
       isr.invokes.map(toPbInvocation)
     )
   }
@@ -146,8 +151,8 @@ object InvokeScriptResult {
     def langTransferToPayment(t: lang.AssetTransfer): Payment =
       Payment(langAddressToAddress(t.recipient), Asset.fromCompatId(t.assetId), t.amount)
 
-    def langLeaseToLease(l: lang.Lease): LeaseRef =
-      LeaseRef(AddressOrAlias.fromRide(l.recipient).explicitGet(), l.amount, l.nonce, lang.Lease.calculateId(l, invokeId), invokeId)
+    def langLeaseToLease(l: lang.Lease): Lease =
+      Lease(AddressOrAlias.fromRide(l.recipient).explicitGet(), l.amount, l.nonce, lang.Lease.calculateId(l, invokeId))
 
     result match {
       case ScriptResultV3(ds, ts, _) =>
@@ -220,21 +225,17 @@ object InvokeScriptResult {
   private def toPbSponsorFee(sf: SponsorFee) =
     PBInvokeScriptResult.SponsorFee(Some(Amount(sf.assetId.toByteString, sf.minSponsoredAssetFee.getOrElse(0))))
 
-  private def toPbLeaseRef(l: LeaseRef) =
-    PBInvokeScriptResult.LeaseRef(
-      ByteString.copyFrom(PBRecipients.publicKeyHash(l.recipient)),
-      l.amount,
-      l.nonce,
-      l.leaseId.toByteString,
-      l.originTransactionId.toByteString,
-      l.height
-    )
+  private def toPbLease(l: Lease) =
+    PBInvokeScriptResult.Lease(Some(PBRecipients.create(l.recipient)), l.amount, l.nonce, l.leaseId.toByteString)
+
+  private def toPbLeaseCancel(l: LeaseCancel) =
+    PBInvokeScriptResult.LeaseCancel(ByteString.copyFrom(l.leaseId.arr))
 
   private def toPbErrorMessage(em: ErrorMessage) =
     PBInvokeScriptResult.ErrorMessage(em.code, em.text)
 
   private def toVanillaCall(i: PBInvokeScriptResult.Call): Call = {
-    Call(i.function, i.args.map(a => Serde.deserialize(a.toByteArray, all = true, allowObjects = true).explicitGet()._1.asInstanceOf[EVALUATED]))
+    Call(i.function, i.args.map(a => Serde.deserialize(a.toByteArray, true, true).explicitGet()._1.asInstanceOf[EVALUATED]))
   }
 
   private def toVanillaInvocation(i: PBInvokeScriptResult.Invocation): Invocation = {
@@ -265,10 +266,13 @@ object InvokeScriptResult {
     SponsorFee(amount.assetId.toByteStr, Some(amount.amount).filter(_ > 0))
   }
 
-  private def toVanillaLeaseRef(l: PBInvokeScriptResult.LeaseRef) = {
-    val recipient = l.recipient.toAddress
-    LeaseRef(recipient, l.amount, l.nonce, l.leaseId.toByteStr, l.originTransactionId.toByteStr, l.height)
+  private def toVanillaLease(l: PBInvokeScriptResult.Lease) = {
+    val recipient = PBRecipients.toAddressOrAlias(l.getRecipient, AddressScheme.current.chainId).explicitGet()
+    Lease(recipient, l.amount, l.nonce, l.leaseId.toByteStr)
   }
+
+  private def toVanillaLeaseCancel(sf: PBInvokeScriptResult.LeaseCancel) =
+    LeaseCancel(sf.leaseId.toByteStr)
 
   private def toVanillaErrorMessage(b: PBInvokeScriptResult.ErrorMessage) =
     ErrorMessage(b.code, b.text)
@@ -284,8 +288,8 @@ object InvokeScriptResult {
       pbValue.reissues.map(toVanillaReissue),
       pbValue.burns.map(toVanillaBurn),
       pbValue.sponsorFees.map(toVanillaSponsorFee),
-      pbValue.leases.map(toVanillaLeaseRef),
-      pbValue.leaseCancels.map(toVanillaLeaseRef),
+      pbValue.leases.map(toVanillaLease),
+      pbValue.leaseCancels.map(toVanillaLeaseCancel),
       pbValue.invokes.map(toVanillaInvocation),
       pbValue.errorMessage.map(toVanillaErrorMessage)
     )
