@@ -78,7 +78,7 @@ object IntegrationTestsPlugin extends AutoPlugin {
               try {
                 val dockerCpu: Int = docker.info().cpus()
                 sLog.value.info(s"Docker CPU count: $dockerCpu")
-                dockerCpu * 2
+                (dockerCpu * 1.5).toInt
               } finally docker.close()
             } catch {
               case NonFatal(_) =>
