@@ -1,0 +1,883 @@
+{
+  types:
+  [
+    {
+      name: Unit
+      fields: []
+    }
+    {
+      name: Up
+      fields: []
+    }
+    {
+      name: HalfDown
+      fields: []
+    }
+    {
+      name: Down
+      fields: []
+    }
+    {
+      name: HalfUp
+      fields: []
+    }
+    {
+      name: HalfEven
+      fields: []
+    }
+    {
+      name: Ceiling
+      fields: []
+    }
+    {
+      name: Floor
+      fields: []
+    }
+    {
+      name: Address
+      fields:
+      [
+        {
+          name: bytes
+          type: ByteVector
+        }
+      ]
+    }
+    {
+      name: Alias
+      fields:
+      [
+        {
+          name: alias
+          type: String
+        }
+      ]
+    }
+    {
+      name: Transfer
+      fields:
+      [
+        {
+          name: recipient
+          type: Address|Alias
+        }
+        {
+          name: amount
+          type: Int
+        }
+      ]
+    }
+    {
+      name: AssetPair
+      fields:
+      [
+        {
+          name: amountAsset
+          type: ByteVector|Unit
+        }
+        {
+          name: priceAsset
+          type: ByteVector|Unit
+        }
+      ]
+    }
+    {
+      name: Order
+      fields:
+      [
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: matcherPublicKey
+          type: ByteVector
+        }
+        {
+          name: assetPair
+          type: AssetPair
+        }
+        {
+          name: orderType
+          type: Buy|Sell
+        }
+        {
+          name: price
+          type: Int
+        }
+        {
+          name: amount
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: expiration
+          type: Int
+        }
+        {
+          name: matcherFee
+          type: Int
+        }
+        {
+          name: matcherFeeAssetId
+          type: ByteVector|Unit
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
+      name: GenesisTransaction
+      fields:
+      [
+        {
+          name: amount
+          type: Int
+        }
+        {
+          name: recipient
+          type: Address|Alias
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+      ]
+    }
+    {
+      name: PaymentTransaction
+      fields:
+      [
+        {
+          name: amount
+          type: Int
+        }
+        {
+          name: recipient
+          type: Address|Alias
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
+      name: ReissueTransaction
+      fields:
+      [
+        {
+          name: quantity
+          type: Int
+        }
+        {
+          name: assetId
+          type: ByteVector
+        }
+        {
+          name: reissuable
+          type: Boolean
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
+      name: BurnTransaction
+      fields:
+      [
+        {
+          name: quantity
+          type: Int
+        }
+        {
+          name: assetId
+          type: ByteVector
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
+      name: MassTransferTransaction
+      fields:
+      [
+        {
+          name: feeAssetId
+          type: ByteVector|Unit
+        }
+        {
+          name: assetId
+          type: ByteVector|Unit
+        }
+        {
+          name: totalAmount
+          type: Int
+        }
+        {
+          name: transfers
+          type: List[Transfer]
+        }
+        {
+          name: transferCount
+          type: Int
+        }
+        {
+          name: attachment
+          type: ByteVector
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
+      name: ExchangeTransaction
+      fields:
+      [
+        {
+          name: buyOrder
+          type: Order
+        }
+        {
+          name: sellOrder
+          type: Order
+        }
+        {
+          name: price
+          type: Int
+        }
+        {
+          name: amount
+          type: Int
+        }
+        {
+          name: buyMatcherFee
+          type: Int
+        }
+        {
+          name: sellMatcherFee
+          type: Int
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
+      name: TransferTransaction
+      fields:
+      [
+        {
+          name: feeAssetId
+          type: ByteVector|Unit
+        }
+        {
+          name: amount
+          type: Int
+        }
+        {
+          name: assetId
+          type: ByteVector|Unit
+        }
+        {
+          name: recipient
+          type: Address|Alias
+        }
+        {
+          name: attachment
+          type: ByteVector
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
+      name: SetAssetScriptTransaction
+      fields:
+      [
+        {
+          name: script
+          type: ByteVector|Unit
+        }
+        {
+          name: assetId
+          type: ByteVector
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
+      name: IssueTransaction
+      fields:
+      [
+        {
+          name: quantity
+          type: Int
+        }
+        {
+          name: name
+          type: ByteVector
+        }
+        {
+          name: description
+          type: ByteVector
+        }
+        {
+          name: reissuable
+          type: Boolean
+        }
+        {
+          name: decimals
+          type: Int
+        }
+        {
+          name: script
+          type: ByteVector|Unit
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
+      name: LeaseTransaction
+      fields:
+      [
+        {
+          name: amount
+          type: Int
+        }
+        {
+          name: recipient
+          type: Address|Alias
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
+      name: LeaseCancelTransaction
+      fields:
+      [
+        {
+          name: leaseId
+          type: ByteVector
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
+      name: CreateAliasTransaction
+      fields:
+      [
+        {
+          name: alias
+          type: String
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
+      name: SetScriptTransaction
+      fields:
+      [
+        {
+          name: script
+          type: ByteVector|Unit
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
+      name: SponsorFeeTransaction
+      fields:
+      [
+        {
+          name: assetId
+          type: ByteVector
+        }
+        {
+          name: minSponsoredAssetFee
+          type: Int|Unit
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
+      name: DataTransaction
+      fields:
+      [
+        {
+          name: data
+          type: List[DataEntry]
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
+      name: DataEntry
+      fields:
+      [
+        {
+          name: key
+          type: String
+        }
+        {
+          name: value
+          type: Boolean|ByteVector|Int|String
+        }
+      ]
+    }
+  ]
+}
