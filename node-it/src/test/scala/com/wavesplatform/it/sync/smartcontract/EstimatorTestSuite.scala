@@ -66,7 +66,7 @@ class EstimatorTestSuite extends BaseTransactionSuite {
         |
         |    WriteSet([DataEntry("result", sigs.size())])
         |}
-                                                """.stripMargin,
+        |""".stripMargin,
       estimator
     )
     .explicitGet()
@@ -150,7 +150,7 @@ class EstimatorTestSuite extends BaseTransactionSuite {
     miner.putData(smartAcc, data, 0.3.waves, waitForTx = true)
   }
 
-  test("can issue scripted asset and set script fro asset before precheck activation") {
+  test("can issue scripted asset and set script for asset before precheck activation") {
     issuedAssetId = miner
       .issue(
         smartAcc,

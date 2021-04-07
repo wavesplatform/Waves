@@ -10,6 +10,7 @@ import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
+import com.wavesplatform.it.util._
 import com.wavesplatform.it.{BaseFunSuite, NodeConfigs, RandomKeyPair}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -27,7 +28,7 @@ class VRFProtobufActivationSuite extends BaseFunSuite {
       .overrideBase(_.raw(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $updateInterval"))
       .buildNonConflicting()
 
-  private def senderAcc             = miner.keyPair
+  private lazy val senderAcc             = RandomKeyPair()
   private lazy val recipientAcc     = RandomKeyPair()
   private var assetId               = ""
   private var otherAssetId          = ""
@@ -35,6 +36,7 @@ class VRFProtobufActivationSuite extends BaseFunSuite {
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
+    miner.transfer(miner.keyPair, senderAcc.toAddress.toString, 100.waves, minFee, waitForTx = true)
     val (defaultName, defaultDescription) = ("asset", "description")
     assetId = miner.broadcastIssue(senderAcc, defaultName, defaultDescription, someAssetAmount, 8, true, script = None, waitForTx = true).id
     miner.waitForHeight(7, 3.minutes)

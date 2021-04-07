@@ -113,14 +113,14 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
        |     && t.id == fromBase58String("$invokeId")
        |     && (toBase58String(addressFromRecipient(t.recipient).bytes) == "${recipient.toAddress.toString}" ||
        |     toBase58String(addressFromRecipient(t.recipient).bytes) == "$recipientAlias")
-       |     && toBase58String(t.miner.bytes) == "${firstDApp.toAddress.toString}"
+       |     && toBase58String(t.sender.bytes) == "${firstDApp.toAddress.toString}"
        |     && t.version == 0
        |    case r: ReissueTransaction => r.senderPublicKey.toBase58String() == "${firstDApp.publicKey.toString}"
        |     && r.assetId.value().toBase58String() == "$smartAssetId"
        |     && r.bodyBytes.size() == 0
        |     && r.fee == 0
        |     && r.id.size() != 0
-       |     && toBase58String(r.miner.bytes) == "${firstDApp.toAddress.toString}"
+       |     && toBase58String(r.sender.bytes) == "${firstDApp.toAddress.toString}"
        |     && r.version == 0
        |     && r.quantity == 100000
        |     && r.reissuable == true
@@ -129,7 +129,7 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
        |     && b.bodyBytes.size() == 0
        |     && b.fee == 0
        |     && b.id.size() != 0
-       |     && toBase58String(b.miner.bytes) == "${firstDApp.toAddress.toString}"
+       |     && toBase58String(b.sender.bytes) == "${firstDApp.toAddress.toString}"
        |     && b.version == 0
        |     && b.quantity == 100000
        |    case _ => true
