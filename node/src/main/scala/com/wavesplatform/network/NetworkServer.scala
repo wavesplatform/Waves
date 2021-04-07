@@ -238,7 +238,7 @@ object NetworkServer extends ScorexLogging {
       }
     }
 
-    scheduleConnectTask()
+    workerGroup.execute(() => scheduleConnectTask())
 
     def doShutdown(): Unit =
       try {

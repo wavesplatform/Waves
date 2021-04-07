@@ -13,6 +13,19 @@ dockerBuildArguments := Map(
   "ENABLE_GRPC" -> "true"
 )
 
-val packageAll = taskKey[Unit]("build all packages")
-docker := docker.dependsOn(packageAll in LocalProject("root")).value
+lazy val packageDeb = taskKey[Unit]("Package DEB packages for docker build")
 
+packageDeb := {
+  val targetDir = baseDirectory.value.getParentFile / "docker" / "target"
+  IO.copyFile(
+    (LocalProject("node") / Debian / packageBin).value,
+    new File(targetDir, "waves.deb")
+  )
+
+  IO.copyFile(
+    (LocalProject("grpc-server") / Debian / packageBin).value,
+    new File(targetDir, "grpc-server.deb")
+  )
+}
+
+docker := docker.dependsOn(packageDeb).value

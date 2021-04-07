@@ -285,6 +285,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // API start
     if (settings.restAPISettings.enable) {
+      log.info(s"About to start REST API...")
       def loadBalanceHistory(address: Address): Seq[(Int, Long)] = db.readOnly { rdb =>
         rdb.get(Keys.addressId(address)).fold(Seq.empty[(Int, Long)]) { aid =>
           rdb.get(Keys.wavesBalanceHistory(aid)).map { h =>
@@ -366,7 +367,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         RewardApiRoute(blockchainUpdater)
       )
 
+      log.info("Building composite route")
+
       val httpService = CompositeHttpService(apiRoutes, settings.restAPISettings)
+
+      log.info("Binding port")
+
       val httpFuture  = Http().bindAndHandle(httpService.loggingCompositeRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)
       serverBinding.whenTerminated.foreach(_ => httpService.scheduler.shutdown())

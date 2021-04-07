@@ -148,7 +148,7 @@ git.uncommittedSignifier := Some("DIRTY")
 
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := {
-  (node / assembly).value
+//  (node / assembly).value
   (`grpc-server` / Universal / packageZipTarball).value
 
   val nodeDebFile = (node / Debian / packageBin).value
