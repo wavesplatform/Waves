@@ -28,7 +28,17 @@ class LeaseApiRouteSpec extends RouteSpec("/leasing") with PathMockFactory with 
       .when(lease.id())
       .returning(
         Some(
-          LeaseInfo(lease.id(), lease.id(), lease.sender.toAddress, lease.recipient.asInstanceOf[Address], lease.amount, 1, LeaseInfo.Status.Active)
+          LeaseInfo(
+            lease.id(),
+            lease.id(),
+            lease.sender.toAddress,
+            lease.recipient.asInstanceOf[Address],
+            lease.amount,
+            1,
+            LeaseInfo.Status.Cancelled,
+            Some(2),
+            Some(leaseCancel.id())
+          )
         )
       )
     (commonApi.leaseInfo _).when(*).returning(None)
@@ -42,7 +52,9 @@ class LeaseApiRouteSpec extends RouteSpec("/leasing") with PathMockFactory with 
                                |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                                |  "amount" : 1000000000,
                                |  "height" : 1,
-                               |  "status" : "Active"
+                               |  "status" : "Cancelled",
+                               |  "leaseCancelHeight" : 2,
+                               |  "leaseCancelTransactionId" : "${leaseCancel.id()}"
                                |}""".stripMargin
     }
 
@@ -53,7 +65,9 @@ class LeaseApiRouteSpec extends RouteSpec("/leasing") with PathMockFactory with 
                                        |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                                        |  "amount" : 1000000000,
                                        |  "height" : 1,
-                                       |  "status" : "Active"
+                                       |  "status" : "Cancelled",
+                                       |  "leaseCancelHeight" : 2,
+                                       |  "leaseCancelTransactionId" : "${leaseCancel.id()}"
                                        |},
                                        {
                                        |  "leaseId" : "${lease.id()}",
@@ -62,7 +76,9 @@ class LeaseApiRouteSpec extends RouteSpec("/leasing") with PathMockFactory with 
                                        |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                                        |  "amount" : 1000000000,
                                        |  "height" : 1,
-                                       |  "status" : "Active"
+                                       |  "status" : "Cancelled",
+                                       |  "leaseCancelHeight" : 2,
+                                       |  "leaseCancelTransactionId" : "${leaseCancel.id()}"
                                        |}]""".stripMargin)
 
     Get(routePath(s"/info?id=${lease.id()}&id=${lease.id()}")) ~> route ~> check {

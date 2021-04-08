@@ -11,6 +11,7 @@ import com.wavesplatform.database.{DBExt, Keys, KeyTags}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height}
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -137,7 +138,7 @@ object CommonAccountsApi extends ScorexLogging {
         case TransactionMeta(height, lt: LeaseTransaction, true) if leaseIsActive(lt.id()) =>
           val recipient = blockchain.resolveAlias(lt.recipient).explicitGet()
           Seq(
-            LeaseInfo(lt.id.value(), lt.id.value(), lt.sender.toAddress, recipient, lt.amount, height, LeaseInfo.Status.Active)
+            LeaseInfo(lt.id(), lt.id(), lt.sender.toAddress, recipient, lt.amount, height, LeaseInfo.Status.Active)
           )
 
         case TransactionMeta.Invoke(height, invoke, true, scriptResult) =>
@@ -146,7 +147,7 @@ object CommonAccountsApi extends ScorexLogging {
             .map { lease =>
               val sender    = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
               val recipient = blockchain.resolveAlias(lease.recipient).explicitGet()
-              LeaseInfo(lease.leaseId, invoke.id.value(), sender, recipient, lease.amount, height, LeaseInfo.Status.Active)
+              LeaseInfo(lease.leaseId, invoke.id(), sender, recipient, lease.amount, height, LeaseInfo.Status.Active)
             }
         case _ => Seq()
       }
@@ -154,7 +155,7 @@ object CommonAccountsApi extends ScorexLogging {
 
     def leaseInfo(leaseId: ByteStr): Option[LeaseInfo] = blockchain.leaseDetails(leaseId) map { ld =>
       val (height, _) = blockchain.transactionMeta(ld.sourceId).get
-      
+
       LeaseInfo(
         leaseId,
         ld.sourceId,
@@ -162,7 +163,9 @@ object CommonAccountsApi extends ScorexLogging {
         blockchain.resolveAlias(ld.recipient).explicitGet(),
         ld.amount,
         height,
-        if (ld.isActive) LeaseInfo.Status.Active else LeaseInfo.Status.Cancelled
+        if (ld.isActive) LeaseInfo.Status.Active else LeaseInfo.Status.Cancelled,
+        LeaseDetails.Status.getCancelHeight(ld.status),
+        LeaseDetails.Status.getCancelTransactionId(ld.status)
       )
     }
 

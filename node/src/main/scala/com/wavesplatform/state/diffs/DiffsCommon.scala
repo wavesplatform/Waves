@@ -11,12 +11,12 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.traits.domain._
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
+import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
-import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
 
 object DiffsCommon {
   def countScriptRuns(blockchain: Blockchain, tx: ProvenTransaction): Int =
@@ -176,7 +176,7 @@ object DiffsCommon {
         senderAddress    -> Portfolio(-fee, LeaseBalance(0, amount)),
         recipientAddress -> Portfolio(0, LeaseBalance(amount, 0))
       )
-      details = LeaseDetails(sender, recipient, txId, amount, isActive = true)
+      details = LeaseDetails(sender, recipient, txId, amount, LeaseDetails.Status.Active)
     } yield Diff.stateOps(
       portfolios = portfolioDiff,
       leaseState = Map((leaseId, details))
@@ -210,7 +210,7 @@ object DiffsCommon {
       )
       senderPortfolio    = Map(sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
       recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
-      actionInfo         = LeaseDetails(sender, lease.recipient, lease.sourceId, lease.amount, isActive = false)
+      actionInfo         = LeaseDetails(sender, lease.recipient, lease.sourceId, lease.amount, LeaseDetails.Status.CancelledByTx(blockchain.height + 1, txId))
     } yield Diff.stateOps(
       portfolios = senderPortfolio |+| recipientPortfolio,
       leaseState = Map((leaseId, actionInfo))

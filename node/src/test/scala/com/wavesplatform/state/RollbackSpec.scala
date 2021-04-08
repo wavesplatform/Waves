@@ -1,43 +1,43 @@
 package com.wavesplatform.state
 
 import cats.kernel.Monoid
+import com.wavesplatform.{history, NoShrink, TestTime, TransactionGen}
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.features._
+import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.history.Domain
 import com.wavesplatform.it.util.AddressOrAliasExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, V5}
+import com.wavesplatform.lang.directives.values.{Account, DApp, V5}
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.{compiler, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Lease
-import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.utils.StringBytes
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen, history}
-import org.scalacheck.Gen.alphaLowerChar
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen.alphaLowerChar
 import org.scalatest.{Assertion, Assertions, FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -200,23 +200,30 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.appendBlock(TestBlock.create(nextTs, genesisBlockId, Seq(lt)))
           d.blockchainUpdater.height shouldBe 2
           val blockWithLeaseId = d.lastBlockId
-          d.blockchainUpdater.leaseDetails(lt.id()) should contain(LeaseDetails(sender.publicKey, recipient.toAddress, lt.id(), leaseAmount, isActive = true))
+          d.blockchainUpdater.leaseDetails(lt.id()) should contain(
+            LeaseDetails(sender.publicKey, recipient.toAddress, lt.id(), leaseAmount, LeaseDetails.Status.Active)
+          )
           d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual leaseAmount
           d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual leaseAmount
 
+          val leaseCancel = LeaseCancelTransaction.selfSigned(1.toByte, sender, lt.id(), 1, nextTs).explicitGet()
           d.appendBlock(
             TestBlock.create(
               nextTs,
               blockWithLeaseId,
-              Seq(LeaseCancelTransaction.selfSigned(1.toByte, sender, lt.id(), 1, nextTs).explicitGet())
+              Seq(leaseCancel)
             )
           )
-          d.blockchainUpdater.leaseDetails(lt.id()) should contain(LeaseDetails(sender.publicKey, recipient.toAddress, lt.id(), leaseAmount, isActive = false))
+          d.blockchainUpdater.leaseDetails(lt.id()) should contain(
+            LeaseDetails(sender.publicKey, recipient.toAddress, lt.id(), leaseAmount, LeaseDetails.Status.CancelledByTx(4, leaseCancel.id()))
+          )
           d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual 0
           d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual 0
 
           d.removeAfter(blockWithLeaseId)
-          d.blockchainUpdater.leaseDetails(lt.id()) should contain(LeaseDetails(sender.publicKey, recipient.toAddress, lt.id(), leaseAmount, isActive = true))
+          d.blockchainUpdater.leaseDetails(lt.id()) should contain(
+            LeaseDetails(sender.publicKey, recipient.toAddress, lt.id(), leaseAmount, LeaseDetails.Status.Active)
+          )
           d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual leaseAmount
           d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual leaseAmount
 
@@ -233,8 +240,18 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.appendBlock(genesisBlock(nextTs, sender.toAddress, initialBalance))
           val genesisBlockId = d.lastBlockId
           val issueTransaction =
-            IssueTransaction(TxVersion.V1, sender.publicKey, "test".utf8Bytes, Array.emptyByteArray, assetAmount, 8, reissuable = true, script = None, 1, nextTs)
-              .signWith(sender.privateKey)
+            IssueTransaction(
+              TxVersion.V1,
+              sender.publicKey,
+              "test".utf8Bytes,
+              Array.emptyByteArray,
+              assetAmount,
+              8,
+              reissuable = true,
+              script = None,
+              1,
+              nextTs
+            ).signWith(sender.privateKey)
 
           d.appendBlock(
             TestBlock.create(
@@ -255,7 +272,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               d.lastBlockId,
               Seq(
                 TransferTransaction
-                  .selfSigned(1.toByte, sender, recipient.toAddress, IssuedAsset(issueTransaction.id()), assetAmount, Waves, 1, ByteStr.empty,  nextTs)
+                  .selfSigned(1.toByte, sender, recipient.toAddress, IssuedAsset(issueTransaction.id()), assetAmount, Waves, 1, ByteStr.empty, nextTs)
                   .explicitGet()
               )
             )
@@ -278,8 +295,18 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val genesisBlockId = d.lastBlockId
 
           val issueTransaction =
-            IssueTransaction(TxVersion.V1, sender.publicKey, name.utf8Bytes, description.utf8Bytes, 2000, 8.toByte, reissuable = true, script = None, 1, nextTs)
-              .signWith(sender.privateKey)
+            IssueTransaction(
+              TxVersion.V1,
+              sender.publicKey,
+              name.utf8Bytes,
+              description.utf8Bytes,
+              2000,
+              8.toByte,
+              reissuable = true,
+              script = None,
+              1,
+              nextTs
+            ).signWith(sender.privateKey)
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe empty
 
           d.appendBlock(
@@ -292,10 +319,22 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           val blockIdWithIssue = d.lastBlockId
 
-          val actualDesc = d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id()))
-          val nameBytes = name.toByteString
+          val actualDesc       = d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id()))
+          val nameBytes        = name.toByteString
           val descriptionBytes = description.toByteString
-          val desc1 = AssetDescription(issueTransaction.id(), sender.publicKey, nameBytes, descriptionBytes, 8, reissuable = true, BigInt(2000), Height @@ 2, None, 0, false)
+          val desc1 = AssetDescription(
+            issueTransaction.id(),
+            sender.publicKey,
+            nameBytes,
+            descriptionBytes,
+            8,
+            reissuable = true,
+            BigInt(2000),
+            Height @@ 2,
+            None,
+            0,
+            false
+          )
           actualDesc shouldBe Some(desc1)
 
           d.appendBlock(
@@ -309,12 +348,36 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           )
 
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(issueTransaction.id(), sender.publicKey, nameBytes, descriptionBytes, 8, reissuable = false, BigInt(4000), Height @@ 2, None, 0, false)
+            AssetDescription(
+              issueTransaction.id(),
+              sender.publicKey,
+              nameBytes,
+              descriptionBytes,
+              8,
+              reissuable = false,
+              BigInt(4000),
+              Height @@ 2,
+              None,
+              0,
+              false
+            )
           )
 
           d.removeAfter(blockIdWithIssue)
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(issueTransaction.id(), sender.publicKey, nameBytes, descriptionBytes, 8, reissuable = true, BigInt(2000), Height @@ 2, None, 0, false)
+            AssetDescription(
+              issueTransaction.id(),
+              sender.publicKey,
+              nameBytes,
+              descriptionBytes,
+              8,
+              reissuable = true,
+              BigInt(2000),
+              Height @@ 2,
+              None,
+              0,
+              false
+            )
           )
 
           d.removeAfter(genesisBlockId)
@@ -609,10 +672,10 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             val (_, issueFc) = issueFunctionCallGen.sample.get
 
             val issueTxId = append(startBlockId, issueFc)
-            val asset = getAsset(d, issueTxId)
+            val asset     = getAsset(d, issueTxId)
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
 
-            val issueBlockId = d.lastBlockId
+            val issueBlockId     = d.lastBlockId
             val issueDescription = d.blockchainUpdater.assetDescription(asset)
 
             val (sponsorship, sponsorFc) = sponsorFunctionCallGen(asset.id).sample.get
@@ -642,12 +705,13 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
             val beforeInvoke1 = d.lastBlockId
 
-            val (leaseAmount, leaseFc)    = leaseFunctionCallGen(invoker.toAddress).sample.get
-            def leaseDetails(invokeId: ByteStr) = Some(LeaseDetails(dApp.publicKey, invoker.toAddress, invokeId, leaseAmount, isActive = true))
+            val (leaseAmount, leaseFc) = leaseFunctionCallGen(invoker.toAddress).sample.get
+            def leaseDetails(invokeId: ByteStr) =
+              Some(LeaseDetails(dApp.publicKey, invoker.toAddress, invokeId, leaseAmount, LeaseDetails.Status.Active))
 
             // liquid block rollback
-            val invokeId1    = append(d.lastBlockId, leaseFc)
-            val leaseId1     = Lease.calculateId(Lease(invoker.toAddress.toRide, leaseAmount, 0), invokeId1)
+            val invokeId1 = append(d.lastBlockId, leaseFc)
+            val leaseId1  = Lease.calculateId(Lease(invoker.toAddress.toRide, leaseAmount, 0), invokeId1)
 
             d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance(in = leaseAmount, out = 0)
             d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance(in = 0, out = leaseAmount)
@@ -686,48 +750,58 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
       }
 
       def assertLeaseCancel(dApp: KeyPair, invoker: KeyPair, d: Domain, leaseAmount: Long, leaseId: ByteStr, sourceId: ByteStr): Assertion = {
-        val append = appendBlock(d, invoker, dApp) _
+        val append        = appendBlock(d, invoker, dApp) _
         val beforeInvoke1 = d.lastBlockId
 
         val call = leaseCancelFunctionCall(leaseId)
-        def leaseDetails(isActive: Boolean) =
-          Some(LeaseDetails(dApp.publicKey, invoker.toAddress, sourceId, leaseAmount, isActive))
+
+        def leaseDetails(height: Int = 0, cancelId: ByteStr = ByteStr.empty) =
+          Some(
+            LeaseDetails(
+              dApp.publicKey,
+              invoker.toAddress,
+              sourceId,
+              leaseAmount,
+              if (cancelId.isEmpty) LeaseDetails.Status.Active
+              else LeaseDetails.Status.CancelledByTx(height, cancelId)
+            )
+          )
 
         // liquid block rollback
-        append(d.lastBlockId, call)
+        val leaseCancelId = append(d.lastBlockId, call)
 
         d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance.empty
-        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(false)
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(true)
+        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(4, leaseCancelId)
+        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails()
         d.appendBlock()
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(false)
+        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(4, leaseCancelId)
 
         d.blockchain.removeAfter(beforeInvoke1).explicitGet()
 
         d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance(in = leaseAmount, 0)
         d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance(0, out = leaseAmount)
-        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(true)
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails( true)
+        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails()
+        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails()
 
         // hardened block rollback
-        val beforeInvoke2 = d.lastBlockId
-        append(d.lastBlockId, call)
+        val beforeInvoke2  = d.lastBlockId
+        val leaseCancelId1 = append(d.lastBlockId, call)
 
         d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance.empty
-        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(false)
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(true)
+        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(4, leaseCancelId1)
+        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails()
         d.appendBlock()
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(false)
+        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(4, leaseCancelId1)
 
         d.appendBlock()
         d.blockchain.removeAfter(beforeInvoke2).explicitGet()
 
         d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance(in = leaseAmount, 0)
         d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance(0, out = leaseAmount)
-        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(true)
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(true)
+        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails()
+        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails()
       }
 
       "leaseCancel with lease tx" in forAll(scenario) {
@@ -965,7 +1039,6 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
 object RollbackSpec {
   private val issueReissueBurnScript = {
-    import com.wavesplatform.lang.directives.values.{DApp => DAppType}
 
     val stdLibVersion = V5
 
@@ -1013,7 +1086,7 @@ object RollbackSpec {
             CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment],
             WavesContext.build(
               Global,
-              DirectiveSet(stdLibVersion, Account, DAppType).explicitGet()
+              DirectiveSet(stdLibVersion, Account, DApp).explicitGet()
             )
           )
         )

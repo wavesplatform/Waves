@@ -157,7 +157,8 @@ object LevelDBWriter extends ScorexLogging {
   }
 }
 
-abstract class LevelDBWriter private[database] (
+//noinspection UnstableApiUsage
+abstract class LevelDBWriter private[database](
     writableDB: DB,
     spendableBalanceChanged: Observer[(Address, Asset)],
     val settings: BlockchainSettings,
@@ -835,8 +836,16 @@ abstract class LevelDBWriter private[database] (
       detailsOrFlag <- db.get(Keys.leaseDetails(leaseId)(h))
       details <- detailsOrFlag.fold(
         isActive =>
-          transactionInfo(leaseId, db) collect [LeaseDetails] {
-            case (_, lt: LeaseTransaction, _) => LeaseDetails(lt.sender, lt.recipient, leaseId, lt.amount, isActive)
+          transactionInfo(leaseId, db).collect {
+            case (h, lt: LeaseTransaction, _) =>
+              LeaseDetails(
+                lt.sender,
+                lt.recipient,
+                leaseId,
+                lt.amount,
+                if (isActive) LeaseDetails.Status.Active
+                else LeaseDetails.Status.CancelledByTx(h, ByteStr.empty)
+              )
           },
         Some(_)
       )
