@@ -20,7 +20,7 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
-class BlocksRouteSpec
+class BlocksApiRouteSpec
     extends RouteSpec("/blocks")
     with PathMockFactory
     with PropertyChecks
@@ -273,7 +273,7 @@ class BlocksRouteSpec
 
     "ideal blocks" in {
       val blocks = (1 to 10).map(i => TestBlock.create(i * 10, Nil))
-      val route = blocksApiRoute.copy(commonApi = emulateBlocks(blocks)).route
+      val route  = blocksApiRoute.copy(commonApi = emulateBlocks(blocks)).route
 
       Get(routePath(s"/heightByTimestamp/10")) ~> route ~> check {
         val result = (responseAs[JsObject] \ "height").as[Int]
