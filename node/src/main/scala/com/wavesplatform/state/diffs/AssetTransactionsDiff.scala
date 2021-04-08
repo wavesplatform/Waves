@@ -41,7 +41,6 @@ object AssetTransactionsDiff extends ScorexLogging {
         .map(
           script =>
             Diff(
-              tx = tx,
               portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
               issuedAssets = Map(asset             -> NewAssetInfo(staticInfo, info, volumeInfo)),
               assetScripts = Map(asset             -> script.map(AssetScriptInfo.tupled)),
@@ -51,16 +50,15 @@ object AssetTransactionsDiff extends ScorexLogging {
     } yield result
   }
 
-  def setAssetScript(blockchain: Blockchain, blockTime: Long)(tx: SetAssetScriptTransaction): Either[ValidationError, Diff] =
+  def setAssetScript(blockchain: Blockchain)(tx: SetAssetScriptTransaction): Either[ValidationError, Diff] =
     DiffsCommon.validateAsset(blockchain, tx.asset, tx.sender.toAddress, issuerOnly = true).flatMap { _ =>
       if (blockchain.hasAssetScript(tx.asset)) {
         DiffsCommon
           .countVerifierComplexity(tx.script, blockchain, isAsset = true)
           .map { script =>
             Diff(
-              tx = tx,
               portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-              assetScripts = Map(tx.asset -> script.map(AssetScriptInfo.tupled)),
+              assetScripts = Map(tx.asset          -> script.map(AssetScriptInfo.tupled)),
               scriptsRun =
                 // Asset script doesn't count before Ride4DApps activation
                 if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
@@ -77,28 +75,18 @@ object AssetTransactionsDiff extends ScorexLogging {
 
   def reissue(blockchain: Blockchain, blockTime: Long)(tx: ReissueTransaction): Either[ValidationError, Diff] =
     DiffsCommon
-      .processReissue(
-        blockchain,
-        tx.sender.toAddress,
-        blockTime,
-        tx.fee,
-        Reissue(tx.asset.id, tx.reissuable, tx.quantity)
-      )
-      .map(_.bindTransaction(tx) |+| Diff.stateOps(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
+      .processReissue(blockchain, tx.sender.toAddress, blockTime, tx.fee, Reissue(tx.asset.id, tx.reissuable, tx.quantity))
+      .map(_ |+| Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
 
   def burn(blockchain: Blockchain)(tx: BurnTransaction): Either[ValidationError, Diff] =
     DiffsCommon
-      .processBurn(
-        blockchain,
-        tx.sender.toAddress,
-        tx.fee,
-        Burn(tx.asset.id, tx.quantity)
-      )
-      .map(_.bindTransaction(tx) |+| Diff.stateOps(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
+      .processBurn(blockchain, tx.sender.toAddress, tx.fee, Burn(tx.asset.id, tx.quantity))
+      .map(_ |+| Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
 
   def sponsor(blockchain: Blockchain)(tx: SponsorFeeTransaction): Either[ValidationError, Diff] =
-    DiffsCommon.processSponsor(blockchain, tx.sender.toAddress, tx.fee, SponsorFee(tx.asset.id, tx.minSponsoredAssetFee))
-      .map(_.bindTransaction(tx) |+| Diff.stateOps(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
+    DiffsCommon
+      .processSponsor(blockchain, tx.sender.toAddress, tx.fee, SponsorFee(tx.asset.id, tx.minSponsoredAssetFee))
+      .map(_ |+| Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
 
   def updateInfo(blockchain: Blockchain)(tx: UpdateAssetInfoTransaction): Either[ValidationError, Diff] =
     DiffsCommon.validateAsset(blockchain, tx.assetId, tx.sender.toAddress, issuerOnly = true) >> {
@@ -118,12 +106,13 @@ object AssetTransactionsDiff extends ScorexLogging {
         _ <- Either.cond(
           blockchain.height >= updateAllowedAt,
           (),
-          GenericError(s"Can't update info of asset with id=${tx.assetId.id} before $updateAllowedAt block, " +
-                       s"current height=${blockchain.height}, minUpdateInfoInterval=$minUpdateInfoInterval")
+          GenericError(
+            s"Can't update info of asset with id=${tx.assetId.id} before $updateAllowedAt block, " +
+              s"current height=${blockchain.height}, minUpdateInfoInterval=$minUpdateInfoInterval"
+          )
         )
         updatedInfo = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
       } yield Diff(
-        tx = tx,
         portfolios = Map(tx.sender.toAddress -> portfolioUpdate),
         updatedAssets = Map(tx.assetId       -> updatedInfo.leftIor),
         scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)

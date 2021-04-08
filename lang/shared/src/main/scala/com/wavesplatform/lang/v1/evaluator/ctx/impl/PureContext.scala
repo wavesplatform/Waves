@@ -305,7 +305,7 @@ object PureContext {
     ) {
       case CONST_LONG(v) :: CONST_LONG(n) :: CONST_LONG(d) :: Nil =>
         for {
-          _ <- Either.cond(d != 0, (), "fraction: division by zero")
+          _ <- Either.cond(d != 0, (), "Fraction: division by zero")
           result = BigInt(v) * n / d
           _ <- Either.cond(result < Long.MaxValue, (), s"Long overflow: value `$result` greater than 2^63-1")
           _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^63-1")
@@ -325,7 +325,7 @@ object PureContext {
     ) {
       case CONST_BIGINT(v) :: CONST_BIGINT(n) :: CONST_BIGINT(d) :: Nil =>
         for {
-          _ <- Either.cond(d != 0, (), "fraction: division by zero")
+          _ <- Either.cond(d != 0, (), "Fraction: division by zero")
           result = v * n / d
           _ <- Either.cond(result < maxBigInt, (), s"Long overflow: value `$result` greater than 2^511-1")
           _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^511-1")
@@ -346,7 +346,7 @@ object PureContext {
     ) {
       case CONST_BIGINT(v) :: CONST_BIGINT(n) :: CONST_BIGINT(d) :: (r: CaseObj) :: Nil =>
         for {
-          _ <- Either.cond(d != 0, (), "fraction: division by zero")
+          _ <- Either.cond(d != 0, (), "Fraction: division by zero")
           p = v * n
           s = p.sign * d.sign
           rm = p.abs /% d.abs
