@@ -68,7 +68,10 @@ class ScriptTransferByAliasTest
        """.stripMargin
     )
 
-  private def dApp(asset: IssuedAsset): Script =
+  private val transferAmount = 123
+  private val alias          = "alias"
+
+  private def dApp(asset: IssuedAsset): Script = {
     TestCompiler(V4).compileContract(
       s"""
          | {-# STDLIB_VERSION 4       #-}
@@ -78,10 +81,11 @@ class ScriptTransferByAliasTest
          | @Callable(i)
          | func default() =
          |   [
-         |     ScriptTransfer(Alias("alias"), 123, base58'$asset')
+         |     ScriptTransfer(Alias("$alias"), $transferAmount, base58'$asset')
          |   ]
        """.stripMargin
     )
+  }
 
   private val paymentPreconditions: Gen[(List[Transaction], () => InvokeScriptTransaction, IssuedAsset, Address)] =
     for {
@@ -94,7 +98,7 @@ class ScriptTransferByAliasTest
         genesis     <- GenesisTransaction.create(dAppAcc.toAddress, ENOUGH_AMT, ts)
         genesis2    <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         genesis3    <- GenesisTransaction.create(receiver.toAddress, ENOUGH_AMT, ts)
-        createAlias <- CreateAliasTransaction.selfSigned(2.toByte, receiver, Alias.create("alias").explicitGet(), fee, ts)
+        createAlias <- CreateAliasTransaction.selfSigned(2.toByte, receiver, Alias.create(alias).explicitGet(), fee, ts)
         issue       <- IssueTransaction.selfSigned(2.toByte, dAppAcc, "Asset", "Description", ENOUGH_AMT, 8, true, Some(verifier), fee, ts)
         asset = IssuedAsset(issue.id.value())
         setDApp <- SetScriptTransaction.selfSigned(1.toByte, dAppAcc, Some(dApp(asset)), fee, ts)
@@ -119,7 +123,7 @@ class ScriptTransferByAliasTest
       val invoke2 = invoke()
       d.appendBlock(invoke2)
       d.blockchain.bestLiquidDiff.get.errorMessage(invoke2.id.value()) shouldBe None
-      d.balance(receiver, asset) shouldBe 123
+      d.balance(receiver, asset) shouldBe transferAmount
     }
   }
 }
