@@ -3,7 +3,7 @@ package com.wavesplatform.state.appender
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase}
+import com.wavesplatform.network.{ExtensionBlocks, InvalidBlockStorage, PeerDatabase}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.SystemTime
 import com.wavesplatform.utx.UtxPoolImpl
@@ -27,7 +27,7 @@ class ExtensionAppenderSpec extends FlatSpec with Matchers with WithDomain with 
     utx.all shouldBe Seq(tx)
 
     time.setTime(block1.header.timestamp)
-    extensionAppender(Seq(block1)).runSyncUnsafe().explicitGet()
+    extensionAppender(ExtensionBlocks(d.blockchain.score + block1.blockScore(), Seq(block1))).runSyncUnsafe().explicitGet()
     d.blockchain.height shouldBe 2
     utx.all shouldBe Nil
   }
