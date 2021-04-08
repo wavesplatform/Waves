@@ -11,10 +11,10 @@ case object CancelInvalidLeaseIn extends DiffPatchFactory {
   }
 
   def apply(): Diff = {
-    val pfs = PatchLoader.read[Map[String, LeaseBalance]](this).map {
+    import PatchLoader._
+    Diff.empty.copy(portfolios = read[Map[String, LeaseBalance]](this).map {
       case (address, lb) =>
         Address.fromString(address).explicitGet() -> Portfolio(lease = lb)
-    }
-    Diff.empty.copy(portfolios = pfs)
+    })
   }
 }

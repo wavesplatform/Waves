@@ -252,6 +252,11 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     leaseCancel                                 <- createLeaseCancel(otherSender, lease.id(), fee2, timestamp2)
   } yield (lease, leaseCancel)
 
+  def leaseGen(sender: KeyPair, timestamp: Long): Gen[LeaseTransaction] = for {
+    (_, amount, fee, _, recipient) <- leaseParamGen
+    version <- Gen.oneOf(1.toByte, 2.toByte, 3.toByte)
+  } yield LeaseTransaction.selfSigned(version, sender, recipient.toAddress, amount, fee, timestamp).explicitGet()
+
   val leaseGen: Gen[LeaseTransaction]             = leaseAndCancelGen.map(_._1)
   val leaseCancelGen: Gen[LeaseCancelTransaction] = leaseAndCancelGen.map(_._2)
 

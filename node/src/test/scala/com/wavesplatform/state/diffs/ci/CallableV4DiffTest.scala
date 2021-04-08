@@ -7,9 +7,8 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Asset, V4}
-import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.script.{ContractScript, Script}
-import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
@@ -347,8 +346,8 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       } yield (List(genesis, genesis2), setDApp, ci, issue, master, invoker, reissueAmount, burnAmount, transferAmount)
     }.explicitGet()
 
-  private def assetVerifier(body: String): Script = {
-    val script =
+  private def assetVerifier(body: String): Script =
+    compileExpr(
       s"""
          | {-# STDLIB_VERSION 4          #-}
          | {-# CONTENT_TYPE   EXPRESSION #-}
@@ -356,12 +355,10 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
          |
          | $body
          |
-       """.stripMargin
-
-    val expr     = Parser.parseExpr(script).get.value
-    val compiled = compileExpr(expr, V4, Asset)
-    ExprScript(V4, compiled).explicitGet()
-  }
+       """.stripMargin,
+      V4,
+      Asset
+    )
 
   private def reissueAndBurnDApp(assetId: ByteStr, reissueAmount: Long, burnAmount: Long): Script =
     dApp(
@@ -384,9 +381,8 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
        """.stripMargin
     )
 
-  private def dApp(body: String): Script = {
-    val script =
-      s"""
+  private def dApp(body: String): Script =
+    TestCompiler(V4).compileContract(s"""
          | {-# STDLIB_VERSION 4       #-}
          | {-# CONTENT_TYPE   DAPP    #-}
          | {-# SCRIPT_TYPE    ACCOUNT #-}
@@ -395,12 +391,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
          | func default() = {
          |   $body
          | }
-       """.stripMargin
-
-    val expr     = Parser.parseContract(script).get.value
-    val contract = compileContractFromExpr(expr, V4)
-    ContractScript(V4, contract).explicitGet()
-  }
+       """.stripMargin)
 
   private val features = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Seq(

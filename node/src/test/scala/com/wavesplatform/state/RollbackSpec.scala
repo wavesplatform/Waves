@@ -1,6 +1,5 @@
 package com.wavesplatform.state
 
-import cats.kernel.Monoid
 import com.wavesplatform.{history, NoShrink, TestTime, TransactionGen}
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
@@ -13,19 +12,12 @@ import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.history.Domain
 import com.wavesplatform.it.util.AddressOrAliasExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, DApp, V5}
-import com.wavesplatform.lang.script.ContractScript
+import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.{compiler, FunctionHeader}
-import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Lease
+import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction, TxVersion}
@@ -768,7 +760,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           )
 
         // liquid block rollback
-        val leaseCancelId = append(d.lastBlockId, call)
+        val leaseCancelId     = append(d.lastBlockId, call)
         val (cancelHeight, _) = d.blockchain.transactionMeta(leaseCancelId).get
 
         d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance.empty
@@ -1040,12 +1032,10 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
 object RollbackSpec {
   private val issueReissueBurnScript = {
-
     val stdLibVersion = V5
 
-    val expr = {
-      val script =
-        s"""
+    val script =
+      s"""
            |{-# STDLIB_VERSION ${stdLibVersion.id} #-}
            |{-# CONTENT_TYPE DAPP #-}
            |{-#SCRIPT_TYPE ACCOUNT#-}
@@ -1076,22 +1066,6 @@ object RollbackSpec {
            |
            |""".stripMargin
 
-      Parser.parseContract(script).get.value
-    }
-
-    val ctx = {
-      Monoid
-        .combineAll(
-          Seq(
-            PureContext.build(stdLibVersion).withEnvironment[Environment],
-            CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment],
-            WavesContext.build(
-              Global,
-              DirectiveSet(stdLibVersion, Account, DApp).explicitGet()
-            )
-          )
-        )
-    }
-    ContractScript(stdLibVersion, compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).explicitGet()).explicitGet()
+    TestCompiler(stdLibVersion).compileContract(script)
   }
 }

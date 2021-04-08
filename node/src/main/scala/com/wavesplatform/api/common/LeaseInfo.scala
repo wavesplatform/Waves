@@ -8,7 +8,7 @@ object LeaseInfo {
   type Status = Status.Value
   //noinspection TypeAnnotation
   object Status extends Enumeration { // TODO: Add expired status before LeaseExpiration feature activation
-    val active    = Value(1)
+    val active   = Value(1)
     val canceled = Value(0)
   }
 }
