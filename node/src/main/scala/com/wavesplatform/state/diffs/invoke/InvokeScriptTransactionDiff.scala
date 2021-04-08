@@ -110,6 +110,7 @@ object InvokeScriptTransactionDiff {
                   pk,
                   Set(tx.senderAddress, dAppAddress),
                   limitedExecution,
+                  ContractLimits.MaxTotalInvokeComplexity(version),
                   ContractLimits.MaxSyncDAppCalls(version),
                   ContractLimits.MaxCallableActionsAmount(version),
                   ContractLimits.MaxWriteSetSize(version),

@@ -315,6 +315,7 @@ object UtilsApiRoute {
               PublicKey(ByteStr.fill(KeyLength)(1)),
               Set(),
               limitedExecution = false,
+              limit,
               remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
               avaliableActions = ContractLimits.MaxCallableActionsAmount(script.stdLibVersion),
               avaliableData = ContractLimits.MaxWriteSetSize(script.stdLibVersion),
