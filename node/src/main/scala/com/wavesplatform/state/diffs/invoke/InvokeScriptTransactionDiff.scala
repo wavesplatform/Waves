@@ -174,6 +174,7 @@ object InvokeScriptTransactionDiff {
               _,
               isSyncCall = false,
               limitedExecution,
+              ContractLimits.MaxTotalInvokeComplexity(version),
               otherIssues
             )
 

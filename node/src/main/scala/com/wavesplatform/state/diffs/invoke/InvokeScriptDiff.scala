@@ -194,6 +194,7 @@ object InvokeScriptDiff {
                     unusedComplexity,
                     isSyncCall = true,
                     limitedExecution,
+                    totalComplexityLimit,
                     Seq()
                   )
                 )
