@@ -1,6 +1,9 @@
 package com.wavesplatform.http
 
+import scala.util.Random
+
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet, TransactionGen}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
@@ -16,21 +19,18 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash}
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet, TransactionGen}
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json.{JsArray, JsObject, JsValue, Json, _}
-
-import scala.util.Random
+import play.api.libs.json.{JsArray, JsObject, Json, JsValue}
 
 //noinspection ScalaStyle
 class DebugApiRouteSpec
@@ -422,7 +422,7 @@ class DebugApiRouteSpec
           |    "data" : [ ],
           |    "transfers" : [ ],
           |    "issues" : [ {
-          |      "assetId" : "${Issue.calculateId(4, "description", true, "name", 1000, 0, tx.id())}",
+          |      "assetId" : "${Issue.calculateId(4, "description", isReissuable = true, "name", 1000, 0, tx.id())}",
           |      "name" : "name",
           |      "description" : "description",
           |      "quantity" : 1000,
@@ -593,7 +593,7 @@ class DebugApiRouteSpec
 
         (blockchain.leaseDetails _)
           .when(leaseCancelId)
-          .returns(Some(LeaseDetails(dAppPk, accountGen.sample.get.toAddress, leaseCancelId, 100, true)))
+          .returns(Some(LeaseDetails(dAppPk, accountGen.sample.get.toAddress, leaseCancelId, 100, isActive = true)))
           .anyNumberOfTimes()
 
         (blockchain.leaseDetails _)
@@ -606,10 +606,12 @@ class DebugApiRouteSpec
           .returns(Right(accountGen.sample.get.toAddress))
           .anyNumberOfTimes()
       }
-      val route = debugApiRoute.copy(
-        blockchain = blockchain,
-        priorityPoolBlockchain = () => blockchain
-      ).route
+      val route = debugApiRoute
+        .copy(
+          blockchain = blockchain,
+          priorityPoolBlockchain = () => blockchain
+        )
+        .route
 
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, invoke.json().toString())) ~> route ~> check {
         val json = Json.parse(responseAs[String])
@@ -734,21 +736,55 @@ class DebugApiRouteSpec
       (() => blockchain.activatedFeatures).when().returning(Map.empty).anyNumberOfTimes()
       (transactionsApi.transactionById _)
         .when(invoke.id())
-        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, true, Some(scriptResult))))
+        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, succeeded = true, Some(scriptResult))))
         .once()
+
+      (blockchain.leaseDetails _).when(leaseId1).returning(Some(LeaseDetails(invoke.sender, recipientAddress, invoke.id(), 100, isActive = true)))
+      (blockchain.leaseDetails _).when(leaseId2).returning(Some(LeaseDetails(invoke.sender, recipientAddress, invoke.id(), 100, isActive = true)))
+      (blockchain.leaseDetails _)
+        .when(leaseCancelId)
+        .returning(Some(LeaseDetails(invoke.sender, recipientAddress, invoke.id(), 100, isActive = false)))
+      (blockchain.transactionMeta _).when(invoke.id()).returning(Some((1, true)))
 
       Get(routePath(s"/stateChanges/info/${invoke.id()}")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        (responseAs[JsObject] \ "stateChanges").as[JsObject] shouldBe Json.toJsObject(scriptResult)
-        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 0 \ "recipient").get shouldBe JsString(recipientAddress.stringRepr)
-        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 0 \ "amount").get shouldBe JsNumber(100)
-        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 0 \ "nonce").get shouldBe JsNumber(1)
-        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 0 \ "leaseId").get shouldBe JsString(leaseId1.toString)
-        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 1 \ "recipient").get shouldBe JsString(recipientAlias.stringRepr)
-        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 1 \ "amount").get shouldBe JsNumber(200)
-        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 1 \ "nonce").get shouldBe JsNumber(3)
-        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 1 \ "leaseId").get shouldBe JsString(leaseId2.toString)
-        (responseAs[JsObject] \ "stateChanges" \ "leaseCancels" \ 0 \ "leaseId").get shouldBe JsString(leaseCancelId.toString)
+        val json = (responseAs[JsObject] \ "stateChanges").as[JsObject]
+        json shouldBe Json.parse(s"""
+                                   |{
+                                   |  "data" : [ ],
+                                   |  "transfers" : [ ],
+                                   |  "issues" : [ ],
+                                   |  "reissues" : [ ],
+                                   |  "burns" : [ ],
+                                   |  "sponsorFees" : [ ],
+                                   |  "leases" : [ {
+                                   |    "leaseId" : "$leaseId1",
+                                   |    "originTransactionId" : "${invoke.id()}",
+                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |    "recipient" : "$recipientAddress",
+                                   |    "amount" : 100,
+                                   |    "height" : 1,
+                                   |    "status" : "active"
+                                   |  }, {
+                                   |    "leaseId" : "$leaseId2",
+                                   |    "originTransactionId" : "${invoke.id()}",
+                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |    "recipient" : "$recipientAddress",
+                                   |    "amount" : 100,
+                                   |    "height" : 1,
+                                   |    "status" : "active"
+                                   |  } ],
+                                   |  "leaseCancels" : [ {
+                                   |    "leaseId" : "$leaseCancelId",
+                                   |    "originTransactionId" : "${invoke.id()}",
+                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |    "recipient" : "$recipientAddress",
+                                   |    "amount" : 100,
+                                   |    "height" : 1,
+                                   |    "status" : "canceled"
+                                   |  } ],
+                                   |  "invokes" : [ ]
+                                   |}""".stripMargin)
       }
     }
   }
