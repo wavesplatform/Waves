@@ -65,7 +65,6 @@ class RideV5LimitsChangeTest extends FlatSpec with Matchers with WithDomain with
     val invokes = for (_ <- 1 to 680) yield TxHelpers.invoke(contractAddress, "test") // 3675 complexity, 2499000 total
 
     val time       = new TestTime()
-    val utxStorage = new UtxPoolImpl(time, d.blockchain, Observer.empty, defaultDomainSettings.utxSettings)
 
     val block = d.createBlock(Block.ProtoBlockVersion, invokes, strictTime = true)
     val differResult = BlockDiffer
