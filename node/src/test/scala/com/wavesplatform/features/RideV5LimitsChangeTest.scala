@@ -18,9 +18,6 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.mining.{MiningConstraints, MultiDimensionalMiningConstraint, OneDimensionalMiningConstraint, TxEstimators}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.utx.UtxPoolImpl
-import monix.execution.Scheduler.Implicits.global
-import monix.reactive.Observer
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{FlatSpec, Matchers}
 
