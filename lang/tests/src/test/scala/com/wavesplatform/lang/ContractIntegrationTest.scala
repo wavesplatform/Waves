@@ -302,8 +302,8 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         DataItem.Bin("d", ByteStr.fromLong(256L))
       ),
       List(
-        AssetTransfer(Recipient.Address(callerAddress), 1L, None),
-        AssetTransfer(Recipient.Address(callerAddress), 2L, None)
+        AssetTransfer(Recipient.Address(callerAddress), Recipient.Address(callerAddress), 1L, None),
+        AssetTransfer(Recipient.Address(callerAddress), Recipient.Address(callerAddress), 2L, None)
       ),
       0
     )
@@ -371,8 +371,8 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         DataItem.Lng("b", 2)
       ),
       List(
-        AssetTransfer(Recipient.Address(callerAddress), 3, None),
-        AssetTransfer(Recipient.Address(callerAddress), 4, None)
+        AssetTransfer(Recipient.Address(callerAddress), Recipient.Address(callerAddress), 3, None),
+        AssetTransfer(Recipient.Address(callerAddress), Recipient.Address(callerAddress), 4, None)
       ),
       0
     )
