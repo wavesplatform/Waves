@@ -747,40 +747,28 @@ class DebugApiRouteSpec
         val json = (responseAs[JsObject] \ "stateChanges").as[JsObject]
         println(Json.prettyPrint(json))
         json shouldBe Json.parse(s"""{
-                                   |  "data" : [ ],
-                                   |  "transfers" : [ ],
-                                   |  "issues" : [ ],
-                                   |  "reissues" : [ ],
-                                   |  "burns" : [ ],
-                                   |  "sponsorFees" : [ ],
-                                   |  "leases" : [ {
-                                   |    "leaseId" : "$leaseId1",
-                                   |    "originTransactionId" : "${invoke.id()}",
-                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "recipient" : "3MxigzjaXxu41EKN732pQwVofVzK2ZmVaKu",
-                                   |    "amount" : 100,
-                                   |    "height" : 1,
-                                   |    "status" : "active"
-                                   |  }, {
-                                   |    "leaseId" : "$leaseId2",
-                                   |    "originTransactionId" : "${invoke.id()}",
-                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "recipient" : "3MxigzjaXxu41EKN732pQwVofVzK2ZmVaKu",
-                                   |    "amount" : 100,
-                                   |    "height" : 1,
-                                   |    "status" : "active"
-                                   |  } ],
-                                   |  "leaseCancels" : [ {
-                                   |    "leaseId" : "${leaseCancelId}",
-                                   |    "originTransactionId" : "${invoke.id()}",
-                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "recipient" : "3MxigzjaXxu41EKN732pQwVofVzK2ZmVaKu",
-                                   |    "amount" : 100,
-                                   |    "height" : 1,
-                                   |    "status" : "canceled"
-                                   |  } ],
-                                   |  "invokes" : [ ]
-                                   |}""".stripMargin)
+                                    |  "data" : [ ],
+                                    |  "transfers" : [ ],
+                                    |  "issues" : [ ],
+                                    |  "reissues" : [ ],
+                                    |  "burns" : [ ],
+                                    |  "sponsorFees" : [ ],
+                                    |  "leases" : [ {
+                                    |    "recipient" : "$recipientAddress",
+                                    |    "amount" : 100,
+                                    |    "nonce" : 1,
+                                    |    "leaseId" : "$leaseId1"
+                                    |  }, {
+                                    |    "recipient" : "$recipientAlias",
+                                    |    "amount" : 200,
+                                    |    "nonce" : 3,
+                                    |    "leaseId" : "$leaseId2"
+                                    |  } ],
+                                    |  "leaseCancels" : [ {
+                                    |    "leaseId" : "$leaseCancelId"
+                                    |  } ],
+                                    |  "invokes" : [ ]
+                                    |}""".stripMargin)
       }
     }
   }

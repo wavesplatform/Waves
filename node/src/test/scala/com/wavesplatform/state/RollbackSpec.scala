@@ -769,13 +769,14 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
         // liquid block rollback
         val leaseCancelId = append(d.lastBlockId, call)
+        val (cancelHeight, _) = d.blockchain.transactionMeta(leaseCancelId).get
 
         d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance.empty
-        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(4, leaseCancelId)
+        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(cancelHeight, leaseCancelId)
         d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails()
         d.appendBlock()
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(4, leaseCancelId)
+        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(cancelHeight, leaseCancelId)
 
         d.blockchain.removeAfter(beforeInvoke1).explicitGet()
 
@@ -790,10 +791,10 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
         d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance.empty
-        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(4, leaseCancelId1)
+        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(cancelHeight, leaseCancelId1)
         d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails()
         d.appendBlock()
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(4, leaseCancelId1)
+        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(cancelHeight, leaseCancelId1)
 
         d.appendBlock()
         d.blockchain.removeAfter(beforeInvoke2).explicitGet()
