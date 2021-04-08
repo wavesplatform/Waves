@@ -138,7 +138,7 @@ object CommonAccountsApi extends ScorexLogging {
         case TransactionMeta(height, lt: LeaseTransaction, true) if leaseIsActive(lt.id()) =>
           val recipient = blockchain.resolveAlias(lt.recipient).explicitGet()
           Seq(
-            LeaseInfo(lt.id(), lt.id(), lt.sender.toAddress, recipient, lt.amount, height, LeaseInfo.Status.Active)
+            LeaseInfo(lt.id(), lt.id(), lt.sender.toAddress, recipient, lt.amount, height, LeaseInfo.Status.active)
           )
 
         case TransactionMeta.Invoke(height, invoke, true, scriptResult) =>
@@ -147,7 +147,7 @@ object CommonAccountsApi extends ScorexLogging {
             .map { lease =>
               val sender    = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
               val recipient = blockchain.resolveAlias(lease.recipient).explicitGet()
-              LeaseInfo(lease.leaseId, invoke.id(), sender, recipient, lease.amount, height, LeaseInfo.Status.Active)
+              LeaseInfo(lease.leaseId, invoke.id(), sender, recipient, lease.amount, height, LeaseInfo.Status.active)
             }
         case _ => Seq()
       }
@@ -163,7 +163,7 @@ object CommonAccountsApi extends ScorexLogging {
         blockchain.resolveAlias(ld.recipient).explicitGet(),
         ld.amount,
         height,
-        if (ld.isActive) LeaseInfo.Status.Active else LeaseInfo.Status.Cancelled,
+        if (ld.isActive) LeaseInfo.Status.active else LeaseInfo.Status.canceled,
         LeaseDetails.Status.getCancelHeight(ld.status),
         LeaseDetails.Status.getCancelTransactionId(ld.status)
       )

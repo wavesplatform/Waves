@@ -35,7 +35,7 @@ class LeaseApiRouteSpec extends RouteSpec("/leasing") with PathMockFactory with 
             lease.recipient.asInstanceOf[Address],
             lease.amount,
             1,
-            LeaseInfo.Status.Cancelled,
+            LeaseInfo.Status.canceled,
             Some(2),
             Some(leaseCancel.id())
           )
@@ -52,7 +52,7 @@ class LeaseApiRouteSpec extends RouteSpec("/leasing") with PathMockFactory with 
                                |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                                |  "amount" : 1000000000,
                                |  "height" : 1,
-                               |  "status" : "Cancelled",
+                               |  "status" : "canceled",
                                |  "leaseCancelHeight" : 2,
                                |  "leaseCancelTransactionId" : "${leaseCancel.id()}"
                                |}""".stripMargin
@@ -65,7 +65,7 @@ class LeaseApiRouteSpec extends RouteSpec("/leasing") with PathMockFactory with 
                                        |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                                        |  "amount" : 1000000000,
                                        |  "height" : 1,
-                                       |  "status" : "Cancelled",
+                                       |  "status" : "canceled",
                                        |  "leaseCancelHeight" : 2,
                                        |  "leaseCancelTransactionId" : "${leaseCancel.id()}"
                                        |},
@@ -76,7 +76,7 @@ class LeaseApiRouteSpec extends RouteSpec("/leasing") with PathMockFactory with 
                                        |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                                        |  "amount" : 1000000000,
                                        |  "height" : 1,
-                                       |  "status" : "Cancelled",
+                                       |  "status" : "canceled",
                                        |  "leaseCancelHeight" : 2,
                                        |  "leaseCancelTransactionId" : "${leaseCancel.id()}"
                                        |}]""".stripMargin)
