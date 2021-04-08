@@ -70,7 +70,7 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
         commonApi
           .activeLeases(request.address.toAddress)
           .map {
-            case LeaseInfo(leaseId, originTransactionId, sender, recipient, amount, height, status) =>
+            case LeaseInfo(leaseId, originTransactionId, sender, recipient, amount, height, status, _, _) =>
               assert(status == LeaseInfo.Status.active)
               LeaseResponse(
                 leaseId.toByteString,
