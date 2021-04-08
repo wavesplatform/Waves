@@ -844,7 +844,7 @@ abstract class LevelDBWriter private[database](
                 leaseId,
                 lt.amount,
                 if (isActive) LeaseDetails.Status.Active
-                else LeaseDetails.Status.CancelledByTx(h, ByteStr.empty)
+                else LeaseDetails.Status.Cancelled(h, ByteStr.empty)
               )
           },
         Some(_)

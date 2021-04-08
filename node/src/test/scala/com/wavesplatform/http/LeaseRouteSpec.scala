@@ -1,6 +1,9 @@
 package com.wavesplatform.http
 
+import scala.concurrent.Future
+
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.{NoShrink, NTPTime, TestWallet, TransactionGen}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.ApiMarshallers._
@@ -15,18 +18,15 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{BinaryDataEntry, Diff}
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.{Asset, TxVersion}
-import com.wavesplatform.{NTPTime, NoShrink, TestWallet, TransactionGen}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import org.scalacheck.Gen
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.libs.json.JsObject
-
-import scala.concurrent.Future
 
 class LeaseRouteSpec
     extends RouteSpec("/leasing")
@@ -121,14 +121,15 @@ class LeaseRouteSpec
       }
     }
 
-  private def toDetails(lt: LeaseTransaction) = LeaseDetails(lt.sender, lt.recipient, lt.id(), lt.amount, isActive = true)
+  private def toDetails(lt: LeaseTransaction) = LeaseDetails(lt.sender, lt.recipient, lt.id(), lt.amount, LeaseDetails.Status.Active)
 
-  private def leaseGen(sender: KeyPair, maxAmount: Long, timestamp: Long): Gen[LeaseTransaction] = for {
-    fee <- smallFeeGen
-    recipient <- accountGen
-    amount <- Gen.chooseNum(1, maxAmount)
-    version <- Gen.oneOf(1.toByte, 2.toByte, 3.toByte)
-  } yield LeaseTransaction.selfSigned(version, sender, recipient.toAddress, amount, fee, timestamp).explicitGet()
+  private def leaseGen(sender: KeyPair, maxAmount: Long, timestamp: Long): Gen[LeaseTransaction] =
+    for {
+      fee       <- smallFeeGen
+      recipient <- accountGen
+      amount    <- Gen.chooseNum(1, maxAmount)
+      version   <- Gen.oneOf(1.toByte, 2.toByte, 3.toByte)
+    } yield LeaseTransaction.selfSigned(version, sender, recipient.toAddress, amount, fee, timestamp).explicitGet()
 
   "returns active leases which were" - {
     val genesisWithLease = for {
@@ -229,7 +230,7 @@ class LeaseRouteSpec
               case i: BinaryDataEntry => i.value
             }
             .get
-          val expectedDetails = Seq(leaseId -> LeaseDetails(setScript.sender, recipient, invoke.id(), 10_000.waves, isActive = true))
+          val expectedDetails = Seq(leaseId -> LeaseDetails(setScript.sender, recipient, invoke.id(), 10_000.waves, LeaseDetails.Status.Active))
           // check liquid block
           checkActiveLeasesFor(sender.toAddress, r, expectedDetails)
           checkActiveLeasesFor(recipient, r, expectedDetails)
@@ -260,7 +261,7 @@ class LeaseRouteSpec
               case i: BinaryDataEntry => i.value
             }
             .get
-          val expectedDetails = Seq(leaseId -> LeaseDetails(setScript.sender, recipient, invoke.id(), 10_000.waves, isActive = true))
+          val expectedDetails = Seq(leaseId -> LeaseDetails(setScript.sender, recipient, invoke.id(), 10_000.waves, LeaseDetails.Status.Active))
           // check liquid block
           checkActiveLeasesFor(sender.toAddress, r, expectedDetails)
           checkActiveLeasesFor(recipient, r, expectedDetails)
@@ -348,7 +349,7 @@ class LeaseRouteSpec
             }
             .get
 
-          val expectedDetails = Seq(leaseId -> LeaseDetails(target.publicKey, recipient, ist.id(), 10_000.waves, isActive = true))
+          val expectedDetails = Seq(leaseId -> LeaseDetails(target.publicKey, recipient, ist.id(), 10_000.waves, LeaseDetails.Status.Active))
           // check liquid block
           checkActiveLeasesFor(target.toAddress, r, expectedDetails)
           checkActiveLeasesFor(recipient, r, expectedDetails)

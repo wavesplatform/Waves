@@ -215,7 +215,7 @@ object DiffsCommon {
         lease.recipient,
         lease.sourceId,
         lease.amount,
-        LeaseDetails.Status.CancelledByTx(blockchain.height, cancelTxId)
+        LeaseDetails.Status.Cancelled(blockchain.height, cancelTxId)
       )
     } yield Diff(
       portfolios = senderPortfolio |+| recipientPortfolio,

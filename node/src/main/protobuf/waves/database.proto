@@ -71,12 +71,12 @@ message DataEntry {
 }
 
 message LeaseDetails {
-    message CancelledByTx {
+    message Cancelled {
         int32 height = 1;
         bytes transaction_id = 2;
     }
 
-    message CancelledAt {
+    message Expired {
         int32 height = 1;
     }
 
@@ -87,7 +87,7 @@ message LeaseDetails {
 
     oneof status {
         google.protobuf.Empty active = 10;
-        CancelledByTx cancelled_by_tx = 11;
-        CancelledAt cancelled_at = 12;
+        Cancelled cancelled = 11;
+        Expired expired = 12;
     }
 }

@@ -11,7 +11,6 @@ import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.{ByteString, CodedInputStream, WireFormat}
-import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -37,7 +36,6 @@ import monix.reactive.Observable
 import org.iq80.leveldb._
 import supertagged.TaggedType
 
-//noinspection UnstableApiUsage
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
     log.debug(s"Open DB at $path")
@@ -198,10 +196,10 @@ package object database extends ScorexLogging {
             ByteString.copyFrom(ld.sourceId.arr),
             ld.amount,
             ld.status match {
-              case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(Empty())
-              case LeaseDetails.Status.CancelledByTx(height, cancelTxId) =>
-                pb.LeaseDetails.Status.CancelledByTx(pb.LeaseDetails.CancelledByTx(height, ByteString.copyFrom(cancelTxId.arr)))
-              case LeaseDetails.Status.CancelledAt(height) => pb.LeaseDetails.Status.CancelledAt(pb.LeaseDetails.CancelledAt(height))
+              case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
+              case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
+                pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, ByteString.copyFrom(cancelTxId.arr)))
+              case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
             }
           )
           .toByteArray
@@ -218,10 +216,10 @@ package object database extends ScorexLogging {
           d.sourceId.toByteStr,
           d.amount,
           d.status match {
-            case pb.LeaseDetails.Status.Active(_)                                    => LeaseDetails.Status.Active
-            case pb.LeaseDetails.Status.CancelledAt(pb.LeaseDetails.CancelledAt(height)) => LeaseDetails.Status.CancelledAt(height)
-            case pb.LeaseDetails.Status.CancelledByTx(pb.LeaseDetails.CancelledByTx(height, transactionId)) =>
-              LeaseDetails.Status.CancelledByTx(height, transactionId.toByteStr)
+            case pb.LeaseDetails.Status.Active(_)                                => LeaseDetails.Status.Active
+            case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height)) => LeaseDetails.Status.Expired(height)
+            case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId)) =>
+              LeaseDetails.Status.Cancelled(height, transactionId.toByteStr)
             case pb.LeaseDetails.Status.Empty => ???
           }
         )

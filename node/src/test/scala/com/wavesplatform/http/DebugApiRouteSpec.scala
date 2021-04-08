@@ -739,7 +739,7 @@ class DebugApiRouteSpec
 
       (blockchain.leaseDetails _).when(leaseId1).returning(Some(LeaseDetails(invoke.sender, recipientAddress, invoke.id(), 100, LeaseDetails.Status.Active)))
       (blockchain.leaseDetails _).when(leaseId2).returning(Some(LeaseDetails(invoke.sender, recipientAddress, invoke.id(), 100, LeaseDetails.Status.Active)))
-      (blockchain.leaseDetails _).when(leaseCancelId).returning(Some(LeaseDetails(invoke.sender, recipientAddress, invoke.id(), 100, LeaseDetails.Status.CancelledByTx(2, leaseCancelId))))
+      (blockchain.leaseDetails _).when(leaseCancelId).returning(Some(LeaseDetails(invoke.sender, recipientAddress, invoke.id(), 100, LeaseDetails.Status.Cancelled(2, leaseCancelId))))
       (blockchain.transactionMeta _).when(invoke.id()).returning(Some((1, true)))
 
       Get(routePath(s"/stateChanges/info/${invoke.id()}")) ~> route ~> check {

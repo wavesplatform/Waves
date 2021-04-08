@@ -7,9 +7,10 @@ import com.wavesplatform.common.state.ByteStr
 object LeaseInfo {
   type Status = Status.Value
   //noinspection TypeAnnotation
-  object Status extends Enumeration { // TODO: Add expired status before LeaseExpiration feature activation
+  object Status extends Enumeration {
     val active   = Value(1)
     val canceled = Value(0)
+    val expired = Value(2)
   }
 }
 

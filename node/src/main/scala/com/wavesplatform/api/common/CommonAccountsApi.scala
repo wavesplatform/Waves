@@ -12,6 +12,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -136,12 +137,30 @@ object CommonAccountsApi extends ScorexLogging {
         None
       ).flatMapIterable {
         case TransactionMeta(h, lt: LeaseTransaction, true) if leaseIsActive(lt.id()) =>
-          Seq(LeaseInfo(lt.id(), lt.id(), lt.sender.toAddress, blockchain.resolveAlias(lt.recipient).explicitGet(), lt.amount, h, LeaseInfo.Status.active))
+          Seq(
+            LeaseInfo(
+              lt.id(),
+              lt.id(),
+              lt.sender.toAddress,
+              blockchain.resolveAlias(lt.recipient).explicitGet(),
+              lt.amount,
+              h,
+              LeaseInfo.Status.active
+            )
+          )
         case TransactionMeta.Invoke(height, originTransaction, true, Some(scriptResult)) =>
           def extractLeases(sender: Address, result: InvokeScriptResult): Seq[LeaseInfo] =
             result.leases.collect {
               case lease if leaseIsActive(lease.leaseId) =>
-                LeaseInfo(lease.leaseId, originTransaction.id(), sender, blockchain.resolveAlias(lease.recipient).explicitGet(), lease.amount, height, LeaseInfo.Status.active)
+                LeaseInfo(
+                  lease.leaseId,
+                  originTransaction.id(),
+                  sender,
+                  blockchain.resolveAlias(lease.recipient).explicitGet(),
+                  lease.amount,
+                  height,
+                  LeaseInfo.Status.active
+                )
             } ++ {
               result.invokes.flatMap(i => extractLeases(i.dApp, i.stateChanges))
             }
@@ -160,7 +179,11 @@ object CommonAccountsApi extends ScorexLogging {
         blockchain.resolveAlias(ld.recipient).explicitGet(),
         ld.amount,
         height,
-        if (ld.isActive) LeaseInfo.Status.active else LeaseInfo.Status.canceled,
+        ld.status match {
+          case Status.Active              => LeaseInfo.Status.active
+          case Status.Cancelled(_, _) => LeaseInfo.Status.canceled
+          case Status.Expired(_)      => LeaseInfo.Status.expired
+        },
         LeaseDetails.Status.getCancelHeight(ld.status),
         LeaseDetails.Status.getCancelTransactionId(ld.status)
       )

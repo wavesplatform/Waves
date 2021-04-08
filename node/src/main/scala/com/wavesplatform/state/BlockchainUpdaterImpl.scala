@@ -403,7 +403,7 @@ class BlockchainUpdaterImpl(
         lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount), Map.empty),
         recipient           -> Portfolio(0, LeaseBalance(-lt.amount, 0), Map.empty)
       ),
-      leaseState = Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.id(), lt.amount, LeaseDetails.Status.CancelledAt(height))))
+      leaseState = Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.id(), lt.amount, LeaseDetails.Status.Expired(height))))
     )).toMap
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[(Block, ByteStr)]] = writeLock {

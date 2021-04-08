@@ -207,7 +207,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             )
           )
           d.blockchainUpdater.leaseDetails(lt.id()) should contain(
-            LeaseDetails(sender.publicKey, recipient.toAddress, lt.id(), leaseAmount, LeaseDetails.Status.CancelledByTx(4, leaseCancel.id()))
+            LeaseDetails(sender.publicKey, recipient.toAddress, lt.id(), leaseAmount, LeaseDetails.Status.Cancelled(4, leaseCancel.id()))
           )
           d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual 0
           d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual 0
@@ -755,7 +755,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               sourceId,
               leaseAmount,
               if (cancelId.isEmpty) LeaseDetails.Status.Active
-              else LeaseDetails.Status.CancelledByTx(height, cancelId)
+              else LeaseDetails.Status.Cancelled(height, cancelId)
             )
           )
 
