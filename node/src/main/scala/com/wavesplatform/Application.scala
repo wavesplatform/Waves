@@ -5,6 +5,11 @@ import java.security.Security
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
+import scala.concurrent.{Await, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
@@ -22,7 +27,7 @@ import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
-import com.wavesplatform.database.{DBExt, Keys, openDB}
+import com.wavesplatform.database.{openDB, DBExt, Keys}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider._
@@ -33,12 +38,12 @@ import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerDebugInfo, MinerImpl}
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
-import com.wavesplatform.utils.Schedulers._
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils._
+import com.wavesplatform.utils.Schedulers._
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -54,11 +59,6 @@ import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
 import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
-import scala.util.{Failure, Success, Try}
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: NTP) extends ScorexLogging {
   app =>
@@ -104,13 +104,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private var maybeUtx: Option[UtxPool] = None
   private var maybeNetwork: Option[NS]  = None
 
-  def apiShutdown(): Unit = {
-    for {
-      u <- maybeUtx
-      n <- maybeNetwork
-    } yield shutdown(u, n)
-  }
-
   def run(): Unit = {
     // initialization
     implicit val as: ActorSystem = actorSystem
@@ -145,7 +138,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
 
-    val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings)
+    val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTargetOpt)
 
     if (settings.minerSettings.enable)
       miner = new MinerImpl(allChannels, blockchainUpdater, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler)
@@ -229,7 +222,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // Node start
     // After this point, node actually starts doing something
-    checkGenesis(settings, blockchainUpdater)
+    appenderScheduler.execute(() => checkGenesis(settings, blockchainUpdater, miner))
 
     val network =
       NetworkServer(settings, lastBlockInfo, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
@@ -268,7 +261,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       timeoutSubject
     ) {
       case (c, b) =>
-        processFork(c, b.blocks).doOnFinish {
+        processFork(c, b).doOnFinish {
           case None    => Task.now(())
           case Some(e) => Task(stopOnAppendError.reportFailure(e))
         }
@@ -290,12 +283,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       .onErrorHandle(stopOnAppendError.reportFailure)
       .subscribe()
 
-    miner.scheduleMining()
-
-    for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
-      upnp.addPort(addr.getPort)
-    }
-
     // API start
     if (settings.restAPISettings.enable) {
       def loadBalanceHistory(address: Address): Seq[(Int, Long)] = db.readOnly { rdb =>
@@ -316,7 +303,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         )
 
       val apiRoutes = Seq(
-        NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
+        NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => shutdown()),
         BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi),
         TransactionsApiRoute(
           settings.restAPISettings,
@@ -330,8 +317,17 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
         UtilsApiRoute(time, settings.restAPISettings, () => blockchainUpdater.estimator, limitedScheduler, blockchainUpdater),
-        PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
-        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, limitedScheduler, extensionContext.accountsApi, settings.dbSettings.maxRollbackDepth),
+        PeersApiRoute(settings.restAPISettings, address => maybeNetwork.foreach(_.connect(address)), peerDatabase, establishedConnections),
+        AddressApiRoute(
+          settings.restAPISettings,
+          wallet,
+          blockchainUpdater,
+          utxSynchronizer,
+          time,
+          limitedScheduler,
+          extensionContext.accountsApi,
+          settings.dbSettings.maxRollbackDepth
+        ),
         DebugApiRoute(
           settings,
           time,
@@ -351,7 +347,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           scoreStatsReporter,
           configRoot,
           loadBalanceHistory,
-          levelDB.loadStateHash
+          levelDB.loadStateHash,
+          () => utxStorage.priorityPool.compositeBlockchain
         ),
         AssetsApiRoute(
           settings.restAPISettings,
@@ -369,27 +366,31 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         RewardApiRoute(blockchainUpdater)
       )
 
-      val httpService   = CompositeHttpService(apiRoutes, settings.restAPISettings)
+      val httpService = CompositeHttpService(apiRoutes, settings.restAPISettings)
       val httpFuture  = Http().bindAndHandle(httpService.loggingCompositeRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)
       serverBinding.whenTerminated.foreach(_ => httpService.scheduler.shutdown())
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 
+    for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
+      upnp.addPort(addr.getPort)
+    }
+
     // on unexpected shutdown
     sys.addShutdownHook {
       timer.stop()
-      shutdown(utxStorage, network)
+      shutdown()
     }
   }
 
   private val shutdownInProgress             = new AtomicBoolean(false)
   @volatile var serverBinding: ServerBinding = _
 
-  def shutdown(utx: UtxPool, network: NS): Unit =
+  def shutdown(): Unit =
     if (shutdownInProgress.compareAndSet(false, true)) {
       spendableBalanceChanged.onComplete()
-      utx.close()
+      maybeUtx.foreach(_.close())
 
       log.info("Closing REST API")
       if (settings.restAPISettings.enable)
@@ -404,8 +405,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       blockchainUpdater.shutdown()
 
-      log.info("Stopping network services")
-      network.shutdown()
+      maybeNetwork.foreach { network =>
+        log.info("Stopping network services")
+        network.shutdown()
+      }
 
       shutdownAndWait(appenderScheduler, "Appender", 5.minutes.some)
 
@@ -451,7 +454,13 @@ object Application extends ScorexLogging {
     if (config.hasPath("waves.config.directory")) System.setProperty("waves.config.directory", config.getString("waves.config.directory"))
 
     maybeExternalConfig match {
-      case Success(None) => log.warn("Config file not defined, TESTNET config will be used")
+      case Success(None) =>
+        val currentBlockchainType = Try(ConfigFactory.defaultOverrides().getString("waves.blockchain.type"))
+          .orElse(Try(ConfigFactory.defaultOverrides().getString("waves.defaults.blockchain.type")))
+          .map(_.toUpperCase)
+          .getOrElse("TESTNET")
+
+        log.warn(s"Config file not defined, default $currentBlockchainType config will be used")
       case Failure(exception) =>
         log.error(s"Couldn't read ${external.get.toPath.toAbsolutePath}", exception)
         forceStopApplication(Misconfiguration)
@@ -496,11 +505,15 @@ object Application extends ScorexLogging {
       meta -> blockchainUpdater
         .liquidTransactions(meta.id)
         .orElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
-        .fold(Seq.empty[(Transaction, Boolean)])(identity)
+        .getOrElse(Seq.empty[(Transaction, Boolean)])
     }
 
-  private[wavesplatform] def loadBlockMetaAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =
-    blockchainUpdater.liquidBlockMeta.filter(_ => blockchainUpdater.height == height).orElse(db.get(Keys.blockMetaAt(Height(height))))
+  private[wavesplatform] def loadBlockMetaAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] = {
+    val result =  blockchainUpdater.liquidBlockMeta
+      .filter(_ => blockchainUpdater.height == height)
+      .orElse(db.get(Keys.blockMetaAt(Height(height))))
+    result
+  }
 
   def main(args: Array[String]): Unit = {
 
@@ -510,10 +523,6 @@ object Application extends ScorexLogging {
     System.setProperty("sun.net.inetaddr.negative.ttl", "0")
     Security.setProperty("networkaddress.cache.ttl", "0")
     Security.setProperty("networkaddress.cache.negative.ttl", "0")
-
-    // specify aspectj to use it's build-in infrastructure
-    // http://www.eclipse.org/aspectj/doc/released/pdguide/trace.html
-    System.setProperty("org.aspectj.tracing.factory", "default")
 
     args.headOption.getOrElse("") match {
       case "export"                 => Exporter.main(args.tail)
@@ -539,8 +548,8 @@ object Application extends ScorexLogging {
     Metrics.start(settings.metrics, time)
 
     def dumpMinerConfig(): Unit = {
-      import settings.synchronizationSettings.microBlockSynchronizer
       import settings.{minerSettings => miner}
+      import settings.synchronizationSettings.microBlockSynchronizer
 
       Metrics.write(
         Point

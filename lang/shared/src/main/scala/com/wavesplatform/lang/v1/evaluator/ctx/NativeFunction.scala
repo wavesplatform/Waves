@@ -120,7 +120,7 @@ object UserFunction {
 
   def apply[C[_[_]]](name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: EXPR): UserFunction[C] =
     UserFunction.withEnvironment[C](name, cost, resultType, args: _ *)(new ContextfulUserFunction[C] {
-      override def apply[F[_] : Monad](context: C[F]): EXPR = ev
+      override def apply[F[_] : Monad](context: C[F], startArgs: List[EXPR]): EXPR = ev
     })
 
   def deprecated[C[_[_]]](name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: EXPR): UserFunction[C] =

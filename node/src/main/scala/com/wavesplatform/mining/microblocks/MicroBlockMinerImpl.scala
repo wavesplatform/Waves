@@ -44,8 +44,8 @@ class MicroBlockMinerImpl(
   ): Task[Unit] =
     generateOneMicroBlockTask(account, accumulatedBlock, restTotalConstraint, lastMicroBlock)
       .flatMap {
-        case res @ Success(newBlock, newConstraint) =>
-          Task.defer(generateMicroBlockSequence(account, newBlock, newConstraint, res.nanoTime))
+        case Success(newBlock, newConstraint, nanoTime) =>
+          Task.defer(generateMicroBlockSequence(account, newBlock, newConstraint, nanoTime))
         case Retry =>
           Task
             .defer(generateMicroBlockSequence(account, accumulatedBlock, restTotalConstraint, lastMicroBlock))
@@ -75,7 +75,7 @@ class MicroBlockMinerImpl(
         )
         val packStrategy =
           if (accumulatedBlock.transactionData.isEmpty) PackStrategy.Limit(settings.microBlockInterval)
-          else PackStrategy.Estimate(settings.microBlockInterval)
+          else PackStrategy.Estimate(settings.microBlockInterval - (System.nanoTime() - lastMicroBlock).nanos)
         log.trace(s"Starting pack for ${accumulatedBlock.id()} with $packStrategy, initial constraint is $mdConstraint")
         val (unconfirmed, updatedMdConstraint) =
           concurrent.blocking(
@@ -98,8 +98,9 @@ class MicroBlockMinerImpl(
 
     packTask.flatMap {
       case (Some(unconfirmed), updatedTotalConstraint) if unconfirmed.nonEmpty =>
+        val packFinishedAt = System.nanoTime()
         val delay = {
-          val delay         = System.nanoTime() - lastMicroBlock
+          val delay         = packFinishedAt - lastMicroBlock
           val requiredDelay = settings.microBlockInterval.toNanos
           if (delay >= requiredDelay) Duration.Zero else (requiredDelay - delay).nanos
         }
@@ -116,7 +117,7 @@ class MicroBlockMinerImpl(
           _       <- broadcastMicroBlock(account, microBlock, blockId)
         } yield {
           if (updatedTotalConstraint.isFull) Stop
-          else Success(signedBlock, updatedTotalConstraint)
+          else Success(signedBlock, updatedTotalConstraint, packFinishedAt)
         }
 
       case (_, updatedTotalConstraint) =>
@@ -173,7 +174,5 @@ object MicroBlockMinerImpl {
 
   case object Stop  extends MicroBlockMiningResult
   case object Retry extends MicroBlockMiningResult
-  final case class Success(b: Block, totalConstraint: MiningConstraint) extends MicroBlockMiningResult {
-    val nanoTime: Long = System.nanoTime()
-  }
+  final case class Success(b: Block, totalConstraint: MiningConstraint, nanoTime: Long) extends MicroBlockMiningResult
 }

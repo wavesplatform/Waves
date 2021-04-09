@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.network.RxScoreObserver.{BestChannel, SyncWith}
+import com.wavesplatform.network.RxScoreObserver.SyncWith
 import com.wavesplatform.{RxScheduler, TransactionGen}
 import io.netty.channel.Channel
 import io.netty.channel.local.LocalChannel

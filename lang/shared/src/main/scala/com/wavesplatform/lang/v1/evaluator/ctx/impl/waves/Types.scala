@@ -69,6 +69,8 @@ object Types {
         List(
           "caller"          -> addressType,
           "callerPublicKey" -> BYTESTR,
+          "originalCaller"          -> addressType,
+          "originalCallerPublicKey" -> BYTESTR,
           "transactionId"   -> BYTESTR,
           "fee"             -> LONG,
           "feeAssetId"      -> optionByteVector

@@ -9,8 +9,8 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.util.AddressOrAliasExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V5
-import com.wavesplatform.lang.script.{ContractScript, Script}
-import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
@@ -46,23 +46,16 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
   private val v4Features = features(activateV5 = false)
   private val v5Features = features(activateV5 = true)
 
-  private def dApp(body: String): Script = {
-    val script =
-      s"""
-         | {-# STDLIB_VERSION 5       #-}
-         | {-# CONTENT_TYPE   DAPP    #-}
-         | {-# SCRIPT_TYPE    ACCOUNT #-}
-         |
-         | @Callable(i)
-         | func default() = {
-         |   $body
-         | }
-       """.stripMargin
-
-    val expr     = Parser.parseContract(script).get.value
-    val contract = compileContractFromExpr(expr, V5)
-    ContractScript(V5, contract).explicitGet()
-  }
+  private def dApp(body: String): Script = TestCompiler(V5).compileContract(s"""
+    | {-# STDLIB_VERSION 5       #-}
+    | {-# CONTENT_TYPE   DAPP    #-}
+    | {-# SCRIPT_TYPE    ACCOUNT #-}
+    |
+    | @Callable(i)
+    | func default() = {
+    |   $body
+    | }
+    |""".stripMargin)
 
   private def singleLeaseDApp(recipient: Recipient, amount: Long): Script =
     dApp(s"[Lease(${recipientStr(recipient)}, $amount)]")
@@ -234,7 +227,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
             Seq(),
             TestBlock.create(preparingTxs),
             v4Features
-          )(_ should produce("Synchronous DAPP Calls feature has not been activated yet"))
+          )(_ should produce("Ride V5, dApp-to-dApp invocations feature has not been activated yet"))
     }
   }
 
@@ -714,10 +707,10 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
     }
   }
 
-  property(s"11 Lease actions") {
+  property(s"31 Lease actions") {
     val recipient = accountGen.sample.get.toAddress
     val amount    = positiveLongGen.sample.get
-    val dApp      = multipleActionsDApp(recipient.toRide, amount, leaseCount = 11, leaseCancelCount = 0, transfersCount = 0)
+    val dApp      = multipleActionsDApp(recipient.toRide, amount, leaseCount = 31, leaseCancelCount = 0, transfersCount = 0)
     forAll(leasePreconditions(customDApp = Some(dApp))) {
       case (preparingTxs, invoke, _, _, _, _, _) =>
         assertDiffAndState(
@@ -726,7 +719,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "Too many script actions: max: 10, actual: 11"
+            diff.errorMessage(invoke.id.value()).get.text shouldBe "Actions count limit is exceeded"
         }
     }
   }
@@ -889,8 +882,8 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
     }
   }
 
-  property(s"11 LeaseCancel actions") {
-    forAll(leasePreconditions(useLeaseCancelDApp = true, leaseCancelCount = 11)) {
+  property(s"31 LeaseCancel actions") {
+    forAll(leasePreconditions(useLeaseCancelDApp = true, leaseCancelCount = 31)) {
       case (preparingTxs, invoke, _, _, _, leaseTxs :+ _, _) =>
         assertDiffAndState(
           Seq(TestBlock.create(preparingTxs ++ leaseTxs)),
@@ -898,7 +891,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "Too many script actions: max: 10, actual: 11"
+            diff.errorMessage(invoke.id.value()).get.text shouldBe "Actions count limit is exceeded"
         }
     }
   }
@@ -927,12 +920,12 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
     }
   }
 
-  property(s"11 multiple actions") {
+  property(s"31 multiple actions") {
     val recipient        = accountGen.sample.get.toAddress
     val amount           = positiveLongGen.sample.get
-    val leaseCount       = Random.nextInt(11) + 1
-    val leaseCancelCount = Random.nextInt(leaseCount).min(11 - leaseCount)
-    val transfersCount   = 11 - leaseCancelCount - leaseCount
+    val leaseCount       = Random.nextInt(31) + 1
+    val leaseCancelCount = Random.nextInt(leaseCount).min(31 - leaseCount)
+    val transfersCount   = 31 - leaseCancelCount - leaseCount
     val dApp             = multipleActionsDApp(recipient.toRide, amount, leaseCount, leaseCancelCount, transfersCount)
     forAll(leasePreconditions(customDApp = Some(dApp))) {
       case (preparingTxs, invoke, _, _, _, _, _) =>
@@ -942,7 +935,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "Too many script actions: max: 10, actual: 11"
+            diff.errorMessage(invoke.id.value()).get.text shouldBe "Actions count limit is exceeded"
         }
     }
   }

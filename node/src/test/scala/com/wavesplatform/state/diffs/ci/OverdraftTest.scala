@@ -7,9 +7,9 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
-import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
@@ -193,20 +193,13 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
     dApp(body, version)
   }
 
-  private def dApp(body: String, version: StdLibVersion): Script = {
-    val script =
-      s"""
-         | {-# STDLIB_VERSION $version #-}
-         | {-# CONTENT_TYPE   DAPP     #-}
-         | {-# SCRIPT_TYPE    ACCOUNT  #-}
-         |
-         | @Callable(i)
-         | func default() = $body
-         |
-       """.stripMargin
-
-    val expr     = Parser.parseContract(script).get.value
-    val contract = compileContractFromExpr(expr, version)
-    ContractScript(version, contract).explicitGet()
-  }
+  private def dApp(body: String, version: StdLibVersion): Script = TestCompiler(version).compileContract(s"""
+    | {-# STDLIB_VERSION $version #-}
+    | {-# CONTENT_TYPE   DAPP     #-}
+    | {-# SCRIPT_TYPE    ACCOUNT  #-}
+    |
+    | @Callable(i)
+    | func default() = $body
+    |
+    |""".stripMargin)
 }

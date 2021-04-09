@@ -1,31 +1,25 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import cats.kernel.Monoid
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.db.WithState
-import com.wavesplatform.features.BlockchainFeatures.{BlockV5, SynchronousCalls, FeeSponsorship}
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, FeeSponsorship, SynchronousCalls}
 import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Testing._
+import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
-import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -330,7 +324,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
               .signed(
                 TxVersion.V1,
                 masterAcc.publicKey,
-                IssuedAsset(issueTx.assetId),
+                issueTx.asset,
                 Some(sponsoredFee),
                 MinIssueFee,
                 dataTransaction.timestamp + 6,
@@ -523,23 +517,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                |     else throw("blocks do not match")
                |}
                |""".stripMargin
-          val expr = Parser.parseContract(script).get.value
 
-          val ctx = {
-            utils.functionCosts(V3)
-            Monoid
-              .combineAll(
-                Seq(
-                  PureContext.build(V3).withEnvironment[Environment],
-                  CryptoContext.build(Global, V3).withEnvironment[Environment],
-                  WavesContext.build(
-                    DirectiveSet(V3, Account, Expression).explicitGet()
-                  )
-                )
-              )
-          }
-
-          val compiledScript = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, expr, V3).explicitGet()).explicitGet()
+          val compiledScript = TestCompiler(V3).compileContract(script)
           val setScriptTx =
             SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
           val fc = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)

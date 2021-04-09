@@ -1,5 +1,7 @@
 package com.wavesplatform.state
 
+import scala.util.{Left, Right}
+
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
@@ -7,15 +9,13 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.network._
-import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPoolImpl
 import io.netty.channel.Channel
 import kamon.Kamon
 import monix.eval.Task
-
-import scala.util.{Left, Right}
 
 package object appender extends ScorexLogging {
 
@@ -58,7 +58,7 @@ package object appender extends ScorexLogging {
     else
       pos
         .validateGenerationSignature(block)
-        .flatMap(hitSource => appendBlock(blockchainUpdater, utxStorage, verify = false)(block, hitSource))
+        .flatMap(hitSource => appendBlockAndUpdateUTX(blockchainUpdater, utxStorage, verify = false)(block, hitSource))
   }
 
   private[appender] def validateAndAppendBlock(
@@ -81,10 +81,10 @@ package object appender extends ScorexLogging {
           s"generator's effective balance $balance is less that required for generation"
         )
       }
-      baseHeight <- appendBlock(blockchainUpdater, utxStorage, verify = true)(block, hitSource)
+      baseHeight <- appendBlockAndUpdateUTX(blockchainUpdater, utxStorage, verify = true)(block, hitSource)
     } yield baseHeight
 
-  private def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utx: UtxPoolImpl, verify: Boolean)(
+  private[appender] def appendBlockAndUpdateUTX(blockchainUpdater: BlockchainUpdater with Blockchain, utx: UtxPoolImpl, verify: Boolean)(
       block: Block,
       hitSource: ByteStr
   ): Either[ValidationError, Option[Int]] = {

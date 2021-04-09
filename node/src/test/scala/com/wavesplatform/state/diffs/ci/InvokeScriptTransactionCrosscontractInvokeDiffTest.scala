@@ -7,13 +7,11 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.V5
-import com.wavesplatform.lang.script.ContractScript
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{IntegerDataEntry, StringDataEntry}
@@ -28,7 +26,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class InvokeScriptTransactionCrosscontractCallDiffTest
+class InvokeScriptTransactionCrosscontractInvokeDiffTest
     extends PropSpec
     with PropertyChecks
     with Matchers
@@ -58,65 +56,50 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
     val (invokeEntry2Key, invokeEntry2NewVal) = ("entry2", 100500)
     val invokeEntry3Key                       = "entry3"
 
-    def contractMain(otherAcc: Address): DApp = {
-      val expr = {
-        val script =
-          s"""
-             |{-# STDLIB_VERSION 5 #-}
-             |{-# CONTENT_TYPE DAPP #-}
-             |{-#SCRIPT_TYPE ACCOUNT#-}
-             |
-             | @Callable(i)
-             | func foo() = {
-             |    let nextDAppAddr = Address(base58'$otherAcc')
-             |
-             |    strict invEntry3BeforeIsDefined = isDefined(getString(nextDAppAddr, "$invokeEntry3Key"))
-             |
-             |    strict invResult = Invoke(nextDAppAddr, "bar", [], [])
-             |
-             |    let invEntry1ValIsOK = getIntegerValue(nextDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
-             |    let invEntry2IsNotString = isDefined(getString(nextDAppAddr, "$invokeEntry2Key")) == false
-             |    let invEntry2ValIsOK = getIntegerValue(nextDAppAddr, "$invokeEntry2Key") == $invokeEntry2NewVal
-             |    let invEntry3AfterIsDeleted = isDefined(getString(nextDAppAddr, "$invokeEntry3Key")) == false
-             |
-             |
-             |    if invEntry1ValIsOK && invEntry2IsNotString && invEntry2ValIsOK && invEntry3BeforeIsDefined && invEntry3AfterIsDeleted
-             |    then
-             |      ([], unit)
-             |    else
-             |      throw("Internal invoke state update error")
-             | }
-             |""".stripMargin
-        Parser.parseContract(script).get.value
-      }
+    def contractMain(otherAcc: Address): Script = TestCompiler(V5).compileContract(s"""
+      |{-# STDLIB_VERSION 5 #-}
+      |{-# CONTENT_TYPE DAPP #-}
+      |{-#SCRIPT_TYPE ACCOUNT#-}
+      |
+      | @Callable(i)
+      | func foo() = {
+      |    let nextDAppAddr = Address(base58'$otherAcc')
+      |
+      |    strict invEntry3BeforeIsDefined = isDefined(getString(nextDAppAddr, "$invokeEntry3Key"))
+      |
+      |    strict invResult = Invoke(nextDAppAddr, "bar", [], [])
+      |
+      |    let invEntry1ValIsOK = getIntegerValue(nextDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
+      |    let invEntry2IsNotString = isDefined(getString(nextDAppAddr, "$invokeEntry2Key")) == false
+      |    let invEntry2ValIsOK = getIntegerValue(nextDAppAddr, "$invokeEntry2Key") == $invokeEntry2NewVal
+      |    let invEntry3AfterIsDeleted = isDefined(getString(nextDAppAddr, "$invokeEntry3Key")) == false
+      |
+      |
+      |    if invEntry1ValIsOK && invEntry2IsNotString && invEntry2ValIsOK && invEntry3BeforeIsDefined && invEntry3AfterIsDeleted
+      |    then
+      |      ([], unit)
+      |    else
+      |      throw("Internal invoke state update error")
+      | }
+      |""".stripMargin)
 
-      compileContractFromExpr(expr, V5)
-    }
+    def contractSecond(): Script = TestCompiler(V5).compileContract(s"""
+      |{-# STDLIB_VERSION 5 #-}
+      |{-# CONTENT_TYPE DAPP #-}
+      |{-#SCRIPT_TYPE ACCOUNT#-}
+      |
+      | @Callable(i)
+      | func bar() = {
+      |    (
+      |      [IntegerEntry("$invokeEntry1Key", $invokeEntry1Val),
+      |       IntegerEntry("$invokeEntry2Key", $invokeEntry2NewVal),
+      |       DeleteEntry("$invokeEntry3Key")
+      |      ],
+      |      unit
+      |    )
+      | }
+      |""".stripMargin)
 
-    def contractSecond(): DApp = {
-      val expr = {
-        val script =
-          s"""
-             |{-# STDLIB_VERSION 5 #-}
-             |{-# CONTENT_TYPE DAPP #-}
-             |{-#SCRIPT_TYPE ACCOUNT#-}
-             |
-             | @Callable(i)
-             | func bar() = {
-             |    (
-             |      [IntegerEntry("$invokeEntry1Key", $invokeEntry1Val),
-             |       IntegerEntry("$invokeEntry2Key", $invokeEntry2NewVal),
-             |       DeleteEntry("$invokeEntry3Key")
-             |      ],
-             |      unit
-             |    )
-             | }
-             |""".stripMargin
-        Parser.parseContract(script).get.value
-      }
-
-      compileContractFromExpr(expr, V5)
-    }
     val scenario =
       for {
         mainAcc   <- accountGen
@@ -128,10 +111,10 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(secondAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        scriptMain   = ContractScript(V5, contractMain(secondAcc.toAddress))
-        scriptSecond = ContractScript(V5, contractSecond())
-        ssTxMain     = SetScriptTransaction.selfSigned(1.toByte, mainAcc, scriptMain.toOption, fee, ts + 5).explicitGet()
-        ssTxSecond   = SetScriptTransaction.selfSigned(1.toByte, secondAcc, scriptSecond.toOption, fee, ts + 5).explicitGet()
+        scriptMain   = Some(contractMain(secondAcc.toAddress))
+        scriptSecond = Some(contractSecond())
+        ssTxMain     = SetScriptTransaction.selfSigned(1.toByte, mainAcc, scriptMain, fee, ts + 5).explicitGet()
+        ssTxSecond   = SetScriptTransaction.selfSigned(1.toByte, secondAcc, scriptSecond, fee, ts + 5).explicitGet()
 
         dataEntry    = StringDataEntry(invokeEntry2Key, "strData")
         dataTxSecond = DataTransaction.selfSigned(1.toByte, secondAcc, Seq(dataEntry), fee, ts + 6).explicitGet()
@@ -173,50 +156,42 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
     val (invokeEntry2Key, invokeEntry2NewVal) = ("entry2", 100500)
     val invokeEntry3Key                       = "entry3"
 
-    def contractMain(): DApp = {
-      val expr = {
-        val script =
-          s"""
-             |{-# STDLIB_VERSION 5 #-}
-             |{-# CONTENT_TYPE DAPP #-}
-             |{-#SCRIPT_TYPE ACCOUNT#-}
-             |
-             | @Callable(i)
-             | func foo() = {
-             |
-             |    strict invEntry3BeforeIsDefined = isDefined(getString(this, "$invokeEntry3Key"))
-             |
-             |    strict invResult = Invoke(this, "bar", [], [])
-             |
-             |    let invEntry1ValIsOK = getIntegerValue(this, "$invokeEntry1Key") == $invokeEntry1Val
-             |    let invEntry2IsNotString = isDefined(getString(this, "$invokeEntry2Key")) == false
-             |    let invEntry2ValIsOK = getIntegerValue(this, "$invokeEntry2Key") == $invokeEntry2NewVal
-             |    let invEntry3AfterIsDeleted = isDefined(getString(this, "$invokeEntry3Key")) == false
-             |
-             |
-             |    if invEntry1ValIsOK && invEntry2IsNotString && invEntry2ValIsOK && invEntry3BeforeIsDefined && invEntry3AfterIsDeleted
-             |    then
-             |      ([], unit)
-             |    else
-             |      throw("Internal invoke state update error")
-             | }
-             |
-             | @Callable(i)
-             | func bar() = {
-             |   (
-             |      [IntegerEntry("$invokeEntry1Key", $invokeEntry1Val),
-             |       IntegerEntry("$invokeEntry2Key", $invokeEntry2NewVal),
-             |       DeleteEntry("$invokeEntry3Key")
-             |      ],
-             |      unit
-             |   )
-             | }
-             |""".stripMargin
-        Parser.parseContract(script).get.value
-      }
-
-      compileContractFromExpr(expr, V5)
-    }
+    val contractMain = TestCompiler(V5).compileContract(s"""
+      |{-# STDLIB_VERSION 5 #-}
+      |{-# CONTENT_TYPE DAPP #-}
+      |{-#SCRIPT_TYPE ACCOUNT#-}
+      |
+      | @Callable(i)
+      | func foo() = {
+      |
+      |    strict invEntry3BeforeIsDefined = isDefined(getString(this, "$invokeEntry3Key"))
+      |
+      |    strict invResult = Invoke(this, "bar", [], [])
+      |
+      |    let invEntry1ValIsOK = getIntegerValue(this, "$invokeEntry1Key") == $invokeEntry1Val
+      |    let invEntry2IsNotString = isDefined(getString(this, "$invokeEntry2Key")) == false
+      |    let invEntry2ValIsOK = getIntegerValue(this, "$invokeEntry2Key") == $invokeEntry2NewVal
+      |    let invEntry3AfterIsDeleted = isDefined(getString(this, "$invokeEntry3Key")) == false
+      |
+      |
+      |    if invEntry1ValIsOK && invEntry2IsNotString && invEntry2ValIsOK && invEntry3BeforeIsDefined && invEntry3AfterIsDeleted
+      |    then
+      |      ([], unit)
+      |    else
+      |      throw("Internal invoke state update error")
+      | }
+      |
+      | @Callable(i)
+      | func bar() = {
+      |   (
+      |      [IntegerEntry("$invokeEntry1Key", $invokeEntry1Val),
+      |       IntegerEntry("$invokeEntry2Key", $invokeEntry2NewVal),
+      |       DeleteEntry("$invokeEntry3Key")
+      |      ],
+      |      unit
+      |   )
+      | }
+      |""".stripMargin)
 
     val scenario =
       for {
@@ -227,8 +202,7 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
         gTx1 = GenesisTransaction.create(mainAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        scriptMain = ContractScript(V5, contractMain())
-        ssTxMain   = SetScriptTransaction.selfSigned(1.toByte, mainAcc, scriptMain.toOption, fee, ts + 5).explicitGet()
+        ssTxMain   = SetScriptTransaction.selfSigned(1.toByte, mainAcc, Some(contractMain), fee, ts + 5).explicitGet()
 
         dataEntry  = StringDataEntry(invokeEntry2Key, "strData")
         dataTxMain = DataTransaction.selfSigned(1.toByte, mainAcc, Seq(dataEntry), fee, ts + 6).explicitGet()
@@ -294,99 +268,75 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
       ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
     }
 
-    def contractMain(secondAcc: Address, thirdAcc: Address, paymentAsset: ByteStr): DApp = {
-      val expr = {
-        val script =
-          s"""
-             |{-# STDLIB_VERSION 5 #-}
-             |{-# CONTENT_TYPE DAPP #-}
-             |{-#SCRIPT_TYPE ACCOUNT#-}
-             |
-             | @Callable(i)
-             | func foo() = {
-             |    let secondDAppAddr = Address(base58'$secondAcc')
-             |    let thirdDAppAddr = Address(base58'$thirdAcc')
-             |
-             |    strict invBarResult = Invoke(secondDAppAddr, "bar", [], [])
-             |
-             |    let thirdDAppDataEntryIsOK = getIntegerValue(thirdDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
-             |
-             |    strict invAnotherBazResult = Invoke(
-             |      thirdDAppAddr,
-             |      "anotherBaz",
-             |      [],
-             |      [AttachedPayment(base58'$paymentAsset', $paymentAssetAmount)])
-             |
-             |    if thirdDAppDataEntryIsOK
-             |    then
-             |      ([], unit)
-             |    else
-             |      throw("Internal invoke chain state update error")
-             | }
-             |""".stripMargin
-        Parser.parseContract(script).get.value
-      }
+    def contractMain(secondAcc: Address, thirdAcc: Address, paymentAsset: ByteStr): Script = TestCompiler(V5).compileContract(s"""
+      |{-# STDLIB_VERSION 5 #-}
+      |{-# CONTENT_TYPE DAPP #-}
+      |{-#SCRIPT_TYPE ACCOUNT#-}
+      |
+      | @Callable(i)
+      | func foo() = {
+      |    let secondDAppAddr = Address(base58'$secondAcc')
+      |    let thirdDAppAddr = Address(base58'$thirdAcc')
+      |
+      |    strict invBarResult = Invoke(secondDAppAddr, "bar", [], [])
+      |
+      |    let thirdDAppDataEntryIsOK = getIntegerValue(thirdDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
+      |
+      |    strict invAnotherBazResult = Invoke(
+      |      thirdDAppAddr,
+      |      "anotherBaz",
+      |      [],
+      |      [AttachedPayment(base58'$paymentAsset', $paymentAssetAmount)])
+      |
+      |    if thirdDAppDataEntryIsOK
+      |    then
+      |      ([], unit)
+      |    else
+      |      throw("Internal invoke chain state update error")
+      | }
+      |""".stripMargin)
 
-      compileContractFromExpr(expr, V5)
-    }
+    def contractSecond(thirdAcc: Address, transferAsset: ByteStr): Script = TestCompiler(V5).compileContract(s"""
+      |{-# STDLIB_VERSION 5 #-}
+      |{-# CONTENT_TYPE DAPP #-}
+      |{-#SCRIPT_TYPE ACCOUNT#-}
+      |
+      | @Callable(i)
+      | func bar() = {
+      |    let thirdDAppAddr = Address(base58'$thirdAcc')
+      |
+      |    strict invBazResult = Invoke(thirdDAppAddr, "baz", [], [])
+      |
+      |    let thirdDAppDataEntryIsOK = getIntegerValue(thirdDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
+      |
+      |    if thirdDAppDataEntryIsOK
+      |    then
+      |      ([ScriptTransfer(thirdDAppAddr, $transferAssetAmount, base58'$transferAsset')], unit)
+      |    else
+      |      throw("Internal invoke chain state update error")
+      | }
+      |""".stripMargin)
 
-    def contractSecond(thirdAcc: Address, transferAsset: ByteStr): DApp = {
-      val expr = {
-        val script =
-          s"""
-             |{-# STDLIB_VERSION 5 #-}
-             |{-# CONTENT_TYPE DAPP #-}
-             |{-#SCRIPT_TYPE ACCOUNT#-}
-             |
-             | @Callable(i)
-             | func bar() = {
-             |    let thirdDAppAddr = Address(base58'$thirdAcc')
-             |
-             |    strict invBazResult = Invoke(thirdDAppAddr, "baz", [], [])
-             |
-             |    let thirdDAppDataEntryIsOK = getIntegerValue(thirdDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
-             |
-             |    if thirdDAppDataEntryIsOK
-             |    then
-             |      ([ScriptTransfer(thirdDAppAddr, $transferAssetAmount, base58'$transferAsset')], unit)
-             |    else
-             |      throw("Internal invoke chain state update error")
-             | }
-             |""".stripMargin
-        Parser.parseContract(script).get.value
-      }
-
-      compileContractFromExpr(expr, V5)
-    }
-
-    def contractThird(): DApp = {
-      val expr = {
-        val script =
-          s"""
-             |{-# STDLIB_VERSION 5 #-}
-             |{-# CONTENT_TYPE DAPP #-}
-             |{-#SCRIPT_TYPE ACCOUNT#-}
-             |
-             | @Callable(i)
-             | func baz() = {
-             |    (
-             |      [
-             |        IntegerEntry("$invokeEntry1Key", $invokeEntry1Val)
-             |      ],
-             |      unit
-             |    )
-             | }
-             |
-             | @Callable(i)
-             | func anotherBaz() = {
-             |    ([], unit)
-             | }
-             |""".stripMargin
-        Parser.parseContract(script).get.value
-      }
-
-      compileContractFromExpr(expr, V5)
-    }
+    val contractThird = TestCompiler(V5).compileContract(s"""
+      |{-# STDLIB_VERSION 5 #-}
+      |{-# CONTENT_TYPE DAPP #-}
+      |{-#SCRIPT_TYPE ACCOUNT#-}
+      |
+      | @Callable(i)
+      | func baz() = {
+      |    (
+      |      [
+      |        IntegerEntry("$invokeEntry1Key", $invokeEntry1Val)
+      |      ],
+      |      unit
+      |    )
+      | }
+      |
+      | @Callable(i)
+      | func anotherBaz() = {
+      |    ([], unit)
+      | }
+      |""".stripMargin)
 
     val scenario =
       for {
@@ -431,12 +381,12 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
         gTx3 = GenesisTransaction.create(secondAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx4 = GenesisTransaction.create(thirdAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        scriptMain   = ContractScript(V5, contractMain(secondAcc.toAddress, thirdAcc.toAddress, paymentIssue.id()))
-        scriptSecond = ContractScript(V5, contractSecond(thirdAcc.toAddress, transferIssue.id()))
-        scriptThird  = ContractScript(V5, contractThird())
-        ssTxMain     = SetScriptTransaction.selfSigned(1.toByte, mainAcc, scriptMain.toOption, fee, ts + 5).explicitGet()
-        ssTxSecond   = SetScriptTransaction.selfSigned(1.toByte, secondAcc, scriptSecond.toOption, fee, ts + 5).explicitGet()
-        ssTxThird    = SetScriptTransaction.selfSigned(1.toByte, thirdAcc, scriptThird.toOption, fee, ts + 5).explicitGet()
+        scriptMain   = Some(contractMain(secondAcc.toAddress, thirdAcc.toAddress, paymentIssue.id()))
+        scriptSecond = Some(contractSecond(thirdAcc.toAddress, transferIssue.id()))
+        scriptThird  = Some(contractThird)
+        ssTxMain     = SetScriptTransaction.selfSigned(1.toByte, mainAcc, scriptMain, fee, ts + 5).explicitGet()
+        ssTxSecond   = SetScriptTransaction.selfSigned(1.toByte, secondAcc, scriptSecond, fee, ts + 5).explicitGet()
+        ssTxThird    = SetScriptTransaction.selfSigned(1.toByte, thirdAcc, scriptThird, fee, ts + 5).explicitGet()
 
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10L, Waves))

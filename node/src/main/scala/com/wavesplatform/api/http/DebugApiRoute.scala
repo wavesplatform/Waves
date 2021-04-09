@@ -22,6 +22,7 @@ import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, Portfolio, StateHash}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -58,7 +59,8 @@ case class DebugApiRoute(
     scoreReporter: Coeval[RxScoreObserver.Stats],
     configRoot: ConfigObject,
     loadBalanceHistory: Address => Seq[(Int, Long)],
-    loadStateHash: Int => Option[StateHash]
+    loadStateHash: Int => Option[StateHash],
+    priorityPoolBlockchain: () => Blockchain
 ) extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -133,7 +135,7 @@ case class DebugApiRoute(
       implicit ec: ExecutionContext
   ): Future[Either[ValidationError, JsObject]] = {
     rollbackTask(blockId, returnTransactionsToUtx)
-      .map(_ => Right(Json.obj("BlockId" -> blockId.toString)))
+      .map(_.map(_ => Json.obj("BlockId" -> blockId.toString)))
       .runAsyncLogErr(Scheduler(ec))
   }
 
@@ -224,13 +226,14 @@ case class DebugApiRoute(
 
   def validate: Route =
     path("validate")(jsonPost[JsObject] { jsv =>
-      val startTime = System.nanoTime()
+      val blockchain = priorityPoolBlockchain()
+      val startTime  = System.nanoTime()
 
       val parsedTransaction = TransactionFactory.fromSignedRequest(jsv)
 
       val tracedDiff = for {
         tx   <- TracedResult(parsedTransaction)
-        diff <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
+        diff <- TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
       } yield (tx, diff)
 
       val error = tracedDiff.resultE match {
@@ -339,4 +342,20 @@ object DebugApiRoute {
       case Disabled          => "disabled"
       case Error(err)        => s"error: $err"
     })
+
+  implicit val assetMapWrites: Writes[Map[IssuedAsset, Long]] = Writes { m =>
+    Json.toJson(m.map {
+      case (asset, balance) => asset.id.toString -> JsNumber(balance)
+    })
+  }
+
+  implicit val portfolioJsonWrites: Writes[Portfolio] = Writes { pf =>
+    JsObject(
+      Map(
+        "balance" -> JsNumber(pf.balance),
+        "lease"   -> Json.toJson(pf.lease),
+        "assets"  -> Json.toJson(pf.assets)
+      )
+    )
+  }
 }

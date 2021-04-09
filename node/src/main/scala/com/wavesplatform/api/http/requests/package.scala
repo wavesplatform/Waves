@@ -71,7 +71,10 @@ package object requests {
             JsSuccess(v).flatMap(s => ByteStr.decodeBase58(s).fold(e => JsError(JsonValidationError("invalid.base58", e.getMessage)), JsSuccess(_)))
           case _ => JsError("expected.string")
         }
-        .map(Proofs.apply)
+        .flatMap(Proofs.create(_) match {
+          case Right(value) => JsSuccess(value)
+          case Left(err)    => JsError(JsonValidationError("invalid.proofs", err.toString))
+        })
     case JsNull => JsSuccess(Proofs.empty)
     case _      => JsError("invalid.proofs")
   }

@@ -15,7 +15,7 @@ import com.wavesplatform.utils._
 
 object Keys {
   import KeyHelpers._
-  import KeyTags.{AddressId => AddressIdTag, InvokeScriptResult => InvokeScriptResultTag, _}
+  import KeyTags.{AddressId => AddressIdTag, InvokeScriptResult => InvokeScriptResultTag, LeaseDetails => LeaseDetailsTag, _}
 
   val version: Key[Int]               = intKey(Version, default = 1)
   val height: Key[Int]                = intKey(Height)
@@ -53,9 +53,10 @@ object Keys {
   def leaseBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(LeaseBalanceHistory, addressId.toByteArray)
   def leaseBalance(addressId: AddressId)(height: Int): Key[LeaseBalance] =
     Key(LeaseBalance, hAddr(height, addressId), readLeaseBalance, writeLeaseBalance)
-  def leaseStatusHistory(leaseId: ByteStr): Key[Seq[Int]] = historyKey(LeaseStatusHistory, leaseId.arr)
-  def leaseStatus(leaseId: ByteStr)(height: Int): Key[Option[LeaseDetails]] =
-    Key.opt(LeaseStatus, Ints.toByteArray(height) ++ leaseId.arr, readLeaseDetails, writeLeaseDetails)
+
+  def leaseDetailsHistory(leaseId: ByteStr): Key[Seq[Int]] = historyKey(LeaseDetailsHistory, leaseId.arr)
+  def leaseDetails(leaseId: ByteStr)(height: Int): Key[Option[Either[Boolean, LeaseDetails]]] =
+    Key.opt(LeaseDetailsTag, Ints.toByteArray(height) ++ leaseId.arr, readLeaseDetails, writeLeaseDetails)
 
   def filledVolumeAndFeeHistory(orderId: ByteStr): Key[Seq[Int]] = historyKey(FilledVolumeAndFeeHistory, orderId.arr)
   def filledVolumeAndFee(orderId: ByteStr)(height: Int): Key[VolumeAndFee] =

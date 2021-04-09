@@ -10,8 +10,13 @@ case class MiningConstraints(total: MiningConstraint, keyBlock: MiningConstraint
 
 object MiningConstraints {
   val MaxScriptRunsInBlock = 100
-  val ClassicAmountOfTxsInBlock = 100
-  val MaxTxsSizeInBytes = 1 * 1024 * 1024 // 1 megabyte
+  object MaxScriptsComplexityInBlock {
+    val BeforeRideV5 = 1000000
+    val AfterRideV5  = 2500000
+  }
+
+  val ClassicAmountOfTxsInBlock: Int = 100
+  val MaxTxsSizeInBytes: Int         = 1 * 1024 * 1024 // 1 megabyte
 
   def apply(blockchain: Blockchain, height: Int, minerSettings: Option[MinerSettings] = None): MiningConstraints = {
     val activatedFeatures     = blockchain.activatedFeaturesAt(height)
@@ -27,15 +32,27 @@ object MiningConstraints {
         OneDimensionalMiningConstraint(maxTxs, TxEstimators.one, "MaxTxs")
       }
 
-    new MiningConstraints(
+    MiningConstraints(
       total =
         if (isDAppsEnabled)
           MultiDimensionalMiningConstraint(
             NonEmptyList
-              .of(OneDimensionalMiningConstraint(blockchain.settings.functionalitySettings.maxComplexityInBlock, TxEstimators.scriptsComplexity, "MaxScriptsComplexityInBlock"), total))
+              .of(
+                OneDimensionalMiningConstraint(
+                  blockchain.settings.functionalitySettings.maxComplexityInBlock.getOrElse[Int] {
+                    if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) MaxScriptsComplexityInBlock.AfterRideV5
+                    else MaxScriptsComplexityInBlock.BeforeRideV5
+                  },
+                  TxEstimators.scriptsComplexity,
+                  "MaxScriptsComplexityInBlock"
+                ),
+                total
+              )
+          )
         else if (isScriptEnabled)
           MultiDimensionalMiningConstraint(
-            NonEmptyList.of(OneDimensionalMiningConstraint(MaxScriptRunsInBlock, TxEstimators.scriptRunNumber, "MaxScriptRunsInBlock"), total))
+            NonEmptyList.of(OneDimensionalMiningConstraint(MaxScriptRunsInBlock, TxEstimators.scriptRunNumber, "MaxScriptRunsInBlock"), total)
+          )
         else total,
       keyBlock =
         if (isNgEnabled) OneDimensionalMiningConstraint(0, TxEstimators.one, "MaxTxsInKeyBlock")

@@ -22,13 +22,6 @@
       complexity: 2
     }
     {
-      name: "extract"
-      params: [ "T|Unit" ]
-      doc: "Extract value from option or fail"
-      paramsDoc: [ "Optional value" ]
-      complexity: 13
-    }
-    {
       name: "isDefined"
       params: [ "T|Unit" ]
       doc: "Checks if a value is not `Unit`"

@@ -19,7 +19,7 @@ object BlockchainFeatures {
   val ReduceNFTFee                    = BlockchainFeature(13, "Reduce NFT fee")
   val BlockReward                     = BlockchainFeature(14, "Block Reward and Community Driven Monetary Policy")
   val BlockV5                         = BlockchainFeature(15, "Ride V4, VRF, Protobuf, Failed transactions")
-  val SynchronousCalls                = BlockchainFeature(16, "Synchronous DAPP Calls")
+  val SynchronousCalls                = BlockchainFeature(16, "Ride V5, dApp-to-dApp invocations")
   val ContinuationTransaction         = BlockchainFeature(17, "Continuation Transaction")
   val LeaseExpiration                 = BlockchainFeature(18, "Lease Expiration")
 

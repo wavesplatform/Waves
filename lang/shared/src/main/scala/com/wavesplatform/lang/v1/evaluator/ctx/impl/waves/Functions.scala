@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -61,6 +61,32 @@ object Functions {
   val getBooleanFromStateF: BaseFunction[Environment] = getDataFromStateF("getBoolean", DATA_BOOLEAN_FROM_STATE, DataType.Boolean)
   val getBinaryFromStateF: BaseFunction[Environment]  = getDataFromStateF("getBinary", DATA_BYTES_FROM_STATE, DataType.ByteArray)
   val getStringFromStateF: BaseFunction[Environment]  = getDataFromStateF("getString", DATA_STRING_FROM_STATE, DataType.String)
+
+  val isDataStorageUntouchedF: BaseFunction[Environment] = {
+    val name = "isDataStorageUntouched"
+    val resultType = BOOLEAN
+    val arg = ("addressOrAlias", addressOrAliasType)
+    NativeFunction.withEnvironment[Environment](
+      name,
+      Map[StdLibVersion, Long](V5 -> 10L),
+      IS_UNTOUCHED,
+      resultType,
+      arg
+    ) {
+      new ContextfulNativeFunction[Environment](name, resultType, List(arg)) {
+        override def ev[F[_]: Monad](input: (Environment[F], List[Terms.EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+          input match {
+            case (env, (addressOrAlias: CaseObj) :: Nil) =>
+              val environmentFunctions = new EnvironmentFunctions[F](env)
+              environmentFunctions
+                .hasData(addressOrAlias)
+                .map(_.map(v => CONST_BOOLEAN(!v)))
+
+            case (_, xs) => notImplemented[F, EVALUATED](s"$name(s: AddressOrAlias)", xs)
+          }
+      }
+    }
+  }
 
   private def getDataFromArrayF(name: String, internalName: Short, dataType: DataType, version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction(
@@ -138,7 +164,7 @@ object Functions {
       ("@publicKey", BYTESTR)
     )(
       new ContextfulUserFunction[Environment] {
-        override def apply[F[_]: Monad](env: Environment[F]): EXPR =
+        override def apply[F[_]: Monad](env: Environment[F], startArgs: List[EXPR]): EXPR =
           FUNCTION_CALL(
             FunctionHeader.User("Address"),
             List(
@@ -214,7 +240,7 @@ object Functions {
   def addressFromStringF(version: StdLibVersion): BaseFunction[Environment] =
     UserFunction.withEnvironment("addressFromString", 124, optionAddress, ("@string", STRING)) {
       new ContextfulUserFunction[Environment] {
-        override def apply[F[_]: Monad](env: Environment[F]): EXPR =
+        override def apply[F[_]: Monad](env: Environment[F], startArgs: List[EXPR]): EXPR =
           LET_BLOCK(
             LET(
               "@afs_addrBytes",
@@ -800,4 +826,36 @@ object Functions {
           }
       }
     }
+
+  def accountScriptHashF(global: BaseGlobal): BaseFunction[Environment] = {
+    val name = "hashScriptAtAddress"
+    val resType = UNION(BYTESTR, UNIT)
+    val arg = ("account", addressOrAliasType)
+    NativeFunction.withEnvironment[Environment](
+      name,
+      200,
+      ACCOUNTSCRIPTHASH,
+      resType,
+      arg
+    ) {
+      new ContextfulNativeFunction[Environment](
+        name,
+        resType,
+        Seq(arg)
+      ) {
+        override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+          input match {
+            case (env, List(addr: CaseObj)) =>
+              env
+                .accountScript(caseObjToRecipient(addr))
+                .map(_.map(si => CONST_BYTESTR(ByteStr(global.blake2b256(si.bytes().arr))))
+                      .getOrElse(Right(unit)))
+
+            case (_, xs) => notImplemented[F, EVALUATED](s"hashScriptAtAddress(account: AddressOrAlias))", xs)
+          }
+      }
+    }
+  }
+
+
 }

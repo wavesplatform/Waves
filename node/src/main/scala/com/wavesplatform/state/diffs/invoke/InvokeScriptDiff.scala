@@ -36,9 +36,9 @@ object InvokeScriptDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
-  def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean, remainingComplexity: Int, remainingCalls: Int)(
+  def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean, remainingComplexity: Int, remainingCalls: Int, remainingActions: Int, remainingData: Int, callChain: Set[Address])(
       tx: InvokeScript
-  ): CoevalR[(Diff, EVALUATED)] = {
+  ): CoevalR[(Diff, EVALUATED, Int, Int)] = {
     val dAppAddress = tx.dAppAddress
     blockchain.accountScript(dAppAddress) match {
       case Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities)) =>
@@ -70,7 +70,7 @@ object InvokeScriptDiff {
             case _                       => None
           }
           complexityAfterPayments <- checkedPayments.foldLeft(traced(Right(remainingComplexity): TxValidationError.Validation[Int])) { (prev, a) =>
-            (prev.v.value(), a) match {
+            (prev.v(), a) match {
               case (TracedResult(Left(_), _), _) => prev
               case (TracedResult(Right(nextRemainingComplexity), _), (script, amount, assetId)) =>
                 val usedComplexity = limit - nextRemainingComplexity
@@ -84,8 +84,8 @@ object InvokeScriptDiff {
                     tx.sender,
                     Recipient.Address(ByteStr(tx.dAppAddress.bytes)),
                     amount,
-                    tx.root.timestamp,
-                    tx.root.id()
+                    tx.timestamp,
+                    tx.txId
                   )
                   ScriptRunner(
                     Coproduct[TxOrd](pseudoTx),
@@ -116,21 +116,25 @@ object InvokeScriptDiff {
 
           tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
           input <- traced(
-            buildThisValue(Coproduct[TxOrd](tx.root: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply)
+            tx.root
+              .map(t => buildThisValue(Coproduct[TxOrd](t: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply))
+              .getOrElse(Right(null))
           )
 
           result <- for {
-            (diff, (scriptResult, log)) <- {
+            (diff, (scriptResult, log), avaliableActions, avaliableData) <- {
               val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
                 val invoker = tx.senderDApp
                 val invocation = ContractEvaluator.Invocation(
                   tx.funcCall,
                   Recipient.Address(ByteStr(invoker.bytes)),
                   ByteStr(tx.sender.arr),
+                  Recipient.Address(ByteStr(tx.root.fold(invoker)(_.senderAddress).bytes)),
+                  ByteStr(tx.root.getOrElse(tx).sender.arr),
                   payments,
-                  tx.root.id(),
-                  tx.root.fee,
-                  tx.root.feeAssetId.compatId
+                  tx.txId,
+                  tx.root.map(_.fee).getOrElse(0L),
+                  tx.root.flatMap(_.feeAssetId.compatId)
                 )
                 val height = blockchain.height
 
@@ -144,8 +148,11 @@ object InvokeScriptDiff {
                   tx.root,
                   tx.dAppAddress,
                   pk,
-                  tx.senderDApp,
+                  callChain + dAppAddress,
+                  limitedExecution,
                   remainingCalls - 1,
+                  remainingActions,
+                  remainingData,
                   (if (version < V5) {
                      Diff.empty
                    } else {
@@ -157,7 +164,7 @@ object InvokeScriptDiff {
                   result <- CoevalR(
                     evaluateV2(version, contract, invocation, environment, complexityAfterPayments, remainingComplexity).map(TracedResult(_))
                   )
-                } yield (environment.currentDiff, result)
+                } yield (environment.currentDiff, result, environment.avaliableActions, environment.avaliableData)
               })
               scriptResultE
             }
@@ -182,18 +189,38 @@ object InvokeScriptDiff {
                 )
               )
 
-            (actionsDiff, evaluated) <- scriptResult match {
+            process = { (actions: List[CallableAction], unusedComplexity: Int, actionsCount: Int, dataCount: Int, ret: EVALUATED) =>
+              if(dataCount > avaliableData) {
+                val usedComplexity = remainingComplexity - unusedComplexity
+                val error          = FailedTransactionError.dAppExecution("Stored data count limit is exceeded", usedComplexity, log)
+                traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
+              } else {
+                if(actionsCount > avaliableActions) {
+                  val usedComplexity = remainingComplexity - unusedComplexity
+                  val error          = FailedTransactionError.dAppExecution("Actions count limit is exceeded", usedComplexity, log)
+                  traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
+                } else {
+                  doProcessActions(actions, unusedComplexity).map((_, ret, avaliableActions - actionsCount, avaliableData - dataCount))
+                }
+              }
+            }
+            (actionsDiff, evaluated, remainingActions1, remainingData1) <- scriptResult match {
               case ScriptResultV3(dataItems, transfers, unusedComplexity) =>
-                doProcessActions(dataItems ::: transfers, unusedComplexity).map((_, unit))
-              case ScriptResultV4(actions, unusedComplexity, ret) => doProcessActions(actions, unusedComplexity).map((_, ret))
-              case _: IncompleteResult if limitedExecution        => doProcessActions(Nil, 0).map((_, unit))
+                val dataCount = dataItems.length
+                val actionsCount = transfers.length
+                process(dataItems ::: transfers,  unusedComplexity, actionsCount, dataCount, unit) 
+              case ScriptResultV4(actions, unusedComplexity, ret) =>
+                val dataCount = actions.count(_.isInstanceOf[DataOp])
+                val actionsCount = actions.length - dataCount
+                process(actions,  unusedComplexity, actionsCount, dataCount, ret) 
+              case _: IncompleteResult if limitedExecution        => doProcessActions(Nil, 0).map((_, unit,  avaliableActions, avaliableData))
               case r: IncompleteResult =>
                 val usedComplexity = remainingComplexity - r.unusedComplexity
                 val error          = FailedTransactionError.dAppExecution(s"Invoke complexity limit = $limit is exceeded", usedComplexity, log)
-                traced(error.asLeft[(Diff, EVALUATED)])
+                traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
             }
             resultDiff = diff |+| actionsDiff |+| Diff.empty.copy(scriptsComplexity = paymentsComplexity)
-          } yield (resultDiff, evaluated)
+          } yield (resultDiff, evaluated, remainingActions1, remainingData1)
         } yield result
 
       case _ => traced(Left(GenericError(s"No contract at address ${tx.dAppAddress}")))

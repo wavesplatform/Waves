@@ -12,7 +12,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.{MultiDimensionalMiningConstraint, OneDimensionalMiningConstraint, TxEstimators}
-import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase}
+import com.wavesplatform.network.{ExtensionBlocks, InvalidBlockStorage, PeerDatabase}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -57,9 +57,9 @@ class UtxPriorityPoolSpecification
               tt.sender.toAddress                -> -(tt.fee + tt.amount),
               tt.recipient.asInstanceOf[Address] -> tt.amount
             ).view.mapValues(Portfolio.waves).toMap
-            Diff(tt, pfs)
+            Diff(portfolios = pfs).bindTransaction(tt)
 
-          case tx => Diff(tx)
+          case _ => Diff.empty
         }
         utx.setPriorityDiffs(asDiffs)
       }
@@ -192,7 +192,7 @@ class UtxPriorityPoolSpecification
         new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
 
       def createDiff(): Diff =
-        Monoid.combineAll((1 to 5).map(_ => Diff(TxHelpers.issue())))
+        Monoid.combineAll((1 to 5).map(_ => Diff.empty.bindTransaction(TxHelpers.issue())))
 
       utx.setPriorityDiffs(Seq(createDiff(), createDiff())) // 10 total
       utx.priorityPool.nextMicroBlockSize(3) shouldBe 5
@@ -297,7 +297,7 @@ class UtxPriorityPoolSpecification
           mbs1.foreach(microBlockAppender(_).runSyncUnsafe() should beRight)
 
           mbs2.head.transactionData.foreach(utx.putIfNew(_).resultE should beRight)
-          extAppender(Seq(block2)).runSyncUnsafe() should beRight
+          extAppender(ExtensionBlocks(d.blockchain.score + block2.blockScore(), Seq(block2))).runSyncUnsafe() should beRight
           val expectedTxs1 = mbs1.last.transactionData ++ mbs2.head.transactionData.sorted(TransactionsOrdering.InUTXPool(Set()))
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs1)
 
@@ -308,7 +308,7 @@ class UtxPriorityPoolSpecification
             ._1
             .get shouldBe mbs1.last.transactionData
 
-          extAppender(Seq(block3)).runSyncUnsafe() should beRight
+          extAppender(ExtensionBlocks(d.blockchain.score + block3.blockScore(), Seq(block3))).runSyncUnsafe() should beRight
           utx
             .packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)
             ._1

@@ -7,7 +7,7 @@ import akka.actor.ActorSystem
 import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints
 import com.wavesplatform.Exporter.Formats
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonBlocksApi, CommonTransactionsApi}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -18,6 +18,7 @@ import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.mining.Miner
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.BlockAppender
@@ -46,7 +47,7 @@ object Importer extends ScorexLogging {
   type AppendBlock = Block => Task[Either[ValidationError, Option[BigInt]]]
 
   final case class ImportOptions(
-      configFile: File = new File("waves-testnet.conf"),
+      configFile: Option[File] = None,
       blockchainFile: String = "blockchain",
       importHeight: Int = Int.MaxValue,
       format: String = Formats.Binary,
@@ -65,7 +66,7 @@ object Importer extends ScorexLogging {
         head("Waves Blockchain Importer", Version.VersionString),
         opt[File]('c', "config")
           .text("Config file name")
-          .action((f, c) => c.copy(configFile = f)),
+          .action((f, c) => c.copy(configFile = Some(f))),
         opt[String]('i', "input-file")
           .required()
           .text("Blockchain data file name")
@@ -92,11 +93,14 @@ object Importer extends ScorexLogging {
 
     OParser
       .parse(commandParser, args, ImportOptions())
-      .getOrElse(throw new IllegalArgumentException("Invalid options"))
+      .getOrElse {
+        println(OParser.usage(commandParser))
+        sys.exit(1)
+      }
   }
 
-  def loadSettings(file: File): WavesSettings = {
-    val settings = Application.loadApplicationConfig(Some(file))
+  def loadSettings(file: Option[File]): WavesSettings = {
+    val settings = Application.loadApplicationConfig(file)
     settings.copy(dbSettings = settings.dbSettings.copy(useBloomFilter = true))
   }
 
@@ -246,9 +250,6 @@ object Importer extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val importOptions = parseOptions(args)
     val settings      = loadSettings(importOptions.configFile)
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
-    }
 
     def initFileStream(file: String, offset: Long): InputStream = {
       log.info(s"Opening import file: $file, offset=$offset")
@@ -281,11 +282,11 @@ object Importer extends ScorexLogging {
     val (blockchainUpdater, levelDb) =
       StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.combined(triggers))
     val utxPool     = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings)
-    val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings)
+    val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTargetOpt)
     val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
 
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, db, actorSystem)
-    checkGenesis(settings, blockchainUpdater)
+    checkGenesis(settings, blockchainUpdater, Miner.Disabled)
 
     val importFileOffset = importOptions.format match {
       case Formats.Binary =>

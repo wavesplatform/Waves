@@ -1,6 +1,5 @@
 package com.wavesplatform.lang.evaluator
 
-import java.nio.ByteBuffer
 import cats.Id
 import cats.data.EitherT
 import cats.implicits._
@@ -9,10 +8,9 @@ import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.{Common, EvalF, ExecutionError, Global}
 import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -29,11 +27,14 @@ import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, Evaluator
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits, FunctionHeader}
+import com.wavesplatform.lang.{Common, EvalF, ExecutionError, Global}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{EitherValues, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
+
+import java.nio.ByteBuffer
 
 class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink with EitherValues {
 
@@ -51,6 +52,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
         defaultCryptoContext(version).withEnvironment[Environment],
         pureContext(version).withEnvironment[Environment],
         WavesContext.build(
+          Global,
           DirectiveSet(version, Account, Expression).explicitGet()
         )
       )
@@ -1207,8 +1209,35 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   property("illegal concatenation args") {
     evalPure(expr = FUNCTION_CALL(PureContext.sumString, List(CONST_LONG(1), CONST_LONG(2)))) should produce(
-      "Unexpected args (1,2) for string concatenation operator")
+      "Unexpected args (1,2) for string concatenation operator"
+    )
     evalPure(expr = FUNCTION_CALL(PureContext.sumByteStr, List(CONST_LONG(1), CONST_LONG(2)))) should produce(
-      "Unexpected args (1,2) for bytes concatenation operator")
+      "Unexpected args (1,2) for bytes concatenation operator"
+    )
+  }
+
+  property("Rounding modes DOWN, HALFUP, HALFEVEN, CEILING, FLOOR are available for all versions") {
+    DirectiveDictionary[StdLibVersion].all
+      .foreach(
+        version =>
+          Rounding.fromV5.foreach { rounding =>
+            evalPure(pureContext(version).evaluationContext, REF(rounding.`type`.name.toUpperCase)) shouldBe Right(rounding.value)
+          }
+      )
+  }
+
+  property("Rounding modes UP, HALFDOWN are not available from V5") {
+    DirectiveDictionary[StdLibVersion].all
+      .foreach(
+        version =>
+          Rounding.all.filterNot(Rounding.fromV5.contains).foreach { rounding =>
+            val ref = rounding.`type`.name.toUpperCase
+            val r   = evalPure(pureContext(version).evaluationContext, REF(ref))
+            if (version < V5)
+              r shouldBe Right(rounding.value)
+            else
+              r should produce(s"A definition of '$ref' not found")
+          }
+      )
   }
 }

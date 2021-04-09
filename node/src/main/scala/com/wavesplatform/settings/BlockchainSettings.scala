@@ -73,7 +73,7 @@ case class FunctionalitySettings(
     minAssetInfoUpdateInterval: Int = 100000,
     minBlockTime: FiniteDuration = 15.seconds,
     delayDelta: Int = 8,
-    maxComplexityInBlock: Int = 1000000
+    maxComplexityInBlock: Option[Int] = None
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int        = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil                       = lastTimeBasedForkParameter

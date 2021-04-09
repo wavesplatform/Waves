@@ -6,11 +6,13 @@ import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 
-class FunctionTypeMapper(mapper: TypeBitMapper, version: MetaVersion) {
-  def toProto(funcTypes: List[List[FINAL]]): Either[String, DAppMeta] =
-    funcTypes
-      .traverse(funcToProto)
-      .map(DAppMeta(version.number, _))
+class DataMetaMapper(mapper: TypeBitMapper, version: MetaVersion) {
+  def toProto(funcTypes: List[List[FINAL]], compactNameToOriginalNameMap: Map[String, String] = Map.empty): Either[String, DAppMeta] = {
+    for {
+      fTypes <- funcTypes.traverse(funcToProto)
+    } yield
+      DAppMeta(version.number, fTypes, compactNameToOriginalNameMap)
+  }
 
   private def funcToProto(types: List[FINAL]): Either[String, CallableFuncSignature] =
     types

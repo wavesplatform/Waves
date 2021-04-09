@@ -309,6 +309,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
           PureContext.build(V4).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
           WavesContext.build(
+            Global,
             DirectiveSet(V4, Account, Expression).explicitGet()
           )
         )
@@ -445,6 +446,75 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
           result should produce(
             "Compilation failed: [Undefined field `feeAssetId` of variable of type `MassTransferTransaction` in 116-128]"
           )
+      }
+  }
+
+  property("Rounding modes DOWN, HALFUP, HALFEVEN, CEILING, FLOOR are available for all versions") {
+    def expr(v: StdLibVersion) = {
+      val script =
+        s"""
+          | {-# STDLIB_VERSION ${v.id}    #-}
+          | {-# CONTENT_TYPE   EXPRESSION #-}
+          |
+          | let r = 
+          |  if (true) then
+          |   DOWN 
+          |  else if (true) then
+          |   HALFUP 
+          |  else if (true) then
+          |   HALFEVEN 
+          |  else if (true) then
+          |   CEILING 
+          |  else
+          |   FLOOR
+          |   
+          | func f(r: Ceiling|Down|Floor|HalfEven|HalfUp) = true
+          | f(r)
+          |
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+
+    DirectiveDictionary[StdLibVersion].all
+      .foreach { version =>
+        ExpressionCompiler(getTestContext(version).compilerContext, expr(version)) shouldBe Symbol("right")
+      }
+  }
+
+  property("Rounding modes UP, HALFDOWN are not available from V5") {
+    def expr(v: StdLibVersion) = {
+      val script =
+        s"""
+          | {-# STDLIB_VERSION ${v.id}    #-}
+          | {-# CONTENT_TYPE   EXPRESSION #-}
+          |
+          | let r =
+          |  if (true) then
+          |   UP
+          |  else
+          |   HALFDOWN
+          |
+          | func f(r: HalfDown) = true
+          | func g(r: Up) = true
+          |
+          | true
+          |
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+
+    DirectiveDictionary[StdLibVersion].all
+      .foreach { version =>
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, expr(version))
+        if (version < V5)
+          result shouldBe Symbol("right")
+        else {
+          val error = result.swap.getOrElse(???)
+          error should include("A definition of 'UP' is not found")
+          error should include("Undefined type: `Up` of variable")
+          error should include("A definition of 'HALFDOWN' is not found")
+          error should include("Undefined type: `HalfDown` of variable")
+        }
       }
   }
 

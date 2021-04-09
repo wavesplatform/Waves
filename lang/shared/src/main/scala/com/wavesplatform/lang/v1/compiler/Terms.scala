@@ -149,23 +149,22 @@ object Terms {
     def prettyString(level: Int): String = toString
     def toStr: Coeval[String]            = Coeval.now(toString)
     def weight: Long
-
-    // FIXME: Do not use global mutable state
-    @volatile var wasLogged: Boolean = false
-
     val getType: REAL // used for _isInstanceOf and therefore for match
 
     override def deepCopy: Eval[EXPR] =
-      Eval.later {
-        this.wasLogged = false
-        this
-      }
+      Eval.now(this)
   }
+
   case class CONST_LONG(t: Long) extends EVALUATED {
     override def toString: String = t.toString
     override val weight: Long     = 8L
     override val getType: REAL = LONG
-}
+  }
+  case class CONST_BIGINT(t: BigInt) extends EVALUATED {
+    override def toString: String = t.toString
+    override val weight: Long     = 64L
+    override val getType: REAL = BIGINT
+  }
 
   class CONST_BYTESTR private (val bs: ByteStr) extends EVALUATED {
     override def toString: String = bs.toString
@@ -329,5 +328,8 @@ object Terms {
   val runtimeTupleType: CASETYPEREF = CASETYPEREF("Tuple", Nil)
 
   implicit val orderingConstLong: Ordering[CONST_LONG] =
+    (a, b) => a.t compare b.t
+
+  implicit val orderingConstBigInt: Ordering[CONST_BIGINT] =
     (a, b) => a.t compare b.t
 }

@@ -16,10 +16,10 @@ package object meta {
     ListTypeMapper(unionTypeMapper)
 
   object MetaMapperStrategyV1
-    extends FunctionTypeMapper(unionTypeMapper, V1)
+    extends DataMetaMapper(unionTypeMapper, V1)
     with MetaMapperStrategy[V1.Self]
 
   object MetaMapperStrategyV2
-    extends FunctionTypeMapper(listTypeMapper, V2)
+    extends DataMetaMapper(listTypeMapper, V2)
     with MetaMapperStrategy[V2.Self]
 }

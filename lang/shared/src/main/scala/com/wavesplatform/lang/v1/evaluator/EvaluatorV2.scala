@@ -75,11 +75,11 @@ class EvaluatorV2(
       }
     }
 
-    def evaluateUserFunction(fc: FUNCTION_CALL, limit: Int, name: String): Option[Coeval[Int]] = {
+    def evaluateUserFunction(fc: FUNCTION_CALL, limit: Int, name: String, startArgs: List[EXPR]): Option[Coeval[Int]] = {
       ctx.ec.functions
         .get(fc.function)
         .map(_.asInstanceOf[UserFunction[Environment]])
-        .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment)))
+        .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment, startArgs)))
         .orElse(findUserFunction(name, parentBlocks))
         .map { signature =>
           val argsWithExpr =
@@ -185,6 +185,7 @@ class EvaluatorV2(
         }
 
       case fc: FUNCTION_CALL =>
+        val startArgs = fc.args
         evaluateFunctionArgs(fc)
           .flatMap { unusedArgsComplexity =>
             val argsEvaluated = fc.args.forall(_.isInstanceOf[EVALUATED])
@@ -193,7 +194,7 @@ class EvaluatorV2(
                 case FunctionHeader.Native(_) =>
                   evaluateNativeFunction(fc, unusedArgsComplexity)
                 case FunctionHeader.User(_, name) =>
-                  evaluateUserFunction(fc, unusedArgsComplexity, name)
+                  evaluateUserFunction(fc, unusedArgsComplexity, name, startArgs)
                     .getOrElse(evaluateConstructor(fc, unusedArgsComplexity, name))
               } else
               Coeval.now(unusedArgsComplexity)
@@ -221,10 +222,6 @@ class EvaluatorV2(
       let: LET,
       nextParentBlocks: List[BLOCK_DEF]
   ): Coeval[Int] = {
-    val wasLogged = let.value match {
-      case evaluated: EVALUATED if evaluated.wasLogged => true
-      case _                                           => false
-    }
     root(
       expr = let.value,
       update = v =>
@@ -233,10 +230,8 @@ class EvaluatorV2(
           .map(
             _ =>
               let.value match {
-                case evaluated: EVALUATED if !wasLogged =>
-                  ctx.l(let.name)(Right(evaluated))
-                  evaluated.wasLogged = true
-                case _ => ()
+                case e: EVALUATED => ctx.log(let, Right(e))
+                case _            =>
               }
           ),
       limit = limit,
@@ -248,10 +243,8 @@ class EvaluatorV2(
         }
       }
       .onErrorHandle { e =>
-        if (!wasLogged) {
-          val error = if (e.getMessage != null) e.getMessage else e.toString
-          ctx.l(let.name)(Left(error))
-        }
+        val error = if (e.getMessage != null) e.getMessage else e.toString
+        ctx.log(let, Left(error))
         throw if (e.isInstanceOf[EvaluationException])
           e
         else
