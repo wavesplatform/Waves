@@ -8,16 +8,14 @@ import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
 import com.wavesplatform.state.Diff
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -26,6 +24,8 @@ import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithState with Inside {
+  private val oldVersions = Gen.oneOf(V1, V2, V3)
+
   property("multi payment with verifier and transfer set") {
     val wavesTransfer = 111
     forAll(
@@ -206,9 +206,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
       repeatAdditionalAsset: Boolean = false,
       withEnoughFee: Boolean = true,
       multiPayment: Boolean = true
-  ): Gen[
-    (List[GenesisTransaction], SetScriptTransaction, SetScriptTransaction, InvokeScriptTransaction, List[IssueTransaction], KeyPair, KeyPair, Long)
-  ] =
+  ) =
     for {
       master        <- accountGen
       invoker       <- accountGen
@@ -269,7 +267,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
         ) {
           case Right(diff: Diff) =>
             val errMsg = diff.scriptResults(diff.transactions.keys.head).error.get.text
-            ((message(oldVersion.id, maybeFailedAssetId)).r.findFirstIn(errMsg)) shouldBe defined
+            message(oldVersion.id, maybeFailedAssetId).r.findFirstIn(errMsg) shouldBe defined
 
           case l @ Left(_) =>
             l should produce(message(oldVersion.id, maybeFailedAssetId))
@@ -278,8 +276,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
 
   private def dApp(version: StdLibVersion, transferPaymentAmount: Int, transferRecipient: KeyPair): Script = {
     val resultSyntax = if (version >= V4) "" else "TransferSet"
-    val script =
-      s"""
+    TestCompiler(version).compileContract(s"""
          | {-# STDLIB_VERSION ${version.id} #-}
          | {-# CONTENT_TYPE   DAPP          #-}
          | {-# SCRIPT_TYPE    ACCOUNT       #-}
@@ -291,11 +288,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
          |    unit
          | )])
          |
-       """.stripMargin
-
-    val expr     = Parser.parseContract(script).get.value
-    val contract = compileContractFromExpr(expr, version)
-    ContractScript(version, contract).explicitGet()
+       """.stripMargin)
   }
 
   private def dAppVerifier(version: StdLibVersion, usePaymentsField: Boolean): Script = {
@@ -310,8 +303,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
         """.stripMargin
       else "true"
 
-    val script =
-      s"""
+    TestCompiler(version).compileContract(s"""
          | {-# STDLIB_VERSION ${version.id} #-}
          | {-# CONTENT_TYPE   DAPP          #-}
          | {-# SCRIPT_TYPE    ACCOUNT       #-}
@@ -319,15 +311,11 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
          | @Verifier(tx)
          | func verify() = $verifierExpr
          |
-       """.stripMargin
-
-    val expr     = Parser.parseContract(script).get.value
-    val contract = compileContractFromExpr(expr, version)
-    ContractScript(version, contract).explicitGet()
+       """.stripMargin)
   }
 
-  private def verifier(version: StdLibVersion, scriptType: ScriptType, result: String = "true"): Script = {
-    val script =
+  private def verifier(version: StdLibVersion, scriptType: ScriptType, result: String = "true"): Script =
+    compileExpr(
       s"""
          | {-# STDLIB_VERSION ${version.id}      #-}
          | {-# CONTENT_TYPE   EXPRESSION         #-}
@@ -335,12 +323,10 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
          |
          | $result
          |
-       """.stripMargin
-
-    val expr     = Parser.parseExpr(script).get.value
-    val compiled = compileExpr(expr, version, scriptType)
-    ExprScript(version, compiled).explicitGet()
-  }
+       """.stripMargin,
+      version,
+      scriptType
+    )
 
   private def accountVerifierGen(version: StdLibVersion) =
     for {
@@ -359,6 +345,4 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
       BlockchainFeatures.BlockV5
     ).map(_.id -> 0).toMap
   )
-
-  private val oldVersions = Gen.oneOf(V1, V2, V3)
 }

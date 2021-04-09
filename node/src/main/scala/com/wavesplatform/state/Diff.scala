@@ -12,14 +12,13 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
-import play.api.libs.json._
 
 import scala.collection.immutable.VectorMap
 
 case class LeaseBalance(in: Long, out: Long)
 
 object LeaseBalance {
-  val empty = LeaseBalance(0, 0)
+  val empty: LeaseBalance = LeaseBalance(0, 0)
 
   implicit val m: Monoid[LeaseBalance] = new Monoid[LeaseBalance] {
     override def empty: LeaseBalance = LeaseBalance.empty
@@ -27,14 +26,12 @@ object LeaseBalance {
     override def combine(x: LeaseBalance, y: LeaseBalance): LeaseBalance =
       LeaseBalance(safeSum(x.in, y.in), safeSum(x.out, y.out))
   }
-
-  implicit val leaseBalanceJsonFormat: Format[LeaseBalance] = Json.format
 }
 
 case class VolumeAndFee(volume: Long, fee: Long)
 
 object VolumeAndFee {
-  val empty = VolumeAndFee(0, 0)
+  val empty: VolumeAndFee = VolumeAndFee(0, 0)
 
   implicit val m: Monoid[VolumeAndFee] = new Monoid[VolumeAndFee] {
     override def empty: VolumeAndFee = VolumeAndFee.empty
@@ -146,115 +143,24 @@ case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: Ass
 case class LeaseActionInfo(invokeId: ByteStr, dAppPublicKey: PublicKey, recipient: AddressOrAlias, amount: Long)
 
 case class Diff(
-    transactions: collection.Map[ByteStr, NewTransactionInfo],
-    portfolios: Map[Address, Portfolio],
-    issuedAssets: Map[IssuedAsset, NewAssetInfo],
-    updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
-    aliases: Map[Alias, Address],
-    orderFills: Map[ByteStr, VolumeAndFee],
-    leaseState: Map[ByteStr, LeaseDetails],
-    scripts: Map[Address, Option[AccountScriptInfo]],
-    assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
-    accountData: Map[Address, AccountDataInfo],
-    sponsorship: Map[IssuedAsset, Sponsorship],
-    scriptsRun: Int,
-    scriptsComplexity: Long,
-    scriptResults: Map[ByteStr, InvokeScriptResult]
-) {
-  def bindTransaction(tx: Transaction): Diff =
-    copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
-}
+    transactions: collection.Map[ByteStr, NewTransactionInfo] = VectorMap.empty,
+    portfolios: Map[Address, Portfolio] = Map.empty,
+    issuedAssets: Map[IssuedAsset, NewAssetInfo] = Map.empty,
+    updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
+    aliases: Map[Alias, Address] = Map.empty,
+    orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
+    leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
+    scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
+    assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
+    accountData: Map[Address, AccountDataInfo] = Map.empty,
+    sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
+    scriptsRun: Int = 0,
+    scriptsComplexity: Long = 0,
+    scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
+)
 
 object Diff {
-  def stateOps(
-      portfolios: Map[Address, Portfolio] = Map.empty,
-      issuedAssets: Map[IssuedAsset, NewAssetInfo] = Map.empty,
-      updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
-      aliases: Map[Alias, Address] = Map.empty,
-      orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
-      leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
-      scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
-      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
-      accountData: Map[Address, AccountDataInfo] = Map.empty,
-      sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
-      scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
-      scriptsRun: Int = 0
-  ): Diff =
-    Diff(
-      transactions = VectorMap.empty,
-      portfolios = portfolios,
-      issuedAssets = issuedAssets,
-      updatedAssets = updatedAssets,
-      aliases = aliases,
-      orderFills = orderFills,
-      leaseState = leaseState,
-      scripts = scripts,
-      assetScripts = assetScripts,
-      accountData = accountData,
-      sponsorship = sponsorship,
-      scriptsRun = scriptsRun,
-      scriptResults = scriptResults,
-      scriptsComplexity = 0
-    )
-
-  def apply(
-      tx: Transaction,
-      portfolios: Map[Address, Portfolio] = Map.empty,
-      issuedAssets: Map[IssuedAsset, NewAssetInfo] = Map.empty,
-      updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
-      aliases: Map[Alias, Address] = Map.empty,
-      orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
-      leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
-      scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
-      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
-      accountData: Map[Address, AccountDataInfo] = Map.empty,
-      sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
-      scriptsRun: Int = 0,
-      scriptsComplexity: Long = 0,
-      scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
-  ): Diff =
-    Diff(
-      // should be changed to VectorMap after 2.13 https://github.com/scala/scala/pull/6854
-      transactions = VectorMap(toDiffTxData(tx, portfolios, accountData)),
-      portfolios = portfolios,
-      issuedAssets = issuedAssets,
-      updatedAssets = updatedAssets,
-      aliases = aliases,
-      orderFills = orderFills,
-      leaseState = leaseState,
-      scripts = scripts,
-      assetScripts = assetScripts,
-      accountData = accountData,
-      sponsorship = sponsorship,
-      scriptsRun = scriptsRun,
-      scriptResults = scriptResults,
-      scriptsComplexity = scriptsComplexity
-    )
-
-  private def toDiffTxData(
-      tx: Transaction,
-      portfolios: Map[Address, Portfolio],
-      accountData: Map[Address, AccountDataInfo]
-  ): (ByteStr, NewTransactionInfo) =
-    tx.id() -> NewTransactionInfo(tx, (portfolios.keys ++ accountData.keys).toSet, true)
-
-  val empty =
-    new Diff(
-      VectorMap.empty,
-      Map.empty,
-      Map.empty,
-      Map.empty,
-      Map.empty,
-      Map.empty,
-      Map.empty,
-      Map.empty,
-      Map.empty,
-      Map.empty,
-      Map.empty,
-      0,
-      0,
-      Map.empty
-    )
+  val empty: Diff = Diff()
 
   implicit val diffMonoid: Monoid[Diff] = new Monoid[Diff] {
     override def empty: Diff = Diff.empty
@@ -284,5 +190,8 @@ object Diff {
 
     def hashString: String =
       Integer.toHexString(d.hashCode())
+
+    def bindTransaction(tx: Transaction): Diff =
+      d.copy(transactions = VectorMap(tx.id() -> NewTransactionInfo(tx, (d.portfolios.keys ++ d.accountData.keys).toSet, applied = true)))
   }
 }

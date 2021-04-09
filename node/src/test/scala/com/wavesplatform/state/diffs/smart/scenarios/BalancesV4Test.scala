@@ -9,12 +9,12 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Asset => AssetType, DApp => DAppType, _}
+import com.wavesplatform.lang.directives.values.{Asset => AssetType, _}
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler}
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser._
@@ -83,13 +83,6 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
   }
 
   def script(a: String): Script = {
-    val ctx = {
-      val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
-      PureContext.build(V4).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-        WavesContext.build(Global, directives)
-    }
-
     val script =
       s"""
          | {-#STDLIB_VERSION 4 #-}
@@ -107,8 +100,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
          |   ]
          | }
       """.stripMargin
-    val dApp = ContractCompiler.compile(script, ctx.compilerContext, V4).explicitGet()
-    ContractScript(V4, dApp).explicitGet()
+    TestCompiler(V4).compileContract(script)
   }
 
   property("Waves balance details") {
@@ -162,13 +154,6 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
     }
 
     def dappScript(acc: ByteStr, asset: ByteStr): Script = {
-      val ctx = {
-        val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
-        PureContext.build(V4).withEnvironment[Environment] |+|
-          CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(Global, directives)
-      }
-
       val script =
         s"""
            | {-#STDLIB_VERSION 4 #-}
@@ -183,8 +168,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
            |   ]
            | }
         """.stripMargin
-      val dApp = ContractCompiler.compile(script, ctx.compilerContext, V4).explicitGet()
-      ContractScript(V4, dApp).explicitGet()
+      TestCompiler(V4).compileContract(script)
     }
 
     val functionCall =
@@ -255,13 +239,6 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
     }
 
     def dappScript(acc: ByteStr, asset: ByteStr): Script = {
-      val ctx = {
-        val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
-        PureContext.build(V4).withEnvironment[Environment] |+|
-          CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(Global, directives)
-      }
-
       val script =
         s"""
            | {-#STDLIB_VERSION 4 #-}
@@ -276,8 +253,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
            |   ]
            | }
         """.stripMargin
-      val dApp = ContractCompiler.compile(script, ctx.compilerContext, V4).explicitGet()
-      ContractScript(V4, dApp).explicitGet()
+      TestCompiler(V4).compileContract(script)
     }
 
     val functionCall =
