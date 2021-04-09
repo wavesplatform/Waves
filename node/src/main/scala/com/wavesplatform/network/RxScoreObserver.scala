@@ -18,12 +18,6 @@ case class BestChannel(channel: Channel, score: BigInt) {
   override def toString: String = s"BestChannel(${id(channel)},$score)"
 }
 
-object BestChannel {
-  implicit val bestChannelEq: Eq[BestChannel] = { (x, y) =>
-    x.channel == y.channel && x.score == y.score
-  }
-}
-
 object RxScoreObserver extends ScorexLogging {
   type SyncWith = Option[BestChannel]
 
