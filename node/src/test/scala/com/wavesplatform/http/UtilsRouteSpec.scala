@@ -706,6 +706,9 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                    |  []
                    |}
                    |
+                   |@Callable(i)
+                   |func testWriteEntryType(b: ByteVector) = [ BinaryEntry("bytes", b) ]
+                   |
                  """.stripMargin
 
       val (script, _) = ScriptCompiler.compile(str, ScriptEstimatorV2).explicitGet()
@@ -826,6 +829,13 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     val customApi = utilsApi.copy(settings = restAPISettings.copy(evaluateScriptComplexityLimit = complexityLimit))
     evalScript(""" testSyncCallComplexityExcess() """.stripMargin) ~> customApi.route ~> check {
       responseAs[String] shouldBe s"""{"error":306,"message":"FailedTransactionError(code = 1, error = Invoke complexity limit = $complexityLimit is exceeded, log =)","expr":" testSyncCallComplexityExcess() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    }
+
+    evalScript(""" testWriteEntryType("abc") """.stripMargin) ~> route ~> check {
+      responseAs[String] shouldBe """{"error":306,"message":"Passed args (bytes, abc) are unsuitable for constructor BinaryEntry(String, ByteVector)","expr":" testWriteEntryType(\"abc\") ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    }
+    evalScript(""" testWriteEntryType(base58'aaaa') """.stripMargin) ~> route ~> check {
+      responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"bytes"},"value":{"type":"ByteVector","value":"aaaa"}}}]},"complexity":3,"expr":" testWriteEntryType(base58'aaaa') ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
     }
   }
 
