@@ -249,12 +249,13 @@ class BlocksApiRouteSpec
 
   routePath("/heightByTimestamp") - {
     def emulateBlocks(blocks: IndexedSeq[Block]): CommonBlocksApi = {
+      require(blocks.nonEmpty)
       val blocksApi = stub[CommonBlocksApi]
       (() => blocksApi.currentHeight).when().returning(blocks.length)
       (blocksApi.metaAtHeight _)
         .when(*)
         .onCall { (height: Int) =>
-          if (height < 1 || height > 10) None
+          if (height < 1 || height > blocks.size) None
           else {
             val block = blocks(height - 1)
             Some(BlockMeta(block.header, block.signature, None, height, 1, 0, 0L, None, None))
