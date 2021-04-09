@@ -242,7 +242,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(s"$longMax / $longMin + 1") shouldBe evaluated(0)
     eval(s"($longMax / 2) * 2") shouldBe evaluated(longMax - 1)
     eval[EVALUATED]("fraction(9223372036854775807, 3, 0)") shouldBe Left(
-      s"fraction: division by zero"
+      s"Fraction: division by zero"
     )
     eval[EVALUATED]("fraction(9223372036854775807, 3, 2)") shouldBe Left(
       s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1"
@@ -2164,28 +2164,31 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     genericEval[Environment, EVALUATED]("""parseBigInt("-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT(-BigInt(2).pow(511)))
     genericEval[Environment, EVALUATED]("""parseBigInt("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(unit)
     genericEval[Environment, EVALUATED](s"""fractionBigInt(parseBigIntValue("${BigInt(2).pow(511)-1}"), toBigInt(-2), toBigInt(-3))""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BIGINT((BigInt(2).pow(511)-1)*2/3))
+    genericEval[Environment, EVALUATED](s"""fractionBigInt(toBigInt(100), toBigInt(2), toBigInt(0))""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Left("Fraction: division by zero")
     genericEval[Environment, EVALUATED](s"""parseBigIntValue("${Long.MaxValue}").toInt()""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(Long.MaxValue))
     genericEval[Environment, EVALUATED](s"""parseBigIntValue("${Long.MinValue}").toInt()""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(Long.MinValue))
     genericEval[Environment, EVALUATED](s"""(parseBigIntValue("${Long.MaxValue}")+toBigInt(1)).toInt()""", ctxt = v5Ctx, version = V5, env = utils.environment) should produce("out of integers range")
   }
 
-  property("BigInt fraction roundin") {
+  property("BigInt fraction rounding") {
     import scala.math.BigDecimal.RoundingMode._
     for {
       s1 <- List(-1, 0, 1)
       s2 <- List(-1, 1)
       r <- List(("DOWN", DOWN), /*("UP", UP),*/ ("CEILING", CEILING), ("FLOOR", FLOOR), ("HALFUP", HALF_UP), /*("HALFDOWN", HALF_DOWN),*/ ("HALFEVEN", HALF_EVEN))
     } {
-      (s1, s2, r._1, genericEval[Environment, EVALUATED](s"""fractionBigInt(toBigInt(${10*s1}), toBigInt(1), toBigInt(${3*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment)) shouldBe
-      ((s1, s2, r._1, Right(CONST_BIGINT(BigInt(BigDecimal((10.0*s1)/(3.0*s2)).setScale(0, r._2).toLong)))))
-      (s1, s2, r._1, genericEval[Environment, EVALUATED](s"""fractionBigInt(toBigInt(${9*s1}), toBigInt(1), toBigInt(${2*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment)) shouldBe
-      ((s1, s2, r._1, Right(CONST_BIGINT(BigInt(BigDecimal((9.0*s1)/(2.0*s2)).setScale(0, r._2).toLong)))))
-      (s1, s2, r._1, genericEval[Environment, EVALUATED](s"""fractionBigInt(toBigInt(${11*s1}), toBigInt(1), toBigInt(${2*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment)) shouldBe
-      ((s1, s2, r._1, Right(CONST_BIGINT(BigInt(BigDecimal((11.0*s1)/(2.0*s2)).setScale(0, r._2).toLong)))))
+      genericEval[Environment, EVALUATED](s"""fractionBigInt(toBigInt(${10*s1}), toBigInt(1), toBigInt(${3*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
+        Right(CONST_BIGINT(BigInt(BigDecimal((10.0*s1)/(3.0*s2)).setScale(0, r._2).toLong)))
+      genericEval[Environment, EVALUATED](s"""fractionBigInt(toBigInt(${9*s1}), toBigInt(1), toBigInt(${2*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
+        Right(CONST_BIGINT(BigInt(BigDecimal((9.0*s1)/(2.0*s2)).setScale(0, r._2).toLong)))
+      genericEval[Environment, EVALUATED](s"""fractionBigInt(toBigInt(${11*s1}), toBigInt(1), toBigInt(${2*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
+        Right(CONST_BIGINT(BigInt(BigDecimal((11.0*s1)/(2.0*s2)).setScale(0, r._2).toLong)))
+      genericEval[Environment, EVALUATED](s"""fractionBigInt(toBigInt(100), toBigInt(2), toBigInt(0), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
+        Left("Fraction: division by zero")
     }
   }
 
-  property("BigInt comparation") {
+  property("BigInt comparison") {
     genericEval[Environment, EVALUATED]("toBigInt(16) > toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
     genericEval[Environment, EVALUATED]("toBigInt(1) > toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(false))
     genericEval[Environment, EVALUATED]("toBigInt(16) >= toBigInt(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
