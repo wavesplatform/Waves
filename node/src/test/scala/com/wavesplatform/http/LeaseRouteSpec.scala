@@ -1,6 +1,9 @@
 package com.wavesplatform.http
 
+import scala.concurrent.Future
+
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.{NoShrink, NTPTime, TestWallet, TransactionGen}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.ApiMarshallers._
@@ -15,18 +18,15 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{BinaryDataEntry, Diff}
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.{Asset, TxVersion}
-import com.wavesplatform.{NTPTime, NoShrink, TestWallet, TransactionGen}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import org.scalacheck.Gen
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.libs.json.JsObject
-
-import scala.concurrent.Future
 
 class LeaseRouteSpec
     extends RouteSpec("/leasing")
@@ -254,6 +254,9 @@ class LeaseRouteSpec
         withRoute { (d, r) =>
           d.appendBlock(genesis, setScript)
           d.appendBlock(invoke)
+          val (_, invokeStatus) = d.blockchain.transactionMeta(invoke.id()).get
+          assert(invokeStatus, "Invoke has failed")
+
           val leaseId = d.blockchain
             .accountData(genesis.recipient, "leaseId")
             .collect {
