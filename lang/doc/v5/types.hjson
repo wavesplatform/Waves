@@ -1154,11 +1154,11 @@
           type: ByteVector|Unit
         }
         {
-          name: originalCaller
+          name: originCaller
           type: Address
         }
         {
-          name: originalCallerPublicKey
+          name: originCallerPublicKey
           type: ByteVector
         }
       ]
