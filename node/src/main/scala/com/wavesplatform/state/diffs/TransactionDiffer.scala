@@ -6,8 +6,8 @@ import cats.instances.either._
 import cats.instances.map._
 import cats.kernel.Monoid
 import cats.syntax.either._
-import cats.syntax.semigroup._
 import cats.syntax.functor._
+import cats.syntax.semigroup._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
@@ -79,7 +79,7 @@ object TransactionDiffer {
           acceptFailed(blockchain) && blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
 
         if (transactionDiff.scriptsComplexity > ContractLimits.FailFreeInvokeComplexity && transactionMayFail(tx) && acceptFailedByBalance())
-          FailedTransactionError(FailedTransactionError.Cause.DAppExecution, transactionDiff.scriptsComplexity, Nil, Some(err.toString), None)
+          FailedTransactionError(FailedTransactionError.Cause.DAppExecution, transactionDiff.scriptsComplexity, Nil, Some(err.toString))
         else
           err
       }
@@ -280,7 +280,7 @@ object TransactionDiffer {
       }
 
     private[this] def scriptResult(cf: FailedTransactionError): Option[InvokeScriptResult] =
-      Some(InvokeScriptResult(error = Some(ErrorMessage(cf.code, cf.message))))
+      Some(cf.getInvokeScriptResult.copy(error = Some(ErrorMessage(cf.code, cf.message))))
   }
 
   // helpers

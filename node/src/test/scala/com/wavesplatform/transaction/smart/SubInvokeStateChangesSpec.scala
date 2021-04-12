@@ -4,14 +4,15 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.{FlatSpec, Matchers}
 import play.api.libs.json.Json
 
-//noinspection TypeAnnotation
 class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
   val ContractFunction = "default"
+  val compileV5: String => Script = TestCompiler(StdLibVersion.V5).compileContract _
 
   "Invoke state changes" should "include intermediary invokes" in withDomain(DomainPresets.RideV5) { d =>
     val dAppAddress = TxHelpers.signer(1)
@@ -20,9 +21,9 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
       val addr2 = TxHelpers.signer(2)
       val addr3 = TxHelpers.signer(3)
 
-      val script1 = TestCompiler(StdLibVersion.V5).compileContract(genScript(Some(addr2.toAddress)))
-      val script2 = TestCompiler(StdLibVersion.V5).compileContract(genScript(Some(addr3.toAddress)))
-      val script3 = TestCompiler(StdLibVersion.V5).compileContract(genScript(None, fail = true))
+      val script1 = compileV5(genScript(Some(addr2.toAddress)))
+      val script2 = compileV5(genScript(Some(addr3.toAddress)))
+      val script3 = compileV5(genScript(None, fail = true))
 
       val genesis = Seq(
         TxHelpers.genesis(TxHelpers.defaultAddress),
