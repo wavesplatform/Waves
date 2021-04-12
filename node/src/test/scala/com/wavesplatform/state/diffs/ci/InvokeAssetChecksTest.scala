@@ -5,8 +5,8 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values.V4
-import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.directives.values.{V4, V5}
+import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
@@ -38,13 +38,11 @@ class InvokeAssetChecksTest
   private val time = new TestTime
   private def ts   = time.getTimestamp()
 
-  private val fs = TestFunctionalitySettings.Enabled
+  private val invalidLengthAsset = IssuedAsset(ByteStr.decodeBase58("WAVES").get)
+  private val unexistingAsset    = IssuedAsset(ByteStr.decodeBase58("WAVESwavesWAVESwavesWAVESwavesWAVESwaves123").get)
 
   property("invoke asset checks") {
-    val illegalLengthAsset = IssuedAsset(ByteStr.decodeBase58("WAVES").get)
-    val unexistingAsset    = IssuedAsset(ByteStr.decodeBase58("WAVESwavesWAVESwavesWAVESwavesWAVESwaves123").get)
-
-    val script = TestCompiler(V4).compileContract(
+    val dApp = TestCompiler(V4).compileContract(
       s"""
          |{-# STDLIB_VERSION 4       #-}
          |{-# CONTENT_TYPE   DAPP    #-}
@@ -54,7 +52,7 @@ class InvokeAssetChecksTest
          |func invalidLength() =
          |  [
          |    ScriptTransfer(i.caller, 0, unit),
-         |    ScriptTransfer(i.caller, 0, base58'$illegalLengthAsset')
+         |    ScriptTransfer(i.caller, 0, base58'$invalidLengthAsset')
          |  ]
          |
          |@Callable(i)
@@ -75,8 +73,8 @@ class InvokeAssetChecksTest
         fee       <- ciFee(nonNftIssue = 1)
         genesis1Tx  = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         genesis2Tx  = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-        setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), fee, ts + 2).explicitGet()
-        call        = Some(FUNCTION_CALL(FunctionHeader.User(func), Nil))
+        setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp), fee, ts + 2).explicitGet()
+        call        = Some(FUNCTION_CALL(User(func), Nil))
         invokeTx = InvokeScriptTransaction
           .selfSigned(TxVersion.V2, invoker, master.toAddress, call, Seq(), fee, Waves, ts + 3)
           .explicitGet()
@@ -93,7 +91,7 @@ class InvokeAssetChecksTest
         if (activated) {
           val expectingMessage =
             if (func == "invalidLength")
-              s"Invalid transferring asset '$illegalLengthAsset' length = 4 bytes != 32"
+              s"Invalid transferring asset '$invalidLengthAsset' length = 4 bytes != 32"
             else
               s"Transferring asset '$unexistingAsset' is not found in the blockchain"
           Diff.empty.copy(
@@ -106,7 +104,7 @@ class InvokeAssetChecksTest
             scriptResults = Map(invoke.id.value() -> InvokeScriptResult(error = Some(ErrorMessage(1, expectingMessage))))
           )
         } else {
-          val asset = if (func == "invalidLength") illegalLengthAsset else unexistingAsset
+          val asset = if (func == "invalidLength") invalidLengthAsset else unexistingAsset
           Diff.empty.copy(
             transactions = invokeInfo(true),
             portfolios = Map(
@@ -127,21 +125,98 @@ class InvokeAssetChecksTest
           )
         }
 
+      val fs = TestFunctionalitySettings.Enabled
       val features =
         if (activated)
-          fs.copy(
+          TestFunctionalitySettings.Enabled.copy(
             preActivatedFeatures = fs.preActivatedFeatures ++ Map(
               BlockchainFeatures.BlockV5.id          -> 0,
               BlockchainFeatures.SynchronousCalls.id -> 0
             )
           )
         else
-          fs.copy(
+          TestFunctionalitySettings.Enabled.copy(
             preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
           )
 
       assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke)), features)(
         _ shouldBe Right(expectedResult)
+      )
+    }
+  }
+
+  property("sync invoke asset checks") {
+    def dApp(callingDApp: Address) = TestCompiler(V5).compileContract(
+      s"""
+         |{-# STDLIB_VERSION 5       #-}
+         |{-# CONTENT_TYPE   DAPP    #-}
+         |{-# SCRIPT_TYPE    ACCOUNT #-}
+         |
+         |let callingDApp = Address(base58'$callingDApp')
+         |
+         |@Callable(i)
+         |func invalidLength() = {
+         |  strict r = Invoke(callingDApp, "default", [], [AttachedPayment(base58'$invalidLengthAsset', 1)])
+         |  []
+         |}
+         |
+         |@Callable(i)
+         |func unexisting() = {
+         |  strict r = Invoke(callingDApp, "default", [], [AttachedPayment(base58'$unexistingAsset', 1)])
+         |  []
+         |}
+       """.stripMargin
+    )
+
+    val emptyDApp = TestCompiler(V5).compileContract(
+      s"""
+         |{-# STDLIB_VERSION 5       #-}
+         |{-# CONTENT_TYPE   DAPP    #-}
+         |{-# SCRIPT_TYPE    ACCOUNT #-}
+         |
+         |@Callable(i)
+         |func default() = []
+       """.stripMargin
+    )
+
+    val features = TestFunctionalitySettings.Enabled.copy(
+      preActivatedFeatures = Map(
+        BlockchainFeatures.SmartAccounts.id    -> 0,
+        BlockchainFeatures.SmartAssets.id      -> 0,
+        BlockchainFeatures.Ride4DApps.id       -> 0,
+        BlockchainFeatures.FeeSponsorship.id   -> 0,
+        BlockchainFeatures.DataTransaction.id  -> 0,
+        BlockchainFeatures.BlockReward.id      -> 0,
+        BlockchainFeatures.BlockV5.id          -> 0,
+        BlockchainFeatures.SynchronousCalls.id -> 0
+      )
+    )
+
+    val preconditions =
+      for {
+        dAppAcc      <- accountGen
+        emptyDAppAcc <- accountGen
+        fee          <- ciFee()
+        genesis  = GenesisTransaction.create(dAppAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
+        genesis2 = GenesisTransaction.create(emptyDAppAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
+        setDApp  = SetScriptTransaction.selfSigned(1.toByte, dAppAcc, Some(dApp(emptyDAppAcc.toAddress)), fee, ts).explicitGet()
+        setDApp2 = SetScriptTransaction.selfSigned(1.toByte, emptyDAppAcc, Some(emptyDApp), fee, ts).explicitGet()
+        invokeInvalidLength = InvokeScriptTransaction
+          .selfSigned(1.toByte, dAppAcc, dAppAcc.toAddress, Some(FUNCTION_CALL(User("invalidLength"), Nil)), Nil, fee, Waves, ts)
+          .explicitGet()
+        invokeUnexisting = InvokeScriptTransaction
+          .selfSigned(1.toByte, dAppAcc, dAppAcc.toAddress, Some(FUNCTION_CALL(User("unexisting"), Nil)), Nil, fee, Waves, ts)
+          .explicitGet()
+      } yield (List(genesis, genesis2, setDApp, setDApp2), invokeInvalidLength, invokeUnexisting)
+
+    val (preparingTxs, invokeInvalidLength, invokeUnexisting) = preconditions.sample.get
+    withDomain(domainSettingsWithFS(features)) { d =>
+      d.appendBlock(preparingTxs: _*)
+      (the[RuntimeException] thrownBy d.appendBlock(invokeInvalidLength)).getMessage should include(
+        s"Invalid transferring asset '$invalidLengthAsset' length = 4 bytes != 32"
+      )
+      (the[RuntimeException] thrownBy d.appendBlock(invokeUnexisting)).getMessage should include(
+        s"Transferring asset '$unexistingAsset' is not found in the blockchain"
       )
     }
   }

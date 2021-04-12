@@ -317,7 +317,7 @@ object InvokeDiffsCommon {
       )
   }
 
-  private def checkTransferAsset(blockchain: Blockchain, assetId: ByteStr): Either[String, Unit] =
+  def checkAsset(blockchain: Blockchain, assetId: ByteStr): Either[String, Unit] =
     if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls))
       if (assetId.size != AssetIdLength)
         Left(s"Invalid transferring asset '$assetId' length = ${assetId.size} bytes != $AssetIdLength")
@@ -411,7 +411,7 @@ object InvokeDiffsCommon {
                 blockchain
                   .assetScript(a)
                   .fold {
-                    val r = checkTransferAsset(blockchain, id)
+                    val r = checkAsset(blockchain, id)
                       .map(_ => nextDiff)
                       .leftMap(FailedTransactionError.dAppExecution(_, 0))
                     TracedResult(r)
