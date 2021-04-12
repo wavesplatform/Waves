@@ -74,7 +74,7 @@ class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     def assertFeatureNotActivated[R](f: => R): Assertion = assertApiError(f) { e =>
       e.statusCode shouldBe 400
       e.id shouldBe StateCheckFailed.Id
-      e.message should include("Synchronous DAPP Calls feature has not been activated")
+      e.message should include("Ride V5, dApp-to-dApp invocations feature has not been activated")
     }
 
     assertFeatureNotActivated(sender.setScript(smartAccV5, Some(dAppV5.compiled)))

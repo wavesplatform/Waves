@@ -9,8 +9,8 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.util.AddressOrAliasExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V5
-import com.wavesplatform.lang.script.{ContractScript, Script}
-import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
@@ -46,23 +46,16 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
   private val v4Features = features(activateV5 = false)
   private val v5Features = features(activateV5 = true)
 
-  private def dApp(body: String): Script = {
-    val script =
-      s"""
-         | {-# STDLIB_VERSION 5       #-}
-         | {-# CONTENT_TYPE   DAPP    #-}
-         | {-# SCRIPT_TYPE    ACCOUNT #-}
-         |
-         | @Callable(i)
-         | func default() = {
-         |   $body
-         | }
-       """.stripMargin
-
-    val expr     = Parser.parseContract(script).get.value
-    val contract = compileContractFromExpr(expr, V5)
-    ContractScript(V5, contract).explicitGet()
-  }
+  private def dApp(body: String): Script = TestCompiler(V5).compileContract(s"""
+    | {-# STDLIB_VERSION 5       #-}
+    | {-# CONTENT_TYPE   DAPP    #-}
+    | {-# SCRIPT_TYPE    ACCOUNT #-}
+    |
+    | @Callable(i)
+    | func default() = {
+    |   $body
+    | }
+    |""".stripMargin)
 
   private def singleLeaseDApp(recipient: Recipient, amount: Long): Script =
     dApp(s"[Lease(${recipientStr(recipient)}, $amount)]")
@@ -234,7 +227,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
             Seq(),
             TestBlock.create(preparingTxs),
             v4Features
-          )(_ should produce("Synchronous DAPP Calls feature has not been activated yet"))
+          )(_ should produce("Ride V5, dApp-to-dApp invocations feature has not been activated yet"))
     }
   }
 
