@@ -2030,8 +2030,8 @@
           "transactions"
         ],
         "summary": "Transaction info",
-        "description": "Get a transactions by its IDs",
-        "operationId": "info_multiple",
+        "description": "Get transactions by IDs",
+        "operationId": "getMultipleTxs",
         "parameters": [
           {
             "name": "id",
@@ -2700,7 +2700,7 @@
         ],
         "summary": "Estimate",
         "description": "Estimates complexity of a given compiled code",
-        "operationId": "estimate",
+        "operationId": "estimateScript",
         "requestBody": {
           "description": "Compiled code in base64 script representation",
           "content": {
@@ -2775,7 +2775,7 @@
         ],
         "summary": "Evaluate",
         "description": "Evaluates the provided expression, taking into account the deployed dApp contract",
-        "operationId": "script_evaluate",
+        "operationId": "evaluateScript",
         "parameters": [
           {
             "name": "address",
