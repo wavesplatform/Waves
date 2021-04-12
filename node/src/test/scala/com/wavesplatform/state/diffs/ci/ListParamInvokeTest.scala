@@ -11,8 +11,8 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
-import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
@@ -123,9 +123,7 @@ class ListParamInvokeTest extends PropSpec with PropertyChecks with Matchers wit
          |
        """.stripMargin
 
-    val expr = Parser.parseContract(script).get.value
-    val contract = compileContractFromExpr(expr, version)
-    ContractScript(version, contract).explicitGet()
+    TestCompiler(version).compileContract(script)
   }
 
   private def features(withV4: Boolean) = {

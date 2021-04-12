@@ -471,14 +471,14 @@ object Types {
     CASETYPEREF(
       "MassTransferTransaction",
       addProofsIfNeeded(
-        List(
-          "assetId"       -> optionByteVector,
-          "totalAmount"   -> LONG,
-          "transfers"     -> listTransfers,
-          "transferCount" -> LONG,
-          "attachment"    -> BYTESTR
-        ) ++ (if (version < V5) List("feeAssetId" -> optionByteVector) else Nil)
-          ++ header ++ proven,
+        (if (version < V5) List("feeAssetId" -> optionByteVector) else Nil) :::
+          List(
+            "assetId"       -> optionByteVector,
+            "totalAmount"   -> LONG,
+            "transfers"     -> listTransfers,
+            "transferCount" -> LONG,
+            "attachment"    -> BYTESTR
+          ) ::: header ::: proven,
         proofsEnabled
       )
     )

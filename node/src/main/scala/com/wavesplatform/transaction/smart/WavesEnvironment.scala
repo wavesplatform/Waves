@@ -59,8 +59,7 @@ class WavesEnvironment(
       .map(_._2)
       .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
 
-  override def inputEntity: InputEntity =
-    in.value()
+  override def inputEntity: InputEntity = in()
 
   override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer] =
     // There are no new transactions in currentBlockchain
@@ -243,7 +242,6 @@ class DAppEnvironment(
     tx: Option[InvokeScriptTransaction],
     currentDApp: com.wavesplatform.account.Address,
     currentDAppPk: com.wavesplatform.account.PublicKey,
-    senderDApp: com.wavesplatform.account.Address,
     callChain: Set[com.wavesplatform.account.Address],
     limitedExecution: Boolean,
     var remainingCalls: Int,
