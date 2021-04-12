@@ -33,16 +33,7 @@ object ScriptRunner {
       complexityLimit: Int = Int.MaxValue,
       default: EVALUATED = TRUE
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    applyGeneric(
-      in,
-      blockchain,
-      script,
-      isAssetScript,
-      scriptContainerAddress,
-      complexityLimit,
-      default,
-      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
-    )
+    applyGeneric(in, blockchain, script, isAssetScript, scriptContainerAddress, complexityLimit, default)
 
   def applyGeneric(
       in: TxOrd,
@@ -51,8 +42,7 @@ object ScriptRunner {
       isAssetScript: Boolean,
       scriptContainerAddress: Environment.Tthis,
       complexityLimit: Int,
-      default: EVALUATED,
-      useCorrectScriptVersion: Boolean
+      default: EVALUATED
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(

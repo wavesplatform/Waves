@@ -9,9 +9,9 @@ import com.wavesplatform.db.{DBCacheSettings, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V5
-import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
@@ -52,32 +52,26 @@ class SyncDAppComplexityCountTest
     )
   )
 
-  def dApp(otherDApp: Option[Address], paymentAsset: Option[IssuedAsset], transferAsset: Option[IssuedAsset], condition: String): Script = {
-    val expr = {
-      val script =
-        s"""
-           | {-# STDLIB_VERSION 5       #-}
-           | {-# CONTENT_TYPE   DAPP    #-}
-           | {-# SCRIPT_TYPE    ACCOUNT #-}
-           |
-           | @Callable(i)
-           | func default() = {
-           |    if (
-           |      $condition
-           |    ) then {
-           |      let payment = ${paymentAsset.fold("[]")(id => s"[AttachedPayment(base58'$id', 1)]")}
-           |      let transfer = ${transferAsset.fold("[]")(id => s"[ScriptTransfer(i.caller, 1, base58'$id')]")}
-           |      ${otherDApp.fold("")(address => s""" strict r = Invoke(Address(base58'$address'), "default", [], payment) """)}
-           |      transfer
-           |    } else {
-           |      throw("Error raised")
-           |    }
-           | }
-           """.stripMargin
-      Parser.parseContract(script).get.value
-    }
-    ContractScript(V5, compileContractFromExpr(expr, V5)).explicitGet()
-  }
+  def dApp(otherDApp: Option[Address], paymentAsset: Option[IssuedAsset], transferAsset: Option[IssuedAsset], condition: String): Script =
+    TestCompiler(V5).compileContract(s"""
+      | {-# STDLIB_VERSION 5       #-}
+      | {-# CONTENT_TYPE   DAPP    #-}
+      | {-# SCRIPT_TYPE    ACCOUNT #-}
+      |
+      | @Callable(i)
+      | func default() = {
+      |    if (
+      |      $condition
+      |    ) then {
+      |      let payment = ${paymentAsset.fold("[]")(id => s"[AttachedPayment(base58'$id', 1)]")}
+      |      let transfer = ${transferAsset.fold("[]")(id => s"[ScriptTransfer(i.caller, 1, base58'$id')]")}
+      |      ${otherDApp.fold("")(address => s""" strict r = Invoke(Address(base58'$address'), "default", [], payment) """)}
+      |      transfer
+      |    } else {
+      |      throw("Error raised")
+      |    }
+      | }
+      |""".stripMargin)
 
   // ~1900 complexity
   val verifierScript: Script = {

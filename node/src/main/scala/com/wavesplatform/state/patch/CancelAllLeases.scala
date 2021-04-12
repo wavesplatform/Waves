@@ -5,9 +5,11 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{Diff, LeaseBalance, Portfolio}
-import play.api.libs.json.Json
+import play.api.libs.json.{Json, OFormat}
 
 case object CancelAllLeases extends DiffPatchFactory {
+  import PatchLoader._
+
   val height: Int = AddressScheme.current.chainId.toChar match {
     case 'W' => 462000
     case 'T' => 51500
@@ -24,16 +26,15 @@ case object CancelAllLeases extends DiffPatchFactory {
     }.toMap
   }
   private[patch] object CancelledLeases {
-    implicit val dataFormat = Json.format[LeaseData]
-    implicit val jsonFormat = Json.format[CancelledLeases]
+    implicit val dataFormat: OFormat[LeaseData]       = Json.format[LeaseData]
+    implicit val jsonFormat: OFormat[CancelledLeases] = Json.format[CancelledLeases]
   }
 
   def apply(): Diff = {
-    val patch = PatchLoader.read[CancelledLeases](this)
-    val pfs = patch.balances.map {
+    val patch = read[CancelledLeases](this)
+    Diff.empty.copy(portfolios = patch.balances.map {
       case (address, lb) =>
         Address.fromString(address).explicitGet() -> Portfolio(lease = lb)
-    }
-    Diff.empty.copy(portfolios = pfs, leaseState = patch.leaseStates)
+    }, leaseState = patch.leaseStates)
   }
 }

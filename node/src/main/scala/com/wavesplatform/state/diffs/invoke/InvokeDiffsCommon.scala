@@ -40,7 +40,7 @@ import shapeless.Coproduct
 import scala.util.{Failure, Right, Success, Try}
 
 object InvokeDiffsCommon {
-  def txFeeDiff(blockchain: Blockchain, tx: InvokeScriptTransaction) = {
+  def txFeeDiff(blockchain: Blockchain, tx: InvokeScriptTransaction): Either[GenericError, (Long, Map[Address, Portfolio])] = {
     val attachedFee = tx.fee
     tx.assetFee._1 match {
       case Waves => Right((attachedFee, Map(tx.sender.toAddress -> Portfolio(-attachedFee))))
@@ -226,24 +226,15 @@ object InvokeDiffsCommon {
       )
 
       paymentsAndFeeDiff = if (isSyncCall) {
-        tx.root.fold(Diff.empty)(t => Diff(tx = t))
+        Diff.empty
       } else if (version < V5) {
         paymentsPart(tx, dAppAddress, feeDiff)
       } else {
-        Diff(tx.root.get, portfolios = txFeeDiff(blockchain, tx.root.get).explicitGet()._2)
+        Diff(portfolios = txFeeDiff(blockchain, tx.root.get).explicitGet()._2)
       }
 
       compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff, complexityLimit)
         .leftMap(_.addComplexity(storingComplexity))
-
-      transfers = compositeDiff.portfolios |+| feeDiff.view.mapValues(_.negate).toMap
-
-      updatedTxDiff = if (tx.root.isDefined) {
-        val currentTxDiff         = compositeDiff.transactions(tx.txId)
-        val currentTxDiffWithKeys = currentTxDiff.copy(affected = currentTxDiff.affected ++ transfers.keys ++ compositeDiff.accountData.keys)
-        compositeDiff.transactions.concat(Map(tx.txId -> currentTxDiffWithKeys))
-      } else
-        compositeDiff.transactions
 
       isr = InvokeScriptResult(
         dataEntries,
@@ -267,7 +258,6 @@ object InvokeDiffsCommon {
       )
 
       resultDiff = compositeDiff.copy(
-        transactions = updatedTxDiff,
         scriptsRun = if (isSyncCall) 0 else additionalScriptsCount + 1,
         scriptResults = Map(tx.txId -> isr),
         scriptsComplexity = storingComplexity + compositeDiff.scriptsComplexity
@@ -275,28 +265,22 @@ object InvokeDiffsCommon {
     } yield resultDiff
   }
 
-  def paymentsPart(
-      tx: InvokeScriptLike,
-      dAppAddress: Address,
-      feePart: Map[Address, Portfolio]
-  ): Diff = {
-    val payablePart = tx.payments
-      .map {
-        case InvokeScriptTransaction.Payment(amt, assetId) =>
-          assetId match {
-            case asset @ IssuedAsset(_) =>
-              Map(tx.senderAddress -> Portfolio(assets = Map(asset -> -amt))) |+|
-                Map(dAppAddress    -> Portfolio(assets = Map(asset -> amt)))
-            case Waves =>
-              Map(tx.senderAddress -> Portfolio(-amt)) |+|
-                Map(dAppAddress    -> Portfolio(amt))
-          }
-      }
-      .foldLeft(Map[Address, Portfolio]())(_ |+| _)
-
-    val diff = Diff.stateOps(portfolios = feePart |+| payablePart)
-    tx.root.fold(diff)(diff.bindTransaction)
-  }
+  def paymentsPart(tx: InvokeScriptLike, dAppAddress: Address, feePart: Map[Address, Portfolio]): Diff =
+    Diff(
+      portfolios = feePart |+| tx.payments
+        .map {
+          case InvokeScriptTransaction.Payment(amt, assetId) =>
+            assetId match {
+              case asset @ IssuedAsset(_) =>
+                Map(tx.senderAddress -> Portfolio(assets = Map(asset -> -amt))) |+|
+                  Map(dAppAddress    -> Portfolio(assets = Map(asset -> amt)))
+              case Waves =>
+                Map(tx.senderAddress -> Portfolio(-amt)) |+|
+                  Map(dAppAddress    -> Portfolio(amt))
+            }
+        }
+        .foldLeft(Map[Address, Portfolio]())(_ |+| _)
+    )
 
   private def dataItemToEntry(item: DataOp): DataEntry[_] =
     item match {
@@ -418,17 +402,10 @@ object InvokeDiffsCommon {
             val address                                   = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
             Asset.fromCompatId(asset) match {
               case Waves =>
-                val r = Diff.stateOps(
-                  portfolios =
-                    Map(address       -> Portfolio(amount)) |+|
-                      Map(dAppAddress -> Portfolio(-amount))
-                )
-                TracedResult.wrapValue(r)
+                TracedResult.wrapValue(Diff(portfolios = Map(address -> Portfolio(amount)) |+| Map(dAppAddress -> Portfolio(-amount))))
               case a @ IssuedAsset(id) =>
-                val nextDiff = Diff.stateOps(
-                  portfolios =
-                    Map(address       -> Portfolio(assets = Map(a -> amount))) |+|
-                      Map(dAppAddress -> Portfolio(assets = Map(a -> -amount)))
+                val nextDiff = Diff(
+                  portfolios = Map(address -> Portfolio(assets = Map(a -> amount))) |+| Map(dAppAddress -> Portfolio(assets = Map(a -> -amount)))
                 )
                 blockchain
                   .assetScript(a)
@@ -469,9 +446,7 @@ object InvokeDiffsCommon {
           }
 
           def applyDataItem(item: DataOp): TracedResult[FailedTransactionError, Diff] =
-            TracedResult.wrapValue(
-              Diff.stateOps(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item)))))
-            )
+            TracedResult.wrapValue(Diff(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item))))))
 
           def applyIssue(itx: InvokeScriptLike, pk: PublicKey, issue: Issue): TracedResult[FailedTransactionError, Diff] = {
             if (issue.name
@@ -492,12 +467,11 @@ object InvokeDiffsCommon {
               DiffsCommon
                 .countVerifierComplexity(None /*issue.compiledScript*/, blockchain, isAsset = true)
                 .map { script =>
-                  val diff = Diff.stateOps(
+                  Diff(
                     portfolios = Map(pk.toAddress -> Portfolio(assets = Map(asset -> issue.quantity))),
                     issuedAssets = Map(asset      -> NewAssetInfo(staticInfo, info, volumeInfo)),
                     assetScripts = Map(asset      -> script.map(script => AssetScriptInfo(script._1, script._2)))
                   )
-                  itx.root.fold(diff)(diff.bindTransaction)
                 }
                 .leftMap(asFailedScriptError)
             }
@@ -541,7 +515,7 @@ object InvokeDiffsCommon {
           def applyLeaseCancel(l: LeaseCancel): TracedResult[ValidationError, Diff] =
             for {
               _    <- TracedResult(LeaseCancelTxValidator.checkLeaseId(l.leaseId))
-              diff <- DiffsCommon.processLeaseCancel(blockchain, pk, fee = 0, blockTime, l.leaseId, tx.txId)
+              diff <- DiffsCommon.processLeaseCancel(blockchain, pk, fee = 0, blockTime, l.leaseId)
             } yield diff
 
           def callAssetVerifierWithPseudoTx(

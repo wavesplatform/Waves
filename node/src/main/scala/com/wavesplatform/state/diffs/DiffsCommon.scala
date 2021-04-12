@@ -84,7 +84,7 @@ object DiffsCommon {
             val portfolio  = Portfolio(balance = -fee, lease = LeaseBalance.empty, assets = Map(asset -> reissue.quantity))
 
             Right(
-              Diff.stateOps(
+              Diff(
                 portfolios = Map(sender                          -> portfolio),
                 updatedAssets = Map(IssuedAsset(reissue.assetId) -> volumeInfo.rightIor)
               )
@@ -104,7 +104,7 @@ object DiffsCommon {
       val volumeInfo = AssetVolumeInfo(isReissuable = true, volume = -burn.quantity)
       val portfolio  = Portfolio(balance = -fee, lease = LeaseBalance.empty, assets = Map(asset -> -burn.quantity))
 
-      Diff.stateOps(
+      Diff(
         portfolios = Map(sender   -> portfolio),
         updatedAssets = Map(asset -> volumeInfo.rightIor)
       )
@@ -116,7 +116,7 @@ object DiffsCommon {
     validateAsset(blockchain, asset, sender, issuerOnly = true).flatMap { _ =>
       Either.cond(
         !blockchain.hasAssetScript(asset),
-        Diff.stateOps(
+        Diff(
           portfolios = Map(sender -> Portfolio(balance = -fee)),
           sponsorship = Map(asset -> SponsorshipValue(sponsorFee.minSponsoredAssetFee.getOrElse(0)))
         ),
@@ -159,7 +159,7 @@ object DiffsCommon {
         recipientAddress -> Portfolio(0, LeaseBalance(amount, 0))
       )
       details = LeaseDetails(sender, recipient, txId, amount, isActive = true)
-    } yield Diff.stateOps(
+    } yield Diff(
       portfolios = portfolioDiff,
       leaseState = Map((leaseId, details))
     )
@@ -170,8 +170,7 @@ object DiffsCommon {
       sender: PublicKey,
       fee: Long,
       time: Long,
-      leaseId: ByteStr,
-      txId: ByteStr
+      leaseId: ByteStr
   ): Either[ValidationError, Diff] = {
     val allowedTs     = blockchain.settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp
     for {
@@ -193,7 +192,7 @@ object DiffsCommon {
       senderPortfolio    = Map(sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
       recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
       actionInfo         = LeaseDetails(sender, lease.recipient, lease.sourceId, lease.amount, isActive = false)
-    } yield Diff.stateOps(
+    } yield Diff(
       portfolios = senderPortfolio |+| recipientPortfolio,
       leaseState = Map((leaseId, actionInfo))
     )

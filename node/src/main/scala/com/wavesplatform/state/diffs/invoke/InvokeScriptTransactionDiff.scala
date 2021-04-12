@@ -84,43 +84,36 @@ object InvokeScriptTransactionDiff {
 
           result <- for {
             (invocationDiff, scriptResult, log, availableActions, availableData, limit) <- {
-              val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
-                val invoker = tx.sender.toAddress
+              val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId) {
+                val invoker = Recipient.Address(ByteStr(tx.sender.toAddress.bytes))
                 val invocation = ContractEvaluator.Invocation(
                   functionCall,
-                  Recipient.Address(ByteStr(invoker.bytes)),
+                  invoker,
                   tx.sender,
-                  Recipient.Address(ByteStr(invoker.bytes)),
+                  invoker,
                   tx.sender,
                   payments,
                   tx.id(),
                   tx.fee,
                   tx.feeAssetId.compatId
                 )
-                val height         = blockchain.height
-                val remainingCalls = ContractLimits.MaxSyncDAppCalls(version)
 
                 val environment = new DAppEnvironment(
                   AddressScheme.current.chainId,
                   Coeval.evalOnce(input),
-                  Coeval(height),
+                  Coeval.evalOnce(blockchain.height),
                   blockchain,
                   tthis,
                   directives,
                   Some(tx),
                   dAppAddress,
                   pk,
-                  dAppAddress,
                   Set(tx.senderAddress, dAppAddress),
                   limitedExecution,
-                  remainingCalls,
+                  ContractLimits.MaxSyncDAppCalls(version),
                   ContractLimits.MaxCallableActionsAmount(version),
                   ContractLimits.MaxWriteSetSize(version),
-                  (if (version < V5) {
-                     Diff.empty
-                   } else {
-                     InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map())
-                   })
+                  if (version < V5) Diff.empty else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map())
                 )
 
                 val fullLimit =
@@ -152,12 +145,12 @@ object InvokeScriptTransactionDiff {
                     blockchain
                   )
                 } yield (environment.currentDiff, result, log, environment.avaliableActions, environment.avaliableData, fullLimit - paymentsComplexity)
-              })
+              }
               TracedResult(
                 scriptResultE,
                 List(
                   InvokeScriptTrace(
-                    tx.id.value(),
+                    tx.id(),
                     tx.dAppAddressOrAlias,
                     functionCall,
                     scriptResultE.map(_._2),
@@ -201,7 +194,7 @@ object InvokeScriptTransactionDiff {
             resultDiff <- scriptResult match {
               case ScriptResultV3(dataItems, transfers, unusedComplexity) => process(dataItems ::: transfers, unusedComplexity)
               case ScriptResultV4(actions, unusedComplexity, _)           => process(actions, unusedComplexity)
-              case _: IncompleteResult if limitedExecution                => doProcessActions(Nil, 0)
+              case _: IncompleteResult if limitedExecution => doProcessActions(Nil, 0)
               case i: IncompleteResult =>
                 TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
             }
