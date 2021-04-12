@@ -69,12 +69,16 @@ object Types {
         List(
           "caller"          -> addressType,
           "callerPublicKey" -> BYTESTR,
-          "originalCaller"          -> addressType,
-          "originalCallerPublicKey" -> BYTESTR,
           "transactionId"   -> BYTESTR,
           "fee"             -> LONG,
           "feeAssetId"      -> optionByteVector
-        )
+        ) :::
+        (if (v >= V5)
+          List(
+            "originalCaller"          -> addressType,
+            "originalCallerPublicKey" -> BYTESTR
+          )
+        else Nil)
     )
 
   private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)
@@ -467,14 +471,14 @@ object Types {
     CASETYPEREF(
       "MassTransferTransaction",
       addProofsIfNeeded(
-        List(
-          "assetId"       -> optionByteVector,
-          "totalAmount"   -> LONG,
-          "transfers"     -> listTransfers,
-          "transferCount" -> LONG,
-          "attachment"    -> BYTESTR
-        ) ++ (if (version < V5) List("feeAssetId" -> optionByteVector) else Nil)
-          ++ header ++ proven,
+        (if (version < V5) List("feeAssetId" -> optionByteVector) else Nil) :::
+          List(
+            "assetId"       -> optionByteVector,
+            "totalAmount"   -> LONG,
+            "transfers"     -> listTransfers,
+            "transferCount" -> LONG,
+            "attachment"    -> BYTESTR
+          ) ::: header ::: proven,
         proofsEnabled
       )
     )
