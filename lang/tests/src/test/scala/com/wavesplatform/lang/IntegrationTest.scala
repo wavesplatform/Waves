@@ -1059,12 +1059,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](script, None) should produce("Can't find a function overload 'size'")
   }
 
-  property("string contains") {
-    eval(""" "qwerty".contains("we") """, version = V3) should produce("Can't find a function")
-    eval(""" "qwerty".contains("we") """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
-    eval(""" "qwerty".contains("xx") """, version = V4) shouldBe Right(CONST_BOOLEAN(false))
-  }
-
   property("valueOrElse") {
     val script =
       s"""
@@ -1627,21 +1621,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 64}', base16'${"a" * 130}')", version = V4) should
       produce("Header byte out of range: 197")
-  }
-
-  property("makeString") {
-    eval(""" ["cat", "dog", "pig"].makeString(", ") """, version = V4) shouldBe CONST_STRING("cat, dog, pig")
-    eval(""" [].makeString(", ") """, version = V4) shouldBe CONST_STRING("")
-    eval(""" ["abc"].makeString(", ") == "abc" """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
-
-    val script = s""" [${s""" "${"a" * 1000}", """ * 32} "${"a" * 704}"].makeString(", ") """
-    eval(script, version = V4) should produce("Constructing string size = 32768 bytes will exceed 32767")
-    // 1000 * 32 + 704 + 2 * 32 = 32768
-
-    val script2 = s""" [${s""" "${"a" * 1000}", """ * 32} "${"a" * 703}"].makeString(", ") """
-    eval[CONST_STRING](script2, version = V4).explicitGet().s.length shouldBe 32767
-
-    eval(""" [].makeString(", ") """, version = V3) should produce("Can't find a function 'makeString'")
   }
 
   property("n-size generic tuple") {
