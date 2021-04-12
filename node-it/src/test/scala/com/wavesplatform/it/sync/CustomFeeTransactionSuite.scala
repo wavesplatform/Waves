@@ -6,7 +6,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.util._
+import com.wavesplatform.test._
 import com.wavesplatform.state.Sponsorship
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -33,7 +33,7 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
 
     val sponsorAssetId = notMiner.sponsorAsset(senderKeyPair, issuedAssetId, assetToken, assetFee).id
-    assert(!sponsorAssetId.isEmpty)
+    assert(sponsorAssetId.nonEmpty)
     nodes.waitForHeightAriseAndTxPresent(sponsorAssetId)
 
     val fees = 2 * assetFee

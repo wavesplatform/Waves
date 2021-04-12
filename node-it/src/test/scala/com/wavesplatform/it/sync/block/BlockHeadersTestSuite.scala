@@ -9,10 +9,15 @@ import com.wavesplatform.it.{Node, NodeConfigs, TransferSending}
 import org.scalactic.source.Position
 import org.scalatest._
 
-import scala.concurrent.duration._
 import scala.concurrent.Await
+import scala.concurrent.duration._
 
-class BlockHeadersTestSuite extends FunSuite with CancelAfterFailure with TransferSending with NodesFromDocker with Matchers {
+class BlockHeadersTestSuite
+    extends funsuite.AnyFunSuite
+    with CancelAfterFailure
+    with TransferSending
+    with NodesFromDocker
+    with matchers.should.Matchers {
 
   private val activationHeight   = 4
   private val minerDesiredReward = 750000000
@@ -23,8 +28,9 @@ class BlockHeadersTestSuite extends FunSuite with CancelAfterFailure with Transf
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
-      .overrideBase(_.raw(
-        s"""waves {
+      .overrideBase(
+        _.raw(
+          s"""waves {
            |  blockchain.custom.functionality {
            |    pre-activated-features = {
            |      ${BlockchainFeatures.BlockReward.id} = $activationHeight
@@ -39,7 +45,8 @@ class BlockHeadersTestSuite extends FunSuite with CancelAfterFailure with Transf
            |  rewards.desired = $minerDesiredReward
            |  miner.quorum = 1
            |}""".stripMargin
-      ))
+        )
+      )
       .withDefault(1)
       .withSpecial(_.nonMiner)
       .buildNonConflicting()

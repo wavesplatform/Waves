@@ -14,15 +14,13 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.PropSpec
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class SigVerifyPerformanceTest extends PropSpec with WithState {
 
   private val AmtOfTxs = 10000
 
@@ -30,13 +28,13 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with WithSta
     for {
       amt <- smallFeeGen
       fee <- smallFeeGen
-    } yield TransferTransaction.selfSigned(1.toByte, from, to.toAddress, Waves, amt, Waves, fee, ByteStr.empty,  ts).explicitGet()
+    } yield TransferTransaction.selfSigned(1.toByte, from, to.toAddress, Waves, amt, Waves, fee, ByteStr.empty, ts).explicitGet()
 
   private def scriptedSendGen(from: KeyPair, to: PublicKey, ts: Long): Gen[TransferTransaction] =
     for {
       amt <- smallFeeGen
       fee <- smallFeeGen
-    } yield TransferTransaction.selfSigned(2.toByte, from, to.toAddress, Waves, amt, Waves, fee, ByteStr.empty,  ts).explicitGet()
+    } yield TransferTransaction.selfSigned(2.toByte, from, to.toAddress, Waves, amt, Waves, fee, ByteStr.empty, ts).explicitGet()
 
   private def differentTransfers(typed: EXPR) =
     for {

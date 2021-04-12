@@ -4,9 +4,9 @@ import com.wavesplatform.lang.directives.values.{V1, V2, V3}
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.traits.domain.{APair, Ord, OrdType, Recipient}
-import org.scalatest.{FreeSpec, Matchers}
+import com.wavesplatform.test.FreeSpec
 
-class OrderProofTest extends FreeSpec with Matchers {
+class OrderProofTest extends FreeSpec {
 
   private def getBindingObjProofStr(obj: CaseObj): Option[String] =
     obj.fields.get("proofs").map(arr => arr.asInstanceOf[ARR].xs.toList.head.toString)

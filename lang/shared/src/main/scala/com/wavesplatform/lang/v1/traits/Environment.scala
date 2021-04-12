@@ -10,17 +10,7 @@ import monix.eval.Coeval
 import shapeless._
 
 object Environment {
-  import io.circe.{Decoder, HCursor}
-
   case class BalanceDetails(available: Long, regular: Long, generating: Long, effective: Long)
-
-  implicit val BalanceDetailsDecoder: Decoder[BalanceDetails] = (c: HCursor) =>
-    for {
-      available  <- c.downField("available").as[Long]
-      regular    <- c.downField("regular").as[Long]
-      generating <- c.downField("generating").as[Long]
-      effective  <- c.downField("effective").as[Long]
-    } yield BalanceDetails(available, regular, generating, effective)
 
   type InputEntity = Tx :+: Ord :+: PseudoTx :+: CNil
 

@@ -8,6 +8,7 @@ import com.wavesplatform.transaction.TxValidationError.InvalidAddress
 import com.wavesplatform.utils.base58Length
 import play.api.libs.json.{Format, Writes}
 import supertagged._
+import supertagged.postfix._
 
 object PublicKey extends TaggedType[ByteStr] {
   private[this] val interner = Interners.newWeakInterner[PublicKey]()

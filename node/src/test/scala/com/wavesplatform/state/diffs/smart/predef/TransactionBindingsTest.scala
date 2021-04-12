@@ -2,7 +2,6 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Global
@@ -24,21 +23,17 @@ import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.{WavesEnvironment, buildThisValue}
 import com.wavesplatform.transaction.{DataTransaction, Proofs, ProvenTransaction, TxVersion, VersionedTransaction}
 import com.wavesplatform.utils.EmptyBlockchain
-import com.wavesplatform.{NoShrink, TransactionGen, crypto}
+import com.wavesplatform.crypto
+import com.wavesplatform.test._
 import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{EitherValues, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import org.scalatest.EitherValues
 import play.api.libs.json.Json
 import shapeless.Coproduct
 
 class TransactionBindingsTest
     extends PropSpec
-    with PropertyChecks
-    with Matchers
-    with TransactionGen
-    with NoShrink
     with PathMockFactory
     with EitherValues {
   private val T = 'T'.toByte

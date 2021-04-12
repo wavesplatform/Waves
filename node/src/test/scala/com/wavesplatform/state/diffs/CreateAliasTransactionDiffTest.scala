@@ -9,15 +9,13 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.utils.addressTransactions
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, Transaction}
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.PropSpec
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class CreateAliasTransactionDiffTest extends PropSpec with WithState {
 
   val fs =
     TestFunctionalitySettings.Enabled.copy(

@@ -135,10 +135,10 @@ object TxValidationError {
     def isAssetScript: Boolean = assetId.isDefined
     private val target: String = assetId.fold("Account")(_ => "Asset")
     override def toString: String =
-      if (error.startsWith("ScriptExecutionError"))
+      if (String.valueOf(error).startsWith("ScriptExecutionError"))
         error
       else
-        s"ScriptExecutionError(error = $error, type = $target, log =${logToString(log)})"
+        s"ScriptExecutionError(error = $error, type = $target, log = ${logToString(log)})"
   }
 
   object ScriptExecutionError {

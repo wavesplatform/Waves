@@ -3,12 +3,10 @@ package com.wavesplatform.common
 import java.util.concurrent.TimeUnit
 
 import com.google.common.primitives.Ints
+import com.wavesplatform.common.merkle._
 import com.wavesplatform.common.merkle.Merkle._
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.{Level => _, _}
 import org.openjdk.jmh.infra.Blackhole
-import scorex.crypto.authds.LeafData
-import scorex.crypto.authds.merkle.MerkleTree
-import scorex.crypto.hash.{Blake2b256, CryptographicHash32, Digest32}
 
 import scala.util.Random
 
@@ -50,22 +48,16 @@ class MerkleBenchmark {
 }
 
 object MerkleBenchmark {
-  implicit val fastHash = new CryptographicHash32 {
-    override def hash(input: Message): Digest32 = Blake2b256.hash(input)
-  }
 
-  def testData(deep: Int): (MerkleTree[Digest32], List[LeafData]) = {
+  def testData(deep: Int): (Seq[Level], List[LeafData]) = {
     val n    = BigInt(2).pow(deep - 1).toInt
     val size = n + 1 + Random.nextInt(n)
     val data: List[LeafData] =
       List
         .fill(size)(Random.nextInt(10000))
         .map(Ints.toByteArray)
-        .map(LeafData @@ _)
 
-    val tree = MerkleTree[Digest32](data)(fastHash)
-
-    (tree, data)
+    (mkLevels(data), data)
   }
 
   class MerkleDeep(size: Int) {

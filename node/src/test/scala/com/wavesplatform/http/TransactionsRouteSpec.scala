@@ -31,13 +31,12 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxHelpers, TxVersion}
-import com.wavesplatform.{BlockGen, BlockchainStubHelpers, NoShrink, TestTime, TestValues, TestWallet, TransactionGen}
+import com.wavesplatform.{BlockGen, BlockchainStubHelpers, TestTime, TestValues, TestWallet}
 import monix.reactive.Observable
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{Matchers, OptionValues}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import org.scalatest.OptionValues
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
@@ -48,13 +47,9 @@ class TransactionsRouteSpec
     extends RouteSpec("/transactions")
     with RestAPISettingsHelper
     with MockFactory
-    with Matchers
-    with TransactionGen
     with BlockGen
-    with PropertyChecks
     with OptionValues
     with TestWallet
-    with NoShrink
     with BlockchainStubHelpers {
 
   private val blockchain          = mock[Blockchain]
@@ -1021,12 +1016,12 @@ class TransactionsRouteSpec
       val amount1    = 100
       val nonce1     = 0
       val recipient1 = Recipient.Address(ByteStr.decodeBase58("3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd").get)
-      val leaseId1   = Lease.calculateId(Lease(recipient1, amount1, nonce1), invoke.id.value())
+      val leaseId1   = Lease.calculateId(Lease(recipient1, amount1, nonce1), invoke.id())
 
       val amount2    = 20
       val nonce2     = 2
       val recipient2 = Recipient.Alias("some_alias")
-      val leaseId2   = Lease.calculateId(Lease(recipient2, amount2, nonce2), invoke.id.value())
+      val leaseId2   = Lease.calculateId(Lease(recipient2, amount2, nonce2), invoke.id())
 
       val blockchain = createBlockchainStub { blockchain =>
         val (dAppScript, _) = ScriptCompiler

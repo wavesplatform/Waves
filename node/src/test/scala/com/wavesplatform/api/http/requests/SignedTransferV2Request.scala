@@ -1,6 +1,7 @@
 package com.wavesplatform.api.http.requests
 
-import cats.implicits._
+import cats.instances.list._
+import cats.syntax.traverse._
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
@@ -40,12 +41,12 @@ case class SignedTransferV2Request(
   def toTx: Either[ValidationError, TransferTransaction] =
     for {
       _sender     <- PublicKey.fromBase58String(senderPublicKey)
-      _assetId    <- parseBase58ToAsset(assetId.filter(_.length > 0), "invalid.assetId")
-      _feeAssetId <- parseBase58ToAsset(feeAssetId.filter(_.length > 0), "invalid.feeAssetId")
+      _assetId    <- parseBase58ToAsset(assetId.filter(_.nonEmpty), "invalid.assetId")
+      _feeAssetId <- parseBase58ToAsset(feeAssetId.filter(_.nonEmpty), "invalid.feeAssetId")
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       _recipient  <- AddressOrAlias.fromString(recipient)
-      _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
+      _attachment <- parseBase58(attachment.filter(_.nonEmpty), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
       tx          <- TransferTransaction.create(2.toByte, _sender, _recipient, _assetId, amount, _feeAssetId, fee, _attachment, timestamp, _proofs)
     } yield tx
 }

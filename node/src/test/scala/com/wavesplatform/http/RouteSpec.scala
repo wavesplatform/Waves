@@ -3,11 +3,11 @@ package com.wavesplatform.http
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.http.scaladsl.testkit._
 import com.wavesplatform.api.http
-import org.scalatest.{FreeSpec, Matchers}
-import org.scalatest.matchers.{Matcher, MatchResult}
-import play.api.libs.json.{Json, JsValue}
+import com.wavesplatform.test.FreeSpec
+import org.scalatest.matchers.{MatchResult, Matcher}
+import play.api.libs.json.{JsValue, Json}
 
-abstract class RouteSpec(basePath: String) extends FreeSpec with ScalatestRouteTest with Matchers with ApiErrorMatchers {
+abstract class RouteSpec(basePath: String) extends FreeSpec with ScalatestRouteTest with ApiErrorMatchers {
   protected implicit val exceptionHandler: ExceptionHandler = http.uncaughtExceptionHandler
   protected def seal(route: Route): Route                   = Route.seal(route)
 
