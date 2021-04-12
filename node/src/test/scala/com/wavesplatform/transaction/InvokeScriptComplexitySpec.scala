@@ -4,21 +4,21 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.lang.directives.values.V5
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.{NTPTime, NoShrink, TransactionGen}
 import monix.reactive.Observer
 import org.scalatest.FreeSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import com.wavesplatform.it.util.DoubleExt
-import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_STRING, FUNCTION_CALL}
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.IssueTransaction
 
 class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with ScalaCheckPropertyChecks with TransactionGen with NTPTime with NoShrink {
   private[this] val dApp1 = TestCompiler(V5).compileContract("""
@@ -122,7 +122,12 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with ScalaChec
           )
           .explicitGet()
 
-        utx.putIfNew(invocation, true).resultE.explicitGet()
+        utx.putIfNew(invocation, true).resultE.explicitGet() shouldBe true
+        utx.size shouldBe 1
+
+        utx.cleanUnconfirmed()
+
+        utx.size shouldBe 1
 
         utx.close()
       }
