@@ -1,29 +1,38 @@
 package com.wavesplatform.history
 
 import scala.concurrent.duration._
+import scala.concurrent.Future
 
 import cats.syntax.option._
+import com.wavesplatform.{database, Application}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.api.common.{AddressPortfolio, AddressTransactions, CommonBlocksApi}
+import com.wavesplatform.api.common.{AddressPortfolio, AddressTransactions, CommonBlocksApi, CommonTransactionsApi}
+import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
-import com.wavesplatform.database
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{BlockchainUpdater, _}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.SystemTime
+import com.wavesplatform.utx.UtxPoolImpl
+import com.wavesplatform.wallet.Wallet
+import monix.execution.Scheduler.Implicits.global
+import monix.reactive.Observer
 import org.iq80.leveldb.DB
 
-case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
+case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter, settings: WavesSettings) {
   import Domain._
 
   @volatile
@@ -31,7 +40,28 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   val posSelector: PoSSelector = PoSSelector(blockchainUpdater, None)
 
-  def blockchain: BlockchainUpdaterImpl = blockchainUpdater
+  val transactionDiffer: Transaction => TracedResult[ValidationError, Diff] =
+    TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
+
+  lazy val utxPool = new UtxPoolImpl(SystemTime, blockchain, Observer.empty, settings.utxSettings)
+  lazy val wallet  = Wallet(settings.walletSettings.copy(file = None))
+
+  object commonApi {
+    def invokeScriptResult(transactionId: ByteStr): InvokeScriptResult =
+      transactions.transactionById(transactionId).get.asInstanceOf[TransactionMeta.Invoke].invokeScriptResult.get
+
+    lazy val transactions = CommonTransactionsApi(
+      blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
+      db,
+      blockchain,
+      utxPool,
+      wallet,
+      tx => Future.successful(utxPool.putIfNew(tx)),
+      Application.loadBlockAt(db, blockchain)
+    )
+  }
+
+  val blockchain: BlockchainUpdaterImpl = blockchainUpdater
 
   def lastBlock: Block = {
     blockchainUpdater.lastBlockId
