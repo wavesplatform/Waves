@@ -1983,8 +1983,8 @@ class InvokeScriptTransactionDiffTest
             if (activated)
               fs.copy(
                 preActivatedFeatures = fs.preActivatedFeatures ++ Map(
-                  BlockchainFeatures.BlockV5.id                 -> 0,
-                  BlockchainFeatures.ContinuationTransaction.id -> 0
+                  BlockchainFeatures.BlockV5.id          -> 0,
+                  BlockchainFeatures.SynchronousCalls.id -> 0
                 )
               )
             else

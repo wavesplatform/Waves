@@ -318,7 +318,7 @@ object InvokeDiffsCommon {
   }
 
   private def checkTransferAsset(blockchain: Blockchain, assetId: ByteStr): Either[String, Unit] =
-    if (blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction))
+    if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls))
       if (assetId.size != AssetIdLength)
         Left(s"Invalid transferring asset '$assetId' length = ${assetId.size} bytes != $AssetIdLength")
       else if (blockchain.assetDescription(IssuedAsset(assetId)).isEmpty)
