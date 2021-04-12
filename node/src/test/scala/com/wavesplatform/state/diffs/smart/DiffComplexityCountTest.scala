@@ -5,12 +5,12 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.values.V4
-import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.diffs.ci.{ciFee, compileContractFromExpr}
+import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -78,8 +78,7 @@ class DiffComplexityCountTest
     ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
   }
 
-  private def dApp(asset: IssuedAsset): Script = {
-    val script =
+  private def dApp(asset: IssuedAsset): Script = TestCompiler(V4).compileContract(
       s"""
          | {-# STDLIB_VERSION 4       #-}
          | {-# CONTENT_TYPE   DAPP    #-}
@@ -99,11 +98,7 @@ class DiffComplexityCountTest
          |   ]
          | }
        """.stripMargin
-
-    val expr     = Parser.parseContract(script).get.value
-    val contract = compileContractFromExpr(expr, V4)
-    ContractScript(V4, contract).explicitGet()
-  }
+  )
 
   private val paymentPreconditions =
     for {
