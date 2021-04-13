@@ -10,17 +10,26 @@ import com.wavesplatform.api.http.BlocksApiRoute
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.utils.SystemTime
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
-class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with PropertyChecks with RestAPISettingsHelper with TestWallet with NoShrink {
+class BlocksApiRouteSpec
+    extends RouteSpec("/blocks")
+    with PathMockFactory
+    with PropertyChecks
+    with RestAPISettingsHelper
+    with TestWallet
+    with NoShrink
+    with WithDomain {
   private val blocksApi                      = mock[CommonBlocksApi]
-  private val blocksApiRoute: BlocksApiRoute = BlocksApiRoute(restAPISettings, blocksApi)
+  private val blocksApiRoute: BlocksApiRoute = BlocksApiRoute(restAPISettings, blocksApi, SystemTime)
   private val route                          = blocksApiRoute.route
 
   private val testBlock1 = TestBlock.create(Nil)
@@ -200,9 +209,21 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
 
   routePath("/delay/{blockId}/{number}") in {
     val blocks = Vector(
-      Block(BlockHeader(1, 0, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty), ByteStr(Random.nextBytes(64)), Nil),
-      Block(BlockHeader(1, 1000, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty), ByteStr(Random.nextBytes(64)), Nil),
-      Block(BlockHeader(1, 2000, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty), ByteStr(Random.nextBytes(64)), Nil)
+      Block(
+        BlockHeader(1, 0, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty),
+        ByteStr(Random.nextBytes(64)),
+        Nil
+      ),
+      Block(
+        BlockHeader(1, 1000, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty),
+        ByteStr(Random.nextBytes(64)),
+        Nil
+      ),
+      Block(
+        BlockHeader(1, 2000, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty),
+        ByteStr(Random.nextBytes(64)),
+        Nil
+      )
     )
 
     val blockchain = stub[Blockchain]
@@ -214,7 +235,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
       else None
 
     val blocksApi = CommonBlocksApi(blockchain, metaAt, _ => None)
-    val route = blocksApiRoute.copy(commonApi = blocksApi).route
+    val route     = blocksApiRoute.copy(commonApi = blocksApi).route
     Get(routePath(s"/delay/${blocks.last.id()}/3")) ~> route ~> check {
       val delay = (responseAs[JsObject] \ "delay").as[Int]
       delay shouldBe 1000
@@ -223,6 +244,90 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     Get(routePath(s"/delay/${blocks.last.id()}/1")) ~> route ~> check {
       val delay = (responseAs[JsObject] \ "delay").as[Int]
       delay shouldBe 1000
+    }
+  }
+
+  routePath("/heightByTimestamp") - {
+    def emulateBlocks(blocks: IndexedSeq[Block]): CommonBlocksApi = {
+      require(blocks.nonEmpty)
+      val blocksApi = stub[CommonBlocksApi]
+      (() => blocksApi.currentHeight).when().returning(blocks.length)
+      (blocksApi.metaAtHeight _)
+        .when(*)
+        .onCall { (height: Int) =>
+          if (height < 1 || height > blocks.size) None
+          else {
+            val block = blocks(height - 1)
+            Some(BlockMeta(block.header, block.signature, None, height, 1, 0, 0L, None, None))
+          }
+        }
+      blocksApi
+    }
+
+    "missing blocks" in {
+      (blocksApi.metaAtHeight _).expects(1).returning(None).repeat(2)
+      (() => blocksApi.currentHeight).expects().returning(5).repeat(2)
+      Get(routePath(s"/heightByTimestamp/1")) ~> route ~> check {
+        responseAs[JsObject] shouldBe Json.parse("{\"error\":199,\"message\":\"State was altered\"}")
+      }
+    }
+
+    "ideal blocks" in {
+      val blocks = (1 to 10).map(i => TestBlock.create(i * 10, Nil))
+      val route  = blocksApiRoute.copy(commonApi = emulateBlocks(blocks)).route
+
+      Get(routePath(s"/heightByTimestamp/10")) ~> route ~> check {
+        val result = (responseAs[JsObject] \ "height").as[Int]
+        result shouldBe 1
+      }
+
+      Get(routePath(s"/heightByTimestamp/100")) ~> route ~> check {
+        val result = (responseAs[JsObject] \ "height").as[Int]
+        result shouldBe 10
+      }
+
+      Get(routePath(s"/heightByTimestamp/55")) ~> route ~> check {
+        val result = (responseAs[JsObject] \ "height").as[Int]
+        result shouldBe 5
+      }
+
+      Get(routePath(s"/heightByTimestamp/99")) ~> route ~> check {
+        val result = (responseAs[JsObject] \ "height").as[Int]
+        result shouldBe 9
+      }
+
+      Get(routePath(s"/heightByTimestamp/110")) ~> route ~> check {
+        val result = (responseAs[JsObject] \ "height").as[Int]
+        result shouldBe 10
+      }
+
+      Get(routePath(s"/heightByTimestamp/9")) ~> route ~> check {
+        responseAs[JsObject] shouldBe Json.parse("{\"error\":199,\"message\":\"Indicated timestamp is before the start of the blockchain\"}")
+      }
+
+      Get(routePath(s"/heightByTimestamp/${System.currentTimeMillis() + 10000}")) ~> route ~> check {
+        responseAs[JsObject] shouldBe Json.parse("{\"error\":199,\"message\":\"Indicated timestamp belongs to the future\"}")
+      }
+    }
+
+    "random blocks" in {
+      val (_, blocks) = (1 to 10).foldLeft((0L, Vector.empty[Block])) {
+        case ((ts, blocks), _) =>
+          val newBlock = TestBlock.create(ts + 100 + Random.nextInt(10000), Nil)
+          (newBlock.header.timestamp, blocks :+ newBlock)
+      }
+
+      // blocks.map(_.header.timestamp).zipWithIndex.foreach { case (ts, i) => println(s"${i + 1}: $ts") }
+
+      val route = blocksApiRoute.copy(commonApi = emulateBlocks(blocks)).route
+
+      blocks.zipWithIndex.foreach {
+        case (block, index) =>
+          Get(routePath(s"/heightByTimestamp/${block.header.timestamp}")) ~> route ~> check {
+            val result = (responseAs[JsObject] \ "height").as[Int]
+            result shouldBe (index + 1)
+          }
+      }
     }
   }
 }
