@@ -2154,7 +2154,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     for {
       s1 <- List(-1, 0, 1)
       s2 <- List(-1, 1)
-      r <- List(("DOWN", DOWN), /*("UP", UP),*/ ("CEILING", CEILING), ("FLOOR", FLOOR), ("HALFUP", HALF_UP), /*("HALFDOWN", HALF_DOWN),*/ ("HALFEVEN", HALF_EVEN))
+      r <- List(("DOWN", DOWN), ("CEILING", CEILING), ("FLOOR", FLOOR), ("HALFUP", HALF_UP), ("HALFEVEN", HALF_EVEN))
     } {
       genericEval[Environment, EVALUATED](s"""fraction(toInt512(${10*s1}), toInt512(1), toInt512(${3*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
         Right(CONST_INT512(BigInt(BigDecimal((10.0*s1)/(3.0*s2)).setScale(0, r._2).toLong)))
@@ -2182,8 +2182,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("Int512 math functions") {
     genericEval[Environment, EVALUATED]("pow(toInt512(12), 1, toInt512(3456), 3, 2, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(187)))
-//    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(12), 1, toBigInt(3456), 3, 2, UP)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(188)))
-//    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(0), 1, toBigInt(3456), 3, 2, UP)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(0)))
+    genericEval[Environment, EVALUATED]("pow(toInt512(0), 1, toInt512(3456), 3, 2, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(0)))
     genericEval[Environment, EVALUATED]("pow(toInt512(20), 1, toInt512(-1), 0, 4, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(5000)))
     genericEval[Environment, EVALUATED]("pow(toInt512(-20), 1, toInt512(-1), 0, 4, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(-5000)))
     genericEval[Environment, EVALUATED]("pow(toInt512(0), 1, toInt512(-1), 0, 4, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
