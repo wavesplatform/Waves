@@ -18,8 +18,8 @@ object FunctionIds {
   val POW: Short = 108
   val LOG: Short = 109
 
-  val POW_BIGINT: Short = 118
-  val LOG_BIGINT: Short = 119
+  val POW_INT512: Short = 118
+  val LOG_INT512: Short = 119
 
   val SIZE_BYTES: Short = 200
   val TAKE_BYTES: Short = 201
@@ -31,38 +31,38 @@ object FunctionIds {
   val DROP_STRING: Short = 304
   val SIZE_STRING: Short = 305
 
-  val TO_BIGINT: Short  = 310
-  val SUM_BIGINT: Short = 311
-  val SUB_BIGINT: Short = 312
-  val MUL_BIGINT: Short = 313
-  val DIV_BIGINT: Short = 314
-  val MOD_BIGINT: Short = 315
-  val FRACTION_BIGINT: Short = 316
-  val FRACTION_BIGINT_ROUNDS: Short = 317
-  val UMINUS_BIGINT: Short = 318
-  val GT_BIGINT: Short  = 319
-  val GE_BIGINT: Short  = 320
+  val TO_INT512: Short  = 310
+  val SUM_INT512: Short = 311
+  val SUB_INT512: Short = 312
+  val MUL_INT512: Short = 313
+  val DIV_INT512: Short = 314
+  val MOD_INT512: Short = 315
+  val FRACTION_INT512: Short = 316
+  val FRACTION_INT512_ROUNDS: Short = 317
+  val UMINUS_INT512: Short = 318
+  val GT_INT512: Short  = 319
+  val GE_INT512: Short  = 320
 
   val SIZE_LIST: Short         = 400
   val GET_LIST: Short          = 401
   val MEDIAN_LIST: Short       = 405
   val MAX_LIST: Short          = 406
   val MIN_LIST: Short          = 407
-  val MAX_LIST_BIGINT: Short   = 408
-  val MIN_LIST_BIGINT: Short   = 409
+  val MAX_LIST_INT512: Short   = 408
+  val MIN_LIST_INT512: Short   = 409
   val LONG_TO_BYTES: Short     = 410
   val STRING_TO_BYTES: Short   = 411
   val BOOLEAN_TO_BYTES: Short  = 412
-  val BIGINT_TO_BYTES: Short   = 413
-  val BYTES_TO_BIGINT: Short   = 414
-  val BYTES_TO_BIGINT_LIM: Short = 415
-  val BIGINT_TO_INT: Short     = 416
+  val INT512_TO_BYTES: Short   = 413
+  val BYTES_TO_INT512: Short   = 414
+  val BYTES_TO_INT512_LIM: Short = 415
+  val INT512_TO_INT: Short     = 416
   val LONG_TO_STRING: Short    = 420
   val BOOLEAN_TO_STRING: Short = 421
-  val BIGINT_TO_STRING: Short  = 422
-  val STRING_TO_BIGINT: Short  = 423
-  val STRING_TO_BIGINTOPT: Short  = 424
-  val MEDIAN_LISTBIGINT: Short    = 425
+  val INT512_TO_STRING: Short  = 422
+  val STRING_TO_INT512: Short  = 423
+  val STRING_TO_INT512OPT: Short  = 424
+  val MEDIAN_LISTINT512: Short    = 425
 
   val CREATE_LIST: Short             = 1100
   val APPEND_LIST: Short             = 1101

@@ -29,10 +29,10 @@
       complexity: 20
     }
     {
-      name: "medianBigInt"
-      params: [ "List[BigInt]" ]
+      name: "medianInt512"
+      params: [ "List[Int512]" ]
       doc: "Returns the median of the list."
-      paramsDoc: [ "The list of BigInt." ]
+      paramsDoc: [ "The list of Int512." ]
       complexity: 160
     }
     {
@@ -50,15 +50,15 @@
       complexity: 3
     }
     {
-      name: "minBigInt"
-      params: [ "List[BigInt]" ]
+      name: "minInt512"
+      params: [ "List[Int512]" ]
       doc: "Returns the minimum of the list."
       paramsDoc: [ "The list of big integers." ]
       complexity: 192
     }
     {
-      name: "maxBigInt"
-      params: [ "List[BigInt]" ]
+      name: "maxInt512"
+      params: [ "List[Int512]" ]
       doc: "Returns the maximum of the list."
       paramsDoc: [ "The list of big integers." ]
       complexity: 192

@@ -160,10 +160,11 @@ object Terms {
     override val weight: Long     = 8L
     override val getType: REAL = LONG
   }
-  case class CONST_BIGINT(t: BigInt) extends EVALUATED {
+
+  case class CONST_INT512(t: BigInt) extends EVALUATED {
     override def toString: String = t.toString
     override val weight: Long     = 64L
-    override val getType: REAL = BIGINT
+    override val getType: REAL = INT512
   }
 
   class CONST_BYTESTR private (val bs: ByteStr) extends EVALUATED {
@@ -330,6 +331,6 @@ object Terms {
   implicit val orderingConstLong: Ordering[CONST_LONG] =
     (a, b) => a.t compare b.t
 
-  implicit val orderingConstBigInt: Ordering[CONST_BIGINT] =
+  implicit val orderingConstBigInt: Ordering[CONST_INT512] =
     (a, b) => a.t compare b.t
 }

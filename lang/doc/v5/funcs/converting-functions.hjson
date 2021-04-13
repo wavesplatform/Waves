@@ -47,10 +47,10 @@
       complexity: 1
     }
     {
-      name: "toBytesBigInt"
-      params: [ "BigInt" ]
-      doc: "Converts an BigInt to an array of bytes."
-      paramsDoc: [ "The BigInt to convert." ]
+      name: "toBytesInt512"
+      params: [ "Int512" ]
+      doc: "Converts an Int512 to an array of bytes."
+      paramsDoc: [ "The Int512 to convert." ]
       complexity: 65
     }
     {
@@ -75,28 +75,28 @@
       complexity: 1
     }
     {
-      name: "parseBigInt"
+      name: "parseInt512"
       params: [ "String" ]
       doc: "Converts an string to an integer."
       paramsDoc: [ "The string to convert." ]
       complexity: 65
     }
     {
-      name: "parseBigIntValue"
+      name: "parseInt512Value"
       params: [ "String" ]
       doc: "Converts an string to an integer."
       paramsDoc: [ "The string to convert." ]
       complexity: 65
     }
     {
-      name: "toBigInt"
+      name: "toInt512"
       params: [ "ByteVector" ]
       doc: "Converts an array of bytes to an big integer."
       paramsDoc: [ "The array of bytes to convert." ]
       complexity: 65
     }
     {
-      name: "toBigInt"
+      name: "toInt512"
       params: [ "ByteVector", "Int", "Int" ]
       doc: "Converts an array of bytes to an big integer."
       paramsDoc: [ "The array of bytes to convert.", "Offset", "Size" ]
@@ -104,13 +104,13 @@
     }
     {
       name: "toInt"
-      params: [ "BigInt" ]
-      doc: "Converts a BigInt to an integer."
-      paramsDoc: [ "The BigInt to convert." ]
+      params: [ "Int512" ]
+      doc: "Converts a Int512 to an integer."
+      paramsDoc: [ "The Int512 to convert." ]
       complexity: 1
     }
     {
-      name: "toBigInt"
+      name: "toInt512"
       params: [ "Int" ]
       doc: "Converts an integer to an integer."
       paramsDoc: [ "The integer to convert." ]
@@ -138,10 +138,10 @@
       complexity: 1
     }
     {
-      name: "toStringBigInt"
-      params: [ "BigInt" ]
-      doc: "Convert BigInt to string"
-      paramsDoc: [ "The BigInt to convert" ]
+      name: "toStringInt512"
+      params: [ "Int512" ]
+      doc: "Convert Int512 to string"
+      paramsDoc: [ "The Int512 to convert" ]
       complexity: 65
     }
     {

@@ -37,35 +37,35 @@
     }
     {
       name: "+"
-      params: [ "BigInt", "BigInt" ]
+      params: [ "Int512", "Int512" ]
       doc: "Sum big integers."
       paramsDoc: [ "First value", "Second value" ]
       complexity: 8
     }
     {
       name: "-"
-      params: [ "BigInt", "BigInt" ]
+      params: [ "Int512", "Int512" ]
       doc: "Subtract big integers."
       paramsDoc: [ "First value", "Second value" ]
       complexity: 8
     }
     {
       name: "*"
-      params: [ "BigInt", "BigInt" ]
+      params: [ "Int512", "Int512" ]
       doc: "Multiply big integers."
       paramsDoc: [ "Multiplier", "Multiplier" ]
       complexity: 64
     }
     {
       name: "/"
-      params: [ "BigInt", "BigInt" ]
+      params: [ "Int512", "Int512" ]
       doc: "Divide big integers."
       paramsDoc: [ "Divisible", "Divisor" ]
       complexity: 64
     }
     {
       name: "%"
-      params: [ "BigInt", "BigInt" ]
+      params: [ "Int512", "Int512" ]
       doc: "Calculate big modulo."
       paramsDoc: [ "Divisible", "Divisor" ]
       complexity: 64
@@ -114,14 +114,14 @@
     }
     {
       name: ">="
-      params: [ "BigInt", "BigInt" ]
+      params: [ "Int512", "Int512" ]
       doc: "Check if integer greater or equal comparison."
       paramsDoc: [ "First value", "Second value" ]
       complexity: 8
     }
     {
       name: ">"
-      params: [ "BigInt", "BigInt" ]
+      params: [ "Int512", "Int512" ]
       doc: "Check if integer greater comparison."
       paramsDoc: [ "First value", "Second value" ]
       complexity: 8
@@ -135,7 +135,7 @@
     }
     {
       name: "-"
-      params: [ "BigInt" ]
+      params: [ "Int512" ]
       doc: "Change integer sign."
       paramsDoc: [ "Value" ]
       complexity: 8
