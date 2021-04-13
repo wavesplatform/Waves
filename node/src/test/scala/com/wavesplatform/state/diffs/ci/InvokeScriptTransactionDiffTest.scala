@@ -2350,10 +2350,12 @@ class InvokeScriptTransactionDiffTest
              |
              | @Callable(i)
              | func foo() = {
-             |  let h = hashScriptAtAddress(this)
-             |  if hashScriptAtAddress(i.caller) == unit
+             |  if hashScriptAtAddress(i.caller) == unit && hashScriptAtAddress(Alias("unexisting")) == unit
              |  then
-             |    [ BinaryEntry("hash", h.value()) ]
+             |    [
+             |      BinaryEntry("hash1", hashScriptAtAddress(this).value()),
+             |      BinaryEntry("hash2", hashScriptAtAddress(Alias("alias")).value())
+             |    ]
              |  else
              |    throw("Unexpected script was found.")
              | }
@@ -2372,6 +2374,7 @@ class InvokeScriptTransactionDiffTest
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
+        alias    = CreateAliasTransaction.selfSigned(TxVersion.V2, master, Alias.create("alias").explicitGet(), fee, ts).explicitGet()
         script   = ContractScript(V5, contract()).explicitGet()
         ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), fee, ts + 5).explicitGet()
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
@@ -2379,14 +2382,16 @@ class InvokeScriptTransactionDiffTest
         invokeTx = InvokeScriptTransaction
           .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
           .explicitGet()
-      } yield (Seq(gTx1, gTx2, ssTx), invokeTx, master.toAddress, script)
+      } yield (Seq(gTx1, gTx2, alias, ssTx), invokeTx, master.toAddress, script)
 
     forAll(scenario) {
       case (genesisTxs, invokeTx, dApp, script) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
             diff.errorMessage(invokeTx.id.value()) shouldBe None
-            bc.accountData(dApp, "hash") shouldBe Some(BinaryDataEntry("hash", ByteStr(com.wavesplatform.lang.Global.blake2b256(script.bytes().arr))))
+            val hash = ByteStr(com.wavesplatform.lang.Global.blake2b256(script.bytes().arr))
+            bc.accountData(dApp, "hash1").get.value shouldBe hash
+            bc.accountData(dApp, "hash2").get.value shouldBe hash
         }
     }
   }
