@@ -159,15 +159,16 @@ object PureContext {
     NativeFunction("toInt512", 65, BYTES_TO_INT512_LIM, INT512, ("n", BYTESTR), ("off", LONG), ("size", LONG)) {
       case CONST_BYTESTR(ByteStr(n)) :: CONST_LONG(off) :: CONST_LONG(s) :: Nil =>
         Either.cond(
-          off >= 0 && off <= n.size && s <= 64 && s > 0,
+          off >= 0 && off <= n.length && s <= 64 && s > 0,
           CONST_INT512(BigInt(n.slice(off.toInt, (off + s).toInt))),
           s"ByteStr too long ($s > 64 bytes)"
         )
       case xs => notImplemented[Id, EVALUATED]("toInt512(n: ByteStr, offset: Int, size: Int)", xs)
     }
+
   lazy val bytesToInt512: BaseFunction[NoContext] =
     NativeFunction("toInt512", 65, BYTES_TO_INT512, INT512, ("n", BYTESTR)) {
-      case CONST_BYTESTR(ByteStr(n)) :: Nil => Either.cond(n.size <= 64, CONST_INT512(BigInt(n)), s"ByteStr too long (${n.size} > 64 bytes)")
+      case CONST_BYTESTR(ByteStr(n)) :: Nil => Either.cond(n.length <= 64, CONST_INT512(BigInt(n)), s"Too big ByteVector for Int512 (${n.length} > 64 bytes)")
       case xs                               => notImplemented[Id, EVALUATED]("toInt512(n: ByteStr)", xs)
     }
 
@@ -1384,8 +1385,8 @@ object PureContext {
         } else {
           global
             .powBigInt(b, bp, e, ep, rp, Rounding.byValue(round))
-            .filterOrElse(v => v <= max && v >= min, "pow: result out of range.")
-            .map(CONST_INT512)
+            .filterOrElse(v => v <= max && v >= min, "Result out of 512-bit range")
+            .bimap(e => s"$e on Int512 pow calculation", CONST_INT512)
         }
       case xs => notImplemented[Id, EVALUATED]("pow(base: Int512, bp: Int, exponent:Big Int, ep: Int, rp: Int, round: Rounds)", xs)
     }
@@ -1404,16 +1405,17 @@ object PureContext {
       ("round", roundTypes)
     ) {
       case CONST_INT512(b) :: CONST_LONG(bp) :: CONST_INT512(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
-        if (bp < 0
+        val r = if (bp < 0
             || bp > 18
             || ep < 0
             || ep > 18
             || rp < 0
             || rp > 18) {
-          Left("log: scale out of range 0-12")
+          Left("Scale out of range 0-12")
         } else {
           global.logBigInt(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_INT512)
         }
+        r.leftMap(e => s"$e on Int512 log calculation")
       case xs => notImplemented[Id, EVALUATED]("log(exponent: Int512, ep: Int, base:Big Int, bp: Int, rp: Int, round: Rounds)", xs)
     }
 
