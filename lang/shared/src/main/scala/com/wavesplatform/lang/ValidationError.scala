@@ -9,4 +9,5 @@ object ValidationError {
 
   case class ScriptParseError(m: String) extends ValidationError
   case class ScriptRunsLimitError(m: String) extends ValidationError
+
 }
