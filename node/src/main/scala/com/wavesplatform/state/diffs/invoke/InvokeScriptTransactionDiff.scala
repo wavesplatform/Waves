@@ -1,7 +1,5 @@
 package com.wavesplatform.state.diffs.invoke
 
-import scala.util.Right
-
 import cats.Id
 import cats.implicits._
 import com.wavesplatform.account._
@@ -22,17 +20,19 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.metrics.{TxProcessingStats => Stats}
-import Stats.TxTimerExt
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import monix.eval.Coeval
 import shapeless.Coproduct
+
+import scala.util.Right
 
 object InvokeScriptTransactionDiff {
 
@@ -56,25 +56,13 @@ object InvokeScriptTransactionDiff {
         invocationComplexity: Long,
         fixedInvocationComplexity: Long,
         payments: AttachedPayments,
-        environment: DAppEnvironment
+        environment: DAppEnvironment,
+        invocation: ContractEvaluator.Invocation
     ) = {
       case class MainScriptResult(invocationDiff: Diff, scriptResult: ScriptResult, log: Log[Id], availableActions: Int, availableData: Int)
 
       def executeMainScript(): TracedResult[ValidationError, MainScriptResult] = {
         val scriptResultE = Stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId) {
-          val invoker = Recipient.Address(ByteStr(tx.sender.toAddress.bytes))
-          val invocation = ContractEvaluator.Invocation(
-            functionCall,
-            invoker,
-            tx.sender,
-            invoker,
-            tx.sender,
-            payments,
-            tx.id(),
-            tx.fee,
-            tx.feeAssetId.compatId
-          )
-
           val fullLimit =
             if (blockchain.estimator == ScriptEstimatorV2)
               Int.MaxValue //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
@@ -205,6 +193,19 @@ object InvokeScriptTransactionDiff {
             input <- buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, tthis)
           } yield (directives, payments, tthis, input)).leftMap(GenericError(_))
 
+          invoker = Recipient.Address(ByteStr(tx.sender.toAddress.bytes))
+          invocation = ContractEvaluator.Invocation(
+            functionCall,
+            invoker,
+            tx.sender,
+            invoker,
+            tx.sender,
+            payments,
+            tx.id(),
+            tx.fee,
+            tx.feeAssetId.compatId
+          )
+
           environment = new DAppEnvironment(
             AddressScheme.current.chainId,
             Coeval.evalOnce(input),
@@ -215,7 +216,7 @@ object InvokeScriptTransactionDiff {
             Some(tx),
             dAppAddress,
             pk,
-            Set(tx.senderAddress, dAppAddress),
+            Vector(DAppEnvironment.DAppInvocation(dAppAddress, None), DAppEnvironment.DAppInvocation(dAppAddress, Some(invocation))),
             limitedExecution,
             ContractLimits.MaxSyncDAppCalls(version),
             ContractLimits.MaxCallableActionsAmount(version),
@@ -223,12 +224,21 @@ object InvokeScriptTransactionDiff {
             if (version < V5) Diff.empty else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map())
           )
 
-          result <- executeInvoke(pk, version, contract, dAppAddress, invocationComplexity, fixedInvocationComplexity, payments, environment)
-            .leftMap {
-              case fte: FailedTransactionError =>
-                fte
-              case err: ValidationError => err
-            }
+          result <- executeInvoke(
+            pk,
+            version,
+            contract,
+            dAppAddress,
+            invocationComplexity,
+            fixedInvocationComplexity,
+            payments,
+            environment,
+            invocation
+          ).leftMap {
+            case fte: FailedTransactionError =>
+              fte
+            case err: ValidationError => err
+          }
         } yield result
 
       case Left(error) => TracedResult(Left(error))

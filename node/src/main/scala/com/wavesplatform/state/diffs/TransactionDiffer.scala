@@ -280,7 +280,7 @@ object TransactionDiffer {
       }
 
     private[this] def scriptResult(cf: FailedTransactionError): Option[InvokeScriptResult] =
-      Some(cf.getInvokeScriptResult.copy(error = Some(ErrorMessage(cf.code, cf.message))))
+      Some(InvokeScriptResult(error = Some(ErrorMessage(cf.code, cf.message))))
   }
 
   // helpers

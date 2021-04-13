@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import cats.implicits._
+import cats.kernel.Monoid
 import com.wavesplatform.account
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.block.BlockHeader
@@ -13,13 +14,13 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
 import com.wavesplatform.lang.v1.traits._
-import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff}
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -27,6 +28,7 @@ import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless._
 
@@ -230,6 +232,10 @@ class WavesEnvironment(
   ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
 }
 
+object DAppEnvironment {
+  final case class DAppInvocation(dAppAddress: com.wavesplatform.account.Address, invocation: Option[ContractEvaluator.Invocation])
+}
+
 // CAUTION: Not thread safe
 class DAppEnvironment(
     nByte: Byte,
@@ -241,7 +247,7 @@ class DAppEnvironment(
     tx: Option[InvokeScriptTransaction],
     currentDApp: com.wavesplatform.account.Address,
     currentDAppPk: com.wavesplatform.account.PublicKey,
-    callChain: Set[com.wavesplatform.account.Address],
+    callChain: Seq[DAppEnvironment.DAppInvocation],
     limitedExecution: Boolean,
     var remainingCalls: Int,
     var availableActions: Int,
@@ -249,6 +255,7 @@ class DAppEnvironment(
     var currentDiff: Diff
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.map(_.id()).getOrElse(ByteStr.empty)) {
 
+  private[this] val calledAddresses   = callChain.map(_.dAppAddress).toSet
   private[this] var mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
 
   override def currentBlockchain(): CompositeBlockchain = this.mutableBlockchain
@@ -287,7 +294,7 @@ class DAppEnvironment(
             )
           )
       )
-      (diff, evaluated, remainingActions, remainingData) <- InvokeScriptDiff(  // This is recursive call
+      (diff, evaluated, remainingActions, remainingData) <- InvokeScriptDiff( // This is a recursive call
         mutableBlockchain,
         blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
         limitedExecution,
@@ -312,14 +319,9 @@ class DAppEnvironment(
 
     r.v.map {
       _.resultE match {
-        case Left(f: FailedTransactionError) =>
-          val result = f.getInvokeScriptResult |+| InvokeScriptResult(invokes = Seq(invocation))
-          (
-            Left(f.copy(invokeScriptResult = Some(result))),
-            f.spentComplexity.toInt
-          )
-        case Left(e)                        => (Left(e), 0)
-        case Right((evaluated, complexity)) => (Right(evaluated), complexity)
+        case Left(fte: FailedTransactionError) => (Left(fte), fte.spentComplexity.toInt)
+        case Left(e)                           => (Left(e), 0)
+        case Right((evaluated, complexity))    => (Right(evaluated), complexity)
       }
     }
   }

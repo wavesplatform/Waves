@@ -1,7 +1,5 @@
 package com.wavesplatform.transaction
 
-import scala.util.Either
-
 import cats.Id
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
@@ -11,6 +9,8 @@ import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.transaction.TxValidationError.FailedTransactionError.Cause
 import com.wavesplatform.transaction.assets.exchange.Order
+
+import scala.util.Either
 
 object TxValidationError {
   type Validation[T] = Either[ValidationError, T]
@@ -59,19 +59,10 @@ object TxValidationError {
       spentComplexity: Long,
       log: Log[Id],
       error: Option[ValidationError],
-      assetId: Option[ByteStr] = None,
-      invokeScriptResult: Option[InvokeScriptResult] = None
+      assetId: Option[ByteStr] = None
   ) extends ValidationError
       with WithLog {
     import FailedTransactionError._
-
-    def getInvokeScriptResult: InvokeScriptResult =
-      invokeScriptResult
-        .orElse(error match {
-          case Some(fte: FailedTransactionError) => fte.invokeScriptResult
-          case _                                 => None
-        })
-        .getOrElse(InvokeScriptResult.empty)
 
     def code: Int = cause.code
     def message: String = cause match {
@@ -91,7 +82,7 @@ object TxValidationError {
       if (message.startsWith("FailedTransactionError"))
         message
       else
-        s"FailedTransactionError(code = ${cause.code}, error = $message, log =${logToString(log)}, $invokeScriptResult)"
+        s"FailedTransactionError(code = ${cause.code}, error = $message, log =${logToString(log)})"
   }
 
   object FailedTransactionError {

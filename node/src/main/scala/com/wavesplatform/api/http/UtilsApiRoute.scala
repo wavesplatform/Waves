@@ -313,7 +313,7 @@ object UtilsApiRoute {
               tx = None,
               address,
               PublicKey(ByteStr.fill(KeyLength)(1)),
-              Set(),
+              Vector.empty,
               limitedExecution = false,
               remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
               availableActions = ContractLimits.MaxCallableActionsAmount(script.stdLibVersion),

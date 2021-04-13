@@ -1,7 +1,5 @@
 package com.wavesplatform.state.diffs.invoke
 
-import scala.util.Right
-
 import cats.Id
 import cats.implicits._
 import com.wavesplatform.account._
@@ -13,33 +11,57 @@ import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.{Transaction, TxValidationError}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, CoevalR, TracedResult}
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
+import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, CoevalR, TracedResult}
+import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
+import com.wavesplatform.transaction.{Transaction, TxValidationError}
 import monix.eval.Coeval
 import shapeless.Coproduct
+
+import scala.util.Right
 
 object InvokeScriptDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
-  def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean, remainingComplexity: Int, remainingCalls: Int, remainingActions: Int, remainingData: Int, callChain: Set[Address])(
+  def apply(
+      blockchain: Blockchain,
+      blockTime: Long,
+      limitedExecution: Boolean,
+      remainingComplexity: Int,
+      remainingCalls: Int,
+      remainingActions: Int,
+      remainingData: Int,
+      invocationChain: Seq[DAppEnvironment.DAppInvocation]
+  )(
       tx: InvokeScript
-  ): CoevalR[(Diff, EVALUATED, Int, Int)] = {
+  ): CoevalR[(Diff, EVALUATED, Int, Int, Seq[DAppEnvironment.DAppInvocation])] = {
     val dAppAddress = tx.dAppAddress
+    val invoker     = tx.senderDApp
+    val invocation = ContractEvaluator.Invocation(
+      tx.funcCall,
+      Recipient.Address(ByteStr(invoker.bytes)),
+      ByteStr(tx.sender.arr),
+      Recipient.Address(ByteStr(tx.root.fold(invoker)(_.senderAddress).bytes)),
+      ByteStr(tx.root.getOrElse(tx).sender.arr),
+      AttachedPayments.Multi(tx.payments.map(p => p.amount -> p.assetId.compatId)),
+      tx.txId,
+      tx.root.map(_.fee).getOrElse(0L),
+      tx.root.flatMap(_.feeAssetId.compatId)
+    )
+
     blockchain.accountScript(dAppAddress) match {
       case Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities)) =>
         val limit = ContractLimits.MaxTotalInvokeComplexity(version)
@@ -124,20 +146,9 @@ object InvokeScriptDiff {
           result <- for {
             (diff, (scriptResult, log), avaliableActions, avaliableData) <- {
               val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
-                val invoker = tx.senderDApp
-                val invocation = ContractEvaluator.Invocation(
-                  tx.funcCall,
-                  Recipient.Address(ByteStr(invoker.bytes)),
-                  ByteStr(tx.sender.arr),
-                  Recipient.Address(ByteStr(tx.root.fold(invoker)(_.senderAddress).bytes)),
-                  ByteStr(tx.root.getOrElse(tx).sender.arr),
-                  payments,
-                  tx.txId,
-                  tx.root.map(_.fee).getOrElse(0L),
-                  tx.root.flatMap(_.feeAssetId.compatId)
-                )
-                val height = blockchain.height
-
+                val height          = blockchain.height
+                val fixedInvocation = invocation.copy(payments = payments)
+                val newCallChain    = invocationChain :+ DAppEnvironment.DAppInvocation(dAppAddress, Some(fixedInvocation))
                 val environment = new DAppEnvironment(
                   AddressScheme.current.chainId,
                   Coeval.evalOnce(input),
@@ -148,7 +159,7 @@ object InvokeScriptDiff {
                   tx.root,
                   tx.dAppAddress,
                   pk,
-                  callChain + dAppAddress,
+                  newCallChain,
                   limitedExecution,
                   remainingCalls - 1,
                   remainingActions,
@@ -162,7 +173,8 @@ object InvokeScriptDiff {
 
                 for {
                   result <- CoevalR(
-                    evaluateV2(version, contract, invocation, environment, complexityAfterPayments, remainingComplexity).map(TracedResult(_))
+                    evaluateV2(version, contract, invocation, environment, complexityAfterPayments, remainingComplexity).map(TracedResult(_)),
+                    newCallChain
                   )
                 } yield (environment.currentDiff, result, environment.availableActions, environment.availableData)
               })
@@ -190,12 +202,12 @@ object InvokeScriptDiff {
               )
 
             process = { (actions: List[CallableAction], unusedComplexity: Int, actionsCount: Int, dataCount: Int, ret: EVALUATED) =>
-              if(dataCount > avaliableData) {
+              if (dataCount > avaliableData) {
                 val usedComplexity = remainingComplexity - unusedComplexity
                 val error          = FailedTransactionError.dAppExecution("Stored data count limit is exceeded", usedComplexity, log)
                 traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
               } else {
-                if(actionsCount > avaliableActions) {
+                if (actionsCount > avaliableActions) {
                   val usedComplexity = remainingComplexity - unusedComplexity
                   val error          = FailedTransactionError.dAppExecution("Actions count limit is exceeded", usedComplexity, log)
                   traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
@@ -206,14 +218,14 @@ object InvokeScriptDiff {
             }
             (actionsDiff, evaluated, remainingActions1, remainingData1) <- scriptResult match {
               case ScriptResultV3(dataItems, transfers, unusedComplexity) =>
-                val dataCount = dataItems.length
+                val dataCount    = dataItems.length
                 val actionsCount = transfers.length
-                process(dataItems ::: transfers,  unusedComplexity, actionsCount, dataCount, unit) 
+                process(dataItems ::: transfers, unusedComplexity, actionsCount, dataCount, unit)
               case ScriptResultV4(actions, unusedComplexity, ret) =>
-                val dataCount = actions.count(_.isInstanceOf[DataOp])
+                val dataCount    = actions.count(_.isInstanceOf[DataOp])
                 val actionsCount = actions.length - dataCount
-                process(actions,  unusedComplexity, actionsCount, dataCount, ret) 
-              case _: IncompleteResult if limitedExecution        => doProcessActions(Nil, 0).map((_, unit,  avaliableActions, avaliableData))
+                process(actions, unusedComplexity, actionsCount, dataCount, ret)
+              case _: IncompleteResult if limitedExecution => doProcessActions(Nil, 0).map((_, unit, avaliableActions, avaliableData))
               case r: IncompleteResult =>
                 val usedComplexity = remainingComplexity - r.unusedComplexity
                 val error          = FailedTransactionError.dAppExecution(s"Invoke complexity limit = $limit is exceeded", usedComplexity, log)
@@ -223,7 +235,7 @@ object InvokeScriptDiff {
           } yield (resultDiff, evaluated, remainingActions1, remainingData1)
         } yield result
 
-      case _ => traced(Left(GenericError(s"No contract at address ${tx.dAppAddress}")))
+      case _ => traced(Left(GenericError(s"No contract at address ${tx.dAppAddress}")), call)
     }
   }
 
