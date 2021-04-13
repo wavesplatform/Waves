@@ -81,7 +81,7 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with ScalaChec
     dapp1   <- accountGen
   } yield (invoker, dapp0, dapp1)
 
-  "zzz" in forAll(gen) {
+  "correctly estimates complexity when child dApp invocation involves payment in smart asset" in forAll(gen) {
     case (invoker, dApp0KP, dApp1KP) =>
       withDomain(settings) { d =>
         val utx = new UtxPoolImpl(ntpTime, d.blockchain, Observer.stopped, settings.utxSettings)
