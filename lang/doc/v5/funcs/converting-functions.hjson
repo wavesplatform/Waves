@@ -47,7 +47,7 @@
       complexity: 1
     }
     {
-      name: "toBytesInt512"
+      name: "toBytes"
       params: [ "Int512" ]
       doc: "Converts an Int512 to an array of bytes."
       paramsDoc: [ "The Int512 to convert." ]
@@ -138,7 +138,7 @@
       complexity: 1
     }
     {
-      name: "toStringInt512"
+      name: "toString"
       params: [ "Int512" ]
       doc: "Convert Int512 to string"
       paramsDoc: [ "The Int512 to convert" ]

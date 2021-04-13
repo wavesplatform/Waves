@@ -29,7 +29,7 @@
       complexity: 20
     }
     {
-      name: "medianInt512"
+      name: "median"
       params: [ "List[Int512]" ]
       doc: "Returns the median of the list."
       paramsDoc: [ "The list of Int512." ]
@@ -50,14 +50,14 @@
       complexity: 3
     }
     {
-      name: "minInt512"
+      name: "min"
       params: [ "List[Int512]" ]
       doc: "Returns the minimum of the list."
       paramsDoc: [ "The list of big integers." ]
       complexity: 192
     }
     {
-      name: "maxInt512"
+      name: "max"
       params: [ "List[Int512]" ]
       doc: "Returns the maximum of the list."
       paramsDoc: [ "The list of big integers." ]

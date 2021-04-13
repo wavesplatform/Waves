@@ -34,8 +34,8 @@ object PureContext {
   implicit def intToLong(num: Int): Long = num.toLong
 
   private val defaultThrowMessage = "Explicit script termination"
-  private val maxInt512: BigInt   = BigInt(2).pow(511) - 1
-  private val minInt512: BigInt   = -maxInt512 - 1
+  private val max: BigInt         = BigInt(2).pow(511) - 1
+  private val min: BigInt         = -max - 1
   val MaxListLengthV4             = 1000
 
   lazy val mulLong: BaseFunction[NoContext] =
@@ -114,7 +114,7 @@ object PureContext {
     }
 
   lazy val int512ToString: BaseFunction[NoContext] =
-    NativeFunction("toStringInt512", 65, INT512_TO_STRING, STRING, ("n", INT512)) {
+    NativeFunction("toString", 65, INT512_TO_STRING, STRING, ("n", INT512)) {
       case CONST_INT512(n) :: Nil => CONST_STRING(n.toString)
       case xs                     => notImplemented[Id, EVALUATED]("toString(n: Int512)", xs)
     }
@@ -124,7 +124,7 @@ object PureContext {
       case CONST_STRING(n) :: Nil =>
         Either
           .cond(n.length <= 155, BigInt(n), s"String too long for 512-bits big integers (${n.length} when max is 155)")
-          .filterOrElse(v => v <= maxInt512 && v >= minInt512, "Value too big for 512-bits big integer")
+          .filterOrElse(v => v <= max && v >= min, "Value too big for 512-bits big integer")
           .map(CONST_INT512.apply)
       case xs => notImplemented[Id, EVALUATED]("parseInt512Value(n: String)", xs)
     }
@@ -135,7 +135,7 @@ object PureContext {
         Right((if (n.length <= 155) {
                  try {
                    val v = BigInt(n)
-                   if (v <= maxInt512 && v >= minInt512) {
+                   if (v <= max && v >= min) {
                      CONST_INT512(v)
                    } else {
                      unit
@@ -150,9 +150,9 @@ object PureContext {
     }
 
   lazy val int512ToBytes: BaseFunction[NoContext] =
-    NativeFunction("toBytesInt512", 65, INT512_TO_BYTES, BYTESTR, ("n", INT512)) {
+    NativeFunction("toBytes", 65, INT512_TO_BYTES, BYTESTR, ("n", INT512)) {
       case CONST_INT512(n) :: Nil => CONST_BYTESTR(ByteStr(n.toByteArray))
-      case xs                     => notImplemented[Id, EVALUATED]("toBytesInt512(n: Int512)", xs)
+      case xs                     => notImplemented[Id, EVALUATED]("toBytes(n: Int512)", xs)
     }
 
   lazy val bytesToInt512Lim: BaseFunction[NoContext] =
@@ -183,7 +183,7 @@ object PureContext {
     ) {
       case (CONST_INT512(a), CONST_INT512(b)) =>
         val s = body(a, b)
-        Either.cond(s >= minInt512 && s <= maxInt512, CONST_INT512(s), s"$a ${op.func} $b is out of range.")
+        Either.cond(s >= min && s <= max, CONST_INT512(s), s"$a ${op.func} $b is out of range.")
       case args =>
         Left(s"Unexpected args $args for Int512 operator '${op.func}'")
     }
@@ -197,7 +197,7 @@ object PureContext {
 
   lazy val negativeInt512: BaseFunction[NoContext] =
     NativeFunction("-", 8, UMINUS_INT512, INT512, ("n", INT512)) {
-      case CONST_INT512(n) :: Nil => Either.cond(n != minInt512, CONST_INT512(-n), s"Positive Int512 overflow")
+      case CONST_INT512(n) :: Nil => Either.cond(n != min, CONST_INT512(-n), s"Positive Int512 overflow")
       case xs                     => notImplemented[Id, EVALUATED]("-(n: Int512)", xs)
     }
 
@@ -326,7 +326,7 @@ object PureContext {
 
   val fractionInt512: BaseFunction[NoContext] =
     NativeFunction(
-      "fractionInt512",
+      "fraction",
       128,
       FRACTION_INT512,
       INT512,
@@ -338,15 +338,15 @@ object PureContext {
         for {
           _ <- Either.cond(d != 0, (), "Fraction: division by zero")
           result = v * n / d
-          _ <- Either.cond(result < maxInt512, (), s"Long overflow: value `$result` greater than 2^511-1")
+          _ <- Either.cond(result < max, (), s"Long overflow: value `$result` greater than 2^511-1")
           _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^511-1")
         } yield CONST_INT512(result)
-      case xs => notImplemented[Id, EVALUATED]("fractionInt512(value: Int512, numerator: Int512, denominator: Int512)", xs)
+      case xs => notImplemented[Id, EVALUATED]("fraction(value: Int512, numerator: Int512, denominator: Int512)", xs)
     }
 
-  def fractionInt512Rounds(roundTypes: UNION): BaseFunction[NoContext] =
+  def fractionRounds(roundTypes: UNION): BaseFunction[NoContext] =
     NativeFunction(
-      "fractionInt512",
+      "fraction",
       128,
       FRACTION_INT512_ROUNDS,
       INT512,
@@ -403,10 +403,10 @@ object PureContext {
               }
             case _ => Left(s"unsupported rounding $r")
           }
-          _ <- Either.cond(result < maxInt512, (), s"Long overflow: value `$result` greater than 2^511-1")
+          _ <- Either.cond(result < max, (), s"Long overflow: value `$result` greater than 2^511-1")
           _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^511-1")
         } yield CONST_INT512(result)
-      case xs => notImplemented[Id, EVALUATED]("fractionInt512Rounds(value: Int512, numerator: Int512, denominator: Int512, round: rounds)", xs)
+      case xs => notImplemented[Id, EVALUATED]("fractionRounds(value: Int512, numerator: Int512, denominator: Int512, round: rounds)", xs)
     }
 
   lazy val _isInstanceOf: BaseFunction[NoContext] =
@@ -1156,8 +1156,8 @@ object PureContext {
         notImplemented[Id, EVALUATED]("min(list: List[Int])", xs)
     }
 
-  lazy val listMaxInt512: BaseFunction[NoContext] =
-    NativeFunction("maxInt512", 192, MAX_LIST_INT512, INT512, ("list", PARAMETERIZEDLIST(INT512))) {
+  lazy val listInt512Max: BaseFunction[NoContext] =
+    NativeFunction("max", 192, MAX_LIST_INT512, INT512, ("list", PARAMETERIZEDLIST(INT512))) {
       case ARR(list) :: Nil =>
         Either.cond(
           list.nonEmpty,
@@ -1165,11 +1165,11 @@ object PureContext {
           "Can't find max for empty list"
         )
       case xs =>
-        notImplemented[Id, EVALUATED]("maxInt512(list: List[Int512])", xs)
+        notImplemented[Id, EVALUATED]("max(list: List[Int512])", xs)
     }
 
-  lazy val listMinInt512: BaseFunction[NoContext] =
-    NativeFunction("minInt512", 192, MIN_LIST_INT512, INT512, ("list", PARAMETERIZEDLIST(INT512))) {
+  lazy val listInt512Min: BaseFunction[NoContext] =
+    NativeFunction("min", 192, MIN_LIST_INT512, INT512, ("list", PARAMETERIZEDLIST(INT512))) {
       case ARR(list) :: Nil =>
         Either.cond(
           list.nonEmpty,
@@ -1177,7 +1177,7 @@ object PureContext {
           "Can't find min for empty list"
         )
       case xs =>
-        notImplemented[Id, EVALUATED]("minInt512(list: List[Int512])", xs)
+        notImplemented[Id, EVALUATED]("min(list: List[Int512])", xs)
     }
 
   lazy val listIndexOf: BaseFunction[NoContext] =
@@ -1362,7 +1362,7 @@ object PureContext {
 
   def powInt512(roundTypes: UNION): BaseFunction[NoContext] =
     NativeFunction(
-      "powInt512",
+      "pow",
       200,
       POW_INT512,
       INT512,
@@ -1380,19 +1380,19 @@ object PureContext {
             || ep > 18
             || rp < 0
             || rp > 18) {
-          Left("powInt512: scale out of range 0-12")
+          Left("pow: scale out of range 0-12")
         } else {
           global
             .powBigInt(b, bp, e, ep, rp, Rounding.byValue(round))
-            .filterOrElse(v => v <= maxInt512 && v >= minInt512, "powInt512: result out of range.")
+            .filterOrElse(v => v <= max && v >= min, "pow: result out of range.")
             .map(CONST_INT512)
         }
-      case xs => notImplemented[Id, EVALUATED]("powInt512(base: Int512, bp: Int, exponent:Big Int, ep: Int, rp: Int, round: Rounds)", xs)
+      case xs => notImplemented[Id, EVALUATED]("pow(base: Int512, bp: Int, exponent:Big Int, ep: Int, rp: Int, round: Rounds)", xs)
     }
 
   def logInt512(roundTypes: UNION): BaseFunction[NoContext] =
     NativeFunction(
-      "logInt512",
+      "log",
       200,
       LOG_INT512,
       INT512,
@@ -1410,11 +1410,11 @@ object PureContext {
             || ep > 18
             || rp < 0
             || rp > 18) {
-          Left("logInt512: scale out of range 0-12")
+          Left("log: scale out of range 0-12")
         } else {
           global.logBigInt(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_INT512)
         }
-      case xs => notImplemented[Id, EVALUATED]("logInt512(exponent: Int512, ep: Int, base:Big Int, bp: Int, rp: Int, round: Rounds)", xs)
+      case xs => notImplemented[Id, EVALUATED]("log(exponent: Int512, ep: Int, base:Big Int, bp: Int, rp: Int, round: Rounds)", xs)
     }
 
   val getListMedian: BaseFunction[NoContext] =
@@ -1431,18 +1431,18 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
     }
 
-  val getListMedianInt512: BaseFunction[NoContext] =
-    NativeFunction("medianInt512", 20 * 8, MEDIAN_LISTINT512, INT512, ("arr", PARAMETERIZEDLIST(INT512))) {
+  val getInt512ListMedian: BaseFunction[NoContext] =
+    NativeFunction("median", 20 * 8, MEDIAN_LISTINT512, INT512, ("arr", PARAMETERIZEDLIST(INT512))) {
       case xs @ (ARR(arr) :: Nil) =>
         if (arr.headOption.forall(_.isInstanceOf[CONST_INT512])) {
           if (arr.nonEmpty)
             Right(CONST_INT512(global.median(arr.asInstanceOf[IndexedSeq[CONST_INT512]].map(_.t).toArray)))
           else
-            Left(s"Can't find medianInt512 for empty list")
+            Left(s"Can't find median for empty list of Int512")
         } else {
-          notImplemented[Id, EVALUATED](s"medianInt512(arr: List[Int512])", xs)
+          notImplemented[Id, EVALUATED](s"median(arr: List[Int512])", xs)
         }
-      case xs => notImplemented[Id, EVALUATED](s"medianInt512(arr: List[Int512])", xs)
+      case xs => notImplemented[Id, EVALUATED](s"median(arr: List[Int512])", xs)
     }
 
   val unitVarName = "unit"
@@ -1609,12 +1609,12 @@ object PureContext {
         modToInt512,
         geInt512,
         gtInt512,
-        listMaxInt512,
-        listMinInt512,
+        listInt512Max,
+        listInt512Min,
         fractionInt512,
-        fractionInt512Rounds(UNION(fromV5RoundTypes)),
+        fractionRounds(UNION(fromV5RoundTypes)),
         negativeInt512,
-        getListMedianInt512,
+        getInt512ListMedian,
         powInt512(UNION(fromV5RoundTypes)),
         logInt512(UNION(fromV5RoundTypes)),
         pow(UNION(fromV5RoundTypes)),

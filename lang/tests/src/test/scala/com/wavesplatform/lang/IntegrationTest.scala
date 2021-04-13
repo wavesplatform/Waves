@@ -2135,15 +2135,15 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       f8(2.toInt512())
       """, ctxt = v5Ctx, version = V5, env = utils.environment) should produce("is out of range")
     genericEval[Environment, EVALUATED](s"""-toInt512(1)""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(-1)))
-    genericEval[Environment, EVALUATED]("toInt512(base58'2Ana1pUpv2ZbMVkwF5FXapYeBEjdxDatLn7nvJkhgTSXbs59SyZSx866bXirPgj8QQVB57uxHJBG1YFvkRbFj4T').toStringInt512()", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_STRING("52785833603464895924505196455835395749861094195642486808108138863402869537852026544579466671752822414281401856143643660416162921950916138504990605852480").explicitGet())
-    genericEval[Environment, EVALUATED]("let bin = base58'2Ana1pUpv2ZbMVkwF5FXapYeBEjdxDatLn7nvJkhgTSXbs59SyZSx866bXirPgj8QQVB57uxHJBG1YFvkRbFj4T' ; toBytesInt512(toInt512(bin)) == bin", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
-    genericEval[Environment, EVALUATED]("toInt512(base58'a' + base58'2Ana1pUpv2ZbMVkwF5FXapYeBEjdxDatLn7nvJkhgTSXbs59SyZSx866bXirPgj8QQVB57uxHJBG1YFvkRbFj4T' + base58'a', base58'a'.size(), 64).toStringInt512()", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_STRING("52785833603464895924505196455835395749861094195642486808108138863402869537852026544579466671752822414281401856143643660416162921950916138504990605852480").explicitGet())
+    genericEval[Environment, EVALUATED]("toInt512(base58'2Ana1pUpv2ZbMVkwF5FXapYeBEjdxDatLn7nvJkhgTSXbs59SyZSx866bXirPgj8QQVB57uxHJBG1YFvkRbFj4T').toString()", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_STRING("52785833603464895924505196455835395749861094195642486808108138863402869537852026544579466671752822414281401856143643660416162921950916138504990605852480").explicitGet())
+    genericEval[Environment, EVALUATED]("let bin = base58'2Ana1pUpv2ZbMVkwF5FXapYeBEjdxDatLn7nvJkhgTSXbs59SyZSx866bXirPgj8QQVB57uxHJBG1YFvkRbFj4T' ; toBytes(toInt512(bin)) == bin", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
+    genericEval[Environment, EVALUATED]("toInt512(base58'a' + base58'2Ana1pUpv2ZbMVkwF5FXapYeBEjdxDatLn7nvJkhgTSXbs59SyZSx866bXirPgj8QQVB57uxHJBG1YFvkRbFj4T' + base58'a', base58'a'.size(), 64).toString()", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_STRING("52785833603464895924505196455835395749861094195642486808108138863402869537852026544579466671752822414281401856143643660416162921950916138504990605852480").explicitGet())
     genericEval[Environment, EVALUATED]("""parseInt512Value("-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(-BigInt(2).pow(511)))
     genericEval[Environment, EVALUATED]("""parseInt512Value("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) should produce("too big")
     genericEval[Environment, EVALUATED]("""parseInt512("-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(-BigInt(2).pow(511)))
     genericEval[Environment, EVALUATED]("""parseInt512("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(unit)
-    genericEval[Environment, EVALUATED](s"""fractionInt512(parseInt512Value("${BigInt(2).pow(511)-1}"), toInt512(-2), toInt512(-3))""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512((BigInt(2).pow(511)-1)*2/3))
-    genericEval[Environment, EVALUATED](s"""fractionInt512(toInt512(100), toInt512(2), toInt512(0))""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Left("Fraction: division by zero")
+    genericEval[Environment, EVALUATED](s"""fraction(parseInt512Value("${BigInt(2).pow(511)-1}"), toInt512(-2), toInt512(-3))""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512((BigInt(2).pow(511)-1)*2/3))
+    genericEval[Environment, EVALUATED](s"""fraction(toInt512(100), toInt512(2), toInt512(0))""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Left("Fraction: division by zero")
     genericEval[Environment, EVALUATED](s"""parseInt512Value("${Long.MaxValue}").toInt()""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(Long.MaxValue))
     genericEval[Environment, EVALUATED](s"""parseInt512Value("${Long.MinValue}").toInt()""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_LONG(Long.MinValue))
     genericEval[Environment, EVALUATED](s"""(parseInt512Value("${Long.MaxValue}")+toInt512(1)).toInt()""", ctxt = v5Ctx, version = V5, env = utils.environment) should produce("out of integers range")
@@ -2156,13 +2156,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       s2 <- List(-1, 1)
       r <- List(("DOWN", DOWN), /*("UP", UP),*/ ("CEILING", CEILING), ("FLOOR", FLOOR), ("HALFUP", HALF_UP), /*("HALFDOWN", HALF_DOWN),*/ ("HALFEVEN", HALF_EVEN))
     } {
-      genericEval[Environment, EVALUATED](s"""fractionInt512(toInt512(${10*s1}), toInt512(1), toInt512(${3*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
+      genericEval[Environment, EVALUATED](s"""fraction(toInt512(${10*s1}), toInt512(1), toInt512(${3*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
         Right(CONST_INT512(BigInt(BigDecimal((10.0*s1)/(3.0*s2)).setScale(0, r._2).toLong)))
-      genericEval[Environment, EVALUATED](s"""fractionInt512(toInt512(${9*s1}), toInt512(1), toInt512(${2*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
+      genericEval[Environment, EVALUATED](s"""fraction(toInt512(${9*s1}), toInt512(1), toInt512(${2*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
         Right(CONST_INT512(BigInt(BigDecimal((9.0*s1)/(2.0*s2)).setScale(0, r._2).toLong)))
-      genericEval[Environment, EVALUATED](s"""fractionInt512(toInt512(${11*s1}), toInt512(1), toInt512(${2*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
+      genericEval[Environment, EVALUATED](s"""fraction(toInt512(${11*s1}), toInt512(1), toInt512(${2*s2}), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
         Right(CONST_INT512(BigInt(BigDecimal((11.0*s1)/(2.0*s2)).setScale(0, r._2).toLong)))
-      genericEval[Environment, EVALUATED](s"""fractionInt512(toInt512(100), toInt512(2), toInt512(0), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
+      genericEval[Environment, EVALUATED](s"""fraction(toInt512(100), toInt512(2), toInt512(0), ${r._1})""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
         Left("Fraction: division by zero")
     }
   }
@@ -2176,30 +2176,30 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     genericEval[Environment, EVALUATED]("toInt512(16) < toInt512(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(false))
     genericEval[Environment, EVALUATED]("toInt512(16) <= toInt512(2)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(false))
     genericEval[Environment, EVALUATED]("toInt512(16) <= toInt512(16)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
-    genericEval[Environment, EVALUATED]("[toInt512(16), toInt512(8)].maxInt512()", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(16)))
-    genericEval[Environment, EVALUATED]("[toInt512(16), toInt512(8)].minInt512()", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(8)))
+    genericEval[Environment, EVALUATED]("[toInt512(16), toInt512(8)].max()", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(16)))
+    genericEval[Environment, EVALUATED]("[toInt512(16), toInt512(8)].min()", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(8)))
   }
 
   property("Int512 math functions") {
-    genericEval[Environment, EVALUATED]("powInt512(toInt512(12), 1, toInt512(3456), 3, 2, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(187)))
+    genericEval[Environment, EVALUATED]("pow(toInt512(12), 1, toInt512(3456), 3, 2, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(187)))
 //    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(12), 1, toBigInt(3456), 3, 2, UP)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(188)))
 //    genericEval[Environment, EVALUATED]("powBigInt(toBigInt(0), 1, toBigInt(3456), 3, 2, UP)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(0)))
-    genericEval[Environment, EVALUATED]("powInt512(toInt512(20), 1, toInt512(-1), 0, 4, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(5000)))
-    genericEval[Environment, EVALUATED]("powInt512(toInt512(-20), 1, toInt512(-1), 0, 4, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(-5000)))
-    genericEval[Environment, EVALUATED]("powInt512(toInt512(0), 1, toInt512(-1), 0, 4, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
-    genericEval[Environment, EVALUATED]("powInt512(toInt512(2), 0, toInt512(512), 0, 0, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
-    genericEval[Environment, EVALUATED]("logInt512(toInt512(16), 0, toInt512(2), 0, 0, CEILING)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(4)))
-    genericEval[Environment, EVALUATED]("logInt512(toInt512(1), 4, toInt512(1), 1, 0, HALFEVEN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(4)))
-    genericEval[Environment, EVALUATED]("logInt512(toInt512(16), 0, toInt512(-2), 0, 0, CEILING)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
-    genericEval[Environment, EVALUATED]("logInt512(toInt512(-16), 0, toInt512(2), 0, 0, CEILING)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
-    genericEval[Environment, EVALUATED]("""logInt512(toInt512(1), 16, parseInt512Value("10"), 0, 0, CEILING)""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(-16)))
+    genericEval[Environment, EVALUATED]("pow(toInt512(20), 1, toInt512(-1), 0, 4, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(5000)))
+    genericEval[Environment, EVALUATED]("pow(toInt512(-20), 1, toInt512(-1), 0, 4, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(-5000)))
+    genericEval[Environment, EVALUATED]("pow(toInt512(0), 1, toInt512(-1), 0, 4, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
+    genericEval[Environment, EVALUATED]("pow(toInt512(2), 0, toInt512(512), 0, 0, DOWN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
+    genericEval[Environment, EVALUATED]("log(toInt512(16), 0, toInt512(2), 0, 0, CEILING)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(4)))
+    genericEval[Environment, EVALUATED]("log(toInt512(1), 4, toInt512(1), 1, 0, HALFEVEN)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(4)))
+    genericEval[Environment, EVALUATED]("log(toInt512(16), 0, toInt512(-2), 0, 0, CEILING)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
+    genericEval[Environment, EVALUATED]("log(toInt512(-16), 0, toInt512(2), 0, 0, CEILING)", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Symbol("left")
+    genericEval[Environment, EVALUATED]("""log(toInt512(1), 16, parseInt512Value("10"), 0, 0, CEILING)""", ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(-16)))
   }
 
   property("List[Int512] median - 100 elements") {
     val arr       = (1 to 100).map(_ => Random.nextLong())
     val arrSorted = arr.sorted
     val src =
-      s"[toInt512(${arr.mkString("),toInt512(")})].medianInt512()"
+      s"[toInt512(${arr.mkString("),toInt512(")})].median()"
     genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(Math.floorDiv(arrSorted(49) + arrSorted(50), 2))))
   }
 
@@ -2207,34 +2207,34 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val arr       = (1 to 99).map(_ => Random.nextLong())
     val arrSorted = arr.sorted
     val src =
-      s"[toInt512(${arr.mkString("),toInt512(")})].medianInt512()"
+      s"[toInt512(${arr.mkString("),toInt512(")})].median()"
     genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(arrSorted(49))))
   }
 
   property("List[Int512] median - 1 elements") {
     val arr = Seq(Random.nextLong())
     val src =
-      s"[toInt512(${arr.mkString("),toInt512(")})].medianInt512()"
+      s"[toInt512(${arr.mkString("),toInt512(")})].median()"
     genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(arr.head)))
   }
 
   property("List[Int512] median - negative rounding down") {
     val arr = Seq(3, -8)
     val src =
-      s"[toInt512(${arr.mkString("),toInt512(")})].medianInt512()"
+      s"[toInt512(${arr.mkString("),toInt512(")})].median()"
     genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(-3)))
   }
 
   property("List[Int512] median - 1000 elements - success") {
     val src =
-      s"[toInt512(${(1 to 1000).mkString("),toInt512(")})].medianInt512()"
+      s"[toInt512(${(1 to 1000).mkString("),toInt512(")})].median()"
     genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe Right(CONST_INT512(BigInt(Math.floorDiv(500 + 501, 2))))
   }
 
   property("List[Int512] median - empty list - error") {
     val src =
-      s"[].medianInt512()"
-    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) should produce("Can't find medianInt512 for empty list")
+      s"[toInt512(1)].removeByIndex(0).median()"
+    genericEval[Environment, EVALUATED](src, ctxt = v5Ctx, version = V5, env = utils.environment) should produce("Can't find median for empty list of Int512")
   }
 
   property("unicode broken") {

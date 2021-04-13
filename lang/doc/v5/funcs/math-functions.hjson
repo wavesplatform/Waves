@@ -32,7 +32,7 @@
       complexity: 100
     }
     {
-      name: "powInt512"
+      name: "pow"
       params: [ "Int512", "Int", "Int512", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Returns a number raised to a power"
       paramsDoc: [
@@ -46,7 +46,7 @@
       complexity: 200
     }
     {
-      name: "logInt512"
+      name: "log"
       params: [ "Int512", "Int", "Int512", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Returns the logarithm of a number."
       paramsDoc: [
@@ -70,14 +70,14 @@
       complexity: 1
     }
     {
-      name: "fractionInt512"
+      name: "fraction"
       params: [ "Int512", "Int512", "Int512" ]
       doc: "Multiply and division with big integer intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]
       complexity: 128
     }
     {
-      name: "fractionInt512"
+      name: "fraction"
       params: [ "Int512", "Int512", "Int512", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Multiply and division with big integer intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor", "Rounding mode" ]
