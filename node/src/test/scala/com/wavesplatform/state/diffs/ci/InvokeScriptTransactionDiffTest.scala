@@ -2806,7 +2806,7 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-  property("originalCaller") {
+  property("originCaller and originCallerPublicKey fields") {
     def contract(): DApp = {
       val expr = {
         val script =
@@ -2817,7 +2817,7 @@ class InvokeScriptTransactionDiffTest
              |
              | @Callable(i)
              | func bar(a: ByteVector, o: ByteVector) = {
-             |   if i.caller.bytes == a && addressFromPublicKey(i.callerPublicKey).bytes == a && i.originalCaller.bytes == o && addressFromPublicKey(i.originalCallerPublicKey).bytes == o
+             |   if i.caller.bytes == a && addressFromPublicKey(i.callerPublicKey).bytes == a && i.originCaller.bytes == o && addressFromPublicKey(i.originCallerPublicKey).bytes == o
              |   then
              |     let n = Issue("barAsset", "bar asset", 1, 0, false, unit, 0)
              |     ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit), BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
@@ -2843,7 +2843,7 @@ class InvokeScriptTransactionDiffTest
              | func foo() = {
              |  let b1 = wavesBalance(this)
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
-             |  if b1 == b1 && ob1 == ob1 && i.caller == i.originalCaller && i.callerPublicKey == i.originalCallerPublicKey
+             |  if b1 == b1 && ob1 == ob1 && i.caller == i.originCaller && i.callerPublicKey == i.originCallerPublicKey
              |  then
              |    let r = Invoke(Alias("${alias.name}"), "bar", [this.bytes, i.caller.bytes], [AttachedPayment(unit, 17)])
              |    if r == 17
