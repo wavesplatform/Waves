@@ -326,7 +326,7 @@ object UtilsApiRoute {
           )
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
         limitedResult <- EvaluatorV2
-          .applyLimited(call, limit, ctx, script.stdLibVersion)
+          .applyLimited(call, limit, ctx, script.stdLibVersion, checkConstructorArgsTypes = true)
           .leftMap { case (err, log) => ScriptExecutionError.dAppExecution(err, log) }
         result <- limitedResult match {
           case (eval: EVALUATED, unusedComplexity, _) => Right((eval, limit - unusedComplexity))
