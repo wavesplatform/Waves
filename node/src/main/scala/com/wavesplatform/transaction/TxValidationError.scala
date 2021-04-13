@@ -58,7 +58,7 @@ object TxValidationError {
       cause: Cause,
       spentComplexity: Long,
       log: Log[Id],
-      error: Option[String],
+      error: Option[ValidationError],
       assetId: Option[ByteStr] = None,
       invokeScriptResult: Option[InvokeScriptResult] = None
   ) extends ValidationError
@@ -66,12 +66,17 @@ object TxValidationError {
     import FailedTransactionError._
 
     def getInvokeScriptResult: InvokeScriptResult =
-      invokeScriptResult.getOrElse(InvokeScriptResult.empty)
+      invokeScriptResult
+        .orElse(error match {
+          case Some(fte: FailedTransactionError) => fte.invokeScriptResult
+          case _                                 => None
+        })
+        .getOrElse(InvokeScriptResult.empty)
 
     def code: Int = cause.code
     def message: String = cause match {
-      case Cause.DAppExecution | Cause.FeeForActions     => error.get
-      case Cause.AssetScriptInAction | Cause.AssetScript => assetScriptError(assetId.get, error)
+      case Cause.DAppExecution | Cause.FeeForActions     => error.fold("Unknown error")(_.toString)
+      case Cause.AssetScriptInAction | Cause.AssetScript => assetScriptError(assetId.get, error.map(_.toString))
     }
 
     def isAssetScript: Boolean    = assetId.isDefined
@@ -86,24 +91,27 @@ object TxValidationError {
       if (message.startsWith("FailedTransactionError"))
         message
       else
-        s"FailedTransactionError(code = ${cause.code}, error = $message, log =${logToString(log)})"
+        s"FailedTransactionError(code = ${cause.code}, error = $message, log =${logToString(log)}, $invokeScriptResult)"
   }
 
   object FailedTransactionError {
-    def dAppExecution(error: String, spentComplexity: Long, log: Log[Id] = List.empty): FailedTransactionError =
+    def dAppExecutionE(error: ValidationError, spentComplexity: Long, log: Log[Id] = List.empty): FailedTransactionError =
       FailedTransactionError(Cause.DAppExecution, spentComplexity, log, Some(error), None)
 
+    def dAppExecution(error: String, spentComplexity: Long, log: Log[Id] = List.empty): FailedTransactionError =
+      dAppExecutionE(GenericError(error), spentComplexity, log)
+
     def feeForActions(error: String, spentComplexity: Long): FailedTransactionError =
-      FailedTransactionError(Cause.FeeForActions, spentComplexity, List.empty, Some(error), None)
+      FailedTransactionError(Cause.FeeForActions, spentComplexity, List.empty, Some(GenericError(error)), None)
 
     def assetExecutionInAction(error: String, spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
-      FailedTransactionError(Cause.AssetScriptInAction, spentComplexity, log, Some(error), Some(assetId))
+      FailedTransactionError(Cause.AssetScriptInAction, spentComplexity, log, Some(GenericError(error)), Some(assetId))
 
     def notAllowedByAssetInAction(spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
       FailedTransactionError(Cause.AssetScriptInAction, spentComplexity, log, None, Some(assetId))
 
     def assetExecution(error: String, spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
-      FailedTransactionError(Cause.AssetScript, spentComplexity, log, Some(error), Some(assetId))
+      FailedTransactionError(Cause.AssetScript, spentComplexity, log, Some(GenericError(error)), Some(assetId))
 
     def notAllowedByAsset(spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
       FailedTransactionError(Cause.AssetScript, spentComplexity, log, None, Some(assetId))

@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
+import scala.util.{Failure, Right, Success, Try}
+
 import cats.implicits._
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
@@ -17,27 +19,25 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, _}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, _}
+import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.DiffsCommon
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
+import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.transaction.validation.impl.{LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
-import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import com.wavesplatform.utils._
 import shapeless.Coproduct
-
-import scala.util.{Failure, Right, Success, Try}
 
 object InvokeDiffsCommon {
   def txFeeDiff(blockchain: Blockchain, tx: InvokeScriptTransaction): Either[GenericError, (Long, Map[Address, Portfolio])] = {
@@ -603,9 +603,8 @@ object InvokeDiffsCommon {
 
   private def asFailedScriptError(ve: ValidationError): FailedTransactionError =
     ve match {
-      case e: FailedTransactionError => e
-      case e: GenericError           => FailedTransactionError.dAppExecution(e.err, 0L)
-      case e                         => FailedTransactionError.dAppExecution(e.toString, 0L)
+      case fte: FailedTransactionError => fte
+      case err                         => FailedTransactionError.dAppExecutionE(err, 0L)
     }
 
   case class StepInfo(

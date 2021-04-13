@@ -79,7 +79,7 @@ object TransactionDiffer {
           acceptFailed(blockchain) && blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
 
         if (transactionDiff.scriptsComplexity > ContractLimits.FailFreeInvokeComplexity && transactionMayFail(tx) && acceptFailedByBalance())
-          FailedTransactionError(FailedTransactionError.Cause.DAppExecution, transactionDiff.scriptsComplexity, Nil, Some(err.toString))
+          FailedTransactionError(FailedTransactionError.Cause.DAppExecution, transactionDiff.scriptsComplexity, Nil, Some(err))
         else
           err
       }

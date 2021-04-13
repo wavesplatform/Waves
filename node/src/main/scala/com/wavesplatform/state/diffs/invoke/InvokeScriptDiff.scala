@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
+import scala.util.Right
+
 import cats.Id
 import cats.implicits._
 import com.wavesplatform.account._
@@ -11,26 +13,24 @@ import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.transaction.{Transaction, TxValidationError}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, CoevalR, TracedResult}
-import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
-import com.wavesplatform.transaction.{Transaction, TxValidationError}
+import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import monix.eval.Coeval
 import shapeless.Coproduct
-
-import scala.util.Right
 
 object InvokeScriptDiff {
   private val stats = TxProcessingStats
@@ -164,7 +164,7 @@ object InvokeScriptDiff {
                   result <- CoevalR(
                     evaluateV2(version, contract, invocation, environment, complexityAfterPayments, remainingComplexity).map(TracedResult(_))
                   )
-                } yield (environment.currentDiff, result, environment.avaliableActions, environment.avaliableData)
+                } yield (environment.currentDiff, result, environment.availableActions, environment.availableData)
               })
               scriptResultE
             }

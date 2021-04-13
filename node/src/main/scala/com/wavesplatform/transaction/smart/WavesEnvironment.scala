@@ -9,16 +9,17 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.traits._
-import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff}
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -26,7 +27,6 @@ import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless._
 
@@ -45,7 +45,7 @@ class WavesEnvironment(
 ) extends Environment[Id] {
   import com.wavesplatform.lang.v1.traits.Environment._
 
-  def currentBlockchain() = blockchain
+  def currentBlockchain(): Blockchain = blockchain
 
   override def height: Long = h()
 
@@ -69,15 +69,15 @@ class WavesEnvironment(
 
   def toAddress(recipient: Recipient): Option[com.wavesplatform.account.Address] = {
     recipient match {
-        case Address(bytes) =>
-          com.wavesplatform.account.Address
-            .fromBytes(bytes.arr)
-            .toOption
-        case Alias(name) =>
-          com.wavesplatform.account.Alias
-            .create(name)
-            .flatMap(blockchain.resolveAlias)
-            .toOption
+      case Address(bytes) =>
+        com.wavesplatform.account.Address
+          .fromBytes(bytes.arr)
+          .toOption
+      case Alias(name) =>
+        com.wavesplatform.account.Alias
+          .create(name)
+          .flatMap(blockchain.resolveAlias)
+          .toOption
     }
   }
 
@@ -96,7 +96,7 @@ class WavesEnvironment(
         }
     } yield data
   }
- 
+
   override def hasData(recipient: Recipient): Boolean = {
     (for {
       address <- recipient match {
@@ -110,10 +110,8 @@ class WavesEnvironment(
             .flatMap(blockchain.resolveAlias)
             .toOption
       }
-    } yield
-      currentBlockchain()
-        .hasData(address)
-    ).getOrElse(false)
+    } yield currentBlockchain()
+      .hasData(address)).getOrElse(false)
   }
 
   override def resolveAlias(name: String): Either[String, Recipient.Address] =
@@ -219,7 +217,7 @@ class WavesEnvironment(
   override def accountScript(addressOrAlias: Recipient): Option[Script] = {
     for {
       address <- toAddress(addressOrAlias)
-      si <- blockchain.accountScript(address)
+      si      <- blockchain.accountScript(address)
     } yield si.script
   }
 
@@ -232,6 +230,7 @@ class WavesEnvironment(
   ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
 }
 
+// CAUTION: Not thread safe
 class DAppEnvironment(
     nByte: Byte,
     in: Coeval[Environment.InputEntity],
@@ -245,14 +244,14 @@ class DAppEnvironment(
     callChain: Set[com.wavesplatform.account.Address],
     limitedExecution: Boolean,
     var remainingCalls: Int,
-    var avaliableActions: Int,
-    var avaliableData: Int,
+    var availableActions: Int,
+    var availableData: Int,
     var currentDiff: Diff
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.map(_.id()).getOrElse(ByteStr.empty)) {
 
-  private var mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
+  private[this] var mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
 
-  override def currentBlockchain() = mutableBlockchain
+  override def currentBlockchain(): CompositeBlockchain = this.mutableBlockchain
 
   override def callScript(
       dApp: Address,
@@ -261,6 +260,13 @@ class DAppEnvironment(
       payments: Seq[(Option[Array[Byte]], Long)],
       availableComplexity: Int
   ): Coeval[(Either[ValidationError, EVALUATED], Int)] = {
+    val invocation = InvokeScriptResult.Invocation(
+      account.Address.fromBytes(dApp.bytes.arr).explicitGet(),
+      InvokeScriptResult.Call(func, args),
+      payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves: Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
+      InvokeScriptResult.empty
+    )
+
     val r = for {
       invoke <- traced(
         account.Address
@@ -281,45 +287,39 @@ class DAppEnvironment(
             )
           )
       )
-      (diff, evaluated, remainingActions, remainingData) <- InvokeScriptDiff(
+      (diff, evaluated, remainingActions, remainingData) <- InvokeScriptDiff(  // This is recursive call
         mutableBlockchain,
         blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
         limitedExecution,
         availableComplexity,
         remainingCalls,
-        avaliableActions,
-        avaliableData,
+        availableActions,
+        availableData,
         callChain
       )(invoke)
     } yield {
       val fixedDiff = diff.copy(
-        scriptResults = Map(
-          txId ->
-            InvokeScriptResult(
-              invokes = Seq(
-                InvokeScriptResult.Invocation(
-                  invoke.dAppAddress,
-                  InvokeScriptResult.Call(func, args),
-                  payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves: Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
-                  diff.scriptResults(txId)
-                )
-              )
-            )
-        ),
+        scriptResults = Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))),
         scriptsRun = diff.scriptsRun + 1
       )
       currentDiff = currentDiff combine fixedDiff
       mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
       remainingCalls = remainingCalls - 1
-      avaliableActions = remainingActions
-      avaliableData = remainingData
+      availableActions = remainingActions
+      availableData = remainingData
       (evaluated, diff.scriptsComplexity.toInt)
     }
+
     r.v.map {
       _.resultE match {
-        case Left(f: FailedTransactionError) => (Left(f), f.spentComplexity.toInt)
-        case Left(e)                         => (Left(e), 0)
-        case Right((evaluated, complexity))  => (Right(evaluated), complexity)
+        case Left(f: FailedTransactionError) =>
+          val result = f.getInvokeScriptResult |+| InvokeScriptResult(invokes = Seq(invocation))
+          (
+            Left(f.copy(invokeScriptResult = Some(result))),
+            f.spentComplexity.toInt
+          )
+        case Left(e)                        => (Left(e), 0)
+        case Right((evaluated, complexity)) => (Right(evaluated), complexity)
       }
     }
   }

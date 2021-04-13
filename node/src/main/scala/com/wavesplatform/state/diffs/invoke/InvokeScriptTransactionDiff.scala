@@ -58,7 +58,9 @@ object InvokeScriptTransactionDiff {
         payments: AttachedPayments,
         environment: DAppEnvironment
     ) = {
-      def executeMainScript(): TracedResult[ValidationError, (Diff, ScriptResult, Log[Id], Int, Int)] = {
+      case class MainScriptResult(invocationDiff: Diff, scriptResult: ScriptResult, log: Log[Id], availableActions: Int, availableData: Int)
+
+      def executeMainScript(): TracedResult[ValidationError, MainScriptResult] = {
         val scriptResultE = Stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId) {
           val invoker = Recipient.Address(ByteStr(tx.sender.toAddress.bytes))
           val invocation = ContractEvaluator.Invocation(
@@ -100,7 +102,7 @@ object InvokeScriptTransactionDiff {
               invocationComplexity.toInt,
               paymentsComplexity.toInt
             )
-          } yield (environment.currentDiff, result, log, environment.avaliableActions, environment.avaliableData)
+          } yield MainScriptResult(environment.currentDiff, result, log, environment.availableActions, environment.availableData)
         }
 
         TracedResult(
@@ -110,18 +112,18 @@ object InvokeScriptTransactionDiff {
               tx.id(),
               tx.dAppAddressOrAlias,
               functionCall,
-              scriptResultE.map(_._2),
-              scriptResultE.fold(_.log, _._3)
+              scriptResultE.map(_.scriptResult),
+              scriptResultE.fold(_.log, _.log)
             )
           )
         )
       }
 
       for {
-        (invocationDiff, scriptResult, log, availableActions, availableData) <- executeMainScript()
+        MainScriptResult(invocationDiff, scriptResult, log, availableActions, availableData) <- executeMainScript()
         otherIssues = invocationDiff.scriptResults.get(tx.id()).fold(Seq.empty[Issue])(allIssues)
 
-        doProcessActions: ((List[CallableAction], Long) => TracedResult[ValidationError, Diff]) = InvokeDiffsCommon.processActions(
+        doProcessActions = InvokeDiffsCommon.processActions(
           _,
           version,
           dAppAddress,
@@ -157,7 +159,11 @@ object InvokeScriptTransactionDiff {
       } yield invocationDiff |+| resultDiff
     }
 
-    def calcInvocationComplexity(version: StdLibVersion, callableComplexities: Map[Int, Map[String, Long]], dAppAddress: Address) = {
+    def calcInvocationComplexity(
+        version: StdLibVersion,
+        callableComplexities: Map[Int, Map[String, Long]],
+        dAppAddress: Address
+    ): TracedResult[ValidationError, (Long, Long)] = {
       for {
         invocationComplexity <- TracedResult {
           InvokeDiffsCommon.getInvocationComplexity(blockchain, tx.funcCall, callableComplexities, dAppAddress)
@@ -220,7 +226,7 @@ object InvokeScriptTransactionDiff {
           result <- executeInvoke(pk, version, contract, dAppAddress, invocationComplexity, fixedInvocationComplexity, payments, environment)
             .leftMap {
               case fte: FailedTransactionError =>
-                fte.copy(invokeScriptResult = Some(environment.currentDiff.scriptResults.getOrElse(tx.id(), InvokeScriptResult.empty)))
+                fte
               case err: ValidationError => err
             }
         } yield result
