@@ -127,7 +127,7 @@ object TransactionDiffer {
       } yield ()
 
   private def verifierDiff(blockchain: Blockchain, tx: Transaction) =
-    Verifier(blockchain)(tx).as(Diff.empty.copy(scriptsComplexity = DiffsCommon.getAccountsComplexity(blockchain, tx)))
+    Verifier(blockchain)(tx).map(complexity => Diff.empty.copy(scriptsComplexity = complexity))
 
   private def assetsVerifierDiff(
       blockchain: Blockchain,

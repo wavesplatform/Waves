@@ -1,6 +1,6 @@
 package com.wavesplatform.features
 
-import com.wavesplatform.features.BlockchainFeatures.{BlockReward, BlockV5}
+import com.wavesplatform.features.BlockchainFeatures.{BlockReward, BlockV5, SynchronousCalls}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
@@ -13,6 +13,9 @@ object EstimatorProvider {
       if (b.isFeatureActivated(BlockV5)) ScriptEstimatorV3
       else if (b.isFeatureActivated(BlockReward)) ScriptEstimatorV2
       else ScriptEstimatorV1
+
+    def storeEvaluatedComplexity: Boolean =
+      b.isFeatureActivated(SynchronousCalls)
   }
 
   implicit class EstimatorWavesSettingsExt(ws: WavesSettings) {

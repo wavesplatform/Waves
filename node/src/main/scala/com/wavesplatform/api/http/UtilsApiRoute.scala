@@ -323,8 +323,9 @@ object UtilsApiRoute {
           )
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
         limitedResult <- EvaluatorV2
-          .applyLimited(call, limit, ctx, script.stdLibVersion)
-          .leftMap { case (err, log) => ScriptExecutionError.dAppExecution(err, log) }
+          .applyLimitedCoeval(call, limit, ctx, script.stdLibVersion)
+          .value()
+          .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err, log) }
         result <- limitedResult match {
           case (eval: EVALUATED, _, _) => Right(eval)
           case (_: EXPR, _, log)       => Left(ScriptExecutionError.dAppExecution(s"Calculation complexity limit exceeded", log))
