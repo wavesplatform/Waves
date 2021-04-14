@@ -59,7 +59,7 @@ package object JsApiUtils {
       "posStart"    -> ast.position.start,
       "posEnd"      -> ast.position.end,
       "decList"     -> ast.decs.map(serDec).toJSArray,
-      "annFuncList" -> ast.fs.map(serAnnFunc)
+      "annFuncList" -> ast.fs.map(serAnnFunc).toJSArray
     )
   }
 
@@ -78,11 +78,13 @@ package object JsApiUtils {
       t match {
         case ut: UNION =>
           jObj.applyDynamic("apply")(
-            "unionTypes" -> ut.typeList.map(serType(_)).toJSArray
+            "type" -> "Union",
+            "subTypes" -> ut.typeList.map(serType(_)).toJSArray
           )
         case lt: LIST =>
           jObj.applyDynamic("apply")(
-            "listOf" -> serType(lt.innerType)
+            "type" -> "List",
+            "subTypes" -> serType(lt.innerType)
           )
         case someT =>
           jObj.applyDynamic("apply")(

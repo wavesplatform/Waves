@@ -494,7 +494,7 @@ object ExpressionCompiler {
         p,
         compLetResult.parseNodeExpr,
         compiledBody.parseNodeExpr,
-        compiledBody.parseNodeExpr.resultType,
+        resultType = compiledBody.parseNodeExpr.resultType,
         ctxOpt = saveExprContext.toOption(compiledBody.ctx.getSimpleContext())
       )
       result = if (!compLetResult.dec.isItFailed) {
@@ -525,7 +525,7 @@ object ExpressionCompiler {
         p,
         compFuncStepRes.parseNodeExpr,
         compiledBody.parseNodeExpr,
-        compiledBody.parseNodeExpr.resultType,
+        resultType = compiledBody.parseNodeExpr.resultType,
         ctxOpt = saveExprContext.toOption(compFuncStepRes.ctx.getSimpleContext())
       )
     } yield CompilationStepResultExpr(compiledBody.ctx, expr, compiledBody.t, parseNodeExpr, compFuncStepRes.errors ++ compiledBody.errors)
@@ -544,11 +544,17 @@ object ExpressionCompiler {
       getterWithErr <- mkGetter(p, ctx, compiledRef.t.typeList, fieldWithErr._1.getOrElse("NO_NAME"), compiledRef.expr).toCompileM.handleError()
 
       errorList     = fieldWithErr._2 ++ getterWithErr._2
-      parseNodeExpr = Expressions.GETTER(p, compiledRef.parseNodeExpr, fieldPart, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
+      parseNodeExpr = Expressions.GETTER(
+        p,
+        compiledRef.parseNodeExpr,
+        fieldPart,
+        resultType = getterWithErr._1.map(_._3),
+        ctxOpt = saveExprContext.toOption(ctx.getSimpleContext())
+      )
 
       result = if (errorList.isEmpty) {
         val (ctx, expr, t) = getterWithErr._1.get
-        CompilationStepResultExpr(ctx, expr, t, parseNodeExpr.copy(resultType = Some(t)), compiledRef.errors)
+        CompilationStepResultExpr(ctx, expr, t, parseNodeExpr, compiledRef.errors)
       } else {
         CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, parseNodeExpr, errorList ++ compiledRef.errors)
       }
@@ -587,6 +593,7 @@ object ExpressionCompiler {
         p,
         namePart,
         compiledArgs.map(_.parseNodeExpr),
+        resultType = funcCallWithErr._1.map(_._2),
         ctxOpt = saveExprContext.toOption(ctx.getSimpleContext())
       )
 
@@ -614,7 +621,7 @@ object ExpressionCompiler {
           ctx,
           REF(keyWithErr._1.get),
           typeWithErr._1.get,
-          Expressions.REF(p, keyPart, None, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
+          Expressions.REF(p, keyPart, typeWithErr._1, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
         )
       } else {
         CompilationStepResultExpr(
