@@ -39,7 +39,7 @@ class RideV5LimitsChangeTest extends FlatSpec with Matchers with WithDomain with
       d.blockchain,
       Some(d.lastBlock),
       block,
-      MiningConstraints(d.blockchain, d.blockchain.height, Some(defaultDomainSettings.minerSettings)).total
+      MiningConstraints(d.blockchain, d.blockchain.height, Some(SettingsFromDefaultConfig.minerSettings)).total
     )
     differResult should produce("Limit of txs was reached")
   }
@@ -69,7 +69,7 @@ class RideV5LimitsChangeTest extends FlatSpec with Matchers with WithDomain with
         d.blockchain,
         Some(d.lastBlock),
         block,
-        MiningConstraints(d.blockchain, d.blockchain.height, Some(defaultDomainSettings.minerSettings)).total
+        MiningConstraints(d.blockchain, d.blockchain.height, Some(SettingsFromDefaultConfig.minerSettings)).total
       )
       .explicitGet()
     differResult.constraint.asInstanceOf[MultiDimensionalMiningConstraint].constraints.head shouldBe OneDimensionalMiningConstraint(
