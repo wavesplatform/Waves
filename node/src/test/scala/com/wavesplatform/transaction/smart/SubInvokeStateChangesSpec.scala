@@ -11,30 +11,42 @@ import org.scalatest.{FlatSpec, Matchers}
 import play.api.libs.json.Json
 
 class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
-  val ContractFunction = "default"
+  val ContractFunction            = "default"
   val compileV5: String => Script = TestCompiler(StdLibVersion.V5).compileContract _
 
-  "Invoke state changes" should "include intermediary invokes" in withDomain(DomainPresets.RideV5) { d =>
+  "Invoke state changes" should "include intermediate invokes" in withDomain(DomainPresets.RideV5) { d =>
+    // Root DApp, calls addr2s and addr2f
     val dAppAddress = TxHelpers.signer(1)
 
-    { // Prerequisites
-      val addr2 = TxHelpers.signer(2)
-      val addr3 = TxHelpers.signer(3)
+    // Success chain
+    val addr2s = TxHelpers.signer(3) // Calls addr3s
+    val addr3s = TxHelpers.signer(5) // Finishes successfully
 
-      val script1 = compileV5(genScript(Some(addr2.toAddress)))
-      val script2 = compileV5(genScript(Some(addr3.toAddress)))
-      val script3 = compileV5(genScript(None, fail = true))
+    // Failed chain
+    val addr2f = TxHelpers.signer(2) // Calls addr3f
+    val addr3f = TxHelpers.signer(4) // Fails
+
+    { // Prerequisites
+      val script1    = compileV5(genScript(Seq(addr2s.toAddress, addr2f.toAddress)))
+      val script2    = compileV5(genScript(Some(addr3f.toAddress)))
+      val script3    = compileV5(genScript(None, fail = true))
+      val script2alt = compileV5(genScript(Some(addr3s.toAddress)))
+      val script3alt = compileV5(genScript(None))
 
       val genesis = Seq(
         TxHelpers.genesis(TxHelpers.defaultAddress),
         TxHelpers.genesis(dAppAddress.toAddress, 1.waves),
-        TxHelpers.genesis(addr2.toAddress, 1.waves),
-        TxHelpers.genesis(addr3.toAddress, 1.waves)
+        TxHelpers.genesis(addr2f.toAddress, 1.waves),
+        TxHelpers.genesis(addr3f.toAddress, 1.waves),
+        TxHelpers.genesis(addr2s.toAddress, 1.waves),
+        TxHelpers.genesis(addr3s.toAddress, 1.waves)
       )
       val setScripts = Seq(
         TxHelpers.setScript(dAppAddress, script1),
-        TxHelpers.setScript(addr2, script2),
-        TxHelpers.setScript(addr3, script3)
+        TxHelpers.setScript(addr2f, script2),
+        TxHelpers.setScript(addr3f, script3),
+        TxHelpers.setScript(addr2s, script2alt),
+        TxHelpers.setScript(addr3s, script3alt)
       )
       d.appendBlock(genesis ++ setScripts: _*)
     }
@@ -45,11 +57,99 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
 
     val stateChanges = d.commonApi.invokeScriptResult(invoke.id())
     val json         = Json.toJson(stateChanges)
-    println(Json.prettyPrint(json))
-    json shouldBe Json.parse("""""")
+    json shouldBe Json.parse(
+      s"""
+        |{
+        |  "data" : [ ],
+        |  "transfers" : [ ],
+        |  "issues" : [ ],
+        |  "reissues" : [ ],
+        |  "burns" : [ ],
+        |  "sponsorFees" : [ ],
+        |  "leases" : [ ],
+        |  "leaseCancels" : [ ],
+        |  "invokes" : [ {
+        |    "dApp" : "${addr2s.toAddress}",
+        |    "call" : {
+        |      "function" : "default",
+        |      "args" : [ ]
+        |    },
+        |    "payments" : [ ],
+        |    "stateChanges" : {
+        |      "data" : [ ],
+        |      "transfers" : [ ],
+        |      "issues" : [ ],
+        |      "reissues" : [ ],
+        |      "burns" : [ ],
+        |      "sponsorFees" : [ ],
+        |      "leases" : [ ],
+        |      "leaseCancels" : [ ],
+        |      "invokes" : [ {
+        |        "dApp" : "${addr3s.toAddress}",
+        |        "call" : {
+        |          "function" : "default",
+        |          "args" : [ ]
+        |        },
+        |        "payments" : [ ],
+        |        "stateChanges" : {
+        |          "data" : [ ],
+        |          "transfers" : [ ],
+        |          "issues" : [ ],
+        |          "reissues" : [ ],
+        |          "burns" : [ ],
+        |          "sponsorFees" : [ ],
+        |          "leases" : [ ],
+        |          "leaseCancels" : [ ],
+        |          "invokes" : [ ]
+        |        }
+        |      } ]
+        |    }
+        |  }, {
+        |    "dApp" : "${addr2f.toAddress}",
+        |    "call" : {
+        |      "function" : "default",
+        |      "args" : [ ]
+        |    },
+        |    "payments" : [ ],
+        |    "stateChanges" : {
+        |      "data" : [ ],
+        |      "transfers" : [ ],
+        |      "issues" : [ ],
+        |      "reissues" : [ ],
+        |      "burns" : [ ],
+        |      "sponsorFees" : [ ],
+        |      "leases" : [ ],
+        |      "leaseCancels" : [ ],
+        |      "invokes" : [ {
+        |        "dApp" : "${addr3f.toAddress}",
+        |        "call" : {
+        |          "function" : "default",
+        |          "args" : [ ]
+        |        },
+        |        "payments" : [ ],
+        |        "stateChanges" : {
+        |          "data" : [ ],
+        |          "transfers" : [ ],
+        |          "issues" : [ ],
+        |          "reissues" : [ ],
+        |          "burns" : [ ],
+        |          "sponsorFees" : [ ],
+        |          "leases" : [ ],
+        |          "leaseCancels" : [ ],
+        |          "invokes" : [ ]
+        |        }
+        |      } ]
+        |    }
+        |  } ],
+        |  "error" : {
+        |    "code" : 1,
+        |    "text" : "GenericError(FailedTransactionError(code = 1, error = GenericError(FailedTransactionError(code = 1, error = GenericError(boom), log =\\n\\t@p = false\\n)), log =\\n\\tr0 = Left(FailedTransactionError(code = 1, error = GenericError(boom), log =\\n\\t@p = false\\n))\\n))"
+        |  }
+        |}""".stripMargin
+    )
   }
 
-  def genScript(otherDApp: Option[Address], fail: Boolean = false): String =
+  def genScript(calls: Iterable[Address], fail: Boolean = false): String =
     s"""
        |{-# STDLIB_VERSION 5       #-}
        |{-# CONTENT_TYPE   DAPP    #-}
@@ -57,7 +157,9 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
        |
        |@Callable(i)
        |func $ContractFunction() = {
-       |  ${otherDApp.fold("")(address => s"""strict r = Invoke(Address(base58'$address'), "$ContractFunction", [], [])""")}
+       |  ${calls.zipWithIndex
+         .map { case (address, i) => s"""strict r$i = Invoke(Address(base58'$address'), "$ContractFunction", [], [])""" }
+         .mkString("\n")}
        |  if ($fail && !(${(1 to 10).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")})) then throw("boom") else []
        |}""".stripMargin
 }

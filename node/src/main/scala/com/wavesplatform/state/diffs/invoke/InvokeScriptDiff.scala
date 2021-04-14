@@ -45,7 +45,7 @@ object InvokeScriptDiff {
       remainingActions: Int,
       remainingData: Int,
       calledAddresses: Set[Address],
-      logInvocation: DAppEnvironment.DAppInvocation => Unit
+      invocationRoot: DAppEnvironment.InvocationTreeTracker
   )(
       tx: InvokeScript
   ): CoevalR[(Diff, EVALUATED, Int, Int)] = {
@@ -164,7 +164,7 @@ object InvokeScriptDiff {
                   remainingActions,
                   remainingData,
                   if (version < V5) Diff.empty else InvokeDiffsCommon.paymentsPart(tx, tx.dAppAddress, Map()),
-                  logInvocation
+                  invocationRoot
                 )
 
                 for {

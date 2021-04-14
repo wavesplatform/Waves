@@ -232,6 +232,26 @@ class WavesEnvironment(
 }
 
 object DAppEnvironment {
+  // Not thread safe
+  final case class InvocationTreeTracker(root: DAppInvocation) {
+    private[this] var invocations = Vector.empty[InvocationTreeTracker]
+
+    def record(invocation: DAppInvocation): InvocationTreeTracker = {
+      val tracker = new InvocationTreeTracker(invocation)
+      this.invocations :+= tracker
+      tracker
+    }
+
+    def toInvocationList: Seq[InvokeScriptResult.Invocation] = {
+      this.invocations.to(LazyList).map { inv =>
+        val subInvokes = inv.toInvocationList
+        val call       = InvokeScriptResult.Call.fromFunctionCall(inv.root.call)
+        val payments   = InvokeScriptResult.AttachedPayment.fromInvokePaymentList(inv.root.payments)
+        InvokeScriptResult.Invocation(inv.root.dAppAddress, call, payments, InvokeScriptResult(invokes = subInvokes))
+      }
+    }
+  }
+
   final case class DAppInvocation(dAppAddress: com.wavesplatform.account.Address, call: FUNCTION_CALL, payments: Seq[InvokeScriptTransaction.Payment])
   object DAppInvocation {
     def fromInvocation(dAppAddress: com.wavesplatform.account.Address, invocation: ContractEvaluator.Invocation): DAppInvocation = {
@@ -244,24 +264,24 @@ object DAppEnvironment {
   }
 }
 
-// CAUTION: Not thread safe
+// Not thread safe
 class DAppEnvironment(
-    nByte: Byte,
-    in: Coeval[Environment.InputEntity],
-    h: Coeval[Int],
-    blockchain: Blockchain,
-    tthis: Environment.Tthis,
-    ds: DirectiveSet,
-    tx: Option[InvokeScriptTransaction],
-    currentDApp: com.wavesplatform.account.Address,
-    currentDAppPk: com.wavesplatform.account.PublicKey,
-    calledAddresses: Set[com.wavesplatform.account.Address],
-    limitedExecution: Boolean,
-    var remainingCalls: Int,
-    var availableActions: Int,
-    var availableData: Int,
-    var currentDiff: Diff,
-    logInvocation: DAppEnvironment.DAppInvocation => Unit
+                       nByte: Byte,
+                       in: Coeval[Environment.InputEntity],
+                       h: Coeval[Int],
+                       blockchain: Blockchain,
+                       tthis: Environment.Tthis,
+                       ds: DirectiveSet,
+                       tx: Option[InvokeScriptTransaction],
+                       currentDApp: com.wavesplatform.account.Address,
+                       currentDAppPk: com.wavesplatform.account.PublicKey,
+                       calledAddresses: Set[com.wavesplatform.account.Address],
+                       limitedExecution: Boolean,
+                       var remainingCalls: Int,
+                       var availableActions: Int,
+                       var availableData: Int,
+                       var currentDiff: Diff,
+                       invocationRoot: DAppEnvironment.InvocationTreeTracker
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.map(_.id()).getOrElse(ByteStr.empty)) {
 
   private[this] var mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
@@ -302,10 +322,10 @@ class DAppEnvironment(
             )
           )
       )
-      _ = {
+      invocationTracker = {
         // Log sub-contract invocation
         val invocation = DAppEnvironment.DAppInvocation(invoke.dAppAddress, invoke.funcCall, invoke.payments)
-        logInvocation(invocation)
+        invocationRoot.record(invocation)
       }
       (diff, evaluated, remainingActions, remainingData) <- InvokeScriptDiff( // This is a recursive call
         mutableBlockchain,
@@ -316,7 +336,7 @@ class DAppEnvironment(
         availableActions,
         availableData,
         calledAddresses,
-        logInvocation
+        invocationTracker
       )(invoke)
     } yield {
       val fixedDiff = diff.copy(

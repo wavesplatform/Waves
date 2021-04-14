@@ -45,8 +45,11 @@ object InvokeScriptTransactionDiff {
   ): TracedResult[ValidationError, Diff] = {
 
     val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
-    val accScriptEi   = dAppAddressEi.map(blockchain.accountScript)
-    val functionCall  = tx.funcCall
+    val accScriptEi =
+      for (address <- dAppAddressEi;
+           script  <- blockchain.accountScript(address).toRight(GenericError(s"No contract at address ${tx.dAppAddressOrAlias}")))
+        yield (address, script)
+    val functionCall = tx.funcCall
 
     def executeInvoke(
         pk: PublicKey,
@@ -178,11 +181,10 @@ object InvokeScriptTransactionDiff {
     }
 
     accScriptEi match {
-      case Right(Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities))) =>
-        for {
-          _           <- TracedResult(checkCall(functionCall, blockchain).leftMap(GenericError(_)))
-          dAppAddress <- TracedResult(dAppAddressEi)
-
+      case Right((dAppAddress, AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities))) =>
+        val invocationTracker = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(dAppAddress, tx.funcCall, tx.payments))
+        (for {
+          _                                                 <- TracedResult(checkCall(functionCall, blockchain).leftMap(GenericError(_)))
           (invocationComplexity, fixedInvocationComplexity) <- calcInvocationComplexity(version, callableComplexities, dAppAddress)
 
           (directives, payments, tthis, input) <- TracedResult(for {
@@ -221,18 +223,20 @@ object InvokeScriptTransactionDiff {
             ContractLimits.MaxCallableActionsAmount(version),
             ContractLimits.MaxWriteSetSize(version),
             if (version < V5) Diff.empty else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()),
-            invocation => println(invocation) // Here we += it to the mutable list
+            invocationTracker
           )
 
           result <- executeInvoke(pk, version, contract, dAppAddress, invocationComplexity, fixedInvocationComplexity, environment, invocation)
             .leftMap {
               case fte: FailedTransactionError => fte
-              case err: ValidationError => err
+              case err: ValidationError        => err
             }
-        } yield result
+        } yield result).leftMap {
+          case fte: FailedTransactionError => fte.copy(invocations = invocationTracker.toInvocationList)
+          case other => other
+        }
 
       case Left(error) => TracedResult(Left(error))
-      case _           => TracedResult(Left(GenericError(s"No contract at address ${tx.dAppAddressOrAlias}")))
     }
   }
 

@@ -319,7 +319,7 @@ object UtilsApiRoute {
               availableActions = ContractLimits.MaxCallableActionsAmount(script.stdLibVersion),
               availableData = ContractLimits.MaxWriteSetSize(script.stdLibVersion),
               currentDiff = Diff.empty,
-              logInvocation = _ => ()
+              invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(address, null, Nil))
             )
           )
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)

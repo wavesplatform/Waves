@@ -15,6 +15,7 @@ import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils._
 import play.api.libs.json._
 
@@ -36,13 +37,19 @@ object InvokeScriptResult {
   val empty = InvokeScriptResult()
 
   final case class AttachedPayment(asset: Asset, amount: Long)
-  implicit val attachedPaymentWrites = Json.writes[AttachedPayment]
+  object AttachedPayment {
+    implicit val attachedPaymentWrites = Json.writes[AttachedPayment]
+
+    def fromInvokePaymentList(ps: Seq[InvokeScriptTransaction.Payment]): Seq[AttachedPayment] =
+      ps.map(p => AttachedPayment(p.assetId, p.amount))
+  }
 
   final case class Call(function: String, args: Seq[EVALUATED])
   object Call {
+    implicit val callWrites = Json.writes[Call]
+
     def fromFunctionCall(fc: FUNCTION_CALL): Call = Call(fc.function.funcName, fc.args.collect { case e: EVALUATED => e })
   }
-  implicit val callWrites = Json.writes[Call]
 
   final case class Invocation(dApp: Address, call: Call, payments: Seq[AttachedPayment], stateChanges: InvokeScriptResult)
 
