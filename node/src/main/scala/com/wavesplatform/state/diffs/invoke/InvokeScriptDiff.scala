@@ -86,52 +86,37 @@ object InvokeScriptDiff {
               .leftMap(GenericError(_))
           }
           complexityAfterPaymentsTraced = checkedPayments.foldLeft(TracedResult(Right(remainingComplexity): TxValidationError.Validation[Int])) {
-            (prev, a) =>
-              (prev, a) match {
-                case (TracedResult(Left(_), _), _) => prev
-                case (TracedResult(Right(nextRemainingComplexity), _), (script, amount, assetId)) =>
-                  val usedComplexity = limit - nextRemainingComplexity
-                  for {
-                    _ <- {
-                      def err = FailedTransactionError.assetExecution(s"Invoke complexity limit = $limit is exceeded", usedComplexity, Nil, assetId)
-                      TracedResult(
-                        Either.cond(script.complexity <= nextRemainingComplexity, (), err),
-                        List(AssetVerifierTrace(assetId, Some(err)))
-                      )
-                    }
-                    nextUnusedComplexity <- {
-                      val pseudoTx: PseudoTx = ScriptTransfer(
-                        Some(assetId),
-                        Recipient.Address(ByteStr(tx.senderDApp.bytes)),
-                        tx.sender,
-                        Recipient.Address(ByteStr(tx.dAppAddress.bytes)),
-                        amount,
-                        tx.timestamp,
-                        tx.txId
-                      )
-                      ScriptRunner(
-                        Coproduct[TxOrd](pseudoTx),
-                        blockchain,
-                        script.script,
-                        isAssetScript = true,
-                        scriptContainerAddress = Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr)),
-                        nextRemainingComplexity
-                      ) match {
-                        case (log, Left(error)) =>
-                          val err = FailedTransactionError.assetExecutionInAction(error, usedComplexity, log, assetId)
-                          TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
-                        case (log, Right(FALSE)) =>
-                          val err = FailedTransactionError.notAllowedByAsset(usedComplexity, log, assetId)
-                          TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
-                        case (_, Right(TRUE)) =>
-                          TracedResult(Right(nextRemainingComplexity - script.complexity.toInt))
-                        case (log, Right(x)) =>
-                          val err =
-                            FailedTransactionError.assetExecution(s"Script returned not a boolean result, but $x", usedComplexity, log, assetId)
-                          TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
-                      }
-                    }
-                  } yield nextUnusedComplexity
+            case (error @ TracedResult(Left(_), _), _) => error
+            case (TracedResult(Right(nextRemainingComplexity), _), (script, amount, assetId)) =>
+              val usedComplexity = limit - nextRemainingComplexity
+              val pseudoTx: PseudoTx = ScriptTransfer(
+                Some(assetId),
+                Recipient.Address(ByteStr(tx.senderDApp.bytes)),
+                tx.sender,
+                Recipient.Address(ByteStr(tx.dAppAddress.bytes)),
+                amount,
+                tx.timestamp,
+                tx.txId
+              )
+              ScriptRunner(
+                Coproduct[TxOrd](pseudoTx),
+                blockchain,
+                script.script,
+                isAssetScript = true,
+                scriptContainerAddress = Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr)),
+                nextRemainingComplexity
+              ) match {
+                case (log, Left(error)) =>
+                  val err = FailedTransactionError.assetExecutionInAction(error, usedComplexity, log, assetId)
+                  TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
+                case (log, Right(FALSE)) =>
+                  val err = FailedTransactionError.notAllowedByAsset(usedComplexity, log, assetId)
+                  TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
+                case (_, Right(TRUE)) =>
+                  TracedResult(Right(nextRemainingComplexity - script.complexity.toInt))
+                case (log, Right(x)) =>
+                  val err = FailedTransactionError.assetExecution(s"Script returned not a boolean result, but $x", usedComplexity, log, assetId)
+                  TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
               }
           }
           complexityAfterPayments <- CoevalR(Coeval.now(complexityAfterPaymentsTraced))
