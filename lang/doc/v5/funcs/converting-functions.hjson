@@ -48,9 +48,9 @@
     }
     {
       name: "toBytes"
-      params: [ "Int512" ]
-      doc: "Converts an Int512 to an array of bytes."
-      paramsDoc: [ "The Int512 to convert." ]
+      params: [ "BigInt" ]
+      doc: "Converts an BigInt to an array of bytes."
+      paramsDoc: [ "The BigInt to convert." ]
       complexity: 65
     }
     {
@@ -139,9 +139,9 @@
     }
     {
       name: "toString"
-      params: [ "Int512" ]
-      doc: "Convert Int512 to string"
-      paramsDoc: [ "The Int512 to convert" ]
+      params: [ "BigInt" ]
+      doc: "Convert BigInt to string"
+      paramsDoc: [ "The BigInt to convert" ]
       complexity: 65
     }
     {

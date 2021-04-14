@@ -85,8 +85,8 @@ object PureContext {
   lazy val ge: BaseFunction[NoContext] = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)(_ >= _)
   lazy val gt: BaseFunction[NoContext] =
     createOp(GT_OP, LONG, BOOLEAN, GT_LONG)(_ > _)
-  lazy val ge_big: BaseFunction[NoContext] = createBigOp(GE_OP, GE_BIGINT)(_ >= _)
-  lazy val gt_big: BaseFunction[NoContext] = createBigOp(GT_OP, GT_BIGINT)(_ > _)
+  lazy val geBigInt: BaseFunction[NoContext] = createBigOp(GE_OP, GE_BIGINT)(_ >= _)
+  lazy val gtBigInt: BaseFunction[NoContext] = createBigOp(GT_OP, GT_BIGINT)(_ > _)
 
   lazy val eq: BaseFunction[NoContext] =
     NativeFunction(EQ_OP.func, 1, EQ, BOOLEAN, ("a", TYPEPARAM('T')), ("b", TYPEPARAM('T'))) {
@@ -100,43 +100,43 @@ object PureContext {
       FUNCTION_CALL(uNot, List(FUNCTION_CALL(eq, List(REF("@a"), REF("@b")))))
     }
 
-  lazy val intToInt512: BaseFunction[NoContext] =
-    NativeFunction("toInt512", 1, TO_INT512, INT512, ("n", LONG)) {
-      case CONST_LONG(n) :: Nil => Right(CONST_INT512(BigInt(n)))
-      case xs                   => notImplemented[Id, EVALUATED]("toInt512(n: Int)", xs)
+  lazy val intToBigInt: BaseFunction[NoContext] =
+    NativeFunction("toBigInt", 1, TO_BIGINT, BIGINT, ("n", LONG)) {
+      case CONST_LONG(n) :: Nil => Right(CONST_BIGINT(BigInt(n)))
+      case xs                   => notImplemented[Id, EVALUATED]("toBigInt(n: Int)", xs)
     }
 
   lazy val int512ToInt: BaseFunction[NoContext] =
-    NativeFunction("toInt", 1, INT512_TO_INT, LONG, ("n", INT512)) {
-      case CONST_INT512(n) :: Nil =>
-        Either.cond(Long.MaxValue >= n && n >= Long.MinValue, CONST_LONG(n.toLong), s"toInt: Int512 $n out of integers range")
-      case xs => notImplemented[Id, EVALUATED]("toInt512(n: Int)", xs)
+    NativeFunction("toInt", 1, BIGINT_TO_INT, LONG, ("n", BIGINT)) {
+      case CONST_BIGINT(n) :: Nil =>
+        Either.cond(Long.MaxValue >= n && n >= Long.MinValue, CONST_LONG(n.toLong), s"toInt: BigInt $n out of integers range")
+      case xs => notImplemented[Id, EVALUATED]("toBigInt(n: Int)", xs)
     }
 
   lazy val int512ToString: BaseFunction[NoContext] =
-    NativeFunction("toString", 65, INT512_TO_STRING, STRING, ("n", INT512)) {
-      case CONST_INT512(n) :: Nil => CONST_STRING(n.toString)
-      case xs                     => notImplemented[Id, EVALUATED]("toString(n: Int512)", xs)
+    NativeFunction("toString", 65, BIGINT_TO_STRING, STRING, ("n", BIGINT)) {
+      case CONST_BIGINT(n) :: Nil => CONST_STRING(n.toString)
+      case xs                     => notImplemented[Id, EVALUATED]("toString(n: BigInt)", xs)
     }
 
-  lazy val stringToInt512: BaseFunction[NoContext] =
-    NativeFunction("parseInt512Value", 65, STRING_TO_INT512, INT512, ("n", STRING)) {
+  lazy val stringToBigInt: BaseFunction[NoContext] =
+    NativeFunction("parseBigIntValue", 65, STRING_TO_BIGINT, BIGINT, ("n", STRING)) {
       case CONST_STRING(n) :: Nil =>
         Either
           .cond(n.length <= 155, BigInt(n), s"String too long for 512-bits big integers (${n.length} when max is 155)")
           .filterOrElse(v => v <= max && v >= min, "Value too big for 512-bits big integer")
-          .map(CONST_INT512.apply)
-      case xs => notImplemented[Id, EVALUATED]("parseInt512Value(n: String)", xs)
+          .map(CONST_BIGINT.apply)
+      case xs => notImplemented[Id, EVALUATED]("parseBigIntValue(n: String)", xs)
     }
 
-  lazy val stringToInt512Opt: BaseFunction[NoContext] =
-    NativeFunction("parseInt512", 65, STRING_TO_INT512OPT, UNION(INT512, UNIT), ("n", STRING)) {
+  lazy val stringToBigIntOpt: BaseFunction[NoContext] =
+    NativeFunction("parseBigInt", 65, STRING_TO_BIGINTOPT, UNION(BIGINT, UNIT), ("n", STRING)) {
       case CONST_STRING(n) :: Nil =>
         Right((if (n.length <= 155) {
                  try {
                    val v = BigInt(n)
                    if (v <= max && v >= min) {
-                     CONST_INT512(v)
+                     CONST_BIGINT(v)
                    } else {
                      unit
                    }
@@ -146,41 +146,30 @@ object PureContext {
                } else {
                  unit
                }))
-      case xs => notImplemented[Id, EVALUATED]("parseInt512(n: String)", xs)
+      case xs => notImplemented[Id, EVALUATED]("parseBigInt(n: String)", xs)
     }
 
   lazy val int512ToBytes: BaseFunction[NoContext] =
-    NativeFunction("toBytes", 65, INT512_TO_BYTES, BYTESTR, ("n", INT512)) {
-      case CONST_INT512(n) :: Nil => CONST_BYTESTR(ByteStr(n.toByteArray))
-      case xs                     => notImplemented[Id, EVALUATED]("toBytes(n: Int512)", xs)
-    }
-
-  lazy val bytesToInt512Lim: BaseFunction[NoContext] =
-    NativeFunction("toInt512", 65, BYTES_TO_INT512_LIM, INT512, ("n", BYTESTR), ("off", LONG), ("size", LONG)) {
-      case CONST_BYTESTR(ByteStr(n)) :: CONST_LONG(off) :: CONST_LONG(s) :: Nil =>
-        Either.cond(
-          off >= 0 && off <= n.length && s <= 64 && s > 0,
-          CONST_INT512(BigInt(n.slice(off.toInt, (off + s).toInt))),
-          s"ByteStr too long ($s > 64 bytes)"
-        )
-      case xs => notImplemented[Id, EVALUATED]("toInt512(n: ByteStr, offset: Int, size: Int)", xs)
-    }
-
-  lazy val bytesToInt512: BaseFunction[NoContext] =
-    NativeFunction("toInt512", 65, BYTES_TO_INT512, INT512, ("n", BYTESTR)) {
-      case CONST_BYTESTR(ByteStr(n)) :: Nil => Either.cond(n.length <= 64, CONST_INT512(BigInt(n)), s"Too big ByteVector for Int512 (${n.length} > 64 bytes)")
-      case xs                               => notImplemented[Id, EVALUATED]("toInt512(n: ByteStr)", xs)
+    NativeFunction("toBytes", 65, BIGINT_TO_BYTES, BYTESTR, ("n", BIGINT)) {
+      case CONST_BIGINT(n) :: Nil => CONST_BYTESTR(ByteStr(n.toByteArray))
+      case xs                     => notImplemented[Id, EVALUATED]("toBytes(n: BigInt)", xs)
     }
 
   lazy val bytesToBigIntLim: BaseFunction[NoContext] =
     NativeFunction("toBigInt", 65, BYTES_TO_BIGINT_LIM, BIGINT, ("n", BYTESTR), ("off", LONG), ("size", LONG)) {
-      case CONST_BYTESTR(ByteStr(n)) :: CONST_LONG(off) :: CONST_LONG(s) :: Nil => Either.cond(off >= 0 && off <= n.size && s <= 64 && s > 0, CONST_BIGINT(BigInt(n.slice(off.toInt, (off+s).toInt))), s"ByteStr too long ($s > 64 bytes)")
+      case CONST_BYTESTR(ByteStr(n)) :: CONST_LONG(off) :: CONST_LONG(s) :: Nil =>
+        Either.cond(
+          off >= 0 && off <= n.length && s <= 64 && s > 0,
+          CONST_BIGINT(BigInt(n.slice(off.toInt, (off + s).toInt))),
+          s"ByteStr too long ($s > 64 bytes)"
+        )
       case xs => notImplemented[Id, EVALUATED]("toBigInt(n: ByteStr, offset: Int, size: Int)", xs)
     }
+
   lazy val bytesToBigInt: BaseFunction[NoContext] =
     NativeFunction("toBigInt", 65, BYTES_TO_BIGINT, BIGINT, ("n", BYTESTR)) {
-      case CONST_BYTESTR(ByteStr(n)) :: Nil => Either.cond(n.size <= 64, CONST_BIGINT(BigInt(n)), s"ByteStr too long (${n.size} > 64 bytes)")
-      case xs => notImplemented[Id, EVALUATED]("toBigInt(n: ByteStr)", xs)
+      case CONST_BYTESTR(ByteStr(n)) :: Nil => Either.cond(n.length <= 64, CONST_BIGINT(BigInt(n)), s"Too big ByteVector for BigInt (${n.length} > 64 bytes)")
+      case xs                               => notImplemented[Id, EVALUATED]("toBigInt(n: ByteStr)", xs)
     }
 
   def createBigOp(op: BinaryOperation, func: Short, complexity: Map[StdLibVersion, Long])(body: (BigInt, BigInt) => BigInt): BaseFunction[NoContext] = {
@@ -193,7 +182,7 @@ object PureContext {
     ) {
       case (CONST_BIGINT(a), CONST_BIGINT(b)) =>
         val s = body(a, b)
-        Either.cond(s >= min && s <= max, CONST_INT512(s), s"$a ${op.func} $b is out of range.")
+        Either.cond(s >= min && s <= max, CONST_BIGINT(s), s"$a ${op.func} $b is out of range.")
       case args =>
         Left(s"Unexpected args $args for BigInt operator '${op.func}'")
     }
@@ -205,10 +194,10 @@ object PureContext {
   lazy val divToBigInt: BaseFunction[NoContext] = createBigOp(DIV_OP, DIV_BIGINT, Map[StdLibVersion, Long](V5 -> 64L)) { _ / _}
   lazy val modToBigInt: BaseFunction[NoContext] = createBigOp(MOD_OP, MOD_BIGINT, Map[StdLibVersion, Long](V5 -> 64L)) { _ % _}
 
-  lazy val negativeInt512: BaseFunction[NoContext] =
-    NativeFunction("-", 8, UMINUS_INT512, INT512, ("n", INT512)) {
-      case CONST_INT512(n) :: Nil => Either.cond(n != min, CONST_INT512(-n), s"Positive Int512 overflow")
-      case xs                     => notImplemented[Id, EVALUATED]("-(n: Int512)", xs)
+  lazy val negativeBigInt: BaseFunction[NoContext] =
+    NativeFunction("-", 8, UMINUS_BIGINT, BIGINT, ("n", BIGINT)) {
+      case CONST_BIGINT(n) :: Nil => Either.cond(n != min, CONST_BIGINT(-n), s"Positive BigInt overflow")
+      case xs                     => notImplemented[Id, EVALUATED]("-(n: BigInt)", xs)
     }
 
   lazy val throwWithMessage: BaseFunction[NoContext] = NativeFunction("throw", 1, THROW, NOTHING, ("err", STRING)) {
@@ -350,8 +339,8 @@ object PureContext {
           result = v * n / d
           _ <- Either.cond(result < max, (), s"Long overflow: value `$result` greater than 2^511-1")
           _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^511-1")
-        } yield CONST_INT512(result)
-      case xs => notImplemented[Id, EVALUATED]("fraction(value: Int512, numerator: Int512, denominator: Int512)", xs)
+        } yield CONST_BIGINT(result)
+      case xs => notImplemented[Id, EVALUATED]("fraction(value: BigInt, numerator: BigInt, denominator: BigInt)", xs)
     }
 
   def fractionRounds(roundTypes: UNION): BaseFunction[NoContext] =
@@ -405,8 +394,8 @@ object PureContext {
           }
           _ <- Either.cond(result < max, (), s"Long overflow: value `$result` greater than 2^511-1")
           _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^511-1")
-        } yield CONST_INT512(result)
-      case xs => notImplemented[Id, EVALUATED]("fractionRounds(value: Int512, numerator: Int512, denominator: Int512, round: rounds)", xs)
+        } yield CONST_BIGINT(result)
+      case xs => notImplemented[Id, EVALUATED]("fractionRounds(value: BigInt, numerator: BigInt, denominator: BigInt, round: rounds)", xs)
     }
 
 
@@ -1146,8 +1135,8 @@ object PureContext {
         notImplemented[Id, EVALUATED]("min(list: List[Int])", xs)
     }
 
-  lazy val listInt512Max: BaseFunction[NoContext] =
-    NativeFunction("max", 192, MAX_LIST_INT512, INT512, ("list", PARAMETERIZEDLIST(INT512))) {
+  lazy val listBigIntMax: BaseFunction[NoContext] =
+    NativeFunction("max", 192, MAX_LIST_BIGINT, BIGINT, ("list", PARAMETERIZEDLIST(BIGINT))) {
       case ARR(list) :: Nil =>
         Either.cond(
           list.nonEmpty,
@@ -1155,11 +1144,11 @@ object PureContext {
           "Can't find max for empty list"
         )
       case xs =>
-        notImplemented[Id, EVALUATED]("max(list: List[Int512])", xs)
+        notImplemented[Id, EVALUATED]("max(list: List[BigInt])", xs)
     }
 
-  lazy val listInt512Min: BaseFunction[NoContext] =
-    NativeFunction("min", 192, MIN_LIST_INT512, INT512, ("list", PARAMETERIZEDLIST(INT512))) {
+  lazy val listBigIntMin: BaseFunction[NoContext] =
+    NativeFunction("min", 192, MIN_LIST_BIGINT, BIGINT, ("list", PARAMETERIZEDLIST(BIGINT))) {
       case ARR(list) :: Nil =>
         Either.cond(
           list.nonEmpty,
@@ -1167,7 +1156,7 @@ object PureContext {
           "Can't find min for empty list"
         )
       case xs =>
-        notImplemented[Id, EVALUATED]("min(list: List[Int512])", xs)
+        notImplemented[Id, EVALUATED]("min(list: List[BigInt])", xs)
     }
 
 
@@ -1351,20 +1340,20 @@ object PureContext {
     }
   }
 
-  def powInt512(roundTypes: UNION): BaseFunction[NoContext] =
+  def powBigInt(roundTypes: UNION): BaseFunction[NoContext] =
     NativeFunction(
       "pow",
       200,
-      POW_INT512,
-      INT512,
-      ("base", INT512),
+      POW_BIGINT,
+      BIGINT,
+      ("base", BIGINT),
       ("bp", LONG),
-      ("exponent", INT512),
+      ("exponent", BIGINT),
       ("ep", LONG),
       ("rp", LONG),
       ("round", roundTypes)
     ) {
-      case CONST_INT512(b) :: CONST_LONG(bp) :: CONST_INT512(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
+      case CONST_BIGINT(b) :: CONST_LONG(bp) :: CONST_BIGINT(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
         if (bp < 0
             || bp > 18
             || ep < 0
@@ -1376,25 +1365,25 @@ object PureContext {
           global
             .powBigInt(b, bp, e, ep, rp, Rounding.byValue(round))
             .filterOrElse(v => v <= max && v >= min, "Result out of 512-bit range")
-            .bimap(e => s"$e on Int512 pow calculation", CONST_INT512)
+            .bimap(e => s"$e on BigInt pow calculation", CONST_BIGINT)
         }
-      case xs => notImplemented[Id, EVALUATED]("pow(base: Int512, bp: Int, exponent:Big Int, ep: Int, rp: Int, round: Rounds)", xs)
+      case xs => notImplemented[Id, EVALUATED]("pow(base: BigInt, bp: Int, exponent:Big Int, ep: Int, rp: Int, round: Rounds)", xs)
     }
 
-  def logInt512(roundTypes: UNION): BaseFunction[NoContext] =
+  def logBigInt(roundTypes: UNION): BaseFunction[NoContext] =
     NativeFunction(
       "log",
       200,
-      LOG_INT512,
-      INT512,
-      ("base", INT512),
+      LOG_BIGINT,
+      BIGINT,
+      ("base", BIGINT),
       ("bp", LONG),
-      ("exponent", INT512),
+      ("exponent", BIGINT),
       ("ep", LONG),
       ("rp", LONG),
       ("round", roundTypes)
     ) {
-      case CONST_INT512(b) :: CONST_LONG(bp) :: CONST_INT512(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
+      case CONST_BIGINT(b) :: CONST_LONG(bp) :: CONST_BIGINT(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
         val r = if (bp < 0
             || bp > 18
             || ep < 0
@@ -1405,8 +1394,8 @@ object PureContext {
         } else {
           global.logBigInt(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_BIGINT)
         }
-        r.leftMap(e => s"$e on Int512 log calculation")
-      case xs => notImplemented[Id, EVALUATED]("log(exponent: Int512, ep: Int, base:Big Int, bp: Int, rp: Int, round: Rounds)", xs)
+        r.leftMap(e => s"$e on BigInt log calculation")
+      case xs => notImplemented[Id, EVALUATED]("log(exponent: BigInt, ep: Int, base:Big Int, bp: Int, rp: Int, round: Rounds)", xs)
     }
 
   val getListMedian: BaseFunction[NoContext] =
@@ -1423,18 +1412,18 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
     }
 
-  val getInt512ListMedian: BaseFunction[NoContext] =
-    NativeFunction("median", 20 * 8, MEDIAN_LISTINT512, INT512, ("arr", PARAMETERIZEDLIST(INT512))) {
+  val getBigIntListMedian: BaseFunction[NoContext] =
+    NativeFunction("median", 20 * 8, MEDIAN_LISTBIGINT, BIGINT, ("arr", PARAMETERIZEDLIST(BIGINT))) {
       case xs @ (ARR(arr) :: Nil) =>
         if (arr.headOption.forall(_.isInstanceOf[CONST_BIGINT])) {
           if (arr.nonEmpty)
             Right(CONST_BIGINT(global.median(arr.asInstanceOf[IndexedSeq[CONST_BIGINT]].map(_.t).toArray)))
           else
-            Left(s"Can't find median for empty list of Int512")
+            Left(s"Can't find median for empty list of BigInt")
         } else {
-          notImplemented[Id, EVALUATED](s"median(arr: List[Int512])", xs)
+          notImplemented[Id, EVALUATED](s"median(arr: List[BigInt])", xs)
         }
-      case xs => notImplemented[Id, EVALUATED](s"median(arr: List[Int512])", xs)
+      case xs => notImplemented[Id, EVALUATED](s"median(arr: List[BigInt])", xs)
     }
 
   val unitVarName = "unit"
@@ -1586,29 +1575,29 @@ object PureContext {
         dropRightStringV5,
         dropStringV5,
         takeRightStringV5,
-        intToInt512,
+        intToBigInt,
         int512ToInt,
         int512ToString,
-        stringToInt512,
-        stringToInt512Opt,
+        stringToBigInt,
+        stringToBigIntOpt,
         int512ToBytes,
-        bytesToInt512,
-        bytesToInt512Lim,
-        sumToInt512,
-        subToInt512,
-        mulToInt512,
-        divToInt512,
-        modToInt512,
-        geInt512,
-        gtInt512,
-        listInt512Max,
-        listInt512Min,
-        fractionInt512,
+        bytesToBigInt,
+        bytesToBigIntLim,
+        sumToBigInt,
+        subToBigInt,
+        mulToBigInt,
+        divToBigInt,
+        modToBigInt,
+        geBigInt,
+        gtBigInt,
+        listBigIntMax,
+        listBigIntMin,
+        fractionBigInt,
         fractionRounds(UNION(fromV5RoundTypes)),
-        negativeInt512,
-        getInt512ListMedian,
-        powInt512(UNION(fromV5RoundTypes)),
-        logInt512(UNION(fromV5RoundTypes)),
+        negativeBigInt,
+        getBigIntListMedian,
+        powBigInt(UNION(fromV5RoundTypes)),
+        logBigInt(UNION(fromV5RoundTypes)),
         pow(UNION(fromV5RoundTypes)),
         log(UNION(fromV5RoundTypes))
       )
