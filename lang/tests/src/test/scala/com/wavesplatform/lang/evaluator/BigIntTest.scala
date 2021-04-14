@@ -3,7 +3,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V5}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BIGINT, CONST_BOOLEAN, CONST_LONG, CONST_STRING}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, unit}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -14,8 +14,8 @@ import scala.util.Random
 class BigIntTest extends PropSpec with EvaluatorSpec with ScalaCheckPropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
   implicit val startVersion: StdLibVersion = V5
 
-  private val maxValue = s"""parseBigIntValue("${(BigInt(2) pow 511) - 1}")"""
-  private val minValue = s"""parseBigIntValue("${-BigInt(2) pow 511}")"""
+  private val maxValue = s"""parseBigIntValue("${PureContext.BigIntMax}")"""
+  private val minValue = s"""parseBigIntValue("${PureContext.BigIntMin}")"""
 
   property("BigInt") {
     eval("toBigInt(fraction(9223372036854775807, -2, -4)) == (toBigInt(9223372036854775807) * toBigInt(-2)) / toBigInt(-4)") shouldBe Right(
@@ -55,8 +55,8 @@ class BigIntTest extends PropSpec with EvaluatorSpec with ScalaCheckPropertyChec
         "52785833603464895924505196455835395749861094195642486808108138863402869537852026544579466671752822414281401856143643660416162921950916138504990605852480"
       ).explicitGet()
     )
-    eval(maxValue) shouldBe Right(CONST_BIGINT(BigInt(2).pow(511) - 1))
-    eval(minValue) shouldBe Right(CONST_BIGINT(-BigInt(2).pow(511)))
+    eval(maxValue) shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
+    eval(minValue) shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
     eval(
       """parseBigIntValue("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")"""
     ) should produce("too big")
@@ -65,12 +65,12 @@ class BigIntTest extends PropSpec with EvaluatorSpec with ScalaCheckPropertyChec
     ) should produce("too big")
     eval(
       """parseBigInt("-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")"""
-    ) shouldBe Right(CONST_BIGINT(-BigInt(2).pow(511)))
+    ) shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
     eval(
       """parseBigInt("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")"""
     ) shouldBe Right(unit)
-    eval(s"""fraction(parseBigIntValue("${BigInt(2).pow(511) - 1}"), toBigInt(-2), toBigInt(-3))""") shouldBe Right(
-      CONST_BIGINT((BigInt(2).pow(511) - 1) * 2 / 3)
+    eval(s"""fraction(parseBigIntValue("${PureContext.BigIntMax}"), toBigInt(-2), toBigInt(-3))""") shouldBe Right(
+      CONST_BIGINT(PureContext.BigIntMax * 2 / 3)
     )
     eval(s"""fraction(toBigInt(100), toBigInt(2), toBigInt(0))""") shouldBe Left("Fraction: division by zero")
     eval(s"""parseBigIntValue("${Long.MaxValue}").toInt()""") shouldBe Right(CONST_LONG(Long.MaxValue))
@@ -201,13 +201,13 @@ class BigIntTest extends PropSpec with EvaluatorSpec with ScalaCheckPropertyChec
 
   property("List[BigInt] median - 1 elements") {
     eval(s"[toBigInt(0)].median()") shouldBe Right(CONST_BIGINT(BigInt(0)))
-    eval(s"""[$maxValue].median()""") shouldBe Right(CONST_BIGINT((BigInt(2) pow 511) - 1))
-    eval(s"""[$minValue].median()""") shouldBe Right(CONST_BIGINT(BigInt(-2) pow 511))
+    eval(s"""[$maxValue].median()""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
+    eval(s"""[$minValue].median()""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
   }
 
   property("List[BigInt] median - 1000 elements - success") {
-    eval(s"""[${(1 to 1000).map(_ => maxValue).mkString(",")}].median()""") shouldBe Right(CONST_BIGINT((BigInt(2) pow 511) - 1))
-    eval(s"""[${(1 to 1000).map(_ => minValue).mkString(",")}].median()""") shouldBe Right(CONST_BIGINT(-BigInt(2) pow 511))
+    eval(s"""[${(1 to 1000).map(_ => maxValue).mkString(",")}].median()""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
+    eval(s"""[${(1 to 1000).map(_ => minValue).mkString(",")}].median()""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
   }
 
   property("List[BigInt] median - negative rounding down") {

@@ -34,9 +34,10 @@ object PureContext {
   implicit def intToLong(num: Int): Long = num.toLong
 
   private val defaultThrowMessage = "Explicit script termination"
-  private val max: BigInt         = BigInt(2).pow(511) - 1
-  private val min: BigInt         = -max - 1
-  val MaxListLengthV4             = 1000
+
+  val BigIntMax: BigInt = BigInt(2).pow(511) - 1
+  val BigIntMin: BigInt = -BigIntMax - 1
+  val MaxListLengthV4   = 1000
 
   lazy val mulLong: BaseFunction[NoContext] =
     createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => Math.multiplyExact(a, b))
@@ -124,7 +125,7 @@ object PureContext {
       case CONST_STRING(n) :: Nil =>
         Either
           .cond(n.length <= 155, BigInt(n), s"String too long for 512-bits big integers (${n.length} when max is 155)")
-          .filterOrElse(v => v <= max && v >= min, "Value too big for 512-bits big integer")
+          .filterOrElse(v => v <= BigIntMax && v >= BigIntMin, "Value too big for 512-bits big integer")
           .map(CONST_BIGINT.apply)
       case xs => notImplemented[Id, EVALUATED]("parseBigIntValue(n: String)", xs)
     }
@@ -135,7 +136,7 @@ object PureContext {
         Right((if (n.length <= 155) {
                  try {
                    val v = BigInt(n)
-                   if (v <= max && v >= min) {
+                   if (v <= BigIntMax && v >= BigIntMin) {
                      CONST_BIGINT(v)
                    } else {
                      unit
@@ -187,7 +188,7 @@ object PureContext {
         Try(body(a, b)).toEither
           .leftMap(_.getMessage)
           .filterOrElse(
-            r => r >= min && r <= max,
+            r => r >= BigIntMin && r <= BigIntMax,
             s"$a ${op.func} $b is out of range."
           )
           .map(CONST_BIGINT)
@@ -204,7 +205,7 @@ object PureContext {
 
   lazy val negativeBigInt: BaseFunction[NoContext] =
     NativeFunction("-", 8, UMINUS_BIGINT, BIGINT, ("n", BIGINT)) {
-      case CONST_BIGINT(n) :: Nil => Either.cond(n != min, CONST_BIGINT(-n), s"Positive BigInt overflow")
+      case CONST_BIGINT(n) :: Nil => Either.cond(n != BigIntMin, CONST_BIGINT(-n), s"Positive BigInt overflow")
       case xs                     => notImplemented[Id, EVALUATED]("-(n: BigInt)", xs)
     }
 
@@ -345,7 +346,7 @@ object PureContext {
         for {
           _ <- Either.cond(d != 0, (), "Fraction: division by zero")
           result = v * n / d
-          _ <- Either.cond(result < max, (), s"Long overflow: value `$result` greater than 2^511-1")
+          _ <- Either.cond(result < BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
           _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^511-1")
         } yield CONST_BIGINT(result)
       case xs => notImplemented[Id, EVALUATED]("fraction(value: BigInt, numerator: BigInt, denominator: BigInt)", xs)
@@ -410,7 +411,7 @@ object PureContext {
               }
             case _ => Left(s"unsupported rounding $r")
           }
-          _ <- Either.cond(result < max, (), s"Long overflow: value `$result` greater than 2^511-1")
+          _ <- Either.cond(result < BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
           _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^511-1")
         } yield CONST_BIGINT(result)
       case xs => notImplemented[Id, EVALUATED]("fractionRounds(value: BigInt, numerator: BigInt, denominator: BigInt, round: rounds)", xs)
@@ -1391,7 +1392,7 @@ object PureContext {
         } else {
           global
             .powBigInt(b, bp, e, ep, rp, Rounding.byValue(round))
-            .filterOrElse(v => v <= max && v >= min, "Result out of 512-bit range")
+            .filterOrElse(v => v <= BigIntMax && v >= BigIntMin, "Result out of 512-bit range")
             .bimap(e => s"$e on BigInt pow calculation", CONST_BIGINT)
         }
       case xs => notImplemented[Id, EVALUATED]("pow(base: BigInt, bp: Int, exponent:Big Int, ep: Int, rp: Int, round: Rounds)", xs)
