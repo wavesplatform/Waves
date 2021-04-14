@@ -256,34 +256,34 @@ class SyncDAppComplexityCountTest
     }
   }
 
-  property("counts complexity correctly") {
+  property("complexity border") {
     assert(1, 2706)
     assert(2, 5494)
-    assert(9, 25069)
+    assert(9, 25010)
     assert(10, 25041, exceeding = true)
     assert(100, 25041, exceeding = true)
 
     assert(1, 5409, withPayment = true)
     assert(2, 8197, withPayment = true)
-    assert(8, 24980, withPayment = true)
+    assert(8, 24925, withPayment = true)
     assert(9, 24965, withPayment = true, exceeding = true)
     assert(100, 24965, withPayment = true, exceeding = true)
 
     assert(2, 8201, withThroughPayment = true)
-    assert(5, 24733, withThroughPayment = true)
-    assert(6, 26000, withThroughPayment = true, exceeding = true)
-    assert(100, 26000, withThroughPayment = true, exceeding = true)
+    assert(5, 24686, withThroughPayment = true)
+    assert(6, 24733, withThroughPayment = true, exceeding = true)
+    assert(100, 24733, withThroughPayment = true, exceeding = true)
 
     assert(1, 5412, withThroughTransfer = true)
     assert(2, 10906, withThroughTransfer = true)
-    assert(4, 21954, withThroughTransfer = true)
-    assert(5, 24745, withThroughTransfer = true, exceeding = true)
+    assert(4, 21894, withThroughTransfer = true)
+    assert(5, 24685, withThroughTransfer = true, exceeding = true)
     assert(100, 25041, withThroughTransfer = true, exceeding = true)
 
-    assert(1, 4615, withVerifier = true)
-    assert(9, 26975, withVerifier = true)
-    assert(10, 26947, withVerifier = true, exceeding = true)
-    assert(100, 26947, withVerifier = true, exceeding = true)
+    assert(1, 4609, withVerifier = true)
+    assert(9, 26913, withVerifier = true)
+    assert(10, 26944, withVerifier = true, exceeding = true)
+    assert(100, 26944, withVerifier = true, exceeding = true)
 
     assert(1, 10018, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true)
     assert(100, 26556, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true, exceeding = true)
@@ -294,10 +294,10 @@ class SyncDAppComplexityCountTest
     assert(14, 1029, raiseError = true)
 
     assert(12, 0, raiseError = true, sequentialCalls = true, reject = true)
-    assert(13, 1016, raiseError = true, sequentialCalls = true)
+    assert(13, 1005, raiseError = true, sequentialCalls = true)
 
     assert(7, 0, raiseError = true, withThroughPayment = true, reject = true)
-    assert(8, 1080, raiseError = true, withThroughPayment = true)
+    assert(8, 1066, raiseError = true, withThroughPayment = true)
 
     assert(13, 0, raiseError = true, withThroughTransfer = true, reject = true)
     assert(14, 1029, raiseError = true, withThroughTransfer = true)
