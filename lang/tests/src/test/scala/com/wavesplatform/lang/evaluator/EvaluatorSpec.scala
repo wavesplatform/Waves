@@ -30,6 +30,6 @@ trait EvaluatorSpec {
     val ctx           = PureContext.build(version).withEnvironment[Environment]
     val typed         = ExpressionCompiler(ctx.compilerContext, parsedExpr)
     val evaluationCtx = ctx.evaluationContext(Common.emptyBlockchainEnvironment())
-    typed.flatMap(v => EvaluatorV2.applyCompleted(evaluationCtx, v._1, version).bimap(_._1, _._1))
+    typed.flatMap(v => EvaluatorV2.applyCompleted(evaluationCtx, v._1, version)._3)
   }
 }
