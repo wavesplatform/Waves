@@ -13,7 +13,7 @@ import scala.util.Random
 
 class BigIntTest extends PropSpec with EvaluatorSpec with ScalaCheckPropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
   implicit val startVersion: StdLibVersion = V5
-  
+
   private val maxValue = s"""parseBigIntValue("${(BigInt(2) pow 511) - 1}")"""
   private val minValue = s"""parseBigIntValue("${-BigInt(2) pow 511}")"""
 

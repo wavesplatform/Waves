@@ -1,6 +1,5 @@
 package com.wavesplatform.lang.evaluator
 
-import cats.implicits._
 import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V1}
@@ -23,7 +22,7 @@ trait EvaluatorSpec {
     if (results.map(_._2).distinct.size == 1)
       results.head._2
     else
-      throw new TestFailedException(s"Evaluation results are not the same: ${results.map(_._2)}", 0)
+      throw new TestFailedException(s"Evaluation results are not the same: $results", 0)
   }
 
   private def eval(parsedExpr: Expressions.EXPR, version: StdLibVersion): Either[String, EVALUATED] = {
