@@ -1,5 +1,7 @@
 package com.wavesplatform.transaction
 
+import scala.util.Either
+
 import cats.Id
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
@@ -9,8 +11,6 @@ import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.transaction.TxValidationError.FailedTransactionError.Cause
 import com.wavesplatform.transaction.assets.exchange.Order
-
-import scala.util.Either
 
 object TxValidationError {
   type Validation[T] = Either[ValidationError, T]
@@ -59,7 +59,8 @@ object TxValidationError {
       spentComplexity: Long,
       log: Log[Id],
       error: Option[ValidationError],
-      assetId: Option[ByteStr] = None
+      assetId: Option[ByteStr] = None,
+      invocations: Seq[InvokeScriptResult.Invocation] = Nil
   ) extends ValidationError
       with WithLog {
     import FailedTransactionError._

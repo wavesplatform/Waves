@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
+import scala.util.Right
+
 import cats.Id
 import cats.implicits._
 import com.wavesplatform.account._
@@ -20,19 +22,17 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
-import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.metrics.{TxProcessingStats => Stats}
+import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
-import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import monix.eval.Coeval
 import shapeless.Coproduct
-
-import scala.util.Right
 
 object InvokeScriptTransactionDiff {
 
@@ -55,7 +55,6 @@ object InvokeScriptTransactionDiff {
         dAppAddress: Address,
         invocationComplexity: Long,
         fixedInvocationComplexity: Long,
-        payments: AttachedPayments,
         environment: DAppEnvironment,
         invocation: ContractEvaluator.Invocation
     ) = {
@@ -216,7 +215,7 @@ object InvokeScriptTransactionDiff {
             Some(tx),
             dAppAddress,
             pk,
-            Vector(DAppEnvironment.DAppInvocation(dAppAddress, None), DAppEnvironment.DAppInvocation(dAppAddress, Some(invocation))),
+            Set(tx.senderAddress, dAppAddress),
             limitedExecution,
             ContractLimits.MaxSyncDAppCalls(version),
             ContractLimits.MaxCallableActionsAmount(version),
@@ -224,21 +223,11 @@ object InvokeScriptTransactionDiff {
             if (version < V5) Diff.empty else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map())
           )
 
-          result <- executeInvoke(
-            pk,
-            version,
-            contract,
-            dAppAddress,
-            invocationComplexity,
-            fixedInvocationComplexity,
-            payments,
-            environment,
-            invocation
-          ).leftMap {
-            case fte: FailedTransactionError =>
-              fte
-            case err: ValidationError => err
-          }
+          result <- executeInvoke(pk, version, contract, dAppAddress, invocationComplexity, fixedInvocationComplexity, environment, invocation)
+            .leftMap {
+              case fte: FailedTransactionError => fte
+              case err: ValidationError => err
+            }
         } yield result
 
       case Left(error) => TracedResult(Left(error))
