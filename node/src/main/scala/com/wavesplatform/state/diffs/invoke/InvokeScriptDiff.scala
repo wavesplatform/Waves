@@ -105,7 +105,7 @@ object InvokeScriptDiff {
                   val scriptComplexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else script.complexity.toInt
                   val totalComplexity  = usedComplexity + scriptComplexity
                   result match {
-                    case Left(_) =>
+                    case Left(error) =>
                       val err = FailedTransactionError.assetExecutionInAction(error, totalComplexity, log, assetId)
                       TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
                     case Right(FALSE) =>
