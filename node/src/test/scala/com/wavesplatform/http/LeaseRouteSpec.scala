@@ -48,7 +48,7 @@ class LeaseRouteSpec
     )
 
   private def withRoute(f: (Domain, Route) => Unit): Unit =
-    withDomain(domainSettingsWithFeatures(BlockchainFeatures.implemented.flatMap(BlockchainFeatures.feature).toSeq: _*)) { d =>
+    withDomain(domainSettingsWithPreactivatedFeatures(BlockchainFeatures.implemented.flatMap(BlockchainFeatures.feature).toSeq: _*)) { d =>
       f(d, route(d).route)
     }
 
