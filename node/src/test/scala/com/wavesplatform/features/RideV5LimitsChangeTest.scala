@@ -1,7 +1,9 @@
 package com.wavesplatform.features
 
 import cats.implicits._
+import com.wavesplatform.TestTime
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.diffs.ProduceError.produce
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.it.util._
@@ -10,17 +12,16 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, DApp => DAppType, _}
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.ContractCompiler
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.mining.MiningConstraints.MaxScriptsComplexityInBlock
+import com.wavesplatform.mining.{MiningConstraints, MultiDimensionalMiningConstraint, OneDimensionalMiningConstraint, TxEstimators}
 import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase}
 import com.wavesplatform.state.appender.ExtensionAppender
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utx.UtxPoolImpl
-import com.wavesplatform.TestTime
-import com.wavesplatform.common.state.diffs.ProduceError.produce
-import com.wavesplatform.mining.{MiningConstraints, MultiDimensionalMiningConstraint, OneDimensionalMiningConstraint, TxEstimators}
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.Observer
@@ -65,7 +66,9 @@ class RideV5LimitsChangeTest extends FlatSpec with Matchers with WithDomain with
     val setScript = TxHelpers.setScript(contractSigner, contract)
     d.appendBlock(setScript)
 
-    val invokes = for (_ <- 1 to 680) yield TxHelpers.invoke(contractAddress, "test") // 3675 complexity, 2499000 total
+    val invokesCount     = 680
+    val invokeComplexity = 3620
+    val invokes          = for (_ <- 1 to invokesCount) yield TxHelpers.invoke(contractAddress, "test")
 
     val time       = new TestTime()
     val utxStorage = new UtxPoolImpl(time, d.blockchain, Observer.empty, SettingsFromDefaultConfig.utxSettings)
@@ -82,7 +85,7 @@ class RideV5LimitsChangeTest extends FlatSpec with Matchers with WithDomain with
       )
       .explicitGet()
     differResult.constraint.asInstanceOf[MultiDimensionalMiningConstraint].constraints.head shouldBe OneDimensionalMiningConstraint(
-      rest = 1000,
+      rest = MaxScriptsComplexityInBlock.AfterRideV5 - invokesCount * invokeComplexity,
       TxEstimators.scriptsComplexity,
       "MaxScriptsComplexityInBlock"
     )

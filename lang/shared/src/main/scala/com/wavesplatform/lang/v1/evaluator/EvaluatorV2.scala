@@ -321,32 +321,27 @@ object EvaluatorV2 {
       expr: EXPR,
       stdLibVersion: StdLibVersion,
       complexityLimit: Int,
-      default: EVALUATED
-  ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
+      handleExpr: EXPR => Either[ExecutionError, EVALUATED]
+  ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
     EvaluatorV2
-      .applyLimited(expr, complexityLimit, ctx, stdLibVersion)
-      .map {
-        case (expr, _, log) =>
-          expr match {
-            case evaluated: EVALUATED => (evaluated, log)
-            case _                    => (default, log)
-          }
-      }
+      .applyLimitedCoeval(expr, complexityLimit, ctx, stdLibVersion)
+      .value()
+      .fold(
+        { case (error, complexity, log) => (log, complexity, Left(error)) }, {
+          case (expr, complexity, log) =>
+            expr match {
+              case evaluated: EVALUATED => (log, complexity, Right(evaluated))
+              case expr: EXPR           => (log, complexity, handleExpr(expr))
+            }
+        }
+      )
 
   def applyCompleted(
       ctx: EvaluationContext[Environment, Id],
       expr: EXPR,
       stdLibVersion: StdLibVersion
-  ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
-    EvaluatorV2
-      .applyLimited(expr, Int.MaxValue, ctx, stdLibVersion)
-      .flatMap {
-        case (expr, _, log) =>
-          expr match {
-            case evaluated: EVALUATED => Right((evaluated, log))
-            case expr: EXPR           => Left((s"Unexpected incomplete evaluation result $expr", log))
-          }
-      }
+  ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
+    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, expr => Left(s"Unexpected incomplete evaluation result $expr"))
 
   case class EvaluationException(message: String, unusedComplexity: Int) extends RuntimeException(message)
 }

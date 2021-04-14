@@ -67,7 +67,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     defaultEvaluator[T](context, expr)
 
   private def evalV2[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] =
-    EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion]).bimap(_._1, _._1.asInstanceOf[T])
+    EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion])._3.asInstanceOf[Either[ExecutionError, T]]
 
   private def eval[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] = {
     val evaluatorV1Result = evalV1[T](context, expr)
@@ -82,9 +82,9 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   private def evalWithLogging(context: EvaluationContext[Environment, Id], expr: EXPR): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
     val evaluatorV1Result = defaultEvaluator.applyWithLogging[EVALUATED](context, expr)
-    val evaluatorV2Result = EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion])
+    val (evaluatorV2Log, _, evaluatorV2Result) = EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion])
 
-    evaluatorV2Result shouldBe evaluatorV1Result
+    evaluatorV2Result.bimap((_, evaluatorV2Log), (_, evaluatorV2Log)) shouldBe evaluatorV1Result
     evaluatorV1Result
   }
 
