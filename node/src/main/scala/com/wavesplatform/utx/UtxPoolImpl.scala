@@ -291,7 +291,7 @@ class UtxPoolImpl(
     pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()))(initialConstraint, strategy, cancelled)
   }
 
-  private def cleanUnconfirmed(): Unit = {
+  def cleanUnconfirmed(): Unit = {
     log.trace(s"Starting UTX cleanup at height ${blockchain.height}")
 
     pack(TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime()))(
@@ -343,7 +343,8 @@ class UtxPoolImpl(
                 else {
                   val updatedBlockchain   = CompositeBlockchain(blockchain, Some(r.totalDiff))
                   val newCheckedAddresses = newScriptedAddresses ++ r.checkedAddresses
-                  differ(updatedBlockchain, tx).resultE match {
+                  val e = differ(updatedBlockchain, tx).resultE
+                  e match {
                     case Right(newDiff) =>
                       val updatedConstraint = r.constraint.put(updatedBlockchain, tx, newDiff)
                       if (updatedConstraint.isOverfilled) {

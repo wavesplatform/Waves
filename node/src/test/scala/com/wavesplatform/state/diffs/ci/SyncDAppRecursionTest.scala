@@ -6,10 +6,10 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V5
-import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, FUNCTION_CALL}
-import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.transaction.Asset.Waves
@@ -44,29 +44,22 @@ class SyncDAppRecursionTest
     )
   )
 
-  def dApp(nextDApp: Address): Script = {
-    val expr = {
-      val script =
-        s"""
-           | {-# STDLIB_VERSION 5       #-}
-           | {-# CONTENT_TYPE   DAPP    #-}
-           | {-# SCRIPT_TYPE    ACCOUNT #-}
-           |
-           | @Callable(i)
-           | func default(end: Boolean) =
-           |    if (end)
-           |      then
-           |        []
-           |      else {
-           |        let address = Address(base58'$nextDApp')
-           |        strict r = Invoke(address, "default", [i.caller == this && address == this], [])
-           |        []
-           |      }
-         """.stripMargin
-      Parser.parseContract(script).get.value
-    }
-    ContractScript(V5, compileContractFromExpr(expr, V5)).explicitGet()
-  }
+  def dApp(nextDApp: Address): Script = TestCompiler(V5).compileContract(s"""
+    | {-# STDLIB_VERSION 5       #-}
+    | {-# CONTENT_TYPE   DAPP    #-}
+    | {-# SCRIPT_TYPE    ACCOUNT #-}
+    |
+    | @Callable(i)
+    | func default(end: Boolean) =
+    |    if (end)
+    |      then
+    |        []
+    |      else {
+    |        let address = Address(base58'$nextDApp')
+    |        strict r = Invoke(address, "default", [i.caller == this && address == this], [])
+    |        []
+    |      }
+    |""".stripMargin)
 
   // A -> A -> B -> B
   property("dApp calls itself that calls other dApp that calls itself") {
@@ -120,7 +113,11 @@ class SyncDAppRecursionTest
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       features
-    )(_ should produce(s"Complex dApp recursion is prohibited, but dApp at address ${invoke.senderAddress} was called twice"))
+    )(
+      _ should produce(
+        s"The invocation stack contains multiple invocations of the dApp at address ${invoke.senderAddress} with invocations of another dApp between them"
+      )
+    )
   }
 
   // A -> B -> C -> B
@@ -147,7 +144,11 @@ class SyncDAppRecursionTest
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       features
-    )(_ should produce(s"Complex dApp recursion is prohibited, but dApp at address ${invoke.dAppAddressOrAlias} was called twice"))
+    )(
+      _ should produce(
+        s"The invocation stack contains multiple invocations of the dApp at address ${invoke.dAppAddressOrAlias} with invocations of another dApp between them"
+      )
+    )
   }
 
   // A -> B -> C -> D -> C
@@ -177,6 +178,10 @@ class SyncDAppRecursionTest
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       features
-    )(_ should produce(s"Complex dApp recursion is prohibited, but dApp at address ${setDApp3.sender.toAddress} was called twice"))
+    )(
+      _ should produce(
+        s"The invocation stack contains multiple invocations of the dApp at address ${setDApp3.sender.toAddress} with invocations of another dApp between them"
+      )
+    )
   }
 }

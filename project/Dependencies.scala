@@ -165,7 +165,7 @@ object Dependencies {
   )
 
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.3.1-SNAPSHOT" classifier "proto" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.3.1" classifier "proto" intransitive ()
 
   lazy val scalapbRuntime = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion
