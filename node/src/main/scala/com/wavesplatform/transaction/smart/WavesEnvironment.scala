@@ -267,7 +267,7 @@ class DAppEnvironment(
         account.Address
           .fromBytes(dApp.bytes.arr)
           .ensureOr(
-            address => GenericError(s"Complex dApp recursion is prohibited, but dApp at address $address was called twice")
+            address => GenericError(s"The invocation stack contains multiple invocations of the dApp at address $address with invocations of another dApp between them")
           )(
             address => currentDApp == address || !callChain.contains(address)
           )

@@ -13,7 +13,14 @@ import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
+import com.wavesplatform.settings.{
+  BlockchainSettings,
+  FunctionalitySettings,
+  TestSettings,
+  WavesSettings,
+  loadConfig,
+  TestFunctionalitySettings => TFS
+}
 import com.wavesplatform.state.diffs.{BlockDiffer, produce}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
@@ -151,18 +158,18 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
 }
 
 trait WithDomain extends WithState { _: Suite =>
-  def defaultDomainSettings: WavesSettings =
+  lazy val SettingsFromDefaultConfig: WavesSettings =
     WavesSettings.fromRootConfig(loadConfig(None))
 
-  def domainSettingsWithFS(fs: FunctionalitySettings): WavesSettings = {
-    val ds = defaultDomainSettings
-    ds.copy(blockchainSettings = ds.blockchainSettings.copy(functionalitySettings = fs))
-  }
+  def domainSettingsWithFS(fs: FunctionalitySettings): WavesSettings =
+    SettingsFromDefaultConfig.copy(
+      blockchainSettings = SettingsFromDefaultConfig.blockchainSettings.copy(functionalitySettings = fs)
+    )
 
   def domainSettingsWithFeatures(fs: BlockchainFeature*): WavesSettings =
-    domainSettingsWithFS(defaultDomainSettings.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap))
+    domainSettingsWithFS(SettingsFromDefaultConfig.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap))
 
-  def withDomain[A](settings: WavesSettings = defaultDomainSettings)(
+  def withDomain[A](settings: WavesSettings = SettingsFromDefaultConfig)(
       test: Domain => A
   ): A =
     withLevelDBWriter(settings) { blockchain =>

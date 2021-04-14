@@ -83,10 +83,7 @@ object InvokeScriptDiff {
               case (TracedResult(Left(_), _), _) => prev
               case (TracedResult(Right(nextRemainingComplexity), _), (script, amount, assetId)) =>
                 val usedComplexity = totalComplexityLimit - nextRemainingComplexity
-                val r = if (script.complexity > nextRemainingComplexity) {
-                  val err = FailedTransactionError.assetExecution(s"Invoke complexity limit = $totalComplexityLimit is exceeded", usedComplexity, Nil, assetId)
-                  TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
-                } else {
+                val r = {
                   val pseudoTx: PseudoTx = ScriptTransfer(
                     Some(assetId),
                     Recipient.Address(ByteStr(tx.senderDApp.bytes)),
@@ -102,9 +99,9 @@ object InvokeScriptDiff {
                     script.script,
                     isAssetScript = true,
                     scriptContainerAddress = Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr)),
-                    Int.MaxValue
+                    nextRemainingComplexity
                   ) match {
-                    case (log, Left(error)) =>
+                    case (log, Left(_)) =>
                       val err =
                         FailedTransactionError.assetExecutionInAction(s"Invoke complexity limit = $totalComplexityLimit is exceeded", usedComplexity, log, assetId)
                       TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
