@@ -45,7 +45,7 @@ class RideV5LimitsChangeTest extends FlatSpec with Matchers with WithDomain with
       d.blockchain,
       Some(d.lastBlock),
       block,
-      MiningConstraints(d.blockchain, d.blockchain.height, Some(defaultDomainSettings.minerSettings)).total
+      MiningConstraints(d.blockchain, d.blockchain.height, Some(SettingsFromDefaultConfig.minerSettings)).total
     )
     differResult should produce("Limit of txs was reached")
   }
@@ -68,7 +68,7 @@ class RideV5LimitsChangeTest extends FlatSpec with Matchers with WithDomain with
     val invokes = for (_ <- 1 to 680) yield TxHelpers.invoke(contractAddress, "test") // 3675 complexity, 2499000 total
 
     val time       = new TestTime()
-    val utxStorage = new UtxPoolImpl(time, d.blockchain, Observer.empty, defaultDomainSettings.utxSettings)
+    val utxStorage = new UtxPoolImpl(time, d.blockchain, Observer.empty, SettingsFromDefaultConfig.utxSettings)
     val extensionAppender =
       ExtensionAppender(d.blockchain, utxStorage, d.posSelector, time, stub[InvalidBlockStorage], stub[PeerDatabase], Scheduler.global)(null, _)
 
@@ -78,7 +78,7 @@ class RideV5LimitsChangeTest extends FlatSpec with Matchers with WithDomain with
         d.blockchain,
         Some(d.lastBlock),
         block,
-        MiningConstraints(d.blockchain, d.blockchain.height, Some(defaultDomainSettings.minerSettings)).total
+        MiningConstraints(d.blockchain, d.blockchain.height, Some(SettingsFromDefaultConfig.minerSettings)).total
       )
       .explicitGet()
     differResult.constraint.asInstanceOf[MultiDimensionalMiningConstraint].constraints.head shouldBe OneDimensionalMiningConstraint(
