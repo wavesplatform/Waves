@@ -44,15 +44,14 @@ object InvokeScriptDiff {
       remainingCalls: Int,
       remainingActions: Int,
       remainingData: Int,
-      invocationChain: Seq[DAppEnvironment.DAppInvocation],
-      calledAddresses: Set[Address]
+      calledAddresses: Set[Address],
+      logInvocation: DAppEnvironment.DAppInvocation => Unit
   )(
       tx: InvokeScript
-  ): (CoevalR[(Diff, EVALUATED, Int, Int)], Seq[DAppEnvironment.DAppInvocation]) = {
+  ): CoevalR[(Diff, EVALUATED, Int, Int)] = {
     val dAppAddress = tx.dAppAddress
     val invoker     = tx.senderDApp
 
-    val invocation = DAppEnvironment.DAppInvocation(dAppAddress, tx.funcCall, tx.payments)
     val result = blockchain.accountScript(dAppAddress) match {
       case Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities)) =>
         val limit = ContractLimits.MaxTotalInvokeComplexity(version)
@@ -164,11 +163,8 @@ object InvokeScriptDiff {
                   remainingCalls - 1,
                   remainingActions,
                   remainingData,
-                  (if (version < V5) {
-                     Diff.empty
-                   } else {
-                     InvokeDiffsCommon.paymentsPart(tx, tx.dAppAddress, Map())
-                   })
+                  if (version < V5) Diff.empty else InvokeDiffsCommon.paymentsPart(tx, tx.dAppAddress, Map()),
+                  logInvocation
                 )
 
                 for {
@@ -176,17 +172,7 @@ object InvokeScriptDiff {
                     evaluateV2(
                       version,
                       contract,
-                      ContractEvaluator.Invocation(
-                        tx.funcCall,
-                        Recipient.Address(ByteStr(invoker.bytes)),
-                        ByteStr(tx.sender.arr),
-                        Recipient.Address(ByteStr(tx.root.fold(invoker)(_.senderAddress).bytes)),
-                        ByteStr(tx.root.getOrElse(tx).sender.arr),
-                        AttachedPayments.Multi(tx.payments.map(p => p.amount -> p.assetId.compatId)),
-                        tx.txId,
-                        tx.root.map(_.fee).getOrElse(0L),
-                        tx.root.flatMap(_.feeAssetId.compatId)
-                      ),
+                      invocation,
                       environment,
                       complexityAfterPayments,
                       remainingComplexity
@@ -253,7 +239,7 @@ object InvokeScriptDiff {
 
       case _ => traced(Left(GenericError(s"No contract at address ${tx.dAppAddress}")))
     }
-    (result, invocationChain :+ invocation)
+    result
   }
 
   private def evaluateV2(

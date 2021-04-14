@@ -18,7 +18,7 @@ import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.invoke.InvokeScript
+import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset._
@@ -260,7 +260,8 @@ class DAppEnvironment(
     var remainingCalls: Int,
     var availableActions: Int,
     var availableData: Int,
-    var currentDiff: Diff
+    var currentDiff: Diff,
+    logInvocation: DAppEnvironment.DAppInvocation => Unit
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.map(_.id()).getOrElse(ByteStr.empty)) {
 
   private[this] var mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
@@ -288,7 +289,7 @@ class DAppEnvironment(
           .ensureOr(
             address => GenericError(s"Complex dApp recursion is prohibited, but dApp at address $address was called twice")
           )(
-            address => currentDApp == address || !callChain.contains(address)
+            address => currentDApp == address || !calledAddresses.contains(address)
           )
           .map(
             InvokeScript(
@@ -301,6 +302,11 @@ class DAppEnvironment(
             )
           )
       )
+      _ = {
+        // Log sub-contract invocation
+        val invocation = DAppEnvironment.DAppInvocation(invoke.dAppAddress, invoke.funcCall, invoke.payments)
+        logInvocation(invocation)
+      }
       (diff, evaluated, remainingActions, remainingData) <- InvokeScriptDiff( // This is a recursive call
         mutableBlockchain,
         blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
@@ -309,7 +315,8 @@ class DAppEnvironment(
         remainingCalls,
         availableActions,
         availableData,
-        callChain
+        calledAddresses,
+        logInvocation
       )(invoke)
     } yield {
       val fixedDiff = diff.copy(

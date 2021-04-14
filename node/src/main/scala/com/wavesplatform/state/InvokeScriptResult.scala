@@ -40,7 +40,7 @@ object InvokeScriptResult {
 
   final case class Call(function: String, args: Seq[EVALUATED])
   object Call {
-    def apply(fc: FUNCTION_CALL) = Call(fc.function.funcName, fc.args.collect { case e: EVALUATED => e })
+    def fromFunctionCall(fc: FUNCTION_CALL): Call = Call(fc.function.funcName, fc.args.collect { case e: EVALUATED => e })
   }
   implicit val callWrites = Json.writes[Call]
 

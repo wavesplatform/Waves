@@ -220,7 +220,8 @@ object InvokeScriptTransactionDiff {
             ContractLimits.MaxSyncDAppCalls(version),
             ContractLimits.MaxCallableActionsAmount(version),
             ContractLimits.MaxWriteSetSize(version),
-            if (version < V5) Diff.empty else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map())
+            if (version < V5) Diff.empty else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()),
+            invocation => println(invocation) // Here we += it to the mutable list
           )
 
           result <- executeInvoke(pk, version, contract, dAppAddress, invocationComplexity, fixedInvocationComplexity, environment, invocation)
