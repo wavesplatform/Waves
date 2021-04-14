@@ -100,7 +100,7 @@ class InvokeAssetChecksTest
               invoke.senderAddress -> Portfolio.waves(-invoke.fee),
               miner                -> Portfolio.waves(invoke.fee)
             ),
-            scriptsComplexity = 18,
+            scriptsComplexity = 8,
             scriptResults = Map(invoke.id.value() -> InvokeScriptResult(error = Some(ErrorMessage(1, expectingMessage))))
           )
         } else {
@@ -113,7 +113,7 @@ class InvokeAssetChecksTest
               dAppAddress          -> Portfolio(-0, assets = Map(asset -> 0))
             ),
             scriptsRun = 1,
-            scriptsComplexity = 18,
+            scriptsComplexity = 8,
             scriptResults = Map(
               invoke.id.value() -> InvokeScriptResult(
                 transfers = Seq(
