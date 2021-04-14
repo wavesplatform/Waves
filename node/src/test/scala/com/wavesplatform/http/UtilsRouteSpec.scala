@@ -802,7 +802,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
     }
 
-    evalScript("letFromContract - 1".stripMargin) ~> route ~> check {
+    evalScript("letFromContract - 1") ~> route ~> check {
       responseJson shouldBe Json.obj("type" -> "Int", "value" -> (letFromContract - 1))
     }
 
@@ -811,8 +811,12 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       .returning(DefaultBlockchainSettings)
       .anyNumberOfTimes()
 
-    evalScript(""" testSyncInvoke() """.stripMargin) ~> route ~> check {
+    evalScript(""" testSyncInvoke() """) ~> route ~> check {
       responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"expr":" testSyncInvoke() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    }
+
+    evalScript(s"""parseBigIntValue("${(BigInt(2) pow 511) - 1}")""") ~> route ~> check {
+      responseAs[String] shouldBe s"""{"result":{"type":"BigInt","value":${(BigInt(2) pow 511) - 1}},"expr":"parseBigIntValue(\\"6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
     }
   }
 
