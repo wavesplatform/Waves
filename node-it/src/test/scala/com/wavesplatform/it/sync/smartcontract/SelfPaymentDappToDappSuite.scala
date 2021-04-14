@@ -51,6 +51,7 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
     isAssetScript = false,
     ScriptEstimatorV3
   ).explicitGet()._1.bytes().base64
+
   private val dAppScript2 = ScriptCompiler(
     s"""
        |{-# STDLIB_VERSION 5 #-}
@@ -95,7 +96,7 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
       AssertiveApiError(
         ScriptExecutionError.Id,
         s"Error while executing account-script: " +
-          s"GenericError(Complex dApp recursion is prohibited, but dApp at address $dAppAddress1 was called twice)"
+          s"GenericError(The invocation stack contains multiple invocations of the dApp at address $dAppAddress1 with invocations of another dApp between them)"
       )
     )
     sender.balance(callerAddress).balance shouldBe callerBalanceBefore
@@ -110,7 +111,7 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
       AssertiveApiError(
         ScriptExecutionError.Id,
         s"Error while executing account-script: " +
-          s"GenericError(Complex dApp recursion is prohibited, but dApp at address $dAppAddress1 was called twice)"
+          s"GenericError(The invocation stack contains multiple invocations of the dApp at address $dAppAddress1 with invocations of another dApp between them)"
       )
     )
     sender.balance(dAppAddress1).balance shouldBe callerBalanceBefore

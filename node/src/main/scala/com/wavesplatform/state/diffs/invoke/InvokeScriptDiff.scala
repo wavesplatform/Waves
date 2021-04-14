@@ -115,7 +115,7 @@ object InvokeScriptDiff {
                         script.script,
                         isAssetScript = true,
                         scriptContainerAddress = Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr)),
-                        Int.MaxValue
+                        nextRemainingComplexity
                       ) match {
                         case (log, Left(error)) =>
                           val err = FailedTransactionError.assetExecutionInAction(error, usedComplexity, log, assetId)

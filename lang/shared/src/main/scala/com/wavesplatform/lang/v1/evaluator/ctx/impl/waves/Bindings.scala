@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
@@ -113,15 +113,18 @@ object Bindings {
     )
 
   def buildInvocation(i: Invocation, version: StdLibVersion): CaseObj = {
-    val fields: Map[String, EVALUATED] = Map(
+    val fields: Map[String, EVALUATED] = Map[String, EVALUATED](
       "caller"          -> mapRecipient(i.caller)._2,
       "callerPublicKey" -> i.callerPk,
-      "originalCaller"  -> mapRecipient(i.originalCaller)._2,
-      "originalCallerPublicKey" -> i.originalCallerPublicKey,
       "transactionId"   -> i.transactionId,
       "fee"             -> i.fee,
       "feeAssetId"      -> i.feeAssetId
-    )
+    ) ++ (if (version >= V5)
+            Map(
+              "originCaller"          -> mapRecipient(i.originCaller)._2,
+              "originCallerPublicKey" -> i.originCallerPublicKey
+            )
+          else Map())
     CaseObj(invocationType(version), fields + buildPayments(i.payments))
   }
 

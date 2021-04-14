@@ -912,4 +912,35 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     res shouldEq script("")
   }
 
+  property("V5 - new functions") {
+    val prefix =
+      """
+        | {-# STDLIB_VERSION 5    #-}
+        | {-#CONTENT_TYPE    DAPP #-}
+        |""".stripMargin
+        
+    val script =
+      s"""
+         | @Callable(i)
+         | func foo() = {
+         |   let v1 = hashScriptAtAddress(Address(base58''))
+         |   nil
+         | }
+        """.stripMargin
+
+    val parsedExpr = Parser.parseContract(prefix ++ script).get.value
+
+    val ctx =
+      Monoid.combineAll(
+        Seq(
+          PureContext.build(V5).withEnvironment[Environment],
+          CryptoContext.build(Global, V5).withEnvironment[Environment],
+          WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
+        )
+      )
+
+    val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V5).explicitGet()
+    val res  = Decompiler(dApp, ctx.decompilerContext)
+    res shouldEq script
+  }
 }
