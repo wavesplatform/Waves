@@ -37,7 +37,7 @@ object ScriptResult {
       .flatMap(
         t =>
           Left(
-            callableResultError(t, actual) + (if (expected.isEmpty) "" else s" instead of '$expected")
+            callableResultError(t, actual) + (if (expected.isEmpty) "" else s" instead of $expected")
           )
       )
 
