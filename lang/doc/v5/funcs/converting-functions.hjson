@@ -75,28 +75,28 @@
       complexity: 1
     }
     {
-      name: "parseInt512"
+      name: "parseBigInt"
       params: [ "String" ]
       doc: "Converts an string to an integer."
       paramsDoc: [ "The string to convert." ]
       complexity: 65
     }
     {
-      name: "parseInt512Value"
+      name: "parseBigIntValue"
       params: [ "String" ]
       doc: "Converts an string to an integer."
       paramsDoc: [ "The string to convert." ]
       complexity: 65
     }
     {
-      name: "toInt512"
+      name: "toBigInt"
       params: [ "ByteVector" ]
       doc: "Converts an array of bytes to an big integer."
       paramsDoc: [ "The array of bytes to convert." ]
       complexity: 65
     }
     {
-      name: "toInt512"
+      name: "toBigInt"
       params: [ "ByteVector", "Int", "Int" ]
       doc: "Converts an array of bytes to an big integer."
       paramsDoc: [ "The array of bytes to convert.", "Offset", "Size" ]
@@ -104,13 +104,13 @@
     }
     {
       name: "toInt"
-      params: [ "Int512" ]
-      doc: "Converts a Int512 to an integer."
-      paramsDoc: [ "The Int512 to convert." ]
+      params: [ "BigInt" ]
+      doc: "Converts a BigInt to an integer."
+      paramsDoc: [ "The BigInt to convert." ]
       complexity: 1
     }
     {
-      name: "toInt512"
+      name: "toBigInt"
       params: [ "Int" ]
       doc: "Converts an integer to an integer."
       paramsDoc: [ "The integer to convert." ]

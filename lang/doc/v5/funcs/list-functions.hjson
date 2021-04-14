@@ -32,7 +32,7 @@
       name: "median"
       params: [ "List[Int512]" ]
       doc: "Returns the median of the list."
-      paramsDoc: [ "The list of Int512." ]
+      paramsDoc: [ "The list of BigInt." ]
       complexity: 160
     }
     {

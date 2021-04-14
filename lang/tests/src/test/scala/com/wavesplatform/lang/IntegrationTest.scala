@@ -2214,7 +2214,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     evalV5(src) shouldBe Right(CONST_INT512(BigInt(Math.floorDiv(arrSorted(49) + arrSorted(50), 2))))
   }
 
-  property("List[Int512] median - 99 elements") {
+  property("List[BigInt] median - 99 elements") {
     val arr       = (1 to 99).map(_ => Random.nextLong())
     val arrSorted = arr.sorted
     val src =
