@@ -187,6 +187,18 @@ class BigIntTest extends PropSpec with EvaluatorSpec with ScalaCheckPropertyChec
     eval(s"$maxValue % toBigInt(0)") should produce("BigInteger divide by zero")
   }
 
+  property("BigInt match") {
+    eval(
+      """
+        | let v = 12345
+        | match if true then toBigInt(v) else v {
+        |   case a: Int    => throw("")
+        |   case b: BigInt => b
+        | }
+      """.stripMargin
+    ) shouldBe Right(CONST_BIGINT(12345))
+  }
+
   property("List[BigInt] median - 100 elements") {
     val arr       = (1 to 100).map(_ => Random.nextLong())
     val arrSorted = arr.sorted
