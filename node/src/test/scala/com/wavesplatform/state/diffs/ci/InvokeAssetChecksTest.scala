@@ -113,7 +113,7 @@ class InvokeAssetChecksTest
               dAppAddress          -> Portfolio(-0, assets = Map(asset -> 0))
             ),
             scriptsRun = 1,
-            scriptsComplexity = 8,
+            scriptsComplexity = 18,
             scriptResults = Map(
               invoke.id.value() -> InvokeScriptResult(
                 transfers = Seq(
