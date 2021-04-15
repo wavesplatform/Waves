@@ -149,10 +149,11 @@ object DiffsCommon {
       )
       leaseBalance  = blockchain.leaseBalance(senderAddress)
       senderBalance = blockchain.balance(senderAddress, Waves)
+      requiredBalance = if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) amount + fee else amount
       _ <- Either.cond(
-        senderBalance - leaseBalance.out >= amount,
+        senderBalance - leaseBalance.out >= requiredBalance,
         (),
-        GenericError(s"Cannot lease more than own: Balance:$senderBalance, already leased: ${leaseBalance.out}")
+        GenericError(s"Cannot lease more than own: Balance: $senderBalance, already leased: ${leaseBalance.out}")
       )
       portfolioDiff = Map(
         senderAddress    -> Portfolio(-fee, LeaseBalance(0, amount)),

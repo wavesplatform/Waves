@@ -2,10 +2,10 @@ package com.wavesplatform.lang.evaluator
 
 import cats.implicits._
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.{Global, Common}
+import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.V4
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
@@ -28,7 +28,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
   private val version = V4
   private val ctx =
     PureContext.build(version).withEnvironment[Environment] |+|
-    WavesContext.build(Global, DirectiveSet.contractDirectiveSet)
+    WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet())
 
   private val environment = Common.emptyBlockchainEnvironment()
   private val evaluator =
@@ -899,5 +899,43 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
         expr shouldBe CONST_STRING("42").explicitGet()
         cost shouldBe 15
     }
+  }
+
+  property("no checks for constructor") {
+    val exprWithCorrectArgs = FUNCTION_CALL(
+      FunctionHeader.User("IntegerEntry"),
+      List(CONST_STRING("key").explicitGet(), CONST_LONG(1))
+    )
+    eval(exprWithCorrectArgs, 100)._2 shouldBe
+      """
+        |IntegerEntry(
+        |	key = "key"
+        |	value = 1
+        |)
+      """.stripMargin.trim
+
+    val exprWithIllegalArgs = FUNCTION_CALL(
+      FunctionHeader.User("IntegerEntry"),
+      List(CONST_STRING("key").explicitGet(), CONST_BOOLEAN(true))
+    )
+    eval(exprWithIllegalArgs, 100)._2 shouldBe
+      """
+        |IntegerEntry(
+        |	key = "key"
+        |	value = true
+        |)
+      """.stripMargin.trim
+
+    val exprWithTooManyArgs = FUNCTION_CALL(
+      FunctionHeader.User("IntegerEntry"),
+      List(CONST_STRING("key").explicitGet(), CONST_BOOLEAN(true), CONST_LONG(1))
+    )
+    eval(exprWithTooManyArgs, 100)._2 shouldBe
+      """
+        |IntegerEntry(
+        |	key = "key"
+        |	value = true
+        |)
+      """.stripMargin.trim
   }
 }

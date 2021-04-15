@@ -48,7 +48,7 @@ class LeaseRouteSpec
     )
 
   private def withRoute(f: (Domain, Route) => Unit): Unit =
-    withDomain(domainSettingsWithFeatures(BlockchainFeatures.implemented.flatMap(BlockchainFeatures.feature).toSeq: _*)) { d =>
+    withDomain(domainSettingsWithPreactivatedFeatures(BlockchainFeatures.implemented.flatMap(BlockchainFeatures.feature).toSeq: _*)) { d =>
       f(d, route(d).route)
     }
 
@@ -126,7 +126,7 @@ class LeaseRouteSpec
   private def leaseGen(sender: KeyPair, maxAmount: Long, timestamp: Long): Gen[LeaseTransaction] = for {
     fee <- smallFeeGen
     recipient <- accountGen
-    amount <- Gen.chooseNum(1, maxAmount)
+    amount <- Gen.chooseNum(1, (maxAmount - fee).max(1))
     version <- Gen.oneOf(1.toByte, 2.toByte, 3.toByte)
   } yield LeaseTransaction.selfSigned(version, sender, recipient.toAddress, amount, fee, timestamp).explicitGet()
 
