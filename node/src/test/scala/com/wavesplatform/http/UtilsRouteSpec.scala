@@ -812,7 +812,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
     }
 
-    evalScript("letFromContract - 1".stripMargin) ~> route ~> check {
+    evalScript("letFromContract - 1") ~> route ~> check {
       responseJson shouldBe Json.obj("type" -> "Int", "value" -> (letFromContract - 1))
     }
 
@@ -821,7 +821,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       .returning(DefaultBlockchainSettings)
       .anyNumberOfTimes()
 
-    evalScript(""" testSyncInvoke() """.stripMargin) ~> route ~> check {
+    evalScript(""" testSyncInvoke() """) ~> route ~> check {
       responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":99,"expr":" testSyncInvoke() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
     }
 
@@ -836,6 +836,10 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
     evalScript(""" testWriteEntryType(base58'aaaa') """.stripMargin) ~> route ~> check {
       responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"bytes"},"value":{"type":"ByteVector","value":"aaaa"}}}]},"complexity":3,"expr":" testWriteEntryType(base58'aaaa') ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    }
+
+    evalScript(s"""parseBigIntValue("${PureContext.BigIntMax}")""") ~> route ~> check {
+      responseAs[String] shouldBe s"""{"result":{"type":"BigInt","value":${PureContext.BigIntMax}},"complexity":65,"expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
     }
   }
 

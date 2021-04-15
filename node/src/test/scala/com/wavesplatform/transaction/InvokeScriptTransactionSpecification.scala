@@ -4,9 +4,10 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account._
 import com.wavesplatform.api.http.requests.{InvokeScriptRequest, SignedInvokeScriptRequest}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.state.diffs.ProduceError.produce
 import com.wavesplatform.common.utils.{Base64, _}
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_LONG, CaseObj}
+import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BIGINT, CONST_LONG, CaseObj}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
 import com.wavesplatform.protobuf.transaction._
@@ -264,7 +265,6 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   }
 
   property(s"can't call a func with non native(simple) args - CaseObj") {
-    import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
       1.toByte,
@@ -284,9 +284,28 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     ) should produce("is unsupported")
   }
 
+  property(s"can't call a func with non native(simple) args - BigInt") {
+    val pk = PublicKey.fromBase58String(publicKey).explicitGet()
+    InvokeScriptTransaction.create(
+      1.toByte,
+      pk,
+      pk.toAddress,
+      Some(
+        Terms.FUNCTION_CALL(
+          FunctionHeader.User("foo"),
+          List(CONST_BIGINT(1))
+        )
+      ),
+      Seq(),
+      1,
+      Waves,
+      1,
+      Proofs.empty
+    ) should produce("is unsupported")
+  }
+
   property("can't be more 5kb") {
     val largeString = "abcde" * 1024
-    import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
       1.toByte,

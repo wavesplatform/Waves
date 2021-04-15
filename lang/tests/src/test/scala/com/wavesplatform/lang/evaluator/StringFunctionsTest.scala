@@ -1,49 +1,15 @@
 package com.wavesplatform.lang.evaluator
 
-import cats.implicits._
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common.{NoShrink, produce}
-import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V1, V3, V4}
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONST_STRING, EVALUATED}
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, unit}
-import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONST_STRING}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.v1.traits.Environment
-import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class StringFunctionsTest extends PropSpec with ScalaCheckPropertyChecks with ScriptGen with Matchers with NoShrink {
-  private def eval(code: String)(implicit startVersion: StdLibVersion = V1): Either[String, EVALUATED] = {
-    val parsedExpr = Parser.parseExpr(code).get.value
-    val results = DirectiveDictionary[StdLibVersion].all
-      .filter(_.id >= startVersion.id - 1)
-      .map(version => (version, eval(parsedExpr, version)))
-      .toList
-      .sortBy(_._1)
-    val correctResults =
-      if (startVersion == V1) results
-      else {
-        results.head._2 should produce("Can't find a function")
-        results.tail
-      }
-    if (correctResults.map(_._2).distinct.size == 1)
-      correctResults.head._2
-    else
-      throw new TestFailedException(s"Evaluation results are not the same: ${correctResults.map(_._2)}", 0)
-  }
-
-  private def eval(parsedExpr: Expressions.EXPR, version: StdLibVersion): Either[String, EVALUATED] = {
-    val ctx           = PureContext.build(version).withEnvironment[Environment]
-    val typed         = ExpressionCompiler(ctx.compilerContext, parsedExpr)
-    val evaluationCtx = ctx.evaluationContext(Common.emptyBlockchainEnvironment())
-    typed.flatMap(v => EvaluatorV2.applyCompleted(evaluationCtx, v._1, version)._3)
-  }
-
+class StringFunctionsTest extends PropSpec with EvaluatorSpec with ScalaCheckPropertyChecks with ScriptGen with Matchers with NoShrink {
   property("take") {
     eval(""" take("abc", 0) """) shouldBe CONST_STRING("")
     eval(""" take("abc", 2) """) shouldBe CONST_STRING("ab")

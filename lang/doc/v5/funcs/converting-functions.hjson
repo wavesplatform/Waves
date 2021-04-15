@@ -47,7 +47,7 @@
       complexity: 1
     }
     {
-      name: "toBytesBigInt"
+      name: "toBytes"
       params: [ "BigInt" ]
       doc: "Converts an BigInt to an array of bytes."
       paramsDoc: [ "The BigInt to convert." ]
@@ -138,7 +138,7 @@
       complexity: 1
     }
     {
-      name: "toStringBigInt"
+      name: "toString"
       params: [ "BigInt" ]
       doc: "Convert BigInt to string"
       paramsDoc: [ "The BigInt to convert" ]
