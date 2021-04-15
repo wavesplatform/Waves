@@ -566,15 +566,7 @@ object Functions {
                   },
                   availableComplexity
                 )
-                .map(_.map {
-                  case (result, complexity) =>
-                    val MaxErrorLength = 200
-                    (result.leftMap { err =>
-                      val errString        = err.toString
-                      val limitedErrString = s"${errString.take(MaxErrorLength)}${if (errString.length > MaxErrorLength) s"... (${errString.length - MaxErrorLength} more)" else ""}"
-                      s"Sub-DApp $dappBytes error: $limitedErrString"
-                    }, complexity)
-                })
+                .map(_.map { case (result, complexity) => (result.leftMap(_.toString), complexity)})
             case xs =>
               val err = notImplemented[F, EVALUATED](s"Invoke(dapp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
               Coeval.now(err.map((_, 0)))

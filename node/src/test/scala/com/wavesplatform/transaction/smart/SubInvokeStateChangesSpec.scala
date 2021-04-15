@@ -144,13 +144,13 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
         |      } ],
         |      "error" : {
         |        "code" : 1,
-        |        "text" : "Sub-DApp 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM error: FailedTransactionError(code = 1, error = boom, log =\n\t@p = false\n)"
+        |        "text" : "FailedTransactionError(code = 1, error = boom, log =\n\t@p = false\n)"
         |      }
         |    }
         |  } ],
         |  "error" : {
         |    "code" : 1,
-        |    "text" : "Sub-DApp 3MsY23LPQnvPZnBKpvs6YcnCvGjLVD42pSy error: FailedTransactionError(code = 1, error = Sub-DApp 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM error: FailedTransactionError(code = 1, error = boom, log =\n\t@p = false\n), log =\n\tr0 = Left(Sub-DApp 3N87Qja7rNj8z... (99 more)"
+        |    "text" : "FailedTransactionError(code = 1, error = boom, log =\n\t@p = false\n)"
         |  }
         |}""".stripMargin
     )

@@ -109,13 +109,13 @@ object TraceStep {
   private def errorJson(e: ValidationError): JsObject = e match {
     case see: ScriptExecutionError          => Json.obj(logJson(see.log), "error" -> see.error)
     case tne: TransactionNotAllowedByScript => Json.obj(logJson(tne.log), "error" -> JsNull)
-    case fte: FailedTransactionError        => Json.obj(logJson(fte.log), "error" -> fte.error.map(_.toString))
+    case fte: FailedTransactionError        => Json.obj(logJson(fte.log), "error" -> fte.error.map(JsString))
     case a                                  => Json.obj("error"                   -> a.toString)
   }
 
   private[trace] def logJson(l: Log[Id]): (String, JsValueWrapper) =
     "vars" -> l.map {
       case (k, Right(v))  => Json.obj("name" -> k) ++ ScriptValuesJson.serializeValue(v)
-      case (k, Left(err)) => Json.obj("name" -> k, "error" -> err.toString)
+      case (k, Left(err)) => Json.obj("name" -> k, "error" -> err)
     }
 }
