@@ -150,7 +150,8 @@ object InvokeDiffsCommon {
       blockTime: Long,
       isSyncCall: Boolean,
       limitedExecution: Boolean,
-      otherIssues: Seq[Issue] = Seq()
+      totalComplexityLimit: Int,
+      otherIssues: Seq[Issue]
   ): TracedResult[ValidationError, Diff] = {
     val complexityLimit =
       if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - storingComplexity
@@ -216,12 +217,11 @@ object InvokeDiffsCommon {
           .getOrElse(TracedResult(Right(Map[Address, Portfolio]())))
       }
 
-      totalLimit = ContractLimits.MaxTotalInvokeComplexity(version)
       _ <- TracedResult(
         Either.cond(
-          actionComplexities.sum + storingComplexity <= totalLimit || limitedExecution, // limited execution has own restriction "complexityLimit"
+          actionComplexities.sum + storingComplexity <= totalComplexityLimit || limitedExecution, // limited execution has own restriction "complexityLimit"
           (),
-          FailedTransactionError.feeForActions(s"Invoke complexity limit = $totalLimit is exceeded", storingComplexity)
+          FailedTransactionError.feeForActions(s"Invoke complexity limit = $totalComplexityLimit is exceeded", storingComplexity)
         )
       )
 

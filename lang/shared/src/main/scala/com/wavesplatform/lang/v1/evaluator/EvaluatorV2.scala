@@ -17,7 +17,8 @@ import scala.collection.mutable.ListBuffer
 
 class EvaluatorV2(
     val ctx: LoggedEvaluationContext[Environment, Id],
-    val stdLibVersion: StdLibVersion
+    val stdLibVersion: StdLibVersion,
+    val checkConstructorArgsTypes: Boolean = false
 ) {
   def apply(expr: EXPR, limit: Int): (EXPR, Int) =
     applyCoeval(expr, limit).value()
@@ -95,15 +96,28 @@ class EvaluatorV2(
         }
     }
 
-    def evaluateConstructor(fc: FUNCTION_CALL, limit: Int, name: String): Coeval[Int] = {
-      val caseType =
-        ctx.ec.typeDefs.get(name) match {
+    def evaluateConstructor(fc: FUNCTION_CALL, limit: Int, name: String): Coeval[Int] =
+      for {
+        objectType <- ctx.ec.typeDefs.get(name) match {
           case Some(caseType: CASETYPEREF) => Coeval.now(caseType)
           case _                           => Coeval.raiseError(new NoSuchElementException(s"Function or type '$name' not found"))
         }
-      caseType.flatMap { objectType =>
-        val fields = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
-        root(CaseObj(objectType, fields.toMap), update, limit, parentBlocks)
+        passedArgs = fc.args.asInstanceOf[List[EVALUATED]]
+        _ <- Coeval(if (checkConstructorArgsTypes) doCheckConstructorArgsTypes(objectType, passedArgs, limit) else ())
+        fields = objectType.fields.map(_._1) zip passedArgs
+        r <- root(CaseObj(objectType, fields.toMap), update, limit, parentBlocks)
+      } yield r
+
+    def doCheckConstructorArgsTypes(objectType: CASETYPEREF, passedArgs: List[EVALUATED], limit: Int): Unit = {
+      def str[T](l: List[T]) = l.mkString("(", ", ", ")")
+
+      if (objectType.fields.size != passedArgs.size)
+        throw EvaluationException(s"Constructor ${objectType.name} expected ${objectType.fields.size} args, but ${str(passedArgs)} was passed", limit)
+      else {
+        val fieldTypes      = objectType.fields.map(_._2)
+        val passedArgsTypes = passedArgs.map(_.getType)
+        if (!(fieldTypes zip passedArgsTypes).forall { case (fieldType, passedType) => fieldType >= passedType })
+          throw EvaluationException(s"Passed args ${str(passedArgs)} are unsuitable for constructor ${objectType.name}${str(fieldTypes)}", limit)
       }
     }
 
@@ -271,15 +285,27 @@ class EvaluatorV2(
 }
 
 object EvaluatorV2 {
+  def applyLimited(
+      expr: EXPR,
+      limit: Int,
+      ctx: EvaluationContext[Environment, Id],
+      stdLibVersion: StdLibVersion,
+      checkConstructorArgsTypes: Boolean = false
+  ): Either[(ExecutionError, Log[Id]), (EXPR, Int, Log[Id])] =
+    applyLimitedCoeval(expr, limit, ctx, stdLibVersion, checkConstructorArgsTypes)
+      .value()
+      .leftMap { case (e, _, unused) => (e, unused) }
+
   def applyLimitedCoeval(
       expr: EXPR,
       limit: Int,
       ctx: EvaluationContext[Environment, Id],
-      stdLibVersion: StdLibVersion
+      stdLibVersion: StdLibVersion,
+      checkConstructorArgsTypes: Boolean = false
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (EXPR, Int, Log[Id])]] = {
     val log       = ListBuffer[LogItem[Id]]()
     val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
-    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion)
+    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion, checkConstructorArgsTypes)
     evaluator
       .applyCoeval(expr, limit)
       .redeem(
