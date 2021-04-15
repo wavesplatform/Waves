@@ -3463,6 +3463,147 @@
         }
       }
     },
+    "/leasing/info/{transactionId}": {
+      "get": {
+        "tags": [
+          "leasing"
+        ],
+        "summary": "Lease transaction",
+        "description": "Get lease transaction info.",
+        "operationId": "lease_info_get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Lease ID base58 encoded",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaseInfo"
+                }
+              }
+            }
+          }
+        }
+      }},
+    "/leasing/info": {
+      "get": {
+        "tags": [
+          "leasing"
+        ],
+        "summary": "Lease transactions",
+        "description": "Get lease transactions info.",
+        "operationId": "lease_infos_get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Transaction IDs base58 encoded",
+            "required": true,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+              },
+              "minItems": 1,
+              "maxItems": 1000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LeaseInfo"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "leasing"
+        ],
+        "summary": "Lease transactions",
+        "description": "Get lease transactions info.",
+        "operationId": "lease_infos_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "description": "Lease IDs base58 encoded",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+                    },
+                    "minItems": 1,
+                    "maxItems": 1000
+                  }
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "array",
+                    "description": "Lease IDs base58 encoded",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+                    }
+                  }
+                }
+              },
+              "encoding": {
+                "id": {
+                  "style": "form",
+                  "explode": true
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LeaseInfo"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-codegen-request-body-name": "ids"
+      }
+    },
     "/consensus/generatingbalance/{address}": {
       "get": {
         "tags": [
@@ -5530,6 +5671,64 @@
             "$ref": "#/components/schemas/UpdateAssetInfoTransaction"
           }
         ]
+      },
+      "LeaseInfo": {
+        "required": [
+          "id",
+          "originTransactionId",
+          "sender",
+          "recipient",
+          "amount",
+          "height",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Lease Transaction ID base58 encoded"
+          },
+          "originTransactionId": {
+            "type": "string",
+            "description": "Origin lease/invoke transaction ID"
+          },
+          "sender": {
+            "type": "string",
+            "description": "Lease sender id"
+          },
+          "recipient": {
+            "type": "string",
+            "description": "Lease recipient id"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Leased Waves amount"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The sequential number of the block that contains the lease transaction"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "canceled",
+              "expired"
+            ],
+            "description": "active: lease is active; canceled: lease was cancelled by transaction; expired: lease has expired"
+          },
+          "cancelHeight": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The sequential number of the block that contains the lease cancel transaction"
+          },
+          "cancelTransactionId": {
+            "type": "string",
+            "description": "Lease cancel/invoke with cancellation transaction ID"
+          }
+        }
       },
       "TransactionStatus": {
         "required": [

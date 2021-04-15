@@ -136,7 +136,7 @@ object CommonAccountsApi extends ScorexLogging {
         Set(LeaseTransaction.typeId, InvokeScriptTransaction.typeId),
         None
       ).flatMapIterable {
-        case TransactionMeta(h, lt: LeaseTransaction, true) if leaseIsActive(lt.id()) =>
+        case TransactionMeta(leaseHeight, lt: LeaseTransaction, true) if leaseIsActive(lt.id()) =>
           Seq(
             LeaseInfo(
               lt.id(),
@@ -144,11 +144,11 @@ object CommonAccountsApi extends ScorexLogging {
               lt.sender.toAddress,
               blockchain.resolveAlias(lt.recipient).explicitGet(),
               lt.amount,
-              h,
-              LeaseInfo.Status.active
+              leaseHeight,
+              LeaseInfo.Status.Active
             )
           )
-        case TransactionMeta.Invoke(height, originTransaction, true, Some(scriptResult)) =>
+        case TransactionMeta.Invoke(invokeHeight, originTransaction, true, Some(scriptResult)) =>
           def extractLeases(sender: Address, result: InvokeScriptResult): Seq[LeaseInfo] =
             result.leases.collect {
               case lease if leaseIsActive(lease.leaseId) =>
@@ -158,8 +158,8 @@ object CommonAccountsApi extends ScorexLogging {
                   sender,
                   blockchain.resolveAlias(lease.recipient).explicitGet(),
                   lease.amount,
-                  height,
-                  LeaseInfo.Status.active
+                  invokeHeight,
+                  LeaseInfo.Status.Active
                 )
             } ++ {
               result.invokes.flatMap(i => extractLeases(i.dApp, i.stateChanges))
@@ -170,19 +170,17 @@ object CommonAccountsApi extends ScorexLogging {
       }
 
     def leaseInfo(leaseId: ByteStr): Option[LeaseInfo] = blockchain.leaseDetails(leaseId) map { ld =>
-      val (height, _) = blockchain.transactionMeta(ld.sourceId).get
-
       LeaseInfo(
         leaseId,
         ld.sourceId,
         ld.sender.toAddress,
         blockchain.resolveAlias(ld.recipient).explicitGet(),
         ld.amount,
-        height,
+        ld.height,
         ld.status match {
-          case Status.Active              => LeaseInfo.Status.active
-          case Status.Cancelled(_, _) => LeaseInfo.Status.canceled
-          case Status.Expired(_)      => LeaseInfo.Status.expired
+          case Status.Active          => LeaseInfo.Status.Active
+          case Status.Cancelled(_, _) => LeaseInfo.Status.Canceled
+          case Status.Expired(_)      => LeaseInfo.Status.Expired
         },
         LeaseDetails.Status.getCancelHeight(ld.status),
         LeaseDetails.Status.getCancelTransactionId(ld.status)

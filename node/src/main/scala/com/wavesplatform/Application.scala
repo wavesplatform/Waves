@@ -135,7 +135,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         reporter = utxSynchronizerLogger.trace("Uncaught exception in UTX Synchronizer", _)
       )
 
-    val utxSynchronizer =
+    val transactionPublisher =
       TransactionPublisher.timeBounded(
         utxStorage.putIfNew,
         allChannels.broadcast,
@@ -198,7 +198,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def wallet: Wallet                                                               = app.wallet
       override def utx: UtxPool                                                                 = utxStorage
       override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
-        Await.result(utxSynchronizer.validateAndBroadcast(tx, None), Duration.Inf) // TODO: Replace with async if possible
+        Await.result(transactionPublisher.validateAndBroadcast(tx, None), Duration.Inf) // TODO: Replace with async if possible
       override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
       override def actorSystem: ActorSystem                              = app.actorSystem
       override def utxEvents: Observable[UtxEvent]                       = app.utxEvents
@@ -209,7 +209,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         blockchainUpdater,
         utxStorage,
         wallet,
-        tx => utxSynchronizer.validateAndBroadcast(tx, None),
+        tx => transactionPublisher.validateAndBroadcast(tx, None),
         loadBlockAt(db, blockchainUpdater)
       )
       override val blocksApi: CommonBlocksApi =
@@ -278,7 +278,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       settings.synchronizationSettings.utxSynchronizer,
       lastBlockInfo.map(_.height).distinctUntilChanged,
       transactions,
-      utxSynchronizer
+      transactionPublisher
     )
 
     Observable(
@@ -324,7 +324,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           wallet,
           blockchainUpdater,
           () => utxStorage.size,
-          utxSynchronizer,
+          transactionPublisher,
           time
         ),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
@@ -335,7 +335,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           settings.restAPISettings,
           wallet,
           blockchainUpdater,
-          utxSynchronizer,
+          transactionPublisher,
           time,
           limitedScheduler,
           extensionContext.accountsApi,
@@ -366,7 +366,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         AssetsApiRoute(
           settings.restAPISettings,
           wallet,
-          utxSynchronizer,
+          transactionPublisher,
           blockchainUpdater,
           time,
           extensionContext.accountsApi,
@@ -374,8 +374,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           settings.dbSettings.maxRollbackDepth
         ),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
-        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, extensionContext.accountsApi),
-        AliasApiRoute(settings.restAPISettings, extensionContext.transactionsApi, wallet, utxSynchronizer, time, blockchainUpdater),
+        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, transactionPublisher, time, extensionContext.accountsApi),
+        AliasApiRoute(settings.restAPISettings, extensionContext.transactionsApi, wallet, transactionPublisher, time, blockchainUpdater),
         RewardApiRoute(blockchainUpdater)
       )
 
@@ -516,7 +516,7 @@ object Application extends ScorexLogging {
     }
 
   private[wavesplatform] def loadBlockMetaAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] = {
-    val result =  blockchainUpdater.liquidBlockMeta
+    val result = blockchainUpdater.liquidBlockMeta
       .filter(_ => blockchainUpdater.height == height)
       .orElse(db.get(Keys.blockMetaAt(Height(height))))
     result

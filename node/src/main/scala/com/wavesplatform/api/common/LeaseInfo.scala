@@ -8,20 +8,20 @@ object LeaseInfo {
   type Status = Status.Value
   //noinspection TypeAnnotation
   object Status extends Enumeration {
-    val active   = Value(1)
-    val canceled = Value(0)
-    val expired = Value(2)
+    val Active   = Value(1)
+    val Canceled = Value(0)
+    val Expired  = Value(2)
   }
 }
 
 case class LeaseInfo(
-    leaseId: ByteStr,
+    id: ByteStr,
     originTransactionId: ByteStr,
     sender: Address,
     recipient: Address,
     amount: Long,
     height: Int,
     status: Status,
-    leaseCancelHeight: Option[Int] = None,
-    leaseCancelTransactionId: Option[ByteStr] = None
+    cancelHeight: Option[Int] = None,
+    cancelTransactionId: Option[ByteStr] = None
 )

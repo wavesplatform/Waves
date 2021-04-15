@@ -34,8 +34,10 @@ import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb._
+import pb.TransactionData.Transaction.{LegacyBytes, NewTransaction}
 import supertagged.TaggedType
 
+//noinspection UnstableApiUsage
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
     log.debug(s"Open DB at $path")
@@ -193,8 +195,9 @@ package object database extends ScorexLogging {
         pb.LeaseDetails(
             ByteString.copyFrom(ld.sender.arr),
             Some(PBRecipients.create(ld.recipient)),
-            ByteString.copyFrom(ld.sourceId.arr),
             ld.amount,
+            ByteString.copyFrom(ld.sourceId.arr),
+            ld.height,
             ld.status match {
               case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
               case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
@@ -213,7 +216,6 @@ package object database extends ScorexLogging {
         LeaseDetails(
           d.senderPublicKey.toPublicKey,
           PBRecipients.toAddressOrAlias(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
-          d.sourceId.toByteStr,
           d.amount,
           d.status match {
             case pb.LeaseDetails.Status.Active(_)                                => LeaseDetails.Status.Active
@@ -221,7 +223,9 @@ package object database extends ScorexLogging {
             case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId)) =>
               LeaseDetails.Status.Cancelled(height, transactionId.toByteStr)
             case pb.LeaseDetails.Status.Empty => ???
-          }
+          },
+          d.sourceId.toByteStr,
+          d.height
         )
       )
     }
@@ -540,7 +544,6 @@ package object database extends ScorexLogging {
   }
 
   def readTransaction(b: Array[Byte]): (Transaction, Boolean) = {
-    import pb.TransactionData.Transaction._
 
     val data = pb.TransactionData.parseFrom(b)
     data.transaction match {
@@ -551,7 +554,6 @@ package object database extends ScorexLogging {
   }
 
   def writeTransaction(v: (Transaction, Boolean)): Array[Byte] = {
-    import pb.TransactionData.Transaction._
     val (tx, succeeded) = v
     val ptx = tx match {
       case lps: LegacyPBSwitch if !lps.isProtobufVersion => LegacyBytes(ByteString.copyFrom(tx.bytes()))

@@ -23,6 +23,6 @@ object LeaseDetails {
   }
 }
 
-case class LeaseDetails(sender: PublicKey, recipient: AddressOrAlias, sourceId: ByteStr, amount: Long, status: LeaseDetails.Status) {
+case class LeaseDetails(sender: PublicKey, recipient: AddressOrAlias, amount: Long, status: LeaseDetails.Status, sourceId: ByteStr, height: Int) {
   def isActive: Boolean = status == LeaseDetails.Status.Active
 }

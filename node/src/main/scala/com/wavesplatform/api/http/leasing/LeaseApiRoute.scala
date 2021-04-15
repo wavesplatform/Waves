@@ -4,7 +4,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
 import com.wavesplatform.api.http.{BroadcastRoute, _}
 import com.wavesplatform.api.http.requests.{LeaseCancelRequest, LeaseRequest}
-import com.wavesplatform.api.http.ApiError.{InvalidIds, TransactionDoesNotExist}
+import com.wavesplatform.api.http.ApiError.{InvalidIds, TooBigArrayAllocation, TransactionDoesNotExist}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.BlockchainFeatures
@@ -15,7 +15,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
-import play.api.libs.json.{JsNumber, Json}
+import play.api.libs.json._
 
 case class LeaseApiRoute(
     settings: RestAPISettings,
@@ -27,6 +27,7 @@ case class LeaseApiRoute(
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
+  import LeaseApiRoute._
 
   override val route: Route = pathPrefix("leasing") {
     active ~ deprecatedRoute
@@ -67,12 +68,15 @@ case class LeaseApiRoute(
 
       complete(result)
     } ~ anyParam("id") { ids =>
-      leasingInfosMap(ids) match {
-        case Left(err) => complete(err)
-        case Right(leaseInfoByIdMap) =>
-          val results = ids.map(leaseInfoByIdMap).toVector
-          complete(results)
-      }
+      if (ids.size > settings.transactionsByAddressLimit)
+        complete(TooBigArrayAllocation(settings.transactionsByAddressLimit))
+      else
+        leasingInfosMap(ids) match {
+          case Left(err) => complete(err)
+          case Right(leaseInfoByIdMap) =>
+            val results = ids.map(leaseInfoByIdMap).toVector
+            complete(results)
+        }
     }
 
   private[this] def leasingInfosMap(ids: Iterable[String]): Either[InvalidIds, Map[String, LeaseInfo]] = {
@@ -87,10 +91,20 @@ case class LeaseApiRoute(
 
     if (failed.isEmpty) {
       Right(infos.collect {
-        case Right(li) => li.leaseId.toString -> li
+        case Right(li) => li.id.toString -> li
       }.toMap)
     } else {
       Left(InvalidIds(failed.toVector))
     }
+  }
+}
+
+object LeaseApiRoute {
+  implicit val leaseStatusWrites: Writes[LeaseInfo.Status] =
+    Writes(s => JsString(s.toString.toLowerCase))
+
+  implicit val leaseInfoWrites: OWrites[LeaseInfo] = {
+    import com.wavesplatform.utils.byteStrFormat
+    Json.writes[LeaseInfo]
   }
 }

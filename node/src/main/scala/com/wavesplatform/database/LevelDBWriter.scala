@@ -837,15 +837,9 @@ abstract class LevelDBWriter private[database](
       details <- detailsOrFlag.fold(
         isActive =>
           transactionInfo(leaseId, db).collect {
-            case (h, lt: LeaseTransaction, _) =>
-              LeaseDetails(
-                lt.sender,
-                lt.recipient,
-                leaseId,
-                lt.amount,
-                if (isActive) LeaseDetails.Status.Active
-                else LeaseDetails.Status.Cancelled(h, ByteStr.empty)
-              )
+            case (leaseHeight, lt: LeaseTransaction, _) =>
+              LeaseDetails(lt.sender, lt.recipient, lt.amount, if (isActive) LeaseDetails.Status.Active
+                else LeaseDetails.Status.Cancelled(leaseHeight, ByteStr.empty), leaseId, leaseHeight)
           },
         Some(_)
       )

@@ -176,7 +176,7 @@ object DiffsCommon {
         senderAddress    -> Portfolio(-fee, LeaseBalance(0, amount)),
         recipientAddress -> Portfolio(0, LeaseBalance(amount, 0))
       )
-      details = LeaseDetails(sender, recipient, txId, amount, LeaseDetails.Status.Active)
+      details = LeaseDetails(sender, recipient, amount, LeaseDetails.Status.Active, txId, blockchain.height)
     } yield Diff(
       portfolios = portfolioDiff,
       leaseState = Map((leaseId, details))
@@ -210,13 +210,7 @@ object DiffsCommon {
       )
       senderPortfolio    = Map(sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
       recipientPortfolio = Map(recipient        -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
-      actionInfo = LeaseDetails(
-        sender,
-        lease.recipient,
-        lease.sourceId,
-        lease.amount,
-        LeaseDetails.Status.Cancelled(blockchain.height, cancelTxId)
-      )
+      actionInfo = lease.copy(status = LeaseDetails.Status.Cancelled(blockchain.height, cancelTxId))
     } yield Diff(
       portfolios = senderPortfolio |+| recipientPortfolio,
       leaseState = Map((leaseId, actionInfo))
