@@ -193,7 +193,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.blockchainUpdater.height shouldBe 2
           val blockWithLeaseId = d.lastBlockId
           d.blockchainUpdater.leaseDetails(lt.id()) should contain(
-            LeaseDetails(sender.publicKey, recipient.toAddress, leaseAmount, LeaseDetails.Status.Active, lt.id(), 1)
+            LeaseDetails(sender.publicKey, recipient.toAddress, leaseAmount, LeaseDetails.Status.Active, lt.id(), 2)
           )
           d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual leaseAmount
           d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual leaseAmount
@@ -213,7 +213,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               leaseAmount,
               LeaseDetails.Status.Cancelled(d.blockchain.height, leaseCancel.id()),
               lt.id(),
-              1
+              2
             )
           )
           d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual 0
@@ -221,7 +221,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           d.removeAfter(blockWithLeaseId)
           d.blockchainUpdater.leaseDetails(lt.id()) should contain(
-            LeaseDetails(sender.publicKey, recipient.toAddress, leaseAmount, LeaseDetails.Status.Active, lt.id(), 1)
+            LeaseDetails(sender.publicKey, recipient.toAddress, leaseAmount, LeaseDetails.Status.Active, lt.id(), 2)
           )
           d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual leaseAmount
           d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual leaseAmount
@@ -706,7 +706,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
             val (leaseAmount, leaseFc) = leaseFunctionCallGen(invoker.toAddress).sample.get
             def leaseDetails(invokeId: ByteStr) =
-              Some(LeaseDetails(dApp.publicKey, invoker.toAddress, leaseAmount, LeaseDetails.Status.Active, invokeId, 1))
+              Some(LeaseDetails(dApp.publicKey, invoker.toAddress, leaseAmount, LeaseDetails.Status.Active, invokeId, 3))
 
             // liquid block rollback
             val invokeId1 = append(d.lastBlockId, leaseFc)
@@ -754,16 +754,16 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
         val call = leaseCancelFunctionCall(leaseId)
 
-        def leaseDetails(height: Int = 0, cancelId: ByteStr = ByteStr.empty) =
+        def leaseDetails(cancelHeight: Int = 0, cancelId: ByteStr = ByteStr.empty) =
           Some(
             LeaseDetails(
               dApp.publicKey,
               invoker.toAddress,
               leaseAmount,
               if (cancelId.isEmpty) LeaseDetails.Status.Active
-              else LeaseDetails.Status.Cancelled(height, cancelId),
+              else LeaseDetails.Status.Cancelled(cancelHeight, cancelId),
               sourceId,
-              1
+              2
             )
           )
 
@@ -822,8 +822,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
       "leaseCancel with lease action" in forAll(scenario) {
         case (dApp, invoker, genesis, setScript) =>
           withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SmartAccounts -> 0, SynchronousCalls -> 0)) { d =>
-            d.appendBlock(genesis)
-            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
+            d.appendBlock(genesis.transactionData :+ setScript: _*)
 
             val (leaseAmount, leaseFc) = leaseFunctionCallGen(invoker.toAddress).sample.get
             val leaseInvokeId          = appendBlock(d, invoker, dApp)(d.lastBlockId, leaseFc)
