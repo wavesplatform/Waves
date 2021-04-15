@@ -58,26 +58,17 @@ object TxValidationError {
       cause: Cause,
       spentComplexity: Long,
       log: Log[Id],
-      error: Option[ValidationError],
+      error: Option[String],
       assetId: Option[ByteStr] = None,
       invocations: Seq[InvokeScriptResult.Invocation] = Nil
   ) extends ValidationError
       with WithLog {
     import FailedTransactionError._
 
-    def calledAddresses: Set[Address] =
-      InvokeScriptResult.Invocation.calledAddresses(invocations).toSet
-
-    private[this] def subErrorMessage: Option[String] = error.collect {
-      case fte: FailedTransactionError => fte.message // Recursion
-      case e: GenericError             => e.err
-      case e                           => e.toString
-    }
-
     def code: Int = cause.code
     def message: String = cause match {
-      case Cause.DAppExecution | Cause.FeeForActions     => subErrorMessage.getOrElse("Unknown error")
-      case Cause.AssetScriptInAction | Cause.AssetScript => assetScriptError(assetId.getOrElse(ByteStr.empty), subErrorMessage)
+      case Cause.DAppExecution | Cause.FeeForActions     => error.get
+      case Cause.AssetScriptInAction | Cause.AssetScript => assetScriptError(assetId.get, error)
     }
 
     def isAssetScript: Boolean    = assetId.isDefined
@@ -96,23 +87,20 @@ object TxValidationError {
   }
 
   object FailedTransactionError {
-    def dAppExecutionE(error: ValidationError, spentComplexity: Long, log: Log[Id] = List.empty): FailedTransactionError =
+    def dAppExecution(error: String, spentComplexity: Long, log: Log[Id] = List.empty): FailedTransactionError =
       FailedTransactionError(Cause.DAppExecution, spentComplexity, log, Some(error), None)
 
-    def dAppExecution(error: String, spentComplexity: Long, log: Log[Id] = List.empty): FailedTransactionError =
-      dAppExecutionE(GenericError(error), spentComplexity, log)
-
     def feeForActions(error: String, spentComplexity: Long): FailedTransactionError =
-      FailedTransactionError(Cause.FeeForActions, spentComplexity, List.empty, Some(GenericError(error)), None)
+      FailedTransactionError(Cause.FeeForActions, spentComplexity, List.empty, Some(error), None)
 
     def assetExecutionInAction(error: String, spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
-      FailedTransactionError(Cause.AssetScriptInAction, spentComplexity, log, Some(GenericError(error)), Some(assetId))
+      FailedTransactionError(Cause.AssetScriptInAction, spentComplexity, log, Some(error), Some(assetId))
 
     def notAllowedByAssetInAction(spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
       FailedTransactionError(Cause.AssetScriptInAction, spentComplexity, log, None, Some(assetId))
 
     def assetExecution(error: String, spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
-      FailedTransactionError(Cause.AssetScript, spentComplexity, log, Some(GenericError(error)), Some(assetId))
+      FailedTransactionError(Cause.AssetScript, spentComplexity, log, Some(error), Some(assetId))
 
     def notAllowedByAsset(spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
       FailedTransactionError(Cause.AssetScript, spentComplexity, log, None, Some(assetId))
@@ -120,7 +108,7 @@ object TxValidationError {
     def asFailedScriptError(ve: ValidationError): FailedTransactionError =
       ve match {
         case fte: FailedTransactionError => fte
-        case err                         => this.dAppExecutionE(err, spentComplexity = 0L)
+        case err                         => this.dAppExecution(err.toString, spentComplexity = 0L)
       }
 
     sealed trait Cause extends Product with Serializable {
