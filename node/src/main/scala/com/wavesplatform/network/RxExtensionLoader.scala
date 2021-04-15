@@ -174,10 +174,14 @@ object RxExtensionLoader extends ScorexLogging {
           extensions.onNext(ch -> extension)
           syncNext(state.copy(applierState = ApplierState.Applying(None, extension)))
         case s @ ApplierState.Applying(None, applying) =>
-          log.trace(s"An optimistic extension was received: $extension, but applying $applying now")
+          if (extension.blocks.size > 10) {
+            log.trace(s"${id(ch)} An optimistic extension was received: $extension, but applying $applying now")
+          } else {
+            log.trace(s"${id(ch)} $extension is too short, we're close to the top of the blockchain")
+          }
           state.copy(applierState = s.copy(buf = Some(Buffer(ch, extension))))
         case _ =>
-          log.warn(s"Overflow, discarding $extension")
+          log.warn(s"${id(ch)} Overflow, discarding $extension")
           state
       }
     }
