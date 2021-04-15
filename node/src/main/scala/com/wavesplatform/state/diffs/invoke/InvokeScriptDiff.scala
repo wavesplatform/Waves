@@ -41,6 +41,7 @@ object InvokeScriptDiff {
       blockchain: Blockchain,
       blockTime: Long,
       limitedExecution: Boolean,
+      totalComplexityLimit: Int,
       remainingComplexity: Int,
       remainingCalls: Int,
       remainingActions: Int,
@@ -52,7 +53,6 @@ object InvokeScriptDiff {
     val dAppAddress = tx.dAppAddress
     blockchain.accountScript(dAppAddress) match {
       case Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities)) =>
-        val limit = ContractLimits.MaxTotalInvokeComplexity(version)
         for {
           _ <- traced(
             Either.cond(
@@ -83,7 +83,7 @@ object InvokeScriptDiff {
             (prev.v(), a) match {
               case (TracedResult(Left(_), _), _) => prev
               case (TracedResult(Right(nextRemainingComplexity), _), (script, amount, assetId)) =>
-                val usedComplexity = limit - nextRemainingComplexity
+                val usedComplexity = totalComplexityLimit - nextRemainingComplexity
                 val r = {
                   val pseudoTx = ScriptTransfer(
                     Some(assetId),
@@ -159,6 +159,7 @@ object InvokeScriptDiff {
                   pk,
                   callChain + dAppAddress,
                   limitedExecution,
+                  totalComplexityLimit,
                   remainingCalls - 1,
                   remainingActions,
                   remainingData,
@@ -193,6 +194,7 @@ object InvokeScriptDiff {
                     blockTime,
                     isSyncCall = true,
                     limitedExecution,
+                    totalComplexityLimit,
                     Seq()
                   )
                 )
@@ -226,7 +228,7 @@ object InvokeScriptDiff {
               case _: IncompleteResult if limitedExecution => doProcessActions(Nil, 0).map((_, unit, availableActions, availableData))
               case r: IncompleteResult =>
                 val usedComplexity = remainingComplexity - r.unusedComplexity
-                val error          = FailedTransactionError.dAppExecution(s"Invoke complexity limit = $limit is exceeded", usedComplexity, log)
+                val error          = FailedTransactionError.dAppExecution(s"Invoke complexity limit = $totalComplexityLimit is exceeded", usedComplexity, log)
                 traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
             }
             resultDiff = diff.copy(scriptsComplexity = 0) |+| actionsDiff |+| Diff.empty.copy(scriptsComplexity = paymentsComplexity)
