@@ -1,40 +1,10 @@
 package com.wavesplatform.lang.evaluator
 
-import com.wavesplatform.lang.Common
-import com.wavesplatform.lang.Common.NoShrink
-import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EVALUATED}
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
-import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.v1.traits.Environment
-import org.scalatest.exceptions.TestFailedException
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 
-class SplitFunctionTest extends PropSpec with ScalaCheckPropertyChecks with ScriptGen with Matchers with NoShrink {
+class SplitFunctionTest extends EvaluatorSpec {
   implicit val startVersion: StdLibVersion = V3
-
-  private def eval(code: String)(implicit startVersion: StdLibVersion): Either[String, EVALUATED] = {
-    val parsedExpr = Parser.parseExpr(code).get.value
-    val results = DirectiveDictionary[StdLibVersion].all
-      .filter(_ >= startVersion)
-      .map(version => eval(parsedExpr, version))
-    if (results.toList.distinct.size == 1)
-      results.head
-    else
-      throw new TestFailedException(s"Evaluation results are not the same: $results", 0)
-  }
-
-  private def eval(parsedExpr: Expressions.EXPR, version: StdLibVersion): Either[String, EVALUATED] = {
-    val ctx           = PureContext.build(version).withEnvironment[Environment]
-    val typed         = ExpressionCompiler(ctx.compilerContext, parsedExpr)
-    val evaluationCtx = ctx.evaluationContext(Common.emptyBlockchainEnvironment())
-    typed.flatMap(v => EvaluatorV2.applyCompleted(evaluationCtx, v._1, version)._3)
-  }
 
   property("split string containing separators") {
     val script =
