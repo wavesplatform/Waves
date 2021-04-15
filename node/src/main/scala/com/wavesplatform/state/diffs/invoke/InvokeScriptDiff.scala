@@ -78,52 +78,55 @@ object InvokeScriptDiff {
 
           directives: DirectiveSet <- traced(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
           payments                 <- traced(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
-          checkedPayments = payments.payments.flatMap {
-            case (amount, Some(assetId)) => blockchain.assetScript(IssuedAsset(assetId)).flatMap(s => Some((s, amount, assetId)))
-            case _                       => None
+          checkedPayments <- traced {
+            payments.payments.toList
+              .traverseFilter {
+                case (amount, Some(assetId)) =>
+                  InvokeDiffsCommon
+                    .checkAsset(blockchain, assetId)
+                    .map(_ => blockchain.assetScript(IssuedAsset(assetId)).flatMap(s => Some((s, amount, assetId))))
+                case _ => Right(None)
+              }
+              .leftMap(GenericError(_))
           }
-          complexityAfterPayments <- checkedPayments.foldLeft(traced(Right(remainingComplexity): TxValidationError.Validation[Int])) { (prev, a) =>
-            (prev.v(), a) match {
-              case (TracedResult(Left(_), _), _) => prev
-              case (TracedResult(Right(nextRemainingComplexity), _), (script, amount, assetId)) =>
-                val usedComplexity = totalComplexityLimit - nextRemainingComplexity
-                val r = {
-                  val pseudoTx = ScriptTransfer(
-                    Some(assetId),
-                    Recipient.Address(ByteStr(tx.senderDApp.bytes)),
-                    tx.sender,
-                    Recipient.Address(ByteStr(tx.dAppAddress.bytes)),
-                    amount,
-                    tx.timestamp,
-                    tx.txId
-                  )
-                  val (log, evaluatedComplexity, result) = ScriptRunner(
-                    Coproduct[TxOrd](pseudoTx: PseudoTx),
-                    blockchain,
-                    script.script,
-                    isAssetScript = true,
-                    scriptContainerAddress = Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr)),
-                    nextRemainingComplexity
-                  )
-                  val scriptComplexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else script.complexity.toInt
-                  val totalComplexity  = usedComplexity + scriptComplexity
-                  result match {
-                    case Left(error) =>
-                      val err = FailedTransactionError.assetExecutionInAction(error, totalComplexity, log, assetId)
-                      TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
-                    case Right(FALSE) =>
-                      val err = FailedTransactionError.notAllowedByAsset(totalComplexity, log, assetId)
-                      TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
-                    case Right(TRUE) =>
-                      TracedResult(Right(nextRemainingComplexity - scriptComplexity))
-                    case Right(x) =>
-                      val err = FailedTransactionError.assetExecution(s"Script returned not a boolean result, but $x", totalComplexity, log, assetId)
-                      TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
-                  }
-                }
-                CoevalR(Coeval.now(r))
-            }
+          complexityAfterPaymentsTraced = checkedPayments.foldLeft(TracedResult(Right(remainingComplexity): TxValidationError.Validation[Int])) {
+            case (error @ TracedResult(Left(_), _), _) => error
+            case (TracedResult(Right(nextRemainingComplexity), _), (script, amount, assetId)) =>
+              val usedComplexity = totalComplexityLimit - nextRemainingComplexity
+              val pseudoTx = ScriptTransfer(
+                Some(assetId),
+                Recipient.Address(ByteStr(tx.senderDApp.bytes)),
+                tx.sender,
+                Recipient.Address(ByteStr(tx.dAppAddress.bytes)),
+                amount,
+                tx.timestamp,
+                tx.txId
+              )
+              val (log, evaluatedComplexity, result) = ScriptRunner(
+                Coproduct[TxOrd](pseudoTx: PseudoTx),
+                blockchain,
+                script.script,
+                isAssetScript = true,
+                scriptContainerAddress = Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr)),
+                nextRemainingComplexity
+              )
+              val scriptComplexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else script.complexity.toInt
+              val totalComplexity  = usedComplexity + scriptComplexity
+              result match {
+                case Left(error) =>
+                  val err = FailedTransactionError.assetExecutionInAction(error, totalComplexity, log, assetId)
+                  TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
+                case Right(FALSE) =>
+                  val err = FailedTransactionError.notAllowedByAsset(totalComplexity, log, assetId)
+                  TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
+                case Right(TRUE) =>
+                  TracedResult(Right(nextRemainingComplexity - scriptComplexity))
+                case Right(x) =>
+                  val err = FailedTransactionError.assetExecution(s"Script returned not a boolean result, but $x", totalComplexity, log, assetId)
+                  TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
+              }
           }
+          complexityAfterPayments <- CoevalR(Coeval.now(complexityAfterPaymentsTraced))
           paymentsComplexity = checkedPayments.map(_._1.complexity).sum.toInt
 
           tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))

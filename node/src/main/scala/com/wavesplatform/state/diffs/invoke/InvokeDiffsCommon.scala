@@ -240,7 +240,7 @@ object InvokeDiffsCommon {
         dataEntries,
         transferList.map { tr =>
           InvokeScriptResult.Payment(
-            Address.fromBytes(tr.recipient.bytes.arr).explicitGet(),
+            Address.fromBytes(tr.address.bytes.arr).explicitGet(),
             Asset.fromCompatId(tr.assetId),
             tr.amount
           )
@@ -301,7 +301,7 @@ object InvokeDiffsCommon {
     if (blockchain.disallowSelfPayment && version >= V4)
       if (tx.payments.nonEmpty && tx.senderAddress == dAppAddress)
         "DApp self-payment is forbidden since V4".asLeft[Unit]
-      else if (transfers.exists(_.recipient.bytes == ByteStr(dAppAddress.bytes)))
+      else if (transfers.exists(_.address.bytes == ByteStr(dAppAddress.bytes)))
         "DApp self-transfer is forbidden since V4".asLeft[Unit]
       else
         ().asRight[String]
@@ -316,8 +316,8 @@ object InvokeDiffsCommon {
       )
   }
 
-  private def checkTransferAsset(blockchain: Blockchain, assetId: ByteStr): Either[String, Unit] =
-    if (blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction))
+  def checkAsset(blockchain: Blockchain, assetId: ByteStr): Either[String, Unit] =
+    if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls))
       if (assetId.size != AssetIdLength)
         Left(s"Invalid transferring asset '$assetId' length = ${assetId.size} bytes != $AssetIdLength")
       else if (blockchain.assetDescription(IssuedAsset(assetId)).isEmpty)
@@ -398,8 +398,8 @@ object InvokeDiffsCommon {
           val actionSender = Recipient.Address(ByteStr(tx.dAppAddressOrAlias.bytes)) // XXX Is it correct for aliases&
 
           def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
-            val AssetTransfer(addressRepr, amount, asset) = transfer
-            val address                                   = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
+            val AssetTransfer(addressRepr, recipient, amount, asset) = transfer
+            val address                                              = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
             Asset.fromCompatId(asset) match {
               case Waves =>
                 TracedResult.wrapValue(Diff(portfolios = Map(address -> Portfolio(amount)) |+| Map(dAppAddress -> Portfolio(-amount))))
@@ -410,7 +410,7 @@ object InvokeDiffsCommon {
                 blockchain
                   .assetScript(a)
                   .fold {
-                    val r = checkTransferAsset(blockchain, id)
+                    val r = checkAsset(blockchain, id)
                       .map(_ => nextDiff)
                       .leftMap(FailedTransactionError.dAppExecution(_, 0))
                     TracedResult(r)
@@ -425,11 +425,16 @@ object InvokeDiffsCommon {
                               dAppAddress -> Portfolio(assets = Map(a -> -amount))
                             )
                           )
+                      val pseudoTxRecipient =
+                        if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls))
+                          recipient
+                        else
+                          Recipient.Address(addressRepr.bytes)
                       val pseudoTx = ScriptTransfer(
                         asset,
                         actionSender,
                         pk,
-                        Recipient.Address(addressRepr.bytes),
+                        pseudoTxRecipient,
                         amount,
                         tx.timestamp,
                         tx.txId
@@ -515,7 +520,7 @@ object InvokeDiffsCommon {
           def applyLeaseCancel(l: LeaseCancel): TracedResult[ValidationError, Diff] =
             for {
               _    <- TracedResult(LeaseCancelTxValidator.checkLeaseId(l.leaseId))
-              diff <- DiffsCommon.processLeaseCancel(blockchain, pk, fee = 0, blockTime, l.leaseId)
+              diff <- DiffsCommon.processLeaseCancel(blockchain, pk, fee = 0, blockTime, l.leaseId, tx.txId)
             } yield diff
 
           def callAssetVerifierWithPseudoTx(

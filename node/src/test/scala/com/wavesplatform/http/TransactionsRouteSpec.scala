@@ -1,6 +1,10 @@
 package com.wavesplatform.http
 
+import scala.concurrent.Future
+import scala.util.Random
+
 import akka.http.scaladsl.model._
+import com.wavesplatform.{BlockchainStubHelpers, BlockGen, NoShrink, TestTime, TestValues, TestWallet, TransactionGen}
 import com.wavesplatform.account.{AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
@@ -18,6 +22,8 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.{Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
+import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -25,19 +31,14 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxVersion}
-import com.wavesplatform.{BlockGen, BlockchainStubHelpers, NoShrink, TestTime, TestWallet, TransactionGen}
 import monix.reactive.Observable
-import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, OptionValues}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
-
-import scala.concurrent.Future
-import scala.util.Random
+import play.api.libs.json.Json.JsValueWrapper
 
 class TransactionsRouteSpec
     extends RouteSpec("/transactions")
@@ -223,6 +224,10 @@ class TransactionsRouteSpec
         .when(TxHelpers.secondAddress, None, *, None)
         .returns(Observable(TransactionMeta.Default(Height(1), leaseCancel, succeeded = true)))
       (transactionsApi.aliasesOfAddress _).when(*).returns(Observable.empty)
+      (blockchain.transactionMeta _).when(lease.id()).returns(Some((1, true)))
+      (blockchain.leaseDetails _)
+        .when(lease.id())
+        .returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Cancelled(2, leaseCancel.id()), lease.id(), 1)))
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
       Get(routePath(s"/address/${TxHelpers.secondAddress}/limit/10")) ~> route ~> check {
@@ -311,6 +316,24 @@ class TransactionsRouteSpec
         leaseCancels = Seq(LeaseCancel(leaseCancelId))
       )
 
+      (blockchain.leaseDetails _)
+        .expects(leaseId1)
+        .returning(Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Active, leaseId1, 1)))
+        .anyNumberOfTimes()
+      (blockchain.leaseDetails _)
+        .expects(leaseId2)
+        .returning(Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Active, leaseId2, 1)))
+        .anyNumberOfTimes()
+      (blockchain.leaseDetails _)
+        .expects(leaseCancelId)
+        .returning(
+          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, leaseCancelId), leaseCancelId, 1))
+        )
+        .anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(leaseId1).returning(Some((1, true))).anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(leaseId2).returning(Some((1, true))).anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(leaseCancelId).returning(Some((1, true))).anyNumberOfTimes()
+
       (() => blockchain.activatedFeatures).expects().returning(Map.empty).anyNumberOfTimes()
       (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
       (addressTransactions.transactionsByAddress _)
@@ -347,6 +370,10 @@ class TransactionsRouteSpec
       val transactionsApi = stub[CommonTransactionsApi]
       (transactionsApi.transactionById _).when(lease.id()).returns(Some(TransactionMeta.Default(Height(1), lease, succeeded = true)))
       (transactionsApi.transactionById _).when(leaseCancel.id()).returns(Some(TransactionMeta.Default(Height(1), leaseCancel, succeeded = true)))
+      (blockchain.transactionMeta _).when(lease.id()).returns(Some((1, true)))
+      (blockchain.leaseDetails _)
+        .when(lease.id())
+        .returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Cancelled(2, leaseCancel.id()), lease.id(), 1)))
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
       Get(routePath(s"/info/${leaseCancel.id()}")) ~> route ~> check {
@@ -421,6 +448,24 @@ class TransactionsRouteSpec
         leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, leaseId1), InvokeScriptResult.Lease(recipientAlias, 200, 3, leaseId2)),
         leaseCancels = Seq(LeaseCancel(leaseCancelId))
       )
+
+      (blockchain.leaseDetails _)
+        .expects(leaseId1)
+        .returning(Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Active, leaseId1, 1)))
+        .anyNumberOfTimes()
+      (blockchain.leaseDetails _)
+        .expects(leaseId2)
+        .returning(Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Active, leaseId2, 1)))
+        .anyNumberOfTimes()
+      (blockchain.leaseDetails _)
+        .expects(leaseCancelId)
+        .returning(
+          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, leaseCancelId), leaseCancelId, 1))
+        )
+        .anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(leaseId1).returning(Some((1, true))).anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(leaseId2).returning(Some((1, true))).anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(leaseCancelId).returning(Some((1, true))).anyNumberOfTimes()
 
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
       (addressTransactions.transactionById _)

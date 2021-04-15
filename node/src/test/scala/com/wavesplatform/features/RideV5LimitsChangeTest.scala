@@ -16,15 +16,9 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.mining.MiningConstraints.MaxScriptsComplexityInBlock
-import com.wavesplatform.mining.{MiningConstraints, MultiDimensionalMiningConstraint, OneDimensionalMiningConstraint, TxEstimators}
-import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase}
-import com.wavesplatform.state.appender.ExtensionAppender
+import com.wavesplatform.mining._
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.utx.UtxPoolImpl
-import monix.execution.Scheduler
-import monix.execution.Scheduler.Implicits.global
-import monix.reactive.Observer
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -62,9 +56,6 @@ class RideV5LimitsChangeTest extends FlatSpec with Matchers with WithDomain with
     val invokes          = for (_ <- 1 to invokesCount) yield TxHelpers.invoke(contractAddress, "test")
 
     val time       = new TestTime()
-    val utxStorage = new UtxPoolImpl(time, d.blockchain, Observer.empty, SettingsFromDefaultConfig.utxSettings)
-    val extensionAppender =
-      ExtensionAppender(d.blockchain, utxStorage, d.posSelector, time, stub[InvalidBlockStorage], stub[PeerDatabase], Scheduler.global)(null, _)
 
     val block = d.createBlock(Block.ProtoBlockVersion, invokes, strictTime = true)
     val differResult = BlockDiffer
@@ -82,7 +73,7 @@ class RideV5LimitsChangeTest extends FlatSpec with Matchers with WithDomain with
     )
 
     time.setTime(block.header.timestamp)
-    extensionAppender(Seq(block)).runSyncUnsafe().explicitGet()
+    d.appendBlock(block)
     d.blockchain.height shouldBe 3
   }
 

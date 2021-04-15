@@ -27,14 +27,15 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
       )
 
   def docCost(function: BaseFunction[Environment], version: StdLibVersion): Int =
-    DocSource
-      .funcData.get(
+    DocSource.funcData
+      .getOrElse(
         (
           function.name,
           function.signature.args.map(_._2.toString).toList,
           version.id
-        )
-      ).getOrElse(throw new Exception(s"Function ${function.name}(${function.signature.args.map(_._2.toString).toList.mkString(", ")}) not found in $version"))
+        ),
+        throw new Exception(s"Function ${function.name}(${function.signature.args.map(_._2.toString).toList.mkString(", ")}) not found in $version")
+      )
       ._3
 
   property("all functions complexities") {
