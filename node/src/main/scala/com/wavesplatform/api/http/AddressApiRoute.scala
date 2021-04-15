@@ -75,6 +75,7 @@ case class AddressApiRoute(
         "address"              -> address.stringRepr,
         "script"               -> scriptInfoOpt.map(_.script.bytes().base64),
         "scriptText"           -> scriptInfoOpt.map(_.script.expr.toString),
+        "version"              -> scriptInfoOpt.map(_.script.stdLibVersion.id),
         "complexity"           -> maxComplexity,
         "verifierComplexity"   -> verifierComplexity,
         "callableComplexities" -> callableComplexities,
