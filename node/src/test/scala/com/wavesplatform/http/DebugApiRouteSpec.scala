@@ -109,7 +109,7 @@ class DebugApiRouteSpec
     def validatePost(tx: TransferTransaction) =
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString()))
 
-    "takes the priority pool into account" in withDomain(domainSettingsWithFeatures(BlockchainFeatures.NG)) { d =>
+    "takes the priority pool into account" in withDomain(domainSettingsWithPreactivatedFeatures(BlockchainFeatures.NG)) { d =>
       d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
       d.appendBlock(TxHelpers.transfer(to = TxHelpers.secondAddress, amount = 1.waves + TestValues.fee))
 
@@ -642,18 +642,18 @@ class DebugApiRouteSpec
             |          "recipient": "${recipient1.bytes}",
             |          "amount": $amount1,
             |          "nonce": $nonce1,
-            |          "leaseId": "$leaseId1"
+            |          "id": "$leaseId1"
             |        },
             |        {
             |          "recipient": "alias:T:${recipient2.name}",
             |          "amount": $amount2,
             |          "nonce": $nonce2,
-            |          "leaseId": "$leaseId2"
+            |          "id": "$leaseId2"
             |        }
             |      ],
             |      "leaseCancels": [
             |        {
-            |          "leaseId": "$leaseCancelId"
+            |          "id": "$leaseCancelId"
             |        }
             |      ],
             |      "invokes": []
@@ -758,7 +758,7 @@ class DebugApiRouteSpec
                                    |  "burns" : [ ],
                                    |  "sponsorFees" : [ ],
                                    |  "leases" : [ {
-                                   |    "leaseId" : "$leaseId1",
+                                   |    "id" : "$leaseId1",
                                    |    "originTransactionId" : "${invoke.id()}",
                                    |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                    |    "recipient" : "$recipientAddress",
@@ -766,7 +766,7 @@ class DebugApiRouteSpec
                                    |    "height" : 1,
                                    |    "status" : "active"
                                    |  }, {
-                                   |    "leaseId" : "$leaseId2",
+                                   |    "id" : "$leaseId2",
                                    |    "originTransactionId" : "${invoke.id()}",
                                    |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                    |    "recipient" : "$recipientAddress",
@@ -775,7 +775,7 @@ class DebugApiRouteSpec
                                    |    "status" : "active"
                                    |  } ],
                                    |  "leaseCancels" : [ {
-                                   |    "leaseId" : "$leaseCancelId",
+                                   |    "id" : "$leaseCancelId",
                                    |    "originTransactionId" : "${invoke.id()}",
                                    |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                    |    "recipient" : "$recipientAddress",

@@ -8,7 +8,7 @@ import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta.Invoke
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
-import com.wavesplatform.database.{DBExt, KeyTags, Keys}
+import com.wavesplatform.database.{DBExt, Keys, KeyTags}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
@@ -138,8 +138,8 @@ object CommonAccountsApi extends ScorexLogging {
         case Invoke(height, originTransaction, true, Some(scriptResult)) =>
           def extractLeases(sender: Address, result: InvokeScriptResult): Seq[LeaseInfo] =
             result.leases.collect {
-              case lease if leaseIsActive(lease.leaseId) =>
-                LeaseInfo(lease.leaseId, originTransaction.id(), sender, blockchain.resolveAlias(lease.recipient).explicitGet(), lease.amount, height)
+              case lease if leaseIsActive(lease.id) =>
+                LeaseInfo(lease.id, originTransaction.id(), sender, blockchain.resolveAlias(lease.recipient).explicitGet(), lease.amount, height)
             } ++ {
               result.invokes.flatMap(i => extractLeases(i.dApp, i.stateChanges))
             }

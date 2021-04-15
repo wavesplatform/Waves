@@ -2788,7 +2788,7 @@ class InvokeScriptTransactionDiffTest
             l.recipient shouldBe service
             l1.amount shouldBe 23
             l1.recipient shouldBe service
-            l1.leaseId shouldBe l2.leaseId
+            l1.id shouldBe l2.id
             bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
             bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
         }
@@ -2902,7 +2902,7 @@ class InvokeScriptTransactionDiffTest
             l.recipient shouldBe service
             l1.amount shouldBe 23
             l1.recipient shouldBe service
-            l1.leaseId shouldBe l2.leaseId
+            l1.id shouldBe l2.id
             bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
             bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
         }
@@ -3025,7 +3025,7 @@ class InvokeScriptTransactionDiffTest
             l.recipient shouldBe service
             l1.amount shouldBe 23
             l1.recipient shouldBe service
-            l1.leaseId shouldBe l2.leaseId
+            l1.id shouldBe l2.id
             bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
             bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
         }

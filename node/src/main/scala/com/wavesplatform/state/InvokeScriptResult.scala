@@ -55,7 +55,7 @@ object InvokeScriptResult {
     implicit val jsonWrites = Json.writes[Payment]
   }
 
-  case class Lease(recipient: AddressOrAlias, amount: Long, nonce: Long, leaseId: ByteStr)
+  case class Lease(recipient: AddressOrAlias, amount: Long, nonce: Long, id: ByteStr)
   object Lease {
     implicit val recipientWrites = Writes[AddressOrAlias] {
       case address: Address => implicitly[Writes[Address]].writes(address)
@@ -233,10 +233,10 @@ object InvokeScriptResult {
     PBInvokeScriptResult.SponsorFee(Some(Amount(sf.assetId.toByteString, sf.minSponsoredAssetFee.getOrElse(0))))
 
   private def toPbLease(l: Lease) =
-    PBInvokeScriptResult.Lease(Some(PBRecipients.create(l.recipient)), l.amount, l.nonce, l.leaseId.toByteString)
+    PBInvokeScriptResult.Lease(Some(PBRecipients.create(l.recipient)), l.amount, l.nonce, l.id.toByteString)
 
   private def toPbLeaseCancel(l: LeaseCancel) =
-    PBInvokeScriptResult.LeaseCancel(ByteString.copyFrom(l.leaseId.arr))
+    PBInvokeScriptResult.LeaseCancel(ByteString.copyFrom(l.id.arr))
 
   private def toPbErrorMessage(em: ErrorMessage) =
     PBInvokeScriptResult.ErrorMessage(em.code, em.text)

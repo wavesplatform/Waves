@@ -329,10 +329,10 @@ object TransactionsApiRoute {
     }
 
     private[http] implicit val leaseFormat: OWrites[InvokeScriptResult.Lease] =
-      LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.Lease) => leaseIdToLeaseRef(l.leaseId))
+      LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.Lease) => leaseIdToLeaseRef(l.id))
 
     private[http] implicit val leaseCancelFormat: OWrites[InvokeScriptResult.LeaseCancel] =
-      LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.LeaseCancel) => leaseIdToLeaseRef(l.leaseId))
+      LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.LeaseCancel) => leaseIdToLeaseRef(l.id))
 
     private[http] implicit val invokeScriptResultWrites: OWrites[InvokeScriptResult] = {
       import InvokeScriptResult.{issueFormat, reissueFormat, burnFormat, sponsorFeeFormat}
@@ -340,7 +340,7 @@ object TransactionsApiRoute {
     }
   }
 
-  private[this] final case class LeaseRef(leaseId: ByteStr, originTransactionId: ByteStr, sender: Address, recipient: Address, amount: TxAmount, height: Int, status: LeaseStatus = LeaseStatus.active)
+  private[this] final case class LeaseRef(id: ByteStr, originTransactionId: ByteStr, sender: Address, recipient: Address, amount: TxAmount, height: Int, status: LeaseStatus = LeaseStatus.active)
   private[this] object LeaseRef {
     implicit val jsonWrites: OWrites[LeaseRef] = {
       import com.wavesplatform.utils.byteStrFormat
