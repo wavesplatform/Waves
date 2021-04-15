@@ -17,6 +17,8 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, LeaseCancel, Recipient}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash}
@@ -561,6 +563,7 @@ class DebugApiRouteSpec
                |
                |@Callable(i)
                |func test() = {
+               |  strict a = parseBigIntValue("${PureContext.BigIntMax}")
                |  let test = 1
                |  if (test == 1)
                |    then
@@ -660,6 +663,11 @@ class DebugApiRouteSpec
             |    },
             |    "error": null,
             |    "vars": [
+            |      {
+            |        "name":"a",
+            |        "type":"BigInt",
+            |        "value":6.703903964971298549787012499102923E+153
+            |      },
             |      {
             |        "name": "test",
             |        "type": "Int",

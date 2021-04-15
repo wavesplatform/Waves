@@ -156,7 +156,7 @@ object InvokeScriptResult {
       Address.fromBytes(a.bytes.arr).explicitGet()
 
     def langTransferToPayment(t: lang.AssetTransfer): Payment =
-      Payment(langAddressToAddress(t.recipient), Asset.fromCompatId(t.assetId), t.amount)
+      Payment(langAddressToAddress(t.address), Asset.fromCompatId(t.assetId), t.amount)
 
     def langLeaseToLease(l: lang.Lease): Lease =
       Lease(AddressOrAlias.fromRide(l.recipient).explicitGet(), l.amount, l.nonce, lang.Lease.calculateId(l, invokeId))

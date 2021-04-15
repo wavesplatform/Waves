@@ -37,7 +37,7 @@ object ScriptResult {
       .flatMap(
         t =>
           Left(
-            callableResultError(t, actual) + (if (expected.isEmpty) "" else s" instead of '$expected")
+            callableResultError(t, actual) + (if (expected.isEmpty) "" else s" instead of $expected")
           )
       )
 
@@ -112,7 +112,7 @@ object ScriptResult {
             case a: Address  => Right(a)
             case Alias(name) => ctx.environment.resolveAlias(name)
           }
-        } yield AssetTransfer(address, b, token)
+        } yield AssetTransfer(address, recipient, b, token)
       case other =>
         err(other, version, FieldNames.ScriptTransfer)
     }
