@@ -14,7 +14,10 @@ import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{loadConfig, BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, TestFunctionalitySettings => TFS}
+import com.wavesplatform.settings.{
+  loadConfig, BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings,
+  TestFunctionalitySettings => TFS
+}
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
 import com.wavesplatform.state.diffs.{produce, BlockDiffer}
 import com.wavesplatform.state.reader.CompositeBlockchain
@@ -164,19 +167,22 @@ trait WithDomain extends WithState { _: Suite =>
     }
   }
 
-  def defaultDomainSettings: WavesSettings =
+  lazy val SettingsFromDefaultConfig: WavesSettings =
     WavesSettings.fromRootConfig(loadConfig(None))
 
-  def domainSettingsWithFS(fs: FunctionalitySettings): WavesSettings = {
-    val ds = defaultDomainSettings
-    ds.copy(blockchainSettings = ds.blockchainSettings.copy(functionalitySettings = fs))
-  }
+  def domainSettingsWithFS(fs: FunctionalitySettings): WavesSettings =
+    SettingsFromDefaultConfig.copy(
+      blockchainSettings = SettingsFromDefaultConfig.blockchainSettings.copy(functionalitySettings = fs)
+    )
 
-  def domainSettingsWithFeatures(fs: BlockchainFeature*): WavesSettings =
-    defaultDomainSettings.withFeatures(fs: _*)
+  def domainSettingsWithPreactivatedFeatures(fs: BlockchainFeature*): WavesSettings =
+    domainSettingsWithFeatures(fs.map(_ -> 0): _*)
+
+  def domainSettingsWithFeatures(fs: (BlockchainFeature, Int)*): WavesSettings =
+    domainSettingsWithFS(SettingsFromDefaultConfig.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map { case (f, h) => f.id -> h }.toMap))
 
   object DomainPresets {
-    val NG = domainSettingsWithFeatures(
+    val NG = domainSettingsWithPreactivatedFeatures(
       BlockchainFeatures.MassTransfer, // Removes limit of 100 transactions per block
       BlockchainFeatures.NG
     )
@@ -191,7 +197,8 @@ trait WithDomain extends WithState { _: Suite =>
     val RideV5 = RideV4.addFeatures(BlockchainFeatures.SynchronousCalls)
   }
 
-  def withDomain[A](settings: WavesSettings = defaultDomainSettings)(
+
+  def withDomain[A](settings: WavesSettings = SettingsFromDefaultConfig)(
       test: Domain => A
   ): A =
     withLevelDBWriter(settings) { blockchain =>

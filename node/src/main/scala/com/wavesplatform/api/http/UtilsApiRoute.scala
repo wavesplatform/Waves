@@ -252,13 +252,12 @@ case class UtilsApiRoute(
 
       val result =
         for {
-          expr   <- parseCall(obj \ "expr")
-          result <- ScriptCallEvaluator.executeExpression(blockchain, script, address, settings.evaluateScriptComplexityLimit)(expr)
-        } yield result
+          expr                 <- parseCall(obj \ "expr")
+          (result, complexity) <- ScriptCallEvaluator.executeExpression(blockchain, script, address, settings.evaluateScriptComplexityLimit)(expr)
+        } yield Json.obj("result" -> ScriptValuesJson.serializeValue(result), "complexity" -> complexity)
 
       val requestData = obj ++ Json.obj("address" -> address.stringRepr)
       val responseJson = result
-        .map(r => Json.obj("result" -> ScriptValuesJson.serializeValue(r)))
         .recover {
           case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
           case other                   => ApiError.fromValidationError(other).json
@@ -282,10 +281,11 @@ object UtilsApiRoute {
     def compile(stdLibVersion: StdLibVersion)(str: String): Either[GenericError, EXPR] = {
       val ctx =
         PureContext.build(stdLibVersion).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(stdLibVersion, Account, Expression).explicitGet())
+          CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment] |+|
+          WavesContext.build(Global, DirectiveSet(stdLibVersion, Account, Expression).explicitGet())
 
-      ExpressionCompiler.compileUntyped(str, ctx.compilerContext.copy(arbitraryDeclarations = true))
+      ExpressionCompiler
+        .compileUntyped(str, ctx.compilerContext.copy(arbitraryDeclarations = true))
         .leftMap(GenericError(_))
     }
 
@@ -297,7 +297,9 @@ object UtilsApiRoute {
         .map(_._1)
     }
 
-    def executeExpression(blockchain: Blockchain, script: Script, address: Address, limit: Int)(expr: EXPR): Either[ValidationError, EVALUATED] = {
+    def executeExpression(blockchain: Blockchain, script: Script, address: Address, limit: Int)(
+        expr: EXPR
+    ): Either[ValidationError, (EVALUATED, Int)] = {
       for {
         ds <- DirectiveSet(script.stdLibVersion, Account, DAppType).leftMap(GenericError(_))
         ctx = BlockchainContext
@@ -315,6 +317,7 @@ object UtilsApiRoute {
               PublicKey(ByteStr.fill(KeyLength)(1)),
               Set.empty[Address],
               limitedExecution = false,
+              limit,
               remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
               availableActions = ContractLimits.MaxCallableActionsAmount(script.stdLibVersion),
               availableData = ContractLimits.MaxWriteSetSize(script.stdLibVersion),
@@ -324,11 +327,12 @@ object UtilsApiRoute {
           )
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
         limitedResult <- EvaluatorV2
-          .applyLimited(call, limit, ctx, script.stdLibVersion)
-          .leftMap { case (err, log) => ScriptExecutionError.dAppExecution(err, log) }
+          .applyLimitedCoeval(call, limit, ctx, script.stdLibVersion, checkConstructorArgsTypes = true)
+          .value()
+          .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err, log) }
         result <- limitedResult match {
-          case (eval: EVALUATED, _, _) => Right(eval)
-          case (_: EXPR, _, log)       => Left(ScriptExecutionError.dAppExecution(s"Calculation complexity limit exceeded", log))
+          case (eval: EVALUATED, unusedComplexity, _) => Right((eval, limit - unusedComplexity))
+          case (_: EXPR, _, log)                      => Left(ScriptExecutionError.dAppExecution(s"Calculation complexity limit exceeded", log))
         }
       } yield result
     }

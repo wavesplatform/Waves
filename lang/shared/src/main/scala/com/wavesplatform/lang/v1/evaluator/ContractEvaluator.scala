@@ -24,8 +24,8 @@ object ContractEvaluator {
       funcCall: FUNCTION_CALL,
       caller: Recipient.Address,
       callerPk: ByteStr,
-      originalCaller: Recipient.Address,
-      originalCallerPublicKey: ByteStr,
+      originCaller: Recipient.Address,
+      originCallerPublicKey: ByteStr,
       payments: AttachedPayments,
       transactionId: ByteStr,
       fee: Long,
@@ -91,9 +91,9 @@ object ContractEvaluator {
       decls: List[DECLARATION],
       v: VerifierFunction,
       ctx: EvaluationContext[Environment, Id],
-      evaluate: (EvaluationContext[Environment, Id], EXPR) => Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])],
+      evaluate: (EvaluationContext[Environment, Id], EXPR) => (Log[Id], Int, Either[ExecutionError, EVALUATED]),
       entity: CaseObj
-  ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
+  ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
     val verifierBlock =
       BLOCK(
         LET(v.annotation.invocationArgName, entity),
@@ -102,18 +102,6 @@ object ContractEvaluator {
 
     evaluate(ctx, foldDeclarations(decls, verifierBlock))
   }
-
-  def apply(
-      ctx: EvaluationContext[Environment, Id],
-      dApp: DApp,
-      i: Invocation,
-      version: StdLibVersion
-  ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] =
-    for {
-      expr              <- buildExprFromInvocation(dApp, i, version).leftMap((_, Nil))
-      (evaluation, log) <- EvaluatorV1().applyWithLogging[EVALUATED](ctx, expr)
-      result            <- ScriptResult.fromObj(ctx, i.transactionId, evaluation, version, unusedComplexity = 0).leftMap((_, log))
-    } yield (result, log)
 
   def applyV2Coeval(
       ctx: EvaluationContext[Environment, Id],
@@ -130,7 +118,7 @@ object ContractEvaluator {
         case Left(error)  => Coeval.now(Left(error))
       }
 
-  def applyV2Coeval(
+  private def applyV2Coeval(
       ctx: EvaluationContext[Environment, Id],
       freezingLets: Map[String, LazyVal[Id]],
       expr: EXPR,

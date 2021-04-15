@@ -56,12 +56,12 @@ object InvokeScriptTransactionDiff {
         version: StdLibVersion,
         contract: DApp,
         dAppAddress: Address,
-        invocationComplexity: Long,
-        fixedInvocationComplexity: Long,
+        invocationComplexity: Int,
+        fixedInvocationComplexity: Int,
         environment: DAppEnvironment,
         invocation: ContractEvaluator.Invocation
     ) = {
-      case class MainScriptResult(invocationDiff: Diff, scriptResult: ScriptResult, log: Log[Id], availableActions: Int, availableData: Int)
+      case class MainScriptResult(invocationDiff: Diff, scriptResult: ScriptResult, log: Log[Id], availableActions: Int, availableData: Int, limit: Int)
 
       def executeMainScript(): TracedResult[ValidationError, MainScriptResult] = {
         val scriptResultE = Stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId) {
@@ -79,7 +79,7 @@ object InvokeScriptTransactionDiff {
             else
               fullLimit
 
-          val paymentsComplexity = tx.checkedAssets.flatMap(blockchain.assetScript).map(_.complexity).sum
+          val paymentsComplexity = tx.checkedAssets.flatMap(blockchain.assetScript).map(_.complexity.toInt).sum
 
           for {
             (result, log) <- evaluateV2(
@@ -89,10 +89,11 @@ object InvokeScriptTransactionDiff {
               environment,
               fullLimit,
               failFreeLimit,
-              invocationComplexity.toInt,
-              paymentsComplexity.toInt
+              invocationComplexity,
+              paymentsComplexity,
+              blockchain
             )
-          } yield MainScriptResult(environment.currentDiff, result, log, environment.availableActions, environment.availableData)
+          } yield MainScriptResult(environment.currentDiff, result, log, environment.availableActions, environment.availableData, fullLimit - paymentsComplexity)
         }
 
         TracedResult(
@@ -110,7 +111,7 @@ object InvokeScriptTransactionDiff {
       }
 
       for {
-        MainScriptResult(invocationDiff, scriptResult, log, availableActions, availableData) <- executeMainScript()
+        MainScriptResult(invocationDiff, scriptResult, log, availableActions, availableData, limit) <- executeMainScript()
         otherIssues = invocationDiff.scriptResults.get(tx.id()).fold(Seq.empty[Issue])(allIssues)
 
         doProcessActions = InvokeDiffsCommon.processActions(
@@ -118,25 +119,31 @@ object InvokeScriptTransactionDiff {
           version,
           dAppAddress,
           pk,
-          fixedInvocationComplexity,
+          _,
           tx,
           CompositeBlockchain(blockchain, Some(invocationDiff)),
           blockTime,
-          _,
+
           isSyncCall = false,
-          limitedExecution,
+          limitedExecution,ContractLimits.MaxTotalInvokeComplexity(version),
           otherIssues
         )
 
-        process = { (actions: List[CallableAction], unusedComplexity: Long) =>
-          val dataCount = actions.count(_.isInstanceOf[DataOp])
-          if (dataCount > availableData)
-            TracedResult(Left(FailedTransactionError.dAppExecution("Stored data count limit is exceeded", fixedInvocationComplexity, log)))
-          else if (actions.length - dataCount > availableActions)
-            TracedResult(Left(FailedTransactionError.dAppExecution("Actions count limit is exceeded", fixedInvocationComplexity, log)))
-          else
-            doProcessActions(actions, unusedComplexity)
-        }
+        process = (actions: List[CallableAction], unusedComplexity: Long) => {
+          val storingComplexity = if (blockchain.storeEvaluatedComplexity) limit - unusedComplexity else fixedInvocationComplexity
+              val dataCount = actions.count(_.isInstanceOf[DataOp])
+          if (dataCount > availableData){
+            TracedResult(Left(FailedTransactionError.dAppExecution("Stored data count limit is exceeded", storingComplexity, log)))
+          } else {
+                val actionsCount = actions.length - dataCount
+                if (actionsCount > availableActions) {
+            TracedResult(Left(FailedTransactionError.dAppExecution("Actions count limit is exceeded", storingComplexity, log)))
+          } else {
+            doProcessActions(actions, storingComplexity.toInt)
+                }
+              }
+            }
+
         resultDiff <- scriptResult match {
           case ScriptResultV3(dataItems, transfers, unusedComplexity) =>
             process(dataItems ::: transfers, unusedComplexity)
@@ -146,14 +153,14 @@ object InvokeScriptTransactionDiff {
           case i: IncompleteResult =>
             TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
         }
-      } yield invocationDiff |+| resultDiff
+      } yield invocationDiff.copy(scriptsComplexity = 0) |+| resultDiff
     }
 
     def calcInvocationComplexity(
         version: StdLibVersion,
         callableComplexities: Map[Int, Map[String, Long]],
         dAppAddress: Address
-    ): TracedResult[ValidationError, (Long, Long)] = {
+    ): TracedResult[ValidationError, (Int, Int)] = {
       for {
         invocationComplexity <- TracedResult {
           InvokeDiffsCommon.getInvocationComplexity(blockchain, tx.funcCall, callableComplexities, dAppAddress)
@@ -177,7 +184,7 @@ object InvokeScriptTransactionDiff {
           issueList = Nil,
           additionalScriptsInvoked = 0
         )
-      } yield (invocationComplexity, fixedInvocationComplexity)
+      } yield (invocationComplexity.toInt, fixedInvocationComplexity.toInt)
     }
 
     (accScriptEi: @unchecked) match {
@@ -219,6 +226,7 @@ object InvokeScriptTransactionDiff {
             pk,
             Set(tx.senderAddress, dAppAddress),
             limitedExecution,
+            ContractLimits.MaxTotalInvokeComplexity(version),
             ContractLimits.MaxSyncDAppCalls(version),
             ContractLimits.MaxCallableActionsAmount(version),
             ContractLimits.MaxWriteSetSize(version),
@@ -244,7 +252,8 @@ object InvokeScriptTransactionDiff {
       limit: Int,
       failFreeLimit: Int,
       estimatedComplexity: Int,
-      paymentsComplexity: Int
+      paymentsComplexity: Int,
+      blockchain: Blockchain
   ): Either[ValidationError with WithLog, (ScriptResult, Log[Id])] = {
     val evaluationCtx = CachedDAppCTX.forVersion(version).completeContext(environment)
     val startLimit    = limit - paymentsComplexity
@@ -257,7 +266,7 @@ object InvokeScriptTransactionDiff {
         case (error, unusedComplexity, log) =>
           val usedComplexity = startLimit - unusedComplexity.max(0)
           if (usedComplexity > failFreeLimit) {
-            val storingComplexity = Math.max(usedComplexity, estimatedComplexity)
+            val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
             FailedTransactionError.dAppExecution(error, storingComplexity + paymentsComplexity, log)
           } else
             ScriptExecutionError.dAppExecution(error, log)

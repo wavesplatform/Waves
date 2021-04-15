@@ -1,10 +1,7 @@
 package com.wavesplatform.state.diffs.ci
 
-import scala.collection.immutable
-
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.{NoShrink, TransactionGen}
 import com.wavesplatform.account._
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -12,46 +9,49 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.{utils, Global}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
-import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
-import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.{compiler, ContractLimits, FunctionHeader}
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.lang.v1.evaluator.{FunctionIds, ScriptResultV3}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{CREATE_LIST, THROW}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.{FunctionIds, ScriptResultV3}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
+import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{TestFunctionalitySettings, TestSettings}
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.{produce, ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
-import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionDiff}
-import com.wavesplatform.transaction.{Asset, _}
+import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Asset, _}
 import com.wavesplatform.utils._
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+
+import scala.collection.immutable
 
 class InvokeScriptTransactionDiffTest
     extends PropSpec
@@ -2227,20 +2227,10 @@ class InvokeScriptTransactionDiffTest
       } yield (Seq(gTx1, gTx2, ssTx, iTx), master.toAddress, txs)
 
     forAll(scenario) {
-      case (genesisTxs, dApp, txs) =>
+      case (genesisTxs, _, txs) =>
         txs.foreach { case (name, invokeTx) =>
           assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
-            case (diff, bc) =>
-              val invocationComplexity =
-                InvokeDiffsCommon
-                  .getInvocationComplexity(bc, invokeTx.funcCall, bc.accountScript(dApp).get.complexitiesByEstimator, dApp)
-                  .explicitGet()
-
-              if (name == "overflow amount")
-                diff.scriptsComplexity shouldBe invocationComplexity + 1 // because if evaluating asset script "false"
-              else
-                diff.scriptsComplexity shouldBe invocationComplexity
-
+            case (diff, _) =>
               if (name == "ok")
                 diff.errorMessage(invokeTx.id.value()) shouldBe empty
               else
@@ -2332,9 +2322,8 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, dApp, assetsComplexity) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
-            val invocationComplexity =
-              InvokeDiffsCommon.getInvocationComplexity(bc, invokeTx.funcCall, bc.accountScript(dApp).get.complexitiesByEstimator, dApp).explicitGet()
-            invocationComplexity + assetsComplexity shouldBe diff.scriptsComplexity
+            diff.errorMessage(invokeTx.id.value()) shouldBe defined
+            diff.scriptsComplexity should be > 0L
         }
     }
   }
@@ -2350,10 +2339,12 @@ class InvokeScriptTransactionDiffTest
              |
              | @Callable(i)
              | func foo() = {
-             |  let h = hashScriptAtAddress(this)
-             |  if hashScriptAtAddress(i.caller) == unit
+             |  if hashScriptAtAddress(i.caller) == unit && hashScriptAtAddress(Alias("unexisting")) == unit
              |  then
-             |    [ BinaryEntry("hash", h.value()) ]
+             |    [
+             |      BinaryEntry("hash1", hashScriptAtAddress(this).value()),
+             |      BinaryEntry("hash2", hashScriptAtAddress(Alias("alias")).value())
+             |    ]
              |  else
              |    throw("Unexpected script was found.")
              | }
@@ -2372,6 +2363,7 @@ class InvokeScriptTransactionDiffTest
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
+        alias    = CreateAliasTransaction.selfSigned(TxVersion.V2, master, Alias.create("alias").explicitGet(), fee, ts).explicitGet()
         script   = ContractScript(V5, contract()).explicitGet()
         ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), fee, ts + 5).explicitGet()
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
@@ -2379,14 +2371,16 @@ class InvokeScriptTransactionDiffTest
         invokeTx = InvokeScriptTransaction
           .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
           .explicitGet()
-      } yield (Seq(gTx1, gTx2, ssTx), invokeTx, master.toAddress, script)
+      } yield (Seq(gTx1, gTx2, alias, ssTx), invokeTx, master.toAddress, script)
 
     forAll(scenario) {
       case (genesisTxs, invokeTx, dApp, script) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
             diff.errorMessage(invokeTx.id.value()) shouldBe None
-            bc.accountData(dApp, "hash") shouldBe Some(BinaryDataEntry("hash", ByteStr(com.wavesplatform.lang.Global.blake2b256(script.bytes().arr))))
+            val hash = ByteStr(com.wavesplatform.lang.Global.blake2b256(script.bytes().arr))
+            bc.accountData(dApp, "hash1").get.value shouldBe hash
+            bc.accountData(dApp, "hash2").get.value shouldBe hash
         }
     }
   }
@@ -2681,7 +2675,7 @@ class InvokeScriptTransactionDiffTest
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, _) =>
             diff.errorMessage(invokeTx.id.value()) shouldBe None
-            diff.scriptsComplexity shouldBe 113
+            diff.scriptsComplexity shouldBe 108
             diff.scriptsRun shouldBe 2
         }
     }
@@ -2801,7 +2795,7 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-  property("originalCaller") {
+  property("originCaller and originCallerPublicKey fields") {
     def contract(): DApp = {
       val expr = {
         val script =
@@ -2812,7 +2806,7 @@ class InvokeScriptTransactionDiffTest
              |
              | @Callable(i)
              | func bar(a: ByteVector, o: ByteVector) = {
-             |   if i.caller.bytes == a && addressFromPublicKey(i.callerPublicKey).bytes == a && i.originalCaller.bytes == o && addressFromPublicKey(i.originalCallerPublicKey).bytes == o
+             |   if i.caller.bytes == a && addressFromPublicKey(i.callerPublicKey).bytes == a && i.originCaller.bytes == o && addressFromPublicKey(i.originCallerPublicKey).bytes == o
              |   then
              |     let n = Issue("barAsset", "bar asset", 1, 0, false, unit, 0)
              |     ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit), BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
@@ -2838,7 +2832,7 @@ class InvokeScriptTransactionDiffTest
              | func foo() = {
              |  let b1 = wavesBalance(this)
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
-             |  if b1 == b1 && ob1 == ob1 && i.caller == i.originalCaller && i.callerPublicKey == i.originalCallerPublicKey
+             |  if b1 == b1 && ob1 == ob1 && i.caller == i.originCaller && i.callerPublicKey == i.originCallerPublicKey
              |  then
              |    let r = Invoke(Alias("${alias.name}"), "bar", [this.bytes, i.caller.bytes], [AttachedPayment(unit, 17)])
              |    if r == 17
