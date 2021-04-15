@@ -63,9 +63,9 @@ object Functions {
   val getStringFromStateF: BaseFunction[Environment]  = getDataFromStateF("getString", DATA_STRING_FROM_STATE, DataType.String)
 
   val isDataStorageUntouchedF: BaseFunction[Environment] = {
-    val name = "isDataStorageUntouched"
+    val name       = "isDataStorageUntouched"
     val resultType = BOOLEAN
-    val arg = ("addressOrAlias", addressOrAliasType)
+    val arg        = ("addressOrAlias", addressOrAliasType)
     NativeFunction.withEnvironment[Environment](
       name,
       Map[StdLibVersion, Long](V5 -> 10L),
@@ -566,7 +566,15 @@ object Functions {
                   },
                   availableComplexity
                 )
-                .map(_.map { case (result, complexity) => (result.leftMap(err => s"Sub-DApp $dappBytes error: $err"), complexity) })
+                .map(_.map {
+                  case (result, complexity) =>
+                    val MaxErrorLength = 200
+                    (result.leftMap { err =>
+                      val errString        = err.toString
+                      val limitedErrString = s"${errString.take(MaxErrorLength)}${if (errString.length > MaxErrorLength) s"... (${errString.length - MaxErrorLength} more)" else ""}"
+                      s"Sub-DApp $dappBytes error: $limitedErrString"
+                    }, complexity)
+                })
             case xs =>
               val err = notImplemented[F, EVALUATED](s"Invoke(dapp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
               Coeval.now(err.map((_, 0)))
@@ -828,9 +836,9 @@ object Functions {
     }
 
   def accountScriptHashF(global: BaseGlobal): BaseFunction[Environment] = {
-    val name = "hashScriptAtAddress"
+    val name    = "hashScriptAtAddress"
     val resType = UNION(BYTESTR, UNIT)
-    val arg = ("account", addressOrAliasType)
+    val arg     = ("account", addressOrAliasType)
     NativeFunction.withEnvironment[Environment](
       name,
       200,
@@ -848,14 +856,15 @@ object Functions {
             case (env, List(addr: CaseObj)) =>
               env
                 .accountScript(caseObjToRecipient(addr))
-                .map(_.map(si => CONST_BYTESTR(ByteStr(global.blake2b256(si.bytes().arr))))
-                      .getOrElse(Right(unit)))
+                .map(
+                  _.map(si => CONST_BYTESTR(ByteStr(global.blake2b256(si.bytes().arr))))
+                    .getOrElse(Right(unit))
+                )
 
             case (_, xs) => notImplemented[F, EVALUATED](s"hashScriptAtAddress(account: AddressOrAlias))", xs)
           }
       }
     }
   }
-
 
 }

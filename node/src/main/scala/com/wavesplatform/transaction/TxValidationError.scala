@@ -69,8 +69,9 @@ object TxValidationError {
       InvokeScriptResult.Invocation.calledAddresses(invocations).toSet
 
     private[this] def subErrorMessage: Option[String] = error.collect {
-      case e: GenericError => e.err
-      case e               => e.toString
+      case fte: FailedTransactionError => fte.message // Recursion
+      case e: GenericError             => e.err
+      case e                           => e.toString
     }
 
     def code: Int = cause.code
