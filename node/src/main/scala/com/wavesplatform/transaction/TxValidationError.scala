@@ -65,10 +65,15 @@ object TxValidationError {
       with WithLog {
     import FailedTransactionError._
 
+    private[this] def subErrorMessage: Option[String] = error.collect {
+      case e: GenericError => e.err
+      case e               => e.toString
+    }
+
     def code: Int = cause.code
     def message: String = cause match {
-      case Cause.DAppExecution | Cause.FeeForActions     => error.fold("Unknown error")(_.toString)
-      case Cause.AssetScriptInAction | Cause.AssetScript => assetScriptError(assetId.get, error.map(_.toString))
+      case Cause.DAppExecution | Cause.FeeForActions     => subErrorMessage.getOrElse("Unknown error")
+      case Cause.AssetScriptInAction | Cause.AssetScript => assetScriptError(assetId.getOrElse(ByteStr.empty), subErrorMessage)
     }
 
     def isAssetScript: Boolean    = assetId.isDefined

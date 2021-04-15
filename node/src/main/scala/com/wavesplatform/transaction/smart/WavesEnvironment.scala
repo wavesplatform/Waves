@@ -13,7 +13,6 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
-import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
@@ -253,15 +252,6 @@ object DAppEnvironment {
   }
 
   final case class DAppInvocation(dAppAddress: com.wavesplatform.account.Address, call: FUNCTION_CALL, payments: Seq[InvokeScriptTransaction.Payment])
-  object DAppInvocation {
-    def fromInvocation(dAppAddress: com.wavesplatform.account.Address, invocation: ContractEvaluator.Invocation): DAppInvocation = {
-      DAppInvocation(
-        dAppAddress,
-        invocation.funcCall,
-        invocation.payments.payments.map { case (amount, assetId) => InvokeScriptTransaction.Payment(amount, Asset.fromCompatId(assetId)) }
-      )
-    }
-  }
 }
 
 // Not thread safe
