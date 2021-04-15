@@ -1,5 +1,7 @@
 package com.wavesplatform.it.api
 
+import scala.util.{Failure, Success}
+
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.DataEntry
@@ -7,8 +9,6 @@ import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import io.grpc.{Metadata, Status => GrpcStatus}
 import play.api.libs.json._
-
-import scala.util.{Failure, Success}
 
 // USCE no longer contains references to non-serializable Request/Response objects
 // to work around https://github.com/scalatest/scalatest/issues/556
@@ -429,7 +429,15 @@ object AttachedPayment {
 case class Invocation(dApp: String, call: Call, payments: Seq[AttachedPayment], stateChanges: StateChangesDetails)
 object Invocation {
   implicit val invokationFormat: Reads[Invocation] = new Reads[Invocation] {
-    override def reads(json: JsValue) = JsSuccess(Invocation((json \ "dApp").as[String], (json \ "call").as[Call], (json \ "payments").as[Seq[AttachedPayment]], (json \ "stateChanges").as[StateChangesDetails]))
+    override def reads(json: JsValue) =
+      JsSuccess(
+        Invocation(
+          (json \ "dApp").as[String],
+          (json \ "call").as[Call],
+          (json \ "payments").as[Seq[AttachedPayment]],
+          (json \ "stateChanges").as[StateChangesDetails]
+        )
+      )
   }
 }
 
@@ -1059,12 +1067,12 @@ object PaymentRequest {
 }
 
 case class LeaseInfo(
-  leaseId: String,
-  originTransactionId: String,
-  sender: String,
-  recipient: String,
-  amount: Long,
-  height: Int
+    id: String,
+    originTransactionId: String,
+    sender: String,
+    recipient: String,
+    amount: Long,
+    height: Int
 )
 object LeaseInfo {
   implicit val format: Format[LeaseInfo] = Json.format
