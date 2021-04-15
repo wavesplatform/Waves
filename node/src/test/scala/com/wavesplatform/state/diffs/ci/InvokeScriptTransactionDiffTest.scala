@@ -29,7 +29,6 @@ import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{TestFunctionalitySettings, TestSettings}
-import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
@@ -1880,121 +1879,6 @@ class InvokeScriptTransactionDiffTest
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
             ei should produce("negative asset balance")
           }
-        }
-    }
-  }
-
-  property("transfer unexisting asset with zero amount") {
-    val illegalAsset1 = IssuedAsset(ByteStr.decodeBase58("WAVES").get)
-    val illegalAsset2 = IssuedAsset(ByteStr.decodeBase58("WAVESwavesWAVESwavesWAVESwavesWAVESwaves123").get)
-
-    val transferBase58WavesDApp: DApp = {
-      val expr = {
-        val script =
-          s"""
-             |{-# STDLIB_VERSION 4       #-}
-             |{-# CONTENT_TYPE   DAPP    #-}
-             |{-# SCRIPT_TYPE    ACCOUNT #-}
-             |
-             |@Callable(i)
-             |func f1() =
-             |  [
-             |    ScriptTransfer(i.caller, 0, unit),
-             |    ScriptTransfer(i.caller, 0, base58'$illegalAsset1')
-             |  ]
-             |
-             |@Callable(i)
-             |func f2() =
-             |  [
-             |    ScriptTransfer(i.caller, 0, unit),
-             |    ScriptTransfer(i.caller, 0, base58'$illegalAsset2')
-             |  ]
-          """.stripMargin
-        Parser.parseContract(script).get.value
-      }
-      compileContractFromExpr(expr, V4)
-    }
-
-    val transferBase58WavesDAppScenario =
-      for {
-        activated <- Gen.oneOf(true, false)
-        func      <- Gen.oneOf("f1", "f2")
-        master    <- accountGen
-        invoker   <- accountGen
-        ts        <- timestampGen
-        fee       <- ciFee(nonNftIssue = 1)
-        genesis1Tx  = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-        genesis2Tx  = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-        script      = ContractScript(V4, transferBase58WavesDApp)
-        setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
-        call        = Some(FUNCTION_CALL(FunctionHeader.User(func), Nil))
-        invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V2, invoker, master.toAddress, call, Seq(), fee, Waves, ts + 3)
-          .explicitGet()
-      } yield (activated, func, invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
-
-    forAll(transferBase58WavesDAppScenario) {
-      case (activated, func, invoke, genesisTxs) =>
-        tempDb { _ =>
-          val miner       = TestBlock.defaultSigner.toAddress
-          val dAppAddress = invoke.dAppAddressOrAlias.asInstanceOf[Address]
-          def invokeInfo(succeeded: Boolean) =
-            Map(invoke.id.value() -> NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded))
-
-          val expectedResult =
-            if (activated) {
-              val expectingMessage =
-                if (func == "f1")
-                  s"Invalid transferring asset '$illegalAsset1' length = 4 bytes != 32"
-                else
-                  s"Transferring asset '$illegalAsset2' is not found in the blockchain"
-              Diff.empty.copy(
-                transactions = invokeInfo(false),
-                portfolios = Map(
-                  invoke.senderAddress -> Portfolio.waves(-invoke.fee),
-                  miner                -> Portfolio.waves(invoke.fee)
-                ),
-                scriptsComplexity = 18,
-                scriptResults = Map(invoke.id.value() -> InvokeScriptResult(error = Some(ErrorMessage(1, expectingMessage))))
-              )
-            } else {
-              val asset = if (func == "f1") illegalAsset1 else illegalAsset2
-              Diff.empty.copy(
-                transactions = invokeInfo(true),
-                portfolios = Map(
-                  invoke.senderAddress -> Portfolio(-invoke.fee, assets = Map(asset -> 0)),
-                  miner                -> Portfolio(invoke.fee),
-                  dAppAddress          -> Portfolio(-0, assets = Map(asset -> 0))
-                ),
-                scriptsRun = 1,
-                scriptsComplexity = 18,
-                scriptResults = Map(
-                  invoke.id.value() -> InvokeScriptResult(
-                    transfers = Seq(
-                      InvokeScriptResult.Payment(invoke.senderAddress, Waves, 0),
-                      InvokeScriptResult.Payment(invoke.senderAddress, asset, 0)
-                    )
-                  )
-                )
-              )
-            }
-
-          val features =
-            if (activated)
-              fs.copy(
-                preActivatedFeatures = fs.preActivatedFeatures ++ Map(
-                  BlockchainFeatures.BlockV5.id                 -> 0,
-                  BlockchainFeatures.ContinuationTransaction.id -> 0
-                )
-              )
-            else
-              fs.copy(
-                preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
-              )
-
-          assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features)(
-            _ shouldBe Right(expectedResult)
-          )
         }
     }
   }

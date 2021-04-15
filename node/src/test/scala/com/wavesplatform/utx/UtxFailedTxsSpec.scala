@@ -103,7 +103,7 @@ class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Event
 
     val tx = TxHelpers.invoke(dApp.toAddress, "test")
 
-    utx.putIfNew(tx, forceValidate = true).resultE should produce("negative asset balance")
+    utx.putIfNew(tx, forceValidate = true).resultE should produce(s"Transferring asset '${TestValues.asset}' is not found in the blockchain")
     utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
 
     utx.addAndCleanup(Nil)
