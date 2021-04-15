@@ -13,7 +13,6 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -148,8 +147,8 @@ object DiffsCommon {
         (),
         GenericError(s"Lease with id=$leaseId is already in the state")
       )
-      leaseBalance  = blockchain.leaseBalance(senderAddress)
-      senderBalance = blockchain.balance(senderAddress, Waves)
+      leaseBalance    = blockchain.leaseBalance(senderAddress)
+      senderBalance   = blockchain.balance(senderAddress, Waves)
       requiredBalance = if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) amount + fee else amount
       _ <- Either.cond(
         senderBalance - leaseBalance.out >= requiredBalance,
@@ -193,8 +192,8 @@ object DiffsCommon {
         )
       )
       senderPortfolio    = Map(sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
-      recipientPortfolio = Map(recipient        -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
-      actionInfo = lease.copy(status = LeaseDetails.Status.Cancelled(blockchain.height, cancelTxId))
+      recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
+      actionInfo         = lease.copy(status = LeaseDetails.Status.Cancelled(blockchain.height, cancelTxId))
     } yield Diff(
       portfolios = senderPortfolio |+| recipientPortfolio,
       leaseState = Map((leaseId, actionInfo))
