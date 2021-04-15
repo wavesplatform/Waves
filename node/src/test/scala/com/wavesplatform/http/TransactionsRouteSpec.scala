@@ -245,7 +245,7 @@ class TransactionsRouteSpec
                                    |  "height" : 1,
                                    |  "applicationStatus" : "succeeded",
                                    |  "lease" : {
-                                   |    "leaseId" : "${lease.id()}",
+                                   |    "id" : "${lease.id()}",
                                    |    "originTransactionId" : "${lease.id()}",
                                    |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                    |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
@@ -372,7 +372,7 @@ class TransactionsRouteSpec
                                     |  "sponsorFees": [],
                                     |  "leases": [
                                     |    {
-                                    |      "leaseId": "$leaseId1",
+                                    |      "id": "$leaseId1",
                                     |      "originTransactionId": "$leaseId1",
                                     |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                     |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
@@ -381,7 +381,7 @@ class TransactionsRouteSpec
                                     |      "status":"active"
                                     |    },
                                     |    {
-                                    |      "leaseId": "$leaseId2",
+                                    |      "id": "$leaseId2",
                                     |      "originTransactionId": "$leaseId2",
                                     |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                     |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
@@ -392,7 +392,7 @@ class TransactionsRouteSpec
                                     |  ],
                                     |  "leaseCancels": [
                                     |    {
-                                    |      "leaseId": "$leaseCancelId",
+                                    |      "id": "$leaseCancelId",
                                     |      "originTransactionId": "$leaseCancelId",
                                     |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                     |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
@@ -441,7 +441,7 @@ class TransactionsRouteSpec
                                    |  "height" : 1,
                                    |  "applicationStatus" : "succeeded",
                                    |  "lease" : {
-                                   |    "leaseId" : "${lease.id()}",
+                                   |    "id" : "${lease.id()}",
                                    |    "originTransactionId" : "${lease.id()}",
                                    |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                    |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
@@ -553,7 +553,7 @@ class TransactionsRouteSpec
                                    |  "burns" : [ ],
                                    |  "sponsorFees" : [ ],
                                    |  "leases" : [ {
-                                   |    "leaseId" : "$leaseId1",
+                                   |    "id" : "$leaseId1",
                                    |    "originTransactionId" : "$leaseId1",
                                    |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                    |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
@@ -561,7 +561,7 @@ class TransactionsRouteSpec
                                    |    "height" : 1,
                                    |    "status" : "active"
                                    |  }, {
-                                   |    "leaseId" : "$leaseId2",
+                                   |    "id" : "$leaseId2",
                                    |    "originTransactionId" : "$leaseId2",
                                    |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                    |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
@@ -570,7 +570,7 @@ class TransactionsRouteSpec
                                    |    "status" : "active"
                                    |  } ],
                                    |  "leaseCancels" : [ {
-                                   |    "leaseId" : "$leaseCancelId",
+                                   |    "id" : "$leaseCancelId",
                                    |    "originTransactionId" : "$leaseCancelId",
                                    |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                    |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
@@ -952,18 +952,18 @@ class TransactionsRouteSpec
             |           "recipient" : "${recipient1.bytes}",
             |           "amount" : $amount1,
             |           "nonce" : $nonce1,
-            |           "leaseId" : "$leaseId1"
+            |           "id" : "$leaseId1"
             |         },
             |         {
             |           "recipient" : "alias:T:${recipient2.name}",
             |           "amount" : $amount2,
             |           "nonce" : $nonce2,
-            |           "leaseId" : "$leaseId2"
+            |           "id" : "$leaseId2"
             |         }
             |      ],
             |      "leaseCancels" : [
             |         {
-            |            "leaseId":"$leaseCancelId"
+            |            "id":"$leaseCancelId"
             |         }
             |      ],
             |      "invokes" : [ ]
