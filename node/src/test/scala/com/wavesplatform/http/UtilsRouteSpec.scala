@@ -687,7 +687,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                    |func testBS() = base58'MATCHER'
                    |func testS() = "Test"
                    |func testF() = throw("Test")
-                   |func testCompl() = ${"sigVerify(base58'', base58'', base58'') ||" * 100} true
+                   |func testCompl() = ${"sigVerify(base58'', base58'', base58'') ||" * 200} true
                    |func testThis() = this
                    |func testListArg(list: List[String|ByteVector|Int], str: String, bytes: ByteVector) = list.containsElement(str)
                    |
@@ -699,10 +699,20 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                    |  strict r = Invoke(this, "testCallable", [], [AttachedPayment(unit, 100)])
                    |  [BinaryEntry("testSyncInvoke", i.caller.bytes)]
                    |}
-                   |""".stripMargin
+                   |
+                   |@Callable(i)
+                   |func testSyncCallComplexityExcess() = {
+                   |  strict r = Invoke(this, "testSyncCallComplexityExcess", [], [])
+                   |  []
+                   |}
+                   |
+                   |@Callable(i)
+                   |func testWriteEntryType(b: ByteVector) = [ BinaryEntry("bytes", b) ]
+                   |
+                 """.stripMargin
 
       val (script, _) = ScriptCompiler.compile(str, ScriptEstimatorV2).explicitGet()
-      AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map(1 -> Map("testCallable" -> 10)))
+      AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map(1 -> Map("testCallable" -> 10, "testSyncCallComplexityExcess" -> 10)))
     }
 
     val dAppAddress = TxHelpers.defaultSigner.toAddress
@@ -736,7 +746,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
 
     evalScript("testCallable()") ~> route ~> check {
-      responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"test"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"expr":"testCallable()","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+      responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"test"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":5,"expr":"testCallable()","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
     }
 
     evalScript("testThis()") ~> route ~> check {
@@ -812,7 +822,20 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       .anyNumberOfTimes()
 
     evalScript(""" testSyncInvoke() """.stripMargin) ~> route ~> check {
-      responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"expr":" testSyncInvoke() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+      responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":99,"expr":" testSyncInvoke() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    }
+
+    val complexityLimit = 1234
+    val customApi = utilsApi.copy(settings = restAPISettings.copy(evaluateScriptComplexityLimit = complexityLimit))
+    evalScript(""" testSyncCallComplexityExcess() """.stripMargin) ~> customApi.route ~> check {
+      responseAs[String] shouldBe s"""{"error":306,"message":"FailedTransactionError(code = 1, error = Invoke complexity limit = $complexityLimit is exceeded, log =)","expr":" testSyncCallComplexityExcess() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    }
+
+    evalScript(""" testWriteEntryType("abc") """.stripMargin) ~> route ~> check {
+      responseAs[String] shouldBe """{"error":306,"message":"Passed args (bytes, abc) are unsuitable for constructor BinaryEntry(String, ByteVector)","expr":" testWriteEntryType(\"abc\") ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    }
+    evalScript(""" testWriteEntryType(base58'aaaa') """.stripMargin) ~> route ~> check {
+      responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"bytes"},"value":{"type":"ByteVector","value":"aaaa"}}}]},"complexity":3,"expr":" testWriteEntryType(base58'aaaa') ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
     }
   }
 
