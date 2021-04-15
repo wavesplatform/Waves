@@ -81,7 +81,7 @@ object InvokeScriptResult {
   implicit val sponsorFeeFormat = Json.writes[SponsorFee]
   implicit val leaseCancelFormat  = Json.writes[LeaseCancel]
   implicit val errorMessageFormat = Json.writes[ErrorMessage]
-  implicit val invokationFormat: Writes[Invocation] = new Writes[Invocation] {
+  implicit val invocationFormat: Writes[Invocation] = new Writes[Invocation] {
     override def writes(i: Invocation) = Json.obj(
         "dApp" -> i.dApp,
         "call" -> i.call,
