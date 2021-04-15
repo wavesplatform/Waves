@@ -41,6 +41,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
       "amount"     -> Right(CONST_LONG(12345)),
       "invocation" -> CONST_STRING("str")
     )
+    val recipient = Recipient.Address(ByteStr(tx.dAppAddressOrAlias.bytes))
     val trace = List(
       InvokeScriptTrace(
         tx.id.value(),
@@ -49,7 +50,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         Right(
           ScriptResultV3(
             List(Lng("3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To", 700000000)),
-            List(AssetTransfer(Recipient.Address(ByteStr(tx.dAppAddressOrAlias.bytes)), 1, None)),
+            List(AssetTransfer(recipient, recipient, 1, None)),
             0
           )
         ),

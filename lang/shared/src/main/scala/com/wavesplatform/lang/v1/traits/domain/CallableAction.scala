@@ -10,7 +10,8 @@ import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 sealed trait CallableAction
 
 case class AssetTransfer(
-    recipient: Address,
+    address: Address,
+    recipient: Recipient,
     amount: Long,
     assetId: Option[ByteStr]
 ) extends CallableAction
