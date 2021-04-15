@@ -839,7 +839,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
 
     evalScript(s"""parseBigIntValue("${PureContext.BigIntMax}")""") ~> route ~> check {
-      responseAs[String] shouldBe s"""{"result":{"type":"BigInt","value":${PureContext.BigIntMax}},"expr":"parseBigIntValue(\\"6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+      responseAs[String] shouldBe s"""{"result":{"type":"BigInt","value":${PureContext.BigIntMax}},"complexity":65,"expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
     }
   }
 
