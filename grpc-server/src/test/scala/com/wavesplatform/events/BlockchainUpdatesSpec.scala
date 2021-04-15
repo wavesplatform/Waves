@@ -59,7 +59,7 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
 
   "BlockchainUpdates" - {
     "should survive invalid rollback" in withDomain(
-      defaultDomainSettings.copy(dbSettings = defaultDomainSettings.dbSettings.copy(maxRollbackDepth = 0))
+      SettingsFromDefaultConfig.copy(dbSettings = SettingsFromDefaultConfig.dbSettings.copy(maxRollbackDepth = 0))
     ) { d =>
       withRepo(d.blocksApi) { (repo, updateRepoTrigger) =>
         d.triggers = Seq(updateRepoTrigger)

@@ -15,29 +15,12 @@ import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, Diff, LeaseBalance,
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 
 object DiffsCommon {
   def countScriptRuns(blockchain: Blockchain, tx: ProvenTransaction): Int =
     tx.checkedAssets.count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
-
-  def getAssetsComplexity(blockchain: Blockchain, tx: Transaction): Long =
-    tx match {
-      case ptx: ProvenTransaction =>
-        ptx.checkedAssets.toList
-          .flatMap(blockchain.assetScript)
-          .map(_.complexity)
-          .sum
-      case _ => 0L
-    }
-
-  def getAccountsComplexity(blockchain: Blockchain, tx: Transaction): Long =
-    (tx match {
-      case etx: ExchangeTransaction => Seq(etx.sender, etx.buyOrder.senderPublicKey, etx.sellOrder.senderPublicKey)
-      case ptx: ProvenTransaction   => Seq(ptx.sender)
-      case _                        => Seq.empty
-    }).flatMap(pk => blockchain.accountScript(pk.toAddress).map(_.verifierComplexity)).sum
 
   def countVerifierComplexity(
       script: Option[Script],
@@ -167,10 +150,11 @@ object DiffsCommon {
       )
       leaseBalance  = blockchain.leaseBalance(senderAddress)
       senderBalance = blockchain.balance(senderAddress, Waves)
+      requiredBalance = if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) amount + fee else amount
       _ <- Either.cond(
-        senderBalance - leaseBalance.out >= amount,
+        senderBalance - leaseBalance.out >= requiredBalance,
         (),
-        GenericError(s"Cannot lease more than own: Balance:$senderBalance, already leased: ${leaseBalance.out}")
+        GenericError(s"Cannot lease more than own: Balance: $senderBalance, already leased: ${leaseBalance.out}")
       )
       portfolioDiff = Map(
         senderAddress    -> Portfolio(-fee, LeaseBalance(0, amount)),

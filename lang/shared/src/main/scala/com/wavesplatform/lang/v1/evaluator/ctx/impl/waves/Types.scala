@@ -74,11 +74,11 @@ object Types {
           "feeAssetId"      -> optionByteVector
         ) :::
         (if (v >= V5)
-          List(
-            "originalCaller"          -> addressType,
-            "originalCallerPublicKey" -> BYTESTR
-          )
-        else Nil)
+           List(
+             "originCaller"          -> addressType,
+             "originCallerPublicKey" -> BYTESTR
+           )
+         else Nil)
     )
 
   private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)

@@ -146,7 +146,7 @@ class CommonAccountApiSpec
   }
 
   "Lease info" - {
-    "shows info of lease made through invoke" in withDomain(domainSettingsWithFeatures(BlockchainFeatures.SynchronousCalls, BlockchainFeatures.Ride4DApps)) { d =>
+    "shows info of lease made through invoke" in withDomain(domainSettingsWithPreactivatedFeatures(BlockchainFeatures.SynchronousCalls, BlockchainFeatures.Ride4DApps)) { d =>
       val dAppScript = TestCompiler(V5).compileContract(
         s"""
            |{-# STDLIB_VERSION 5 #-}

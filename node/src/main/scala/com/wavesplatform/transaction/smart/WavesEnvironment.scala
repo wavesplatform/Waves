@@ -244,6 +244,7 @@ class DAppEnvironment(
     currentDAppPk: com.wavesplatform.account.PublicKey,
     callChain: Set[com.wavesplatform.account.Address],
     limitedExecution: Boolean,
+    totalComplexityLimit: Int,
     var remainingCalls: Int,
     var avaliableActions: Int,
     var avaliableData: Int,
@@ -266,7 +267,7 @@ class DAppEnvironment(
         account.Address
           .fromBytes(dApp.bytes.arr)
           .ensureOr(
-            address => GenericError(s"Complex dApp recursion is prohibited, but dApp at address $address was called twice")
+            address => GenericError(s"The invocation stack contains multiple invocations of the dApp at address $address with invocations of another dApp between them")
           )(
             address => currentDApp == address || !callChain.contains(address)
           )
@@ -285,6 +286,7 @@ class DAppEnvironment(
         mutableBlockchain,
         blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
         limitedExecution,
+        totalComplexityLimit,
         availableComplexity,
         remainingCalls,
         avaliableActions,
