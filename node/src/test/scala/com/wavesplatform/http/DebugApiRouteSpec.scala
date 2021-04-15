@@ -16,8 +16,8 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.util._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, LeaseCancel, Recipient}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash}
@@ -595,7 +595,7 @@ class DebugApiRouteSpec
 
         (blockchain.leaseDetails _)
           .when(leaseCancelId)
-          .returns(Some(LeaseDetails(dAppPk, accountGen.sample.get.toAddress, leaseCancelId, 100, isActive = true)))
+          .returns(Some(LeaseDetails(dAppPk, accountGen.sample.get.toAddress, 100, LeaseDetails.Status.Active, leaseCancelId, 1)))
           .anyNumberOfTimes()
 
         (blockchain.leaseDetails _)
@@ -746,17 +746,21 @@ class DebugApiRouteSpec
         .returning(Some(TransactionMeta.Invoke(Height(1), invoke, succeeded = true, Some(scriptResult))))
         .once()
 
-      (blockchain.leaseDetails _).when(leaseId1).returning(Some(LeaseDetails(invoke.sender, recipientAddress, invoke.id(), 100, isActive = true)))
-      (blockchain.leaseDetails _).when(leaseId2).returning(Some(LeaseDetails(invoke.sender, recipientAddress, invoke.id(), 100, isActive = true)))
+      (blockchain.leaseDetails _)
+        .when(leaseId1)
+        .returning(Some(LeaseDetails(invoke.sender, recipientAddress, 100, LeaseDetails.Status.Active, invoke.id(), 1)))
+      (blockchain.leaseDetails _)
+        .when(leaseId2)
+        .returning(Some(LeaseDetails(invoke.sender, recipientAddress, 100, LeaseDetails.Status.Active, invoke.id(), 1)))
       (blockchain.leaseDetails _)
         .when(leaseCancelId)
-        .returning(Some(LeaseDetails(invoke.sender, recipientAddress, invoke.id(), 100, isActive = false)))
+        .returning(Some(LeaseDetails(invoke.sender, recipientAddress, 100, LeaseDetails.Status.Cancelled(2, leaseCancelId), invoke.id(), 1)))
       (blockchain.transactionMeta _).when(invoke.id()).returning(Some((1, true)))
 
       Get(routePath(s"/stateChanges/info/${invoke.id()}")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
         val json = (responseAs[JsObject] \ "stateChanges").as[JsObject]
-        json shouldBe Json.parse(s"""
+        json should matchJson(s"""
                                    |{
                                    |  "data" : [ ],
                                    |  "transfers" : [ ],
