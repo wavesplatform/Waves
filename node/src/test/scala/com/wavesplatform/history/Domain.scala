@@ -50,6 +50,9 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     def invokeScriptResult(transactionId: ByteStr): InvokeScriptResult =
       transactions.transactionById(transactionId).get.asInstanceOf[TransactionMeta.Invoke].invokeScriptResult.get
 
+    def addressTransactions(address: Address): Seq[Transaction] =
+      transactions.transactionsByAddress(address, None, Set.empty, None).map(_.transaction).toListL.runSyncUnsafe()
+
     lazy val transactions = CommonTransactionsApi(
       blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
       db,

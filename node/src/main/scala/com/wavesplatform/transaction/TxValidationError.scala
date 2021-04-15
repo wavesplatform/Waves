@@ -65,6 +65,9 @@ object TxValidationError {
       with WithLog {
     import FailedTransactionError._
 
+    def calledAddresses: Set[Address] =
+      InvokeScriptResult.Invocation.calledAddresses(invocations).toSet
+
     private[this] def subErrorMessage: Option[String] = error.collect {
       case e: GenericError => e.err
       case e               => e.toString

@@ -61,7 +61,14 @@ object InvokeScriptTransactionDiff {
         environment: DAppEnvironment,
         invocation: ContractEvaluator.Invocation
     ) = {
-      case class MainScriptResult(invocationDiff: Diff, scriptResult: ScriptResult, log: Log[Id], availableActions: Int, availableData: Int, limit: Int)
+      case class MainScriptResult(
+          invocationDiff: Diff,
+          scriptResult: ScriptResult,
+          log: Log[Id],
+          availableActions: Int,
+          availableData: Int,
+          limit: Int
+      )
 
       def executeMainScript(): TracedResult[ValidationError, MainScriptResult] = {
         val scriptResultE = Stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId) {
@@ -93,7 +100,14 @@ object InvokeScriptTransactionDiff {
               paymentsComplexity,
               blockchain
             )
-          } yield MainScriptResult(environment.currentDiff, result, log, environment.availableActions, environment.availableData, fullLimit - paymentsComplexity)
+          } yield MainScriptResult(
+            environment.currentDiff,
+            result,
+            log,
+            environment.availableActions,
+            environment.availableData,
+            fullLimit - paymentsComplexity
+          )
         }
 
         TracedResult(
@@ -123,26 +137,26 @@ object InvokeScriptTransactionDiff {
           tx,
           CompositeBlockchain(blockchain, Some(invocationDiff)),
           blockTime,
-
           isSyncCall = false,
-          limitedExecution,ContractLimits.MaxTotalInvokeComplexity(version),
+          limitedExecution,
+          ContractLimits.MaxTotalInvokeComplexity(version),
           otherIssues
         )
 
         process = (actions: List[CallableAction], unusedComplexity: Long) => {
           val storingComplexity = if (blockchain.storeEvaluatedComplexity) limit - unusedComplexity else fixedInvocationComplexity
-              val dataCount = actions.count(_.isInstanceOf[DataOp])
-          if (dataCount > availableData){
+          val dataCount         = actions.count(_.isInstanceOf[DataOp])
+          if (dataCount > availableData) {
             TracedResult(Left(FailedTransactionError.dAppExecution("Stored data count limit is exceeded", storingComplexity, log)))
           } else {
-                val actionsCount = actions.length - dataCount
-                if (actionsCount > availableActions) {
-            TracedResult(Left(FailedTransactionError.dAppExecution("Actions count limit is exceeded", storingComplexity, log)))
-          } else {
-            doProcessActions(actions, storingComplexity.toInt)
-                }
-              }
+            val actionsCount = actions.length - dataCount
+            if (actionsCount > availableActions) {
+              TracedResult(Left(FailedTransactionError.dAppExecution("Actions count limit is exceeded", storingComplexity, log)))
+            } else {
+              doProcessActions(actions, storingComplexity.toInt)
             }
+          }
+        }
 
         resultDiff <- scriptResult match {
           case ScriptResultV3(dataItems, transfers, unusedComplexity) =>
@@ -237,7 +251,7 @@ object InvokeScriptTransactionDiff {
           result <- executeInvoke(pk, version, contract, dAppAddress, invocationComplexity, fixedInvocationComplexity, environment, invocation)
         } yield result).leftMap {
           case fte: FailedTransactionError => fte.copy(invocations = invocationTracker.toInvocationList)
-          case other => other
+          case other                       => other
         }
 
       case Left(error) => TracedResult(Left(error))

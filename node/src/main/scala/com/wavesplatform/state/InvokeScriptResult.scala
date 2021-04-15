@@ -52,6 +52,13 @@ object InvokeScriptResult {
   }
 
   final case class Invocation(dApp: Address, call: Call, payments: Seq[AttachedPayment], stateChanges: InvokeScriptResult)
+  object Invocation {
+    def calledAddresses(inv: InvokeScriptResult.Invocation): LazyList[Address] =
+      LazyList(inv.dApp) #::: inv.stateChanges.invokes.to(LazyList).flatMap(calledAddresses)
+
+    def calledAddresses(invs: Iterable[InvokeScriptResult.Invocation]): LazyList[Address] =
+      invs.to(LazyList).flatMap(calledAddresses)
+  }
 
   final case class Payment(address: Address, asset: Asset, amount: Long)
   object Payment {
