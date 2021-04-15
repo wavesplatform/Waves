@@ -104,13 +104,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private var maybeUtx: Option[UtxPool] = None
   private var maybeNetwork: Option[NS]  = None
 
-  def apiShutdown(): Unit = {
-    for {
-      u <- maybeUtx
-      n <- maybeNetwork
-    } yield shutdown(u, n)
-  }
-
   def run(): Unit = {
     // initialization
     implicit val as: ActorSystem = actorSystem
@@ -229,7 +222,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // Node start
     // After this point, node actually starts doing something
-    checkGenesis(settings, blockchainUpdater)
+    appenderScheduler.execute(() => checkGenesis(settings, blockchainUpdater, miner))
 
     val network =
       NetworkServer(settings, lastBlockInfo, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
@@ -268,7 +261,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       timeoutSubject
     ) {
       case (c, b) =>
-        processFork(c, b.blocks).doOnFinish {
+        processFork(c, b).doOnFinish {
           case None    => Task.now(())
           case Some(e) => Task(stopOnAppendError.reportFailure(e))
         }
@@ -290,12 +283,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       .onErrorHandle(stopOnAppendError.reportFailure)
       .subscribe()
 
-    miner.scheduleMining()
-
-    for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
-      upnp.addPort(addr.getPort)
-    }
-
     // API start
     if (settings.restAPISettings.enable) {
       def loadBalanceHistory(address: Address): Seq[(Int, Long)] = db.readOnly { rdb =>
@@ -316,7 +303,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         )
 
       val apiRoutes = Seq(
-        NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
+        NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => shutdown()),
         BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, time),
         TransactionsApiRoute(
           settings.restAPISettings,
@@ -330,7 +317,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
         UtilsApiRoute(time, settings.restAPISettings, () => blockchainUpdater.estimator, limitedScheduler, blockchainUpdater),
-        PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
+        PeersApiRoute(settings.restAPISettings, address => maybeNetwork.foreach(_.connect(address)), peerDatabase, establishedConnections),
         AddressApiRoute(
           settings.restAPISettings,
           wallet,
@@ -386,20 +373,24 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 
+    for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
+      upnp.addPort(addr.getPort)
+    }
+
     // on unexpected shutdown
     sys.addShutdownHook {
       timer.stop()
-      shutdown(utxStorage, network)
+      shutdown()
     }
   }
 
   private val shutdownInProgress             = new AtomicBoolean(false)
   @volatile var serverBinding: ServerBinding = _
 
-  def shutdown(utx: UtxPool, network: NS): Unit =
+  def shutdown(): Unit =
     if (shutdownInProgress.compareAndSet(false, true)) {
       spendableBalanceChanged.onComplete()
-      utx.close()
+      maybeUtx.foreach(_.close())
 
       log.info("Closing REST API")
       if (settings.restAPISettings.enable)
@@ -414,8 +405,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       blockchainUpdater.shutdown()
 
-      log.info("Stopping network services")
-      network.shutdown()
+      maybeNetwork.foreach { network =>
+        log.info("Stopping network services")
+        network.shutdown()
+      }
 
       shutdownAndWait(appenderScheduler, "Appender", 5.minutes.some)
 

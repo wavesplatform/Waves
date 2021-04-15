@@ -34,7 +34,7 @@ object BlockAppender extends ScorexLogging {
   )(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
       if (blockchainUpdater.isLastBlockId(newBlock.header.reference))
-        appendBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
+        appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
       else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
         Right(None)
       else
