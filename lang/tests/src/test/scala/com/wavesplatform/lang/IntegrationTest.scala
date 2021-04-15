@@ -102,9 +102,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     )
   }
   
-  private def evalV5(code: String) =
-    genericEval[Environment, EVALUATED](code, ctxt = v5Ctx, version = V5, env = utils.environment)
-
   private val v5Ctx = WavesContext.build(Global, DirectiveSet(V5, Account, DApp).explicitGet())
 
   property("simple let") {
