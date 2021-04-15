@@ -30,7 +30,7 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class RideV5LimitsChangeTest extends FlatSpec with Matchers with WithDomain with PathMockFactory {
   "Blockchain" should "reject block with >1kk complexity before SynchronousCalls activated" in withDomain(
-    domainSettingsWithFeatures(BlockchainFeatures.Ride4DApps, BlockchainFeatures.BlockV5, BlockchainFeatures.MassTransfer)
+    domainSettingsWithPreactivatedFeatures(BlockchainFeatures.Ride4DApps, BlockchainFeatures.BlockV5, BlockchainFeatures.MassTransfer)
   ) { d =>
     val contractSigner  = TxHelpers.secondSigner
     val contractAddress = contractSigner.toAddress
@@ -52,7 +52,7 @@ class RideV5LimitsChangeTest extends FlatSpec with Matchers with WithDomain with
   }
 
   it should "accept block with 2.5kk complexity after SynchronousCalls activated" in withDomain(
-    domainSettingsWithFeatures(
+    domainSettingsWithPreactivatedFeatures(
       BlockchainFeatures.Ride4DApps,
       BlockchainFeatures.BlockV5,
       BlockchainFeatures.MassTransfer,
