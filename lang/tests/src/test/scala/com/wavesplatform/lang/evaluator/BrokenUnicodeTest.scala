@@ -73,4 +73,13 @@ class BrokenUnicodeTest extends EvaluatorSpec {
     eval(s"""takeRight("x冬x", 2)""") shouldBe CONST_STRING("冬x")
     eval(s"""dropRight("x冬x", 2)""") shouldBe CONST_STRING("x")
   }
+
+  property("broken unicode usage in V5") {
+    eval(s"""take("aaa\ud87ebbb", 3)""") shouldBe CONST_STRING("aaa")
+    eval(s"""take("aaa\ud87ebbb", 4)""") shouldBe CONST_STRING("aaa\ud87e")
+    eval(s"""take("aaa\ud87ebbb", 5)""") shouldBe CONST_STRING("aaa\ud87eb")
+    eval(s"""take("\ud1ca\ud87ea\ud1ca\ud87e", 2)""") shouldBe CONST_STRING("\ud1ca\ud87e")
+    eval(s"""take("\ud1ca\ud87ea\ud1ca\ud87e", 3)""") shouldBe CONST_STRING("\ud1ca\ud87ea")
+    eval(s"""take("\ud1ca\ud87ea\ud1ca\ud87e", 4)""") shouldBe CONST_STRING("\ud1ca\ud87ea\ud1ca")
+  }
 }
