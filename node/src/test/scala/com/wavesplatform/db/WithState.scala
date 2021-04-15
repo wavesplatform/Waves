@@ -166,8 +166,12 @@ trait WithDomain extends WithState { _: Suite =>
       blockchainSettings = SettingsFromDefaultConfig.blockchainSettings.copy(functionalitySettings = fs)
     )
 
-  def domainSettingsWithFeatures(fs: BlockchainFeature*): WavesSettings =
-    domainSettingsWithFS(SettingsFromDefaultConfig.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap))
+  def domainSettingsWithPreactivatedFeatures(fs: BlockchainFeature*): WavesSettings =
+    domainSettingsWithFeatures(fs.map(_ -> 0): _*)
+
+  def domainSettingsWithFeatures(fs: (BlockchainFeature, Int)*): WavesSettings =
+    domainSettingsWithFS(SettingsFromDefaultConfig.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map { case (f, h) => f.id -> h }.toMap))
+
 
   def withDomain[A](settings: WavesSettings = SettingsFromDefaultConfig)(
       test: Domain => A

@@ -84,7 +84,7 @@ class VerifierSpecification
     forAll(sharedParamGen) {
       case (sender, matcher, genesisTxs, assetPair) =>
         withDomain(
-          domainSettingsWithFeatures(
+          domainSettingsWithPreactivatedFeatures(
             BlockchainFeatures.SmartAccountTrading,
             BlockchainFeatures.SmartAssets,
             BlockchainFeatures.OrderV3,
@@ -167,7 +167,7 @@ class VerifierSpecification
           SetAssetScriptTransaction.selfSigned(1.toByte, sender, assetId, script, 0.001.waves, ntpTime.getTimestamp()).explicitGet()
 
         withDomain(
-          domainSettingsWithFeatures(
+          domainSettingsWithPreactivatedFeatures(
             BlockchainFeatures.SmartAccountTrading,
             BlockchainFeatures.OrderV3,
             BlockchainFeatures.SmartAssets,
