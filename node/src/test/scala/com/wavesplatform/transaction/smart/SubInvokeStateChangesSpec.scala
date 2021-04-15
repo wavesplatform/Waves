@@ -58,8 +58,7 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
     val stateChanges = d.commonApi.invokeScriptResult(invoke.id())
     val json         = Json.toJson(stateChanges)
     json shouldBe Json.parse(
-      s"""
-        |{
+      """{
         |  "data" : [ ],
         |  "transfers" : [ ],
         |  "issues" : [ ],
@@ -69,7 +68,7 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
         |  "leases" : [ ],
         |  "leaseCancels" : [ ],
         |  "invokes" : [ {
-        |    "dApp" : "${addr2s.toAddress}",
+        |    "dApp" : "3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L",
         |    "call" : {
         |      "function" : "default",
         |      "args" : [ ]
@@ -85,7 +84,7 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
         |      "leases" : [ ],
         |      "leaseCancels" : [ ],
         |      "invokes" : [ {
-        |        "dApp" : "${addr3s.toAddress}",
+        |        "dApp" : "3MvAdB2DFMf6unzX6czVGgco5rA24End8Jn",
         |        "call" : {
         |          "function" : "default",
         |          "args" : [ ]
@@ -105,7 +104,7 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
         |      } ]
         |    }
         |  }, {
-        |    "dApp" : "${addr2f.toAddress}",
+        |    "dApp" : "3MsY23LPQnvPZnBKpvs6YcnCvGjLVD42pSy",
         |    "call" : {
         |      "function" : "default",
         |      "args" : [ ]
@@ -121,7 +120,7 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
         |      "leases" : [ ],
         |      "leaseCancels" : [ ],
         |      "invokes" : [ {
-        |        "dApp" : "${addr3f.toAddress}",
+        |        "dApp" : "3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM",
         |        "call" : {
         |          "function" : "default",
         |          "args" : [ ]
@@ -136,14 +135,22 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
         |          "sponsorFees" : [ ],
         |          "leases" : [ ],
         |          "leaseCancels" : [ ],
-        |          "invokes" : [ ]
+        |          "invokes" : [ ],
+        |          "error" : {
+        |            "code" : 1,
+        |            "text" : "boom"
+        |          }
         |        }
-        |      } ]
+        |      } ],
+        |      "error" : {
+        |        "code" : 1,
+        |        "text" : "FailedTransactionError(code = 1, error = boom, log =\n\t@p = false\n)"
+        |      }
         |    }
         |  } ],
         |  "error" : {
         |    "code" : 1,
-        |    "text" : "GenericError(FailedTransactionError(code = 1, error = GenericError(FailedTransactionError(code = 1, error = GenericError(boom), log =\\n\\t@p = false\\n)), log =\\n\\tr0 = Left(FailedTransactionError(code = 1, error = GenericError(boom), log =\\n\\t@p = false\\n))\\n))"
+        |    "text" : "FailedTransactionError(code = 1, error = boom, log =\n\t@p = false\n)"
         |  }
         |}""".stripMargin
     )

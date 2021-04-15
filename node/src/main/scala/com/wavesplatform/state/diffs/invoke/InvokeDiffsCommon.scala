@@ -474,18 +474,18 @@ object InvokeDiffsCommon {
                     assetScripts = Map(asset      -> script.map(script => AssetScriptInfo(script._1, script._2)))
                   )
                 }
-                .leftMap(asFailedScriptError)
+                .leftMap(FailedTransactionError.asFailedScriptError)
             }
           }
 
           def applyReissue(reissue: Reissue, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
-            val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue).leftMap(asFailedScriptError)
+            val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue).leftMap(FailedTransactionError.asFailedScriptError)
             val pseudoTx    = ReissuePseudoTx(reissue, actionSender, pk, tx.txId, tx.timestamp)
             callAssetVerifierWithPseudoTx(reissueDiff, reissue.assetId, pseudoTx, AssetContext.Reissue)
           }
 
           def applyBurn(burn: Burn, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
-            val burnDiff = DiffsCommon.processBurn(blockchain, dAppAddress, fee = 0, burn).leftMap(asFailedScriptError)
+            val burnDiff = DiffsCommon.processBurn(blockchain, dAppAddress, fee = 0, burn).leftMap(FailedTransactionError.asFailedScriptError)
             val pseudoTx = BurnPseudoTx(burn, actionSender, pk, tx.txId, tx.timestamp)
             callAssetVerifierWithPseudoTx(burnDiff, burn.assetId, pseudoTx, AssetContext.Burn)
           }
@@ -499,8 +499,8 @@ object InvokeDiffsCommon {
                   FailedTransactionError.dAppExecution(s"SponsorFee assetId=${sponsorFee.assetId} was not issued from address of current dApp", 0L)
                 )
               )
-              _ <- TracedResult(SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee).leftMap(asFailedScriptError))
-              sponsorDiff = DiffsCommon.processSponsor(blockchain, dAppAddress, fee = 0, sponsorFee).leftMap(asFailedScriptError)
+              _ <- TracedResult(SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee).leftMap(FailedTransactionError.asFailedScriptError))
+              sponsorDiff = DiffsCommon.processSponsor(blockchain, dAppAddress, fee = 0, sponsorFee).leftMap(FailedTransactionError.asFailedScriptError)
               pseudoTx    = SponsorFeePseudoTx(sponsorFee, actionSender, pk, tx.txId, tx.timestamp)
               r <- callAssetVerifierWithPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx, AssetContext.Sponsor)
             } yield r
@@ -558,8 +558,8 @@ object InvokeDiffsCommon {
             case r: Reissue      => applyReissue(r, pk)
             case b: Burn         => applyBurn(b, pk)
             case sf: SponsorFee  => applySponsorFee(sf, pk)
-            case l: Lease        => applyLease(l).leftMap(asFailedScriptError)
-            case lc: LeaseCancel => applyLeaseCancel(lc).leftMap(asFailedScriptError)
+            case l: Lease        => applyLease(l).leftMap(FailedTransactionError.asFailedScriptError)
+            case lc: LeaseCancel => applyLeaseCancel(lc).leftMap(FailedTransactionError.asFailedScriptError)
           }
           diffAcc |+| diff.leftMap(_.addComplexity(curDiff.scriptsComplexity))
 
@@ -599,12 +599,6 @@ object InvokeDiffsCommon {
             .assetExecutionInAction(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", complexity, List.empty, assetId)
         )
       case Success(s) => s
-    }
-
-  private def asFailedScriptError(ve: ValidationError): FailedTransactionError =
-    ve match {
-      case fte: FailedTransactionError => fte
-      case err                         => FailedTransactionError.dAppExecutionE(err, 0L)
     }
 
   case class StepInfo(

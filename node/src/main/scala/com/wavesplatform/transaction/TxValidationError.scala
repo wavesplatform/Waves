@@ -113,6 +113,12 @@ object TxValidationError {
     def notAllowedByAsset(spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
       FailedTransactionError(Cause.AssetScript, spentComplexity, log, None, Some(assetId))
 
+    def asFailedScriptError(ve: ValidationError): FailedTransactionError =
+      ve match {
+        case fte: FailedTransactionError => fte
+        case err                         => this.dAppExecutionE(err, spentComplexity = 0L)
+      }
+
     sealed trait Cause extends Product with Serializable {
       def code: Int
     }

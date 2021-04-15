@@ -180,7 +180,7 @@ object InvokeScriptTransactionDiff {
       } yield (invocationComplexity, fixedInvocationComplexity)
     }
 
-    accScriptEi match {
+    (accScriptEi: @unchecked) match {
       case Right((dAppAddress, AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities))) =>
         val invocationTracker = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(dAppAddress, tx.funcCall, tx.payments))
         (for {
@@ -227,10 +227,6 @@ object InvokeScriptTransactionDiff {
           )
 
           result <- executeInvoke(pk, version, contract, dAppAddress, invocationComplexity, fixedInvocationComplexity, environment, invocation)
-            .leftMap {
-              case fte: FailedTransactionError => fte
-              case err: ValidationError        => err
-            }
         } yield result).leftMap {
           case fte: FailedTransactionError => fte.copy(invocations = invocationTracker.toInvocationList)
           case other => other
