@@ -4,14 +4,15 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
-import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta.Invoke
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
-import com.wavesplatform.database.{DBExt, KeyTags, Keys}
+import com.wavesplatform.database.{DBExt, Keys, KeyTags}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
+import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -44,6 +45,8 @@ trait CommonAccountsApi {
   def activeLeasesOld(address: Address): Observable[(Height, LeaseTransaction)]
 
   def activeLeases(address: Address): Observable[LeaseInfo]
+
+  def leaseInfo(leaseId: ByteStr): Option[LeaseInfo]
 
   def resolveAlias(alias: Alias): Either[ValidationError, Address]
 }
@@ -133,13 +136,31 @@ object CommonAccountsApi extends ScorexLogging {
         Set(LeaseTransaction.typeId, InvokeScriptTransaction.typeId),
         None
       ).flatMapIterable {
-        case TransactionMeta(h, lt: LeaseTransaction, true) if leaseIsActive(lt.id()) =>
-          Seq(LeaseInfo(lt.id(), lt.id(), lt.sender.toAddress, blockchain.resolveAlias(lt.recipient).explicitGet(), lt.amount, h))
-        case Invoke(height, originTransaction, true, Some(scriptResult)) =>
+        case TransactionMeta(leaseHeight, lt: LeaseTransaction, true) if leaseIsActive(lt.id()) =>
+          Seq(
+            LeaseInfo(
+              lt.id(),
+              lt.id(),
+              lt.sender.toAddress,
+              blockchain.resolveAlias(lt.recipient).explicitGet(),
+              lt.amount,
+              leaseHeight,
+              LeaseInfo.Status.Active
+            )
+          )
+        case TransactionMeta.Invoke(invokeHeight, originTransaction, true, Some(scriptResult)) =>
           def extractLeases(sender: Address, result: InvokeScriptResult): Seq[LeaseInfo] =
             result.leases.collect {
               case lease if leaseIsActive(lease.leaseId) =>
-                LeaseInfo(lease.leaseId, originTransaction.id(), sender, blockchain.resolveAlias(lease.recipient).explicitGet(), lease.amount, height)
+                LeaseInfo(
+                  lease.leaseId,
+                  originTransaction.id(),
+                  sender,
+                  blockchain.resolveAlias(lease.recipient).explicitGet(),
+                  lease.amount,
+                  invokeHeight,
+                  LeaseInfo.Status.Active
+                )
             } ++ {
               result.invokes.flatMap(i => extractLeases(i.dApp, i.stateChanges))
             }
@@ -148,16 +169,26 @@ object CommonAccountsApi extends ScorexLogging {
         case _ => Seq()
       }
 
-    private def leaseIsActive(id: ByteStr): Boolean =
+    def leaseInfo(leaseId: ByteStr): Option[LeaseInfo] = blockchain.leaseDetails(leaseId) map { ld =>
+      LeaseInfo(
+        leaseId,
+        ld.sourceId,
+        ld.sender.toAddress,
+        blockchain.resolveAlias(ld.recipient).explicitGet(),
+        ld.amount,
+        ld.height,
+        ld.status match {
+          case Status.Active          => LeaseInfo.Status.Active
+          case Status.Cancelled(_, _) => LeaseInfo.Status.Canceled
+          case Status.Expired(_)      => LeaseInfo.Status.Expired
+        },
+        LeaseDetails.Status.getCancelHeight(ld.status),
+        LeaseDetails.Status.getCancelTransactionId(ld.status)
+      )
+    }
+
+    private[this] def leaseIsActive(id: ByteStr): Boolean =
       blockchain.leaseDetails(id).exists(_.isActive)
   }
 
-  case class LeaseInfo(
-      leaseId: ByteStr,
-      originTransactionId: ByteStr,
-      sender: Address,
-      recipient: Address,
-      amount: Long,
-      height: Int
-  )
 }

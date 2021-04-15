@@ -363,7 +363,7 @@ class BlockchainUpdaterImpl(
                       featuresApprovedWithBlock(block),
                       reward,
                       hitSource,
-                      cancelLeases(collectLeasesToCancel(newHeight))
+                      cancelLeases(collectLeasesToCancel(newHeight), newHeight)
                     )
                   )
                   notifyChangedSpendable(prevNgState, ngState)
@@ -394,16 +394,17 @@ class BlockchainUpdaterImpl(
       collectActiveLeases(fromHeight, toHeight)
     } else Seq.empty
 
-  private def cancelLeases(leaseTransactions: Seq[LeaseTransaction]): Map[ByteStr, Diff] =
+  private def cancelLeases(leaseTransactions: Seq[LeaseTransaction], height: Int): Map[ByteStr, Diff] =
     (for {
-      lt        <- leaseTransactions
-      recipient <- leveldb.resolveAlias(lt.recipient).toSeq
+      lt               <- leaseTransactions
+      (leaseHeight, _) <- transactionMeta(lt.id()).toSeq
+      recipient        <- leveldb.resolveAlias(lt.recipient).toSeq
     } yield lt.id() -> Diff.empty.copy(
       portfolios = Map(
         lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount), Map.empty),
         recipient           -> Portfolio(0, LeaseBalance(-lt.amount, 0), Map.empty)
       ),
-      leaseState = Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.id(), lt.amount, isActive = false)))
+      leaseState = Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.amount, LeaseDetails.Status.Expired(height), lt.id(), leaseHeight)))
     )).toMap
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[(Block, ByteStr)]] = writeLock {
