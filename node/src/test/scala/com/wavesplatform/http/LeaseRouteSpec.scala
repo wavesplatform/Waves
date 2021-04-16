@@ -261,6 +261,9 @@ class LeaseRouteSpec
         withRoute { (d, r) =>
           d.appendBlock(genesis, setScript)
           d.appendBlock(invoke)
+          val (_, invokeStatus) = d.blockchain.transactionMeta(invoke.id()).get
+          assert(invokeStatus, "Invoke has failed")
+
           val leaseId = d.blockchain
             .accountData(genesis.recipient, "leaseId")
             .collect {

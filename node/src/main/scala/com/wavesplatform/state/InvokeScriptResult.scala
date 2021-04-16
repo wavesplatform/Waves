@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.protobuf.{Amount, _}
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBUtils
-import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
+import com.wavesplatform.state.{InvokeScriptResult => R}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -20,20 +20,27 @@ import com.wavesplatform.utils._
 import play.api.libs.json._
 
 final case class InvokeScriptResult(
-    data: Seq[DataEntry[_]] = Nil,
-    transfers: Seq[InvokeScriptResult.Payment] = Nil,
-    issues: Seq[Issue] = Nil,
-    reissues: Seq[Reissue] = Nil,
-    burns: Seq[Burn] = Nil,
-    sponsorFees: Seq[SponsorFee] = Nil,
-    leases: Seq[InvokeScriptResult.Lease] = Nil,
-    leaseCancels: Seq[LeaseCancel] = Nil,
-    invokes: Seq[InvokeScriptResult.Invocation] = Nil,
-    error: Option[ErrorMessage] = None
+    data: Seq[R.DataEntry] = Nil,
+    transfers: Seq[R.Payment] = Nil,
+    issues: Seq[R.Issue] = Nil,
+    reissues: Seq[R.Reissue] = Nil,
+    burns: Seq[R.Burn] = Nil,
+    sponsorFees: Seq[R.SponsorFee] = Nil,
+    leases: Seq[R.Lease] = Nil,
+    leaseCancels: Seq[R.LeaseCancel] = Nil,
+    invokes: Seq[R.Invocation] = Nil,
+    error: Option[R.ErrorMessage] = None
 )
 
 //noinspection TypeAnnotation
 object InvokeScriptResult {
+  type LeaseCancel = com.wavesplatform.lang.v1.traits.domain.LeaseCancel
+  type SponsorFee = com.wavesplatform.lang.v1.traits.domain.SponsorFee
+  type Issue = com.wavesplatform.lang.v1.traits.domain.Issue
+  type Reissue = com.wavesplatform.lang.v1.traits.domain.Reissue
+  type Burn = com.wavesplatform.lang.v1.traits.domain.Burn
+  type DataEntry = com.wavesplatform.state.DataEntry[_]
+
   val empty = InvokeScriptResult()
 
   final case class AttachedPayment(asset: Asset, amount: Long)
@@ -65,7 +72,7 @@ object InvokeScriptResult {
     implicit val jsonWrites = Json.writes[Payment]
   }
 
-  case class Lease(recipient: AddressOrAlias, amount: Long, nonce: Long, leaseId: ByteStr)
+  case class Lease(recipient: AddressOrAlias, amount: Long, nonce: Long, id: ByteStr)
   object Lease {
     implicit val recipientWrites = Writes[AddressOrAlias] {
       case address: Address => implicitly[Writes[Address]].writes(address)
@@ -243,10 +250,10 @@ object InvokeScriptResult {
     PBInvokeScriptResult.SponsorFee(Some(Amount(sf.assetId.toByteString, sf.minSponsoredAssetFee.getOrElse(0))))
 
   private def toPbLease(l: Lease) =
-    PBInvokeScriptResult.Lease(Some(PBRecipients.create(l.recipient)), l.amount, l.nonce, l.leaseId.toByteString)
+    PBInvokeScriptResult.Lease(Some(PBRecipients.create(l.recipient)), l.amount, l.nonce, l.id.toByteString)
 
   private def toPbLeaseCancel(l: LeaseCancel) =
-    PBInvokeScriptResult.LeaseCancel(ByteString.copyFrom(l.leaseId.arr))
+    PBInvokeScriptResult.LeaseCancel(ByteString.copyFrom(l.id.arr))
 
   private def toPbErrorMessage(em: ErrorMessage) =
     PBInvokeScriptResult.ErrorMessage(em.code, em.text)

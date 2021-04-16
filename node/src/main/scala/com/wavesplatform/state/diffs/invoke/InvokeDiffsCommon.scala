@@ -372,7 +372,7 @@ object InvokeDiffsCommon {
     Either.cond(
       duplicates.isEmpty,
       (),
-      s"Duplicate LeaseCancel id(s): ${duplicates.distinct.map(_.leaseId).mkString(", ")}"
+      s"Duplicate LeaseCancel id(s): ${duplicates.distinct.map(_.id).mkString(", ")}"
     )
   }
 
@@ -519,8 +519,8 @@ object InvokeDiffsCommon {
 
           def applyLeaseCancel(l: LeaseCancel): TracedResult[ValidationError, Diff] =
             for {
-              _    <- TracedResult(LeaseCancelTxValidator.checkLeaseId(l.leaseId))
-              diff <- DiffsCommon.processLeaseCancel(blockchain, pk, fee = 0, blockTime, l.leaseId, tx.txId)
+              _    <- TracedResult(LeaseCancelTxValidator.checkLeaseId(l.id))
+              diff <- DiffsCommon.processLeaseCancel(blockchain, pk, fee = 0, blockTime, l.id, tx.txId)
             } yield diff
 
           def callAssetVerifierWithPseudoTx(

@@ -151,9 +151,9 @@ object CommonAccountsApi extends ScorexLogging {
         case TransactionMeta.Invoke(invokeHeight, originTransaction, true, Some(scriptResult)) =>
           def extractLeases(sender: Address, result: InvokeScriptResult): Seq[LeaseInfo] =
             result.leases.collect {
-              case lease if leaseIsActive(lease.leaseId) =>
+              case lease if leaseIsActive(lease.id) =>
                 LeaseInfo(
-                  lease.leaseId,
+                  lease.id,
                   originTransaction.id(),
                   sender,
                   blockchain.resolveAlias(lease.recipient).explicitGet(),

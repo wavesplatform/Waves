@@ -16,14 +16,12 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BinaryDataEntry, Blockchain, BooleanDataEntry, Height, IntegerDataEntry, InvokeScriptResult, NG, StateHash, StringDataEntry}
-import com.wavesplatform.state.InvokeScriptResult.{AttachedPayment, Call, Invocation}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash}
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -424,7 +422,7 @@ class DebugApiRouteSpec
           |    "data" : [ ],
           |    "transfers" : [ ],
           |    "issues" : [ {
-          |      "assetId" : "${Issue.calculateId(4, "description", true, "name", 1000, 0, tx.id())}",
+          |      "assetId" : "${Issue.calculateId(4, "description", isReissuable = true, "name", 1000, 0, tx.id())}",
           |      "name" : "name",
           |      "description" : "description",
           |      "quantity" : 1000,
@@ -645,18 +643,18 @@ class DebugApiRouteSpec
             |          "recipient": "${recipient1.bytes}",
             |          "amount": $amount1,
             |          "nonce": $nonce1,
-            |          "leaseId": "$leaseId1"
+            |          "id": "$leaseId1"
             |        },
             |        {
             |          "recipient": "alias:T:${recipient2.name}",
             |          "amount": $amount2,
             |          "nonce": $nonce2,
-            |          "leaseId": "$leaseId2"
+            |          "id": "$leaseId2"
             |        }
             |      ],
             |      "leaseCancels": [
             |        {
-            |          "leaseId": "$leaseCancelId"
+            |          "id": "$leaseCancelId"
             |        }
             |      ],
             |      "invokes": []
@@ -744,7 +742,7 @@ class DebugApiRouteSpec
       (() => blockchain.activatedFeatures).when().returning(Map.empty).anyNumberOfTimes()
       (transactionsApi.transactionById _)
         .when(invoke.id())
-        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, true, Some(scriptResult))))
+        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, succeeded = true, Some(scriptResult))))
         .once()
 
       (blockchain.leaseDetails _)
@@ -761,182 +759,42 @@ class DebugApiRouteSpec
       Get(routePath(s"/stateChanges/info/${invoke.id()}")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
         val json = (responseAs[JsObject] \ "stateChanges").as[JsObject]
-        println(Json.prettyPrint(json))
-        json shouldBe Json.parse(s"""{
-                                    |  "data" : [ ],
-                                    |  "transfers" : [ ],
-                                    |  "issues" : [ ],
-                                    |  "reissues" : [ ],
-                                    |  "burns" : [ ],
-                                    |  "sponsorFees" : [ ],
-                                    |  "leases" : [ {
-                                    |    "recipient" : "$recipientAddress",
-                                    |    "amount" : 100,
-                                    |    "nonce" : 1,
-                                    |    "leaseId" : "$leaseId1"
-                                    |  }, {
-                                    |    "recipient" : "$recipientAlias",
-                                    |    "amount" : 200,
-                                    |    "nonce" : 3,
-                                    |    "leaseId" : "$leaseId2"
-                                    |  } ],
-                                    |  "leaseCancels" : [ {
-                                    |    "leaseId" : "$leaseCancelId"
-                                    |  } ],
-                                    |  "invokes" : [ ]
-                                    |}""".stripMargin)
-      }
-    }
-
-    "sync dApp call with actions" in {
-      val invokeAddress    = accountGen.sample.get.toAddress
-      val assetId          = ByteStr.fromBytes(1, 2, 3, 4)
-      val leaseId          = ByteStr(bytes32gen.sample.get)
-      val leaseCancelId    = ByteStr(bytes32gen.sample.get)
-      val recipientAddress = accountGen.sample.get.toAddress
-      val quantity         = 12345
-      val nonce            = 1
-      val invoke           = TxHelpers.invoke(invokeAddress, "test")
-      val scriptResult = InvokeScriptResult(
-        leases = Seq(InvokeScriptResult.Lease(recipientAddress, quantity, nonce, leaseId)),
-        leaseCancels = Seq(LeaseCancel(leaseCancelId)),
-        data = Seq(
-          IntegerDataEntry("key", 1),
-          StringDataEntry("key", "value"),
-          BinaryDataEntry("key", ByteStr.fromBytes(1, 2, 3, 4)),
-          BooleanDataEntry("key", true)
-        ),
-        transfers = Seq(
-          InvokeScriptResult.Payment(recipientAddress, Waves, 1)
-        ),
-        issues = Seq(
-          Issue(assetId, None, 10, "description", true, "name", quantity, nonce)
-        ),
-        reissues = Seq(
-          Reissue(assetId, true, quantity)
-        ),
-        sponsorFees = Seq(
-          SponsorFee(assetId, Some(quantity))
-        ),
-        burns = Seq(
-          Burn(assetId, quantity)
-        )
-      )
-      val scriptResultWithInvoke = scriptResult.copy(
-        invokes = Seq(Invocation(recipientAddress, Call("function", Nil), Seq(AttachedPayment(IssuedAsset(assetId), quantity)), scriptResult))
-      )
-      (transactionsApi.transactionById _)
-        .when(invoke.id())
-        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, true, Some(scriptResultWithInvoke))))
-        .once()
-
-      (() => blockchain.activatedFeatures).when().returning(Map.empty).anyNumberOfTimes()
-
-      Get(routePath(s"/stateChanges/info/${invoke.id()}")) ~> route ~> check {
-        status shouldEqual StatusCodes.OK
-        val stateChangesJson =
-          s"""
-             |"data": [
-             |    {
-             |      "key": "key",
-             |      "type": "integer",
-             |      "value": 1
-             |    },
-             |    {
-             |      "key": "key",
-             |      "type": "string",
-             |      "value": "value"
-             |    },
-             |    {
-             |      "key": "key",
-             |      "type": "binary",
-             |      "value": "base64:AQIDBA=="
-             |    },
-             |    {
-             |      "key": "key",
-             |      "type": "boolean",
-             |      "value": true
-             |    }
-             |  ],
-             |  "transfers": [
-             |    {
-             |      "address": "$recipientAddress",
-             |      "asset": null,
-             |      "amount": 1
-             |    }
-             |  ],
-             |  "issues": [
-             |    {
-             |      "assetId": "$assetId",
-             |      "name": "name",
-             |      "description": "description",
-             |      "quantity": $quantity,
-             |      "decimals": 10,
-             |      "isReissuable": true,
-             |      "compiledScript": null,
-             |      "nonce": $nonce
-             |    }
-             |  ],
-             |  "reissues": [
-             |    {
-             |      "assetId": "$assetId",
-             |      "isReissuable": true,
-             |      "quantity": $quantity
-             |    }
-             |  ],
-             |  "burns": [
-             |    {
-             |      "assetId": "$assetId",
-             |      "quantity": $quantity
-             |    }
-             |  ],
-             |  "sponsorFees": [
-             |    {
-             |      "assetId": "$assetId",
-             |      "minSponsoredAssetFee": $quantity
-             |    }
-             |  ],
-             |  "leases": [
-             |    {
-             |      "recipient": "$recipientAddress",
-             |      "amount": $quantity,
-             |      "nonce": $nonce,
-             |      "leaseId": "$leaseId"
-             |    }
-             |  ],
-             |  "leaseCancels": [
-             |    {
-             |      "leaseId": "$leaseCancelId"
-             |    }
-             |  ]
-           """.stripMargin
-
-        (responseAs[JsObject] \ "stateChanges").as[JsObject] shouldBe Json.parse(
-          s"""
-            |{
-            |  $stateChangesJson,
-            |  "invokes": [
-            |    {
-            |      "dApp": "$recipientAddress",
-            |      "call": {
-            |        "function": "function",
-            |        "args": []
-            |      },
-            |      "payments": [
-            |        {
-            |          "asset": "$assetId",
-            |          "amount": $quantity
-            |        }
-            |      ],
-            |      "stateChanges": {
-            |        $stateChangesJson,
-            |        "invokes": []
-            |      }
-            |    }
-            |  ]
-            |}
-          """.stripMargin
-        )
+        json should matchJson(s"""
+                                   |{
+                                   |  "data" : [ ],
+                                   |  "transfers" : [ ],
+                                   |  "issues" : [ ],
+                                   |  "reissues" : [ ],
+                                   |  "burns" : [ ],
+                                   |  "sponsorFees" : [ ],
+                                   |  "leases" : [ {
+                                   |    "id" : "$leaseId1",
+                                   |    "originTransactionId" : "${invoke.id()}",
+                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |    "recipient" : "$recipientAddress",
+                                   |    "amount" : 100,
+                                   |    "height" : 1,
+                                   |    "status" : "active"
+                                   |  }, {
+                                   |    "id" : "$leaseId2",
+                                   |    "originTransactionId" : "${invoke.id()}",
+                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |    "recipient" : "$recipientAddress",
+                                   |    "amount" : 100,
+                                   |    "height" : 1,
+                                   |    "status" : "active"
+                                   |  } ],
+                                   |  "leaseCancels" : [ {
+                                   |    "id" : "$leaseCancelId",
+                                   |    "originTransactionId" : "${invoke.id()}",
+                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |    "recipient" : "$recipientAddress",
+                                   |    "amount" : 100,
+                                   |    "height" : 1,
+                                   |    "status" : "canceled"
+                                   |  } ],
+                                   |  "invokes" : [ ]
+                                   |}""".stripMargin)
       }
     }
   }
