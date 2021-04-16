@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
+import scala.util.Right
+
 import cats.Id
 import cats.implicits._
 import com.wavesplatform.account._
@@ -12,26 +14,24 @@ import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.transaction.{Transaction, TxValidationError}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, CoevalR, TracedResult}
-import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
-import com.wavesplatform.transaction.{Transaction, TxValidationError}
+import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import monix.eval.Coeval
 import shapeless.Coproduct
-
-import scala.util.Right
 
 object InvokeScriptDiff {
   private val stats = TxProcessingStats
@@ -41,17 +41,20 @@ object InvokeScriptDiff {
       blockchain: Blockchain,
       blockTime: Long,
       limitedExecution: Boolean,
-      totalComplexityLimit: Int,
-      remainingComplexity: Int,
+     totalComplexityLimit: Int, remainingComplexity: Int,
       remainingCalls: Int,
       remainingActions: Int,
       remainingData: Int,
-      callChain: Set[Address]
+      calledAddresses: Set[Address]
+  ,
+      invocationRoot: DAppEnvironment.InvocationTreeTracker
   )(
       tx: InvokeScript
   ): CoevalR[(Diff, EVALUATED, Int, Int)] = {
     val dAppAddress = tx.dAppAddress
-    blockchain.accountScript(dAppAddress) match {
+    val invoker     = tx.senderDApp
+
+    val result = blockchain.accountScript(dAppAddress) match {
       case Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities)) =>
         for {
           _ <- traced(
@@ -136,7 +139,7 @@ object InvokeScriptDiff {
           result <- for {
             (diff, (scriptResult, log), availableActions, availableData) <- {
               val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
-                val invoker = tx.senderDApp
+                val height = blockchain.height
                 val invocation = ContractEvaluator.Invocation(
                   tx.funcCall,
                   Recipient.Address(ByteStr(invoker.bytes)),
@@ -148,8 +151,6 @@ object InvokeScriptDiff {
                   tx.root.map(_.fee).getOrElse(0L),
                   tx.root.flatMap(_.feeAssetId.compatId)
                 )
-                val height = blockchain.height
-
                 val environment = new DAppEnvironment(
                   AddressScheme.current.chainId,
                   Coeval.evalOnce(input),
@@ -160,24 +161,28 @@ object InvokeScriptDiff {
                   tx.root,
                   tx.dAppAddress,
                   pk,
-                  callChain + dAppAddress,
+                  calledAddresses + dAppAddress,
                   limitedExecution,
                   totalComplexityLimit,
                   remainingCalls - 1,
                   remainingActions,
                   remainingData,
-                  (if (version < V5) {
-                     Diff.empty
-                   } else {
-                     InvokeDiffsCommon.paymentsPart(tx, tx.dAppAddress, Map())
-                   })
+                  if (version < V5) Diff.empty else InvokeDiffsCommon.paymentsPart(tx, tx.dAppAddress, Map()),
+                  invocationRoot
                 )
 
                 for {
                   result <- CoevalR(
-                    evaluateV2(version, contract, invocation, environment, complexityAfterPayments, remainingComplexity).map(TracedResult(_))
+                    evaluateV2(
+                      version,
+                      contract,
+                      invocation,
+                      environment,
+                      complexityAfterPayments,
+                      remainingComplexity
+                    ).map(TracedResult(_))
                   )
-                } yield (environment.currentDiff, result, environment.avaliableActions, environment.avaliableData)
+                } yield (environment.currentDiff, result, environment.availableActions, environment.availableData)
               })
               scriptResultE
             }
@@ -240,6 +245,7 @@ object InvokeScriptDiff {
 
       case _ => traced(Left(GenericError(s"No contract at address ${tx.dAppAddress}")))
     }
+    result
   }
 
   private def evaluateV2(

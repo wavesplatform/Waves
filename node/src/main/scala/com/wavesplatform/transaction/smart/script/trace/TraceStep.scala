@@ -15,8 +15,8 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
+import play.api.libs.json.Json.JsValueWrapper
 
 sealed abstract class TraceStep {
   def json: JsObject // TODO: Is this format necessary?

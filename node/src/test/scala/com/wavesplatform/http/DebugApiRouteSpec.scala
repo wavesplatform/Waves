@@ -12,7 +12,6 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.util._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
@@ -110,7 +109,7 @@ class DebugApiRouteSpec
     def validatePost(tx: TransferTransaction) =
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString()))
 
-    "takes the priority pool into account" in withDomain(domainSettingsWithPreactivatedFeatures(BlockchainFeatures.NG)) { d =>
+    "takes the priority pool into account" in withDomain(DomainPresets.NG) { d =>
       d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
       d.appendBlock(TxHelpers.transfer(to = TxHelpers.secondAddress, amount = 1.waves + TestValues.fee))
 
