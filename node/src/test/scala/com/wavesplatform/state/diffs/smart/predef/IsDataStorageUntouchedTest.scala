@@ -59,7 +59,6 @@ class IsDataStorageUntouchedTest
     withDomain(RideV5) { d =>
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invokeTx)
-      d.blockchain.bestLiquidDiff.get.errorMessage(invokeTx.id.value()) shouldBe None
       d.blockchain.accountData(dApp, "virgin") shouldBe Some(BooleanDataEntry("virgin", true))
     }
   }
@@ -67,22 +66,30 @@ class IsDataStorageUntouchedTest
   property("isDataStorageUntouched false") {
     val (genesisTxs, dataTx, _, invokeTx, dApp) = scenario.sample.get
     withDomain(RideV5) { d =>
-      d.appendBlock(genesisTxs: _*)
+      val genesis = d.appendBlock(genesisTxs: _*).id()
+
       d.appendBlock(dataTx)
       d.appendBlock(invokeTx)
-      d.blockchain.bestLiquidDiff.get.errorMessage(invokeTx.id.value()) shouldBe None
       d.blockchain.accountData(dApp, "virgin") shouldBe Some(BooleanDataEntry("virgin", false))
+
+      d.removeAfter(genesis)
+      d.appendBlock(invokeTx)
+      d.blockchain.accountData(dApp, "virgin") shouldBe Some(BooleanDataEntry("virgin", true))
     }
   }
 
   property("isDataStorageUntouched false after delete") {
     val (genesisTxs, dataTx, deleteDataTx, invokeTx, dApp) = scenario.sample.get
     withDomain(RideV5) { d =>
-      d.appendBlock(genesisTxs: _*)
+      val genesis = d.appendBlock(genesisTxs: _*).id()
+
       d.appendBlock(dataTx, deleteDataTx)
       d.appendBlock(invokeTx)
-      d.blockchain.bestLiquidDiff.get.errorMessage(invokeTx.id.value()) shouldBe None
       d.blockchain.accountData(dApp, "virgin") shouldBe Some(BooleanDataEntry("virgin", false))
+
+      d.removeAfter(genesis)
+      d.appendBlock(invokeTx)
+      d.blockchain.accountData(dApp, "virgin") shouldBe Some(BooleanDataEntry("virgin", true))
     }
   }
 }
