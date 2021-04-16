@@ -9,9 +9,10 @@ import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.state.StringDataEntry
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
+import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
@@ -42,6 +43,14 @@ object TxHelpers {
     IssueTransaction
       .selfSigned(TxVersion.V2, defaultSigner, "test", "", amount, 0, reissuable = true, Option(script), 1.waves, timestamp)
       .explicitGet()
+
+  def reissue(asset: IssuedAsset, amount: Long = 1000): ReissueTransaction =
+    ReissueTransaction
+      .selfSigned(TxVersion.V2, defaultSigner, asset, amount, reissuable = true, TestValues.fee, timestamp)
+      .explicitGet()
+
+  def data(account: KeyPair = defaultSigner, key: String = "test", value: String = "test"): DataTransaction =
+    DataTransaction.selfSigned(TxVersion.V1, account, Seq(StringDataEntry(key, value)), TestValues.fee * 3, timestamp).explicitGet()
 
   def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {
     orderV3(orderType, asset, Waves, feeAsset)

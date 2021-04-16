@@ -2,20 +2,27 @@ package com.wavesplatform.events.repo
 
 import java.nio.{ByteBuffer, ByteOrder}
 
+import scala.annotation.tailrec
+import scala.jdk.CollectionConverters._
+import scala.util.{Failure, Success, Try}
+
+import cats.kernel.Monoid
 import com.wavesplatform.Shutdownable
+import com.wavesplatform.api.common.CommonBlocksApi
+import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events._
-import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
+import com.wavesplatform.events.protobuf.serde._
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
+import monix.eval.Task
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
-import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success, Try}
-
-class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
+class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val scheduler: Scheduler)
     extends UpdatesRepo.Read
     with UpdatesRepo.Write
     with UpdatesRepo.Stream
@@ -29,73 +36,79 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
   @volatile
   private[this] var liquidState: Option[LiquidState] = None
 
-  log.info(s"BlockchainUpdates extension opened db at ${directory}")
+  log.info(s"BlockchainUpdates extension opened db at $directory")
 
   override def shutdown(): Unit = db.close()
 
-  private[this] val realTimeUpdates = ConcurrentSubject.replayLimited[BlockchainUpdated](100)
+  @volatile
+  private[this] var lastRealTimeUpdates = Seq.empty[BlockchainUpdated]
+  private[this] val realTimeUpdates     = ConcurrentSubject.publish[BlockchainUpdated]
 
-  private[this] def sendRealTimeUpdate(ba: BlockchainUpdated): Try[Unit] = {
-    realTimeUpdates.onNext(ba) match {
-      case Ack.Continue =>
-        Success(())
-      case Ack.Stop =>
-        Failure(new IllegalStateException("realTimeUpdates stream sent Ack.Stop"))
+  private[this] def sendRealTimeUpdate(upd: BlockchainUpdated): Unit = {
+    val currentUpdates = this.lastRealTimeUpdates
+    val currentHeight  = height.toOption
+    this.lastRealTimeUpdates = currentUpdates.dropWhile(u => currentHeight.exists(_ - 5 > u.height)) :+ upd
+    realTimeUpdates.onNext(upd) match {
+      case Ack.Continue => // OK
+      case Ack.Stop     => throw new IllegalStateException("Real time updates subject is stopped")
     }
   }
 
   // UpdatesRepo.Read impl
   override def height: Try[Int] = Try {
-    liquidState.map(_.keyBlock.toHeight).getOrElse {
+    liquidState.map(_.keyBlock.height).getOrElse {
       val iter = db.iterator()
 
       def parseHeight(blockBytes: Array[Byte]) = {
         val lastUpdate = PBBlockchainUpdated.parseFrom(blockBytes).vanilla.get
-        lastUpdate.toHeight
+        lastUpdate.height
       }
 
-      try Try(iter.seekToLast()).fold(
-        _ =>
-          iter.asScala
-            .foldLeft(Option.empty[Array[Byte]]) { case (_, e) => Some(e.getValue) }
-            .fold(0)(parseHeight),
-        _ => if (iter.hasNext) parseHeight(iter.next.getValue) else 0
-      )
-      finally iter.close()
+      try {
+        try iter.seekToLast()
+        catch {
+          case _: UnsupportedOperationException =>
+          // Skip to support test implementation
+        }
+
+        iter.asScala
+          .map(_.getValue)
+          .to(LazyList)
+          .lastOption
+          .fold(0)(parseHeight)
+      } finally iter.close()
     }
   }
 
-  override def updateForHeight(height: Int): Try[Option[BlockAppended]] =
-    liquidState match {
-      case Some(ls) if ls.keyBlock.toHeight == height =>
+  private[this] def readBlock(height: Int) = {
+    val (meta, txs) = blocks.blockAtHeight(height).get
+    Block(meta.header, meta.signature, txs.map(_._1))
+  }
+
+  override def updateForHeight(height: Int): Try[BlockAppended] =
+    Try(liquidState match {
+      case Some(ls) if ls.keyBlock.height == height =>
         log.debug(s"BlockchainUpdates extension requested liquid block at height $height")
-        Success(Some(ls.solidify()))
-      case Some(ls) if ls.keyBlock.toHeight < height =>
-        log.warn(s"BlockchainUpdates extension requested non-existing block at height $height, current ${ls.keyBlock.toHeight}")
-        Success(None)
+        ls.solidify()
+      case Some(ls) if ls.keyBlock.height < height =>
+        throw new NoSuchElementException(s"BlockchainUpdates extension requested non-existing block at height $height, current ${ls.keyBlock.height}")
       case _ if height <= 0 =>
-        Failure(new IllegalArgumentException("BlockchainUpdates asked for an update at a non-positive height"))
+        throw new IllegalArgumentException("BlockchainUpdates asked for an update at a non-positive height")
       case _ =>
         val bytes = db.get(key(height))
         if (bytes == null || bytes.isEmpty) {
-          Success(None)
+          throw new IllegalStateException(s"No data for blockchain update in database at height $height")
         } else {
-          for {
-            pbParseResult <- Try(PBBlockchainUpdated.parseFrom(bytes))
-            vanillaUpdate <- pbParseResult.vanilla
-            blockAppended <- Try(vanillaUpdate.asInstanceOf[BlockAppended])
-          } yield Some(blockAppended)
+          val pbParseResult = PBBlockchainUpdated.parseFrom(bytes)
+          val vanillaUpdate = pbParseResult.vanilla.get.asInstanceOf[BlockAppended]
+          vanillaUpdate.copy(block = readBlock(vanillaUpdate.height))
         }
-    }
+    })
 
-  override def updatesRange(from: Int, to: Int): Observable[BlockAppended] = height match {
-    case Success(h) =>
-      stream(from)
-        .collect { case u: BlockAppended => u }
-        .takeWhile(_.toHeight <= h)
-
-    case Failure(exception) =>
-      Observable.raiseError(exception)
+  override def updatesRange(from: Int, to: Int): Observable[BlockAppended] = {
+    stream(from)
+      .collect { case u: BlockAppended => u }
+      .takeWhileInclusive(_.height < to)
   }
 
   // UpdatesRepo.Write impl
@@ -103,139 +116,177 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     Try {
       liquidState.foreach { ls =>
         val solidBlock = ls.solidify()
+        if (solidBlock.height > 1) require(db.get(key(solidBlock.height - 1)) != null, s"Previous block missing: ${solidBlock.height - 1}")
         db.put(
-          key(solidBlock.toHeight),
-          solidBlock.protobuf.toByteArray
+          key(solidBlock.height),
+          solidBlock.protobuf.update(_.append.block.optionalBlock := None).toByteArray
         )
+        require(db.get(key(solidBlock.height)) != null, s"Update isn't persisted: ${solidBlock.height}")
       }
       liquidState = Some(LiquidState(blockAppended, Seq.empty))
       sendRealTimeUpdate(blockAppended)
     }
   }
 
-  override def appendMicroBlock(microBlockAppended: MicroBlockAppended): Try[Unit] = {
+  override def appendMicroBlock(microBlockAppended: MicroBlockAppended): Try[Unit] = Try {
     liquidState match {
       case Some(LiquidState(keyBlock, microBlocks)) =>
         liquidState = Some(LiquidState(keyBlock, microBlocks :+ microBlockAppended))
         sendRealTimeUpdate(microBlockAppended)
-      case None =>
-        Failure(new IllegalStateException("BlockchainUpdates attempted to insert a microblock without a keyblock"))
+      case None => throw new IllegalStateException("BlockchainUpdates attempted to insert a microblock without a keyblock")
     }
   }
 
-  override def rollback(rollback: RollbackCompleted): Try[Unit] =
-    height
-      .flatMap { h =>
-        if (rollback.toHeight > h) {
-          Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to a height higher than current"))
-        } else if (rollback.toHeight <= 0) {
-          Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to a non-positive height"))
-        } else if (rollback.toHeight == h) {
-          Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to current height"))
-        } else if (rollback.toHeight == h - 1) {
-          liquidState = None
-          Success(())
-        } else
-          writeLock {
-            val iter  = db.iterator()
-            val batch = db.createWriteBatch()
-            try {
-              iter.seek(key(rollback.toHeight))
-              iter.next
-              while (iter.hasNext) {
-                batch.delete(iter.next.getKey)
+  override def rollback(blockchain: Blockchain, toId: ByteStr, toHeight: Int, sendEvent: Boolean): Try[Unit] =
+    for {
+      h <- this.height
+      result <- if (toHeight > h) {
+        Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to a height higher than current"))
+      } else if (toHeight == h) {
+        Success(Monoid.empty[RollbackResult])
+      } else if (toHeight == h - 1 && liquidState.isDefined) {
+        Success(doFullLiquidRollback())
+      } else {
+        doStateRollback(toHeight)
+      }
+      refAssets = StateUpdate.referencedAssets(blockchain, Seq(result.stateUpdate))
+      _         = if (sendEvent) sendRealTimeUpdate(RollbackCompleted(toId, toHeight, result, refAssets))
+    } yield ()
+
+  private[this] def doFullLiquidRollback(): RollbackResult = {
+    val microBlocks = liquidState.toSeq.flatMap(_.microBlocks)
+    val removedTxs  = microBlocks.flatMap(_.microBlock.transactionData).map(_.id())
+    val stateUpdate = MicroBlockAppended.revertMicroBlocks(microBlocks)
+    liquidState = None
+    RollbackResult.micro(removedTxs, stateUpdate)
+  }
+
+  private[this] def doStateRollback(toHeight: Int): Try[RollbackResult] =
+    Try(writeLock {
+      log.info(s"Rolling back blockchain updates to $toHeight")
+
+      val iter  = db.iterator()
+      val batch = db.createWriteBatch()
+      try {
+        var changes = Seq.empty[RollbackResult]
+
+        iter.seek(key(toHeight))
+
+        iter.asScala
+          .map(e => (e.getKey, protobuf.BlockchainUpdated.parseFrom(e.getValue).vanilla.get.asInstanceOf[BlockAppended]))
+          .filter(_._2.height > toHeight)
+          .foreach {
+            case (key, ba) =>
+              val reverted = {
+                val block        = Try(readBlock(ba.height)).toOption
+                val transactions = block.fold(Seq.empty[ByteStr])(_.transactionData.map(_.id()))
+                RollbackResult(block.toSeq, transactions.reverse, ba.reverseStateUpdate)
               }
-              db.write(batch)
-              Success(())
-            } catch {
-              case t: Throwable => Failure(t)
-            } finally {
-              iter.close()
-              batch.close()
+              log.trace(s"Rolling back block update at ${ba.height}: ${ba.id}")
+              changes = reverted +: changes
+              batch.delete(key)
+          }
+
+        db.write(batch)
+        liquidState = None
+
+        require(height.get == toHeight, s"Rollback doesn't succeed: ${height.get} != $toHeight")
+        Monoid.combineAll(changes)
+      } finally {
+        iter.close()
+        batch.close()
+      }
+    })
+
+  override def rollbackMicroBlock(blockchain: Blockchain, toId: ByteStr): Try[Unit] =
+    for {
+      height <- this.height
+      result <- liquidState match {
+        case Some(ls) =>
+          if (toId == ls.keyBlock.id) {
+            liquidState = Some(ls.copy(microBlocks = Seq.empty))
+            val removedTxs  = ls.microBlocks.flatMap(_.microBlock.transactionData).map(_.id())
+            val stateUpdate = MicroBlockAppended.revertMicroBlocks(ls.microBlocks)
+            Success(RollbackResult.micro(removedTxs, stateUpdate))
+          } else {
+            @tailrec
+            def dropUntilId(
+                microBlocks: Seq[MicroBlockAppended],
+                id: ByteStr,
+                dropped: Seq[MicroBlockAppended] = Nil
+            ): (Seq[MicroBlockAppended], Seq[MicroBlockAppended]) = microBlocks match {
+              case Nil                                   => (Nil, dropped)
+              case rest @ (_ :+ block) if block.id == id => (rest, dropped)
+              case rest :+ block                         => dropUntilId(rest, id, block +: dropped)
+            }
+            val (keep, drop) = dropUntilId(ls.microBlocks, toId)
+            if (keep.isEmpty) {
+              Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback a non-existing microblock"))
+            } else {
+              liquidState = Some(ls.copy(microBlocks = keep))
+              val removedTxs  = drop.flatMap(_.microBlock.transactionData).map(_.id()).reverse
+              val stateUpdate = MicroBlockAppended.revertMicroBlocks(drop)
+              Success(RollbackResult.micro(removedTxs, stateUpdate))
             }
           }
+        case None => Failure(new IllegalStateException("BlockchainUpdates attempted to rollback microblock without liquid state present"))
       }
-      .flatMap(_ => sendRealTimeUpdate(rollback))
-
-  override def rollbackMicroBlock(microBlockRollback: MicroBlockRollbackCompleted): Try[Unit] =
-    height
-      .flatMap { h =>
-        if (microBlockRollback.toHeight != h) {
-          Failure(new IllegalArgumentException("BlockchainUpdates microblock rollback height was not equal to current height"))
-        } else {
-          liquidState match {
-            case Some(ls) =>
-              if (microBlockRollback.toId == ls.keyBlock.toId) {
-                liquidState = Some(ls.copy(microBlocks = Seq.empty))
-                Success(())
-              } else {
-                val remainingMicroBlocks = ls.microBlocks.reverse.dropWhile(_.toId != microBlockRollback.toId).reverse
-                if (remainingMicroBlocks.isEmpty) {
-                  Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback a non-existing microblock"))
-                } else {
-                  liquidState = Some(ls.copy(microBlocks = remainingMicroBlocks))
-                  Success(())
-                }
-              }
-            case None => Failure(new IllegalStateException("BlockchainUpdates attempted to rollback microblock without liquid state present"))
-          }
-        }
-      }
-      .flatMap(_ => sendRealTimeUpdate(microBlockRollback))
+      refAssets = StateUpdate.referencedAssets(blockchain, Seq(result.stateUpdate))
+      _         = sendRealTimeUpdate(MicroBlockRollbackCompleted(toId, height, result, refAssets))
+    } yield ()
 
   // UpdatesRepo.Stream impl
   override def stream(fromHeight: Int): Observable[BlockchainUpdated] = {
-
-    /**
-      * reads from level db by synchronous batches each using one iterator
-      * each batch gets a read lock
-      * @param from batch start height
-      * @return Task to be consumed by Observable.unfoldEval
-      */
-    def readBatch(from: Int): (Seq[BlockchainUpdated], Option[Int]) =
-      readLockCond {
-        def isLastBatch(data: Seq[_]): Boolean = data.length < LevelDBReadBatchSize
-
-        val data = {
-          val iterator = db.iterator()
-          try {
-            iterator.seek(key(from))
-            iterator.asScala
-              .take(LevelDBReadBatchSize)
-              .map(e => PBBlockchainUpdated.parseFrom(e.getValue).vanilla.get)
-              .toVector
-          } finally iterator.close()
+    def readBatchTask(from: Int): Task[(Seq[BlockchainUpdated], Option[Int])] = {
+      blocks
+        .blocksRange(from, from + LevelDBReadBatchSize)
+        .map {
+          case (meta, txs) =>
+            for {
+              bytes <- readLockCond(Option(db.get(key(meta.height))))(_.isEmpty)
+              update = PBBlockchainUpdated.parseFrom(bytes)
+              ba     = update.vanilla.get.asInstanceOf[BlockAppended]
+            } yield ba.copy(block = Block(meta.header, meta.signature, txs.map(_._1)))
         }
+        .takeWhile(_.isDefined)
+        .flatMap(Observable.fromIterable(_))
+        .toListL
+        .map { data =>
+          def isLastBatch(data: Seq[_]): Boolean = data.length < LevelDBReadBatchSize
 
-        if (isLastBatch(data)) {
-          val liquidUpdates = liquidState match {
-            case None => Seq.empty
-            case Some(LiquidState(keyBlock, microBlocks)) =>
-              val lastBlock = data.lastOption
-              require(lastBlock.forall(keyBlock.references))
-              Seq(keyBlock) ++ microBlocks
+          if (isLastBatch(data)) {
+            val liquidUpdates = liquidState match {
+              case None => Seq.empty
+              case Some(LiquidState(keyBlock, microBlocks)) =>
+                val lastBlock = data.lastOption
+                require(lastBlock.forall(keyBlock.references), "Liquid block doesn't reference last hard block")
+                Seq(keyBlock) ++ microBlocks
+            }
+            (data ++ liquidUpdates, None)
+          } else {
+            val nextTickFrom = data.lastOption.map(_.height + 1)
+            (data, nextTickFrom)
           }
-          (data ++ liquidUpdates, None)
-        } else {
-          val nextTickFrom = data.lastOption.map(_.toHeight + 1)
-          (data, nextTickFrom)
         }
-      }(_._2.isEmpty)
+    }
 
     Observable.fromTry(height).flatMap { h =>
       if (h < fromHeight) {
         Observable.raiseError(new IllegalArgumentException("Requested start height exceeds current blockchain height"))
       } else {
-        def readBatchStream(from: Int): Observable[BlockchainUpdated] = Observable.defer {
-          val (data, next) = concurrent.blocking(readBatch(from))
-          Observable.fromIterable(data) ++ (next match {
-            case Some(next) =>
-              readBatchStream(next)
+        def readBatchStream(from: Int): Observable[BlockchainUpdated] = Observable.fromTask(readBatchTask(from)).flatMap {
+          case (data, next) =>
+            Observable.fromIterable(data) ++ (next match {
+              case Some(next) =>
+                readBatchStream(next)
 
-            case None =>
-              val lastPersistentUpdate = data.lastOption
-              realTimeUpdates.dropWhile(u => !lastPersistentUpdate.forall(u.references))
-          })
+              case None =>
+                val lastPersistentUpdate = data.lastOption
+                Observable
+                  .fromIterable(lastRealTimeUpdates)
+                  .++(realTimeUpdates)
+                  .dropWhile(u => !lastPersistentUpdate.forall(u.references))
+            })
         }
         readBatchStream(fromHeight)
       }

@@ -8,12 +8,12 @@ import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.database.{LevelDBWriter, openDB}
+import com.wavesplatform.database.{openDB, LevelDBWriter}
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.{Diff, Portfolio}
+import com.wavesplatform.transaction.{GenesisTransaction, Proofs}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, Proofs}
 import com.wavesplatform.utils.{NTP, ScorexLogging}
 import monix.reactive.Observer
 
@@ -92,7 +92,7 @@ object RollbackBenchmark extends ScorexLogging {
 
     log.info("Rolling back")
     val start = System.nanoTime()
-    levelDBWriter.rollbackTo(genesisBlock.id())
+    levelDBWriter.rollbackTo(1)
     val end = System.nanoTime()
     log.info(f"Rollback took ${(end - start) * 1e-6}%.3f ms")
     levelDBWriter.close()

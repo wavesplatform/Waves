@@ -2,6 +2,10 @@ package com.wavesplatform.database
 
 import java.util
 
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
+import scala.reflect.ClassTag
+
 import cats.data.Ior
 import cats.syntax.monoid._
 import cats.syntax.option._
@@ -11,16 +15,12 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.settings.DBSettings
-import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
-
-import scala.jdk.CollectionConverters._
-import scala.concurrent.duration._
-import scala.reflect.ClassTag
 
 abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) extends Blockchain with Storage {
   import Caches._
@@ -32,8 +32,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   protected def loadHeight(): Int
   override def height: Int = current._1
-
-  protected def safeRollbackHeight: Int
 
   protected def loadScore(): BigInt
   override def score: BigInt = current._2
@@ -329,19 +327,17 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     forgetBlocks()
   }
 
-  protected def doRollback(targetBlockId: ByteStr): Seq[(Block, ByteStr)]
+  protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr)]
 
-  override def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[(Block, ByteStr)]] = {
+  override def rollbackTo(height: Int): Either[String, Seq[(Block, ByteStr)]] = {
     for {
-      height <- heightOf(targetBlockId)
-        .toRight(s"No block with signature: $targetBlockId found in blockchain")
       _ <- Either
         .cond(
-          height > safeRollbackHeight,
+          height >= safeRollbackHeight,
           (),
-          s"Rollback is possible only to the block at a height: ${safeRollbackHeight + 1}"
+          s"Rollback is possible only to the block at the height: $safeRollbackHeight"
         )
-      discardedBlocks = doRollback(targetBlockId)
+      discardedBlocks = doRollback(height)
     } yield {
       current = (loadHeight(), loadScore(), loadLastBlock())
 
