@@ -79,7 +79,7 @@ case class AddressApiRoute(
         "complexity"           -> maxComplexity,
         "verifierComplexity"   -> verifierComplexity,
         "callableComplexities" -> callableComplexities,
-        "extraFee"             -> (if (scriptInfoOpt.isEmpty) 0L else FeeValidation.ScriptExtraFee)
+        "extraFee"             -> (if (blockchain.hasPaidVerifier(address)) FeeValidation.ScriptExtraFee else 0L)
       )
     }
   }
