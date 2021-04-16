@@ -11,8 +11,8 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.traits.domain._
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -147,8 +147,8 @@ object DiffsCommon {
         (),
         GenericError(s"Lease with id=$leaseId is already in the state")
       )
-      leaseBalance  = blockchain.leaseBalance(senderAddress)
-      senderBalance = blockchain.balance(senderAddress, Waves)
+      leaseBalance    = blockchain.leaseBalance(senderAddress)
+      senderBalance   = blockchain.balance(senderAddress, Waves)
       requiredBalance = if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) amount + fee else amount
       _ <- Either.cond(
         senderBalance - leaseBalance.out >= requiredBalance,
@@ -159,7 +159,7 @@ object DiffsCommon {
         senderAddress    -> Portfolio(-fee, LeaseBalance(0, amount)),
         recipientAddress -> Portfolio(0, LeaseBalance(amount, 0))
       )
-      details = LeaseDetails(sender, recipient, txId, amount, isActive = true)
+      details = LeaseDetails(sender, recipient, amount, LeaseDetails.Status.Active, txId, blockchain.height)
     } yield Diff(
       portfolios = portfolioDiff,
       leaseState = Map((leaseId, details))
@@ -171,9 +171,10 @@ object DiffsCommon {
       sender: PublicKey,
       fee: Long,
       time: Long,
-      leaseId: ByteStr
+      leaseId: ByteStr,
+      cancelTxId: ByteStr
   ): Either[ValidationError, Diff] = {
-    val allowedTs     = blockchain.settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp
+    val allowedTs = blockchain.settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp
     for {
       lease     <- blockchain.leaseDetails(leaseId).toRight(GenericError(s"Lease with id=$leaseId not found"))
       recipient <- blockchain.resolveAlias(lease.recipient)
@@ -192,7 +193,7 @@ object DiffsCommon {
       )
       senderPortfolio    = Map(sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
       recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
-      actionInfo         = LeaseDetails(sender, lease.recipient, lease.sourceId, lease.amount, isActive = false)
+      actionInfo         = lease.copy(status = LeaseDetails.Status.Cancelled(blockchain.height, cancelTxId))
     } yield Diff(
       portfolios = senderPortfolio |+| recipientPortfolio,
       leaseState = Map((leaseId, actionInfo))

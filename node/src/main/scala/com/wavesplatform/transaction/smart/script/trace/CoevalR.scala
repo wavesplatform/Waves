@@ -1,8 +1,8 @@
 package com.wavesplatform.transaction.smart.script.trace
+import scala.util.Right
+
 import com.wavesplatform.lang.ValidationError
 import monix.eval.Coeval
-
-import scala.util.Right
 
 case class CoevalR[+A](v: Coeval[TracedResult[ValidationError, A]]) extends AnyVal {
   def flatMap[B](f: A => CoevalR[B]): CoevalR[B] = {
@@ -21,6 +21,9 @@ case class CoevalR[+A](v: Coeval[TracedResult[ValidationError, A]]) extends AnyV
 
   def withFilter(f: A => Boolean): CoevalR[A] =
     CoevalR(v.map(_.withFilter(f)))
+
+  def leftMap(f: ValidationError => ValidationError): CoevalR[A] =
+    CoevalR(v.map(_.leftMap(f)))
 }
 
 object CoevalR {

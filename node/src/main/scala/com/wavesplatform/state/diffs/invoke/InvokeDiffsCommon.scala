@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
+import scala.util.{Failure, Right, Success, Try}
+
 import cats.implicits._
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
@@ -17,27 +19,25 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, _}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, _}
+import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.DiffsCommon
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
+import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.transaction.validation.impl.{LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
-import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import com.wavesplatform.utils._
 import shapeless.Coproduct
-
-import scala.util.{Failure, Right, Success, Try}
 
 object InvokeDiffsCommon {
   def txFeeDiff(blockchain: Blockchain, tx: InvokeScriptTransaction): Either[GenericError, (Long, Map[Address, Portfolio])] = {
@@ -372,7 +372,7 @@ object InvokeDiffsCommon {
     Either.cond(
       duplicates.isEmpty,
       (),
-      s"Duplicate LeaseCancel id(s): ${duplicates.distinct.map(_.leaseId).mkString(", ")}"
+      s"Duplicate LeaseCancel id(s): ${duplicates.distinct.map(_.id).mkString(", ")}"
     )
   }
 
@@ -478,18 +478,18 @@ object InvokeDiffsCommon {
                     assetScripts = Map(asset      -> script.map(script => AssetScriptInfo(script._1, script._2)))
                   )
                 }
-                .leftMap(asFailedScriptError)
+                .leftMap(FailedTransactionError.asFailedScriptError)
             }
           }
 
           def applyReissue(reissue: Reissue, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
-            val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue).leftMap(asFailedScriptError)
+            val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue).leftMap(FailedTransactionError.asFailedScriptError)
             val pseudoTx    = ReissuePseudoTx(reissue, actionSender, pk, tx.txId, tx.timestamp)
             callAssetVerifierWithPseudoTx(reissueDiff, reissue.assetId, pseudoTx, AssetContext.Reissue)
           }
 
           def applyBurn(burn: Burn, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
-            val burnDiff = DiffsCommon.processBurn(blockchain, dAppAddress, fee = 0, burn).leftMap(asFailedScriptError)
+            val burnDiff = DiffsCommon.processBurn(blockchain, dAppAddress, fee = 0, burn).leftMap(FailedTransactionError.asFailedScriptError)
             val pseudoTx = BurnPseudoTx(burn, actionSender, pk, tx.txId, tx.timestamp)
             callAssetVerifierWithPseudoTx(burnDiff, burn.assetId, pseudoTx, AssetContext.Burn)
           }
@@ -503,8 +503,8 @@ object InvokeDiffsCommon {
                   FailedTransactionError.dAppExecution(s"SponsorFee assetId=${sponsorFee.assetId} was not issued from address of current dApp", 0L)
                 )
               )
-              _ <- TracedResult(SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee).leftMap(asFailedScriptError))
-              sponsorDiff = DiffsCommon.processSponsor(blockchain, dAppAddress, fee = 0, sponsorFee).leftMap(asFailedScriptError)
+              _ <- TracedResult(SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee).leftMap(FailedTransactionError.asFailedScriptError))
+              sponsorDiff = DiffsCommon.processSponsor(blockchain, dAppAddress, fee = 0, sponsorFee).leftMap(FailedTransactionError.asFailedScriptError)
               pseudoTx    = SponsorFeePseudoTx(sponsorFee, actionSender, pk, tx.txId, tx.timestamp)
               r <- callAssetVerifierWithPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx, AssetContext.Sponsor)
             } yield r
@@ -519,8 +519,8 @@ object InvokeDiffsCommon {
 
           def applyLeaseCancel(l: LeaseCancel): TracedResult[ValidationError, Diff] =
             for {
-              _    <- TracedResult(LeaseCancelTxValidator.checkLeaseId(l.leaseId))
-              diff <- DiffsCommon.processLeaseCancel(blockchain, pk, fee = 0, blockTime, l.leaseId)
+              _    <- TracedResult(LeaseCancelTxValidator.checkLeaseId(l.id))
+              diff <- DiffsCommon.processLeaseCancel(blockchain, pk, fee = 0, blockTime, l.id, tx.txId)
             } yield diff
 
           def callAssetVerifierWithPseudoTx(
@@ -562,8 +562,8 @@ object InvokeDiffsCommon {
             case r: Reissue      => applyReissue(r, pk)
             case b: Burn         => applyBurn(b, pk)
             case sf: SponsorFee  => applySponsorFee(sf, pk)
-            case l: Lease        => applyLease(l).leftMap(asFailedScriptError)
-            case lc: LeaseCancel => applyLeaseCancel(lc).leftMap(asFailedScriptError)
+            case l: Lease        => applyLease(l).leftMap(FailedTransactionError.asFailedScriptError)
+            case lc: LeaseCancel => applyLeaseCancel(lc).leftMap(FailedTransactionError.asFailedScriptError)
           }
           diffAcc |+| diff.leftMap(_.addComplexity(curDiff.scriptsComplexity))
 
@@ -605,13 +605,6 @@ object InvokeDiffsCommon {
             .assetExecutionInAction(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", estimatedComplexity, List.empty, assetId)
         )
       case Success(s) => s
-    }
-
-  private def asFailedScriptError(ve: ValidationError): FailedTransactionError =
-    ve match {
-      case e: FailedTransactionError => e
-      case e: GenericError           => FailedTransactionError.dAppExecution(e.err, 0L)
-      case e                         => FailedTransactionError.dAppExecution(e.toString, 0L)
     }
 
   case class StepInfo(

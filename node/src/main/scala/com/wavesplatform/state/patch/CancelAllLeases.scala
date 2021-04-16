@@ -3,8 +3,8 @@ package com.wavesplatform.state.patch
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.state.reader.LeaseDetails
 import play.api.libs.json.{Json, OFormat}
 
 case object CancelAllLeases extends DiffPatchFactory {
@@ -22,7 +22,7 @@ case object CancelAllLeases extends DiffPatchFactory {
       val sender    = PublicKey(ByteStr.decodeBase58(data.senderPublicKey).get)
       val recipient = Address.fromString(data.recipient).explicitGet()
       val id        = ByteStr.decodeBase58(data.id).get
-      (id, LeaseDetails(sender, recipient, id, data.amount, isActive = false))
+      (id, LeaseDetails(sender, recipient, data.amount, status = LeaseDetails.Status.Expired(height), id, height))
     }.toMap
   }
   private[patch] object CancelledLeases {
