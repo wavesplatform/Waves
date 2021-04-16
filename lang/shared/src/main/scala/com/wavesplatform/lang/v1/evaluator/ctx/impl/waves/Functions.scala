@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import cats.implicits._
 import cats.{Id, Monad}
+import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ExecutionError
@@ -10,15 +10,15 @@ import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{notImplemented, unit, EnvironmentFunctions, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{scriptTransfer => _, _}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.{addressOrAliasType, addressType, commonDataEntryType, optionAddress, _}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, notImplemented, unit}
-import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
-import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction}
-import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import monix.eval.Coeval
 
 object Functions {
@@ -63,9 +63,9 @@ object Functions {
   val getStringFromStateF: BaseFunction[Environment]  = getDataFromStateF("getString", DATA_STRING_FROM_STATE, DataType.String)
 
   val isDataStorageUntouchedF: BaseFunction[Environment] = {
-    val name = "isDataStorageUntouched"
+    val name       = "isDataStorageUntouched"
     val resultType = BOOLEAN
-    val arg = ("addressOrAlias", addressOrAliasType)
+    val arg        = ("addressOrAlias", addressOrAliasType)
     NativeFunction.withEnvironment[Environment](
       name,
       Map[StdLibVersion, Long](V5 -> 10L),
@@ -566,7 +566,7 @@ object Functions {
                   },
                   availableComplexity
                 )
-                .map(_.map { case (result, complexity) => (result.leftMap(_.toString), complexity) })
+                .map(_.map { case (result, complexity) => (result.leftMap(_.toString), complexity)})
             case xs =>
               val err = notImplemented[F, EVALUATED](s"Invoke(dapp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
               Coeval.now(err.map((_, 0)))
@@ -828,9 +828,9 @@ object Functions {
     }
 
   def accountScriptHashF(global: BaseGlobal): BaseFunction[Environment] = {
-    val name = "hashScriptAtAddress"
+    val name    = "hashScriptAtAddress"
     val resType = UNION(BYTESTR, UNIT)
-    val arg = ("account", addressOrAliasType)
+    val arg     = ("account", addressOrAliasType)
     NativeFunction.withEnvironment[Environment](
       name,
       200,
@@ -848,14 +848,15 @@ object Functions {
             case (env, List(addr: CaseObj)) =>
               env
                 .accountScript(caseObjToRecipient(addr))
-                .map(_.map(si => CONST_BYTESTR(ByteStr(global.blake2b256(si.bytes().arr))))
-                      .getOrElse(Right(unit)))
+                .map(
+                  _.map(si => CONST_BYTESTR(ByteStr(global.blake2b256(si.bytes().arr))))
+                    .getOrElse(Right(unit))
+                )
 
             case (_, xs) => notImplemented[F, EVALUATED](s"hashScriptAtAddress(account: AddressOrAlias))", xs)
           }
       }
     }
   }
-
 
 }

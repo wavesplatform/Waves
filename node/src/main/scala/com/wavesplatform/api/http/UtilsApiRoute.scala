@@ -1,44 +1,44 @@
 package com.wavesplatform.api.http
 
+import java.security.SecureRandom
+
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.implicits._
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, ScriptCompilerError, TooBigArrayAllocation}
-import com.wavesplatform.api.http.requests.{ScriptWithImportsRequest, byteStrFormat}
+import com.wavesplatform.api.http.requests.{byteStrFormat, ScriptWithImportsRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
+import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
-import com.wavesplatform.lang.v1.{ContractLimits, Serde}
-import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
 import monix.eval.Coeval
 import monix.execution.Scheduler
 import play.api.libs.json._
 import shapeless.Coproduct
-
-import java.security.SecureRandom
 
 case class UtilsApiRoute(
     timeService: Time,
@@ -315,13 +315,14 @@ object UtilsApiRoute {
               tx = None,
               address,
               PublicKey(ByteStr.fill(KeyLength)(1)),
-              Set(),
+              Set.empty[Address],
               limitedExecution = false,
               limit,
               remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
-              avaliableActions = ContractLimits.MaxCallableActionsAmount(script.stdLibVersion),
-              avaliableData = ContractLimits.MaxWriteSetSize(script.stdLibVersion),
-              currentDiff = Diff.empty
+              availableActions = ContractLimits.MaxCallableActionsAmount(script.stdLibVersion),
+              availableData = ContractLimits.MaxWriteSetSize(script.stdLibVersion),
+              currentDiff = Diff.empty,
+              invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(address, null, Nil))
             )
           )
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
