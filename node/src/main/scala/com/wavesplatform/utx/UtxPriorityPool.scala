@@ -3,17 +3,18 @@ package com.wavesplatform.utx
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 
+import scala.annotation.tailrec
+
 import cats.kernel.Monoid
+import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
-
-import scala.annotation.tailrec
 
 final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with OptimisticLockable {
   import UtxPriorityPool._
@@ -122,7 +123,10 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
 
     val removed = oldTxs diff newTxs
     removed.foreach(PoolMetrics.removeTransactionPriority)
-    (newTxs diff oldTxs).foreach(PoolMetrics.addTransactionPriority)
+    (newTxs diff oldTxs).foreach { tx =>
+      PoolMetrics.addTransactionPriority(tx)
+      ResponsivenessLogs.writeEvent(base.height, tx, ResponsivenessLogs.TxEvent.Received)
+    }
     removed
   }
 
