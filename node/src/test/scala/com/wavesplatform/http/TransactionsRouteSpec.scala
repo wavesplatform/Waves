@@ -231,6 +231,7 @@ class TransactionsRouteSpec
 
           (blockchain.accountScript _).when(TxHelpers.defaultSigner.toAddress).returns(info(199))
           (blockchain.accountScript _).when(TxHelpers.secondSigner.toAddress).returns(info(201))
+          (blockchain.accountScript _).when(TxHelpers.signer(3).toAddress).returns(None)
         }
         val route = seal(transactionsApiRoute.copy(blockchain = blockchain).route)
 
@@ -269,6 +270,18 @@ class TransactionsRouteSpec
         Post(routePath("/calculateFee"), tx2) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 500000
+        }
+
+        val tx3 = Json.obj(
+          "type"            -> 4,
+          "version"         -> 2,
+          "amount"          -> 1,
+          "senderPublicKey" -> Base58.encode(TxHelpers.signer(3).publicKey.arr),
+          "recipient"       -> accountGen.sample.get.toAddress
+        )
+        Post(routePath("/calculateFee"), tx3) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 100000
         }
       }
     }
