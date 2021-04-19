@@ -134,9 +134,9 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       val issuedQuantity      = issueAmount
       val transferredQuantity = issuedQuantity / 2
 
-      val issuedAssetId = sender.issue(firstKeyPair, s"name+$v", "description", issuedQuantity, decimals, reissuable = true, issueFee).id
+      val issuedAssetId = sender.issue(firstKeyPair, s"name+$v", "description", issuedQuantity, decimals, reissuable = true, issueFee, waitForTx = true).id
 
-      miner.waitForTransaction(issuedAssetId)
+      nodes.waitForEmptyUtx()
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity)
 
       val transferId = sender.transfer(firstKeyPair, secondAddress, transferredQuantity, minFee, issuedAssetId.some).id

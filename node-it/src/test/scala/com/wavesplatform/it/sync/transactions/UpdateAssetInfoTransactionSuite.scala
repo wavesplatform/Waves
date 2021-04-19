@@ -1,5 +1,8 @@
 package com.wavesplatform.it.sync.transactions
 
+import scala.concurrent.duration._
+import scala.util.Random
+
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.{InvalidName, StateCheckFailed, TooBigArrayAllocation}
@@ -7,8 +10,8 @@ import com.wavesplatform.api.http.requests.UpdateAssetInfoRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs.{Miners, NotMiner}
-import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}
+import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -21,10 +24,7 @@ import org.scalatest.CancelAfterFailure
 import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.{JsObject, Json}
 
-import scala.concurrent.duration._
-import scala.util.Random
-
-class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAfterFailure with TableDrivenPropertyChecks  {
+class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAfterFailure with TableDrivenPropertyChecks with OverflowBlock {
   import UpdateAssetInfoTransactionSuite._
   val updateInterval = 2
   override protected def nodeConfigs: Seq[Config] =
@@ -40,6 +40,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   var otherAssetId      = ""
   var smartAssetId      = ""
   var nftId             = ""
+  var lastUpdateHeight = 0
 
   val testDapp =
     """
@@ -139,7 +140,8 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   test("able to update name/description of issued asset") {
     val nextTerm = sender.transactionInfo[TransactionInfo](assetId).height + updateInterval + 1
     nodes.waitForHeight(nextTerm)
-    val issuerBalance       = sender.balanceDetails(issuer.publicKey.toAddress.toString)
+    val issuerBalance = sender.balanceDetails(issuer.publicKey.toAddress.toString)
+    overflowBlock()
     val updateAssetInfoTxId = notMiner.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)._1.id
     checkUpdateAssetInfoTx(notMiner.utx().head, "updatedName", "updatedDescription")
     miner.waitForTransaction(updateAssetInfoTxId)
@@ -166,6 +168,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
     sender.balanceDetails(issuer.publicKey.toAddress.toString).available shouldBe issuerBalance.available - minFee
     nodes.waitForHeightArise()
+    lastUpdateHeight = updateAssetInfoTxHeight
   }
 
   test("DApp can read updated asset info") {
@@ -191,19 +194,19 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   test("not able to update name/description more than once within interval") {
-    val nextTermEnd = sender.transactionInfo[TransactionInfo](assetId).height + 2 * updateInterval
+    val nextTermEnd = lastUpdateHeight + updateInterval
     assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)) { error =>
       error.id shouldBe StateCheckFailed.Id
       error.message should include(
-        s"Can't update info of asset with id=$assetId before ${nextTermEnd + 1} block, current height=${sender.height}, minUpdateInfoInterval=$updateInterval"
+        s"Can't update info of asset with id=$assetId before $nextTermEnd block, current height=${sender.height}, minUpdateInfoInterval=$updateInterval"
       )
     }
-    sender.waitForHeight(nextTermEnd)
+    sender.waitForHeight(nextTermEnd - 1)
 
     assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)) { error =>
       error.id shouldBe StateCheckFailed.Id
       error.message should include(
-        s"Can't update info of asset with id=$assetId before ${nextTermEnd + 1} block, current height=${sender.height}, minUpdateInfoInterval=$updateInterval"
+        s"Can't update info of asset with id=$assetId before $nextTermEnd block, current height=${sender.height}, minUpdateInfoInterval=$updateInterval"
       )
     }
   }
@@ -374,6 +377,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   test("able to update name/description of nft") {
+    overflowBlock()
     val updateAssetInfoTxId = sender.updateAssetInfo(issuer, nftId, "updatedName", "updatedDescription", minFee + smartFee)._1.id
     checkUpdateAssetInfoTx(sender.utx().head, "updatedName", "updatedDescription")
     sender.waitForTransaction(updateAssetInfoTxId)

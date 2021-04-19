@@ -1,5 +1,7 @@
 package com.wavesplatform.it.sync
 
+import scala.util.{Random, Try}
+
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
@@ -7,20 +9,20 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
+import com.wavesplatform.it.sync.transactions.OverflowBlock
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxVersion
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
 
-import scala.util.{Random, Try}
-
-class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker with Matchers {
+class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker with Matchers with OverflowBlock {
   private val miner: Node    = nodes.head
   private val notMiner: Node = nodes(1)
+  protected def sender: Node = notMiner
 
   private var whitelistedAccount: KeyPair     = _
   private var whitelistedDAppAccount: KeyPair = _
@@ -67,6 +69,7 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
       )
       .explicitGet()
 
+    overflowBlock()
     val tx2Id = notMiner.signedBroadcast(secondTransfer.json()).id
     val tx1Id = miner.signedBroadcast(firstTransfer.json()).id
 
