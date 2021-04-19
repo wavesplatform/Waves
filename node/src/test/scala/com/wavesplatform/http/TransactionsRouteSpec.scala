@@ -1,10 +1,6 @@
 package com.wavesplatform.http
 
-import scala.concurrent.Future
-import scala.util.Random
-
 import akka.http.scaladsl.model._
-import com.wavesplatform.{BlockchainStubHelpers, BlockGen, NoShrink, TestTime, TestValues, TestWallet, TransactionGen}
 import com.wavesplatform.account.{AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
@@ -16,14 +12,17 @@ import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, _}
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL, TRUE}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.{Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
+import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
+import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxVersion}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -31,14 +30,19 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.{BlockGen, BlockchainStubHelpers, NoShrink, TestTime, TestValues, TestWallet, TransactionGen}
 import monix.reactive.Observable
-import org.scalacheck.{Arbitrary, Gen}
 import org.scalacheck.Gen._
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, OptionValues}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json._
 import play.api.libs.json.Json.JsValueWrapper
+import play.api.libs.json._
+
+import scala.concurrent.Future
+import scala.util.Random
 
 class TransactionsRouteSpec
     extends RouteSpec("/transactions")
@@ -199,6 +203,72 @@ class TransactionsRouteSpec
           status shouldEqual StatusCodes.OK
           (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.toString
           (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 45
+        }
+      }
+
+      s"after ${BlockchainFeatures.SynchronousCalls}" in {
+        val blockchain = createBlockchainStub { blockchain =>
+          val settings = TestFunctionalitySettings.Enabled.copy(
+            preActivatedFeatures = Map(
+              BlockchainFeatures.SmartAccounts.id    -> 0,
+              BlockchainFeatures.SmartAssets.id      -> 0,
+              BlockchainFeatures.Ride4DApps.id       -> 0,
+              BlockchainFeatures.FeeSponsorship.id   -> 0,
+              BlockchainFeatures.DataTransaction.id  -> 0,
+              BlockchainFeatures.BlockReward.id      -> 0,
+              BlockchainFeatures.BlockV5.id          -> 0,
+              BlockchainFeatures.SynchronousCalls.id -> 0
+            ),
+            featureCheckBlocksPeriod = 1,
+            blocksForFeatureActivation = 1
+          )
+          (() => blockchain.settings).when().returns(WavesSettings.default().blockchainSettings.copy(functionalitySettings = settings))
+          (() => blockchain.activatedFeatures).when().returns(settings.preActivatedFeatures)
+          (blockchain.balance _).when(*, *).returns(ENOUGH_AMT)
+
+          val script                = ExprScript(TRUE).explicitGet()
+          def info(complexity: Int) = Some(AccountScriptInfo(TxHelpers.secondSigner.publicKey, script, complexity))
+
+          (blockchain.accountScript _).when(TxHelpers.defaultSigner.toAddress).returns(info(199))
+          (blockchain.accountScript _).when(TxHelpers.secondSigner.toAddress).returns(info(201))
+        }
+        val route = seal(transactionsApiRoute.copy(blockchain = blockchain).route)
+
+        (addressTransactions.calculateFee _)
+          .expects(*)
+          .onCall(
+            (tx: Transaction) =>
+              FeeValidation
+                .getMinFee(blockchain, tx)
+                .map {
+                  case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
+                    (asset, feeInAsset, feeInWaves)
+                }
+          )
+          .anyNumberOfTimes()
+
+        val tx1 = Json.obj(
+          "type"            -> 4,
+          "version"         -> 2,
+          "amount"          -> 1,
+          "senderPublicKey" -> Base58.encode(TxHelpers.defaultSigner.publicKey.arr),
+          "recipient"       -> accountGen.sample.get.toAddress
+        )
+        Post(routePath("/calculateFee"), tx1) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 100000
+        }
+
+        val tx2 = Json.obj(
+          "type"            -> 4,
+          "version"         -> 2,
+          "amount"          -> 1,
+          "senderPublicKey" -> Base58.encode(TxHelpers.secondSigner.publicKey.arr),
+          "recipient"       -> accountGen.sample.get.toAddress
+        )
+        Post(routePath("/calculateFee"), tx2) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 500000
         }
       }
     }
