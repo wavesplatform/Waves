@@ -300,9 +300,9 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
                   .fromIterable(lastRealTimeUpdates)
                   .++(realTimeUpdates)
                   .dropWhile { u =>
-                    val referencesLastPersistent = !lastPersistentUpdate.forall(u.references)
-                    if (referencesLastPersistent) log.trace(s"[$streamId] Dropping by referencesLastPersistent=false ${u.id}")
-                    else log.trace(s"[$streamId] Found referencesLastPersistent=true ${u.id}")
+                    val referencesLastPersistent = lastPersistentUpdate.forall(u.references)
+                    if (referencesLastPersistent) log.trace(s"[$streamId] Found referencesLastPersistent=true ${u.id}")
+                    else log.trace(s"[$streamId] Dropping by referencesLastPersistent=false ${u.id}")
                     !referencesLastPersistent
                   }
                   .guaranteeCase(
