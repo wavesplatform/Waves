@@ -293,19 +293,20 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
                 readBatchStream(next, data.lastOption.ensuring(_.nonEmpty))
 
               case None =>
+                val streamId = Integer.toHexString(System.nanoTime().toInt)
                 val lastPersistentUpdate = data.lastOption.orElse(prevLastPersistent)
-                log.trace(s"lastPersistentUpdate = $lastPersistentUpdate")
+                log.trace(s"[$streamId] lastPersistentUpdate = $lastPersistentUpdate")
                 Observable
                   .fromIterable(lastRealTimeUpdates)
                   .++(realTimeUpdates)
                   .dropWhile { u =>
                     val referencesLastPersistent = !lastPersistentUpdate.forall(u.references)
-                    if (referencesLastPersistent) log.trace(s"Dropping by referencesLastPersistent=false $u")
-                    else log.trace(s"Found referencesLastPersistent=true $u")
+                    if (referencesLastPersistent) log.trace(s"[$streamId] Dropping by referencesLastPersistent=false $u")
+                    else log.trace(s"[$streamId] Found referencesLastPersistent=true $u")
                     !referencesLastPersistent
                   }
                   .map { bu =>
-                    log.trace(s"Sending real-time update: $bu")
+                    log.trace(s"[$streamId] Sending real-time update: $bu")
                     bu
                   }
             })
