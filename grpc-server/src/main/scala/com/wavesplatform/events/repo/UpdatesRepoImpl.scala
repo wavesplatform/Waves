@@ -6,6 +6,7 @@ import scala.annotation.tailrec
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
+import cats.effect.ExitCase
 import cats.kernel.Monoid
 import com.wavesplatform.Shutdownable
 import com.wavesplatform.api.common.CommonBlocksApi
@@ -44,13 +45,33 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
   private[this] var lastRealTimeUpdates = Seq.empty[BlockchainUpdated]
   private[this] val realTimeUpdates     = ConcurrentSubject.publish[BlockchainUpdated]
 
+  realTimeUpdates.foreach { bu =>
+    log.trace(s"realTimeUpdates event: $bu")
+  }
+
+  realTimeUpdates
+    .guaranteeCase(
+      ec =>
+        Task(ec match {
+          case ExitCase.Completed =>
+            log.error("realTimeUpdates completed")
+          case ExitCase.Error(e) =>
+            log.error("realTimeUpdates error", e)
+          case ExitCase.Canceled =>
+            log.error("realTimeUpdates cancelled")
+        })
+    )
+    .subscribe()
+
   private[this] def sendRealTimeUpdate(upd: BlockchainUpdated): Unit = {
     val currentUpdates = this.lastRealTimeUpdates
     val currentHeight  = height.toOption
     this.lastRealTimeUpdates = currentUpdates.dropWhile(u => currentHeight.exists(_ - 1 > u.height)) :+ upd
     realTimeUpdates.onNext(upd) match {
       case Ack.Continue => // OK
-      case Ack.Stop     => throw new IllegalStateException("Real time updates subject is stopped")
+      case Ack.Stop =>
+        log.error("realTimeUpdates returned Ack.Stop")
+        throw new IllegalStateException("Real time updates subject is stopped")
     }
   }
 
@@ -273,10 +294,20 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
 
               case None =>
                 val lastPersistentUpdate = data.lastOption.orElse(prevLastPersistent)
+                log.trace(s"lastPersistentUpdate = $lastPersistentUpdate")
                 Observable
                   .fromIterable(lastRealTimeUpdates)
                   .++(realTimeUpdates)
-                  .dropWhile(u => !lastPersistentUpdate.forall(u.references))
+                  .dropWhile { u =>
+                    val referencesLastPersistent = !lastPersistentUpdate.forall(u.references)
+                    if (referencesLastPersistent) log.trace(s"Dropping by referencesLastPersistent=false $u")
+                    else log.trace(s"Found referencesLastPersistent=true $u")
+                    !referencesLastPersistent
+                  }
+                  .map { bu =>
+                    log.trace(s"Sending real-time update: $bu")
+                    bu
+                  }
             })
         }
         readBatchStream(fromHeight)
