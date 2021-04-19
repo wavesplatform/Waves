@@ -46,7 +46,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
   private[this] val realTimeUpdates     = ConcurrentSubject.publish[BlockchainUpdated]
 
   realTimeUpdates.foreach { bu =>
-    log.trace(s"realTimeUpdates event: $bu")
+    log.trace(s"realTimeUpdates event: ${bu.id}")
   }
 
   realTimeUpdates
@@ -301,12 +301,23 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
                   .++(realTimeUpdates)
                   .dropWhile { u =>
                     val referencesLastPersistent = !lastPersistentUpdate.forall(u.references)
-                    if (referencesLastPersistent) log.trace(s"[$streamId] Dropping by referencesLastPersistent=false $u")
-                    else log.trace(s"[$streamId] Found referencesLastPersistent=true $u")
+                    if (referencesLastPersistent) log.trace(s"[$streamId] Dropping by referencesLastPersistent=false ${u.id}")
+                    else log.trace(s"[$streamId] Found referencesLastPersistent=true ${u.id}")
                     !referencesLastPersistent
                   }
+                  .guaranteeCase(
+                    ec =>
+                      Task(ec match {
+                        case ExitCase.Completed =>
+                          log.error(s"[$streamId] Stream is completed")
+                        case ExitCase.Error(e) =>
+                          log.error(s"[$streamId] Stream error", e)
+                        case ExitCase.Canceled =>
+                          log.error(s"[$streamId] Stream cancelled")
+                      })
+                  )
                   .map { bu =>
-                    log.trace(s"[$streamId] Sending real-time update: $bu")
+                    log.trace(s"[$streamId] Sending real-time update: ${bu.id}")
                     bu
                   }
             })
