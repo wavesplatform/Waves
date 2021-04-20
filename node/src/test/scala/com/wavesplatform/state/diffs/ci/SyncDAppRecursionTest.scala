@@ -44,25 +44,28 @@ class SyncDAppRecursionTest
     )
   )
 
-  def dApp(nextDApp: Address): Script = TestCompiler(V5).compileContract(s"""
-    | {-# STDLIB_VERSION 5       #-}
-    | {-# CONTENT_TYPE   DAPP    #-}
-    | {-# SCRIPT_TYPE    ACCOUNT #-}
-    |
-    | @Callable(i)
-    | func default(end: Boolean) =
-    |    if (end)
-    |      then
-    |        []
-    |      else {
-    |        let address = Address(base58'$nextDApp')
-    |        strict r = Invoke(address, "default", [i.caller == this && address == this], [])
-    |        []
-    |      }
-    |""".stripMargin)
+  def dApp(nextDApp: Address, sendEnd: Boolean = false, reentrant: Boolean = false): Script = TestCompiler(V5).compileContract {
+    val func = if (reentrant) "reentrantInvoke" else "Invoke"
+    s"""
+       | {-# STDLIB_VERSION 5       #-}
+       | {-# CONTENT_TYPE   DAPP    #-}
+       | {-# SCRIPT_TYPE    ACCOUNT #-}
+       |
+       | @Callable(i)
+       | func default(end: Boolean) =
+       |    if (end)
+       |      then
+       |        []
+       |      else {
+       |        let address = Address(base58'$nextDApp')
+       |        strict r = $func(address, "default", [$sendEnd], [])
+       |        []
+       |      }
+     """.stripMargin
+  }
 
   // A -> A -> B -> B
-  property("dApp calls itself that calls other dApp that calls itself") {
+  property("dApp calls itself that calls other dApp that calls itself - allowed") {
     val preconditions =
       for {
         dApp1 <- accountGen
@@ -71,7 +74,7 @@ class SyncDAppRecursionTest
         genesis1 = GenesisTransaction.create(dApp1.toAddress, ENOUGH_AMT, ts).explicitGet()
         genesis2 = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
         setDApp1 = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp(dApp2.toAddress)), fee, ts).explicitGet()
-        setDApp2 = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp(dApp2.toAddress)), fee, ts).explicitGet()
+        setDApp2 = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp(dApp2.toAddress, sendEnd = true)), fee, ts).explicitGet()
         invoke = InvokeScriptTransaction
           .selfSigned(1.toByte, dApp1, dApp1.toAddress, Some(FUNCTION_CALL(User("default"), List(CONST_BOOLEAN(false)))), Nil, fee, Waves, ts)
           .explicitGet()
@@ -85,12 +88,12 @@ class SyncDAppRecursionTest
     ) {
       case (diff, _) =>
         diff.errorMessage(invoke.id.value()) shouldBe None
-        diff.scriptsRun shouldBe 4
+        diff.scriptsRun shouldBe 3
     }
   }
 
   // A -> B -> C -> A
-  property("dApp calls dApp chain with itself at the end") {
+  property("dApp calls dApp chain with itself at the end - prohibited") {
     val preconditions =
       for {
         dApp1 <- accountGen
@@ -121,7 +124,7 @@ class SyncDAppRecursionTest
   }
 
   // A -> B -> C -> B
-  property("calling dApp called at the end") {
+  property("calling dApp is called at the end - prohibited") {
     val preconditions =
       for {
         dApp1 <- accountGen
@@ -152,7 +155,7 @@ class SyncDAppRecursionTest
   }
 
   // A -> B -> C -> D -> C
-  property("dApp from chain called at the end") {
+  property("dApp from chain is called at the end - prohibited") {
     val preconditions =
       for {
         dApp1 <- accountGen
@@ -183,5 +186,39 @@ class SyncDAppRecursionTest
         s"The invocation stack contains multiple invocations of the dApp at address ${setDApp3.sender.toAddress} with invocations of another dApp between them"
       )
     )
+  }
+
+  // A -> B -> C -[r]-> D -> C
+  property("dApp is called after reentrant call - allowed") {
+    val preconditions =
+      for {
+        dApp1 <- accountGen
+        dApp2 <- accountGen
+        dApp3 <- accountGen
+        dApp4 <- accountGen
+        fee   <- ciFee()
+        genesis1 = GenesisTransaction.create(dApp1.toAddress, ENOUGH_AMT, ts).explicitGet()
+        genesis2 = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
+        genesis3 = GenesisTransaction.create(dApp3.toAddress, ENOUGH_AMT, ts).explicitGet()
+        genesis4 = GenesisTransaction.create(dApp4.toAddress, ENOUGH_AMT, ts).explicitGet()
+        setDApp1 = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp(dApp1.toAddress)), fee, ts).explicitGet()
+        setDApp2 = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp(dApp3.toAddress)), fee, ts).explicitGet()
+        setDApp3 = SetScriptTransaction.selfSigned(1.toByte, dApp3, Some(dApp(dApp4.toAddress, reentrant = true)), fee, ts).explicitGet()
+        setDApp4 = SetScriptTransaction.selfSigned(1.toByte, dApp4, Some(dApp(dApp3.toAddress, sendEnd = true)), fee, ts).explicitGet()
+        invoke = InvokeScriptTransaction
+          .selfSigned(1.toByte, dApp1, dApp2.toAddress, Some(FUNCTION_CALL(User("default"), List(CONST_BOOLEAN(false)))), Nil, fee, Waves, ts)
+          .explicitGet()
+      } yield (List(genesis1, genesis2, genesis3, genesis4, setDApp1, setDApp2, setDApp3, setDApp4), invoke)
+
+    val (preparingTxs, invoke) = preconditions.sample.get
+    assertDiffAndState(
+      Seq(TestBlock.create(preparingTxs)),
+      TestBlock.create(Seq(invoke)),
+      features
+    ) {
+      case (diff, _) =>
+        diff.errorMessage(invoke.id.value()) shouldBe None
+        diff.scriptsRun shouldBe 4
+    }
   }
 }
