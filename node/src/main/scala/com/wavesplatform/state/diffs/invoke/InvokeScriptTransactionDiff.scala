@@ -238,7 +238,7 @@ object InvokeScriptTransactionDiff {
             Some(tx),
             dAppAddress,
             pk,
-            Set(tx.senderAddress, dAppAddress),
+            Set(tx.senderAddress),
             limitedExecution,
             ContractLimits.MaxTotalInvokeComplexity(version),
             ContractLimits.MaxSyncDAppCalls(version),

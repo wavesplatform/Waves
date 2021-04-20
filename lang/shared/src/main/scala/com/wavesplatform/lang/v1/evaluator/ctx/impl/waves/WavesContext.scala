@@ -77,7 +77,8 @@ object WavesContext {
       simplifiedLeaseActionConstructor,
       detailedLeaseActionConstructor,
       calculateLeaseId,
-      callDAppF(version),
+      callDAppF(version, reentrant = false),
+      callDAppF(version, reentrant = true),
       isDataStorageUntouchedF
     )
 

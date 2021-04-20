@@ -34,7 +34,7 @@ object ErrorMessageEnvironment extends Environment[Future] {
   override def transferTransactionFromProto(b: Array[Byte]): Future[Option[Tx.Transfer]]                               = unavailable
   override def addressFromString(address: String): Either[String, Recipient.Address]                                   = unavailable
   override def accountScript(addressOrAlias: Recipient): Future[Option[Script]]                                        = unavailable
-  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], availableComplexity: Int): Coeval[Future[(Either[ValidationError, EVALUATED], Int)]] = unavailable
+  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], availableComplexity: Int, reentrant: Boolean): Coeval[Future[(Either[ValidationError, EVALUATED], Int)]] = unavailable
 }
 
 class BlockchainUnavailableException extends RuntimeException {
