@@ -509,7 +509,7 @@ object Functions {
     }
 
   def callDAppF(version: StdLibVersion, reentrant: Boolean): BaseFunction[Environment] = {
-    val (id, name) =  if (reentrant) (CALLDAPPREENTRANT, "reentrantInvoke") else (CALLDAPP, "Invoke")
+    val (id, name) =  if (reentrant) (CALLDAPPREENTRANT, "reentrantInvoke") else (CALLDAPP, "invoke")
     NativeFunction.withEnvironment[Environment](
       name,
       Map[StdLibVersion, Long](V5 -> 75L),
@@ -570,7 +570,7 @@ object Functions {
                 )
                 .map(_.map { case (result, complexity) => (result.leftMap(_.toString), complexity)})
             case xs =>
-              val err = notImplemented[F, EVALUATED](s"Invoke(dapp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
+              val err = notImplemented[F, EVALUATED](s"invoke(dApp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
               Coeval.now(err.map((_, 0)))
           }
         }

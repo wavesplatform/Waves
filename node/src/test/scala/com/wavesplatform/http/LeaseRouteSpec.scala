@@ -313,7 +313,7 @@ class LeaseRouteSpec
               |
               |@Callable(inv)
               |func callProxy(targetDapp: ByteVector, recipient: ByteVector, amount: Int) = {
-              |  strict result = Invoke(Address(targetDapp), "leaseTo", [recipient, amount], [])
+              |  strict result = invoke(Address(targetDapp), "leaseTo", [recipient, amount], [])
               |  []
               |}
               |""".stripMargin)),

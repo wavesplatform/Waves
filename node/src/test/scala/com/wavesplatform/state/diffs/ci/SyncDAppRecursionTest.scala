@@ -55,7 +55,8 @@ class SyncDAppRecursionTest
       sendForceInvoke: Boolean = false,
       secondReentrantInvoke: Option[Address] = None
   ): Script = TestCompiler(V5).compileContract {
-    val func = if (reentrant) "reentrantInvoke" else "Invoke"
+    val func = if (reentrant) "reentrantInvoke" else "invoke"
+    val args = s"[$sendEnd, $sendChangeDApp, $sendForceInvoke]"
     s"""
        | {-# STDLIB_VERSION 5       #-}
        | {-# CONTENT_TYPE   DAPP    #-}
@@ -71,14 +72,11 @@ class SyncDAppRecursionTest
        |        strict r =
        |          if (forceInvoke)
        |            then
-       |              Invoke(address, "default", [$sendEnd, $sendChangeDApp, $sendForceInvoke], [])
+       |              invoke(address, "default", $args, [])
        |            else
-       |              $func(address, "default", [$sendEnd, $sendChangeDApp, $sendForceInvoke], [])
+       |              $func(address, "default", $args, [])
        |
-       |        ${secondReentrantInvoke.fold("")(
-         a => s""" strict r2 = reentrantInvoke(Address(base58'$a'), "default", [$sendEnd, $sendChangeDApp, $sendForceInvoke], []) """
-       )}
-       |
+       |        ${secondReentrantInvoke.fold("")(a => s""" strict r2 = reentrantInvoke(Address(base58'$a'), "default", $args, []) """)}
        |        []
        |      }
      """.stripMargin

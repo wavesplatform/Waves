@@ -28,7 +28,7 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with ScalaChec
       |func call(k: String, childAddress: ByteVector, assetId: ByteVector) = {
       |    let key = takeRight(toBase58String(keccak256_16Kb((k+"x").toBytes())), 15)
       |    let payment = AttachedPayment(assetId, 1)
-      |    strict z = Invoke(Address(childAddress), "call", [key, assetId],[payment])
+      |    strict z = invoke(Address(childAddress), "call", [key, assetId],[payment])
       |    let val1 = match (z) {
       |        case t:String => takeRight(toBase58String(sha256_16Kb(("x" + t).toBytes())), 50)
       |        case _ => "2"

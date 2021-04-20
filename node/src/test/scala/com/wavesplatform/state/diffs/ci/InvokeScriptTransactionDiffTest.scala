@@ -2451,7 +2451,7 @@ class InvokeScriptTransactionDiffTest
              |
              | @Callable(i)
              | func foo() = {
-             |  let r = Invoke(this, unit, [], [])
+             |  let r = invoke(this, unit, [], [])
              |  if r == "return"
              |  then
              |   let data = getIntegerValue(this, "bar")
@@ -2516,7 +2516,7 @@ class InvokeScriptTransactionDiffTest
              |
              | @Callable(i)
              | func foo() = {
-             |  let r = Invoke(this, unit, [], [])
+             |  let r = invoke(this, unit, [], [])
              |  if r == "return"
              |  then
              |   let data = getIntegerValue(this, "bar")
@@ -2604,7 +2604,7 @@ class InvokeScriptTransactionDiffTest
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
              |  if b1 == b1 && ob1 == ob1
              |  then
-             |    let r = Invoke(Alias("${alias.name}"), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+             |    let r = invoke(Alias("${alias.name}"), "bar", [this.bytes], [AttachedPayment(unit, 17)])
              |    if r == 17
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
@@ -2718,7 +2718,7 @@ class InvokeScriptTransactionDiffTest
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
              |  if b1 == b1 && ob1 == ob1 && i.caller == i.originCaller && i.callerPublicKey == i.originCallerPublicKey
              |  then
-             |    let r = Invoke(Alias("${alias.name}"), "bar", [this.bytes, i.caller.bytes], [AttachedPayment(unit, 17)])
+             |    let r = invoke(Alias("${alias.name}"), "bar", [this.bytes, i.caller.bytes], [AttachedPayment(unit, 17)])
              |    if r == 17
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
@@ -2832,7 +2832,7 @@ class InvokeScriptTransactionDiffTest
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
              |  if b1 == b1 && ob1 == ob1
              |  then
-             |    let r = Invoke(Alias("${alias.name}"), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+             |    let r = invoke(Alias("${alias.name}"), "bar", [this.bytes], [AttachedPayment(unit, 17)])
              |    if r == 17
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
@@ -2955,7 +2955,7 @@ class InvokeScriptTransactionDiffTest
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
              |  if b1 == b1 && ob1 == ob1
              |  then
-             |    let r = Invoke(Alias("${alias.name}"), "bar", [this.bytes], [AttachedPayment(unit, 17)${assets.map(a => ", AttachedPayment(base58'" ++ a ++ "', 1)").mkString("")}])
+             |    let r = invoke(Alias("${alias.name}"), "bar", [this.bytes], [AttachedPayment(unit, 17)${assets.map(a => ", AttachedPayment(base58'" ++ a ++ "', 1)").mkString("")}])
              |    if r == 17
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
@@ -3067,7 +3067,7 @@ class InvokeScriptTransactionDiffTest
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
              |  if b1 == b1 && ob1 == ob1
              |  then
-             |    let r = Invoke(Alias("${alias.name}"), "bar", [this.bytes], [AttachedPayment(unit, 17)${assets.map(a => ", AttachedPayment(base58'" ++ a ++ "', 1)").mkString("")}])
+             |    let r = invoke(Alias("${alias.name}"), "bar", [this.bytes], [AttachedPayment(unit, 17)${assets.map(a => ", AttachedPayment(base58'" ++ a ++ "', 1)").mkString("")}])
              |    if r == 17
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
@@ -3177,7 +3177,7 @@ class InvokeScriptTransactionDiffTest
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
              |  if b1 == b1 && ob1 == ob1
              |  then
-             |    let r = Invoke(Alias("${alias.name}"), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+             |    let r = invoke(Alias("${alias.name}"), "bar", [this.bytes], [AttachedPayment(unit, 17)])
              |    if r == 17
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
@@ -3282,7 +3282,7 @@ class InvokeScriptTransactionDiffTest
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
              |  if b1 == b1 && ob1 == ob1
              |  then
-             |    let r = Invoke(Alias("${alias.name}"), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+             |    let r = invoke(Alias("${alias.name}"), "bar", [this.bytes], [AttachedPayment(unit, 17)])
              |    if r == 17
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
@@ -3379,7 +3379,7 @@ class InvokeScriptTransactionDiffTest
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
              |  if b1 == b1 && ob1 == ob1
              |  then
-             |    let r = Invoke(Address(base58'$otherAcc'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+             |    let r = invoke(Address(base58'$otherAcc'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
              |    if r == 17
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
@@ -3389,7 +3389,7 @@ class InvokeScriptTransactionDiffTest
              |     then
              |      if ob1.regular+14 == ob2.regular && b1.regular == b2.regular+14
              |      then
-             |       let r1 = Invoke(Address(base58'$otherAcc'), "bar", [this.bytes], [AttachedPayment(unit, 18)])
+             |       let r1 = invoke(Address(base58'$otherAcc'), "bar", [this.bytes], [AttachedPayment(unit, 18)])
              |       if r1 == r1
              |       then
              |        let b3 = wavesBalance(this)
@@ -3490,7 +3490,7 @@ class InvokeScriptTransactionDiffTest
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
              |  if b1 == b1 && ob1 == ob1
              |  then
-             |    let r = Invoke(Address(base58'$otherAcc'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+             |    let r = invoke(Address(base58'$otherAcc'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
              |    if r == 17
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
@@ -3589,7 +3589,7 @@ class InvokeScriptTransactionDiffTest
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
              |  if b1 == b1 && ob1 == ob1
              |  then
-             |    let r = Invoke(Address(base58'$otherAcc'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+             |    let r = invoke(Address(base58'$otherAcc'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
              |    if r == 17
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
@@ -3660,7 +3660,7 @@ class InvokeScriptTransactionDiffTest
              |
              | @Callable(i)
              | func foo() = {
-             |  let r = Invoke(this, "foo", [], [])
+             |  let r = invoke(this, "foo", [], [])
              |  if r == r
              |  then
              |    [
@@ -3747,7 +3747,7 @@ class InvokeScriptTransactionDiffTest
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
              |  if b1 == b1 && ob1 == ob1
              |  then
-             |    let r = Invoke(Address(base58'$otherAcc'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+             |    let r = invoke(Address(base58'$otherAcc'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
              |    if r == 17
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
@@ -3859,7 +3859,7 @@ class InvokeScriptTransactionDiffTest
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
              |  if b1 == b1 && ob1 == ob1
              |  then
-             |    let r = Invoke(Address(base58'$otherAcc'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+             |    let r = invoke(Address(base58'$otherAcc'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
              |    if r == 17
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
@@ -3941,7 +3941,7 @@ class InvokeScriptTransactionDiffTest
              |
              | @Callable(i)
              | func bar(a: ByteVector) = {
-             |   let r = Invoke(Address(a), "back", [], [])
+             |   let r = invoke(Address(a), "back", [], [])
              |   if r == r
              |   then
              |    ([IntegerEntry("bar", 1)], 17)
@@ -3974,7 +3974,7 @@ class InvokeScriptTransactionDiffTest
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
              |  if b1 == b1 && ob1 == ob1
              |  then
-             |    let r = Invoke(Address(base58'$otherAcc'), "bar", [this.bytes], [AttachedPayment(base58'$asset', 1)])
+             |    let r = invoke(Address(base58'$otherAcc'), "bar", [this.bytes], [AttachedPayment(base58'$asset', 1)])
              |    if r == 17
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
@@ -4048,7 +4048,7 @@ class InvokeScriptTransactionDiffTest
              |
              | @Callable(i)
              | func bar(a: ByteVector) = {
-             |   let r = Invoke(Address(a), "back", [], [])
+             |   let r = invoke(Address(a), "back", [], [])
              |   if r == r
              |   then
              |    ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, base58'$asset')], 17)
@@ -4081,7 +4081,7 @@ class InvokeScriptTransactionDiffTest
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
              |  if b1 == b1 && ob1 == ob1
              |  then
-             |    let r = Invoke(Address(base58'$otherAcc'), "bar", [this.bytes], i.payments)
+             |    let r = invoke(Address(base58'$otherAcc'), "bar", [this.bytes], i.payments)
              |    if r == 17
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
@@ -4228,7 +4228,7 @@ class InvokeScriptTransactionDiffTest
              |  strict startWavesBalance = wavesBalance(this).regular
              |  strict startPaymentAssetBalance = assetBalance(this, base58'$paymentAsset')
              |
-             |  strict r = Invoke(
+             |  strict r = invoke(
              |    Address(base58'$serviceDAppAddress'),
              |    "bar",
              |    [startInvokerBalance, startWavesBalance, startPaymentAssetBalance, base58'$paymentAsset'],
