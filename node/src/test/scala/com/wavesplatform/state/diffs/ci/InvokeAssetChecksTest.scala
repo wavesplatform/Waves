@@ -15,7 +15,7 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.{AssetIdLength, GenesisTransaction, TxVersion}
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -91,9 +91,9 @@ class InvokeAssetChecksTest
         if (activated) {
           val expectingMessage =
             if (func == "invalidLength")
-              s"Invalid transferring asset '$invalidLengthAsset' length = 4 bytes != 32"
+              s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32"
             else
-              s"Transferring asset '$unexistingAsset' is not found in the blockchain"
+              s"Transfer error: asset '$unexistingAsset' is not found on the blockchain"
           Diff.empty.copy(
             transactions = invokeInfo(false),
             portfolios = Map(
@@ -213,10 +213,10 @@ class InvokeAssetChecksTest
     withDomain(domainSettingsWithFS(features)) { d =>
       d.appendBlock(preparingTxs: _*)
       (the[RuntimeException] thrownBy d.appendBlock(invokeInvalidLength)).getMessage should include(
-        s"Invalid transferring asset '$invalidLengthAsset' length = 4 bytes != 32"
+        s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32"
       )
       (the[RuntimeException] thrownBy d.appendBlock(invokeUnexisting)).getMessage should include(
-        s"Transferring asset '$unexistingAsset' is not found in the blockchain"
+        s"Transfer error: asset '$unexistingAsset' is not found on the blockchain"
       )
     }
   }
