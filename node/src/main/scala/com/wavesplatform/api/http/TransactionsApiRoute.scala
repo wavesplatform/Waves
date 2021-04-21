@@ -23,6 +23,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{Blockchain, InvokeScriptResult}
+import com.wavesplatform.state.InvokeScriptResult.jsonFormat
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.utils.Time
@@ -289,7 +290,7 @@ object TransactionsApiRoute {
       }
 
       val stateChanges = meta match {
-        case i: TransactionMeta.Invoke => Json.obj("stateChanges" -> i.invokeScriptResult)
+        case i: TransactionMeta.Invoke => Json.obj("stateChanges" -> i.invokeScriptResult.map(invokeScriptResultWrites.writes))
         case _                         => JsObject.empty
       }
 
@@ -328,13 +329,21 @@ object TransactionsApiRoute {
       LeaseRef(leaseId, ld.sourceId, ld.sender.toAddress, recipient, ld.amount, height, LeaseStatus(ld.isActive))
     }
 
-    private[http] implicit val leaseFormat: OWrites[InvokeScriptResult.Lease] =
+    private[http] implicit val leaseWrites: OWrites[InvokeScriptResult.Lease] =
       LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.Lease) => leaseIdToLeaseRef(l.id))
 
-    private[http] implicit val leaseCancelFormat: OWrites[InvokeScriptResult.LeaseCancel] =
+    private[http] implicit val leaseCancelWrites: OWrites[InvokeScriptResult.LeaseCancel] =
       LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.LeaseCancel) => leaseIdToLeaseRef(l.id))
 
-    private[http] implicit val invokeScriptResultWrites: OWrites[InvokeScriptResult] = {
+    // To override nested InvokeScriptResult writes
+    private[http] implicit lazy val invocationWrites: OWrites[InvokeScriptResult.Invocation] = (i: InvokeScriptResult.Invocation) => Json.obj(
+      "dApp" -> i.dApp,
+      "call" -> i.call,
+      "payments" -> i.payments,
+      "stateChanges" -> invokeScriptResultWrites.writes(i.stateChanges)
+    )
+
+    private[http] implicit lazy val invokeScriptResultWrites: OWrites[InvokeScriptResult] = {
       import InvokeScriptResult.{issueFormat, reissueFormat, burnFormat, sponsorFeeFormat}
       Json.writes[InvokeScriptResult]
     }
