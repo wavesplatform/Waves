@@ -71,6 +71,13 @@
     }
     {
       name: "fraction"
+      params: [ "Int", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
+      doc: "Multiply and division with big integer intermediate representation"
+      paramsDoc: [ "Multiplier", "Multiplier", "Divisor", "Rounding mode" ]
+      complexity: 17
+    }
+    {
+      name: "fraction"
       params: [ "BigInt", "BigInt", "BigInt" ]
       doc: "Multiply and division with big integer intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]

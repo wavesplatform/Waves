@@ -332,6 +332,28 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
     }
 
+  def fractionIntRounds(roundTypes: UNION): BaseFunction[NoContext] =
+    UserFunction(
+      "fraction",
+      17,
+      LONG,
+      ("@value", LONG),
+      ("@numerator", LONG),
+      ("@denominator", LONG),
+      ("@round", roundTypes)
+    ) {
+      val r = FUNCTION_CALL(
+        Native(FRACTION_BIGINT_ROUNDS),
+        List(
+          FUNCTION_CALL(Native(TO_BIGINT), List(REF("@value"))),
+          FUNCTION_CALL(Native(TO_BIGINT), List(REF("@numerator"))),
+          FUNCTION_CALL(Native(TO_BIGINT), List(REF("@denominator"))),
+          REF("@round")
+        )
+      )
+      FUNCTION_CALL(Native(BIGINT_TO_INT), List(r))
+    }
+
   val fractionBigInt: BaseFunction[NoContext] =
     NativeFunction(
       "fraction",
@@ -352,7 +374,7 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED]("fraction(value: BigInt, numerator: BigInt, denominator: BigInt)", xs)
     }
 
-  def fractionRounds(roundTypes: UNION): BaseFunction[NoContext] =
+  def fractionBigIntRounds(roundTypes: UNION): BaseFunction[NoContext] =
     NativeFunction(
       "fraction",
       128,
@@ -1622,7 +1644,8 @@ object PureContext {
         listBigIntMax,
         listBigIntMin,
         fractionBigInt,
-        fractionRounds(UNION(fromV5RoundTypes)),
+        fractionBigIntRounds(UNION(fromV5RoundTypes)),
+        fractionIntRounds(UNION(fromV5RoundTypes)),
         negativeBigInt,
         getBigIntListMedian,
         powBigInt(UNION(fromV5RoundTypes)),
