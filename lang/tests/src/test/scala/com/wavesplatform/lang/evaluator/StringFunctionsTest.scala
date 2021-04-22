@@ -1,15 +1,12 @@
 package com.wavesplatform.lang.evaluator
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common.{NoShrink, produce}
+import com.wavesplatform.lang.Common.produce
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONST_STRING}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
-import com.wavesplatform.lang.v1.testing.ScriptGen
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class StringFunctionsTest extends PropSpec with EvaluatorSpec with ScalaCheckPropertyChecks with ScriptGen with Matchers with NoShrink {
+class StringFunctionsTest extends EvaluatorSpec {
   property("take") {
     eval(""" take("abc", 0) """) shouldBe CONST_STRING("")
     eval(""" take("abc", 2) """) shouldBe CONST_STRING("ab")
