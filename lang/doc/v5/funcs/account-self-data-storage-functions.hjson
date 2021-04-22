@@ -1,13 +1,6 @@
 {
   funcs: [
     {
-      name: "assetBalance"
-      params: [ "ByteVector" ]
-      doc: "Gets account balance by token ID."
-      paramsDoc: [ "Token ID." ]
-      complexity: 10
-    }
-    {
       name: "getBinary"
       params: [ "String" ]
       doc: "Gets an array of bytes by key."
@@ -61,13 +54,6 @@
       params: [ "String" ]
       doc: "Gets a string by key. Throws an exception if there is no data."
       paramsDoc: [ "The key." ]
-      complexity: 10
-    }
-    {
-      name: "wavesBalance"
-      params: [ ]
-      doc: "Gets account waves balance details."
-      paramsDoc: [ ]
       complexity: 10
     }
   ]
