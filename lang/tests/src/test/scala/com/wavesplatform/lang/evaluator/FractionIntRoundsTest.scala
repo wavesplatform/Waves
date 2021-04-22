@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.evaluator
 import com.wavesplatform.lang.Common.produce
+import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V5}
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding._
@@ -14,6 +15,19 @@ class FractionIntRoundsTest extends EvaluatorSpec {
     eval(s"fraction($max, $min, 1, HALFEVEN)") should produce("out of integers range")
     eval(s"fraction($max, $min, $min, HALFEVEN)") shouldBe Right(CONST_LONG(max))
     eval(s"fraction(1, $min, 1, HALFEVEN)") shouldBe Right(CONST_LONG(min))
+  }
+
+  property("plain fraction with long limits") {
+    eval(s"fraction($max, $min, 1)") should produce("Long overflow")
+    eval(s"fraction($max, $min, $min)") shouldBe Right(CONST_LONG(max))
+    eval(s"fraction(1, $min, 1)") shouldBe Right(CONST_LONG(min))
+
+    DirectiveDictionary[StdLibVersion].all.filter(_ < V5)
+      .foreach {
+        v =>
+          eval(s"fraction($max, $min, $min)")(v, checkNext = false) should produce("Long overflow")
+          eval(s"fraction(1, $min, 1)")(v, checkNext = false) should produce("Long overflow")
+      }
   }
 
   property("divide by zero") {

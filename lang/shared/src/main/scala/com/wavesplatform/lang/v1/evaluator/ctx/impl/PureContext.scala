@@ -312,7 +312,7 @@ object PureContext {
       FUNCTION_CALL(ne, List(REF("@a"), REF("unit")))
     }
 
-  lazy val fraction: BaseFunction[NoContext] =
+  def fraction(fixLimitCheck: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "fraction",
       Map[StdLibVersion, Long](V1 -> 1, V2 -> 1, V3 -> 1, V4 -> 1, V5 -> 14),
@@ -323,11 +323,16 @@ object PureContext {
       ("denominator", LONG)
     ) {
       case CONST_LONG(v) :: CONST_LONG(n) :: CONST_LONG(d) :: Nil =>
+        val (checkMax, checkMin) =
+          if (fixLimitCheck)
+            ((_: BigInt) <= Long.MaxValue, (_: BigInt) >= Long.MinValue)
+          else
+            ((_: BigInt) < Long.MaxValue, (_: BigInt) > Long.MinValue)
         for {
           _ <- Either.cond(d != 0, (), "Fraction: division by zero")
           result = BigInt(v) * n / d
-          _ <- Either.cond(result < Long.MaxValue, (), s"Long overflow: value `$result` greater than 2^63-1")
-          _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^63-1")
+          _ <- Either.cond(checkMax(result), (), s"Long overflow: value `$result` greater than 2^63-1")
+          _ <- Either.cond(checkMin(result), (), s"Long overflow: value `$result` less than -2^63-1")
         } yield CONST_LONG(result.toLong)
       case xs => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
     }
@@ -1527,7 +1532,6 @@ object PureContext {
 
   private val commonFunctions =
     Array(
-      fraction,
       sizeBytes,
       toBytesBoolean,
       toBytesLong,
@@ -1545,7 +1549,7 @@ object PureContext {
     ) ++ operators
 
   private val v1V2V3CommonFunctions =
-    commonFunctions :+ takeString :+ dropRightString :+ extract :+ sizeString :+ dropString :+ takeRightString
+    commonFunctions :+ takeString :+ dropRightString :+ extract :+ sizeString :+ dropString :+ takeRightString :+ fraction(fixLimitCheck = false)
 
   private val fromV3V4Functions =
     Array(
@@ -1610,7 +1614,8 @@ object PureContext {
         takeString,
         dropRightString,
         dropString,
-        takeRightString
+        takeRightString,
+        fraction(fixLimitCheck = false)
       )
 
   private val v5Functions =
@@ -1651,7 +1656,8 @@ object PureContext {
         powBigInt(UNION(fromV5RoundTypes)),
         logBigInt(UNION(fromV5RoundTypes)),
         pow(UNION(fromV5RoundTypes)),
-        log(UNION(fromV5RoundTypes))
+        log(UNION(fromV5RoundTypes)),
+        fraction(fixLimitCheck = true)
       )
 
   private val v1V2Ctx =
