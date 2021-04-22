@@ -84,7 +84,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def appendMicroBlock(b: MicroBlock): BlockId = blockchainUpdater.processMicroBlock(b).explicitGet()
 
-  def lastBlockId: ByteStr = blockchainUpdater.lastBlockId.get
+  def lastBlockId: ByteStr = blockchainUpdater.lastBlockId.getOrElse(randomSig)
 
   def carryFee: Long = blockchainUpdater.carryFee
 
@@ -118,13 +118,13 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     lastBlock
   }
 
-  def appendKeyBlock(): Block = {
-    val block = createBlock(Block.NgBlockVersion, Nil)
+  def appendKeyBlock(ref: ByteStr = lastBlockId): Block = {
+    val block = createBlock(Block.NgBlockVersion, Nil, ref)
     appendBlock(block)
     lastBlock
   }
 
-  def appendMicroBlock(txs: Transaction*): Unit = {
+  def appendMicroBlock(txs: Transaction*): BlockId = {
     val lastBlock = this.lastBlock
     val block = Block
       .buildAndSign(
