@@ -368,8 +368,8 @@ object PureContext {
         for {
           _ <- Either.cond(d != 0, (), "Fraction: division by zero")
           result = v * n / d
-          _ <- Either.cond(result < BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
-          _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^511-1")
+          _ <- Either.cond(result <= BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
+          _ <- Either.cond(result >= BigIntMin, (), s"Long overflow: value `$result` less than -2^511")
         } yield CONST_BIGINT(result)
       case xs => notImplemented[Id, EVALUATED]("fraction(value: BigInt, numerator: BigInt, denominator: BigInt)", xs)
     }
@@ -433,8 +433,8 @@ object PureContext {
               }
             case _ => Left(s"unsupported rounding $r")
           }
-          _ <- Either.cond(result < BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
-          _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^511-1")
+          _ <- Either.cond(result <= BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
+          _ <- Either.cond(result >= BigIntMin, (), s"Long overflow: value `$result` less than -2^511")
         } yield CONST_BIGINT(result)
       case xs => notImplemented[Id, EVALUATED]("fractionRounds(value: BigInt, numerator: BigInt, denominator: BigInt, round: rounds)", xs)
     }
