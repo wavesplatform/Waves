@@ -67,7 +67,7 @@
       params: [ "Int", "Int", "Int" ]
       doc: "Multiply and division with big integer intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]
-      complexity: 1
+      complexity: 14
     }
     {
       name: "fraction"

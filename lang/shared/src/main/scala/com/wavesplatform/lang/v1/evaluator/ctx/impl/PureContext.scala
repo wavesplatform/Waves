@@ -315,7 +315,7 @@ object PureContext {
   lazy val fraction: BaseFunction[NoContext] =
     NativeFunction(
       "fraction",
-      1,
+      Map[StdLibVersion, Long](V1 -> 1, V2 -> 1, V3 -> 1, V4 -> 1, V5 -> 14),
       FRACTION,
       LONG,
       ("value", LONG),
