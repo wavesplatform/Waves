@@ -6,7 +6,6 @@ import scala.concurrent.{Await, Promise}
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
-import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.block.{Block, MicroBlock}
@@ -21,7 +20,6 @@ import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.repo.UpdatesRepoImpl
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
-import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
 import com.wavesplatform.state.diffs.BlockDiffer
@@ -63,14 +61,13 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
   "BlockchainUpdates" - {
     "should not freeze" in withDomainAndRepo {
       case (d, repo) =>
-        d.appendKeyBlock()
+        val keyBlock = d.appendKeyBlock()
         d.appendMicroBlock(TxHelpers.transfer())
         d.appendMicroBlock(TxHelpers.transfer())
 
         val subscription = repo.createSubscription(SubscribeRequest.of(1, 0))
         Thread.sleep(1000)
-        d.rollbackMicros()
-        d.appendKeyBlock()
+        d.appendKeyBlock(keyBlock.id())
 
         Thread.sleep(1000)
         subscription.cancel()
@@ -78,11 +75,11 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
         events should matchPattern {
           case Seq(
               E.Block(1, _),
-              E.Micro(1, microId),
+              E.Micro(1, _),
               E.Micro(1, _),
               E.MicroRollback(1, rollbackId),
               E.Block(2, _)
-              ) if rollbackId == microId =>
+              ) if rollbackId == keyBlock.id() =>
         }
     }
 
@@ -98,7 +95,7 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
     }
 
     "should include correct waves amount" in withNEmptyBlocksSubscription() { result =>
-      val balances = result.map(_.getAppend.getBlock.updatedWavesAmount)
+      val balances = result.collect { case b: BlockAppended => b.updatedWavesAmount }
       balances shouldBe Seq(10000000000000000L, 10000000600000000L, 10000001200000000L)
     }
 
@@ -132,15 +129,23 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
     } { results =>
       val reward        = 600000000
       val genesisAmount = Constants.TotalWaves * Constants.UnitsInWave + reward
-      val genesis       = results.head.getAppend.transactionStateUpdates.head.balances.head
-      genesis.address shouldBe ByteString.copyFrom(TxHelpers.defaultAddress.bytes)
-      genesis.getAmountAfter shouldBe Amount(ByteString.EMPTY, genesisAmount)
-      genesis.amountBefore shouldBe reward
+      val genesis = results.head match {
+        case bu: BlockAppended => bu.transactionStateUpdates.head.balances.head
+        case _                 => ???
+      }
+      genesis.address shouldBe TxHelpers.defaultAddress
+      genesis.after shouldBe genesisAmount
+      genesis.before shouldBe reward
+      genesis.asset shouldBe Waves
 
-      val payment = results.last.getAppend.transactionStateUpdates.head.balances.last
-      payment.address shouldBe ByteString.copyFrom(TxHelpers.secondAddress.bytes)
-      payment.getAmountAfter shouldBe Amount(ByteString.EMPTY, 100)
-      payment.amountBefore shouldBe 0
+      val payment = results.last match {
+        case bu: BlockAppended => bu.transactionStateUpdates.last.balances.last
+        case _                 => ???
+      }
+      payment.address shouldBe TxHelpers.secondAddress
+      payment.after shouldBe 100
+      payment.before shouldBe 0
+      payment.asset shouldBe Waves
     })
 
     "should fail stream with invalid range" in {
@@ -168,7 +173,7 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       withGenerateSubscription() { d =>
         d.appendBlock(issue)
       } { events =>
-        val event  = events.last.vanilla.get.asInstanceOf[BlockAppended]
+        val event  = events.last.asInstanceOf[BlockAppended]
         val issued = event.transactionStateUpdates.head.assets
         issued shouldBe Seq(AssetStateUpdate(issue.assetId, None, Some(description)))
         event.referencedAssets shouldBe Seq(AssetInfo(issue.assetId, description.decimals, description.name.toStringUtf8))
@@ -202,7 +207,7 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
         d.appendKeyBlock()
         d.rollbackTo(1)
       } { events =>
-        val rollback: RollbackResult = events.last.vanilla.get.asInstanceOf[RollbackCompleted].rollbackResult
+        val rollback: RollbackResult = events.collectFirst { case r: RollbackCompleted => r.rollbackResult }.get
         rollback.removedTransactionIds shouldBe Seq(data, reissue, issue, lease, transfer).map(_.id())
         rollback.removedBlocks should have length 1
 
@@ -232,11 +237,11 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
 
       withGenerateSubscription() { d =>
         d.appendKeyBlock()
-        d.appendMicroBlock(TxHelpers.transfer())
+        val firstMicroId = d.appendMicroBlock(TxHelpers.transfer())
         d.appendMicroBlock(transfer, lease, issue, reissue, data)
-        d.rollbackMicros()
+        d.appendKeyBlock(firstMicroId)
       } { events =>
-        val rollback: RollbackResult = events.last.vanilla.get.asInstanceOf[MicroBlockRollbackCompleted].rollbackResult
+        val rollback: RollbackResult = events.collectFirst { case r: MicroBlockRollbackCompleted => r.rollbackResult }.get
         rollback.removedTransactionIds shouldBe Seq(data, reissue, issue, lease, transfer).map(_.id())
         rollback.removedBlocks shouldBe empty
 
@@ -297,7 +302,7 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
   }
 
   def withGenerateSubscription(request: SubscribeRequest = SubscribeRequest.of(1, Int.MaxValue))(generateBlocks: Domain => Unit)(
-      f: Seq[protobuf.BlockchainUpdated] => Unit
+      f: Seq[BlockchainUpdated] => Unit
   ): Unit = {
     withDomainAndRepo { (d, repo) =>
       d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
@@ -308,7 +313,7 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       subscription.cancel()
 
       val result = Await.result(subscription, 20 seconds)
-      f(result.map(_.getUpdate))
+      f(result.map(_.toUpdate))
     }
   }
 
@@ -327,7 +332,7 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
   }
 
   def withNEmptyBlocksSubscription(count: Int = 2, request: SubscribeRequest = SubscribeRequest.of(1, Int.MaxValue))(
-      f: Seq[protobuf.BlockchainUpdated] => Unit
+      f: Seq[BlockchainUpdated] => Unit
   ): Unit = withGenerateSubscription(request)(d => for (_ <- 1 to count) d.appendBlock())(f)
 
   def withRepo[T](blocksApi: CommonBlocksApi = stub[CommonBlocksApi])(f: (UpdatesRepoImpl, BlockchainUpdateTriggers) => T): T = {
