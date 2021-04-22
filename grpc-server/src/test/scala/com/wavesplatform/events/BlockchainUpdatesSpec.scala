@@ -4,6 +4,7 @@ import java.nio.file.Files
 
 import scala.concurrent.{Await, Promise}
 import scala.concurrent.duration._
+import scala.reflect.ClassTag
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
@@ -35,13 +36,15 @@ import org.scalatest.{FreeSpec, Matchers}
 import org.scalatest.concurrent.ScalaFutures
 
 class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with ScalaFutures with PathMockFactory {
-  var currentSettings: WavesSettings = domainSettingsWithFS(TestFunctionalitySettings.withFeatures(
-    BlockchainFeatures.BlockReward,
-    BlockchainFeatures.NG,
-    BlockchainFeatures.SmartAccounts,
-    BlockchainFeatures.DataTransaction,
-    BlockchainFeatures.FeeSponsorship
-  ))
+  var currentSettings: WavesSettings = domainSettingsWithFS(
+    TestFunctionalitySettings.withFeatures(
+      BlockchainFeatures.BlockReward,
+      BlockchainFeatures.NG,
+      BlockchainFeatures.SmartAccounts,
+      BlockchainFeatures.DataTransaction,
+      BlockchainFeatures.FeeSponsorship
+    )
+  )
 
   def currentFS: FunctionalitySettings = currentSettings.blockchainSettings.functionalitySettings
 
@@ -58,6 +61,31 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
   }
 
   "BlockchainUpdates" - {
+    "should not freeze" in withDomainAndRepo {
+      case (d, repo) =>
+        d.appendKeyBlock()
+        d.appendMicroBlock(TxHelpers.transfer())
+        d.appendMicroBlock(TxHelpers.transfer())
+
+        val subscription = repo.createSubscription(SubscribeRequest.of(1, 0))
+        Thread.sleep(1000)
+        d.rollbackMicros()
+        d.appendKeyBlock()
+
+        Thread.sleep(1000)
+        subscription.cancel()
+        val events = subscription.futureValue.map(_.toUpdate)
+        events should matchPattern {
+          case Seq(
+              E.Block(1, _),
+              E.Micro(1, microId),
+              E.Micro(1, _),
+              E.MicroRollback(1, rollbackId),
+              E.Block(2, _)
+              ) if rollbackId == microId =>
+        }
+    }
+
     "should survive invalid rollback" in withDomain(
       defaultDomainSettings.copy(dbSettings = defaultDomainSettings.dbSettings.copy(maxRollbackDepth = 0))
     ) { d =>
@@ -102,9 +130,9 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
         PaymentTransaction.create(TxHelpers.defaultSigner, TxHelpers.secondAddress, 100, 100000, TxHelpers.timestamp).explicitGet()
       d.appendBlock(tx)
     } { results =>
-      val reward = 600000000
+      val reward        = 600000000
       val genesisAmount = Constants.TotalWaves * Constants.UnitsInWave + reward
-      val genesis = results.head.getAppend.transactionStateUpdates.head.balances.head
+      val genesis       = results.head.getAppend.transactionStateUpdates.head.balances.head
       genesis.address shouldBe ByteString.copyFrom(TxHelpers.defaultAddress.bytes)
       genesis.getAmountAfter shouldBe Amount(ByteString.EMPTY, genesisAmount)
       genesis.amountBefore shouldBe reward
@@ -208,7 +236,6 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
         d.appendMicroBlock(transfer, lease, issue, reissue, data)
         d.rollbackMicros()
       } { events =>
-        import com.wavesplatform.events.protobuf.serde._
         val rollback: RollbackResult = events.last.vanilla.get.asInstanceOf[MicroBlockRollbackCompleted].rollbackResult
         rollback.removedTransactionIds shouldBe Seq(data, reissue, issue, lease, transfer).map(_.id())
         rollback.removedBlocks shouldBe empty
@@ -364,4 +391,23 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
 
   implicit def asGrpcService(updatesRepoImpl: UpdatesRepoImpl): BlockchainUpdatesApiGrpcImpl =
     new BlockchainUpdatesApiGrpcImpl(updatesRepoImpl)
+
+  // Matchers
+  private[this] object E {
+    class EventMatcher[T: ClassTag] {
+      def unapply(bu: BlockchainUpdated): Option[(Int, ByteStr)] = bu match {
+        case ba if implicitly[ClassTag[T]].runtimeClass.isInstance(bu) => Some((ba.height, ba.id))
+        case _                                                         => None
+      }
+    }
+
+    object Block         extends EventMatcher[BlockAppended]
+    object Micro         extends EventMatcher[MicroBlockAppended]
+    object Rollback      extends EventMatcher[RollbackCompleted]
+    object MicroRollback extends EventMatcher[MicroBlockRollbackCompleted]
+  }
+
+  implicit class ProtoSubscribeEventOps(e: com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent) {
+    def toUpdate: BlockchainUpdated = e.getUpdate.vanilla.get
+  }
 }
