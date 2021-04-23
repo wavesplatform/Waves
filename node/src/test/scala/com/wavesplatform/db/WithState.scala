@@ -189,6 +189,7 @@ trait WithDomain extends WithState { _: Suite =>
 
     val RideV4 = NG.addFeatures(
       BlockchainFeatures.SmartAccounts,
+      BlockchainFeatures.DataTransaction,
       BlockchainFeatures.Ride4DApps,
       BlockchainFeatures.SmartAssets,
       BlockchainFeatures.BlockV5
