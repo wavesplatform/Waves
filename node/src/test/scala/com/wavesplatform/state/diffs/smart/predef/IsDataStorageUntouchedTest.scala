@@ -106,7 +106,7 @@ class IsDataStorageUntouchedTest
          | func default() = {
          |   let address  = Address(base58'$nextDApp')
          |   strict start = isDataStorageUntouched(address)
-         |   strict r     = Invoke(address, "default", [], [])
+         |   strict r     = invoke(address, "default", [], [])
          |   strict end   = isDataStorageUntouched(address)
          |   [
          |     BooleanEntry("start", start),
