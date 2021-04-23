@@ -44,37 +44,44 @@ class SyncDAppRecursionTest
     )
   )
 
-  private val fc = Some(FUNCTION_CALL(User("default"), List(CONST_BOOLEAN(false), CONST_BOOLEAN(false), CONST_BOOLEAN(false))))
+  private val fc = Some(FUNCTION_CALL(User("default"), (1 to 4).map(_ => CONST_BOOLEAN(false)).toList))
 
   def dApp(
       nextDApp: Address,
       sendEnd: Boolean = false,
       reentrant: Boolean = false,
       secondNextDApp: Option[Address] = None,
+      sendEndToNext: Boolean = false,
       sendChangeDApp: Boolean = false,
       sendForceInvoke: Boolean = false,
+      sendForceReentrant: Boolean = false,
       secondReentrantInvoke: Option[Address] = None
   ): Script = TestCompiler(V5).compileContract {
     val func = if (reentrant) "reentrantInvoke" else "invoke"
-    val args = s"[$sendEnd, $sendChangeDApp, $sendForceInvoke]"
+    val args = s"[sendEnd, $sendChangeDApp, $sendForceInvoke, $sendForceReentrant]"
     s"""
        | {-# STDLIB_VERSION 5       #-}
        | {-# CONTENT_TYPE   DAPP    #-}
        | {-# SCRIPT_TYPE    ACCOUNT #-}
        |
        | @Callable(i)
-       | func default(end: Boolean, useSecondAddress: Boolean, forceInvoke: Boolean) =
+       | func default(end: Boolean, useSecondAddress: Boolean, forceInvoke: Boolean, forceReentrant: Boolean) =
        |    if (end)
        |      then
        |        []
        |      else {
+       |        let endWithNextDApp = useSecondAddress && $sendEndToNext
+       |        let sendEnd = $sendEnd || endWithNextDApp
        |        let address = ${secondNextDApp.fold("")(a => s"if (useSecondAddress) then Address(base58'$a') else")} Address(base58'$nextDApp')
        |        strict r =
-       |          if (forceInvoke)
+       |          if (forceInvoke || endWithNextDApp) # param 'endWithNextDApp' is used for self-recursion check without reentrancy
        |            then
        |              invoke(address, "default", $args, [])
-       |            else
-       |              $func(address, "default", $args, [])
+       |            else if (forceReentrant)
+       |              then
+       |                reentrantInvoke(address, "default", $args, [])
+       |              else
+       |                $func(address, "default", $args, [])
        |
        |        ${secondReentrantInvoke.fold("")(a => s""" strict r2 = reentrantInvoke(Address(base58'$a'), "default", $args, []) """)}
        |        []
@@ -141,8 +148,45 @@ class SyncDAppRecursionTest
     )
   }
 
+  // 2 scenarios:
   // A -> B -> C -> B
+  // A -> B -> C -[r]-> B
   property("calling dApp is called again - prohibited") {
+    def assert(reentrant: Boolean): Unit = {
+      val preconditions =
+        for {
+          dApp1 <- accountGen
+          dApp2 <- accountGen
+          dApp3 <- accountGen
+          fee   <- ciFee()
+          genesis1 = GenesisTransaction.create(dApp1.toAddress, ENOUGH_AMT, ts).explicitGet()
+          genesis2 = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
+          genesis3 = GenesisTransaction.create(dApp3.toAddress, ENOUGH_AMT, ts).explicitGet()
+          setDApp1 = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp(dApp1.toAddress)), fee, ts).explicitGet()
+          setDApp2 = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp(dApp3.toAddress)), fee, ts).explicitGet()
+          setDApp3 = SetScriptTransaction.selfSigned(1.toByte, dApp3, Some(dApp(dApp2.toAddress, reentrant = reentrant)), fee, ts).explicitGet()
+          invoke = InvokeScriptTransaction
+            .selfSigned(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
+            .explicitGet()
+        } yield (List(genesis1, genesis2, genesis3, setDApp1, setDApp2, setDApp3), invoke)
+
+      val (preparingTxs, invoke) = preconditions.sample.get
+      assertDiffEi(
+        Seq(TestBlock.create(preparingTxs)),
+        TestBlock.create(Seq(invoke)),
+        features
+      )(
+        _ should produce(
+          s"The invocation stack contains multiple invocations of the dApp at address ${invoke.dAppAddressOrAlias} with invocations of another dApp between them"
+        )
+      )
+    }
+    assert(reentrant = false)
+    assert(reentrant = true)
+  }
+
+  // A -> B -> B -[r]-> C -[r]-> B
+  property("calling twice dApp is called again after reentrant calls - prohibited") {
     val preconditions =
       for {
         dApp1 <- accountGen
@@ -153,8 +197,18 @@ class SyncDAppRecursionTest
         genesis2 = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
         genesis3 = GenesisTransaction.create(dApp3.toAddress, ENOUGH_AMT, ts).explicitGet()
         setDApp1 = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp(dApp1.toAddress)), fee, ts).explicitGet()
-        setDApp2 = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp(dApp3.toAddress)), fee, ts).explicitGet()
-        setDApp3 = SetScriptTransaction.selfSigned(1.toByte, dApp3, Some(dApp(dApp2.toAddress)), fee, ts).explicitGet()
+        setDApp2 = SetScriptTransaction
+          .selfSigned(
+            1.toByte,
+            dApp2,
+            Some(dApp(dApp2.toAddress, secondNextDApp = Some(dApp3.toAddress), sendChangeDApp = true, sendForceReentrant = true)),
+            fee,
+            ts
+          )
+          .explicitGet()
+        setDApp3 = SetScriptTransaction
+          .selfSigned(1.toByte, dApp3, Some(dApp(dApp2.toAddress, reentrant = true, sendEnd = true)), fee, ts)
+          .explicitGet()
         invoke = InvokeScriptTransaction
           .selfSigned(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
           .explicitGet()
@@ -261,6 +315,45 @@ class SyncDAppRecursionTest
           .selfSigned(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
           .explicitGet()
       } yield (List(genesis1, genesis2, genesis3, genesis4, setDApp1, setDApp2, setDApp3, setDApp4), invoke)
+
+    val (preparingTxs, invoke) = preconditions.sample.get
+    assertDiffAndState(
+      Seq(TestBlock.create(preparingTxs)),
+      TestBlock.create(Seq(invoke)),
+      features
+    ) {
+      case (diff, _) =>
+        diff.errorMessage(invoke.id.value()) shouldBe None
+        diff.scriptsRun shouldBe 4
+    }
+  }
+
+  // A -> B -[r]-> C -> B -> B
+  property("dApp is called from itself after reentrant call - allowed") {
+    val preconditions =
+      for {
+        dApp1 <- accountGen
+        dApp2 <- accountGen
+        dApp3 <- accountGen
+        fee   <- ciFee()
+        genesis1 = GenesisTransaction.create(dApp1.toAddress, ENOUGH_AMT, ts).explicitGet()
+        genesis2 = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
+        genesis3 = GenesisTransaction.create(dApp3.toAddress, ENOUGH_AMT, ts).explicitGet()
+        setDApp1 = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp(dApp1.toAddress)), fee, ts).explicitGet()
+        setDApp2 = SetScriptTransaction
+          .selfSigned(
+            1.toByte,
+            dApp2,
+            Some(dApp(dApp3.toAddress, reentrant = true, secondNextDApp = Some(dApp2.toAddress), sendEndToNext = true)),
+            fee,
+            ts
+          )
+          .explicitGet()
+        setDApp3 = SetScriptTransaction.selfSigned(1.toByte, dApp3, Some(dApp(dApp2.toAddress, sendChangeDApp = true)), fee, ts).explicitGet()
+        invoke = InvokeScriptTransaction
+          .selfSigned(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
+          .explicitGet()
+      } yield (List(genesis1, genesis2, genesis3, setDApp1, setDApp2, setDApp3), invoke)
 
     val (preparingTxs, invoke) = preconditions.sample.get
     assertDiffAndState(
