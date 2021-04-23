@@ -40,7 +40,7 @@ class InvokePaymentsLimitTest
     val nested = nestedInvoke.fold("") {
       case (address, payments) =>
         val paymentsStr = payments.map(p => s"AttachedPayment(base58'${p.assetId}', ${p.amount})").mkString("[", ", ", "]")
-        s""" strict r = Invoke(Address(base58'$address'), "default", [], $paymentsStr) """
+        s""" strict r = invoke(Address(base58'$address'), "default", [], $paymentsStr) """
     }
     TestCompiler(version).compileContract(
       s"""
