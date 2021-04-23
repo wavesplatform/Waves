@@ -23,7 +23,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{Blockchain, InvokeScriptResult}
-import com.wavesplatform.state.InvokeScriptResult.jsonFormat
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.utils.Time
@@ -290,7 +289,7 @@ object TransactionsApiRoute {
       }
 
       val stateChanges = meta match {
-        case i: TransactionMeta.Invoke => Json.obj("stateChanges" -> i.invokeScriptResult.map(invokeScriptResultWrites.writes))
+        case i: TransactionMeta.Invoke => Json.obj("stateChanges" -> i.invokeScriptResult)
         case _                         => JsObject.empty
       }
 
