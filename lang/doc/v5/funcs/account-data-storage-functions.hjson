@@ -59,7 +59,7 @@
     {
       name: "isDataStorageUntouched"
       params: [ "Address|Alias" ]
-      doc: "Check that any data was stored on account."
+      doc: "Check that no data was stored on account."
       paramsDoc: [ "[Address](/blockchain/address.md) or [alias](/blockchain/alias.md) of the account." ]
       complexity: 10
     }
