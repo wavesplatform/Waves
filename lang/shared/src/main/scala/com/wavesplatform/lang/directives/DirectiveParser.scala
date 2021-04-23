@@ -25,14 +25,16 @@ object DirectiveParser {
   private def parser[_:P]: P[Either[ExecutionError, Directive]] =
     P(space ~ start ~ directiveKeyP ~ directiveValueP ~ end ~ space)
       .map {
-        case (keyRaw, valueRaw) =>
+        case (parsedKey, parsedValue) => {
+          val valueRaw = parsedValue.replace(" ", "")
           for {
-            key   <- DirectiveKey.textMap.get(keyRaw).toRight(s"Illegal directive key $keyRaw")
+            key   <- DirectiveKey.textMap.get(parsedKey).toRight(s"Illegal directive key $parsedKey")
             value <- key match {
-              case k: PredefinedDirectiveKey => k.valueDic.textMap.get(valueRaw).toRight(s"Illegal directive value $valueRaw for key $keyRaw")
-              case k: ArbitraryDirectiveKey  => Right(k.valueMapper(valueRaw.replace(" ", "")))
+              case k: PredefinedDirectiveKey => k.valueDic.textMap.get(valueRaw).toRight(s"Illegal directive value $valueRaw for key $parsedKey")
+              case k: ArbitraryDirectiveKey  => Right(k.valueMapper(valueRaw))
             }
           } yield Directive(key, value)
+        }
       }
 
   def apply(input: String): Either[ExecutionError, List[Directive]] =
