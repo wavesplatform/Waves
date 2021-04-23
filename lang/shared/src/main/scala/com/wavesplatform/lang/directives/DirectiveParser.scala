@@ -19,7 +19,7 @@ object DirectiveParser {
       .repX(1).!
 
   private def directiveValueP[_:P]: P[String] =
-    P(CharIn("a-zA-Z0-9/\\.,"))
+    P(CharIn("a-zA-Z0-9/\\., "))
       .repX(1).!
 
   private def parser[_:P]: P[Either[ExecutionError, Directive]] =
@@ -30,7 +30,7 @@ object DirectiveParser {
             key   <- DirectiveKey.textMap.get(keyRaw).toRight(s"Illegal directive key $keyRaw")
             value <- key match {
               case k: PredefinedDirectiveKey => k.valueDic.textMap.get(valueRaw).toRight(s"Illegal directive value $valueRaw for key $keyRaw")
-              case k: ArbitraryDirectiveKey  => Right(k.valueMapper(valueRaw))
+              case k: ArbitraryDirectiveKey  => Right(k.valueMapper(valueRaw.replace(" ", "")))
             }
           } yield Directive(key, value)
       }
