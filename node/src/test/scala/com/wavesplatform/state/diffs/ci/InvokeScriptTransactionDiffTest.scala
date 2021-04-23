@@ -1,7 +1,10 @@
 package com.wavesplatform.state.diffs.ci
 
+import scala.collection.immutable
+
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
+import com.wavesplatform.{NoShrink, TransactionGen}
 import com.wavesplatform.account._
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -9,47 +12,44 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.{utils, Global}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.{compiler, ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.lang.v1.evaluator.FunctionIds.{CREATE_LIST, THROW}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{FunctionIds, ScriptResultV3}
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.{CREATE_LIST, THROW}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
-import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{TestFunctionalitySettings, TestSettings}
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.{produce, ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionDiff}
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
+import com.wavesplatform.transaction.{Asset, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, _}
 import com.wavesplatform.utils._
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-
-import scala.collection.immutable
 
 class InvokeScriptTransactionDiffTest
     extends PropSpec
@@ -817,7 +817,7 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-  val chainId: Byte     = AddressScheme.current.chainId
+  val chainId: Byte       = AddressScheme.current.chainId
   val enoughFee: TxAmount = FeeValidation.ScriptExtraFee + FeeValidation.FeeConstants(IssueTransaction.typeId) * FeeValidation.FeeUnit
 
   property("invoking contract receive payment") {
@@ -911,8 +911,8 @@ class InvokeScriptTransactionDiffTest
           inside(blockDiffEi.trace) {
             case List(
                 InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers)), _),
-                AssetVerifierTrace(transferringAssetId, None),
-                AssetVerifierTrace(attachedAssetId, None)
+                AssetVerifierTrace(transferringAssetId, None, _),
+                AssetVerifierTrace(attachedAssetId, None, _)
                 ) =>
               attachedAssetId shouldBe attachedAsset.id()
               transferringAssetId shouldBe transferringAsset.id()
@@ -952,7 +952,7 @@ class InvokeScriptTransactionDiffTest
         assertDiffEiTraced(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
           blockDiffEi.resultE should produce("TransactionNotAllowedByScript")
           inside(blockDiffEi.trace) {
-            case List(_, AssetVerifierTrace(assetId, Some(tne: TransactionNotAllowedByScript))) =>
+            case List(_, AssetVerifierTrace(assetId, Some(tne: TransactionNotAllowedByScript), _)) =>
               assetId shouldBe asset.id()
               tne.isAssetScript shouldBe true
           }
@@ -1061,8 +1061,8 @@ class InvokeScriptTransactionDiffTest
           inside(blockDiffEi.trace) {
             case List(
                 InvokeScriptTrace(dAppAddress, functionCall, Right(ScriptResultV3(_, transfers)), _),
-                AssetVerifierTrace(allowedAssetId, None),
-                AssetVerifierTrace(bannedAssetId, Some(_: FailedTransactionError))
+                AssetVerifierTrace(allowedAssetId, None, _),
+                AssetVerifierTrace(bannedAssetId, Some(_: FailedTransactionError), _)
                 ) =>
               dAppAddress shouldBe ci.dAppAddressOrAlias
               functionCall shouldBe ci.funcCall
@@ -1126,7 +1126,7 @@ class InvokeScriptTransactionDiffTest
           inside(blockDiffEi.trace) {
             case List(
                 InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers)), _),
-                AssetVerifierTrace(transferringAssetId, Some(_))
+                AssetVerifierTrace(transferringAssetId, Some(_), _)
                 ) =>
               transferringAssetId shouldBe transferringAsset.id()
               transfers.head.assetId.get shouldBe transferringAsset.id()
@@ -1444,7 +1444,7 @@ class InvokeScriptTransactionDiffTest
     }
 
     forAll(for {
-      proofsCount <- Gen.choose(2, 9)
+      proofsCount <- Gen.choose(2, 8)
       r           <- preconditionsAndSetContractWithVerifier(multiSigCheckDApp(proofsCount), writeSetWithKeyLength(_))
     } yield (r._1, r._2, r._3, r._4, proofsCount)) {
       case (genesis, setVerifier, setContract, ci, proofsCount) =>
@@ -1929,7 +1929,7 @@ class InvokeScriptTransactionDiffTest
           acc             <- accountGen
           amt             <- Gen.choose(1L, issueTx.quantity)
           arg             <- genBoundedStringBytes(1, 32)
-          paymentContract <- paymentContractGen(acc.toAddress, amt, List(IssuedAsset(issueTx.assetId)), V4)(funcBinding)
+          paymentContract <- paymentContractGen(acc.toAddress, amt, List(issueTx.asset), V4)(funcBinding)
         } yield (fee, Waves, paymentContract, List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
       )
     }

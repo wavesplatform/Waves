@@ -2,7 +2,7 @@
   "openapi": "3.0.1",
   "info": {
     "title": "Waves Full Node (???)",
-    "description": "The Web Interface to the Waves Full Node API",
+    "description": "The Waves node REST API is the main interface for interacting with the blockchain. See [documentation](https://docs.waves.tech/en/waves-node/node-api/) for more info. If this API lacks data you need, check the [Waves Data Services API](https://docs.waves.tech/en/building-apps/waves-api-and-sdk/waves-data-service-api).",
     "termsOfService": "",
     "license": {
       "name": "MIT License",
@@ -65,8 +65,8 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Addresses",
-        "description": "Get the wallet accounts addresses",
+        "summary": "Wallet addresses",
+        "description": "Get a list of account addresses in the [node wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet)",
         "operationId": "root_1",
         "responses": {
           "200": {
@@ -88,8 +88,8 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Create",
-        "description": "Create a new account in the wallet(if it exists)",
+        "summary": "Create wallet address",
+        "description": "Generate a new account address in the [node wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet)",
         "operationId": "create_1",
         "responses": {
           "200": {
@@ -111,18 +111,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -142,17 +131,11 @@
         "operationId": "verify_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "requestBody": {
-          "description": "Json with data",
+          "description": "JSON with data",
           "content": {
             "application/json": {
               "schema": {
@@ -182,18 +165,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -209,8 +181,8 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Seq",
-        "description": "Get the wallet accounts addresses. Max range {from}-{to} is 100 addresses",
+        "summary": "Wallet addresses by range",
+        "description": "Get a list addresses in the [node wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet) by a given range of indices. Max range {from}-{to} is 100 addresses",
         "operationId": "seq_2",
         "parameters": [
           {
@@ -225,7 +197,7 @@
           {
             "name": "to",
             "in": "path",
-            "description": "address",
+            "description": "End address (not included)",
             "required": true,
             "schema": {
               "type": "integer"
@@ -259,13 +231,7 @@
         "operationId": "seed_2",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -292,18 +258,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -319,13 +274,13 @@
           "addresses"
         ],
         "summary": "Address from a public key",
-        "description": "Generate an address from a public key. Public key should be Base58-encoded",
+        "description": "Generate an address from a given public key",
         "operationId": "publicKey_1",
         "parameters": [
           {
             "name": "publicKey",
             "in": "path",
-            "description": "Public key Base58-encoded",
+            "description": "Public key base58 encoded",
             "required": true,
             "schema": {
               "type": "string"
@@ -359,18 +314,12 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Regular balance",
-        "description": "Account regular balance",
+        "summary": "Regular balance in WAVES",
+        "description": "Get the regular balance at a given address",
         "operationId": "balance_2",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -393,32 +342,89 @@
           "addresses"
         ],
         "summary": "Multiple accounts balances",
-        "description": "Multiple accounts balances",
+        "description": "Get multiple accounts balances. For dozens of addresses, better use the POST method",
         "operationId": "balance_3",
         "parameters": [
           {
             "name": "address",
             "in": "query",
-            "description": "Address",
+            "description": "Addresses base58 encoded",
             "required": true,
             "style": "form",
             "explode": true,
             "schema": {
               "type": "array",
+              "minItems": 1,
+              "maxItems": 47,
               "items": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^[1-9A-HJ-NP-Za-km-z]{35}$"
               }
             }
           },
           {
             "name": "height",
             "in": "query",
-            "description": "For balance at height requests",
+            "description": "For balance at height requests. Max number of blocks back from the current height is set by `waves.db.max-rollback-depth`, 2000 by default",
             "schema": {
               "type": "integer"
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Balance"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Multiple accounts balances",
+        "description": "Get multiple accounts balances. Max number of addresses is set by `waves.rest-api.transactions-by-address-limit`, 1000 by default",
+        "operationId": "balance_4",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "addresses"
+                ],
+                "properties": {
+                  "addresses": {
+                    "type": "array",
+                    "description": "Addresses base58 encoded",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{35}$"
+                    },
+                    "minItems": 1,
+                    "maxItems": 1000
+                  },
+                  "height": {
+                    "type": "integer",
+                    "description": "For balance at height requests. Max number of blocks back from the current height is set by `waves.db.max-rollback-depth`, 2000 by default"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "successful operation",
@@ -441,18 +447,12 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Effective balance",
-        "description": "Account effective balance",
+        "summary": "Effective balance in WAVES",
+        "description": "Get the effective balance at a given address",
         "operationId": "effectiveBalance_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -474,18 +474,12 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Complete Data",
-        "description": "Read all data posted by an account",
+        "summary": "Data by keys or regexp",
+        "description": "Read account data entries by given keys or a regular expression",
         "operationId": "getData_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
             "name": "matches",
@@ -529,18 +523,12 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Complete Data",
-        "description": "Read all data posted by an account",
+        "summary": "Data by keys",
+        "description": "Read account data entries by given keys",
         "operationId": "postData_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "requestBody": {
@@ -548,7 +536,7 @@
             "application/json": {
               "schema": {
                 "properties": {
-                  "key": {
+                  "keys": {
                     "type": "array",
                     "description": "Exact keys to query",
                     "items": {
@@ -569,6 +557,12 @@
                       "type": "string"
                     }
                   }
+                }
+              },
+              "encoding": {
+                "key": {
+                  "style": "form",
+                  "explode": true
                 }
               }
             }
@@ -602,13 +596,7 @@
         "operationId": "sign_3",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "requestBody": {
@@ -634,18 +622,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -666,13 +643,7 @@
         "operationId": "validate_2",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -711,13 +682,7 @@
         "operationId": "scriptMeta_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -740,17 +705,11 @@
           "addresses"
         ],
         "summary": "Account script info",
-        "description": "Account script with an additional information",
+        "description": "Get an account script or a dApp script with additional info by a given address",
         "operationId": "scriptInfo_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -770,18 +729,34 @@
                       "type": "string"
                     },
                     "script": {
-                      "type": "string"
+                      "type": "string",
+                      "format": "byte",
+                      "nullable": true,
+                      "description": "Compiled script in base64 representation"
                     },
                     "scriptText": {
-                      "type": "string"
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Compiled script in text representation"
                     },
                     "complexity": {
                       "type": "integer",
-                      "format": "int64"
+                      "format": "int64",
+                      "description": "The maximum of `callableComplexities` and `verifierComplexity`"
+                    },
+                    "verifierComplexity": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "[Complexity](https://docs.waves.tech/en/ride/base-concepts/complexity) of an account script or the verifier function of the dApp script"
+                    },
+                    "callableComplexities": {
+                      "type": "object",
+                      "description": "Complexity of callable functions of the dApp script. Empty for an account script"
                     },
                     "extraFee": {
                       "type": "integer",
-                      "format": "int64"
+                      "format": "int64",
+                      "description": "Extra fee for transactions sending on behalf of the account"
                     }
                   }
                 }
@@ -801,13 +776,7 @@
         "operationId": "deleteAddress_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -830,18 +799,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -861,13 +819,7 @@
         "operationId": "signText_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "requestBody": {
@@ -893,18 +845,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -925,17 +866,11 @@
         "operationId": "verifyText_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "requestBody": {
-          "description": "Json with data",
+          "description": "JSON with data",
           "content": {
             "application/json": {
               "schema": {
@@ -965,18 +900,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -992,18 +916,12 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Account balances",
-        "description": "Account available, regular, generating and effective balance",
+        "summary": "All types of balances in WAVES",
+        "description": "Get the available, regular, generating, and effective balance, see [definitions](https://docs.waves.tech/en/blockchain/account/account-balance#account-balance-in-waves)",
         "operationId": "balanceDetails_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -1053,23 +971,17 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Confirmed regular balance",
-        "description": "Get the regular balance of the address within {confirmations} blocks back from the current height. {confirmations} supports return of balance not more than 2,000 blocks back",
+        "summary": "Confirmed regular balance in WAVES",
+        "description": "Get the minimum regular balance at a given address for {confirmations} blocks back from the current height. Max number of confirmations is set by `waves.db.max-rollback-depth`, 2000 by default",
         "operationId": "balanceWithConfirmations_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
             "name": "confirmations",
             "in": "path",
-            "description": "0",
+            "description": "Number of blocks",
             "required": true,
             "schema": {
               "type": "integer"
@@ -1095,23 +1007,17 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Confirmed effective balance",
-        "description": "Get effective balance at the address of {confirmations} blocks from the current height. {confirmations} supports return of balance not more than 2000 blocks back",
+        "summary": "Confirmed effective balance in WAVES",
+        "description": "Get the minimum effective balance at a given address for {confirmations} blocks from the current height. Max number of confirmations is set by `waves.db.max-rollback-depth`, 2000 by default",
         "operationId": "effectiveBalanceWithConfirmations_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
             "name": "confirmations",
             "in": "path",
-            "description": "0",
+            "description": "Number of blocks",
             "required": true,
             "schema": {
               "type": "integer"
@@ -1137,18 +1043,12 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Data by Key",
-        "description": "Read data stored in account by key",
+        "summary": "Data by key",
+        "description": "Read account data entries by a given key",
         "operationId": "getDataItem_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
             "name": "key",
@@ -1180,16 +1080,17 @@
           "blocks"
         ],
         "summary": "Block by signature",
-        "description": "Get block by its signature",
+        "description": "Get a block by its signature",
         "operationId": "signature_1",
         "parameters": [
           {
             "name": "signature",
             "in": "path",
-            "description": "Base58-encoded block signature",
+            "description": "Block signature base58 encoded",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]+$"
             }
           }
         ],
@@ -1213,18 +1114,12 @@
         "tags": [
           "blocks"
         ],
-        "summary": "Block by id",
-        "description": "Get block by its id",
+        "summary": "Block by ID",
+        "description": "Get a block by its ID",
         "operationId": "block_by_id",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "Base58-encoded block id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/blockId"
           }
         ],
         "responses": {
@@ -1268,8 +1163,8 @@
         "tags": [
           "blocks"
         ],
-        "summary": "Blocks produced by address",
-        "description": "Get list of blocks generated by specified address. Max range {from}-{to} is 100 blocks",
+        "summary": "Blocks forged by address",
+        "description": "Get a list of blocks forged by a given address. Max range {from}-{to} is 100 blocks",
         "operationId": "address_1",
         "parameters": [
           {
@@ -1291,13 +1186,7 @@
             }
           },
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -1323,7 +1212,7 @@
           "blocks"
         ],
         "summary": "Block range",
-        "description": "Get blocks at specified heights. Max range {from}-{to} is 100 blocks",
+        "description": "Get blocks at a given range of heights. Max range {from}-{to} is 100 blocks",
         "operationId": "seq",
         "parameters": [
           {
@@ -1372,13 +1261,7 @@
         "operationId": "delay_1",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "Base58-encoded block id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/blockId"
           },
           {
             "name": "blockNum",
@@ -1419,7 +1302,7 @@
           "blocks"
         ],
         "summary": "Blockchain height",
-        "description": "Get current blockchain height",
+        "description": "Get the current blockchain height",
         "operationId": "height_1",
         "responses": {
           "200": {
@@ -1450,7 +1333,7 @@
           "blocks"
         ],
         "summary": "Block at height",
-        "description": "Get block at specified height",
+        "description": "Get a block at a given height",
         "operationId": "at_1",
         "parameters": [
           {
@@ -1483,7 +1366,7 @@
           "blocks"
         ],
         "summary": "Last block",
-        "description": "Get last block",
+        "description": "Get the block at the current blockchain height",
         "operationId": "last_1",
         "responses": {
           "200": {
@@ -1505,17 +1388,11 @@
           "blocks"
         ],
         "summary": "Block height",
-        "description": "Height of a block by its id",
+        "description": "Get the height of a block by its ID",
         "operationId": "heightEncoded_1",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "Base58-encoded block id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/blockId"
           }
         ],
         "responses": {
@@ -1546,8 +1423,8 @@
         "tags": [
           "blocks"
         ],
-        "summary": "Block header at height",
-        "description": "Get block header at specified height",
+        "summary": "Block headers at height",
+        "description": "Get block headers at a given height",
         "operationId": "atHeaderOnly_1",
         "parameters": [
           {
@@ -1579,18 +1456,12 @@
         "tags": [
           "blocks"
         ],
-        "summary": "Block header by id",
-        "description": "Get header of specified block",
+        "summary": "Block headers by ID",
+        "description": "Get headers of a given block",
         "operationId": "block_header_by_id",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "Base58-encoded block id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/blockId"
           }
         ],
         "responses": {
@@ -1612,8 +1483,8 @@
         "tags": [
           "blocks"
         ],
-        "summary": "Block header range",
-        "description": "Get block headers at specified heights. Max range {from}-{to} is 100 blocks",
+        "summary": "Block headers at range",
+        "description": "Get block headers at a given range of heights. Max range {from}-{to} is 100 blocks",
         "operationId": "seqHeaderOnly_1",
         "parameters": [
           {
@@ -1657,8 +1528,8 @@
         "tags": [
           "blocks"
         ],
-        "summary": "Last block header",
-        "description": "Get last block header",
+        "summary": "Last block headers",
+        "description": "Get headers of the block at the current blockchain height",
         "operationId": "lastHeaderOnly_1",
         "responses": {
           "200": {
@@ -1683,7 +1554,7 @@
         "description": "Connect to peer",
         "operationId": "connect_1",
         "requestBody": {
-          "description": "Json with data",
+          "description": "JSON with data",
           "content": {
             "application/json": {
               "schema": {
@@ -1732,18 +1603,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -1782,18 +1642,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -1809,7 +1658,7 @@
           "peers"
         ],
         "summary": "Peer list",
-        "description": "Peer list",
+        "description": "Get a list of all ever known not blacklisted peers with a publicly available declared address",
         "operationId": "allPeers_1",
         "responses": {
           "200": {
@@ -1847,7 +1696,7 @@
           "peers"
         ],
         "summary": "Connected peers list",
-        "description": "Connected peers list",
+        "description": "Get a list of all peers currently connected to the node",
         "operationId": "connectedPeers_1",
         "responses": {
           "200": {
@@ -1909,7 +1758,7 @@
           "peers"
         ],
         "summary": "Blacklisted peers list",
-        "description": "Blacklisted peers list",
+        "description": "Get a list of all currently blacklisted peers of the node",
         "operationId": "blacklistedPeers_1",
         "responses": {
           "200": {
@@ -2047,22 +1896,25 @@
         "tags": [
           "transactions"
         ],
-        "summary": "Transaction status",
-        "description": "Get a transaction status by its ID. Max for 1,000 transactions",
+        "summary": "Transaction statuses",
+        "description": "Get transaction statuses by their ID. For dozens of transactions, better use the POST method.<br>Transactions in the response are in the same order as in the request.",
         "operationId": "status_3",
         "parameters": [
           {
             "name": "id",
             "in": "query",
-            "description": "Transaction ID",
+            "description": "Transaction IDs base58 encoded",
             "required": true,
             "style": "form",
             "explode": true,
             "schema": {
               "type": "array",
               "items": {
-                "type": "string"
-              }
+                "type": "string",
+                "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+              },
+              "minItems": 1,
+              "maxItems": 42
             }
           }
         ],
@@ -2083,34 +1935,45 @@
         "tags": [
           "transactions"
         ],
-        "summary": "Transaction status",
-        "description": "Get a transaction status by its ID",
+        "summary": "Transaction statuses",
+        "description": "Get transaction statuses by their ID. Max number of transactions is set by `waves.rest-api.transactions-by-address-limit`, 1000 by default.<br>Transactions in the response are in the same order as in the request.",
         "operationId": "status_4",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "properties": {
-                  "id": {
+                  "ids": {
                     "type": "array",
-                    "description": "Transaction IDs",
+                    "description": "Transaction IDs base58 encoded",
                     "items": {
-                      "type": "string"
-                    }
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+                    },
+                    "minItems": 1,
+                    "maxItems": 1000
                   }
                 }
               }
             },
             "application/x-www-form-urlencoded": {
               "schema": {
+                "type": "object",
                 "properties": {
                   "id": {
                     "type": "array",
-                    "description": "Transaction IDs",
+                    "description": "Transaction IDs base58 encoded",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
                     }
                   }
+                }
+              },
+              "encoding": {
+                "id": {
+                  "style": "form",
+                  "explode": true
                 }
               }
             }
@@ -2144,13 +2007,7 @@
         "operationId": "info_2",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "Transaction ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/txId"
           }
         ],
         "responses": {
@@ -2167,16 +2024,58 @@
         }
       }
     },
+    "/transactions/info": {
+      "get": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Transaction info",
+        "description": "Get a transactions by its IDs",
+        "operationId": "info_multiple",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Transaction IDs base58 encoded",
+            "required": true,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/parameters/txId"
+              },
+              "minItems": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Transaction"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/transactions/sign": {
       "post": {
         "tags": [
           "transactions"
         ],
-        "summary": "Sign a transaction",
-        "description": "Sign a transaction with the sender's private key",
+        "summary": "Sign transaction on behalf of wallet account",
+        "description": "Sign a transaction with the private key corresponding to the `sender`. Sender must exist in the [node's wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet)",
         "operationId": "sign",
         "requestBody": {
-          "description": "Transaction data including type",
+          "description": "Transaction [data in JSON](https://docs.waves.tech/en/blockchain/transaction/#json-representation) including [`type`](https://docs.waves.tech/en/blockchain/transaction-type/) and `sender`. If `timestamp` is omitted, current node's time is used. `senderPublicKey` is ignored.",
           "content": {
             "application/json": {
               "schema": {
@@ -2198,18 +2097,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -2226,7 +2114,7 @@
           "transactions"
         ],
         "summary": "Unconfirmed transactions",
-        "description": "Get a list of unconfirmed transactions",
+        "description": "Get a list of transactions in node's UTX pool",
         "operationId": "unconfirmed_1",
         "responses": {
           "200": {
@@ -2251,17 +2139,11 @@
           "transactions"
         ],
         "summary": "List of transactions by address",
-        "description": "Get list of transactions where specified address has been involved. Max for 1,000 transactions. To get the next 1,000 transactions, use the field {after}.",
+        "description": "Get a list of the latest transactions involving a given address. Max number of transactions is set by `waves.rest-api.transactions-by-address-limit`, 1000 by default. For pagination, use the field {after}",
         "operationId": "addressLimit_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
             "name": "limit",
@@ -2275,7 +2157,7 @@
           {
             "name": "after",
             "in": "query",
-            "description": "Id of transaction to paginate after",
+            "description": "ID of the transaction to paginate after",
             "schema": {
               "type": "string"
             }
@@ -2304,7 +2186,7 @@
           "transactions"
         ],
         "summary": "Number of unconfirmed transactions",
-        "description": "Get the number of unconfirmed transactions in the UTX pool",
+        "description": "Get the number of transactions in the UTX pool",
         "operationId": "utxSize_1",
         "responses": {
           "200": {
@@ -2339,13 +2221,7 @@
         "operationId": "utxTransactionInfo_1",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "Transaction ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/txId"
           }
         ],
         "responses": {
@@ -2368,10 +2244,10 @@
           "transactions"
         ],
         "summary": "Calculate transaction fee",
-        "description": "Calculates minimal fee for a transaction",
+        "description": "Get the minimum fee for a given transaction",
         "operationId": "calculateFee_1",
         "requestBody": {
-          "description": "Transaction data including type",
+          "description": "Transaction [data in JSON](https://docs.waves.tech/en/blockchain/transaction/#json-representation) including [`type`](https://docs.waves.tech/en/blockchain/transaction-type/) and `senderPublicKey`. To calculate a sponsored fee, specify `feeAssetId`. `fee` and `sender` are ignored.",
           "content": {
             "application/json": {
               "schema": {
@@ -2414,22 +2290,23 @@
         "tags": [
           "transactions"
         ],
-        "summary": "Sign a transaction with a non-default private key",
-        "description": "Sign a transaction with the private key corresponding to the given address",
+        "summary": "Sign transaction on behalf of wallet account",
+        "description": "Sign a transaction with the private key corresponding to a given address. The address must exist in the [node's wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet)",
         "operationId": "signWithSigner_1",
         "parameters": [
           {
             "name": "signerAddress",
             "in": "path",
-            "description": "Wallet address",
+            "description": "Wallet address base58 encoded",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{35}$"
             }
           }
         ],
         "requestBody": {
-          "description": "Transaction data including type, see <a href='https://docs.waves.tech/en/blockchain/transaction/'>documentation</a>",
+          "description": "Transaction [data in JSON](https://docs.waves.tech/en/blockchain/transaction/#json-representation) including [`type`](https://docs.waves.tech/en/blockchain/transaction-type/) and `sender`. If `timestamp` is omitted, current node's time is used. `senderPublicKey` is ignored.",
           "content": {
             "application/json": {
               "schema": {
@@ -2449,8 +2326,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
+        "security": [
+          {
+            "APIKey": []
+          }
+        ],
         "x-codegen-request-body-name": "json"
       }
     },
@@ -2460,10 +2345,10 @@
           "transactions"
         ],
         "summary": "Broadcast transaction",
-        "description": "Broadcast a signed transaction. You should use the JSON transaction format with proofs",
+        "description": "Broadcast a signed transaction",
         "operationId": "signedBroadcast_1",
         "requestBody": {
-          "description": "Transaction data including type and signature/proofs",
+          "description": "Transaction [data in JSON](https://docs.waves.tech/en/blockchain/transaction/#json-representation) including [`type`](https://docs.waves.tech/en/blockchain/transaction-type/) and `signature`/`proofs`",
           "content": {
             "application/json": {
               "schema": {
@@ -2494,7 +2379,7 @@
           "transactions"
         ],
         "summary": "Merkle proofs",
-        "description": "Get merkle proofs for transactions",
+        "description": "Get [merkle proofs](https://docs.waves.tech/en/blockchain/block/merkle-root#proof-of-transaction-in-block) for given transactions. For dozens of transactions, better use the POST method",
         "operationId": "merkle_proof_1",
         "parameters": [
           {
@@ -2530,7 +2415,7 @@
           "transactions"
         ],
         "summary": "Merkle proofs",
-        "description": "Get merkle proofs for transactions",
+        "description": "Get [merkle proofs](https://docs.waves.tech/en/blockchain/block/merkle-root#proof-of-transaction-in-block) for given transactions",
         "operationId": "merkle_proof_2",
         "requestBody": {
           "description": "Transaction IDs",
@@ -2578,13 +2463,13 @@
           "utils"
         ],
         "summary": "Seed of specified length",
-        "description": "Generate random seed of specified length",
+        "description": "Generate random seed of a given length in bytes. The returned value is base58 encoded",
         "operationId": "length_1",
         "parameters": [
           {
             "name": "length",
             "in": "path",
-            "description": "Seed length ",
+            "description": "Seed length",
             "required": true,
             "schema": {
               "type": "integer"
@@ -2735,7 +2620,6 @@
         "description": "Compiles string code to base64 script representation",
         "operationId": "compileCode_1",
         "requestBody": {
-          "description": "Script code with imports",
           "content": {
             "text/plain": {
               "schema": {
@@ -2815,14 +2699,15 @@
           "utils"
         ],
         "summary": "Estimate",
-        "description": "Estimates compiled code in Base64 representation",
+        "description": "Estimates complexity of a given compiled code",
         "operationId": "estimate_1",
         "requestBody": {
-          "description": "A compiled Base64 code",
+          "description": "Compiled code in base64 script representation",
           "content": {
-            "application/json": {
+            "text/plain": {
               "schema": {
-                "type": "string"
+                "type": "string",
+                "format": "byte"
               }
             }
           },
@@ -2835,26 +2720,44 @@
               "application/json": {
                 "schema": {
                   "required": [
-                    "complexity",
-                    "extraFee",
                     "script",
-                    "scriptText"
+                    "scriptText",
+                    "complexity",
+                    "verifierComplexity",
+                    "callableComplexities",
+                    "extraFee"
                   ],
                   "type": "object",
                   "properties": {
                     "script": {
-                      "type": "string"
+                      "type": "string",
+                      "format": "byte",
+                      "nullable": true,
+                      "description": "Compiled script in base64 script representation"
                     },
                     "scriptText": {
-                      "type": "string"
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Compiled script in text representation"
                     },
                     "complexity": {
                       "type": "integer",
-                      "format": "int32"
+                      "format": "int64",
+                      "description": "The maximum of `callableComplexities` and `verifierComplexity`"
+                    },
+                    "verifierComplexity": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "[Complexity](https://docs.waves.tech/en/ride/base-concepts/complexity) of the account or asset script or the verifier function of the dApp script"
+                    },
+                    "callableComplexities": {
+                      "type": "object",
+                      "description": "Complexity of callable functions of the dApp script. Empty for an account script or asset script"
                     },
                     "extraFee": {
                       "type": "integer",
-                      "format": "int64"
+                      "format": "int64",
+                      "description": "Extra fee for transactions sending on behalf of the dApp or smart account or transactions involving the asset"
                     }
                   }
                 }
@@ -2865,19 +2768,36 @@
         "x-codegen-request-body-name": "code"
       }
     },
-    "/utils/script/meta": {
+    "/utils/script/evaluate/{address}": {
       "post": {
         "tags": [
           "utils"
         ],
-        "summary": "DApp meta",
-        "description": "Extract DApp meta from compiled code in Base64 representation",
+        "summary": "Evaluate",
+        "description": "Evaluates the provided expression, taking into account the deployed dApp contract",
+        "operationId": "script_evaluate",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address of the deployed dApp contract",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
-          "description": "A compiled Base64 code",
+          "description": "Expression to evaluate",
           "content": {
-            "text/plain": {
+            "application/json": {
               "schema": {
-                "type": "string"
+                "type": "object",
+                "properties": {
+                  "expr": {
+                    "type": "string"
+                  }
+                }
               }
             }
           },
@@ -2889,13 +2809,30 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ScriptMeta"
+                  "type": "object",
+                  "properties": {
+                    "address": {
+                      "type": "string"
+                    },
+                    "expr": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "value": {
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
           }
-        },
-        "x-codegen-request-body-name": "code"
+        }
       }
     },
     "/utils/seed": {
@@ -2904,7 +2841,7 @@
           "utils"
         ],
         "summary": "Seed",
-        "description": "Generate random seed",
+        "description": "Generate random seed. The returned value is base58 encoded",
         "operationId": "seedRoute_1",
         "responses": {
           "200": {
@@ -2924,20 +2861,6 @@
                 }
               }
             }
-          },
-          "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
           }
         }
       }
@@ -2947,13 +2870,13 @@
         "tags": [
           "utils"
         ],
-        "summary": "Hash",
-        "description": "Return SecureCryptographicHash of specified message",
+        "summary": "Secure hash",
+        "description": "Calculate the [Keccak-256](https://keccak.team/files/Keccak-submission-3.pdf) hash of the [BLAKE2b-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29) hash of a given message",
         "operationId": "hashSecure_1",
         "requestBody": {
           "description": "Message to hash",
           "content": {
-            "application/json": {
+            "text/plain": {
               "schema": {
                 "type": "string"
               }
@@ -2981,13 +2904,13 @@
         "tags": [
           "utils"
         ],
-        "summary": "Hash",
-        "description": "Return FastCryptographicHash of specified message",
+        "summary": "Fast hash",
+        "description": "Calculate the [BLAKE2b-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29) hash of a given message",
         "operationId": "hashFast_1",
         "requestBody": {
           "description": "Message to hash",
           "content": {
-            "application/json": {
+            "text/plain": {
               "schema": {
                 "type": "string"
               }
@@ -3019,7 +2942,7 @@
         "description": "Serialize transaction",
         "operationId": "transactionSerialize_1",
         "requestBody": {
-          "description": "Transaction data including type and signature/proofs",
+          "description": "Transaction [data in JSON](https://docs.waves.tech/en/blockchain/transaction/#json-representation) including [`type`](https://docs.waves.tech/en/blockchain/transaction-type/)",
           "content": {
             "application/json": {
               "schema": {
@@ -3043,9 +2966,7 @@
                     "bytes": {
                       "type": "array",
                       "items": {
-                        "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
-                        "type": "string",
-                        "format": "byte"
+                        "type": "number"
                       }
                     }
                   }
@@ -3085,18 +3006,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -3112,7 +3022,7 @@
           "alias"
         ],
         "summary": "Address by alias",
-        "description": "Returns an address associated with an Alias. Alias should be plain text without an 'alias' prefix and network code.",
+        "description": "Get an address associated with a given alias. Alias should be plain text without an 'alias' prefix and chain ID.",
         "operationId": "addressOfAlias_1",
         "parameters": [
           {
@@ -3153,17 +3063,11 @@
           "alias"
         ],
         "summary": "Aliases by address",
-        "description": "Returns a collection of aliases associated with an address",
+        "description": "Get a list of aliases associated with a given address",
         "operationId": "aliasOfAddress_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -3189,18 +3093,12 @@
         "tags": [
           "assets"
         ],
-        "summary": "Account balance",
-        "description": "Account balances for all assets",
+        "summary": "Account balances in all assets",
+        "description": "Get account balances in all assets (excluding WAVES and NFTs) at a given address",
         "operationId": "balances_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -3233,26 +3131,34 @@
                         "type": "object",
                         "properties": {
                           "assetId": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "Asset ID base58 encoded"
                           },
                           "balance": {
                             "type": "integer",
-                            "format": "int64"
+                            "format": "int64",
+                            "description": "Account balance in the asset"
                           },
                           "reissuable": {
-                            "type": "boolean"
+                            "type": "boolean",
+                            "description": "Indicates if the asset is reissuable"
                           },
                           "minSponsoredAssetFee": {
                             "type": "integer",
-                            "format": "int64"
+                            "format": "int64",
+                            "nullable": true,
+                            "description": "For [sponsored asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee) only: the equivalent of 0.001 WAVES"
                           },
                           "sponsorBalance": {
                             "type": "integer",
-                            "format": "int64"
+                            "format": "int64",
+                            "nullable": true,
+                            "description": "For [sponsored asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee) only: the sponsor balance in WAVES"
                           },
                           "quantity": {
                             "type": "integer",
-                            "format": "int64"
+                            "format": "int64",
+                            "description": "Total supply of the asset"
                           },
                           "issueTransaction": {
                             "$ref": "#/components/schemas/IssueTransaction"
@@ -3273,18 +3179,12 @@
         "tags": [
           "assets"
         ],
-        "summary": "Information about an asset",
-        "description": "Provides detailed information about given asset",
+        "summary": "Information about asset",
+        "description": "Get detailed information about a given asset. See [fields descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters)",
         "operationId": "asset_details",
         "parameters": [
           {
-            "name": "assetId",
-            "in": "path",
-            "description": "ID of the asset",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/assetId"
           },
           {
             "name": "full",
@@ -3314,14 +3214,14 @@
         "tags": [
           "assets"
         ],
-        "summary": "Information about the multiple assets",
-        "description": "Provides detailed information about the given assets",
+        "summary": "Information about multiple assets",
+        "description": "Get detailed information about given assets. See [fields descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters)",
         "operationId": "asset_details_array",
         "parameters": [
           {
             "name": "id",
             "in": "query",
-            "description": "ID of the asset",
+            "description": "Asset ID base58 encoded",
             "required": true,
             "style": "form",
             "explode": true,
@@ -3363,27 +3263,15 @@
         "tags": [
           "assets"
         ],
-        "summary": "Asset's balance",
-        "description": "Account balance by given asset",
+        "summary": "Account balance in asset",
+        "description": "Get the account balance in a given asset",
         "operationId": "balance",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
-            "name": "assetId",
-            "in": "path",
-            "description": "Asset ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/assetId"
           }
         ],
         "responses": {
@@ -3423,17 +3311,11 @@
           "assets"
         ],
         "summary": "Asset balance distribution",
-        "description": "Asset balance distribution by account",
+        "description": "Get asset balance distribution by addresses",
         "operationId": "balanceDistribution_1",
         "parameters": [
           {
-            "name": "assetId",
-            "in": "path",
-            "description": "Asset ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/assetId"
           }
         ],
         "responses": {
@@ -3457,22 +3339,16 @@
           "assets"
         ],
         "summary": "Asset balance distribution at height",
-        "description": "Asset balance distribution by account at specified height. Max for 10,000 addresses",
+        "description": "Get asset balance distribution by addresses at a given height. Max number of addresses is set by `waves.rest-api.distribution-address-limit`, 1000 by default. For pagination, use the field {after}",
         "operationId": "balanceDistributionAtHeight_1",
         "parameters": [
           {
-            "name": "assetId",
-            "in": "path",
-            "description": "Asset ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/assetId"
           },
           {
             "name": "height",
             "in": "path",
-            "description": "Height",
+            "description": "For balance at height requests. Max number of blocks back from the current height is set by `waves.db.max-rollback-depth`, 2000 by default",
             "required": true,
             "schema": {
               "type": "integer"
@@ -3490,7 +3366,7 @@
           {
             "name": "after",
             "in": "query",
-            "description": "address to paginate after",
+            "description": "Address to paginate after",
             "schema": {
               "type": "string"
             }
@@ -3515,18 +3391,12 @@
         "tags": [
           "assets"
         ],
-        "summary": "Account NFTs balance",
-        "description": "Account NFTs balance. Max for 1,000 tokens",
+        "summary": "Account NFTs",
+        "description": "Get a list of [non-fungible tokens](https://docs.waves.tech/en/blockchain/token/non-fungible-token) at a given address. Max for 1000 tokens. For pagination, use the field {after}. See [fields descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters).<br>Since activation of [feature #15](https://docs.waves.tech/en/waves-node/features/) this method returns only tokens that are issued as NFT (amount: 1, decimal places: 0, reissuable: false) after activation of feature #13. Before activation of feature #15 the method returned all the assets that are issued as NFT.",
         "operationId": "nft_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
             "name": "limit",
@@ -3540,7 +3410,7 @@
           {
             "name": "after",
             "in": "query",
-            "description": "Id of token to paginate after",
+            "description": "ID of the token to paginate after",
             "schema": {
               "type": "string"
             }
@@ -3568,18 +3438,12 @@
         "tags": [
           "leasing"
         ],
-        "summary": "Active leases for an address",
-        "description": "Get all active leases for an address",
+        "summary": "Active leases by address",
+        "description": "Get all active leases involving a given address",
         "operationId": "active_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Wallet address ",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -3609,13 +3473,7 @@
         "operationId": "generatingBalance_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -3651,16 +3509,17 @@
           "consensus"
         ],
         "summary": "Base target",
-        "description": "base target of a block with specified id",
+        "description": "Base target of a block with a given ID",
         "operationId": "baseTargetId_1",
         "parameters": [
           {
             "name": "blockId",
             "in": "path",
-            "description": "Block id",
+            "description": "Block ID base58 encoded",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
             }
           }
         ],
@@ -3757,8 +3616,8 @@
         "tags": [
           "activation"
         ],
-        "summary": "Activation status",
-        "description": "Activation status of the blockchain features",
+        "summary": "Feature activation status",
+        "description": "Activation statuses of [blockchain features](https://docs.waves.tech/en/waves-node/features/)",
         "operationId": "status",
         "responses": {
           "200": {
@@ -3777,19 +3636,23 @@
                   "properties": {
                     "height": {
                       "type": "integer",
-                      "format": "int32"
+                      "format": "int32",
+                      "description": "Current blockchain height on the node"
                     },
                     "votingInterval": {
                       "type": "integer",
-                      "format": "int32"
+                      "format": "int32",
+                      "description": "Voting period length in blocks"
                     },
                     "votingThreshold": {
                       "type": "integer",
-                      "format": "int32"
+                      "format": "int32",
+                      "description": "Number of blocks that support a feature to approve it"
                     },
                     "nextCheck": {
                       "type": "integer",
-                      "format": "int32"
+                      "format": "int32",
+                      "description": "Next height to calculate feature statuses"
                     },
                     "features": {
                       "type": "array",
@@ -3804,7 +3667,8 @@
                         "properties": {
                           "id": {
                             "type": "integer",
-                            "format": "int32"
+                            "format": "int32",
+                            "description": "Feature ID"
                           },
                           "description": {
                             "type": "string"
@@ -3815,7 +3679,8 @@
                               "VOTING",
                               "APPROVED",
                               "ACTIVATED"
-                            ]
+                            ],
+                            "description": "Feature status"
                           },
                           "nodeStatus": {
                             "type": "string",
@@ -3823,7 +3688,8 @@
                               "NOT_IMPLEMENTED",
                               "IMPLEMENTED",
                               "VOTED"
-                            ]
+                            ],
+                            "description": "Support for the feature on the node"
                           },
                           "activationHeight": {
                             "type": "integer",
@@ -3831,7 +3697,8 @@
                           },
                           "supportingBlocks": {
                             "type": "integer",
-                            "format": "int32"
+                            "format": "int32",
+                            "description": "Number of blocks that support for the feature"
                           }
                         }
                       }
@@ -3853,7 +3720,7 @@
         "description": "Prints a string at DEBUG level, strips to 100 chars",
         "operationId": "print_1",
         "requestBody": {
-          "description": "Json with data",
+          "description": "JSON with data",
           "content": {
             "application/json": {
               "schema": {
@@ -3877,18 +3744,7 @@
             "content": {}
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -3928,18 +3784,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -4064,18 +3909,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -4110,18 +3944,7 @@
             "content": {}
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -4137,7 +3960,7 @@
           "debug"
         ],
         "summary": "State hash",
-        "description": "Get state hash at height",
+        "description": "Get state hash at height. Available only if node configuration contains `waves.db.store-state-hashes = true` option",
         "operationId": "state_hash",
         "parameters": [
           {
@@ -4192,7 +4015,7 @@
                       "type": "string"
                     }
                   }
-                }  
+                }
               }
             }
           }
@@ -4204,8 +4027,8 @@
         "tags": [
           "debug"
         ],
-        "summary": "Blacklist given peer",
-        "description": "Moving peer to blacklist",
+        "summary": "Blacklist peer",
+        "description": "Move a given peer to the blacklist for the time specified in `waves.network.black-list-residence-time`, 15 min by default. The connection to the peer is immediately closed (if it was open)",
         "operationId": "blacklist_1",
         "requestBody": {
           "description": "IP address of node",
@@ -4224,18 +4047,7 @@
             "content": {}
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           },
           "404": {
             "description": "There are no peer with such address",
@@ -4260,13 +4072,7 @@
         "operationId": "portfolios_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "An address of portfolio",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
             "name": "considerUnspent",
@@ -4330,18 +4136,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -4357,17 +4152,11 @@
           "debug"
         ],
         "summary": "Block id",
-        "description": "Rollback the state to the block with a given id",
+        "description": "Rollback the state to the block with a given ID",
         "operationId": "rollbackTo_1",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "Base58-encoded block id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/blockId"
           }
         ],
         "responses": {
@@ -4390,18 +4179,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -4460,20 +4238,6 @@
                 }
               }
             }
-          },
-          "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
           }
         },
         "x-codegen-request-body-name": "transaction"
@@ -4484,18 +4248,12 @@
         "tags": [
           "debug"
         ],
-        "summary": "History of the regular balance",
-        "description": "History of the regular balance for the last 3,000 blocks",
+        "summary": "History of regular balance",
+        "description": "Get history of the regular balance at a given address. Max depth is set by `waves.db.max-rollback-depth`, 2000 by default",
         "operationId": "balanceHistory_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "An address to load waves balance history for",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -4535,13 +4293,13 @@
           "debug"
         ],
         "summary": "Regular address balance at the height",
-        "description": "Regular address balance at the height. No more than 2,000 blocks back",
+        "description": "Regular address balance at the height. Max number of blocks back from the current height is set by `waves.db.max-rollback-depth`, 2000 by default",
         "operationId": "stateWaves_1",
         "parameters": [
           {
             "name": "height",
             "in": "path",
-            "description": "height",
+            "description": "Height",
             "required": true,
             "schema": {
               "type": "integer"
@@ -4569,18 +4327,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -4596,10 +4343,10 @@
           "debug"
         ],
         "summary": "Rollback to height",
-        "description": "Removes all blocks after the given height. Max for 2,000 blocks",
+        "description": "Removes all blocks after a given height. Max number of blocks back from the current height is set by `waves.db.max-rollback-depth`, 2000 by default",
         "operationId": "rollback_1",
         "requestBody": {
-          "description": "Json with data",
+          "description": "JSON with data",
           "content": {
             "application/json": {
               "schema": {
@@ -4642,18 +4389,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -4702,18 +4438,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -4748,18 +4473,7 @@
             "content": {}
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -4775,17 +4489,11 @@
           "debug"
         ],
         "summary": "Transaction state changes",
-        "description": "Returns state changes made by the transaction",
+        "description": "Get state changes made by the transaction",
         "operationId": "stateChangesById_1",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "Transaction ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/txId"
           }
         ],
         "responses": {
@@ -4808,17 +4516,11 @@
           "debug"
         ],
         "summary": "List of transactions by address with state changes",
-        "description": "Get list of transactions with state changes where specified address has been involved. Max for 1,000 transactions. To get the next 1,000 transactions, use the field {after}.",
+        "description": "Get a list of transactions involving a given address with state changes. Max for 1000 transactions. To get the next 1000 transactions, use the field {after}",
         "operationId": "stateChangesByAddress_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
             "name": "limit",
@@ -4832,7 +4534,7 @@
           {
             "name": "after",
             "in": "query",
-            "description": "Id of transaction to paginate after",
+            "description": "ID of the transaction to paginate after",
             "schema": {
               "type": "string"
             }
@@ -4883,18 +4585,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -5223,10 +4914,10 @@
             "format": "int64"
           },
           "VRF": {
-              "type": "string"
+            "type": "string"
           },
           "transactionsRoot": {
-              "type": "string"
+            "type": "string"
           }
         }
       },
@@ -5315,32 +5006,47 @@
             "format": "int64"
           },
           "VRF": {
-              "type": "string"
+            "type": "string"
           },
           "transactionsRoot": {
-              "type": "string"
+            "type": "string"
           }
         }
       },
       "CompiledScript": {
         "required": [
+          "script",
           "complexity",
-          "extraFee",
-          "script"
+          "verifierComplexity",
+          "callableComplexities",
+          "extraFee"
         ],
         "type": "object",
         "properties": {
           "script": {
             "type": "string",
-            "format": "byte"
+            "format": "byte",
+            "nullable": true,
+            "description": "Compiled script in base64 representation"
           },
           "complexity": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64",
+            "description": "The maximum of `callableComplexities` and `verifierComplexity`"
+          },
+          "verifierComplexity": {
+            "type": "integer",
+            "format": "int64",
+            "description": "[Complexity](https://docs.waves.tech/en/ride/base-concepts/complexity) of an account or asset script or the verifier function of the dApp script"
+          },
+          "callableComplexities": {
+            "type": "object",
+            "description": "Complexity of callable functions of the dApp script. Empty for an account script or asset script"
           },
           "extraFee": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "description": "Extra fee for transactions sending on behalf of the dApp or smart account or transactions involving the asset"
           }
         }
       },
@@ -5393,7 +5099,9 @@
           },
           "type": {
             "type": "string",
-            "enum": ["binary"]
+            "enum": [
+              "binary"
+            ]
           },
           "value": {
             "type": "string",
@@ -5414,7 +5122,9 @@
           },
           "type": {
             "type": "string",
-            "enum": ["boolean"]
+            "enum": [
+              "boolean"
+            ]
           },
           "value": {
             "type": "boolean"
@@ -5478,7 +5188,9 @@
           },
           "type": {
             "type": "string",
-            "enum": ["integer"]
+            "enum": [
+              "integer"
+            ]
           },
           "value": {
             "type": "integer",
@@ -5499,9 +5211,11 @@
           },
           "type": {
             "type": "string",
-            "enum": ["string"]
+            "enum": [
+              "string"
+            ]
           },
-          "value":{
+          "value": {
             "type": "string"
           }
         }
@@ -5825,7 +5539,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "description": "Transaction ID base58 encoded"
           },
           "status": {
             "type": "string",
@@ -5833,18 +5548,22 @@
               "confirmed",
               "unconfirmed",
               "not_found"
-            ]
+            ],
+            "description": "not_found: transaction is not found, unconfirmed: transaction is in the UTX pool, confirmed: transaction is added to the block or microblock"
           },
           "height": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "The sequential number of the block that contains the transaction"
           },
           "confirmations": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "Number of blocks added on top of the one that contains the transaction"
           },
           "applicationStatus": {
-            "type": "string"
+            "type": "string",
+            "description": "succeeded: transaction is successful, script_execution_failed: the dApp script or the asset script failed. See [Transaction Validation](https://docs.waves.tech/en/blockchain/transaction/transaction-validation) for details"
           }
         }
       },
@@ -5857,14 +5576,17 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "description": "Transaction ID base58 encoded"
           },
           "transactionIndex": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "Sequential number of the transaction in the block"
           },
           "merkleProof": {
             "type": "array",
+            "description": "Array of sibling hashes of the Merkle tree, bottom-to-top",
             "items": {
               "type": "string"
             }
@@ -6146,7 +5868,7 @@
           "proofs": {
             "type": "array",
             "items": {
-                "type": "string"
+              "type": "string"
             }
           },
           "version": {
@@ -6280,7 +6002,7 @@
           "proofs": {
             "type": "array",
             "items": {
-                "type": "string"
+              "type": "string"
             }
           },
           "version": {
@@ -6346,7 +6068,7 @@
             }
           },
           "applicationStatus": {
-                "type": "string"
+            "type": "string"
           },
           "height": {
             "type": "integer",
@@ -6405,7 +6127,7 @@
           "proofs": {
             "type": "array",
             "items": {
-                "type": "string"
+              "type": "string"
             }
           },
           "version": {
@@ -6494,7 +6216,7 @@
           "proofs": {
             "type": "array",
             "items": {
-                "type": "string"
+              "type": "string"
             }
           },
           "version": {
@@ -6516,7 +6238,7 @@
           },
           "height": {
             "type": "integer",
-             "format": "int32"
+            "format": "int32"
           }
         }
       },
@@ -6643,7 +6365,7 @@
           "proofs": {
             "type": "array",
             "items": {
-                "type": "string"
+              "type": "string"
             }
           },
           "version": {
@@ -6671,19 +6393,19 @@
           },
           "transfers": {
             "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "recipient": {
-                    "type": "string"
-                  },
-                  "amount": {
-                    "type": "integer",
-                    "format": "int64"
-                  }
+            "items": {
+              "type": "object",
+              "properties": {
+                "recipient": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "integer",
+                  "format": "int64"
                 }
               }
-            },
+            }
+          },
           "applicationStatus": {
             "type": "string"
           },
@@ -6740,7 +6462,7 @@
           "proofs": {
             "type": "array",
             "items": {
-                "type": "string"
+              "type": "string"
             }
           },
           "version": {
@@ -6816,7 +6538,7 @@
           "proofs": {
             "type": "array",
             "items": {
-                "type": "string"
+              "type": "string"
             }
           },
           "version": {
@@ -7031,7 +6753,7 @@
           "proofs": {
             "type": "array",
             "items": {
-                "type": "string"
+              "type": "string"
             }
           },
           "version": {
@@ -7066,7 +6788,7 @@
             "type": "integer",
             "format": "int32"
           }
-        }  
+        }
       },
       "UpdateAssetInfoTransaction": {
         "type": "object",
@@ -7115,7 +6837,7 @@
           "proofs": {
             "type": "array",
             "items": {
-                "type": "string"
+              "type": "string"
             }
           },
           "version": {
@@ -7154,6 +6876,58 @@
               "message": "Provided API key is not correct"
             }
           }
+        }
+      },
+      "BadRequest": {
+        "description": "The request cannot be fulfilled due to bad syntax",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "address": {
+        "name": "address",
+        "in": "path",
+        "description": "Address base58 encoded",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[1-9A-HJ-NP-Za-km-z]{35}$"
+        }
+      },
+      "assetId": {
+        "name": "assetId",
+        "in": "path",
+        "description": "Asset ID base58 encoded",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+        }
+      },
+      "blockId": {
+        "name": "id",
+        "in": "path",
+        "description": "Block ID base58 encoded",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+        }
+      },
+      "txId": {
+        "name": "id",
+        "in": "path",
+        "description": "Transaction ID base58 encoded",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
         }
       }
     },

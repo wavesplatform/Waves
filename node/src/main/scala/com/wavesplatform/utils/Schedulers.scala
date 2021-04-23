@@ -5,7 +5,7 @@ import java.util.concurrent.{Future => JavaFuture, _}
 
 import io.netty.util.{Timeout, Timer}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
-import monix.execution.{ExecutionModel, Features, Scheduler, UncaughtExceptionReporter}
+import monix.execution.{ExecutionModel, Features, UncaughtExceptionReporter}
 
 import scala.concurrent.duration._
 
@@ -131,13 +131,15 @@ object Schedulers {
   import scala.concurrent.{Future, Promise}
   import scala.util.control.NonFatal
 
-  // Catches InterruptedException correctly
-  def executeCatchingInterruptedException[T](pool: Scheduler)(f: => T): Future[T] = {
-    val promise = Promise[T]()
-    pool.execute { () =>
-      try promise.success(f)
-      catch { case e @ (NonFatal(_) | _: InterruptedException) => promise.failure(e) }
+  implicit class ExecutorExt(val executor: Executor) extends AnyVal {
+    // Catches InterruptedException correctly
+    def executeCatchingInterruptedException[T](f: => T): Future[T] = {
+      val promise = Promise[T]()
+      executor.execute { () =>
+        try promise.success(f)
+        catch { case e @ (NonFatal(_) | _: InterruptedException) => promise.failure(e) }
+      }
+      promise.future
     }
-    promise.future
   }
 }

@@ -7,7 +7,7 @@
  */
 
 import sbt.Keys._
-import sbt._
+import sbt.{File, IO, Project, _}
 import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
 
 val langPublishSettings = Seq(
@@ -95,6 +95,8 @@ lazy val `node-it`        = project.dependsOn(node, `grpc-server`)
 lazy val `node-generator` = project.dependsOn(node, `node` % "compile")
 lazy val benchmark        = project.dependsOn(node % "compile;test->test")
 
+lazy val `curve25519-test` = project.dependsOn(node)
+
 lazy val root = (project in file("."))
   .aggregate(
     `lang-js`,
@@ -112,7 +114,7 @@ inScope(Global)(
     scalaVersion := "2.13.3",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 2, 13),
+    V.fallback := (1, 2, 20),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
@@ -126,7 +128,8 @@ inScope(Global)(
       "-Ywarn-unused:-implicits",
       "-Xlint",
       "-opt:l:inline",
-      "-opt-inline-from:**"
+      "-opt-inline-from:**",
+      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s" // Ignore gRPC warnings
     ),
     crossPaths := false,
     scalafmtOnCompile := false,
@@ -158,17 +161,15 @@ git.useGitDescribe := true
 git.uncommittedSignifier := Some("DIRTY")
 
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
-packageAll := Def
-  .sequential(
-    root / clean,
-    Def.task {
-      (node / assembly).value
-      (node / Debian / packageBin).value
-      (`grpc-server` / Universal / packageZipTarball).value
-      (`grpc-server` / Debian / packageBin).value
-    }
-  )
-  .value
+packageAll := {
+  (node / assembly).value
+  (`grpc-server` / Universal / packageZipTarball).value
+
+  val nodeDebFile = (node / Debian / packageBin).value
+  val grpcDebFile = (`grpc-server` / Debian / packageBin).value
+  IO.copyFile(nodeDebFile, new File(baseDirectory.value, "docker/target/waves.deb"))
+  IO.copyFile(grpcDebFile, new File(baseDirectory.value, "docker/target/grpc-server.deb"))
+}
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw := Def
@@ -178,16 +179,20 @@ checkPRRaw := Def
       (Test / compile).value
       (`lang-tests` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
+      (`grpc-server` / Test / test).value
       (node / Test / test).value
     }
   )
   .value
 
 def checkPR: Command = Command.command("checkPR") { state =>
-  val updatedState = Project
+  val newState = Project
     .extract(state)
-    .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings")), state)
-  Project.extract(updatedState).runTask(checkPRRaw, updatedState)
+    .appendWithoutSession(
+      Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings")),
+      state
+    )
+  Project.extract(newState).runTask(checkPRRaw, newState)
   state
 }
 

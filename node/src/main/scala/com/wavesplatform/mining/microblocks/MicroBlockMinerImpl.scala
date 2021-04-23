@@ -1,9 +1,11 @@
 package com.wavesplatform.mining.microblocks
 
+import scala.concurrent.duration._
+
 import cats.implicits._
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining._
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl._
@@ -20,8 +22,6 @@ import kamon.Kamon
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 
-import scala.concurrent.duration._
-
 class MicroBlockMinerImpl(
     setDebugState: MinerDebugInfo.State => Unit,
     allChannels: ChannelGroup,
@@ -29,7 +29,8 @@ class MicroBlockMinerImpl(
     utx: UtxPool,
     settings: MinerSettings,
     minerScheduler: SchedulerService,
-    appenderScheduler: SchedulerService
+    appenderScheduler: SchedulerService,
+    nextMicroBlockSize: Int => Int
 ) extends MicroBlockMiner
     with ScorexLogging {
 
@@ -67,7 +68,7 @@ class MicroBlockMinerImpl(
         val mdConstraint = MultiDimensionalMiningConstraint(
           restTotalConstraint,
           OneDimensionalMiningConstraint(
-            utx.nextMicroBlockSize().getOrElse(0).max(settings.maxTransactionsInMicroBlock),
+            nextMicroBlockSize(settings.maxTransactionsInMicroBlock),
             TxEstimators.one,
             "MaxTxsInMicroBlock"
           )

@@ -285,7 +285,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   def compile(script: String): Either[String, Terms.EXPR] =
-    ExpressionCompiler.compile(script, CTX.empty.compilerContext)
+    ExpressionCompiler.compileBoolean(script, CTX.empty.compilerContext)
 
   property("wrong script return type") {
     compile("1") should produce("should return boolean")
@@ -2054,5 +2054,78 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(" [1, 2, 3, 4].removeByIndex(0)", version = V3) should produce(
       "Can't find a function 'removeByIndex'(List[Int], Int)"
     )
+  }
+
+  property("Union with single List") {
+    eval("""match (if false then 2 else [3]) { case n: Int => n case a => a[0] }""", version = V4) shouldBe Right(CONST_LONG(3))
+  }
+
+  property("Union with multiple List") {
+    eval("""match (if false then 2 else if true then [3] else ["qqq"]) { case n: Int => n case a => a[0] }""", version = V4) shouldBe Right(CONST_LONG(3))
+  }
+
+  property("Any type") {
+    eval("""func f(x:Any) = {
+           match x { case n: Int => n*4-1 case a => 4 }
+    }
+    f(1)""", version = V4) shouldBe Right(CONST_LONG(3))
+    eval("""func f(x:Any) = {
+           match x { case n: Int => n*4-1 case a => 4 }
+    }
+    f("q")""", version = V4) shouldBe Right(CONST_LONG(4))
+  }
+
+  property("extracting data functions with DeleteEntry") {
+    val script =
+      """
+        | let deleteEntry  = DeleteEntry("delete")
+        | let integerEntry = IntegerEntry("integer", 123)
+        | let stringEntry  = StringEntry("string", "value")
+        | let booleanEntry = BooleanEntry("boolean", true)
+        | let binaryEntry  = BinaryEntry("binary", base58'a')
+        |
+        | let entries = [deleteEntry, integerEntry, stringEntry, booleanEntry, binaryEntry]
+        |
+        | getIntegerValue(entries, "integer") == 123       &&
+        | getIntegerValue(entries, 1)         == 123       &&
+        | getStringValue(entries, "string")   == "value"   &&
+        | getStringValue(entries, 2)          == "value"   &&
+        | getBooleanValue(entries, "boolean") == true      &&
+        | getBooleanValue(entries, 3)         == true      &&
+        | getBinaryValue(entries, "binary")   == base58'a' &&
+        | getBinaryValue(entries, 4)          == base58'a' &&
+        | entries[0] == deleteEntry
+      """.stripMargin
+
+    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    genericEval(script, ctxt = ctx, version = V4, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("List[Any]") {
+    eval("""func f(x: List[Int]|Int) = {
+      match x { case a: List[Any] => 4 case n: Int => n*4-1 }
+    }
+    f([1])""", version = V4) shouldBe Right(CONST_LONG(4))
+  }
+
+  property("value(Any)") {
+    eval("""func f(x: Any) = {
+      value(x)
+    }
+    f(1)""", version = V4) shouldBe Symbol("Left")
+  }
+
+  property("default type") {
+    eval("""func f(x: Int| String) = {
+      match x {
+        case i: Int => 1
+        case v =>
+          match v {
+            case j: Int => 2
+            case s: String => 3
+          }
+      }
+    }
+    f("q")""", version = V4) shouldBe Symbol("Left")
   }
 }

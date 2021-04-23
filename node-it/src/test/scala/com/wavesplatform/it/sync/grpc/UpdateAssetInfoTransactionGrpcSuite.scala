@@ -103,7 +103,7 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
     val tooBigDescription = Random.nextString(1001)
     assertGrpcError(
       sender.updateAssetInfo(issuer, assetId, "updatedName", tooBigDescription, minFee),
-      "Too big sequences requested",
+      "Too big sequence requested",
       Code.INVALID_ARGUMENT
     )
   }

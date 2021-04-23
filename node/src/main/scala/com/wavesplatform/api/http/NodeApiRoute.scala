@@ -1,10 +1,9 @@
-package com.wavesplatform.http
+package com.wavesplatform.api.http
 
 import java.time.Instant
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.Shutdownable
-import com.wavesplatform.api.http.{ApiRoute, AuthRoute}
 import com.wavesplatform.settings.{Constants, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.ScorexLogging

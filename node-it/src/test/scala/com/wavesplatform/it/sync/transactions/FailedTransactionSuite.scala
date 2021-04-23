@@ -3,9 +3,9 @@ package com.wavesplatform.it.sync.transactions
 import com.google.common.primitives.Longs
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.{ScriptExecutionError, TransactionNotAllowedByAccountScript, TransactionNotAllowedByAssetScript}
+import com.wavesplatform.api.http.DebugMessage
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{DebugStateChanges, TransactionStatus}
 import com.wavesplatform.it.sync._

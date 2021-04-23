@@ -5,13 +5,12 @@ import java.net.InetSocketAddress
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
-import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.IssueRequest
+import com.wavesplatform.api.http.{ApiError, DebugMessage}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
-import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -549,13 +548,12 @@ object SyncHttpApi extends Assertions {
 
     def broadcastCancelLease(source: KeyPair, leaseId: String, fee: Long = minFee, waitForTx: Boolean = false): Transaction = {
       val tx = LeaseCancelTransaction
-        .signed(
+        .selfSigned(
           TxVersion.V2,
-          source.publicKey,
+          source,
           ByteStr.decodeBase58(leaseId).get,
           fee,
-          System.currentTimeMillis(),
-          source.privateKey
+          System.currentTimeMillis()
         )
         .explicitGet()
 

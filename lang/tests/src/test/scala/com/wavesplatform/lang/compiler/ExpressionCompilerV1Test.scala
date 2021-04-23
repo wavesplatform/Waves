@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -118,11 +118,11 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
 
   property("tuple type checks") {
     val script = """ ("a", true, 123, base58'aaaa')._3 == true  """
-    val expr = Parser.parseExpr(script).get.value
+    val expr   = Parser.parseExpr(script).get.value
     ExpressionCompiler(compilerContextV4, expr) should produce("Can't match inferred types of T over Int, Boolean")
 
     val script2 = """ ("a", true, 123, base58'aaaa') == ("a", true, "b", base58'aaaa') """
-    val expr2 = Parser.parseExpr(script2).get.value
+    val expr2   = Parser.parseExpr(script2).get.value
     ExpressionCompiler(compilerContextV4, expr2) should produce(
       "Can't match inferred types of T over (String, Boolean, Int, ByteVector), (String, Boolean, String, ByteVector)"
     )
@@ -301,10 +301,10 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ExpressionCompiler(compilerContextV4, expr5) shouldBe Symbol("right")
   }
 
-
   property("JS API compile limit exceeding error") {
     val expr = s" ${"sigVerify(base58'', base58'', base58'') &&" * 350} true "
-    val ctx = Monoid.combineAll(
+    val ctx = Monoid
+      .combineAll(
         Seq(
           PureContext.build(V4).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
@@ -329,6 +329,33 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     checkExtract(V2) shouldBe Symbol("right")
     checkExtract(V3) shouldBe Symbol("right")
     checkExtract(V4) should produce("Can't find a function 'extract'")
+  }
+
+  property("DataTransaction data composite type") {
+    val expr =
+      """
+        | match tx {
+        |    case dataTx: DataTransaction =>
+        |       match dataTx.data[0] {
+        |         case e: BinaryEntry  => e.key == "" && e.value == base58''
+        |         case e: BooleanEntry => e.key == "" && e.value == true
+        |         case e: IntegerEntry => e.key == "" && e.value == 1
+        |         case e: StringEntry  => e.key == "" && e.value == ""
+        |         case e: DeleteEntry  => e.key == ""
+        |       }
+        |     case _ =>
+        |       false
+        | }
+      """.stripMargin
+
+    DirectiveDictionary[StdLibVersion].all
+      .foreach { version =>
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, Parser.parseExpr(expr).get.value)
+        if (version >= V4)
+          result shouldBe Symbol("right")
+        else
+          result should produce("Undefined type: `BinaryEntry`")
+      }
   }
 
   treeTypeTest("GETTER")(
@@ -512,12 +539,12 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
                 )
               ),
               LET_BLOCK(
-               LET("p", REF("$match0")),
-               FUNCTION_CALL(
-                 FunctionHeader.Native(FunctionIds.EQ),
-                 List(REF("p"), REF("p"))
-               )
-             ),
+                LET("p", REF("$match0")),
+                FUNCTION_CALL(
+                  FunctionHeader.Native(FunctionIds.EQ),
+                  List(REF("p"), REF("p"))
+                )
+              ),
               FALSE
             )
           ),

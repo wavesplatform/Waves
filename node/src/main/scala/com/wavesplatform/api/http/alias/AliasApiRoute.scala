@@ -7,10 +7,9 @@ import akka.stream.scaladsl.Source
 import cats.syntax.either._
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.requests.CreateAliasRequest
-import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.api.http.{BroadcastRoute, _}
+import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
@@ -22,7 +21,7 @@ case class AliasApiRoute(
     settings: RestAPISettings,
     commonApi: CommonTransactionsApi,
     wallet: Wallet,
-    utxPoolSynchronizer: UtxPoolSynchronizer,
+    transactionPublisher: TransactionPublisher,
     time: Time,
     blockchain: Blockchain
 ) extends ApiRoute

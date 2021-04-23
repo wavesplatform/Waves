@@ -79,16 +79,19 @@ object PBTransactions {
           )
         )
       else
-        createVanilla(
-          parsedTx.version,
-          parsedTx.chainId.toByte,
-          sender,
-          feeAmount._2,
-          feeAmount._1,
-          parsedTx.timestamp,
-          Proofs(signedTx.proofs.map(_.toByteStr)),
-          parsedTx.data
-        )
+        for {
+          proofs <- Proofs.create(signedTx.proofs.map(_.toByteStr))
+          tx <- createVanilla(
+            parsedTx.version,
+            parsedTx.chainId.toByte,
+            sender,
+            feeAmount._2,
+            feeAmount._1,
+            parsedTx.timestamp,
+            proofs,
+            parsedTx.data
+          )
+        } yield tx
     } yield tx
   }
 

@@ -4,11 +4,10 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.settings.Constants
+import com.wavesplatform.it.{Node, ReportingTestName}
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
 
 import scala.concurrent.duration._
@@ -25,9 +24,9 @@ class RewardsTestSuite
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  private lazy val miner            = nodes.head
-  private lazy val initMinerBalance = miner.balanceAtHeight(miner.address, 1)
-  private lazy val initialAmount    = BigInt(Constants.TotalWaves) * BigInt(Constants.UnitsInWave)
+  val miner: Node                 = nodes.head
+  lazy val initMinerBalance: Long = miner.balanceAtHeight(miner.address, 1)
+  val InitialAmount               = 6400000000000000L
 
   "reward changes accordingly node's votes and miner's balance changes by reward amount after block generation" - {
     "when miner votes for increase" in {
@@ -52,7 +51,7 @@ class RewardsTestSuite
       rewardAtActivation.votingThreshold shouldBe votingInterval / 2 + 1
       rewardAtActivation.votes.increase shouldBe 0
       rewardAtActivation.votes.decrease shouldBe 0
-      rewardAtActivation.totalWavesAmount shouldBe initialAmount + initial
+      rewardAtActivation.totalWavesAmount shouldBe InitialAmount + initial
 
       miner.waitForHeight(activationHeight + 1) // 5
       miner.balanceAtHeight(miner.address, activationHeight + 1) shouldBe minerBalanceAtActivationHeight + miner.rewardStatus().currentReward
@@ -68,11 +67,11 @@ class RewardsTestSuite
       rewardAfterFirstVote.votingThreshold shouldBe votingInterval / 2 + 1
       rewardAfterFirstVote.votes.increase shouldBe 1
       rewardAfterFirstVote.votes.decrease shouldBe 0
-      rewardAfterFirstVote.totalWavesAmount shouldBe initialAmount + BigInt(initial) * BigInt(votingStartHeight - activationHeight + 1)
+      rewardAfterFirstVote.totalWavesAmount shouldBe InitialAmount + BigInt(initial) * BigInt(votingStartHeight - activationHeight + 1)
 
       val termEndHeight   = activationHeight + term
       val newReward       = initial + minIncrement
-      val amountAfterTerm = initialAmount + BigInt(initial) * BigInt(term) + newReward
+      val amountAfterTerm = InitialAmount + BigInt(initial) * BigInt(term) + newReward
 
       miner.waitForHeight(termEndHeight - 1, 2.minutes) // 11
       miner.rewardStatus().currentReward shouldBe initial
@@ -129,11 +128,11 @@ class RewardsTestSuite
       rewardAtActivation.votingThreshold shouldBe votingInterval / 2 + 1
       rewardAtActivation.votes.increase shouldBe 0
       rewardAtActivation.votes.decrease shouldBe 0
-      rewardAtActivation.totalWavesAmount shouldBe initialAmount + initial
+      rewardAtActivation.totalWavesAmount shouldBe InitialAmount + initial
 
       val termEndHeight   = activationHeight + term
       val newReward       = initial - minIncrement
-      val amountAfterTerm = initialAmount + BigInt(initial) * BigInt(term) + newReward
+      val amountAfterTerm = InitialAmount + BigInt(initial) * BigInt(term) + newReward
 
       miner.waitForHeight(termEndHeight - 1, 2.minutes)
       val minerBalanceBeforeTermEnd = miner.balanceAtHeight(miner.address, termEndHeight - 1)

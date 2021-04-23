@@ -28,15 +28,19 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
-  private val cmpCtx: CompilerContext =
-    WavesContext
-      .build(
-        DirectiveSet(V3, Account, DAppType).explicitGet()
+  private val dAppV3Ctx: CompilerContext =
+    Monoid.combineAll(
+      Seq(
+        PureContext.build(V3).withEnvironment[Environment],
+        CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+        WavesContext.build(
+          DirectiveSet(V3, Account, DAppType).explicitGet()
+        )
       )
-      .compilerContext
+    ).compilerContext
 
-  private val dAppV4Ctx: CompilerContext = Monoid
-    .combineAll(
+  private val dAppV4Ctx: CompilerContext =
+    Monoid.combineAll(
       Seq(
         PureContext.build(V4).withEnvironment[Environment],
         CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
@@ -199,7 +203,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compiles callable functions independently") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val ctx = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         """
@@ -223,7 +227,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract can access declarations") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val ctx = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         """
@@ -403,7 +407,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract functions could return parent type values") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val ctx = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         """
@@ -506,7 +510,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compilation fails if functions has the same name") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val ctx = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         """
@@ -533,7 +537,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compilation fails if declaration and annotation bindings has the same name") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val ctx = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         """
@@ -552,7 +556,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compilation fails if annotation bindings and func args has the same name") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val ctx = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         """
@@ -572,7 +576,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compiles if annotation bindings and another func args has the same name") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val ctx = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         """
@@ -594,7 +598,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compiles if declaration vars and func args has the same name") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val ctx = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         """
@@ -613,7 +617,6 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compiles if it use invoke script fields: payment, feeAssetId") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
         """
@@ -626,7 +629,14 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |  func verify() = {
           |    match tx {
           |      case tx:InvokeScriptTransaction =>
-          |        isDefined(tx.payment) && isDefined(tx.feeAssetId)
+          |        isDefined(tx.payment) && isDefined(tx.feeAssetId) &&
+          |        match tx.args[0] {
+          |          case _: Int => false
+          |          case _: String => false
+          |          case _: Boolean => false
+          |          case _: ByteVector => false
+          |          case ll => ll[0] == 1
+          |        }
           |      case _ => true
           |    }
           |  }
@@ -634,11 +644,11 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
+    compiler.ContractCompiler(dAppV3Ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("matching case with non-existing type should produce error message with suitable types") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val ctx = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         """
@@ -658,7 +668,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("expression matching case with non-existing type should produce error message with suitable types") {
-    val ctx           = Monoid.combine(compilerContext, cmpCtx)
+    val ctx           = Monoid.combine(compilerContext, dAppV3Ctx)
     val verifierTypes = Types.verifierInput(V3).typeList.map(_.name)
 
     val expr = {
@@ -681,7 +691,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("matching case with union type containing non-existing type should produce error message with suitable types") {
-    val ctx           = Monoid.combine(compilerContext, cmpCtx)
+    val ctx           = Monoid.combine(compilerContext, dAppV3Ctx)
     val verifierTypes = Types.verifierInput(V3).typeList.map(_.name)
 
     val expr = {
@@ -702,7 +712,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("locally call @Callable func should produce informative error") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val ctx = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         """
@@ -723,7 +733,6 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compiles if script uses InvokeScriptTransaction function and args field") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
         s"""
@@ -739,11 +748,11 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
+    compiler.ContractCompiler(dAppV3Ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("compiler error if user function defined below usage") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val ctx = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         """
@@ -761,7 +770,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("compiler error if variable defined below usage") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val ctx = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         """
@@ -780,7 +789,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
 
   property("contract compilation fails if function name length is longer than 255 bytes") {
     val longName = "a" * (ContractLimits.MaxDeclarationNameInBytes + 1)
-    val ctx      = Monoid.combine(compilerContext, cmpCtx)
+    val ctx      = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         s"""
@@ -798,7 +807,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
 
   property("contract compiles if function name length is equal to 255 bytes") {
     val longName = "a" * ContractLimits.MaxDeclarationNameInBytes
-    val ctx      = Monoid.combine(compilerContext, cmpCtx)
+    val ctx      = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         s"""
@@ -815,7 +824,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("compiler error if annotated func has argument of not native type") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val ctx = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         """
@@ -833,7 +842,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compiles if annotated func has argument of native type") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val ctx = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         """
@@ -851,7 +860,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("list as @Callable argument forbidden in V3") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val ctx = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         """
@@ -869,7 +878,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("list as @Callable argument allowed in V4") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val ctx = Monoid.combine(compilerContext, dAppV3Ctx)
     val expr = {
       val script =
         """

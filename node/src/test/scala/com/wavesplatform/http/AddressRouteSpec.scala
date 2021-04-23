@@ -6,9 +6,11 @@ import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
+import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.values.V3
@@ -19,8 +21,9 @@ import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.Schedulers
-import com.wavesplatform.{NoShrink, TestTime, TestWallet, WithDB, crypto}
+import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
 import io.netty.util.HashedWheelTimer
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
@@ -36,7 +39,7 @@ class AddressRouteSpec
     with RestAPISettingsHelper
     with TestWallet
     with NoShrink
-    with WithDB {
+    with WithDomain {
 
   testWallet.generateNewAccounts(10)
   private val allAccounts  = testWallet.privateKeyAccounts
@@ -44,33 +47,49 @@ class AddressRouteSpec
   private val blockchain   = stub[Blockchain]("globalBlockchain")
   (() => blockchain.activatedFeatures).when().returning(Map())
 
-  private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.accepting
+  private[this] val utxPoolSynchronizer = DummyTransactionPublisher.accepting
 
   private val commonAccountApi = mock[CommonAccountsApi]("globalAccountApi")
 
-  private val route =
-    seal(
-      AddressApiRoute(
-        restAPISettings,
-        testWallet,
-        blockchain,
-        utxPoolSynchronizer,
-        new TestTime,
-        Schedulers.timeBoundedFixedPool(
-          new HashedWheelTimer(),
-          5.seconds,
-          1,
-          "rest-time-limited"
-        ),
-        commonAccountApi
-      ).route
-    )
+  private val addressApiRoute: AddressApiRoute = AddressApiRoute(
+    restAPISettings,
+    testWallet,
+    blockchain,
+    utxPoolSynchronizer,
+    new TestTime,
+    Schedulers.timeBoundedFixedPool(
+      new HashedWheelTimer(),
+      5.seconds,
+      1,
+      "rest-time-limited"
+    ),
+    commonAccountApi,
+    5
+  )
+  private val route = seal(addressApiRoute.route)
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")
     length  <- Gen.chooseNum(10, 1000)
     message <- Gen.listOfN(length, Gen.alphaNumChar).map(_.mkString).label("message")
   } yield (account, message)
+
+  routePath("/balance/{address}/{confirmations}") in withDomain() { d =>
+    val route =
+      addressApiRoute.copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(d.liquidDiff, d.db, d.blockchainUpdater)).route
+    val address = TxHelpers.signer(1).toAddress
+
+    d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, 10000.waves))
+    for (_ <- 1 until 10) d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, address))
+
+    Get(routePath(s"/balance/$address/10")) ~> route ~> check {
+      responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> "Unable to get balance past height 5")
+    }
+
+    Get(routePath(s"/balance?address=$address&height=1")) ~> route ~> check {
+      responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> "Unable to get balance past height 5")
+    }
+  }
 
   routePath("/seq/{from}/{to}") in {
     val r1 = Get(routePath("/seq/1/4")) ~> route ~> check {
@@ -88,6 +107,14 @@ class AddressRouteSpec
     }
 
     r1 shouldNot contain allElementsOf r2
+
+    Get(routePath("/seq/1/9000")) ~> route ~> check {
+      responseAs[JsObject] shouldBe Json.obj("error" -> 10, "message" -> "Too big sequence requested: max limit is 1000 entries")
+    }
+
+    Get(routePath("/seq/10/1")) ~> route ~> check {
+      responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> "Invalid sequence")
+    }
   }
 
   routePath("/validate/{address}") in {
@@ -229,7 +256,10 @@ class AddressRouteSpec
 
     val contractScript       = ContractScript(V3, contractWithMeta).explicitGet()
     val callableComplexities = Map("a" -> 1L, "b" -> 2L, "c" -> 3L, "d" -> 100L, "verify" -> 11L)
-    (commonAccountApi.script _).expects(allAccounts(3).toAddress).returning(Some(AccountScriptInfo(allAccounts(3).publicKey, contractScript, 11L))).once()
+    (commonAccountApi.script _)
+      .expects(allAccounts(3).toAddress)
+      .returning(Some(AccountScriptInfo(allAccounts(3).publicKey, contractScript, 11L)))
+      .once()
     (blockchain.accountScript _)
       .when(allAccounts(3).toAddress)
       .returns(Some(AccountScriptInfo(allAccounts(3).publicKey, contractScript, 11L, complexitiesByEstimator = Map(1 -> callableComplexities))))
@@ -287,7 +317,7 @@ class AddressRouteSpec
       (json \ "message").as[String] shouldBe "The request took too long to complete"
     }
 
-    val contractWithoutVerifier = contractWithMeta.copy(verifierFuncOpt = None)
+    val contractWithoutVerifier             = contractWithMeta.copy(verifierFuncOpt = None)
     val contractWithoutVerifierComplexities = Map("a" -> 1L, "b" -> 2L, "c" -> 3L)
     (blockchain.accountScript _)
       .when(allAccounts(6).toAddress)

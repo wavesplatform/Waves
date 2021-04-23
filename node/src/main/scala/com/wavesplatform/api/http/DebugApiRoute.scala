@@ -1,7 +1,12 @@
-package com.wavesplatform.http
+package com.wavesplatform.api.http
 
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
+
+import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
+import scala.util.control.NonFatal
 
 import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
 import akka.http.scaladsl.model.StatusCodes
@@ -13,18 +18,17 @@ import cats.kernel.Monoid
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi}
-import com.wavesplatform.api.http.TransactionsApiRoute.applicationStatus
-import com.wavesplatform.api.http._
+import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
+import com.wavesplatform.api.http.TransactionsApiRoute.TransactionJsonSerializer
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
-import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, Portfolio, StateHash}
-import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
+import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
@@ -32,13 +36,8 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
-import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
-
-import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.control.NonFatal
-import scala.util.{Failure, Success}
+import play.api.libs.json.Json.JsValueWrapper
 
 case class DebugApiRoute(
     ws: WavesSettings,
@@ -59,7 +58,8 @@ case class DebugApiRoute(
     scoreReporter: Coeval[RxScoreObserver.Stats],
     configRoot: ConfigObject,
     loadBalanceHistory: Address => Seq[(Int, Long)],
-    loadStateHash: Int => Option[StateHash]
+    loadStateHash: Int => Option[StateHash],
+    priorityPoolBlockchain: () => Blockchain
 ) extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -71,6 +71,10 @@ case class DebugApiRoute(
   private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
 
   override val settings: RestAPISettings = ws.restAPISettings
+
+  private[this] val serializer                     = TransactionJsonSerializer(blockchain, transactionsApi)
+  private[this] implicit val transactionMetaWrites = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
+
   override lazy val route: Route = pathPrefix("debug") {
     stateChanges ~ balanceHistory ~ stateHash ~ validate ~ withAuth {
       state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ configInfo ~ print
@@ -130,7 +134,7 @@ case class DebugApiRoute(
       implicit ec: ExecutionContext
   ): Future[Either[ValidationError, JsObject]] = {
     rollbackTask(blockId, returnTransactionsToUtx)
-      .map(_ => Right(Json.obj("BlockId" -> blockId.toString)))
+      .map(_.map(_ => Json.obj("BlockId" -> blockId.toString)))
       .runAsyncLogErr(Scheduler(ec))
   }
 
@@ -221,35 +225,44 @@ case class DebugApiRoute(
 
   def validate: Route =
     path("validate")(jsonPost[JsObject] { jsv =>
-      val t0 = System.nanoTime
-      val tracedDiff = for {
-        tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
-        ei <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
-      } yield (tx, ei)
+      val blockchain = priorityPoolBlockchain()
+      val startTime  = System.nanoTime()
+      
+      val parsedTransaction = TransactionFactory.fromSignedRequest(jsv)
 
-      val timeSpent = (System.nanoTime - t0) * 1e-6
+      val tracedDiff = for {
+        tx   <- TracedResult(parsedTransaction)
+        diff <- TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
+      } yield (tx, diff)
+
       val error = tracedDiff.resultE match {
         case Right((tx, diff)) => diff.errorMessage(tx.id()).map(em => GenericError(em.text))
         case Left(err)         => Some(err)
       }
-      log.error(tracedDiff.resultE.toString)
+
+      val transactionJson = parsedTransaction match {
+        case Right(tx) => tx.json()
+        case Left(_)   => jsv
+      }
 
       val response = Json.obj(
         "valid"          -> error.isEmpty,
-        "validationTime" -> timeSpent.toLong,
+        "validationTime" -> (System.nanoTime() - startTime).nanos.toMillis,
         "trace"          -> tracedDiff.trace.map(_.loggedJson)
       )
-      error.fold(response)(err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)))
+
+      error.fold(response ++ transactionJson)(
+        err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)) + ("transaction" -> transactionJson)
+      )
     })
 
   def stateChanges: Route = stateChangesById ~ stateChangesByAddress
 
   def stateChangesById: Route = (get & path("stateChanges" / "info" / TransactionId)) { id =>
     transactionsApi.transactionById(id) match {
-      case Some((height, Right((ist, isr)), succeeded)) =>
-        complete(ist.json() ++ applicationStatus(isBlockV5(height), succeeded) ++ Json.obj("height" -> height.toInt, "stateChanges" -> isr))
-      case Some(_) => complete(ApiError.UnsupportedTransactionType)
-      case None    => complete(ApiError.TransactionDoesNotExist)
+      case Some(meta: TransactionMeta.Invoke) => complete(meta: TransactionMeta)
+      case Some(_)                            => complete(ApiError.UnsupportedTransactionType)
+      case None                               => complete(ApiError.TransactionDoesNotExist)
     }
   }
 
@@ -263,16 +276,11 @@ case class DebugApiRoute(
             Source
               .fromPublisher(
                 transactionsApi
-                  .invokeScriptResults(address, None, Set.empty, afterOpt)
-                  .map {
-                    case (height, Right((ist, isr)), succeeded) =>
-                      ist.json() ++ applicationStatus(isBlockV5(height), succeeded) ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr)
-                    case (height, Left(tx), succeeded) =>
-                      tx.json() ++ applicationStatus(isBlockV5(height), succeeded) ++ Json.obj("height" -> JsNumber(height))
-                  }
+                  .transactionsByAddress(address, None, Set.empty, afterOpt)
+                  .take(limit)
+                  .map(Json.toJsObject(_))
                   .toReactivePublisher
               )
-              .take(limit)
           }
         }
       }
@@ -281,8 +289,8 @@ case class DebugApiRoute(
   def stateHash: Route =
     (get & path("stateHash" / IntNumber)) { height =>
       val result = for {
-        sh      <- loadStateHash(height)
-        h <- blockchain.blockHeader(height)
+        sh <- loadStateHash(height)
+        h  <- blockchain.blockHeader(height)
       } yield Json.toJson(sh).as[JsObject] ++ Json.obj("blockId" -> h.id().toString)
 
       result match {
@@ -290,8 +298,6 @@ case class DebugApiRoute(
         case None        => complete(StatusCodes.NotFound)
       }
     }
-
-  private def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)
 }
 
 object DebugApiRoute {
@@ -313,6 +319,7 @@ object DebugApiRoute {
     },
     m => Json.toJson(m.map { case (assetId, count) => assetId.toString -> count })
   )
+
   implicit val leaseInfoFormat: Format[LeaseBalance] = Json.format
 
   case class AccountMiningInfo(address: String, miningBalance: Long, timestamp: Long)

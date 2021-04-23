@@ -17,8 +17,8 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
     with ScorexLogging {
   override def getBlockUpdate(request: GetBlockUpdateRequest): Future[GetBlockUpdateResponse] = Future {
     repo.updateForHeight(request.height) match {
-      case Success(Some(upd)) => GetBlockUpdateResponse(Some(upd.protobuf))
-      case Success(None)      => throw new StatusRuntimeException(Status.NOT_FOUND)
+      case Success(upd)                       => GetBlockUpdateResponse(Some(upd.protobuf))
+      case Failure(_: NoSuchElementException) => throw new StatusRuntimeException(Status.NOT_FOUND)
       case Failure(e: IllegalArgumentException) =>
         throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription(e.getMessage))
       case Failure(exception) =>
@@ -28,21 +28,30 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
   }
 
   override def getBlockUpdatesRange(request: GetBlockUpdatesRangeRequest): Future[GetBlockUpdatesRangeResponse] = {
-    repo.updatesRange(request.fromHeight, request.toHeight) // TODO: Use stream
-      .take(1000) // Limit
-      .toListL
-      .runAsyncLogErr
-      .map(updates => GetBlockUpdatesRangeResponse(updates.map(_.protobuf)))
-      .wrapErrors
+    if (request.fromHeight <= 0) {
+      Future.failed(new IllegalArgumentException("height must be a positive integer")).wrapErrors
+    } else if (request.toHeight < request.fromHeight) {
+      Future.failed(new IllegalArgumentException("toHeight should be >= fromHeight")).wrapErrors
+    } else {
+      repo
+        .updatesRange(request.fromHeight, request.toHeight) // TODO: Use stream
+        .take(1000)                                         // Limit
+        .toListL
+        .runAsyncLogErr
+        .map(updates => GetBlockUpdatesRangeResponse(updates.map(_.protobuf)))
+        .wrapErrors
+    }
   }
 
   override def subscribe(request: SubscribeRequest, responseObserver: StreamObserver[SubscribeEvent]): Unit = {
     if (request.fromHeight <= 0) {
-      responseObserver.onError(new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("height must be a positive integer")))
+      responseObserver.failWith(new IllegalArgumentException("height must be a positive integer"))
+    } else if (request.toHeight != 0 && request.toHeight < request.fromHeight) {
+      responseObserver.failWith(new IllegalArgumentException("toHeight should be >= fromHeight"))
     } else {
       val updatesPB = repo
         .stream(request.fromHeight)
-        .takeWhile(bu => bu.toHeight <= request.toHeight)
+        .takeWhile(bu => request.toHeight == 0 || bu.height <= request.toHeight)
         .map(elem => SubscribeEvent(update = Some(elem.protobuf)))
 
       responseObserver.completeWith(updatesPB)

@@ -1,4 +1,4 @@
-package com.wavesplatform.http
+package com.wavesplatform.api.http
 
 import akka.NotUsed
 import akka.http.scaladsl.common.EntityStreamingSupport
@@ -9,7 +9,6 @@ import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromE
 import akka.http.scaladsl.util.FastFuture
 import akka.stream.scaladsl.{Flow, Source}
 import akka.util.ByteString
-import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.meta.FunctionSignatures
@@ -36,17 +35,17 @@ trait ApiMarshallers {
   implicit lazy val ValidationErrorMarshaller: ToResponseMarshaller[ValidationError] =
     ApiErrorMarshaller.compose(ve => ApiError.fromValidationError(ve))
 
-  implicit lazy val TransactionJsonWrites: Writes[Transaction] = Writes(_.json())
+  implicit lazy val TransactionJsonWrites: OWrites[Transaction] = OWrites(_.json())
 
   implicit lazy val logWrites: Writes[TraceStep] = Writes(_.json)
 
-  implicit def tracedResultMarshaller[A](implicit writes: Writes[A]): ToResponseMarshaller[TracedResult[ApiError, A]] =
+  def tracedResultMarshaller[A](includeTrace: Boolean)(implicit writes: OWrites[A]): ToResponseMarshaller[TracedResult[ApiError, A]] =
     fromStatusCodeAndValue[StatusCode, JsValue]
       .compose(
         ae =>
           (
             ae.resultE.fold(_.code, _ => StatusCodes.OK),
-            ae.resultE.fold(_.json, writes.writes)
+            ae.resultE.fold(_.json, writes.writes) ++ (if (includeTrace) Json.obj("trace" -> ae.trace.map(_.loggedJson)) else Json.obj())
           )
       )
 

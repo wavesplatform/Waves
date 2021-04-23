@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Type}
-import com.wavesplatform.lang.v1.parser.{Expressions, Parser, ParserV2}
+import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 
@@ -251,6 +251,9 @@ object ContractCompiler {
 
       case Expressions.Tuple(types) =>
         argTypesError(func, funcName, types.mkString("(", ", ", ")"))
+
+      case Expressions.AnyType(pos) =>
+        List.empty[(PART.VALID[String], Option[PART.VALID[Type]])].pure[CompileM]
     }
 
   private def checkAnnotatedParamType(t: (String, Option[Type])): Boolean = {
@@ -335,7 +338,7 @@ object ContractCompiler {
       version: StdLibVersion,
       saveExprContext: Boolean = true
   ): Either[String, (Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
-    ParserV2.parseDAPP(input) match {
+    Parser.parseDAPPWithErrorRecovery(input) match {
       case Right((parseResult, removedCharPosOpt)) =>
         compileContract(ctx, parseResult, version, saveExprContext)
           .run(ctx)
