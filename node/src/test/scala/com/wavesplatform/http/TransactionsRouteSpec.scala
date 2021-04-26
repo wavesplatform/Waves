@@ -515,15 +515,32 @@ class TransactionsRouteSpec
 
     "provides lease and lease cancel action stateChanges" in {
       val invokeAddress    = accountGen.sample.get.toAddress
-      val leaseId1         = ByteStr(bytes32gen.sample.get)
-      val leaseId2         = ByteStr(bytes32gen.sample.get)
-      val leaseCancelId    = ByteStr(bytes32gen.sample.get)
       val recipientAddress = accountGen.sample.get.toAddress
       val recipientAlias   = aliasGen.sample.get
-      val invoke           = TxHelpers.invoke(invokeAddress, "test")
+
+      val leaseId1      = ByteStr(bytes32gen.sample.get)
+      val leaseId2      = ByteStr(bytes32gen.sample.get)
+      val leaseCancelId = ByteStr(bytes32gen.sample.get)
+
+      val nestedInvokeAddress = accountGen.sample.get.toAddress
+      val nestedLeaseId       = ByteStr(bytes32gen.sample.get)
+      val nestedLeaseCancelId = ByteStr(bytes32gen.sample.get)
+
+      val invoke = TxHelpers.invoke(invokeAddress, "test")
       val scriptResult = InvokeScriptResult(
         leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, leaseId1), InvokeScriptResult.Lease(recipientAlias, 200, 3, leaseId2)),
-        leaseCancels = Seq(LeaseCancel(leaseCancelId))
+        leaseCancels = Seq(LeaseCancel(leaseCancelId)),
+        invokes = Seq(
+          InvokeScriptResult.Invocation(
+            nestedInvokeAddress,
+            InvokeScriptResult.Call("nested", Nil),
+            Nil,
+            InvokeScriptResult(
+              leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, nestedLeaseId)),
+              leaseCancels = Seq(LeaseCancel(nestedLeaseCancelId))
+            )
+          )
+        )
       )
 
       (blockchain.leaseDetails _)
@@ -540,9 +557,22 @@ class TransactionsRouteSpec
           Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, leaseCancelId), leaseCancelId, 1))
         )
         .anyNumberOfTimes()
+      (blockchain.leaseDetails _)
+        .expects(nestedLeaseId)
+        .returning(Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Active, nestedLeaseId, 1)))
+        .anyNumberOfTimes()
+      (blockchain.leaseDetails _)
+        .expects(nestedLeaseCancelId)
+        .returning(
+          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, nestedLeaseCancelId), nestedLeaseCancelId, 1))
+        )
+        .anyNumberOfTimes()
+
       (blockchain.transactionMeta _).expects(leaseId1).returning(Some((1, true))).anyNumberOfTimes()
       (blockchain.transactionMeta _).expects(leaseId2).returning(Some((1, true))).anyNumberOfTimes()
       (blockchain.transactionMeta _).expects(leaseCancelId).returning(Some((1, true))).anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(nestedLeaseId).returning(Some((1, true))).anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(nestedLeaseCancelId).returning(Some((1, true))).anyNumberOfTimes()
 
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
       (addressTransactions.transactionById _)
@@ -553,7 +583,7 @@ class TransactionsRouteSpec
       Get(routePath(s"/info/${invoke.id()}")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
         val json = (responseAs[JsObject] \ "stateChanges").as[JsObject]
-        json shouldBe Json.parse(s"""{
+        json should matchJson(s"""{
                                    |  "data" : [ ],
                                    |  "transfers" : [ ],
                                    |  "issues" : [ ],
@@ -586,7 +616,41 @@ class TransactionsRouteSpec
                                    |    "height" : 1,
                                    |    "status" : "canceled"
                                    |  } ],
-                                   |  "invokes" : [ ]
+                                   |  "invokes" : [ {
+                                   |    "dApp" : "$nestedInvokeAddress",
+                                   |    "call" : {
+                                   |      "function" : "nested",
+                                   |      "args" : [ ]
+                                   |    },
+                                   |    "payments" : [ ],
+                                   |    "stateChanges" : {
+                                   |      "data" : [ ],
+                                   |      "transfers" : [ ],
+                                   |      "issues" : [ ],
+                                   |      "reissues" : [ ],
+                                   |      "burns" : [ ],
+                                   |      "sponsorFees" : [ ],
+                                   |      "leases" : [ {
+                                   |        "id" : "$nestedLeaseId",
+                                   |        "originTransactionId" : "$nestedLeaseId",
+                                   |        "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |        "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |        "amount" : 123,
+                                   |        "height" : 1,
+                                   |        "status" : "active"
+                                   |      } ],
+                                   |      "leaseCancels" : [ {
+                                   |        "id" : "$nestedLeaseCancelId",
+                                   |        "originTransactionId" : "$nestedLeaseCancelId",
+                                   |        "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |        "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |        "amount" : 123,
+                                   |        "height" : 1,
+                                   |        "status" : "canceled"
+                                   |      } ],
+                                   |      "invokes" : [ ]
+                                   |    }
+                                   |  } ]
                                    |}
                                    |""".stripMargin)
       }
