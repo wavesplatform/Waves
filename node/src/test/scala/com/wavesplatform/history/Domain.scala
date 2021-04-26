@@ -35,6 +35,8 @@ import org.iq80.leveldb.DB
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter, settings: WavesSettings) {
   import Domain._
 
+  val blockchain: BlockchainUpdaterImpl = blockchainUpdater
+
   @volatile
   var triggers: Seq[BlockchainUpdateTriggers] = Nil
 
@@ -63,8 +65,6 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       Application.loadBlockAt(db, blockchain)
     )
   }
-
-  val blockchain: BlockchainUpdaterImpl = blockchainUpdater
 
   def lastBlock: Block = {
     blockchainUpdater.lastBlockId
@@ -118,7 +118,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     lastBlock
   }
 
-  def appendKeyBlock(ref: ByteStr = lastBlockId): Block = {
+  def appendKeyBlock(ref: Option[ByteStr] = None): Block = {
     val block = createBlock(Block.NgBlockVersion, Nil, ref)
     appendBlock(block)
     lastBlock
