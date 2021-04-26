@@ -59,15 +59,15 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
   }
 
   "BlockchainUpdates" - {
-    "should not freeze" in withDomainAndRepo {
+    "should not freeze on micro rollback" in withDomainAndRepo {
       case (d, repo) =>
-        val keyBlock = d.appendKeyBlock()
+        val keyBlockId = d.appendKeyBlock().id()
         d.appendMicroBlock(TxHelpers.transfer())
         d.appendMicroBlock(TxHelpers.transfer())
 
         val subscription = repo.createSubscription(SubscribeRequest.of(1, 0))
         Thread.sleep(1000)
-        d.appendKeyBlock(keyBlock.id())
+        d.appendKeyBlock(keyBlockId)
 
         Thread.sleep(1000)
         subscription.cancel()
@@ -77,9 +77,59 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
               E.Block(1, _),
               E.Micro(1, _),
               E.Micro(1, _),
-              E.MicroRollback(1, rollbackId),
+              E.MicroRollback(1, `keyBlockId`),
               E.Block(2, _)
-              ) if rollbackId == keyBlock.id() =>
+              ) =>
+        }
+    }
+
+    "should not freeze on block rollback" in withDomainAndRepo {
+      case (d, repo) =>
+        val block1Id = d.appendKeyBlock().id()
+        d.appendKeyBlock()
+
+        val subscription = repo.createSubscription(SubscribeRequest.of(1, 0))
+        Thread.sleep(1000)
+        d.rollbackTo(block1Id)
+        d.appendKeyBlock()
+
+        Thread.sleep(1000)
+        subscription.cancel()
+        val events = subscription.futureValue.map(_.toUpdate)
+        events should matchPattern {
+          case Seq(
+              E.Block(1, _),
+              E.Block(2, _),
+              E.Rollback(1, `block1Id`),
+              E.Block(2, _)
+              ) =>
+        }
+    }
+
+    "should not freeze on block rollback without key-block" in withDomainAndRepo {
+      case (d, repo) =>
+        val block1Id = d.appendBlock().id()
+        val block2Id = d.appendBlock().id()
+        d.appendBlock()
+        d.rollbackTo(block2Id)
+
+        val subscription = repo.createSubscription(SubscribeRequest.of(1, 0))
+        Thread.sleep(1000)
+        d.rollbackTo(block1Id)
+        d.appendBlock()
+
+        Thread.sleep(1000)
+        subscription.cancel()
+        val events = subscription.futureValue.map(_.toUpdate)
+        events should matchPattern {
+          case Seq(
+              E.Block(1, _),
+              E.Block(2, _),
+              E.Block(3, _),
+              E.Rollback(2, `block2Id`),
+              E.Rollback(1, `block1Id`),
+              E.Block(2, _)
+              ) =>
         }
     }
 
