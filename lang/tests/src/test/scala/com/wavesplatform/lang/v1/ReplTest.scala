@@ -205,4 +205,30 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     await(repl.execute("FOLD<1>()")) shouldBe Left("Can't parse 'FOLD<1>()'")
     await(repl.execute("getInteger(")) shouldBe Left("Can't parse 'getInteger('")
   }
+
+  property("libraries") {
+    val address  = "3MpLKVSnWSY53bSNTECuGvESExzhV9ppcun"
+    val settings = NodeConnectionSettings("testnodes.wavesnodes.com", 'T'.toByte, address)
+    val repl = Repl(
+      Some(settings),
+      libraries = List(
+      """
+        |func f1(a: Int, b: Int) = a * a + b * b
+        |func f2(a: Int, b: Int) = a * a - b * b
+        |
+        |let a = 12345
+      """.stripMargin,
+      """
+        |let b = 678
+        |
+        |func g1() = this.bytes.toBase58String()
+      """.stripMargin
+      )
+    )
+    await(repl.execute("f1(4, 3)")) shouldBe Right("res1: Int = 25")
+    await(repl.execute("f2(4, 3)")) shouldBe Right("res2: Int = 7")
+    await(repl.execute(""" g1() """)) shouldBe Right(s"""res3: String = "$address"""")
+    await(repl.execute("a")) shouldBe Right("res4: Int = 12345")
+    await(repl.execute("b")) shouldBe Right("res5: Int = 678")
+  }
 }
