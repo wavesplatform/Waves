@@ -15,7 +15,7 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class ExtensionAppenderSpec extends FlatSpec with Matchers with WithDomain with PathMockFactory {
   "Extension appender" should "drop duplicate transactions from UTX" in withDomain() { d =>
-    val utx = new UtxPoolImpl(SystemTime, d.blockchain, ConcurrentSubject.publish, defaultDomainSettings.utxSettings)
+    val utx = new UtxPoolImpl(SystemTime, d.blockchain, ConcurrentSubject.publish, SettingsFromDefaultConfig.utxSettings)
     val time = new TestTime()
     val extensionAppender = ExtensionAppender(d.blockchain, utx, d.posSelector, time, stub[InvalidBlockStorage], stub[PeerDatabase], global)(null, _)
 

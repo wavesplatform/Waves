@@ -15,18 +15,16 @@ import com.wavesplatform.lang.v1.compiler.ContractCompiler
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.mining.{MiningConstraints, MultiDimensionalMiningConstraint, OneDimensionalMiningConstraint, TxEstimators}
+import com.wavesplatform.mining.MiningConstraints.MaxScriptsComplexityInBlock
+import com.wavesplatform.mining._
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.utx.UtxPoolImpl
-import monix.execution.Scheduler.Implicits.global
-import monix.reactive.Observer
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{FlatSpec, Matchers}
 
 class RideV5LimitsChangeTest extends FlatSpec with Matchers with WithDomain with PathMockFactory {
   "Blockchain" should "reject block with >1kk complexity before SynchronousCalls activated" in withDomain(
-    domainSettingsWithFeatures(BlockchainFeatures.Ride4DApps, BlockchainFeatures.BlockV5, BlockchainFeatures.MassTransfer)
+    domainSettingsWithPreactivatedFeatures(BlockchainFeatures.Ride4DApps, BlockchainFeatures.BlockV5, BlockchainFeatures.MassTransfer)
   ) { d =>
     val contractSigner  = TxHelpers.secondSigner
     val contractAddress = contractSigner.toAddress
@@ -42,13 +40,13 @@ class RideV5LimitsChangeTest extends FlatSpec with Matchers with WithDomain with
       d.blockchain,
       Some(d.lastBlock),
       block,
-      MiningConstraints(d.blockchain, d.blockchain.height, Some(defaultDomainSettings.minerSettings)).total
+      MiningConstraints(d.blockchain, d.blockchain.height, Some(SettingsFromDefaultConfig.minerSettings)).total
     )
     differResult should produce("Limit of txs was reached")
   }
 
   it should "accept block with 2.5kk complexity after SynchronousCalls activated" in withDomain(
-    domainSettingsWithFeatures(
+    domainSettingsWithPreactivatedFeatures(
       BlockchainFeatures.Ride4DApps,
       BlockchainFeatures.BlockV5,
       BlockchainFeatures.MassTransfer,
@@ -62,10 +60,11 @@ class RideV5LimitsChangeTest extends FlatSpec with Matchers with WithDomain with
     val setScript = TxHelpers.setScript(contractSigner, contract)
     d.appendBlock(setScript)
 
-    val invokes = for (_ <- 1 to 680) yield TxHelpers.invoke(contractAddress, "test") // 3675 complexity, 2499000 total
+    val invokesCount     = 680
+    val invokeComplexity = 3620
+    val invokes          = for (_ <- 1 to invokesCount) yield TxHelpers.invoke(contractAddress, "test")
 
     val time       = new TestTime()
-    val utxStorage = new UtxPoolImpl(time, d.blockchain, Observer.empty, defaultDomainSettings.utxSettings)
 
     val block = d.createBlock(Block.ProtoBlockVersion, invokes, strictTime = true)
     val differResult = BlockDiffer
@@ -73,11 +72,11 @@ class RideV5LimitsChangeTest extends FlatSpec with Matchers with WithDomain with
         d.blockchain,
         Some(d.lastBlock),
         block,
-        MiningConstraints(d.blockchain, d.blockchain.height, Some(defaultDomainSettings.minerSettings)).total
+        MiningConstraints(d.blockchain, d.blockchain.height, Some(SettingsFromDefaultConfig.minerSettings)).total
       )
       .explicitGet()
     differResult.constraint.asInstanceOf[MultiDimensionalMiningConstraint].constraints.head shouldBe OneDimensionalMiningConstraint(
-      rest = 1000,
+      rest = MaxScriptsComplexityInBlock.AfterRideV5 - invokesCount * invokeComplexity,
       TxEstimators.scriptsComplexity,
       "MaxScriptsComplexityInBlock"
     )

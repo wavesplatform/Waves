@@ -57,7 +57,7 @@ object ExtensionAppender extends ScorexLogging {
                     val forkApplicationResultEi = {
                       newBlocks.view
                         .map { b =>
-                          b -> validateAndAppendBlock(blockchainUpdater, utxStorage, pos, time)(b)
+                          b -> appendExtensionBlock(blockchainUpdater, pos, time, verify = true)(b)
                             .map {
                               _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
                             }
@@ -101,12 +101,10 @@ object ExtensionAppender extends ScorexLogging {
                               .addField("txs", droppedBlocks.size)
                           )
                         }
-                        val newTransactions = {
-                          val all  = droppedBlocks.flatMap { case (block, _) => block.transactionData }
-                          val seen = newBlocks.flatMap(_.transactionData).toSet
-                          all.filterNot(seen)
-                        }
-                        utxStorage.addAndCleanup(newTransactions)
+
+                        val newTransactions = newBlocks.view.flatMap(_.transactionData).toSet
+                        utxStorage.removeAll(newTransactions)
+                        utxStorage.addAndCleanup(droppedBlocks.flatMap(_._1.transactionData).filterNot(newTransactions))
                         Right(Some(blockchainUpdater.score))
                     }
                 }

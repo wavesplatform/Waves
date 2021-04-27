@@ -72,12 +72,13 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
     }
 
     val result = removeRec(this.priorityDiffs)
-    log.trace(
-      s"Removing diffs from priority pool: removed txs: [${result.removed.map(_.id()).mkString(", ")}], remaining diffs: [${result.diffsRest.map(_.diff.hashString).mkString(", ")}]"
-    )
+    if (result.removed.nonEmpty)
+      log.trace(
+        s"Removing diffs from priority pool: removed txs: [${result.removed.map(_.id()).mkString(", ")}], remaining diffs: [${result.diffsRest.map(_.diff.hashString).mkString(", ")}]"
+      )
 
     updateDiffs(_ => result.diffsRest)
-    log.trace(s"Priority pool transactions order: ${priorityTransactionIds.mkString(", ")}")
+    if (priorityTransactionIds.nonEmpty) log.trace(s"Priority pool transactions order: ${priorityTransactionIds.mkString(", ")}")
 
     result.removed
   }

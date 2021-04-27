@@ -1,12 +1,11 @@
-import java.io.File
-import java.nio.file.{Files, Paths}
-
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.{DefaultScalaModule, ScalaObjectMapper}
 import org.hjson.JsonValue
 import sbt.Keys.{baseDirectory, sourceManaged}
 import sbt.{Def, IO, _}
 
+import java.io.File
+import java.nio.file.{Files, Paths}
 import scala.collection.JavaConverters._
 
 object Tasks {
@@ -63,6 +62,14 @@ object Tasks {
         f => Seq(str(f.doc), listStr(f.paramsDoc.map(str)), f.complexity.toString)
       )
 
+    def buildTypesStr(vars: Seq[TypeSourceData], ver: String): String =
+      kvStr[String, TypeSourceData](
+        vars,
+        _.name,
+        v => Seq(str(v.name), ver),
+        v => Seq(listStr(v.fields.map(f => tupleStr(Seq(str(f.name), str(f.`type`))))))
+      )
+
     def readV1V2Data(): (String, String) =
       Seq("1", "2")
         .map { ver =>
@@ -110,6 +117,13 @@ object Tasks {
       (varsStr, funcsStr)
     }
 
+    def readTypeData(ver: String): String = {
+      val typesJson = JsonValue.readHjson(Files.newBufferedReader(Paths.get(s"$baseLangDir/doc/v$ver/types.hjson"))).asObject().toString
+      val types     = mapper.readValue[Map[String, List[TypeSourceData]]](typesJson).head._2
+      buildTypesStr(types, ver)
+    }
+
+    val types             = (1 to 5).map(v => readTypeData(v.toString)).mkString(" ++ ")
     val (vars, funcs)     = readV1V2Data()
     val (varsV3, funcsV3) = readCategorizedData("3")
     val (varsV4, funcsV4) = readCategorizedData("4")
@@ -122,6 +136,7 @@ object Tasks {
          | object DocSource {
          |   private val regex = "\\\\[(.+?)\\\\]\\\\(.+?\\\\)".r
          |
+         |   lazy val typeData = $types
          |   lazy val varData  = $vars ++ $varsV3 ++ $varsV4 ++ $varsV5
          |   lazy val funcData = $funcs ++ (categorizedfuncDataV3 ++ categorizedfuncDataV4 ++ categorizedfuncDataV5).view.mapValues(v => (regex.replaceAllIn(v._1, _.group(1)), v._2, v._4))
          |   lazy val categorizedfuncDataV3 = $funcsV3

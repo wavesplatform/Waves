@@ -304,7 +304,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => shutdown()),
-        BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi),
+        BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, time),
         TransactionsApiRoute(
           settings.restAPISettings,
           extensionContext.transactionsApi,
@@ -509,7 +509,7 @@ object Application extends ScorexLogging {
     }
 
   private[wavesplatform] def loadBlockMetaAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] = {
-    val result =  blockchainUpdater.liquidBlockMeta
+    val result = blockchainUpdater.liquidBlockMeta
       .filter(_ => blockchainUpdater.height == height)
       .orElse(db.get(Keys.blockMetaAt(Height(height))))
     result
