@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1
 
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.v1.repl.Repl
+import com.wavesplatform.lang.v1.repl.node.BlockchainUnavailableException
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.{Matchers, PropSpec}
@@ -230,5 +231,16 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     await(repl.execute(""" g1() """)) shouldBe Right(s"""res3: String = "$address"""")
     await(repl.execute("a")) shouldBe Right("res4: Int = 12345")
     await(repl.execute("b")) shouldBe Right("res5: Int = 678")
+  }
+
+  property("blockchain interaction using lets from libraries is prohibited") {
+    val address  = "3MpLKVSnWSY53bSNTECuGvESExzhV9ppcun"
+    val settings = NodeConnectionSettings("testnodes.wavesnodes.com", 'T'.toByte, address)
+    val repl = Repl(
+      Some(settings),
+      libraries = List("let a = this")
+    )
+    (the[BlockchainUnavailableException] thrownBy await(repl.execute("a"))).toString shouldBe
+      "Blockchain interaction using lets from libraries is prohibited, use functions instead"
   }
 }

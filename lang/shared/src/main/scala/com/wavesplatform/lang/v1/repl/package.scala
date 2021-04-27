@@ -26,5 +26,5 @@ package object repl {
     WavesContext.build(global, directives)
 
   def buildEnvironment(settings: Option[NodeConnectionSettings]): Environment[Future] =
-    settings.fold(new ErrorMessageEnvironment[Future]: Environment[Future])(WebEnvironment)
+    settings.fold(ErrorMessageEnvironment[Future]("Blockchain state is unavailable from REPL"): Environment[Future])(WebEnvironment)
 }

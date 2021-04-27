@@ -10,8 +10,8 @@ import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAsse
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import monix.eval.Coeval
 
-class ErrorMessageEnvironment[F[_]] extends Environment[F] {
-  lazy val unavailable                                                                                            = throw new BlockchainUnavailableException()
+case class ErrorMessageEnvironment[F[_]](message: String) extends Environment[F] {
+  lazy val unavailable                                                                                            = throw new BlockchainUnavailableException(message)
   override def chainId: Byte                                                                                      = 0
   override def height: F[Long]                                                                                    = unavailable
   override def inputEntity: InputEntity                                                                           = unavailable
@@ -41,6 +41,6 @@ class ErrorMessageEnvironment[F[_]] extends Environment[F] {
   ): Coeval[F[(Either[ValidationError, EVALUATED], Int)]] = unavailable
 }
 
-class BlockchainUnavailableException extends RuntimeException {
-  override def toString: String = "Blockchain state is unavailable from REPL"
+case class BlockchainUnavailableException(message: String) extends RuntimeException {
+  override def toString: String = message
 }

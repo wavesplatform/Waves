@@ -30,7 +30,7 @@ case class Repl(
   private val currentState = Atomic(initialState)
   private val engine = new ReplEngine[Future]()
 
-  initLibraries()
+  if (libraries.nonEmpty) initLibraries()
 
   private def state[S, V](s: S, view: S => V): (S, V) = (s, view(s))
   private def view(ctx: (CompilerContext, Any)) = StateView(ctx._1)
@@ -59,7 +59,7 @@ case class Repl(
     val libraryState = state(
       (
         initialCtx.compilerContext,
-        initialCtx.evaluationContext(new ErrorMessageEnvironment[Id])
+        initialCtx.evaluationContext(ErrorMessageEnvironment[Id]("Blockchain interaction using lets from libraries is prohibited, use functions instead"))
       ),
       view
     )
