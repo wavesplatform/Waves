@@ -414,7 +414,7 @@ object PureContext {
           _ <- Either.cond(result < BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
           _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^511-1")
         } yield CONST_BIGINT(result)
-      case xs => notImplemented[Id, EVALUATED]("fraction(value: BigInt, numerator: BigInt, denominator: BigInt, round: rounds)", xs)
+      case xs => notImplemented[Id, EVALUATED]("fraction(value: BigInt, numerator: BigInt, denominator: BigInt, round: Ceiling|Down|Floor|HalfEven|HalfUp)", xs)
     }
 
   lazy val _isInstanceOf: BaseFunction[NoContext] =
