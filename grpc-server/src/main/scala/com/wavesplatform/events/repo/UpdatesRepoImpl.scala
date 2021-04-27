@@ -47,7 +47,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
   private[this] def sendRealTimeUpdate(upd: BlockchainUpdated): Unit = {
     val currentUpdates = this.lastRealTimeUpdates
     val currentHeight  = height.toOption
-    this.lastRealTimeUpdates = currentUpdates.dropWhile(u => currentHeight.exists(_ - 5 > u.height)) :+ upd
+    this.lastRealTimeUpdates = currentUpdates.dropWhile(u => currentHeight.exists(_ - 1 > u.height)) :+ upd
     realTimeUpdates.onNext(upd) match {
       case Ack.Continue => // OK
       case Ack.Stop     => throw new IllegalStateException("Real time updates subject is stopped")
@@ -254,16 +254,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
         .map { data =>
           def isLastBatch(data: Seq[_]): Boolean = data.length < LevelDBReadBatchSize
 
-          if (isLastBatch(data)) {
-            val liquidUpdates = liquidState match {
-              case None => Seq.empty
-              case Some(LiquidState(keyBlock, microBlocks)) =>
-                val lastBlock = data.lastOption
-                require(lastBlock.forall(keyBlock.references), "Liquid block doesn't reference last hard block")
-                Seq(keyBlock) ++ microBlocks
-            }
-            (data ++ liquidUpdates, None)
-          } else {
+          if (isLastBatch(data)) (data, None) else {
             val nextTickFrom = data.lastOption.map(_.height + 1)
             (data, nextTickFrom)
           }
