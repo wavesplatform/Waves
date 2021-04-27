@@ -2,18 +2,18 @@ package com.wavesplatform.events.repo
 
 import java.nio.{ByteBuffer, ByteOrder}
 
+import scala.jdk.CollectionConverters._
+import scala.util.{Failure, Success, Try}
+
 import com.wavesplatform.Shutdownable
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events._
-import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
+import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
-
-import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success, Try}
 
 class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     extends UpdatesRepo.Read
@@ -208,14 +208,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
         }
 
         if (isLastBatch(data)) {
-          val liquidUpdates = liquidState match {
-            case None => Seq.empty
-            case Some(LiquidState(keyBlock, microBlocks)) =>
-              val lastBlock = data.lastOption
-              require(lastBlock.forall(keyBlock.references))
-              Seq(keyBlock) ++ microBlocks
-          }
-          (data ++ liquidUpdates, None)
+          (data, None)
         } else {
           val nextTickFrom = data.lastOption.map(_.toHeight + 1)
           (data, nextTickFrom)
