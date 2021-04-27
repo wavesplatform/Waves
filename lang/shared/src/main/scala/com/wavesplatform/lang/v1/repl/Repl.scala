@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.repl
 
-import cats.{Functor, Monoid}
 import cats.implicits._
+import cats.{Functor, Monoid}
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
@@ -13,14 +13,14 @@ import scala.concurrent.Future
 
 case class Repl(
   settings: Option[NodeConnectionSettings] = None,
-  lastСontext: (CompilerContext, EvaluationContext[Environment, Future]) =
+  lastContext: (CompilerContext, EvaluationContext[Environment, Future]) =
     (CompilerContext.empty, Monoid[EvaluationContext[Environment, Future]].empty)
 ) {
   private val environment  = buildEnvironment(settings)
   private val initialState = state(
     (
-      lastСontext._1 |+| initialCtx.compilerContext,
-      lastСontext._2 |+| initialCtx.evaluationContext(environment)
+      lastContext._1 |+| initialCtx.compilerContext,
+      lastContext._2 |+| initialCtx.evaluationContext(environment)
     ),
     view
   )
