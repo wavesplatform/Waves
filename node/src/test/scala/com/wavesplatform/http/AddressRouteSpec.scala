@@ -379,6 +379,7 @@ class AddressRouteSpec
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3).toString
+      (response \ "version").asOpt[Int] shouldBe None
       (response \ "complexity").as[Long] shouldBe 0
       (response \ "verifierComplexity").as[Long] shouldBe 0
       (response \ "extraFee").as[Long] shouldBe 0
