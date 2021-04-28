@@ -107,14 +107,14 @@ object PureContext {
       case xs                   => notImplemented[Id, EVALUATED]("toBigInt(n: Int)", xs)
     }
 
-  lazy val int512ToInt: BaseFunction[NoContext] =
+  lazy val bigIntToInt: BaseFunction[NoContext] =
     NativeFunction("toInt", 1, BIGINT_TO_INT, LONG, ("n", BIGINT)) {
       case CONST_BIGINT(n) :: Nil =>
         Either.cond(Long.MaxValue >= n && n >= Long.MinValue, CONST_LONG(n.toLong), s"toInt: BigInt $n out of integers range")
       case xs => notImplemented[Id, EVALUATED]("toBigInt(n: Int)", xs)
     }
 
-  lazy val int512ToString: BaseFunction[NoContext] =
+  lazy val bigIntToString: BaseFunction[NoContext] =
     NativeFunction("toString", 65, BIGINT_TO_STRING, STRING, ("n", BIGINT)) {
       case CONST_BIGINT(n) :: Nil => CONST_STRING(n.toString)
       case xs                     => notImplemented[Id, EVALUATED]("toString(n: BigInt)", xs)
@@ -150,7 +150,7 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED]("parseBigInt(n: String)", xs)
     }
 
-  lazy val int512ToBytes: BaseFunction[NoContext] =
+  lazy val bigIntToBytes: BaseFunction[NoContext] =
     NativeFunction("toBytes", 65, BIGINT_TO_BYTES, BYTESTR, ("n", BIGINT)) {
       case CONST_BIGINT(n) :: Nil => CONST_BYTESTR(ByteStr(n.toByteArray))
       case xs                     => notImplemented[Id, EVALUATED]("toBytes(n: BigInt)", xs)
@@ -312,10 +312,10 @@ object PureContext {
       FUNCTION_CALL(ne, List(REF("@a"), REF("unit")))
     }
 
-  lazy val fraction: BaseFunction[NoContext] =
+  def fraction(fixLimitCheck: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "fraction",
-      1,
+      Map[StdLibVersion, Long](V1 -> 1, V2 -> 1, V3 -> 1, V4 -> 1, V5 -> 14),
       FRACTION,
       LONG,
       ("value", LONG),
@@ -323,13 +323,40 @@ object PureContext {
       ("denominator", LONG)
     ) {
       case CONST_LONG(v) :: CONST_LONG(n) :: CONST_LONG(d) :: Nil =>
+        val (checkMax, checkMin) =
+          if (fixLimitCheck)
+            ((_: BigInt) <= Long.MaxValue, (_: BigInt) >= Long.MinValue)
+          else
+            ((_: BigInt) < Long.MaxValue, (_: BigInt) > Long.MinValue)
         for {
           _ <- Either.cond(d != 0, (), "Fraction: division by zero")
           result = BigInt(v) * n / d
-          _ <- Either.cond(result < Long.MaxValue, (), s"Long overflow: value `$result` greater than 2^63-1")
-          _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^63-1")
+          _ <- Either.cond(checkMax(result), (), s"Long overflow: value `$result` greater than 2^63-1")
+          _ <- Either.cond(checkMin(result), (), s"Long overflow: value `$result` less than -2^63-1")
         } yield CONST_LONG(result.toLong)
       case xs => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
+    }
+
+  def fractionIntRounds(roundTypes: UNION): BaseFunction[NoContext] =
+    UserFunction(
+      "fraction",
+      17,
+      LONG,
+      ("@value", LONG),
+      ("@numerator", LONG),
+      ("@denominator", LONG),
+      ("@round", roundTypes)
+    ) {
+      val r = FUNCTION_CALL(
+        Native(FRACTION_BIGINT_ROUNDS),
+        List(
+          FUNCTION_CALL(Native(TO_BIGINT), List(REF("@value"))),
+          FUNCTION_CALL(Native(TO_BIGINT), List(REF("@numerator"))),
+          FUNCTION_CALL(Native(TO_BIGINT), List(REF("@denominator"))),
+          REF("@round")
+        )
+      )
+      FUNCTION_CALL(Native(BIGINT_TO_INT), List(r))
     }
 
   val fractionBigInt: BaseFunction[NoContext] =
@@ -346,13 +373,13 @@ object PureContext {
         for {
           _ <- Either.cond(d != 0, (), "Fraction: division by zero")
           result = v * n / d
-          _ <- Either.cond(result < BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
-          _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^511-1")
+          _ <- Either.cond(result <= BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
+          _ <- Either.cond(result >= BigIntMin, (), s"Long overflow: value `$result` less than -2^511")
         } yield CONST_BIGINT(result)
       case xs => notImplemented[Id, EVALUATED]("fraction(value: BigInt, numerator: BigInt, denominator: BigInt)", xs)
     }
 
-  def fractionRounds(roundTypes: UNION): BaseFunction[NoContext] =
+  def fractionBigIntRounds(roundTypes: UNION): BaseFunction[NoContext] =
     NativeFunction(
       "fraction",
       128,
@@ -411,10 +438,10 @@ object PureContext {
               }
             case _ => Left(s"unsupported rounding $r")
           }
-          _ <- Either.cond(result < BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
-          _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^511-1")
+          _ <- Either.cond(result <= BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
+          _ <- Either.cond(result >= BigIntMin, (), s"Long overflow: value `$result` less than -2^511")
         } yield CONST_BIGINT(result)
-      case xs => notImplemented[Id, EVALUATED]("fractionRounds(value: BigInt, numerator: BigInt, denominator: BigInt, round: rounds)", xs)
+      case xs => notImplemented[Id, EVALUATED]("fraction(value: BigInt, numerator: BigInt, denominator: BigInt, round: Ceiling|Down|Floor|HalfEven|HalfUp)", xs)
     }
 
   lazy val _isInstanceOf: BaseFunction[NoContext] =
@@ -1505,7 +1532,6 @@ object PureContext {
 
   private val commonFunctions =
     Array(
-      fraction,
       sizeBytes,
       toBytesBoolean,
       toBytesLong,
@@ -1523,7 +1549,7 @@ object PureContext {
     ) ++ operators
 
   private val v1V2V3CommonFunctions =
-    commonFunctions :+ takeString :+ dropRightString :+ extract :+ sizeString :+ dropString :+ takeRightString
+    commonFunctions :+ takeString :+ dropRightString :+ extract :+ sizeString :+ dropString :+ takeRightString :+ fraction(fixLimitCheck = false)
 
   private val fromV3V4Functions =
     Array(
@@ -1588,7 +1614,8 @@ object PureContext {
         takeString,
         dropRightString,
         dropString,
-        takeRightString
+        takeRightString,
+        fraction(fixLimitCheck = false)
       )
 
   private val v5Functions =
@@ -1605,11 +1632,11 @@ object PureContext {
         dropStringV5,
         takeRightStringV5,
         intToBigInt,
-        int512ToInt,
-        int512ToString,
+        bigIntToInt,
+        bigIntToString,
         stringToBigInt,
         stringToBigIntOpt,
-        int512ToBytes,
+        bigIntToBytes,
         bytesToBigInt,
         bytesToBigIntLim,
         sumToBigInt,
@@ -1622,13 +1649,15 @@ object PureContext {
         listBigIntMax,
         listBigIntMin,
         fractionBigInt,
-        fractionRounds(UNION(fromV5RoundTypes)),
+        fractionBigIntRounds(UNION(fromV5RoundTypes)),
+        fractionIntRounds(UNION(fromV5RoundTypes)),
         negativeBigInt,
         getBigIntListMedian,
         powBigInt(UNION(fromV5RoundTypes)),
         logBigInt(UNION(fromV5RoundTypes)),
         pow(UNION(fromV5RoundTypes)),
-        log(UNION(fromV5RoundTypes))
+        log(UNION(fromV5RoundTypes)),
+        fraction(fixLimitCheck = true)
       )
 
   private val v1V2Ctx =

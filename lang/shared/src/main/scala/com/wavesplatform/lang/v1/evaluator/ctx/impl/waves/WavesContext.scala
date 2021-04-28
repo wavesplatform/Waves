@@ -1,13 +1,13 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import cats.implicits._
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Functions.{addressFromStringF, _}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Vals._
 import com.wavesplatform.lang.v1.traits._
+import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
 object WavesContext {
   def build(global: BaseGlobal, ds: DirectiveSet): CTX[Environment] =
@@ -52,7 +52,7 @@ object WavesContext {
     CTX(
       variableTypes(version, proofsEnabled),
       variableVars(isTokenContext, version, ds.contentType, proofsEnabled),
-      variableFuncs(global, version, ds.contentType, proofsEnabled)
+      variableFuncs(global, version, ds.scriptType, proofsEnabled)
     )
   }
 
@@ -82,7 +82,15 @@ object WavesContext {
       isDataStorageUntouchedF
     )
 
-  private def variableFuncs(global: BaseGlobal, version: StdLibVersion, c: ContentType, proofsEnabled: Boolean) = {
+  private def selfCallFunctions(v: StdLibVersion) =
+    Array(
+      getIntegerFromStateSelfF,
+      getBooleanFromStateSelfF,
+      getBinaryFromStateSelfF,
+      getStringFromStateSelfF
+    ) ++ extractedStateSelfFuncs(v)
+
+  private def variableFuncs(global: BaseGlobal, version: StdLibVersion, scriptType: ScriptType, proofsEnabled: Boolean) = {
     val commonFuncs =
       Array(
         getIntegerFromArrayF(version),
@@ -95,18 +103,15 @@ object WavesContext {
         getStringByIndexF(version),
         addressFromPublicKeyF(version),
         if (version >= V4) addressFromStringV4 else addressFromStringF(version)
-        ) ++ (if(version >= V5) {
-          Array(accountScriptHashF(global))
-        } else {
-          Array()
-        })
+      ) ++ (if (version >= V5) Array(accountScriptHashF(global)) else Array())
 
     val versionSpecificFuncs =
       version match {
-        case V1 | V2 => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
-        case V3      => fromV3Funcs(proofsEnabled, version) ++ balanceV123Functions
-        case V4      => fromV4Funcs(proofsEnabled, version)
-        case V5      => fromV5Funcs(proofsEnabled, version)
+        case V1 | V2                     => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
+        case V3                          => fromV3Funcs(proofsEnabled, version) ++ balanceV123Functions
+        case V4                          => fromV4Funcs(proofsEnabled, version)
+        case V5 if scriptType == Account => fromV5Funcs(proofsEnabled, version) ++ selfCallFunctions(V5)
+        case V5                          => fromV5Funcs(proofsEnabled, version)
       }
     commonFuncs ++ versionSpecificFuncs
   }

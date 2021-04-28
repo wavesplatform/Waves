@@ -137,7 +137,13 @@ object FunctionIds {
   val DATA_BOOLEAN_FROM_STATE: Short = 1051
   val DATA_BYTES_FROM_STATE: Short   = 1052
   val DATA_STRING_FROM_STATE: Short  = 1053
+
   val IS_UNTOUCHED: Short            = 1054
+
+  val DATA_LONG_FROM_STATE_SELF: Short    = 1055
+  val DATA_BOOLEAN_FROM_STATE_SELF: Short = 1056
+  val DATA_BYTES_FROM_STATE_SELF: Short   = 1057
+  val DATA_STRING_FROM_STATE_SELF: Short  = 1058
 
   val ADDRESSFROMRECIPIENT: Short     = 1060
   val ADDRESSTOSTRING: Short          = 1061

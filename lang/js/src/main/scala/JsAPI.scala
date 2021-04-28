@@ -127,10 +127,15 @@ object JsAPI {
       libraries: Dictionary[String] = Dictionary.empty,
   ): js.Dynamic = {
     val r = for {
+      estimatorVer <- Either.cond(
+        estimatorVersion > 0 && estimatorVersion <= ScriptEstimator.all.length,
+        estimatorVersion,
+        s"Version of estimator must be not greater than ${ScriptEstimator.all.length}"
+      )
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
-      compiled    <- parseAndCompileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVersion - 1))
+      compiled    <- parseAndCompileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVer - 1))
     } yield compiled
     r.fold(
       e => js.Dynamic.literal("error" -> e),
@@ -191,10 +196,15 @@ object JsAPI {
       libraries: Dictionary[String] = Dictionary.empty
   ): js.Dynamic = {
     val r = for {
+      estimatorVer <- Either.cond(
+        estimatorVersion > 0 && estimatorVersion <= ScriptEstimator.all.length,
+        estimatorVersion,
+        s"Version of estimator must be not greater than ${ScriptEstimator.all.length}"
+      )
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
-      compiled    <- compileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVersion - 1), needCompaction)
+      compiled    <- compileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVer - 1), needCompaction)
     } yield compiled
     r.fold(
       e => js.Dynamic.literal("error" -> e),
@@ -286,7 +296,10 @@ object JsAPI {
   def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
 
   @JSExportTopLevel("repl")
-  def repl(settings: UndefOr[NodeConnectionSettings]): js.Dynamic = asJs(Repl(settings.toOption))
+  def repl(
+    settings: UndefOr[NodeConnectionSettings],
+    libraries: js.Array[String] = js.Array()
+  ): js.Dynamic = asJs(Repl(settings.toOption, libraries.toList))
 
   private def asJs(repl: Repl): js.Dynamic =
     jObj(

@@ -38,8 +38,8 @@ object TxHelpers {
   def genesis(address: Address, amount: Long = 100_000_000.waves): GenesisTransaction =
     GenesisTransaction.create(address, amount, timestamp).explicitGet()
 
-  def transfer(from: KeyPair = defaultSigner, to: AddressOrAlias = secondAddress, amount: Long = 1.waves, asset: Asset = Waves): TransferTransaction =
-    TransferTransaction.selfSigned(TxVersion.V1, from, to, asset, amount, Waves, TestValues.fee, ByteStr.empty, timestamp).explicitGet()
+  def transfer(from: KeyPair = defaultSigner, to: AddressOrAlias = secondAddress, amount: Long = 1.waves, asset: Asset = Waves, fee: Long = TestValues.fee, version: Byte = TxVersion.V1): TransferTransaction =
+    TransferTransaction.selfSigned(version, from, to, asset, amount, Waves, fee, ByteStr.empty, timestamp).explicitGet()
 
   def issue(amount: Long = 1000, script: Script = null): IssueTransaction =
     IssueTransaction

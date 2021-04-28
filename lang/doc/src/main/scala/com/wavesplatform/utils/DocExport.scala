@@ -1,24 +1,19 @@
 package com.wavesplatform.utils
 
-import cats.Id
-import cats.kernel.Monoid
 import com.github.mustachejava._
 import com.wavesplatform.DocSource
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.utils.doc.RideFullContext
 
 import scala.jdk.CollectionConverters._
 
 object DocExport {
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
     if (args.size != 4 || args(0) != "--gen-doc") {
       System.err.println("Expected args: --gen-doc <version> <template> <output>")
     } else {
@@ -51,12 +46,12 @@ object DocExport {
       }
 
       def typeRepr(t: FINAL)(name: String = t.name): TypeDoc = t match {
-        case UNION(Seq(UNIT, l), _) => OptionOf(typeRepr(l)())
-        case UNION(Seq(l, UNIT), _) => OptionOf(typeRepr(l)())
-        case UNION(l, _)            => UnionDoc(name, l.map(t => typeRepr(t)()).asJava)
+        case UNION(Seq(UNIT, l), _) => OptionOf(typeRepr(l)(l.name))
+        case UNION(Seq(l, UNIT), _) => OptionOf(typeRepr(l)(l.name))
+        case UNION(l, _)            => UnionDoc(name, l.map(t => typeRepr(t)(t.name)).asJava)
         case CASETYPEREF(_, fields, _) =>
-          objDoc(name, fields.map(f => Field(f._1, typeRepr(f._2)())).asJava)
-        case LIST(t) => ListOf(typeRepr(t)())
+          objDoc(name, fields.map(f => Field(f._1, typeRepr(f._2)(f._2.name))).asJava)
+        case LIST(t) => ListOf(typeRepr(t)(t.name))
         case t       => nativeTypeDoc(t.toString)
       }
 
@@ -87,7 +82,7 @@ object DocExport {
         fullContext.functions
           .map(
             f => {
-              val (funcDoc, paramsDoc) = DocSource.funcData((
+              val (funcDoc, paramsDoc, _) = DocSource.funcData((
                 f.name,
                 f.signature.args.map(_._2.toString).toList,
                 version.value.asInstanceOf[Int]
@@ -96,7 +91,7 @@ object DocExport {
                 f.name,
                 extType(f.signature.result),
                 funcDoc,
-                ((f.args, f.signature.args, paramsDoc).zipped.toList
+                (f.args.lazyZip(f.signature.args).lazyZip(paramsDoc).toList
                   map { arg => VarDoc(arg._1, extType(arg._2._2), arg._3)}
                 ).asJava,
                 f.costByLibVersion(version).toString
