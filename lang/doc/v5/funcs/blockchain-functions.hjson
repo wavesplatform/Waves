@@ -50,7 +50,7 @@
       complexity: 5
     }
     {
-      name: "hashScriptAtAddress"
+      name: "scriptHash"
       params: [ "Address|Alias" ]
       doc: "blake2b hash of account's script"
       paramsDoc: [ "account" ]
