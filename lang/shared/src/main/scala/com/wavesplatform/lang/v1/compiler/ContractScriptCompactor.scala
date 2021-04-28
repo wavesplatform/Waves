@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.protobuf.dapp.DAppMeta.CompactNameAndOriginalNamePair
 
 import scala.collection._
 
@@ -108,12 +109,17 @@ object ContractScriptCompactor {
       )
     }
 
-    val resultNameMap = if (saveNameMapToMeta) {
-      originalToCompactedNameMap.map{ case (k, v) => v -> k }.toMap
+    val resultNamePairList = if (saveNameMapToMeta) {
+      originalToCompactedNameMap
+        .toSeq
+        .sortBy(_._2) //sort by compactName
+        .map{
+          case (k, v) => CompactNameAndOriginalNamePair(v, k)
+        }
     } else {
-      immutable.HashMap[String, String]()
+      immutable.Seq.empty[CompactNameAndOriginalNamePair]
     }
-    val metaWithNameMap = handledDApp.meta.withCompactNameToOriginalNameMap(resultNameMap)
+    val metaWithNameMap = handledDApp.meta.withCompactNameAndOriginalNamePairList(resultNamePairList)
 
     handledDApp.copy(
       meta = metaWithNameMap,
@@ -124,8 +130,9 @@ object ContractScriptCompactor {
   }
 
   def decompact(dApp: DApp): DApp = {
-    if (dApp.meta.compactNameToOriginalNameMap.nonEmpty) {
-      compact(dApp, dApp.meta.compactNameToOriginalNameMap, false)
+    if (dApp.meta.compactNameAndOriginalNamePairList.nonEmpty) {
+      val compactNameToOriginalNameMap = dApp.meta.compactNameAndOriginalNamePairList.map(pair => pair.compactName -> pair.originalName).toMap
+      compact(dApp, compactNameToOriginalNameMap, false)
     } else {
       dApp
     }
