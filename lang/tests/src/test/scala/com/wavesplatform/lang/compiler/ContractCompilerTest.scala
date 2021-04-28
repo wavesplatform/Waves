@@ -1116,28 +1116,33 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     result should produce("Undefined field `originCallerPublicKey` of variable of type `Invocation`")
   }
 
-  property("contract script compaction") {
-    val expr = {
-      val script =
-        """
-          | {-# STDLIB_VERSION 5 #-}
-          | {-# CONTENT_TYPE DAPP #-}
-          |
-          | let fooVar = 42
-          |
-          | func barFunc(barFuncArg1: Int) = 100500 + barFuncArg1
-          |
-          | @Callable(invocation)
-          | func bazCallableFunc(bazCallableFuncArg1: Int, bazCallableFuncArg2: String) = {
-          |   let result = barFunc(fooVar) + bazCallableFuncArg1
-          |   [
-          |     IntegerEntry("integerEntryKey", result),
-          |     StringEntry("stringEntryKey", bazCallableFuncArg2)
-          |   ]
-          | }
-          |
+  property("contract script compaction - V4, V5") {
+    val script =
+      """
+        | {-# CONTENT_TYPE DAPP #-}
+        |
+        | let fooVar = 42
+        |
+        | func barFunc(barFuncArg1: Int) = 100500 + barFuncArg1
+        |
+        | @Callable(invocation)
+        | func bazCallableFunc(bazCallableFuncArg1: Int, bazCallableFuncArg2: String) = {
+        |   let result = barFunc(fooVar) + bazCallableFuncArg1
+        |   [
+        |     IntegerEntry("integerEntryKey", result),
+        |     StringEntry("stringEntryKey", bazCallableFuncArg2)
+        |   ]
+        | }
+        |
         """.stripMargin
-      Parser.parseContract(script).get.value
+    val exprV4 = {
+      val v4Script = "{-# STDLIB_VERSION 4 #-}\n" + script
+      Parser.parseContract(v4Script).get.value
+    }
+
+    val exprV5 = {
+      val v5Script = "{-# STDLIB_VERSION 5 #-}\n" + script
+      Parser.parseContract(v5Script).get.value
     }
 
     val expectedResult = Right(
@@ -1194,6 +1199,251 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           )
         ),
         None
+      )
+    )
+
+    val ctxV4 =
+      PureContext.build(V4).withEnvironment[Environment] |+|
+        WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
+
+    val ctxV5 =
+      PureContext.build(V5).withEnvironment[Environment] |+|
+        WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
+
+    compiler.ContractCompiler(ctxV4.compilerContext, exprV4, V4, needCompaction = true) shouldBe expectedResult
+    compiler.ContractCompiler(ctxV5.compilerContext, exprV5, V5, needCompaction = true) shouldBe expectedResult
+  }
+
+  property("contract script compaction - V3") {
+    val expr = {
+      val script =
+        """
+          | {-# STDLIB_VERSION 3 #-}
+          | {-# CONTENT_TYPE DAPP #-}
+          |
+          | let fooVar = 42
+          |
+          | func barFunc(barFuncArg1: Int) = 100500 + barFuncArg1
+          |
+          | @Callable(invocation)
+          | func bazCallableFunc(bazCallableFuncArg1: Int, bazCallableFuncArg2: String) = {
+          |   let result = barFunc(fooVar) + bazCallableFuncArg1
+          |   WriteSet([DataEntry("integerEntryKey", result), DataEntry("stringEntryKey", bazCallableFuncArg2)])
+          | }
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    val expectedResult = Right(
+      DApp(
+        DAppMeta(
+          version = 1,
+          List(
+            CallableFuncSignature(ByteString.copyFrom(Array[Byte](1, 8)))
+          ),
+          Seq(
+            ("a1", "fooVar"),
+            ("a2", "barFunc"),
+            ("a3", "barFuncArg1"),
+            ("a4", "invocation"),
+            ("a5", "bazCallableFuncArg1"),
+            ("a6", "bazCallableFuncArg2"),
+            ("a7", "result")
+          ).map(el => CompactNameAndOriginalNamePair(el._1, el._2))
+        ),
+        List(
+          LET("a1", CONST_LONG(42L)),
+          Terms.FUNC(
+            "a2",
+            List("a3"),
+            FUNCTION_CALL(Native(100), List(CONST_LONG(100500L), REF("a3")))
+          )
+        ),
+        List(
+          CallableFunction(
+            CallableAnnotation("a4"),
+            Terms.FUNC(
+              "bazCallableFunc",
+              List("a5", "a6"),
+              LET_BLOCK(
+                LET(
+                  "a7",
+                  FUNCTION_CALL(Native(100), List(FUNCTION_CALL(User("a2"), List(REF("a1"))), REF("a5")))
+                ),
+                FUNCTION_CALL(
+                  User(FieldNames.WriteSet),
+                  List(
+                    FUNCTION_CALL(
+                      Native(1100),
+                      List(
+                        FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("integerEntryKey").explicitGet(), REF("a7"))),
+                        FUNCTION_CALL(
+                          Native(1100),
+                          List(
+                            FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("stringEntryKey").explicitGet(), REF("a6"))),
+                            REF("nil")
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        ),
+        None
+      )
+    )
+
+    val stdLibVer = V3
+    val ctx =
+      PureContext.build(stdLibVer).withEnvironment[Environment] |+|
+        WavesContext.build(Global, DirectiveSet(stdLibVer, Account, DAppType).explicitGet())
+
+    val compilationResult = compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVer, needCompaction = true)
+    compilationResult shouldBe expectedResult
+  }
+
+
+  property("contract script compaction - vars with the same name") {
+    val expr = {
+      val script =
+        """
+          | {-# STDLIB_VERSION 5 #-}
+          | {-# CONTENT_TYPE DAPP #-}
+          |
+          | func barFunc() = {
+          |   let fooVar = 40
+          |   fooVar
+          | }
+          |
+          | func bazFunc() = {
+          |   let fooVar = 2
+          |   fooVar
+          | }
+          |
+          | @Verifier(tx)
+          | func verify() = {
+          |   (barFunc() + bazFunc()) == 42
+          | }
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    val expectedResult = Right(
+      DApp(
+        DAppMeta(
+          version = 2,
+          List.empty,
+          Seq(
+            ("a1", "barFunc"),
+            ("a2", "fooVar"),
+            ("a3", "bazFunc"),
+            ("a4", "tx"),
+            ("a5", "verify")
+          ).map(el => CompactNameAndOriginalNamePair(el._1, el._2))
+        ),
+        List(
+          Terms.FUNC(
+            "a1",
+            List.empty,
+            LET_BLOCK(
+              LET("a2", CONST_LONG(40L)),
+              REF("a2")
+            )
+          ),
+          Terms.FUNC(
+            "a3",
+            List.empty,
+            LET_BLOCK(
+              LET("a2", CONST_LONG(2L)),
+              REF("a2")
+            )
+          )
+        ),
+        List.empty,
+        Some(
+          VerifierFunction(
+            VerifierAnnotation("a4"),
+            Terms.FUNC(
+              "a5",
+              List(),
+              FUNCTION_CALL(Native(0),
+                List(
+                  FUNCTION_CALL(Native(100), List(FUNCTION_CALL(User("a1"), List()), FUNCTION_CALL(User("a3"), List()))),
+                  CONST_LONG(42L)
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+
+    val ctx =
+      PureContext.build(V5).withEnvironment[Environment] |+|
+        WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
+
+    val compilationResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = true)
+    compilationResult shouldBe expectedResult
+  }
+
+  property("contract script compaction - script var has name as compacted name") {
+    val expr = {
+      val script =
+        """
+          | {-# STDLIB_VERSION 5 #-}
+          | {-# CONTENT_TYPE DAPP #-}
+          |
+          | let fooVar = "some value"
+          |
+          | @Verifier(tx)
+          | func verify() = {
+          |   let a1 = "some value"
+          |   fooVar == a1
+          | }
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    val expectedResult = Right(
+      DApp(
+        DAppMeta(
+          version = 2,
+          List.empty,
+          Seq(
+            ("a1", "fooVar"),
+            ("a2", "tx"),
+            ("a3", "verify"),
+            ("a4", "a1")
+          ).map(el => CompactNameAndOriginalNamePair(el._1, el._2))
+        ),
+        List(
+          LET("a1", CONST_STRING("some value").explicitGet())
+        ),
+        List.empty,
+        Some(
+          VerifierFunction(
+            VerifierAnnotation("a2"),
+            Terms.FUNC(
+              "a3",
+              List(),
+              LET_BLOCK(
+                LET("a4", CONST_STRING("some value").explicitGet()),
+                FUNCTION_CALL(Native(0),
+                  List(
+                    REF("a1"),
+                    REF("a4")
+                  )
+                )
+              )
+            )
+          )
+        )
       )
     )
 
