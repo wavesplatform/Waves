@@ -107,14 +107,14 @@ object PureContext {
       case xs                   => notImplemented[Id, EVALUATED]("toBigInt(n: Int)", xs)
     }
 
-  lazy val int512ToInt: BaseFunction[NoContext] =
+  lazy val bigIntToInt: BaseFunction[NoContext] =
     NativeFunction("toInt", 1, BIGINT_TO_INT, LONG, ("n", BIGINT)) {
       case CONST_BIGINT(n) :: Nil =>
         Either.cond(Long.MaxValue >= n && n >= Long.MinValue, CONST_LONG(n.toLong), s"toInt: BigInt $n out of integers range")
       case xs => notImplemented[Id, EVALUATED]("toBigInt(n: Int)", xs)
     }
 
-  lazy val int512ToString: BaseFunction[NoContext] =
+  lazy val bigIntToString: BaseFunction[NoContext] =
     NativeFunction("toString", 65, BIGINT_TO_STRING, STRING, ("n", BIGINT)) {
       case CONST_BIGINT(n) :: Nil => CONST_STRING(n.toString)
       case xs                     => notImplemented[Id, EVALUATED]("toString(n: BigInt)", xs)
@@ -150,7 +150,7 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED]("parseBigInt(n: String)", xs)
     }
 
-  lazy val int512ToBytes: BaseFunction[NoContext] =
+  lazy val bigIntToBytes: BaseFunction[NoContext] =
     NativeFunction("toBytes", 65, BIGINT_TO_BYTES, BYTESTR, ("n", BIGINT)) {
       case CONST_BIGINT(n) :: Nil => CONST_BYTESTR(ByteStr(n.toByteArray))
       case xs                     => notImplemented[Id, EVALUATED]("toBytes(n: BigInt)", xs)
@@ -441,7 +441,7 @@ object PureContext {
           _ <- Either.cond(result <= BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
           _ <- Either.cond(result >= BigIntMin, (), s"Long overflow: value `$result` less than -2^511")
         } yield CONST_BIGINT(result)
-      case xs => notImplemented[Id, EVALUATED]("fractionRounds(value: BigInt, numerator: BigInt, denominator: BigInt, round: rounds)", xs)
+      case xs => notImplemented[Id, EVALUATED]("fraction(value: BigInt, numerator: BigInt, denominator: BigInt, round: Ceiling|Down|Floor|HalfEven|HalfUp)", xs)
     }
 
   lazy val _isInstanceOf: BaseFunction[NoContext] =
@@ -1632,11 +1632,11 @@ object PureContext {
         dropStringV5,
         takeRightStringV5,
         intToBigInt,
-        int512ToInt,
-        int512ToString,
+        bigIntToInt,
+        bigIntToString,
         stringToBigInt,
         stringToBigIntOpt,
-        int512ToBytes,
+        bigIntToBytes,
         bytesToBigInt,
         bytesToBigIntLim,
         sumToBigInt,
