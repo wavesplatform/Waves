@@ -15,8 +15,6 @@ object ContractScriptCompactor {
       saveNameMapToMeta: Boolean = true
   ): DApp = {
 
-    val handledDApp = removeUnusedCode(dApp)
-
     val originalToCompactedNameMap: mutable.Map[String, String] = nameMap.to(mutable.Map)
 
     var currentNameCharIdx = 0
@@ -92,8 +90,8 @@ object ContractScriptCompactor {
       }
     }
 
-    val compDecs = handledDApp.decs.map(compactDec)
-    val compCallableFuncs = handledDApp.callableFuncs.map { cFunc =>
+    val compDecs = dApp.decs.map(compactDec)
+    val compCallableFuncs = dApp.callableFuncs.map { cFunc =>
       cFunc.copy(
         annotation = cFunc.annotation.copy(invocationArgName = createCompName(cFunc.annotation.invocationArgName)),
         u = cFunc.u.copy(
@@ -102,7 +100,7 @@ object ContractScriptCompactor {
         )
       )
     }
-    val comVerifierFuncOpt = handledDApp.verifierFuncOpt.map { vFunc =>
+    val comVerifierFuncOpt = dApp.verifierFuncOpt.map { vFunc =>
       vFunc.copy(
         annotation = vFunc.annotation.copy(invocationArgName = createCompName(vFunc.annotation.invocationArgName)),
         u = compactDec(vFunc.u).asInstanceOf[FUNC]
@@ -119,9 +117,9 @@ object ContractScriptCompactor {
     } else {
       immutable.Seq.empty[CompactNameAndOriginalNamePair]
     }
-    val metaWithNameMap = handledDApp.meta.withCompactNameAndOriginalNamePairList(resultNamePairList)
+    val metaWithNameMap = dApp.meta.withCompactNameAndOriginalNamePairList(resultNamePairList)
 
-    handledDApp.copy(
+    dApp.copy(
       meta = metaWithNameMap,
       decs = compDecs,
       callableFuncs = compCallableFuncs,
@@ -138,7 +136,7 @@ object ContractScriptCompactor {
     }
   }
 
-  private def removeUnusedCode(dApp: DApp): DApp = {
+  def removeUnusedCode(dApp: DApp): DApp = {
 
     def getUsedNames(expr: EXPR): Seq[String] = {
       expr match {
