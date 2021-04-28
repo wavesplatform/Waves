@@ -2212,7 +2212,7 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-  property("hashScriptAtAddress") {
+  property("scriptHash") {
     def contract(): DApp = {
       val expr = {
         val script =
@@ -2223,11 +2223,11 @@ class InvokeScriptTransactionDiffTest
              |
              | @Callable(i)
              | func foo() = {
-             |  if hashScriptAtAddress(i.caller) == unit && hashScriptAtAddress(Alias("unexisting")) == unit
+             |  if scriptHash(i.caller) == unit && scriptHash(Alias("unexisting")) == unit
              |  then
              |    [
-             |      BinaryEntry("hash1", hashScriptAtAddress(this).value()),
-             |      BinaryEntry("hash2", hashScriptAtAddress(Alias("alias")).value())
+             |      BinaryEntry("hash1", scriptHash(this).value()),
+             |      BinaryEntry("hash2", scriptHash(Alias("alias")).value())
              |    ]
              |  else
              |    throw("Unexpected script was found.")

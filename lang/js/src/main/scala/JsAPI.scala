@@ -129,10 +129,15 @@ object JsAPI {
       libraries: Dictionary[String] = Dictionary.empty
   ): js.Dynamic = {
     val r = for {
+      estimatorVer <- Either.cond(
+        estimatorVersion > 0 && estimatorVersion <= ScriptEstimator.all.length,
+        estimatorVersion,
+        s"Version of estimator must be not greater than ${ScriptEstimator.all.length}"
+      )
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
-      compiled    <- parseAndCompileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVersion - 1), needCompaction, removeUnusedCode)
+      compiled    <- parseAndCompileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVer - 1))
     } yield compiled
     r.fold(
       e => js.Dynamic.literal("error" -> e),
@@ -200,10 +205,15 @@ object JsAPI {
       libraries: Dictionary[String] = Dictionary.empty
   ): js.Dynamic = {
     val r = for {
+      estimatorVer <- Either.cond(
+        estimatorVersion > 0 && estimatorVersion <= ScriptEstimator.all.length,
+        estimatorVersion,
+        s"Version of estimator must be not greater than ${ScriptEstimator.all.length}"
+      )
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
-      compiled    <- compileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVersion - 1), needCompaction, removeUnusedCode)
+      compiled    <- compileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVer - 1), needCompaction)
     } yield compiled
     r.fold(
       e => js.Dynamic.literal("error" -> e),
