@@ -828,7 +828,7 @@ object Functions {
     }
 
   def accountScriptHashF(global: BaseGlobal): BaseFunction[Environment] = {
-    val name    = "hashScriptAtAddress"
+    val name    = "scriptHash"
     val resType = UNION(BYTESTR, UNIT)
     val arg     = ("account", addressOrAliasType)
     NativeFunction.withEnvironment[Environment](
@@ -853,7 +853,7 @@ object Functions {
                     .getOrElse(Right(unit))
                 )
 
-            case (_, xs) => notImplemented[F, EVALUATED](s"hashScriptAtAddress(account: AddressOrAlias))", xs)
+            case (_, xs) => notImplemented[F, EVALUATED](s"scriptHash(account: AddressOrAlias))", xs)
           }
       }
     }
