@@ -296,7 +296,10 @@ object JsAPI {
   def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
 
   @JSExportTopLevel("repl")
-  def repl(settings: UndefOr[NodeConnectionSettings]): js.Dynamic = asJs(Repl(settings.toOption))
+  def repl(
+    settings: UndefOr[NodeConnectionSettings],
+    libraries: js.Array[String] = js.Array()
+  ): js.Dynamic = asJs(Repl(settings.toOption, libraries.toList))
 
   private def asJs(repl: Repl): js.Dynamic =
     jObj(
