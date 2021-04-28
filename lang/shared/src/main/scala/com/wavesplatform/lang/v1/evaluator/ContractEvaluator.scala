@@ -132,7 +132,7 @@ object ContractEvaluator {
           BLOCK(LET(letName, letValue.value.value.explicitGet()), buildingExpr)
       }
     EvaluatorV2
-      .applyLimitedCoeval(exprWithLets, limit, ctx, version)
+      .applyLimitedCoeval(exprWithLets, limit, ctx, version, transactionId)
       .map(_.flatMap {
         case (expr, unusedComplexity, log) =>
           val result =

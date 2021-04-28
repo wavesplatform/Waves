@@ -16,6 +16,7 @@ import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.traits.domain.Tx
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import com.wavesplatform.transaction.{Authorized, Proven}
@@ -55,6 +56,23 @@ object ScriptRunner {
       useCorrectScriptVersion: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
 
+    val id =
+      in.eliminate(
+        _.id.value(),
+        _.eliminate(
+          _.id.value(),
+          _.eliminate(
+            {
+              case p: Tx.ScriptTransfer     => p.id
+              case p: Tx.ReissuePseudoTx    => p.txId
+              case p: Tx.BurnPseudoTx       => p.txId
+              case p: Tx.SponsorFeePseudoTx => p.txId
+            },
+            _ => ???
+          )
+        )
+      )
+
     def evalVerifier(
         isContract: Boolean,
         partialEvaluate: (DirectiveSet, EvaluationContext[Environment, Id]) => (Log[Id], Int, Either[ExecutionError, EVALUATED])
@@ -84,9 +102,9 @@ object ScriptRunner {
     def evaluate(ctx: EvaluationContext[Environment, Id], expr: EXPR): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
       val (log, unusedComplexity, result) =
         if (complexityLimit == Int.MaxValue)
-          EvaluatorV2.applyCompleted(ctx, expr, script.stdLibVersion)
+          EvaluatorV2.applyCompleted(ctx, expr, script.stdLibVersion, id)
         else
-          EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, complexityLimit, _ => Right(default))
+          EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, complexityLimit, id, _ => Right(default))
       (log, complexityLimit - unusedComplexity, result)
     }
 

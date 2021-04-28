@@ -327,7 +327,7 @@ object UtilsApiRoute {
           )
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
         limitedResult <- EvaluatorV2
-          .applyLimitedCoeval(call, limit, ctx, script.stdLibVersion, checkConstructorArgsTypes = true)
+          .applyLimitedCoeval(call, limit, ctx, script.stdLibVersion, ByteStr.empty, checkConstructorArgsTypes = true)
           .value()
           .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err, log) }
         result <- limitedResult match {

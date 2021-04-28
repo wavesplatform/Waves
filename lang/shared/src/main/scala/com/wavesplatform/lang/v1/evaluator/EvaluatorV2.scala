@@ -2,15 +2,24 @@ package com.wavesplatform.lang.v1.evaluator
 
 import cats.Id
 import cats.implicits._
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.StdLibVersion.V5
+import com.wavesplatform.lang.directives.values.{Account, DApp, StdLibVersion}
+import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.EvaluationException
+import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
 import monix.eval.Coeval
+import scorex.util.ScorexLogging
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
@@ -18,8 +27,30 @@ import scala.collection.mutable.ListBuffer
 class EvaluatorV2(
     val ctx: LoggedEvaluationContext[Environment, Id],
     val stdLibVersion: StdLibVersion,
+    val txId: ByteStr = ByteStr.empty,
     val checkConstructorArgsTypes: Boolean = false
-) {
+) extends ScorexLogging {
+  private val checkingFunctions = Set(
+    Native(INDEXOF),
+    Native(INDEXOFN),
+    Native(LASTINDEXOF),
+    Native(LASTINDEXOFN),
+    Native(SPLIT),
+    Native(SIZE_STRING),
+    Native(SIZE_STRING),
+    Native(TAKE_STRING),
+    Native(DROP_STRING)
+  )
+
+  private val global: BaseGlobal = com.wavesplatform.lang.Global
+
+  private lazy val v5BaseCtx = PureContext.build(V5).withEnvironment[Environment] |+|
+    CryptoContext.build(global, V5).withEnvironment[Environment] |+|
+    WavesContext.build(global, DirectiveSet(V5, Account, DApp).explicitGet())
+
+  private lazy val v5Ctx = v5BaseCtx.evaluationContext(ctx.ec.environment)
+  private lazy val v5DecompilerCtx = v5BaseCtx.decompilerContext
+
   def apply(expr: EXPR, limit: Int): (EXPR, Int) =
     applyCoeval(expr, limit).value()
 
@@ -66,6 +97,14 @@ class EvaluatorV2(
           .evaluateExtended[Id](ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]], limit - cost)
           .flatMap {
             case (result, additionalComplexity) =>
+              val header = fc.function.asInstanceOf[Native]
+              if (checkingFunctions.contains(header) && !txId.isEmpty) {
+                val v5Function = v5Ctx.functions(fc.function).asInstanceOf[NativeFunction[Environment]]
+                val (v5Result, _) = v5Function.ev.evaluateExtended[Id](ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]], limit - cost).value()
+                if (v5Result != result)
+                  log.error(s"Inconsistent result for txId=$txId ${v5DecompilerCtx.opCodes(header.name)}(${fc.args.mkString(", ")}): current = $result, V5 = $v5Result")
+              }
+
               val totalCost        = cost + additionalComplexity
               val unusedComplexity = limit - totalCost
               result.fold(
@@ -289,10 +328,11 @@ object EvaluatorV2 {
       expr: EXPR,
       limit: Int,
       ctx: EvaluationContext[Environment, Id],
+      txId: ByteStr = ByteStr.empty,
       stdLibVersion: StdLibVersion,
       checkConstructorArgsTypes: Boolean = false
   ): Either[(ExecutionError, Log[Id]), (EXPR, Int, Log[Id])] =
-    applyLimitedCoeval(expr, limit, ctx, stdLibVersion, checkConstructorArgsTypes)
+    applyLimitedCoeval(expr, limit, ctx, stdLibVersion, txId, checkConstructorArgsTypes)
       .value()
       .leftMap { case (e, _, unused) => (e, unused) }
 
@@ -301,11 +341,12 @@ object EvaluatorV2 {
       limit: Int,
       ctx: EvaluationContext[Environment, Id],
       stdLibVersion: StdLibVersion,
+      txId: ByteStr = ByteStr.empty,
       checkConstructorArgsTypes: Boolean = false
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (EXPR, Int, Log[Id])]] = {
     val log       = ListBuffer[LogItem[Id]]()
     val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
-    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion, checkConstructorArgsTypes)
+    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion, txId, checkConstructorArgsTypes)
     evaluator
       .applyCoeval(expr, limit)
       .redeem(
@@ -321,10 +362,11 @@ object EvaluatorV2 {
       expr: EXPR,
       stdLibVersion: StdLibVersion,
       complexityLimit: Int,
+      txId: ByteStr = ByteStr.empty,
       handleExpr: EXPR => Either[ExecutionError, EVALUATED]
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
     EvaluatorV2
-      .applyLimitedCoeval(expr, complexityLimit, ctx, stdLibVersion)
+      .applyLimitedCoeval(expr, complexityLimit, ctx, stdLibVersion, txId)
       .value()
       .fold(
         { case (error, complexity, log) => (log, complexity, Left(error)) }, {
@@ -339,9 +381,10 @@ object EvaluatorV2 {
   def applyCompleted(
       ctx: EvaluationContext[Environment, Id],
       expr: EXPR,
-      stdLibVersion: StdLibVersion
+      stdLibVersion: StdLibVersion,
+      txId: ByteStr = ByteStr.empty
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, expr => Left(s"Unexpected incomplete evaluation result $expr"))
+    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, txId, expr => Left(s"Unexpected incomplete evaluation result $expr"))
 
   case class EvaluationException(message: String, unusedComplexity: Int) extends RuntimeException(message)
 }
