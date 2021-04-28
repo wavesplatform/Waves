@@ -1,22 +1,30 @@
 package com.wavesplatform.state.diffs.smart.predef
 
+import cats.implicits._
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.db.WithState
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{BlockV5, FeeSponsorship, SynchronousCalls}
 import com.wavesplatform.lagonaki.mocks.TestBlock._
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms, TestCompiler}
+import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler, Terms, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.transaction.Asset.Waves
@@ -68,13 +76,13 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
     }
     setScriptTransaction: SetScriptTransaction = SetScriptTransaction.selfSigned(1.toByte, recipient, Some(typedScript), 100000000L, ts).explicitGet()
 
-  } yield (master, Seq(genesis1, genesis2), setScriptTransaction, dataTransaction, transfer, transfer2)
+  } yield (master, recipient, Seq(genesis1, genesis2), setScriptTransaction, dataTransaction, transfer, transfer2)
 
   private val estimator = ScriptEstimatorV2
 
   property("validation of all functions from contexts") {
     forAll(preconditionsAndPayments) {
-      case (_, genesis, setScriptTransaction, dataTransaction, transfer, _) =>
+      case (_, _, genesis, setScriptTransaction, dataTransaction, transfer, _) =>
         assertDiffAndState(smartEnabledFS) { append =>
           append(genesis).explicitGet()
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
@@ -88,7 +96,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
       version       <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3))
       preconditions <- preconditionsAndPayments
     } yield (version, preconditions)) {
-      case (version, (_, _, _, tx, _, _)) =>
+      case (version, (_, _, _, _, tx, _, _)) =>
         val int  = tx.data(0)
         val bool = tx.data(1)
         val bin  = tx.data(2)
@@ -142,7 +150,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
 
   property("reading from data transaction array by index") {
     forAll(preconditionsAndPayments, Gen.choose(4, 40)) {
-      case ((_, _, _, tx, _, _), badIndex) =>
+      case ((_, _, _, _, tx, _, _), badIndex) =>
         val int  = tx.data(0)
         val bool = tx.data(1)
         val bin  = tx.data(2)
@@ -277,10 +285,10 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
 
   property("get assetInfo by asset id") {
     forAll(for {
-      (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
-      version                                                                            <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
-      v4Activation                                                                       <- if (version >= V4) Gen.const(true) else Gen.oneOf(false, true)
-      v5Activation                                                                       <- if (version >= V5) Gen.const(true) else Gen.oneOf(false, true)
+      (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
+      version                                                                               <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
+      v4Activation                                                                          <- if (version >= V4) Gen.const(true) else Gen.oneOf(false, true)
+      v5Activation                                                                          <- if (version >= V5) Gen.const(true) else Gen.oneOf(false, true)
     } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, v4Activation, v5Activation)) {
       case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, v4Activation, v5Activation) =>
         val fs = {
@@ -386,7 +394,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
 
   property("last block info check") {
     forAll(preconditionsAndPayments) {
-      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
+      case (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
         assertDiffAndState(smartEnabledFS) { append =>
           append(genesis).explicitGet()
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
@@ -425,9 +433,9 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
 
   property("block info by height") {
     forAll(for {
-      (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
-      version                                                                            <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
-      withVrf                                                                            <- Gen.oneOf(version >= V4, true)
+      (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
+      version                                                                               <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
+      withVrf                                                                               <- Gen.oneOf(version >= V4, true)
     } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf)) {
       case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf) =>
         val generationSignature =
@@ -493,7 +501,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
 
   property("blockInfoByHeight(height) is the same as lastBlock") {
     forAll(preconditionsAndPayments) {
-      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, _) =>
+      case (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, _) =>
         assertDiffAndState(smartEnabledFS) { append =>
           append(genesis).explicitGet()
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
@@ -544,7 +552,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
 
   property("transfer transaction by id") {
     forAll(preconditionsAndPayments) {
-      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
+      case (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
         assertDiffAndState(smartEnabledFS) { append =>
           append(genesis).explicitGet()
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
@@ -615,7 +623,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
 
   property("account this") {
     forAll(preconditionsAndPayments) {
-      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
+      case (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
         assertDiffAndState(smartEnabledFS) { append =>
           append(genesis).explicitGet()
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
@@ -646,7 +654,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
 
   property("address toString") {
     forAll(preconditionsAndPayments) {
-      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
+      case (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
         assertDiffAndState(smartEnabledFS) { append =>
           append(genesis).explicitGet()
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
@@ -682,7 +690,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
 
   property("transactionFromProtoBytes") {
     forAll(preconditionsAndPayments) {
-      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
+      case (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
         val fs = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (BlockV5.id -> 0))
 
         assertDiffAndState(fs) { append =>
@@ -720,6 +728,81 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
 
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(transfer2)).explicitGet()
+        }
+    }
+  }
+
+  property("self-state functions") {
+    val preconditions =
+      for {
+        (masterAcc, recipient, genesis, _, dataTransaction, transferTx, _) <- preconditionsAndPayments
+        version                                                            <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V5))
+      } yield (version, masterAcc, recipient, genesis, dataTransaction, transferTx)
+
+    forAll(preconditions) {
+      case (version, masterAcc, recipient, genesis, dataTransaction, transferTx) =>
+        val fs = smartEnabledFS.copy(
+          preActivatedFeatures = smartEnabledFS.preActivatedFeatures ++
+            Map(BlockchainFeatures.SynchronousCalls.id -> 0)
+        )
+        assertDiffAndState(fs) { append =>
+          val (intKey, intValue)         = dataTransaction.data.collectFirst { case IntegerDataEntry(key, value) => (key, value) }.get
+          val (booleanKey, booleanValue) = dataTransaction.data.collectFirst { case BooleanDataEntry(key, value) => (key, value) }.get
+          val (binaryKey, binaryValue)   = dataTransaction.data.collectFirst { case BinaryDataEntry(key, value)  => (key, value) }.get
+          val (stringKey, stringValue)   = dataTransaction.data.collectFirst { case StringDataEntry(key, value)  => (key, value) }.get
+
+          val script =
+            s"""
+               |  {-# STDLIB_VERSION ${version.id} #-}
+               |  {-# CONTENT_TYPE DAPP #-}
+               |
+               |  @Callable(i)
+               |  func default() = {
+               |    let result =
+               |      getInteger("$intKey")          == $intValue            &&
+               |      getIntegerValue("$intKey")     == $intValue            &&
+               |      getString("$stringKey")        == "$stringValue"       &&
+               |      getStringValue("$stringKey")   == "$stringValue"       &&
+               |      getBoolean("$booleanKey")      == $booleanValue        &&
+               |      getBooleanValue("$booleanKey") == $booleanValue        &&
+               |      getBinary("$binaryKey")        == base58'$binaryValue' &&
+               |      getBinaryValue("$binaryKey")   == base58'$binaryValue' &&
+               |      getInteger("unexisting")       == unit                 &&
+               |      getString("unexisting")        == unit                 &&
+               |      getBinary("unexisting")        == unit                 &&
+               |      getString("unexisting")        == unit
+               |
+               |    if (result) then [] else throw("failed")
+               |  }
+             """.stripMargin
+          val expr = Parser.parseContract(script).get.value
+
+          val ctx =
+            PureContext.build(version).withEnvironment[Environment] |+|
+              CryptoContext.build(Global, version).withEnvironment[Environment] |+|
+              WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet())
+
+          val compiledScript = ContractScript(version, ContractCompiler(ctx.compilerContext, expr, version).explicitGet()).explicitGet()
+          val setScriptTx =
+            SetScriptTransaction.selfSigned(1.toByte, recipient, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
+
+          val ci = InvokeScriptTransaction
+            .selfSigned(
+              1.toByte,
+              masterAcc,
+              recipient.toAddress,
+              None,
+              Seq.empty,
+              FeeUnit * (FeeConstants(InvokeScriptTransaction.typeId) + ScriptExtraFee),
+              Waves,
+              System.currentTimeMillis()
+            )
+            .explicitGet()
+
+          append(genesis).explicitGet()
+          append(Seq(dataTransaction)).explicitGet()
+          append(Seq(setScriptTx)).explicitGet()
+          append(Seq(ci)).explicitGet()
         }
     }
   }

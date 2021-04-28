@@ -131,7 +131,8 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     repl.info("getInteger").split("\n") shouldBe Array(
       "func getInteger(addressOrAlias: Address|Alias, key: String): Int|Unit",
       "func getInteger(data: List[BinaryEntry|BooleanEntry|DeleteEntry|IntegerEntry|StringEntry], key: String): Int|Unit",
-      "func getInteger(data: List[BinaryEntry|BooleanEntry|DeleteEntry|IntegerEntry|StringEntry], index: Int): Int|Unit"
+      "func getInteger(data: List[BinaryEntry|BooleanEntry|DeleteEntry|IntegerEntry|StringEntry], index: Int): Int|Unit",
+      "func getInteger(key: String): Int|Unit"
     )
     await(repl.execute("func my(a: Int) = toString(a)"))
     repl.info("my") shouldBe "func my(a: Int): String"
