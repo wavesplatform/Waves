@@ -8,13 +8,14 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.TransactionMeta
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state._
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils._
 
 object Keys {
   import KeyHelpers._
-  import KeyTags.{AddressId => AddressIdTag, InvokeScriptResult => InvokeScriptResultTag, _}
+  import KeyTags.{AddressId => AddressIdTag, InvokeScriptResult => InvokeScriptResultTag, LeaseDetails => LeaseDetailsTag, _}
 
   val version: Key[Int]               = intKey(Version, default = 1)
   val height: Key[Int]                = intKey(Height)
@@ -52,9 +53,10 @@ object Keys {
   def leaseBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(LeaseBalanceHistory, addressId.toByteArray)
   def leaseBalance(addressId: AddressId)(height: Int): Key[LeaseBalance] =
     Key(LeaseBalance, hAddr(height, addressId), readLeaseBalance, writeLeaseBalance)
-  def leaseStatusHistory(leaseId: ByteStr): Key[Seq[Int]] = historyKey(LeaseStatusHistory, leaseId.arr)
-  def leaseStatus(leaseId: ByteStr)(height: Int): Key[Boolean] =
-    Key(LeaseStatus, Ints.toByteArray(height) ++ leaseId.arr, _(0) == 1, active => Array[Byte](if (active) 1 else 0))
+
+  def leaseDetailsHistory(leaseId: ByteStr): Key[Seq[Int]] = historyKey(LeaseDetailsHistory, leaseId.arr)
+  def leaseDetails(leaseId: ByteStr)(height: Int): Key[Option[Either[Boolean, LeaseDetails]]] =
+    Key.opt(LeaseDetailsTag, Ints.toByteArray(height) ++ leaseId.arr, readLeaseDetails, writeLeaseDetails)
 
   def filledVolumeAndFeeHistory(orderId: ByteStr): Key[Seq[Int]] = historyKey(FilledVolumeAndFeeHistory, orderId.arr)
   def filledVolumeAndFee(orderId: ByteStr)(height: Int): Key[VolumeAndFee] =

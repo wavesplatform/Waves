@@ -4,11 +4,13 @@ import sbt.Keys._
 
 //noinspection TypeAnnotation
 object Dependencies {
+  // Node protobuf schemas
+  private[this] val protoSchemasLib =
+    "com.wavesplatform" % "protobuf-schemas" % "1.3.1" classifier "proto" intransitive ()
 
   def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.4"
 
   private def akkaHttpModule(module: String)               = "com.typesafe.akka"             %% module            % "10.1.12"
-  private def nettyModule(module: String)                  = "io.netty"                      % s"netty-$module"   % "4.1.59.Final"
   private def kamonModule(module: String)                  = "io.kamon"                      %% s"kamon-$module"  % "2.1.0"
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.11.0"
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
@@ -18,15 +20,16 @@ object Dependencies {
 
   private val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.11.0" cross CrossVersion.full)
 
-  val akkaHttp           = akkaHttpModule("akka-http")
-  val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
-  val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
-  val kamonCore          = kamonModule("core")
-  val machinist          = "org.typelevel" %% "machinist" % "0.6.8"
-  val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
-  val janino             = "org.codehaus.janino" % "janino" % "3.0.12"
-  val asyncHttpClient    = "org.asynchttpclient" % "async-http-client" % "2.7.0"
-  val curve25519         = "com.wavesplatform" % "curve25519-java" % "0.6.4"
+  val akkaHttp               = akkaHttpModule("akka-http")
+  val jacksonModuleScala     = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
+  val googleGuava            = "com.google.guava" % "guava" % "27.0.1-jre"
+  val kamonCore              = kamonModule("core")
+  val machinist              = "org.typelevel" %% "machinist" % "0.6.8"
+  val logback                = "ch.qos.logback" % "logback-classic" % "1.2.3"
+  val janino                 = "org.codehaus.janino" % "janino" % "3.0.12"
+  val asyncHttpClient        = "org.asynchttpclient" % "async-http-client" % "2.7.0"
+  val curve25519             = "com.wavesplatform" % "curve25519-java" % "0.6.4"
+  val nettyHandler: ModuleID = "io.netty" % "netty-handler" % "4.1.59.Final"
 
   val catsEffect = catsModule("effect", "2.1.3")
   val catsCore   = catsModule("core")
@@ -57,7 +60,7 @@ object Dependencies {
       "com.squareup.okhttp3" % "okhttp"      % "3.11.0",
       "com.squareup.okio"    % "okio"        % "1.14.0",
       "com.lihaoyi"          %% "sourcecode" % "0.2.1",
-      nettyModule("handler"),
+      nettyHandler,
       bouncyCastle("bcpkix"),
       bouncyCastle("bcprov"),
       "org.apache.httpcomponents" % "httpcore"         % "4.4.5",
@@ -157,15 +160,12 @@ object Dependencies {
       "org.bitlet" % "weupnp" % "0.1.4",
       kindProjector,
       monixModule("reactive").value,
-      nettyModule("handler"),
+      nettyHandler,
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
     ) ++ test ++ console ++ logDeps ++ levelDBJNA ++ protobuf.value
   )
-
-  private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.2.11" classifier "proto" intransitive ()
 
   lazy val scalapbRuntime = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion

@@ -6,12 +6,16 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
 import monix.eval.Coeval
@@ -22,18 +26,21 @@ package object utils {
 
   private val Global: BaseGlobal = com.wavesplatform.lang.Global // Hack for IDEA
 
-  val environment = new Environment[Id] {
+  val environment = buildEnvironment(ByteStr.empty)
+
+  def buildEnvironment(txIdParam: ByteStr) = new Environment[Id] {
     override def height: Long                                                                                    = 0
     override def chainId: Byte                                                                                   = 1: Byte
     override def inputEntity: Environment.InputEntity                                                            = null
-    override val txId: ByteStr                                                                                   = ByteStr.empty
+    override val txId: ByteStr                                                                                   = txIdParam
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
     override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer]                                   = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
     override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
     override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
     override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
-    override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
+    override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = None
+    override def hasData(addressOrAlias: Recipient): Boolean                                                     = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
@@ -41,6 +48,8 @@ package object utils {
     override def multiPaymentAllowed: Boolean                                                                    = true
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
     override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
+    override def accountScript(addressOrAlias: Recipient): Option[Script]                                        = ???
+    override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], availableComplexity: Int): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
   }
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {
@@ -59,7 +68,7 @@ package object utils {
             Seq(
               PureContext.build(version).withEnvironment[Environment],
               CryptoContext.build(Global, version).withEnvironment[Environment],
-              WavesContext.build(ds)
+              WavesContext.build(Global, ds)
             )
           )
         )

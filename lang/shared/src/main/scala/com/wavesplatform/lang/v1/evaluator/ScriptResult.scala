@@ -4,22 +4,32 @@ import cats.Id
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
+import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain._
 
-sealed trait ScriptResult
-case class ScriptResultV3(ds: List[DataItem[_]], ts: List[AssetTransfer]) extends ScriptResult
-case class ScriptResultV4(actions: List[CallableAction])                  extends ScriptResult
-case class IncompleteResult(expr: EXPR, unusedComplexity: Int)            extends ScriptResult
+sealed trait ScriptResult {
+  def returnedValue: EVALUATED                                                    = unit
+  def invokes: Seq[(Address, String, Seq[EVALUATED], Seq[CaseObj], ScriptResult)] = Nil
+}
+case class ScriptResultV3(ds: List[DataItem[_]], ts: List[AssetTransfer], unusedComplexity: Int) extends ScriptResult
+case class ScriptResultV4(
+    actions: List[CallableAction],
+    unusedComplexity: Int,
+    override val returnedValue: EVALUATED = unit
+) extends ScriptResult
+case class IncompleteResult(expr: EXPR, unusedComplexity: Int) extends ScriptResult
 
 object ScriptResult {
-  type E[A] = Either[String, A]
+  type ActionInput    = (EvaluationContext[Environment, Id], ByteStr, Map[String, EVALUATED])
+  type ActionResult   = Either[ExecutionError, CallableAction]
+  type ActionHandlers = Map[String, ActionInput => ActionResult]
 
   private def err[A](actual: AnyRef, version: StdLibVersion, expected: String = ""): Either[ExecutionError, A] =
     Types
@@ -27,7 +37,7 @@ object ScriptResult {
       .flatMap(
         t =>
           Left(
-            callableResultError(t, actual) + (if (expected.isEmpty) "" else s" instead of '$expected")
+            callableResultError(t, actual) + (if (expected.isEmpty) "" else s" instead of $expected")
           )
       )
 
@@ -36,14 +46,15 @@ object ScriptResult {
       .lift((fields.get(FieldNames.Key), fields.get(FieldNames.Value)))
       .fold(err[DataItem[_]](s"can't reconstruct ${FieldNames.DataEntry} from $fields", V3))(Right(_))
 
-  private def processDataEntryV4(
+  private def processDataEntry(
       fields: Map[String, EVALUATED],
       dataType: String,
-      entryHandler: PartialFunction[(Option[EVALUATED], Option[EVALUATED]), DataItem[_]]
+      entryHandler: PartialFunction[(Option[EVALUATED], Option[EVALUATED]), DataItem[_]],
+      version: StdLibVersion
   ): Either[ExecutionError, DataItem[_]] =
     entryHandler
       .lift((fields.get(FieldNames.Key), fields.get(FieldNames.Value)))
-      .fold(err[DataItem[_]](s"can't reconstruct $dataType from $fields", V4))(Right(_))
+      .fold(err[DataItem[_]](s"can't reconstruct $dataType from $fields", version))(Right(_))
 
   private val processIntEntry =
     processDataEntryPartially(
@@ -77,10 +88,10 @@ object ScriptResult {
       constructor(key, valueExtractor(value))
   }
 
-  private def processDeleteEntry(fields: Map[String, EVALUATED]): Either[String, DataItem.Delete] =
+  private def processDeleteEntry(fields: Map[String, EVALUATED], version: StdLibVersion): Either[String, DataItem.Delete] =
     fields.get(FieldNames.Key) match {
       case Some(CONST_STRING(key)) => Right(DataItem.Delete(key))
-      case other                   => err(other, V4, FieldNames.DeleteEntry)
+      case other                   => err(other, version, FieldNames.DeleteEntry)
     }
 
   private def processScriptTransfer(
@@ -89,30 +100,34 @@ object ScriptResult {
       version: StdLibVersion
   ): Either[ExecutionError, AssetTransfer] =
     (fields(FieldNames.Recipient), fields(FieldNames.Amount), fields(FieldNames.Asset)) match {
-      case (other @ CaseObj(at, fields2), CONST_LONG(b), maybeToken) if ctx.environment.multiPaymentAllowed || at.name == Types.addressType.name =>
+      case (recipient: CaseObj, CONST_LONG(b), maybeToken) =>
         for {
           token <- maybeToken match {
             case CONST_BYTESTR(tokenId)     => Right(Some(tokenId))
             case CaseObj(_, m) if m.isEmpty => Right(None)
             case other                      => err(s"can't reconstruct token from $other", version)
           }
-          r <- if (at.name == Types.addressType.name) {
-            fields2("bytes") match {
-              case CONST_BYTESTR(addBytes) => Right(AssetTransfer(Address(addBytes), b, token))
-              case other                   => err(s"can't reconstruct address from $other", version)
-            }
-          } else if (at.name == Types.aliasType.name) {
-            fields2("alias") match {
-              case CONST_STRING(alias) => ctx.environment.resolveAlias(alias).map(a => AssetTransfer(a, b, token))
-              case other               => err(s"can't reconstruct alias from $other", version)
-            }
-          } else {
-            err(other, version, FieldNames.ScriptTransfer)
+          recipient <- processRecipient(recipient, ctx, version)
+          address <- recipient match {
+            case a: Address  => Right(a)
+            case Alias(name) => ctx.environment.resolveAlias(name)
           }
-        } yield r
+        } yield AssetTransfer(address, recipient, b, token)
       case other =>
         err(other, version, FieldNames.ScriptTransfer)
     }
+
+  private def processRecipient(obj: CaseObj, ctx: EvaluationContext[Environment, Id], version: StdLibVersion): Either[String, Recipient] =
+    if (obj.caseType.name == Types.addressType.name)
+      obj.fields("bytes") match {
+        case CONST_BYTESTR(addBytes) => Right(Address(addBytes))
+        case other                   => err(s"can't reconstruct address from $other", version)
+      } else if (obj.caseType.name == Types.aliasType.name && ctx.environment.multiPaymentAllowed)
+      obj.fields("alias") match {
+        case CONST_STRING(alias) => Right(Alias(alias))
+        case other               => err(s"can't reconstruct alias from $other", version)
+      } else
+      err(obj, version, FieldNames.Recipient)
 
   private def processWriteSetV3(fields: Map[String, EVALUATED]): Either[String, List[DataItem[_]]] =
     fields(FieldNames.Data) match {
@@ -134,7 +149,11 @@ object ScriptResult {
       case other => err(other, V3, s"List(${FieldNames.Transfers})")
     }
 
-  private def processScriptResultV3(ctx: EvaluationContext[Environment, Id], fields: Map[String, EVALUATED]): Either[String, ScriptResultV3] = {
+  private def processActionV3(
+      ctx: EvaluationContext[Environment, Id],
+      fields: Map[String, EVALUATED],
+      unusedComplexity: Int
+  ): Either[String, ScriptResultV3] = {
     val writes = fields(FieldNames.ScriptWriteSet) match {
       case CaseObj(tpe, fields) if tpe.name == FieldNames.WriteSet => processWriteSetV3(fields)
       case other                                                   => err(other, V3, FieldNames.Data)
@@ -146,10 +165,24 @@ object ScriptResult {
     for {
       w <- writes
       p <- payments
-    } yield ScriptResultV3(w, p)
+    } yield ScriptResultV3(w, p, unusedComplexity)
   }
 
-  private def processIssue(ctx: EvaluationContext[Environment, Id], parentId: ByteStr, fields: Map[String, EVALUATED]): Either[String, Issue] = {
+  private def processScriptResultV3(
+      ctx: EvaluationContext[Environment, Id],
+      tpe: CASETYPEREF,
+      fields: Map[String, EVALUATED],
+      unusedComplexity: Int
+  ) =
+    tpe.name match {
+      case FieldNames.WriteSet     => processWriteSetV3(fields).map(ScriptResultV3(_, List.empty, unusedComplexity))
+      case FieldNames.TransferSet  => processTransferSetV3(ctx, fields).map(ScriptResultV3(List.empty, _, unusedComplexity))
+      case FieldNames.ScriptResult => processActionV3(ctx, fields, unusedComplexity)
+      case f                       => err(f, V3)
+    }
+
+  private def processIssue(input: ActionInput): Either[String, Issue] = {
+    val (_, parentId, fields) = input
     (
       fields.get(FieldNames.IssueQuantity),
       fields.get(FieldNames.IssueDecimals),
@@ -181,7 +214,7 @@ object ScriptResult {
     }
   }
 
-  private def processReissue(fields: Map[String, EVALUATED]): Either[String, Reissue] =
+  private def processReissue(fields: Map[String, EVALUATED], version: StdLibVersion): Either[String, Reissue] =
     (
       fields.get(FieldNames.ReissueAssetId),
       fields.get(FieldNames.ReissueQuantity),
@@ -194,18 +227,18 @@ object ScriptResult {
           ) =>
         Right(Reissue(assetId, isReissuable, quantity))
       case other =>
-        err(other, V4, FieldNames.Reissue)
+        err(other, version, FieldNames.Reissue)
     }
 
-  private def processBurn(fields: Map[String, EVALUATED]): Either[String, Burn] =
+  private def processBurn(fields: Map[String, EVALUATED], version: StdLibVersion): Either[String, Burn] =
     (fields.get(FieldNames.BurnAssetId), fields.get(FieldNames.BurnQuantity)) match {
       case (Some(CONST_BYTESTR(assetId)), Some(CONST_LONG(quantity))) =>
         Right(Burn(assetId, quantity))
       case other =>
-        err(other, V4, FieldNames.Burn)
+        err(other, version, FieldNames.Burn)
     }
 
-  private def processSponsorFee(fields: Map[String, EVALUATED]): Either[String, SponsorFee] =
+  private def processSponsorFee(fields: Map[String, EVALUATED], version: StdLibVersion): Either[String, SponsorFee] =
     (fields.get(FieldNames.SponsorFeeAssetId), fields.get(FieldNames.SponsorFeeMinFee)) match {
       case (Some(CONST_BYTESTR(assetId)), Some(minFeeOpt)) =>
         val minFeeValueOpt = minFeeOpt match {
@@ -215,49 +248,87 @@ object ScriptResult {
         }
         minFeeValueOpt.map(v => SponsorFee(assetId, v))
       case other =>
-        err(other, V4, FieldNames.SponsorFee)
+        err(other, version, FieldNames.SponsorFee)
     }
 
-  private def processScriptResultV4(ctx: EvaluationContext[Environment, Id], txId: ByteStr, actions: Seq[EVALUATED]): Either[String, ScriptResultV4] =
+  private def processLease(ctx: EvaluationContext[Environment, Id], fields: Map[String, EVALUATED], version: StdLibVersion): Either[String, Lease] =
+    (fields.get(FieldNames.LeaseRecipient), fields.get(FieldNames.LeaseAmount), fields.get(FieldNames.LeaseNonce)) match {
+      case (Some(recipient: CaseObj), Some(CONST_LONG(quantity)), Some(CONST_LONG(nonce))) =>
+        processRecipient(recipient, ctx, version)
+          .map(Lease(_, quantity, nonce))
+      case other =>
+        err(other, version, FieldNames.Lease)
+    }
+
+  private def processLeaseCancel(fields: Map[String, EVALUATED], version: StdLibVersion): Either[String, LeaseCancel] =
+    fields.get(FieldNames.LeaseId) match {
+      case Some(CONST_BYTESTR(leaseId)) =>
+        Right(LeaseCancel(leaseId))
+      case other =>
+        err(other, version, FieldNames.LeaseCancel)
+    }
+
+  private def processScriptResult(
+    ctx: EvaluationContext[Environment, Id],
+    txId: ByteStr,
+    actions: Seq[EVALUATED],
+    handlers: ActionHandlers,
+    version: StdLibVersion,
+    unusedComplexity: Int,
+    ret: EVALUATED = unit
+  ): Either[String, ScriptResultV4] =
     actions.toList
       .traverse {
         case obj @ CaseObj(actionType, fields) =>
-          v4ActionHandlers
+          handlers
             .get(actionType.name)
-            .map(_(ctx, txId, fields))
-            .getOrElse(err(obj, V4))
+            .map(_((ctx, txId, fields)))
+            .getOrElse(err(obj, version))
 
-        case other => err(other, V4)
+        case other => err(other, version)
       }
-      .map(ScriptResultV4)
+      .map(ScriptResultV4(_, unusedComplexity, ret))
 
-  private val v4ActionHandlers
-      : Map[String, (EvaluationContext[Environment, Id], ByteStr, Map[String, EVALUATED]) => Either[ExecutionError, CallableAction]] =
+  private def fromV4ActionHandlers(v: StdLibVersion): ActionHandlers =
     Map(
-      FieldNames.ScriptTransfer -> ((ctx, _, a) => (processScriptTransfer(ctx, a, V4))),
-      FieldNames.IntegerEntry   -> ((_, _, a) => (processDataEntryV4(a, FieldNames.IntegerEntry, processIntEntry))),
-      FieldNames.BooleanEntry   -> ((_, _, a) => (processDataEntryV4(a, FieldNames.BooleanEntry, processBoolEntry))),
-      FieldNames.StringEntry    -> ((_, _, a) => (processDataEntryV4(a, FieldNames.StringEntry, processStringEntry))),
-      FieldNames.BinaryEntry    -> ((_, _, a) => (processDataEntryV4(a, FieldNames.BinaryEntry, processBinaryEntry))),
-      FieldNames.DeleteEntry    -> ((_, _, a) => processDeleteEntry(a)),
-      FieldNames.Issue          -> processIssue,
-      FieldNames.Reissue        -> ((_, _, a) => processReissue(a)),
-      FieldNames.Burn           -> ((_, _, a) => processBurn(a)),
-      FieldNames.SponsorFee     -> ((_, _, a) => processSponsorFee(a))
+      FieldNames.ScriptTransfer -> { case (ctx, _, fields) => processScriptTransfer(ctx, fields, v) },
+      FieldNames.IntegerEntry   -> { case (_, _, fields) => processDataEntry(fields, FieldNames.IntegerEntry, processIntEntry, v) },
+      FieldNames.BooleanEntry   -> { case (_, _, fields) => processDataEntry(fields, FieldNames.BooleanEntry, processBoolEntry, v) },
+      FieldNames.StringEntry    -> { case (_, _, fields) => processDataEntry(fields, FieldNames.StringEntry, processStringEntry, v) },
+      FieldNames.BinaryEntry    -> { case (_, _, fields) => processDataEntry(fields, FieldNames.BinaryEntry, processBinaryEntry, v) },
+      FieldNames.DeleteEntry    -> { case (_, _, fields) => processDeleteEntry(fields, v) },
+      FieldNames.Reissue        -> { case (_, _, fields) => processReissue(fields, v) },
+      FieldNames.Burn           -> { case (_, _, fields) => processBurn(fields, v) },
+      FieldNames.SponsorFee     -> { case (_, _, fields) => processSponsorFee(fields, v) },
+      FieldNames.Issue          -> processIssue
     )
 
-  def fromObj(ctx: EvaluationContext[Environment, Id], txId: ByteStr, e: EVALUATED, version: StdLibVersion): Either[ExecutionError, ScriptResult] =
-    (e, version) match {
-      case (CaseObj(tpe, fields), V3) =>
-        tpe.name match {
-          case FieldNames.WriteSet     => processWriteSetV3(fields).map(ScriptResultV3(_, List.empty))
-          case FieldNames.TransferSet  => processTransferSetV3(ctx, fields).map(ScriptResultV3(List.empty, _))
-          case FieldNames.ScriptResult => processScriptResultV3(ctx, fields)
-          case f                       => err(f, version)
-        }
-      case (ARR(actions), V4) => processScriptResultV4(ctx, txId, actions)
+  private def fromV5ActionHandlers(v: StdLibVersion): ActionHandlers =
+    Map(
+      FieldNames.Lease       -> { case (ctx, _, fields) => processLease(ctx, fields, v) },
+      FieldNames.LeaseCancel -> { case (_, _, fields)   => processLeaseCancel(fields, v) }
+    )
 
+  private val v4ActionHandlers = fromV4ActionHandlers(V4)
+  private val v5ActionHandlers = fromV4ActionHandlers(V5) ++ fromV5ActionHandlers(V5)
+
+  def fromObj(
+      ctx: EvaluationContext[Environment, Id],
+      txId: ByteStr,
+      e: EVALUATED,
+      version: StdLibVersion,
+      unusedComplexity: Int
+  ): Either[ExecutionError, ScriptResult] =
+    (e, version) match {
+      case (CaseObj(tpe, fields), V3) => processScriptResultV3(ctx, tpe, fields, unusedComplexity)
+      case (ARR(actions), V4)         => processScriptResult(ctx, txId, actions, v4ActionHandlers, V4, unusedComplexity)
+      case (ARR(actions), V5)         => processScriptResult(ctx, txId, actions, v5ActionHandlers, V5, unusedComplexity)
+      case (CaseObj(tpe, fields), V5) if fields.size == 2 =>
+        // XXX check tpe
+        (fields("_1"), fields("_2")) match {
+          case (ARR(actions), ret) => processScriptResult(ctx, txId, actions, v5ActionHandlers, V5, unusedComplexity, ret)
+          case _                   => err(tpe.name, version)
+        }
       case c => err(c.toString, version)
     }
-
 }

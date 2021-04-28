@@ -22,12 +22,10 @@ object ContractSerDe {
 
   def serialize(c: DApp): Either[String, Array[Byte]] =
     for {
-      metaBytes <- {
-        val metaBytes = c.meta.toByteArray
-        checkMetaSize(metaBytes.length).map(_ => metaBytes)
-      }
       out <- tryEi {
         val out = new ByteArrayOutputStream()
+
+        val metaBytes = c.meta.toByteArray
 
         // version byte
         out.writeInt(0)
@@ -62,18 +60,9 @@ object ContractSerDe {
     } yield DApp(meta, decs, callableFuncs, verifierFuncOpt)
   }
 
-  private def checkMetaSize(metaSize: Int): Either[String, Unit] = {
-    Either.cond(
-      metaSize <= ContractLimits.MaxContractMetaSizeInBytes,
-      (),
-      s"Script meta size in bytes must be not greater than ${ContractLimits.MaxContractMetaSizeInBytes}"
-    )
-  }
-
   private[lang] def deserializeMeta(bb: ByteBuffer): Either[String, DAppMeta] =
     for {
       size <- tryEi(bb.getInt)
-      _    <- checkMetaSize(size)
       meta <- tryEi {
         val arr = new Array[Byte](size)
         bb.get(arr, bb.arrayOffset(), size)

@@ -313,6 +313,9 @@ object SyncHttpApi extends Assertions {
     def transactionStatus(txIds: Seq[String]): Seq[TransactionStatus] =
       sync(async(n).transactionsStatus(txIds))
 
+    def transactionStatus(txId: String): TransactionStatus =
+      sync(async(n).transactionsStatus(Seq(txId))).head
+
     def transactionsByAddress(address: String, limit: Int): Seq[TransactionInfo] =
       sync(async(n).transactionsByAddress(address, limit))
 
@@ -543,7 +546,12 @@ object SyncHttpApi extends Assertions {
     def broadcastRequest[A: Writes](req: A): Transaction =
       sync(async(n).broadcastRequest(req))
 
-    def activeLeases(sourceAddress: String): Seq[Transaction] =
+
+    def activeLeasesOld(sourceAddress: String): Seq[Transaction] =
+      sync(async(n).activeLeasesOld(sourceAddress))
+
+    // since activation of SynchronousCalls
+    def activeLeases(sourceAddress: String): Seq[LeaseInfo] =
       sync(async(n).activeLeases(sourceAddress))
 
     def broadcastCancelLease(source: KeyPair, leaseId: String, fee: Long = minFee, waitForTx: Boolean = false): Transaction = {

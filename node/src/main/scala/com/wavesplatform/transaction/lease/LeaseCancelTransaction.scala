@@ -57,6 +57,16 @@ object LeaseCancelTransaction extends TransactionParser {
   ): Either[ValidationError, TransactionT] =
     LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, proofs, chainId).validatedEither
 
+  def signed(
+      version: TxVersion,
+      sender: PublicKey,
+      leaseId: ByteStr,
+      fee: TxAmount,
+      timestamp: TxTimestamp,
+      signer: PrivateKey
+  ): Either[ValidationError, TransactionT] =
+    create(version, sender, leaseId, fee, timestamp, Nil).map(_.signWith(signer))
+
   def selfSigned(
       version: TxVersion,
       sender: KeyPair,
@@ -64,5 +74,5 @@ object LeaseCancelTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp
   ): Either[ValidationError, TransactionT] =
-    create(version, sender.publicKey, leaseId, fee, timestamp, Nil).map(_.signWith(sender.privateKey))
+    signed(version, sender.publicKey, leaseId, fee, timestamp, sender.privateKey).map(_.signWith(sender.privateKey))
 }

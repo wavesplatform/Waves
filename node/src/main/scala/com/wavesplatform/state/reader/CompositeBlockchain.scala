@@ -4,18 +4,17 @@ import cats.data.Ior
 import cats.implicits._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
-import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
 
 final case class CompositeBlockchain(
     inner: Blockchain,
@@ -45,11 +44,9 @@ final case class CompositeBlockchain(
     CompositeBlockchain.assetDescription(asset, maybeDiff.orEmpty, inner.assetDescription(asset), inner.assetScript(asset), height)
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
-    inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
-      diff.transactions.get(leaseId).collect {
-        case NewTransactionInfo(lt: LeaseTransaction, _, true) =>
-          LeaseDetails(lt.sender, lt.recipient, this.height, lt.amount, diff.leaseState(lt.id()))
-      }
+    inner.leaseDetails(leaseId)
+      .map(ld => ld.copy(status = diff.leaseState.get(leaseId).map(_.status).getOrElse(ld.status)))
+      .orElse(diff.leaseState.get(leaseId))
   }
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = {
@@ -126,6 +123,10 @@ final case class CompositeBlockchain(
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = {
     val diffData = diff.accountData.get(acc).orEmpty
     diffData.data.get(key).orElse(inner.accountData(acc, key)).filterNot(_.isEmpty)
+  }
+
+  override def hasData(acc: Address): Boolean = {
+    diff.accountData.contains(acc) || inner.hasData(acc)
   }
 
   override def carryFee: Long = carry

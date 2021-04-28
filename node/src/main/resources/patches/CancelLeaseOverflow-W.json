@@ -10,8 +10,23 @@
     }
   },
   "cancelledLeases": [
-    "4X6kgy1QmPRjsXPJT6z9dJW9dFSuGQ6NwZoE6TcvgthW",
-    "2T35YKdux2Hpb6FL8aEwqZZ94Kq5Aj1FMeUURDPLsZPh",
-    "AnbPaS138EAafTDr1nci6N1ZMyceJifNoaxcjzkWgHgk"
+    {
+      "senderPublicKey": "6444wqMCdcpX39iAcm3EdHn4uDA2zHosVUBJQMAJDNcu",
+      "amount": 11900000000,
+      "recipient": "3PFrn8EHRhjJGEQxYwWKdJcwcsW1XFRJbmz",
+      "id": "4X6kgy1QmPRjsXPJT6z9dJW9dFSuGQ6NwZoE6TcvgthW"
+    },
+    {
+      "senderPublicKey": "KDPyuaK9B7dsg5X9EWir9LJ3tnVYTbAhmdpG9QTuXBX",
+      "amount": 30000000000,
+      "recipient": "3PHkrdL58z8pYq4w8Vd9rbxWxTQVaq2SJMi",
+      "id": "2T35YKdux2Hpb6FL8aEwqZZ94Kq5Aj1FMeUURDPLsZPh"
+    },
+    {
+      "senderPublicKey": "KDPyuaK9B7dsg5X9EWir9LJ3tnVYTbAhmdpG9QTuXBX",
+      "amount": 1000000000,
+      "recipient": "3PHkrdL58z8pYq4w8Vd9rbxWxTQVaq2SJMi",
+      "id": "AnbPaS138EAafTDr1nci6N1ZMyceJifNoaxcjzkWgHgk"
+    }
   ]
 }

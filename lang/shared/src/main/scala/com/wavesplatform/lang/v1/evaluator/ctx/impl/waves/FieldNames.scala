@@ -45,4 +45,12 @@ object FieldNames {
   val SponsorFee        = "SponsorFee"
   val SponsorFeeAssetId = "assetId"
   val SponsorFeeMinFee  = "minSponsoredAssetFee"
+
+  val Lease          = "Lease"
+  val LeaseRecipient = "recipient"
+  val LeaseAmount    = "amount"
+  val LeaseNonce     = "nonce"
+
+  val LeaseCancel = "LeaseCancel"
+  val LeaseId     = "leaseId"
 }

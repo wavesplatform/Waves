@@ -9,12 +9,12 @@ import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms, TestCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
@@ -125,7 +125,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
         val directives = DirectiveSet(V3, Account, Expression).explicitGet()
         PureContext.build(V3).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V3).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
+          WavesContext.build(Global, directives)
       }
 
       val script =
@@ -148,13 +148,6 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
     }
 
     val contractV3WithComplexityBetween2000And3000 = {
-      val ctx = {
-        val directives = DirectiveSet(V3, Account, DAppType).explicitGet()
-        PureContext.build(V3).withEnvironment[Environment] |+|
-          CryptoContext.build(Global, V3).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
-      }
-
       val script =
         """
           | {-#STDLIB_VERSION 3 #-}
@@ -172,8 +165,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
           |   rsaVerify(SHA256, base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')
       """.stripMargin
 
-      val dApp = ContractCompiler.compile(script, ctx.compilerContext, V3).explicitGet()
-      ContractScript(V3, dApp).explicitGet()
+      TestCompiler(V3).compileContract(script)
     }
 
     val exprV4WithComplexityBetween2000And3000 = {
@@ -181,7 +173,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
         val directives = DirectiveSet(V4, Account, Expression).explicitGet()
         PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
+          WavesContext.build(Global, directives)
       }
 
       val script =
@@ -198,13 +190,6 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
     }
 
     val contractV4WithComplexityBetween2000And3000 = {
-      val ctx = {
-        val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
-        PureContext.build(V4).withEnvironment[Environment] |+|
-          CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
-      }
-
       val script =
         """
         | {-#STDLIB_VERSION 4 #-}
@@ -217,18 +202,10 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
         |
       """.stripMargin
 
-      val dApp = ContractCompiler.compile(script, ctx.compilerContext, V4).explicitGet()
-      ContractScript(V4, dApp).explicitGet()
+      TestCompiler(V4).compileContract(script)
     }
 
     val contractV4WithCallableComplexityBetween3000And4000 = {
-      val ctx = {
-        val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
-        PureContext.build(V4).withEnvironment[Environment] |+|
-          CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(directives)
-      }
-
       val script =
         """
         | {-#STDLIB_VERSION 4 #-}
@@ -243,8 +220,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
         |
       """.stripMargin
 
-      val dApp = ContractCompiler.compile(script, ctx.compilerContext, V4).explicitGet()
-      ContractScript(V4, dApp).explicitGet()
+      TestCompiler(V4).compileContract(script)
     }
 
     val rideV3Activated = TestFunctionalitySettings.Enabled.copy(

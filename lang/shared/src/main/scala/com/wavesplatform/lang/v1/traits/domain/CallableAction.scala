@@ -1,12 +1,17 @@
 package com.wavesplatform.lang.v1.traits.domain
 
+import java.io.ByteArrayOutputStream
+
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
+import com.wavesplatform.lang.hacks.Global
+import com.wavesplatform.lang.utils.Serialize._
+import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 
 sealed trait CallableAction
 
 case class AssetTransfer(
-    recipient: Address,
+    address: Address,
+    recipient: Recipient,
     amount: Long,
     assetId: Option[ByteStr]
 ) extends CallableAction
@@ -23,12 +28,6 @@ case class Issue(
 ) extends CallableAction
 
 object Issue {
-  import java.io.ByteArrayOutputStream
-
-  import com.wavesplatform.lang.utils.Serialize._
-  import com.wavesplatform.lang.v1.BaseGlobal
-  private val Global: BaseGlobal = com.wavesplatform.lang.Global // Hack for IDEA
-
   def create(
       compiledScript: Option[ByteStr],
       decimals: Int,
@@ -80,6 +79,30 @@ case class SponsorFee(
     minSponsoredAssetFee: Option[Long]
 ) extends CallableAction
 
+case class Lease(
+    recipient: Recipient,
+    amount: Long,
+    nonce: Long
+) extends CallableAction
+
+case class LeaseCancel(
+    id: ByteStr
+) extends CallableAction
+
+object Lease {
+  def calculateId(l: Lease, invokeId: ByteStr): ByteStr = {
+    val out = new ByteArrayOutputStream()
+    l.recipient match {
+      case Address(bytes) => out.write(bytes.arr)
+      case Alias(name)    => out.writeString(name)
+    }
+    out.write(invokeId.arr)
+    out.writeLong(l.nonce)
+    out.writeLong(l.amount)
+    ByteStr(Global.blake2b256(out.toByteArray))
+  }
+}
+
 sealed trait DataOp extends CallableAction {
   val key: String
 }
@@ -89,9 +112,9 @@ sealed trait DataItem[T] extends DataOp {
 }
 
 object DataItem {
-  case class Lng(k: String, v: Long)     extends DataItem[Long]    { val key = k; val value = v    }
-  case class Bool(k: String, v: Boolean) extends DataItem[Boolean] { val key = k; val value = v    }
-  case class Bin(k: String, v: ByteStr)  extends DataItem[ByteStr] { val key = k; val value = v    }
-  case class Str(k: String, v: String)   extends DataItem[String]  { val key = k; val value = v    }
+  case class Lng(k: String, v: Long)     extends DataItem[Long] { val key = k; val value = v }
+  case class Bool(k: String, v: Boolean) extends DataItem[Boolean] { val key = k; val value = v }
+  case class Bin(k: String, v: ByteStr)  extends DataItem[ByteStr] { val key = k; val value = v }
+  case class Str(k: String, v: String)   extends DataItem[String] { val key = k; val value = v }
   case class Delete(key: String)         extends DataOp
 }

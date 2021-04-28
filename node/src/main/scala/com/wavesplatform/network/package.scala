@@ -48,7 +48,7 @@ package object network extends ScorexLogging {
   def id(ctx: ChannelHandlerContext): String = id(ctx.channel())
 
   def id(chan: Channel, prefix: String = ""): String =
-    if (chan == null) "???" else s"[$prefix${chan.id().asShortText()}${formatAddress(chan.remoteAddress())}]"
+    if (chan == null) "[null]" else s"[$prefix${chan.id().asShortText()}${formatAddress(chan.remoteAddress())}]"
 
   def formatBlocks(blocks: Seq[Block]): String = formatSignatures(blocks.view.map(_.id()))
 

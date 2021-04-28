@@ -208,7 +208,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     "Issue more than 10 assets should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
       assertApiError(invokeScript(acc, "issue11Assets").id) { e =>
-        e.message should include("Too many script actions: max: 10, actual: 11")
+        e.message should include("Actions count limit is exceeded")
       }
     }
 
@@ -218,14 +218,14 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
       assertApiError(invokeScript(acc, "process11actions", assetId = assetId).id) { e =>
-        e.message should include("Too many script actions: max: 10, actual: 11")
+        e.message should include("Actions count limit is exceeded")
       }
     }
 
     "More than 10 issue action in one invocation should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
       assertApiError(invokeScript(acc, "issue11Assets").id) { e =>
-        e.message should include("Too many script actions: max: 10, actual: 11")
+        e.message should include("Actions count limit is exceeded")
       }
     }
   }
@@ -305,7 +305,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val assetA     = issueValidated(acc, simpleReissuableAsset)
 
       sender.debugStateChangesByAddress(addressStr, 100).flatMap(_.stateChanges) should matchPattern {
-        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>
+        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, Nil, None, Nil)) if issue.name == simpleReissuableAsset.name =>
       }
 
       val height = nodes.waitForHeightArise()
@@ -327,7 +327,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       nodes.rollback(height, returnToUTX = false)
 
       sender.debugStateChangesByAddress(addressStr, 100).flatMap(_.stateChanges) should matchPattern {
-        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>
+        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, Nil, None, Nil)) if issue.name == simpleReissuableAsset.name =>
       }
       assertApiError(sender.debugStateChanges(txId), TransactionDoesNotExist)
 

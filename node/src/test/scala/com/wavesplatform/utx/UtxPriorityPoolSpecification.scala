@@ -2,29 +2,24 @@ package com.wavesplatform.utx
 
 import cats.data.NonEmptyList
 import cats.kernel.Monoid
-import com.wavesplatform
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
-import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.{PoSSelector, TransactionsOrdering}
+import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.{MultiDimensionalMiningConstraint, OneDimensionalMiningConstraint, TxEstimators}
-import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase}
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.appender.{ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Diff, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool.PackStrategy
 import com.wavesplatform.{BlocksTransactionsHelpers, EitherMatchers, NoShrink, TestValues, TransactionGen}
-import monix.execution.Scheduler
-import monix.execution.schedulers.SchedulerService
 import org.scalacheck.Gen
 import org.scalacheck.Gen.chooseNum
 import org.scalamock.scalatest.MockFactory
@@ -57,9 +52,9 @@ class UtxPriorityPoolSpecification
               tt.sender.toAddress                -> -(tt.fee + tt.amount),
               tt.recipient.asInstanceOf[Address] -> tt.amount
             ).view.mapValues(Portfolio.waves).toMap
-            Diff(tt, pfs)
+            Diff(portfolios = pfs).bindTransaction(tt)
 
-          case tx => Diff(tx)
+          case _ => Diff.empty
         }
         utx.setPriorityDiffs(asDiffs)
       }
@@ -192,7 +187,7 @@ class UtxPriorityPoolSpecification
         new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
 
       def createDiff(): Diff =
-        Monoid.combineAll((1 to 5).map(_ => Diff(TxHelpers.issue())))
+        Monoid.combineAll((1 to 5).map(_ => Diff.empty.bindTransaction(TxHelpers.issue())))
 
       utx.setPriorityDiffs(Seq(createDiff(), createDiff())) // 10 total
       utx.priorityPool.nextMicroBlockSize(3) shouldBe 5
@@ -235,92 +230,6 @@ class UtxPriorityPoolSpecification
 
         utx.all shouldBe Seq(tx1, tx2, profitableTx)
         utx.putIfNew(tx2).resultE should beLeft // Diff not counted
-    }
-
-    val genChain = for {
-      acc <- accountGen
-      genesis  = GenesisTransaction.create(acc.toAddress, ENOUGH_AMT, ntpTime.correctedTime()).explicitGet()
-      genBlock = TestBlock.create(Seq(genesis))
-      txs1 <- Gen.nonEmptyListOf(transferV2(acc, 10000000L, ntpTime))
-      (block1, mbs1) = UnsafeBlocks.unsafeChainBaseAndMicro(
-        genBlock.id(),
-        Nil,
-        Seq(Nil, txs1),
-        acc,
-        Block.NgBlockVersion,
-        ntpTime.correctedTime()
-      )
-      txs2 <- Gen.nonEmptyListOf(transferV2(acc, 10000000L, ntpTime))
-      txs4 <- Gen.nonEmptyListOf(transferV2(acc, 10000000L, ntpTime))
-      (block2, mbs2) = UnsafeBlocks.unsafeChainBaseAndMicro(
-        mbs1.head.totalResBlockSig,
-        Nil,
-        Seq(txs2, txs4),
-        acc,
-        Block.NgBlockVersion,
-        ntpTime.correctedTime()
-      )
-      txs3 <- Gen.nonEmptyListOf(transferV2(acc, 10000000L, ntpTime))
-      block3 = UnsafeBlocks.unsafeBlock(mbs2.last.totalResBlockSig, txs3, acc, Block.NgBlockVersion, ntpTime.correctedTime())
-      block4 = UnsafeBlocks.unsafeBlock(genBlock.id(), txs4, acc, Block.NgBlockVersion, ntpTime.correctedTime())
-    } yield (genBlock, (block1, mbs1), (block2, mbs2), block3, block4)
-
-    val settingsWithNG = wavesplatform.history.settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.SmartAccounts)
-
-    "applies chains correctly" in forAll(genChain) {
-      case (genBlock, (block1, mbs1), (block2, mbs2), block3, block4) =>
-        withDomain(settingsWithNG) { d =>
-          implicit val scheduler: SchedulerService = Scheduler.singleThread("ext-appender")
-          val blockchain                           = d.blockchainUpdater
-          val utx =
-            new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
-
-          val pos = stub[PoSSelector]
-          (pos.validateBaseTarget _).when(*, *, *, *).returning(Right((): Unit))
-          (pos.validateBlockDelay _).when(*, *, *, *).returning(Right((): Unit))
-          (pos.validateGenerationSignature _).when(*).returning(Right(ByteStr(new Array[Byte](32))))
-
-          val extAppender = ExtensionAppender(
-            blockchain,
-            utx,
-            pos,
-            ntpTime,
-            stub[InvalidBlockStorage],
-            stub[PeerDatabase],
-            scheduler
-          )(null, _)
-
-          val microBlockAppender = MicroblockAppender(blockchain, utx, scheduler) _
-
-          d.appendBlock(genBlock) shouldBe Nil
-          d.appendBlock(block1) shouldBe Nil
-          mbs1.foreach(microBlockAppender(_).runSyncUnsafe() should beRight)
-
-          mbs2.head.transactionData.foreach(utx.putIfNew(_).resultE should beRight)
-          extAppender(Seq(block2)).runSyncUnsafe() should beRight
-          val expectedTxs1 = mbs1.last.transactionData ++ mbs2.head.transactionData.sorted(TransactionsOrdering.InUTXPool(Set()))
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs1)
-
-          mbs2.foreach(microBlockAppender(_).runSyncUnsafe() should beRight)
-          utx.priorityPool.priorityTransactions shouldBe mbs1.last.transactionData
-          utx
-            .packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)
-            ._1
-            .get shouldBe mbs1.last.transactionData
-
-          extAppender(Seq(block3)).runSyncUnsafe() should beRight
-          utx
-            .packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)
-            ._1
-            .get
-            .toSet shouldBe mbs1.last.transactionData.toSet
-
-          // Not supported at the moment
-          //extAppender(Seq(block4)).runSyncUnsafe() should beRight
-          //val expectedTxs2 = mbs1.flatMap(_.transactionData) ++ mbs2.head.transactionData ++ block3.transactionData
-          //utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs2)
-          utx.close()
-        }
     }
 
     "takes into account priority diff on putIfNew" in forAll(genDependent) {

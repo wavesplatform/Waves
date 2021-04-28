@@ -107,7 +107,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       ("base64:", "Can't parse empty script bytes"),
       ("base64:AA==", "Illegal length of script: 1"),
       ("base64:AAQB", "Invalid content type of script: 4"),
-      ("base64:AAEF", "Invalid version of script: 5"),
+      ("base64:AAEF", "Invalid checksum"),
       ("base64:CAEF", "Invalid version of script: 8")
     )
 

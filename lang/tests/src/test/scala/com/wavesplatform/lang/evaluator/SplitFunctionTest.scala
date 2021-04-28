@@ -1,43 +1,10 @@
-package com.wavesplatform.lang.v1.evaluator
+package com.wavesplatform.lang.evaluator
 
-import cats.Id
-import cats.kernel.Monoid
-import com.wavesplatform.lang.Common.{AorBorC, NoShrink, addCtx, sampleTypes}
-import com.wavesplatform.lang.directives.values.V3
-import com.wavesplatform.lang.v1.CTX
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CaseObj, EVALUATED}
-import com.wavesplatform.lang.v1.compiler.Types.FINAL
-import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.testing.ScriptGen
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 
-class SplitFunctionTest
-  extends PropSpec
-    with  ScalaCheckPropertyChecks
-    with  ScriptGen
-    with  Matchers
-    with  NoShrink {
-
-  private val evaluator = new EvaluatorV1[Id, NoContext]()
-
-  private def eval[T <: EVALUATED](code: String, pointInstance: Option[CaseObj] = None, pointType: FINAL = AorBorC): Either[String, T] = {
-    val untyped                                                = Parser.parseExpr(code).get.value
-    val lazyVal                                                = ContextfulVal.pure[NoContext](pointInstance.orNull)
-    val stringToTuple = Map(("p", (pointType, lazyVal)))
-    val ctx: CTX[NoContext] =
-      Monoid.combineAll(Seq(
-        PureContext.build(V3),
-        CTX[NoContext](sampleTypes, stringToTuple, Array.empty),
-        addCtx
-      ))
-    val typed = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => evaluator.apply[T](ctx.evaluationContext, v._1))
-  }
+class SplitFunctionTest extends EvaluatorSpec {
+  implicit val startVersion: StdLibVersion = V3
 
   property("split string containing separators") {
     val script =
@@ -158,7 +125,7 @@ class SplitFunctionTest
   }
 
   property("split string containing only separators") {
-    val sep = ";;;"
+    val sep   = ";;;"
     val count = 10
     val script =
       s"""
@@ -173,7 +140,7 @@ class SplitFunctionTest
 
   property("split perceives regex as plain text") {
     val strContainingRegex = "aaa1bbb2ccc"
-    val regex = "[12]+"
+    val regex              = "[12]+"
     strContainingRegex.split(regex) shouldBe Array("aaa", "bbb", "ccc")
 
     val script =

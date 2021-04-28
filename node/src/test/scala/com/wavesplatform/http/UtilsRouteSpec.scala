@@ -1,7 +1,8 @@
 package com.wavesplatform.http
 
+import scala.concurrent.duration._
+
 import akka.http.scaladsl.testkit.RouteTestTimeout
-import cats.implicits._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
@@ -11,24 +12,22 @@ import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
+import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
-import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{V2, V3}
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
-import com.wavesplatform.lang.v1.compiler.ContractCompiler
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
+import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, IntegerDataEntry}
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.{Schedulers, Time}
@@ -38,7 +37,6 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
-import scala.concurrent.duration._
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory {
   implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
   implicit val timeout          = routeTestTimeout.duration
@@ -61,6 +59,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     ),
     stub[Blockchain]("globalBlockchain")
   )
+
+  (() => utilsApi.blockchain.activatedFeatures).when().returning(Map()).anyNumberOfTimes()
   private val route = utilsApi.route
 
   val script = FUNCTION_CALL(
@@ -576,6 +576,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/compileWithImports"), request) ~> route ~> check {
       val expectedScript =
         """
+          | {-# STDLIB_VERSION 3 #-}
           | {-# SCRIPT_TYPE ACCOUNT #-}
           | func inc(a: Int) = a + 1
           | let a = 5
@@ -608,21 +609,12 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
-    val ctx = {
-      val directives = DirectiveSet.contractDirectiveSet
-      PureContext.build(V3).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, V3).withEnvironment[Environment] |+|
-        WavesContext.build(directives)
-    }
-
-    def dAppToBase64(dApp: String) = {
-      val r = for {
-        compiled   <- ContractCompiler.compile(dApp, ctx.compilerContext, V3)
+    def dAppToBase64(dApp: String) =
+      (for {
+        compiled   <- TestCompiler(V3).compile(dApp)
         serialized <- Global.serializeContract(compiled, V3)
-      } yield ByteStr(serialized).base64
-
-      r.explicitGet()
-    }
+      } yield ByteStr(serialized).base64)
+        .explicitGet()
 
     val dAppBase64                = dAppToBase64(dApp)
     val dAppWithoutVerifierBase64 = dAppToBase64(dAppWithoutVerifier)
@@ -681,27 +673,46 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   routePath("/script/evaluate/{address}") in {
+    val letFromContract = 1000
     val testScript = {
       val str = s"""
-                   |{-# STDLIB_VERSION 4 #-}
+                   |{-# STDLIB_VERSION 5 #-}
                    |{-# CONTENT_TYPE DAPP #-}
                    |{-# SCRIPT_TYPE ACCOUNT #-}
+                   |
+                   |let letFromContract = $letFromContract
                    |
                    |func test(i: Int) = i * 10
                    |func testB() = true
                    |func testBS() = base58'MATCHER'
                    |func testS() = "Test"
                    |func testF() = throw("Test")
-                   |func testCompl() = ${"sigVerify(base58'', base58'', base58'') ||" * 100} true
+                   |func testCompl() = ${"sigVerify(base58'', base58'', base58'') ||" * 200} true
                    |func testThis() = this
                    |func testListArg(list: List[String|ByteVector|Int], str: String, bytes: ByteVector) = list.containsElement(str)
                    |
                    |@Callable(i)
                    |func testCallable() = [BinaryEntry("test", i.caller.bytes)]
-                   |""".stripMargin
+                   |
+                   |@Callable(i)
+                   |func testSyncInvoke() = {
+                   |  strict r = Invoke(this, "testCallable", [], [AttachedPayment(unit, 100)])
+                   |  [BinaryEntry("testSyncInvoke", i.caller.bytes)]
+                   |}
+                   |
+                   |@Callable(i)
+                   |func testSyncCallComplexityExcess() = {
+                   |  strict r = Invoke(this, "testSyncCallComplexityExcess", [], [])
+                   |  []
+                   |}
+                   |
+                   |@Callable(i)
+                   |func testWriteEntryType(b: ByteVector) = [ BinaryEntry("bytes", b) ]
+                   |
+                 """.stripMargin
 
       val (script, _) = ScriptCompiler.compile(str, ScriptEstimatorV2).explicitGet()
-      AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map.empty)
+      AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map(1 -> Map("testCallable" -> 10, "testSyncCallComplexityExcess" -> 10)))
     }
 
     val dAppAddress = TxHelpers.defaultSigner.toAddress
@@ -735,7 +746,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
 
     evalScript("testCallable()") ~> route ~> check {
-      responseAs[String] shouldBe "{\"result\":{\"type\":\"Array\",\"value\":[{\"type\":\"BinaryEntry\",\"value\":{\"key\":{\"type\":\"String\",\"value\":\"test\"},\"value\":{\"type\":\"ByteVector\",\"value\":\"11111111111111111111111111\"}}}]},\"expr\":\"testCallable()\",\"address\":\"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9\"}"
+      responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"test"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":5,"expr":"testCallable()","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
     }
 
     evalScript("testThis()") ~> route ~> check {
@@ -782,6 +793,53 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         |  case _ => throw("")
         |}""".stripMargin) ~> route ~> check {
       responseJson shouldBe Json.obj("type" -> "Int", "value" -> 151290)
+    }
+
+    val expectingKey   = "some"
+    val expectingValue = 1234
+
+    (utilsApi.blockchain.accountData _)
+      .when(dAppAddress, expectingKey)
+      .returning(Some(IntegerDataEntry(expectingKey, expectingValue)))
+      .anyNumberOfTimes()
+
+    evalScript(
+      s"""
+         | this.getInteger("$expectingKey") == $expectingValue &&
+         | height == height
+       """.stripMargin
+    ) ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
+    }
+
+    evalScript("letFromContract - 1") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Int", "value" -> (letFromContract - 1))
+    }
+
+    (() => utilsApi.blockchain.settings)
+      .when()
+      .returning(DefaultBlockchainSettings)
+      .anyNumberOfTimes()
+
+    evalScript(""" testSyncInvoke() """) ~> route ~> check {
+      responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":99,"expr":" testSyncInvoke() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    }
+
+    val complexityLimit = 1234
+    val customApi       = utilsApi.copy(settings = restAPISettings.copy(evaluateScriptComplexityLimit = complexityLimit))
+    evalScript(""" testSyncCallComplexityExcess() """.stripMargin) ~> customApi.route ~> check {
+      responseAs[String] shouldBe s"""{"error":306,"message":"FailedTransactionError(code = 1, error = Invoke complexity limit = $complexityLimit is exceeded, log =)","expr":" testSyncCallComplexityExcess() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    }
+
+    evalScript(""" testWriteEntryType("abc") """.stripMargin) ~> route ~> check {
+      responseAs[String] shouldBe """{"error":306,"message":"Passed args (bytes, abc) are unsuitable for constructor BinaryEntry(String, ByteVector)","expr":" testWriteEntryType(\"abc\") ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    }
+    evalScript(""" testWriteEntryType(base58'aaaa') """.stripMargin) ~> route ~> check {
+      responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"bytes"},"value":{"type":"ByteVector","value":"aaaa"}}}]},"complexity":3,"expr":" testWriteEntryType(base58'aaaa') ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    }
+
+    evalScript(s"""parseBigIntValue("${PureContext.BigIntMax}")""") ~> route ~> check {
+      responseAs[String] shouldBe s"""{"result":{"type":"BigInt","value":${PureContext.BigIntMax}},"complexity":65,"expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
     }
   }
 

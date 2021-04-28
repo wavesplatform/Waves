@@ -134,18 +134,20 @@ object CommonValidation {
 
       val v3Activation = activationBarrier(BlockchainFeatures.Ride4DApps)
       val v4Activation = activationBarrier(BlockchainFeatures.BlockV5)
+      val v5Activation = activationBarrier(BlockchainFeatures.SynchronousCalls)
 
       def scriptVersionActivation(sc: Script): Either[ActivationError, T] = sc.stdLibVersion match {
-        case V1 | V2 | V3 if sc.containsArray      => v4Activation
-        case V1 | V2 if sc.containsBlockV2.value() => v3Activation
-        case V1 | V2                               => Right(tx)
-        case V3                                    => v3Activation
-        case V4                                    => v4Activation
+        case V1 | V2 | V3 if sc.containsArray => v4Activation
+        case V1 | V2 if sc.containsBlockV2()  => v3Activation
+        case V1 | V2                          => Right(tx)
+        case V3                               => v3Activation
+        case V4                               => v4Activation
+        case V5                               => v5Activation
       }
 
       def scriptTypeActivation(sc: Script): Either[ActivationError, T] = sc match {
-        case e: ExprScript                        => Right(tx)
-        case c: ContractScript.ContractScriptImpl => v3Activation
+        case _: ExprScript                        => Right(tx)
+        case _: ContractScript.ContractScriptImpl => v3Activation
       }
 
       for {
@@ -155,7 +157,7 @@ object CommonValidation {
 
     }
 
-    def generic1or2Barrier(t: VersionedTransaction, name: String) = {
+    def generic1or2Barrier(t: VersionedTransaction): Either[ActivationError, T] = {
       if (t.version == 1.toByte) Right(tx)
       else if (t.version == 2.toByte) activationBarrier(BlockchainFeatures.SmartAccounts)
       else Right(tx)
@@ -208,12 +210,12 @@ object CommonValidation {
           }
         }
 
-      case t: TransferTransaction    => generic1or2Barrier(t, "transfer")
-      case t: CreateAliasTransaction => generic1or2Barrier(t, "create alias")
-      case t: LeaseTransaction       => generic1or2Barrier(t, "lease")
-      case t: LeaseCancelTransaction => generic1or2Barrier(t, "lease cancel")
-      case t: ReissueTransaction     => generic1or2Barrier(t, "reissue")
-      case t: BurnTransaction        => generic1or2Barrier(t, "burn")
+      case t: TransferTransaction    => generic1or2Barrier(t)
+      case t: CreateAliasTransaction => generic1or2Barrier(t)
+      case t: LeaseTransaction       => generic1or2Barrier(t)
+      case t: LeaseCancelTransaction => generic1or2Barrier(t)
+      case t: ReissueTransaction     => generic1or2Barrier(t)
+      case t: BurnTransaction        => generic1or2Barrier(t)
 
       case _: SponsorFeeTransaction   => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _: InvokeScriptTransaction => activationBarrier(BlockchainFeatures.Ride4DApps)

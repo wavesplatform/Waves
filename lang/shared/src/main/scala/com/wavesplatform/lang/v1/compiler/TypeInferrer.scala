@@ -126,7 +126,7 @@ object TypeInferrer {
       case (LIST(tp), LIST(t))            => matchTypes(t, tp, knownTypes)
       case (TUPLE(types1), TUPLE(types2)) => matchTupleTypes(err, types1, types2, knownTypes)
       case (placeholder: FINAL, _) =>
-        Either.cond(placeholder >= UNION.create(argType.typeList), None, err)
+        Either.cond(placeholder >= argType, None, err)
     }
   }
 

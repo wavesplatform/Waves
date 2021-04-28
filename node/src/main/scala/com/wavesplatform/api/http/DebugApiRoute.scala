@@ -28,6 +28,7 @@ import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, Portfolio, StateHash}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -227,7 +228,7 @@ case class DebugApiRoute(
     path("validate")(jsonPost[JsObject] { jsv =>
       val blockchain = priorityPoolBlockchain()
       val startTime  = System.nanoTime()
-      
+
       val parsedTransaction = TransactionFactory.fromSignedRequest(jsv)
 
       val tracedDiff = for {
@@ -341,4 +342,20 @@ object DebugApiRoute {
       case Disabled          => "disabled"
       case Error(err)        => s"error: $err"
     })
+
+  implicit val assetMapWrites: Writes[Map[IssuedAsset, Long]] = Writes { m =>
+    Json.toJson(m.map {
+      case (asset, balance) => asset.id.toString -> JsNumber(balance)
+    })
+  }
+
+  implicit val portfolioJsonWrites: Writes[Portfolio] = Writes { pf =>
+    JsObject(
+      Map(
+        "balance" -> JsNumber(pf.balance),
+        "lease"   -> Json.toJson(pf.lease),
+        "assets"  -> Json.toJson(pf.assets)
+      )
+    )
+  }
 }

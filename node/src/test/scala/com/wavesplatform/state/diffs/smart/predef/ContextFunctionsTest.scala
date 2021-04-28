@@ -1,27 +1,21 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import cats.kernel.Monoid
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.db.WithState
-import com.wavesplatform.features.BlockchainFeatures.{BlockV5, FeeSponsorship}
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, FeeSponsorship, SynchronousCalls}
 import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Testing._
+import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
-import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
@@ -286,12 +280,20 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
       (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
       version                                                                            <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
       v4Activation                                                                       <- if (version >= V4) Gen.const(true) else Gen.oneOf(false, true)
-    } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, v4Activation)) {
-      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, v4Activation) =>
+      v5Activation                                                                       <- if (version >= V5) Gen.const(true) else Gen.oneOf(false, true)
+    } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, v4Activation, v5Activation)) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, v4Activation, v5Activation) =>
         val fs = {
           val features = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (FeeSponsorship.id -> 0))
-          if (v4Activation) features.copy(preActivatedFeatures = features.preActivatedFeatures + (BlockV5.id -> 0))
-          else features
+          val features1 =
+            if (v4Activation)
+              features.copy(preActivatedFeatures = features.preActivatedFeatures + (BlockV5.id -> 0))
+            else
+              features
+          if (v5Activation)
+            features1.copy(preActivatedFeatures = features1.preActivatedFeatures + (SynchronousCalls.id -> 0))
+          else
+            features1
         }
 
         assertDiffAndState(fs) { append =>
@@ -432,7 +434,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
           if (withVrf) ByteStr(new Array[Byte](Block.GenerationVRFSignatureLength)) else ByteStr(new Array[Byte](Block.GenerationSignatureLength))
 
         val fs =
-          if (version >= V4) smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (BlockV5.id -> 0))
+          if (version >= V5) smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (SynchronousCalls.id -> 0))
           else smartEnabledFS
 
         val fsWithVrf =
@@ -515,23 +517,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                |     else throw("blocks do not match")
                |}
                |""".stripMargin
-          val expr = Parser.parseContract(script).get.value
 
-          val ctx = {
-            utils.functionCosts(V3)
-            Monoid
-              .combineAll(
-                Seq(
-                  PureContext.build(V3).withEnvironment[Environment],
-                  CryptoContext.build(Global, V3).withEnvironment[Environment],
-                  WavesContext.build(
-                    DirectiveSet(V3, Account, Expression).explicitGet()
-                  )
-                )
-              )
-          }
-
-          val compiledScript = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, expr, V3).explicitGet()).explicitGet()
+          val compiledScript = TestCompiler(V3).compileContract(script)
           val setScriptTx =
             SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
           val fc = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)

@@ -16,9 +16,21 @@ import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetScriptInfo, Blockchain, DataEntry, Diff, DiffToStateApplier, EmptyDataEntry, Height, InvokeScriptResult, LeaseBalance}
+import com.wavesplatform.state.{
+  AccountDataInfo,
+  AssetDescription,
+  AssetScriptInfo,
+  Blockchain,
+  DataEntry,
+  Diff,
+  DiffToStateApplier,
+  EmptyDataEntry,
+  Height,
+  InvokeScriptResult,
+  LeaseBalance
+}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxAmount}
@@ -381,24 +393,13 @@ object StateUpdate {
 
     val updatedLeases = diff.leaseState.map {
       case (leaseId, newState) =>
-        val originTransactionId = diff.transactions.values.map(_.transaction) collectFirst {
-          case ltx: LeaseTransaction if ltx.id() == leaseId        => ltx.id()
-          case lc: LeaseCancelTransaction if lc.leaseId == leaseId => lc.id()
-          // TODO: case is: InvokeScriptTransaction if diff.scriptResults(is.id()).leases.contains(leaseId) => ???
-        }
-
-        val tx = blockchainAfter.transactionInfo(leaseId) match {
-          case Some((_, tx: LeaseTransaction, _)) => tx
-          case _                                  => throw new IllegalArgumentException(s"Transaction $leaseId is not a lease transaction")
-        }
-
         LeaseUpdate(
           leaseId,
-          if (newState) LeaseStatus.Active else LeaseStatus.Inactive,
-          tx.amount,
-          tx.sender,
-          blockchainAfter.resolveAlias(tx.recipient).explicitGet(),
-          originTransactionId.getOrElse(ByteStr.empty)
+          if (newState.isActive) LeaseStatus.Active else LeaseStatus.Inactive,
+          newState.amount,
+          newState.sender,
+          blockchainAfter.resolveAlias(newState.recipient).explicitGet(),
+          newState.sourceId
         )
     }.toVector
 
@@ -537,7 +538,7 @@ object BlockAppended {
     }
 
     BlockAppended(
-      block.id.value(),
+      block.id(),
       blockchainBeforeWithMinerReward.height + 1,
       block,
       updatedWavesAmount,

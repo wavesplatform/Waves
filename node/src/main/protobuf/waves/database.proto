@@ -4,6 +4,8 @@ option java_package = "com.wavesplatform.database.protobuf";
 
 import "waves/block.proto";
 import "waves/transaction.proto";
+import "waves/recipient.proto";
+import "google/protobuf/empty.proto";
 
 message AssetDetails {
     bytes name = 1;
@@ -65,5 +67,28 @@ message DataEntry {
         bool bool_value = 2;
         bytes binary_value = 3;
         string string_value = 4;
+    }
+}
+
+message LeaseDetails {
+    message Cancelled {
+        int32 height = 1;
+        bytes transaction_id = 2;
+    }
+
+    message Expired {
+        int32 height = 1;
+    }
+
+    bytes sender_public_key = 1;
+    Recipient recipient = 2;
+    int64 amount = 3;
+    bytes source_id = 4;
+    int32 height = 5;
+
+    oneof status {
+        google.protobuf.Empty active = 10;
+        Cancelled cancelled = 11;
+        Expired expired = 12;
     }
 }

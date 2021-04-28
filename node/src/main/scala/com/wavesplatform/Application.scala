@@ -104,13 +104,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private var maybeUtx: Option[UtxPool] = None
   private var maybeNetwork: Option[NS]  = None
 
-  def apiShutdown(): Unit = {
-    for {
-      u <- maybeUtx
-      n <- maybeNetwork
-    } yield shutdown(u, n)
-  }
-
   def run(): Unit = {
     // initialization
     implicit val as: ActorSystem = actorSystem
@@ -135,7 +128,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         reporter = utxSynchronizerLogger.trace("Uncaught exception in UTX Synchronizer", _)
       )
 
-    val utxSynchronizer =
+    val transactionPublisher =
       TransactionPublisher.timeBounded(
         utxStorage.putIfNew,
         allChannels.broadcast,
@@ -198,7 +191,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def wallet: Wallet                                                               = app.wallet
       override def utx: UtxPool                                                                 = utxStorage
       override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
-        Await.result(utxSynchronizer.validateAndBroadcast(tx, None), Duration.Inf) // TODO: Replace with async if possible
+        Await.result(transactionPublisher.validateAndBroadcast(tx, None), Duration.Inf) // TODO: Replace with async if possible
       override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
       override def actorSystem: ActorSystem                              = app.actorSystem
       override def utxEvents: Observable[UtxEvent]                       = app.utxEvents
@@ -209,7 +202,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         blockchainUpdater,
         utxStorage,
         wallet,
-        tx => utxSynchronizer.validateAndBroadcast(tx, None),
+        tx => transactionPublisher.validateAndBroadcast(tx, None),
         loadBlockAt(db, blockchainUpdater)
       )
       override val blocksApi: CommonBlocksApi =
@@ -229,7 +222,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // Node start
     // After this point, node actually starts doing something
-    checkGenesis(settings, blockchainUpdater)
+    appenderScheduler.execute(() => checkGenesis(settings, blockchainUpdater, miner))
 
     val network =
       NetworkServer(settings, lastBlockInfo, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
@@ -268,7 +261,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       timeoutSubject
     ) {
       case (c, b) =>
-        processFork(c, b.blocks).doOnFinish {
+        processFork(c, b).doOnFinish {
           case None    => Task.now(())
           case Some(e) => Task(stopOnAppendError.reportFailure(e))
         }
@@ -278,7 +271,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       settings.synchronizationSettings.utxSynchronizer,
       lastBlockInfo.map(_.height).distinctUntilChanged,
       transactions,
-      utxSynchronizer
+      transactionPublisher
     )
 
     Observable(
@@ -289,12 +282,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     ).merge
       .onErrorHandle(stopOnAppendError.reportFailure)
       .subscribe()
-
-    miner.scheduleMining()
-
-    for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
-      upnp.addPort(addr.getPort)
-    }
 
     // API start
     if (settings.restAPISettings.enable) {
@@ -316,26 +303,26 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         )
 
       val apiRoutes = Seq(
-        NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
-        BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi),
+        NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => shutdown()),
+        BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, time),
         TransactionsApiRoute(
           settings.restAPISettings,
           extensionContext.transactionsApi,
           wallet,
           blockchainUpdater,
           () => utxStorage.size,
-          utxSynchronizer,
+          transactionPublisher,
           time
         ),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
         UtilsApiRoute(time, settings.restAPISettings, () => blockchainUpdater.estimator, limitedScheduler, blockchainUpdater),
-        PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
+        PeersApiRoute(settings.restAPISettings, address => maybeNetwork.foreach(_.connect(address)), peerDatabase, establishedConnections),
         AddressApiRoute(
           settings.restAPISettings,
           wallet,
           blockchainUpdater,
-          utxSynchronizer,
+          transactionPublisher,
           time,
           limitedScheduler,
           extensionContext.accountsApi,
@@ -366,7 +353,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         AssetsApiRoute(
           settings.restAPISettings,
           wallet,
-          utxSynchronizer,
+          transactionPublisher,
           blockchainUpdater,
           time,
           extensionContext.accountsApi,
@@ -374,8 +361,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           settings.dbSettings.maxRollbackDepth
         ),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
-        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, extensionContext.accountsApi),
-        AliasApiRoute(settings.restAPISettings, extensionContext.transactionsApi, wallet, utxSynchronizer, time, blockchainUpdater),
+        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, transactionPublisher, time, extensionContext.accountsApi),
+        AliasApiRoute(settings.restAPISettings, extensionContext.transactionsApi, wallet, transactionPublisher, time, blockchainUpdater),
         RewardApiRoute(blockchainUpdater)
       )
 
@@ -386,20 +373,24 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 
+    for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
+      upnp.addPort(addr.getPort)
+    }
+
     // on unexpected shutdown
     sys.addShutdownHook {
       timer.stop()
-      shutdown(utxStorage, network)
+      shutdown()
     }
   }
 
   private val shutdownInProgress             = new AtomicBoolean(false)
   @volatile var serverBinding: ServerBinding = _
 
-  def shutdown(utx: UtxPool, network: NS): Unit =
+  def shutdown(): Unit =
     if (shutdownInProgress.compareAndSet(false, true)) {
       spendableBalanceChanged.onComplete()
-      utx.close()
+      maybeUtx.foreach(_.close())
 
       log.info("Closing REST API")
       if (settings.restAPISettings.enable)
@@ -414,8 +405,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       blockchainUpdater.shutdown()
 
-      log.info("Stopping network services")
-      network.shutdown()
+      maybeNetwork.foreach { network =>
+        log.info("Stopping network services")
+        network.shutdown()
+      }
 
       shutdownAndWait(appenderScheduler, "Appender", 5.minutes.some)
 
@@ -516,7 +509,7 @@ object Application extends ScorexLogging {
     }
 
   private[wavesplatform] def loadBlockMetaAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] = {
-    val result =  blockchainUpdater.liquidBlockMeta
+    val result = blockchainUpdater.liquidBlockMeta
       .filter(_ => blockchainUpdater.height == height)
       .orElse(db.get(Keys.blockMetaAt(Height(height))))
     result

@@ -2,32 +2,125 @@ package com.wavesplatform.lang.v1.evaluator
 
 import cats.Id
 import cats.implicits._
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.EvaluationException
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.traits.Environment
 import monix.eval.Coeval
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
-import scala.util.Try
 
 class EvaluatorV2(
     val ctx: LoggedEvaluationContext[Environment, Id],
-    val stdLibVersion: StdLibVersion
+    val stdLibVersion: StdLibVersion,
+    val checkConstructorArgsTypes: Boolean = false
 ) {
+  def apply(expr: EXPR, limit: Int): (EXPR, Int) =
+    applyCoeval(expr, limit).value()
 
-  def apply(expr: EXPR, limit: Int): (EXPR, Int) = {
-    var ref    = expr.deepCopy.value
-    val unused = root(ref, v => Coeval.delay { ref = v }, limit, Nil).value()
-    (ref, unused)
+  def applyCoeval(expr: EXPR, limit: Int): Coeval[(EXPR, Int)] = {
+    var ref = expr.deepCopy.value
+    root(ref, v => Coeval.delay { ref = v }, limit, Nil)
+      .map((ref, _))
   }
 
-  private def root(expr: EXPR, update: EXPR => Coeval[Unit], limit: Int, parentBlocks: List[BLOCK_DEF]): Coeval[Int] =
+  private def root(
+      expr: EXPR,
+      update: EXPR => Coeval[Unit],
+      limit: Int,
+      parentBlocks: List[BLOCK_DEF]
+  ): Coeval[Int] = {
+    def evaluateFunctionArgs(fc: FUNCTION_CALL): Coeval[Int] =
+      Coeval.defer {
+        fc.args.indices
+          .to(LazyList)
+          .foldM(limit) {
+            case (unused, argIndex) =>
+              if (unused <= 0)
+                Coeval.now(unused)
+              else
+                root(
+                  expr = fc.args(argIndex),
+                  update = argValue => Coeval.delay(fc.args = fc.args.updated(argIndex, argValue)),
+                  limit = unused,
+                  parentBlocks
+                )
+          }
+      }
+
+    def evaluateNativeFunction(fc: FUNCTION_CALL, limit: Int): Coeval[Int] = {
+      val function =
+        ctx.ec.functions
+          .getOrElse(fc.function, throw EvaluationException(s"function '${fc.function}' not found", limit))
+          .asInstanceOf[NativeFunction[Environment]]
+      val cost = function.costByLibVersion(stdLibVersion).toInt
+      if (limit < cost)
+        Coeval.now(limit)
+      else {
+        function.ev
+          .evaluateExtended[Id](ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]], limit - cost)
+          .flatMap {
+            case (result, additionalComplexity) =>
+              val totalCost        = cost + additionalComplexity
+              val unusedComplexity = limit - totalCost
+              result.fold(
+                error => throw EvaluationException(error, unusedComplexity),
+                evaluated => update(evaluated).map(_ => unusedComplexity)
+              )
+          }
+      }
+    }
+
+    def evaluateUserFunction(fc: FUNCTION_CALL, limit: Int, name: String, startArgs: List[EXPR]): Option[Coeval[Int]] = {
+      ctx.ec.functions
+        .get(fc.function)
+        .map(_.asInstanceOf[UserFunction[Environment]])
+        .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment, startArgs)))
+        .orElse(findUserFunction(name, parentBlocks))
+        .map { signature =>
+          val argsWithExpr =
+            (signature.args zip fc.args)
+              .foldRight(signature.body.deepCopy.value) {
+                case ((argName, argValue), argsWithExpr) =>
+                  BLOCK(LET(argName, argValue), argsWithExpr)
+              }
+          update(argsWithExpr)
+            .flatMap(
+              _ => root(argsWithExpr, update, limit, parentBlocks)
+            )
+        }
+    }
+
+    def evaluateConstructor(fc: FUNCTION_CALL, limit: Int, name: String): Coeval[Int] =
+      for {
+        objectType <- ctx.ec.typeDefs.get(name) match {
+          case Some(caseType: CASETYPEREF) => Coeval.now(caseType)
+          case _                           => Coeval.raiseError(new NoSuchElementException(s"Function or type '$name' not found"))
+        }
+        passedArgs = fc.args.asInstanceOf[List[EVALUATED]]
+        _ <- Coeval(if (checkConstructorArgsTypes) doCheckConstructorArgsTypes(objectType, passedArgs, limit) else ())
+        fields = objectType.fields.map(_._1) zip passedArgs
+        r <- root(CaseObj(objectType, fields.toMap), update, limit, parentBlocks)
+      } yield r
+
+    def doCheckConstructorArgsTypes(objectType: CASETYPEREF, passedArgs: List[EVALUATED], limit: Int): Unit = {
+      def str[T](l: List[T]) = l.mkString("(", ", ", ")")
+
+      if (objectType.fields.size != passedArgs.size)
+        throw EvaluationException(s"Constructor ${objectType.name} expected ${objectType.fields.size} args, but ${str(passedArgs)} was passed", limit)
+      else {
+        val fieldTypes      = objectType.fields.map(_._2)
+        val passedArgsTypes = passedArgs.map(_.getType)
+        if (!(fieldTypes zip passedArgsTypes).forall { case (fieldType, passedType) => fieldType >= passedType })
+          throw EvaluationException(s"Passed args ${str(passedArgs)} are unsuitable for constructor ${objectType.name}${str(fieldTypes)}", limit)
+      }
+    }
+
     expr match {
       case b: BLOCK_DEF =>
         Coeval.defer(
@@ -55,7 +148,7 @@ class EvaluatorV2(
               case _: CaseObj =>
                 Coeval.now(unused)
               case ev: EVALUATED =>
-                throw new IllegalArgumentException(s"GETTER of non-case-object $ev")
+                throw EvaluationException(s"GETTER of non-case-object $ev", unused)
               case _ =>
                 Coeval.now(unused)
             }
@@ -92,7 +185,7 @@ class EvaluatorV2(
                       parentBlocks = parentBlocks
                     )
                 )
-              case _: EVALUATED => throw new IllegalArgumentException("Non-boolean result in cond")
+              case _: EVALUATED => throw EvaluationException("Non-boolean result in cond", unused)
               case _            => Coeval.now(unused)
             }
           }
@@ -102,81 +195,31 @@ class EvaluatorV2(
         Coeval.defer {
           visitRef(key, update, limit, parentBlocks)
             .orElse(findGlobalVar(key, update, limit))
-            .getOrElse(throw new NoSuchElementException(s"A definition of '$key' not found"))
+            .getOrElse(throw EvaluationException(s"A definition of '$key' not found", limit))
         }
 
       case fc: FUNCTION_CALL =>
-        val evaluatedArgs =
-          Coeval.defer {
-            fc.args.indices
-              .to(LazyList)
-              .foldM(limit) {
-                case (unused, argIndex) =>
-                  if (unused <= 0)
-                    Coeval.now(unused)
-                  else
-                    root(
-                      expr = fc.args(argIndex),
-                      update = argValue => Coeval.delay(fc.args = fc.args.updated(argIndex, argValue)),
-                      limit = unused,
-                      parentBlocks
-                    )
-              }
-          }
-        evaluatedArgs
+        val startArgs = fc.args
+        evaluateFunctionArgs(fc)
           .flatMap { unusedArgsComplexity =>
-            if (fc.args.forall(_.isInstanceOf[EVALUATED])) {
+            val argsEvaluated = fc.args.forall(_.isInstanceOf[EVALUATED])
+            if (argsEvaluated && unusedArgsComplexity > 0)
               fc.function match {
                 case FunctionHeader.Native(_) =>
-                  val NativeFunction(_, costByVersion, _, ev, _) =
-                    ctx.ec.functions
-                      .getOrElse(fc.function, throw new RuntimeException(s"function '${fc.function}' not found"))
-                      .asInstanceOf[NativeFunction[Environment]]
-                  val cost = costByVersion(stdLibVersion).toInt
-                  if (unusedArgsComplexity < cost)
-                    Coeval.now(unusedArgsComplexity)
-                  else
-                    update(ev[Id]((ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]])).explicitGet())
-                      .map(_ => unusedArgsComplexity - cost)
-
+                  evaluateNativeFunction(fc, unusedArgsComplexity)
                 case FunctionHeader.User(_, name) =>
-                  if (unusedArgsComplexity > 0)
-                    ctx.ec.functions
-                      .get(fc.function)
-                      .map(_.asInstanceOf[UserFunction[Environment]])
-                      .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment)))
-                      .orElse(findUserFunction(name, parentBlocks))
-                      .map { signature =>
-                        val argsWithExpr =
-                          (signature.args zip fc.args)
-                            .foldRight(signature.body.deepCopy.value) {
-                              case ((argName, argValue), argsWithExpr) =>
-                                BLOCK(LET(argName, argValue), argsWithExpr)
-                            }
-                        update(argsWithExpr).flatMap(_ => root(argsWithExpr, update, unusedArgsComplexity, parentBlocks))
-                      }
-                      .getOrElse {
-                        val caseType =
-                          ctx.ec.typeDefs.get(name) match {
-                            case Some(caseType: CASETYPEREF) => Coeval.now(caseType)
-                            case _                           => Coeval.raiseError(new NoSuchElementException(s"Function or type '$name' not found"))
-                          }
-                        caseType.flatMap { objectType =>
-                          val fields = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
-                          root(CaseObj(objectType, fields.toMap), update, unusedArgsComplexity, parentBlocks)
-                        }
-                      } else
-                    Coeval.now(unusedArgsComplexity)
-              }
-            } else {
+                  evaluateUserFunction(fc, unusedArgsComplexity, name, startArgs)
+                    .getOrElse(evaluateConstructor(fc, unusedArgsComplexity, name))
+              } else
               Coeval.now(unusedArgsComplexity)
-            }
           }
+
       case evaluated: EVALUATED =>
         update(evaluated).map(_ => limit)
 
-      case f: FAILED_EXPR => throw new Error(s"Unexpected $f")
+      case f: FAILED_EXPR => throw EvaluationException(s"Unexpected $f", limit)
     }
+  }
 
   @tailrec
   private def visitRef(key: String, update: EVALUATED => Coeval[Unit], limit: Int, parentBlocks: List[BLOCK_DEF]): Option[Coeval[Int]] =
@@ -208,19 +251,18 @@ class EvaluatorV2(
       limit = limit,
       parentBlocks = nextParentBlocks
     ).flatMap { unused =>
-        if (unused < 0) throw new Error("Unused < 0")
-        else
-          let.value match {
-            case ev: EVALUATED if unused > 0 =>
-              update(ev).map(_ => unused - 1)
-            case _ =>
-              Coeval.now(unused)
-          }
+        let.value match {
+          case ev: EVALUATED if unused > 0 => update(ev).map(_ => unused - 1)
+          case _                           => Coeval.now(unused)
+        }
       }
       .onErrorHandle { e =>
         val error = if (e.getMessage != null) e.getMessage else e.toString
         ctx.log(let, Left(error))
-        throw e
+        throw if (e.isInstanceOf[EvaluationException])
+          e
+        else
+          EvaluationException(e.getMessage, limit)
       }
   }
 
@@ -228,7 +270,7 @@ class EvaluatorV2(
     ctx.ec.letDefs
       .get(key)
       .map { v =>
-        val globalValue = v.value.value.explicitGet()
+        val globalValue = v.value.value.fold(e => throw EvaluationException(e, limit), identity)
         update(globalValue).map(_ => limit - 1)
       }
 
@@ -247,15 +289,30 @@ object EvaluatorV2 {
       expr: EXPR,
       limit: Int,
       ctx: EvaluationContext[Environment, Id],
-      stdLibVersion: StdLibVersion
-  ): Either[(ExecutionError, Log[Id]), (EXPR, Int, Log[Id])] = {
+      stdLibVersion: StdLibVersion,
+      checkConstructorArgsTypes: Boolean = false
+  ): Either[(ExecutionError, Log[Id]), (EXPR, Int, Log[Id])] =
+    applyLimitedCoeval(expr, limit, ctx, stdLibVersion, checkConstructorArgsTypes)
+      .value()
+      .leftMap { case (e, _, unused) => (e, unused) }
+
+  def applyLimitedCoeval(
+      expr: EXPR,
+      limit: Int,
+      ctx: EvaluationContext[Environment, Id],
+      stdLibVersion: StdLibVersion,
+      checkConstructorArgsTypes: Boolean = false
+  ): Coeval[Either[(ExecutionError, Int, Log[Id]), (EXPR, Int, Log[Id])]] = {
     val log       = ListBuffer[LogItem[Id]]()
     val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
-    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion)
-    Try(evaluator(expr, limit)).toEither
-      .bimap(
-        err => (err.getMessage, log.toList),
-        { case (expr, unused) => (expr, unused, log.toList) }
+    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion, checkConstructorArgsTypes)
+    evaluator
+      .applyCoeval(expr, limit)
+      .redeem(
+        {
+          case e: EvaluationException => Left((e.getMessage, e.unusedComplexity, log.toList))
+          case e                      => Left((e.getMessage, limit, log.toList))
+        }, { case (expr, unused)      => Right((expr, unused, log.toList)) }
       )
   }
 
@@ -264,30 +321,27 @@ object EvaluatorV2 {
       expr: EXPR,
       stdLibVersion: StdLibVersion,
       complexityLimit: Int,
-      default: EVALUATED
-  ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
+      handleExpr: EXPR => Either[ExecutionError, EVALUATED]
+  ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
     EvaluatorV2
-      .applyLimited(expr, complexityLimit, ctx, stdLibVersion)
-      .flatMap {
-        case (expr, _, log) =>
-          expr match {
-            case evaluated: EVALUATED => Right((evaluated, log))
-            case _                    => Right((default, log))
-          }
-      }
+      .applyLimitedCoeval(expr, complexityLimit, ctx, stdLibVersion)
+      .value()
+      .fold(
+        { case (error, complexity, log) => (log, complexity, Left(error)) }, {
+          case (expr, complexity, log) =>
+            expr match {
+              case evaluated: EVALUATED => (log, complexity, Right(evaluated))
+              case expr: EXPR           => (log, complexity, handleExpr(expr))
+            }
+        }
+      )
 
   def applyCompleted(
       ctx: EvaluationContext[Environment, Id],
       expr: EXPR,
       stdLibVersion: StdLibVersion
-  ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
-    EvaluatorV2
-      .applyLimited(expr, Int.MaxValue, ctx, stdLibVersion)
-      .flatMap {
-        case (expr, _, log) =>
-          expr match {
-            case evaluated: EVALUATED => Right((evaluated, log))
-            case expr: EXPR           => Left((s"Unexpected incomplete evaluation result $expr", log))
-          }
-      }
+  ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
+    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, expr => Left(s"Unexpected incomplete evaluation result $expr"))
+
+  case class EvaluationException(message: String, unusedComplexity: Int) extends RuntimeException(message)
 }

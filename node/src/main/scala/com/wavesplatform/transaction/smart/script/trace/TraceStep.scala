@@ -15,8 +15,8 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
+import play.api.libs.json.Json.JsValueWrapper
 
 sealed abstract class TraceStep {
   def json: JsObject // TODO: Is this format necessary?
@@ -74,6 +74,7 @@ case class AssetVerifierTrace(
 }
 
 case class InvokeScriptTrace(
+    invokeId: ByteStr,
     dAppAddressOrAlias: AddressOrAlias,
     functionCall: FUNCTION_CALL,
     resultE: Either[ValidationError, ScriptResult],
@@ -89,15 +90,15 @@ case class InvokeScriptTrace(
       "function" -> functionCall.function.funcName,
       "args"     -> functionCall.args.map(_.toString)
     ) ++ (resultE match {
-      case Right(value) => TraceStep.maybeErrorJson(None) ++ Json.obj("result" -> TraceStep.scriptResultJson(value))
+      case Right(value) => TraceStep.maybeErrorJson(None) ++ Json.obj("result" -> TraceStep.scriptResultJson(invokeId, value))
       case Left(e)      => TraceStep.maybeErrorJson(Some(e))
     }) ++ (if (logged) Json.obj(TraceStep.logJson(log)) else JsObject.empty)
   }
 }
 
 object TraceStep {
-  private[trace] def scriptResultJson(v: ScriptResult): JsObject =
-    Json.toJsObject(InvokeScriptResult.fromLangResult(v))
+  private[trace] def scriptResultJson(invokeId: ByteStr, v: ScriptResult): JsObject =
+    Json.toJsObject(InvokeScriptResult.fromLangResult(invokeId, v))
 
   private[trace] def maybeErrorJson(errorOpt: Option[ValidationError]): JsObject =
     errorOpt match {

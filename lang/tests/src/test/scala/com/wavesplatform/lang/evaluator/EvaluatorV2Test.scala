@@ -1,13 +1,15 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.evaluator
 
 import cats.implicits._
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.V4
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.EvaluationException
 import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -26,7 +28,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
   private val version = V4
   private val ctx =
     PureContext.build(version).withEnvironment[Environment] |+|
-    WavesContext.build(DirectiveSet.contractDirectiveSet)
+    WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet())
 
   private val environment = Common.emptyBlockchainEnvironment()
   private val evaluator =
@@ -514,7 +516,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
         )
       )
 
-    (the[NoSuchElementException] thrownBy eval(expr, limit = 100)).getMessage shouldBe "A definition of 'b' not found"
+    (the[EvaluationException] thrownBy eval(expr, limit = 100)).getMessage shouldBe "A definition of 'b' not found"
 
     val expr2 =
       BLOCK(
@@ -525,7 +527,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
         )
       )
 
-    (the[NoSuchElementException] thrownBy eval(expr2, limit = 100)).getMessage shouldBe "Function or type 'b' not found"
+    (the[EvaluationException] thrownBy eval(expr2, limit = 100)).getMessage shouldBe "Function or type 'b' not found"
   }
 
   property("function context leak") {
@@ -548,7 +550,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
       f() + x
     */
 
-    (the[NoSuchElementException] thrownBy eval(expr, limit = 100)).getMessage shouldBe "A definition of 'x' not found"
+    (the[EvaluationException] thrownBy eval(expr, limit = 100)).getMessage shouldBe "A definition of 'x' not found"
 
     val expr2 = BLOCK(
       FUNC("f", Nil, BLOCK(FUNC("g", Nil, CONST_LONG(1)), FUNCTION_CALL(FunctionHeader.User("g"), Nil))),
@@ -829,5 +831,111 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
       summarizedCost shouldBe precalculatedComplexity
       resultExpr shouldBe evaluated
     }
+  }
+
+  property("strict evaluation") {
+    val strictScript =
+      """
+        |func testFunc() = {
+        |  strict a = 100500 + 42
+        |  a
+        |}
+        |testFunc()
+        |
+      """.stripMargin.trim
+
+    inside(eval(strictScript, limit = 100)) {
+      case (expr, _, cost) =>
+        expr shouldBe CONST_LONG(100542)
+        cost shouldBe 6
+    }
+  }
+
+  property("strict with throw expression") {
+    val strictScript =
+      """
+        |func testFunc() = {
+        |  strict a = throw("Strict executed error")
+        |  true
+        |}
+        |testFunc()
+        |
+      """.stripMargin.trim
+
+    (the[RuntimeException] thrownBy eval(strictScript, limit = 100)).getMessage shouldBe "Strict executed error"
+  }
+
+  property("strict var add cost without usage") {
+    val defaultScript =
+      """
+        |func testFunc() = {
+        |  let a = 1 + 2 + 3 + 4 + 5 + 5 + 6 + 7 + 8 + 9 + 100500
+        |  let z = "42"
+        |  z
+        |}
+        |testFunc()
+        |
+      """.stripMargin.trim
+
+    inside(eval(defaultScript, limit = 100)) {
+      case (expr, _, cost) =>
+        expr shouldBe CONST_STRING("42").explicitGet()
+        cost shouldBe 1
+    }
+
+    val strictScript =
+      """
+        |func testFunc() = {
+        |  strict a = 1 + 2 + 3 + 4 + 5 + 5 + 6 + 7 + 8 + 9 + 100500
+        |  let z = "42"
+        |  z
+        |}
+        |testFunc()
+        |
+      """.stripMargin.trim
+
+    inside(eval(strictScript, limit = 100)) {
+      case (expr, _, cost) =>
+        expr shouldBe CONST_STRING("42").explicitGet()
+        cost shouldBe 15
+    }
+  }
+
+  property("no checks for constructor") {
+    val exprWithCorrectArgs = FUNCTION_CALL(
+      FunctionHeader.User("IntegerEntry"),
+      List(CONST_STRING("key").explicitGet(), CONST_LONG(1))
+    )
+    eval(exprWithCorrectArgs, 100)._2 shouldBe
+      """
+        |IntegerEntry(
+        |	key = "key"
+        |	value = 1
+        |)
+      """.stripMargin.trim
+
+    val exprWithIllegalArgs = FUNCTION_CALL(
+      FunctionHeader.User("IntegerEntry"),
+      List(CONST_STRING("key").explicitGet(), CONST_BOOLEAN(true))
+    )
+    eval(exprWithIllegalArgs, 100)._2 shouldBe
+      """
+        |IntegerEntry(
+        |	key = "key"
+        |	value = true
+        |)
+      """.stripMargin.trim
+
+    val exprWithTooManyArgs = FUNCTION_CALL(
+      FunctionHeader.User("IntegerEntry"),
+      List(CONST_STRING("key").explicitGet(), CONST_BOOLEAN(true), CONST_LONG(1))
+    )
+    eval(exprWithTooManyArgs, 100)._2 shouldBe
+      """
+        |IntegerEntry(
+        |	key = "key"
+        |	value = true
+        |)
+      """.stripMargin.trim
   }
 }

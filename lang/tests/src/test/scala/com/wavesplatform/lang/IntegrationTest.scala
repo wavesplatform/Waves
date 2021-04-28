@@ -1,7 +1,5 @@
 package com.wavesplatform.lang
 
-import java.nio.charset.StandardCharsets
-
 import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
@@ -13,7 +11,7 @@ import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG, STRING}
+import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -24,7 +22,8 @@ import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, Evaluator
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Issue
+import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
+import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease}
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -32,6 +31,7 @@ import org.web3j.crypto.Keys
 import scorex.crypto.hash.Keccak256
 import scorex.util.encode.Base16
 
+import java.nio.charset.StandardCharsets
 import scala.util.{Random, Try}
 
 class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
@@ -101,6 +101,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         .leftMap(_.getMessage)
     )
   }
+  
+  private val v5Ctx = WavesContext.build(Global, DirectiveSet(V5, Account, DApp).explicitGet())
 
   property("simple let") {
     val src =
@@ -239,6 +241,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(s"$longMin + 1 - 1") shouldBe evaluated(longMin)
     eval(s"$longMax / $longMin + 1") shouldBe evaluated(0)
     eval(s"($longMax / 2) * 2") shouldBe evaluated(longMax - 1)
+    eval[EVALUATED]("fraction(9223372036854775807, 3, 0)") shouldBe Left(
+      s"Fraction: division by zero"
+    )
     eval[EVALUATED]("fraction(9223372036854775807, 3, 2)") shouldBe Left(
       s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1"
     )
@@ -687,168 +692,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) should produce("IndexOutOfBounds")
   }
 
-  property("indexOf") {
-    val src =
-      """ "qweqwe".indexOf("we") """
-    eval[EVALUATED](src) shouldBe Right(CONST_LONG(1L))
-  }
-
-  property("indexOf with zero offset") {
-    val src =
-      """ "qweqwe".indexOf("qw", 0) """
-    eval[EVALUATED](src) shouldBe Right(CONST_LONG(0L))
-  }
-
-  property("indexOf with start offset") {
-    val src =
-      """ "qweqwe".indexOf("we", 2) """
-    eval[EVALUATED](src) shouldBe Right(CONST_LONG(4L))
-  }
-
-  property("indexOf from end of max sized string") {
-    val str = "a" * 32766 + "z"
-    val src =
-      """ str.indexOf("z", 32766) """
-    eval[EVALUATED](
-      src,
-      ctxt = CTX[NoContext](
-        Seq(),
-        Map("str" -> (STRING -> ContextfulVal.pure[NoContext](CONST_STRING(str).explicitGet()))),
-        Array()
-      )
-    ) shouldBe Right(CONST_LONG(32766L))
-  }
-
-  property("indexOf (not present)") {
-    val src =
-      """ "qweqwe".indexOf("ww") """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf from empty string") {
-    val src =
-      """ "".indexOf("!") """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf from empty string with offset") {
-    val src =
-      """ "".indexOf("!", 1) """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf from string with Long.MaxValue offset") {
-    val src =
-      s""" "abc".indexOf("c", ${Long.MaxValue}) """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf from string with negative offset") {
-    val src =
-      """ "abc".indexOf("a", -1) """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf from string with negative Long.MinValue offset") {
-    val src =
-      s""" "abc".indexOf("a", ${Long.MinValue}) """
-    eval[EVALUATED](src) shouldBe Right(unit)
-  }
-
-  property("indexOf empty string from non-empty string") {
-    val src =
-      """ "abc".indexOf("") """
-    eval[EVALUATED](src) shouldBe Right(CONST_LONG(0))
-  }
-
-  property("indexOf empty string from empty string") {
-    val src =
-      """ "".indexOf("") """
-    eval[EVALUATED](src) shouldBe Right(CONST_LONG(0))
-  }
-
-  property("lastIndexOf") {
-    val src =
-      """ "qweqwe".lastIndexOf("we") """
-    eval(src) shouldBe Right(CONST_LONG(4))
-  }
-
-  property("lastIndexOf with zero offset") {
-    val src =
-      """ "qweqwe".lastIndexOf("qw", 0) """
-    eval(src) shouldBe Right(CONST_LONG(0))
-  }
-
-  property("lastIndexOf with start offset") {
-    val src =
-      """ "qweqwe".lastIndexOf("we", 4) """
-    eval(src) shouldBe Right(CONST_LONG(4L))
-  }
-
-  property("lastIndexOf from end of max sized string") {
-    val str = "a" * 32766 + "z"
-    val src =
-      """ str.lastIndexOf("z", 32766) """
-    eval(src, ctxt = CTX[NoContext](Seq(), Map("str" -> (STRING -> ContextfulVal.pure[NoContext](CONST_STRING(str).explicitGet()))), Array())) shouldBe Right(
-      CONST_LONG(32766L)
-    )
-  }
-
-  property("lastIndexOf (not present)") {
-    val src =
-      """ "qweqwe".lastIndexOf("ww") """
-    eval(src) shouldBe Right(unit)
-  }
-
-  property("lastIndexOf from empty string") {
-    val src =
-      """ "".lastIndexOf("!") """
-    eval(src) shouldBe Right(unit)
-  }
-
-  property("lastIndexOf from empty string with offset") {
-    val src =
-      """ "".lastIndexOf("!", 1) """
-    eval(src) shouldBe Right(unit)
-  }
-
-  property("lastIndexOf from string with Int.MaxValue offset") {
-    val src =
-      s""" "abc".lastIndexOf("c", ${Int.MaxValue}) """
-    eval(src) shouldBe Right(CONST_LONG(2))
-  }
-
-  property("lastIndexOf from string with Long.MaxValue offset") {
-    val src =
-      s""" "abc".lastIndexOf("c", ${Long.MaxValue}) """
-    eval(src) shouldBe Right(CONST_LONG(2))
-  }
-
-  property("lastIndexOf from string with negative offset") {
-    val src =
-      """ "abc".lastIndexOf("a", -1) """
-    eval(src) shouldBe Right(unit)
-  }
-
-  property("lastIndexOf from string with negative Long.MinValue offset") {
-    val src =
-      s""" "abc".lastIndexOf("a", ${Long.MinValue}) """
-    eval(src) shouldBe Right(unit)
-  }
-
-  property("lastIndexOf empty string from non-empty string") {
-    val str = "abcde"
-    val src =
-      s""" "$str".lastIndexOf("") """
-    eval(src) shouldBe Right(CONST_LONG(str.length))
-  }
-
-  property("lastIndexOf empty string from empty string") {
-    val src =
-      """ "".lastIndexOf("") """
-    eval(src) shouldBe Right(CONST_LONG(0))
-  }
-
   property("split") {
     val src =
       """ "q:we:.;q;we:x;q.we".split(":.;") """
@@ -904,6 +747,25 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           CONST_STRING("").explicitGet(),
           CONST_STRING("str2").explicitGet(),
           CONST_STRING("str3").explicitGet()
+        ),
+        false
+      ).explicitGet()
+    )
+  }
+
+  property("split empty separator") {
+    val src =
+      """ "冬x🤦冬".split("") """
+    eval[EVALUATED](src) shouldBe Right(
+      ARR(
+        IndexedSeq(
+          CONST_STRING("\ud87e").explicitGet(),
+          CONST_STRING("\udc1a").explicitGet(),
+          CONST_STRING("\u0078").explicitGet(),
+          CONST_STRING("\ud83e").explicitGet(),
+          CONST_STRING("\udd26").explicitGet(),
+          CONST_STRING("\ud87e").explicitGet(),
+          CONST_STRING("\udc1a").explicitGet()
         ),
         false
       ).explicitGet()
@@ -1197,12 +1059,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](script, None) should produce("Can't find a function overload 'size'")
   }
 
-  property("string contains") {
-    eval(""" "qwerty".contains("we") """, version = V3) should produce("Can't find a function")
-    eval(""" "qwerty".contains("we") """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
-    eval(""" "qwerty".contains("xx") """, version = V4) shouldBe Right(CONST_BOOLEAN(false))
-  }
-
   property("valueOrElse") {
     val script =
       s"""
@@ -1286,7 +1142,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |
        """.stripMargin
 
-    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
 
     genericEval[Environment, EVALUATED](
       writeSetScript,
@@ -1356,6 +1212,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       s"""["1", "2"].median()"""
     eval(src, version = V4) should produce("Compilation failed: [Non-matching types: expected: Int, actual: String")
+  }
+
+  property("List[Int] median - list with big elements - error") {
+    val src =
+      s"""[${Long.MaxValue}, ${Long.MaxValue-2}].median()"""
+    eval(src, version = V4) shouldBe Right(CONST_LONG(Long.MaxValue-1))
+  }
+
+  property("List[Int] median - list with MinValue - error") {
+    val src =
+      s"""[0, ${Long.MinValue}].median()"""
+    eval(src, version = V4) shouldBe Right(CONST_LONG(Long.MinValue/2))
   }
 
   property("groth16Verify") {
@@ -1545,7 +1413,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         | calculateAssetId(issue)
       """.stripMargin
 
-    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
 
     genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
       CONST_BYTESTR(issue.id)
@@ -1558,7 +1426,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
        | Issue("name", "description", 1234567, 100, true, unit, 0)
      """.stripMargin
 
-    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
 
     genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
       Right(CONST_BOOLEAN(true))
@@ -1755,21 +1623,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       produce("Header byte out of range: 197")
   }
 
-  property("makeString") {
-    eval(""" ["cat", "dog", "pig"].makeString(", ") """, version = V4) shouldBe CONST_STRING("cat, dog, pig")
-    eval(""" [].makeString(", ") """, version = V4) shouldBe CONST_STRING("")
-    eval(""" ["abc"].makeString(", ") == "abc" """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
-
-    val script = s""" [${s""" "${"a" * 1000}", """ * 32} "${"a" * 704}"].makeString(", ") """
-    eval(script, version = V4) should produce("Constructing string size = 32768 bytes will exceed 32767")
-    // 1000 * 32 + 704 + 2 * 32 = 32768
-
-    val script2 = s""" [${s""" "${"a" * 1000}", """ * 32} "${"a" * 703}"].makeString(", ") """
-    eval[CONST_STRING](script2, version = V4).explicitGet().s.length shouldBe 32767
-
-    eval(""" [].makeString(", ") """, version = V3) should produce("Can't find a function 'makeString'")
-  }
-
   property("n-size generic tuple") {
     lazy val getElement: LazyList[(String, String)] =
       LazyList(
@@ -1845,6 +1698,16 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
 
     eval(script2, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("Tuple of unions as function args") {
+    val script = """
+         func f(x: (Int|String, String|ByteVector)) = {
+           x._1
+         }
+         f((1,"qqq"))"""
+
+    eval(script, version = V4) shouldBe Right(CONST_LONG(1L))
   }
 
   property("lists of complex types") {
@@ -2073,6 +1936,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
            match x { case n: Int => n*4-1 case a => 4 }
     }
     f("q")""", version = V4) shouldBe Right(CONST_LONG(4))
+    eval("""func f(x: Any) = { x+1 }
+            f(1)""", version = V4) shouldBe Symbol("left")
+
   }
 
   property("extracting data functions with DeleteEntry") {
@@ -2097,7 +1963,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         | entries[0] == deleteEntry
       """.stripMargin
 
-    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
     genericEval(script, ctxt = ctx, version = V4, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
   }
 
@@ -2127,5 +1993,157 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       }
     }
     f("q")""", version = V4) shouldBe Symbol("Left")
+  }
+
+  property("different Lease action constructors") {
+    val script = " Lease(Address(base58''), 1234567) == Lease(Address(base58''), 1234567, 0) "
+    genericEval[Environment, EVALUATED](script, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
+      Right(CONST_BOOLEAN(true))
+  }
+
+  property("calculateLeaseId") {
+    val txId = ByteStr.decodeBase58("aaaa").get
+    val id1 = Lease.calculateId(Lease(Address(ByteStr.decodeBase58("bbbb").get), 1234567, 123), txId)
+    val id2 = Lease.calculateId(Lease(Alias("alias"), 9876, 100), txId)
+    val script =
+      s"""
+         | calculateLeaseId(Lease(Address(base58'bbbb'), 1234567, 123)) == base58'$id1' &&
+         | calculateLeaseId(Lease(Alias("alias"), 9876, 100))           == base58'$id2' &&
+         | base58'$id1' != base58'$id2'
+       """.stripMargin
+    genericEval[Environment, EVALUATED](script, ctxt = v5Ctx, version = V5, env = utils.buildEnvironment(txId)) shouldBe
+      Right(CONST_BOOLEAN(true))
+  }
+
+  property("calculateLeaseId restrictions") {
+    val script1 = s" calculateLeaseId(Lease(Address(base58'${"a"* 36}'), 1234567, 123)) "
+    val script2 = s""" calculateLeaseId(Lease(Alias("${"a"* 31}"), 1234567, 123)) """
+
+    genericEval[Environment, EVALUATED](script1, ctxt = v5Ctx, version = V5, env = utils.environment) should
+      produce("Address bytes length=27 exceeds limit=26")
+    genericEval[Environment, EVALUATED](script2, ctxt = v5Ctx, version = V5, env = utils.environment) should
+      produce("Alias name length=31 exceeds limit=30")
+  }
+
+    property("integer case") {
+    val sampleScript =
+      """match 2 {
+        |  case 1 => 7
+        |  case 3 | 2 => 8
+        |  case _ => 9
+        |}""".stripMargin
+    eval[EVALUATED](sampleScript, None) shouldBe evaluated(8)
+  }
+
+  property("string case") {
+    val sampleScript =
+      """match "qq" {
+        |  case "1" => 7
+        |  case "qq" | "2" => 8
+        |  case _ => 9
+        |}""".stripMargin
+    eval[EVALUATED](sampleScript, None) shouldBe evaluated(8)
+  }
+
+  property("binary case") {
+    val sampleScript =
+      """match base64'TElLRQ==' {
+        |  case base64'TElLRQ==' => 7
+        |  case base64'ZGdnZHMK' | base64'ZGdnZHMJ' => 8
+        |  case _ => 9
+        |}""".stripMargin
+    eval[EVALUATED](sampleScript, None) shouldBe evaluated(7)
+  }
+  property("tuple destruct") {
+    val sampleScript =
+      """|
+         |match (5, "qqq") {
+         |  case (n, "qqq") => n
+         |  case _  => (1, "ggg")
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, version=V4) shouldBe evaluated(5)
+  }
+
+  property("typed tuple destruct") {
+    val sampleScript =
+      """|
+         |match (5, if true then "qqq" else base64'') {
+         |  case (5, n : ByteVector) => "ttt"
+         |  case (5|4, n : String) => n
+         |  case _  => "ggg"
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, version=V4) shouldBe evaluated("qqq")
+  }
+
+  property("caseType destruct") {
+    val sampleScript =
+      """|
+         |match p {
+         |  case _: PointA => 0
+         |  case PointC(YB=n) => n
+         |  case _  => 1
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
+    eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(42)
+  }
+
+  property("caseType destruct with type checking") {
+    val sampleScript =
+      """|
+         |match p {
+         |  case _: PointA => 0
+         |  case PointC(YB=n:Int) => n
+         |  case _  => 1
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
+    eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(42)
+  }
+
+  property("caseType constant field") {
+    val sampleScript =
+      """|
+         |match p {
+         |  case _: PointA => 0
+         |  case PointC(YB=24) => 2
+         |  case PointC(YB=42) => 6
+         |  case _  => 1
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
+    eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(6)
+  }
+
+  property("value() error message") {
+    val script =
+      s"""
+         | let a = if (true) then unit else 7
+         | a.value()
+       """.stripMargin
+    eval(script) should produce("value() called on unit value by reference 'a'")
+
+    val script2 =
+      s"""
+         | func a() = if (true) then unit else 7
+         | a().value()
+       """.stripMargin
+    eval(script2) should produce("value() called on unit value on function 'a' call")
+
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
+    val script3 = "SponsorFee(base58'', unit).minSponsoredAssetFee.value()"
+    genericEval(script3, ctxt = ctx, version = V4, env = utils.environment) should produce("value() called on unit value while accessing field 'minSponsoredAssetFee'")
+    val script4 = """ getIntegerValue(Address(base58''), "") """
+    genericEval(script4, ctxt = ctx, version = V4, env = utils.environment) should produce("value() called on unit value on function 'getInteger' call")
+
+    eval("(if (true) then unit else 7).value()") should produce("value() called on unit value after condition evaluation")
+    eval("(let a = 1; if (true) then unit else 7).value()") should produce("value() called on unit value after let block evaluation")
   }
 }

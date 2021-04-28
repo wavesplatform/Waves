@@ -309,6 +309,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
           PureContext.build(V4).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
           WavesContext.build(
+            Global,
             DirectiveSet(V4, Account, Expression).explicitGet()
           )
         )
@@ -355,6 +356,165 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
           result shouldBe Symbol("right")
         else
           result should produce("Undefined type: `BinaryEntry`")
+      }
+  }
+
+  // should be works with continuations
+  ignore("self-functions are unavailable for previous versions and asset scripts") {
+    def expr(v: StdLibVersion, scriptType: ScriptType) = {
+      val script =
+        s"""
+           | {-# STDLIB_VERSION ${v.id}    #-}
+           | {-# SCRIPT_TYPE    ${scriptType.value}    #-}
+           | {-# CONTENT_TYPE   EXPRESSION #-}
+           |
+           | getInteger("key") == 1             &&
+           | getIntegerValue("key") == 1        &&
+           | getString("key")  == "text"        &&
+           | getStringValue("key")  == "text"   &&
+           | getBinary("key")  == base58''      &&
+           | getBinaryValue("key")  == base58'' &&
+           | getBoolean("key")  == false        &&
+           | getBooleanValue("key")  == false
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+    for {
+      version    <- DirectiveDictionary[StdLibVersion].all
+      scriptType <- DirectiveDictionary[ScriptType].all
+    } {
+      val result = ExpressionCompiler(getTestContext(version, scriptType).compilerContext, expr(version, scriptType))
+      if (version < V5 || scriptType != Account)
+        result.swap.getOrElse(???).split("Can't find a function").length shouldBe 9
+      else
+        result shouldBe Symbol("right")
+    }
+  }
+
+  property("V5 functions are unavailable for previous versions") {
+    def expr(v: StdLibVersion) = {
+      val script =
+        s"""
+          | {-# STDLIB_VERSION ${v.id}    #-}
+          | {-# CONTENT_TYPE   EXPRESSION #-}
+          |
+          | let a = Lease(Address(base58''), 1)
+          | let b = Lease(Address(base58''), 1, 0)
+          | let c = calculateLeaseId(b)
+          | true
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+
+    DirectiveDictionary[StdLibVersion].all
+      .foreach { version =>
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, expr(version))
+        if (version < V5)
+          result should produce(
+            "Compilation failed: [" +
+              "Can't find a function 'Lease'(Address, Int) or it is @Callable in 75-102; " +
+              "Can't find a function 'Lease'(Address, Int, Int) or it is @Callable in 112-142; " +
+              "Can't find a function 'calculateLeaseId'(Nothing) or it is @Callable in 152-171" +
+              "]"
+          )
+        else
+          result shouldBe Symbol("right")
+      }
+  }
+
+  property("Field feeAssetId is unavailable for MassTransferTransaction") {
+    def expr(v: StdLibVersion) = {
+      val script =
+        s"""
+          | {-# STDLIB_VERSION ${v.id}    #-}
+          | {-# CONTENT_TYPE   EXPRESSION #-}
+          |
+          | match tx {
+          |   case m: MassTransferTransaction => m.feeAssetId == unit
+          |   case _                          => throw()
+          | }
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+
+    DirectiveDictionary[StdLibVersion].all
+      .foreach { version =>
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, expr(version))
+        if (version < V5)
+          result shouldBe Symbol("right")
+        else
+          result should produce(
+            "Compilation failed: [Undefined field `feeAssetId` of variable of type `MassTransferTransaction` in 116-128]"
+          )
+      }
+  }
+
+  property("Rounding modes DOWN, HALFUP, HALFEVEN, CEILING, FLOOR are available for all versions") {
+    def expr(v: StdLibVersion) = {
+      val script =
+        s"""
+          | {-# STDLIB_VERSION ${v.id}    #-}
+          | {-# CONTENT_TYPE   EXPRESSION #-}
+          |
+          | let r = 
+          |  if (true) then
+          |   DOWN 
+          |  else if (true) then
+          |   HALFUP 
+          |  else if (true) then
+          |   HALFEVEN 
+          |  else if (true) then
+          |   CEILING 
+          |  else
+          |   FLOOR
+          |   
+          | func f(r: Ceiling|Down|Floor|HalfEven|HalfUp) = true
+          | f(r)
+          |
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+
+    DirectiveDictionary[StdLibVersion].all
+      .foreach { version =>
+        ExpressionCompiler(getTestContext(version).compilerContext, expr(version)) shouldBe Symbol("right")
+      }
+  }
+
+  property("Rounding modes UP, HALFDOWN are not available from V5") {
+    def expr(v: StdLibVersion) = {
+      val script =
+        s"""
+          | {-# STDLIB_VERSION ${v.id}    #-}
+          | {-# CONTENT_TYPE   EXPRESSION #-}
+          |
+          | let r =
+          |  if (true) then
+          |   UP
+          |  else
+          |   HALFDOWN
+          |
+          | func f(r: HalfDown) = true
+          | func g(r: Up) = true
+          |
+          | true
+          |
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+
+    DirectiveDictionary[StdLibVersion].all
+      .foreach { version =>
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, expr(version))
+        if (version < V5)
+          result shouldBe Symbol("right")
+        else {
+          val error = result.swap.getOrElse(???)
+          error should include("A definition of 'UP' is not found")
+          error should include("Undefined type: `Up` of variable")
+          error should include("A definition of 'HALFDOWN' is not found")
+          error should include("Undefined type: `HalfDown` of variable")
+        }
       }
   }
 

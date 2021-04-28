@@ -15,7 +15,7 @@ object Parser {
   private val Global                 = com.wavesplatform.lang.hacks.Global // Hack for IDEA
   implicit def hack(p: fastparse.P[Any]): fastparse.P[Unit] = p.map(_ => ())
 
-  def keywords                = Set("let", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
+  def keywords                = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
   def lowerChar[_:P]          = CharIn("a-z")
   def upperChar[_:P]          = CharIn("A-Z")
   def char[_:P]               = lowerChar | upperChar
@@ -265,7 +265,7 @@ object Parser {
       }
 
     def restMatchCaseInvalidP(implicit c: fastparse.P[Any]): P[String] = P((!P("=>") ~~ AnyChar.!).repX.map(_.mkString))
-    def varDefP(implicit c: fastparse.P[Any]): P[Option[PART[String]]] = anyVarName.map(Some(_)) | P("_").!.map(_ => None)
+    def varDefP(implicit c: fastparse.P[Any]): P[Option[PART[String]]] = (anyVarName ~~ !("'"|"(")).map(Some(_)) | P("_").!.map(_ => None)
 
     def typesDefP(implicit c: fastparse.P[Any]) = (
       ":" ~ comment ~
@@ -274,28 +274,41 @@ object Parser {
         })
     ).?.map(_.getOrElse(Union(Seq())))
 
+    def pattern(implicit c: fastparse.P[Any]): P[Pattern] =
+                 (varDefP ~ comment ~ typesDefP).map { case (v, t) => TypedVar(v, t) } |
+                 (Index ~ "(" ~ pattern.rep(min=2, sep=",") ~ ")" ~ Index).map(p => TuplePat(p._2, Pos(p._1, p._3))) |
+                 (Index ~ anyVarName ~ "(" ~ (anyVarName ~ "=" ~ pattern).rep(sep=",") ~ ")" ~ Index).map(p => ObjPat(p._3.map(kp => (PART.toOption(kp._1).get, kp._2)).toMap, Single(p._2, None), Pos(p._1, p._4))) |
+                 (Index ~ baseExpr.rep(min=1, sep="|") ~ Index).map(p => ConstsPat(p._2, Pos(p._1, p._3)))
+
+    def checkPattern(p: Pattern): Either[INVALID, Option[Pos]] = p match {
+      case TypedVar(_, t) => checkForGenericAndGetLastPos(t)
+      case ConstsPat(_, pos) => Right(Some(pos))
+      case TuplePat(ps, pos) => ps.toList traverse checkPattern map { _ => Some(pos) }
+      case ObjPat(ps, _, pos) => ps.values.toList traverse checkPattern map { _ => Some(pos) }
+    }
+
     P(
       Index ~~ "case" ~~ &(border) ~ comment ~/ (
-        (varDefP ~ comment ~ typesDefP) |
+        pattern |
           (Index ~~ restMatchCaseInvalidP ~~ Index).map {
             case (start, _, end) =>
-              (
+              TypedVar(
                 Some(PART.INVALID(Pos(start, end), "invalid syntax, should be: `case varName: Type => expr` or `case _ => expr`")),
                 Union(Seq())
               )
           }
       ) ~ comment ~ "=>" ~/ baseExpr.? ~~ Index
     ).map {
-      case (caseStart, (v, types), e, end) =>
-        checkForGenericAndGetLastPos(types)
+      case (caseStart, p, e, end) =>
+        checkPattern(p)
           .fold(
-            error => MATCH_CASE(error.position, newVarName = v, caseType = types, expr = error),
+            error => MATCH_CASE(error.position, pattern = p, expr = error),
             { pos =>
-              val exprStart = pos.orElse(v.map(_.position)).fold(caseStart)(_.end)
+              val cPos = Pos(caseStart, end)
+              val exprStart = pos.fold(caseStart)(_.end)
               MATCH_CASE(
-                Pos(caseStart, end),
-                newVarName = v,
-                caseType = types,
+                cPos,
+                pattern = p,
                 expr = e.getOrElse(INVALID(Pos(exprStart, end), "expected expression"))
               )
             }
@@ -394,6 +407,44 @@ object Parser {
           }
       }
 
+  // Hack to force parse of "\n". Otherwise it is treated as a separator
+  def newLineSep(implicit c: fastparse.P[Any]) = {
+    P(CharsWhileIn(" \t\r").repX  ~~ "\n").repX(1)
+  }
+
+  def strictLetP[_:P]: P[Seq[LET]] = {
+    P(Index ~~ "strict" ~~ &(CharIn(" \t\n\r")) ~/ comment ~ letNameP ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
+      .map {
+        case (start, names, valuePosStart, valueRawOpt, end) =>
+          val value = extractValue(valuePosStart, valueRawOpt)
+          val pos = Pos(start, end)
+
+          names.map { case (nameStart, nameRaw) =>
+            val name = extractName(Pos(nameStart, nameStart), nameRaw)
+            LET(pos, name, value)
+          }
+      }
+  }
+
+  def strictLetBlockP[_:P]: P[EXPR] = {
+    P(
+      Index ~~
+        strictLetP ~/
+        Pass ~~
+        (
+          ("" ~ ";") ~/ (baseExpr | invalid).? |
+            newLineSep ~/ (baseExpr | invalid).? |
+            (Index ~~ CharPred(_ != '\n').repX).map(pos => Some(INVALID(Pos(pos, pos), "expected ';'")))
+          ) ~~
+        Index
+    ).map {
+      case (start, strictLet, body, end) => {
+        val blockPos = Pos(start, end)
+        Macro.unwrapStrict(blockPos, strictLet.head, body.getOrElse(INVALID(Pos(end, end), "expected a body")))
+      }
+    }
+  }
+
   private def extractName(
     namePos: Pos,
     nameRaw: Option[PART[String]]
@@ -412,11 +463,6 @@ object Parser {
 
   private def blockOr(otherExpr: Pos => EXPR)(implicit c: fastparse.P[Any]): P[EXPR] = {
     def declaration(implicit c: fastparse.P[Any]) = letP | funcP.map(Seq(_))
-
-    // Hack to force parse of "\n". Otherwise it is treated as a separator
-    def newLineSep(implicit c: fastparse.P[Any]) = {
-      P(CharsWhileIn(" \t\r").repX  ~~ "\n").repX(1)
-    }
 
     P(
       Index ~~
@@ -444,7 +490,7 @@ object Parser {
     comment ~ P(foldP | ifP | matchP | ep | maybeAccessP) ~ comment
   }
 
-  def baseExpr[_:P] = P(binaryOp(baseAtom(block(_))(_), opsByPriority))
+  def baseExpr[_:P] = P(strictLetBlockP | binaryOp(baseAtom(block(_))(_), opsByPriority))
 
   def blockOrDecl[_:P] = baseAtom(blockOr(p => REF(p, VALID(p, "unit")))(_))
   def baseExprOrDecl[_:P] = binaryOp(baseAtom(blockOrDecl(_))(_), opsByPriority)

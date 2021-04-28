@@ -1,29 +1,30 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import cats.implicits._
 import cats.{Id, Monad}
+import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, LIST, LONG, STRING, UNION, UNIT, optionLong}
+import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{notImplemented, unit, EnvironmentFunctions, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{scriptTransfer => _, _}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.{addressOrAliasType, addressType, commonDataEntryType, optionAddress, _}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, notImplemented, unit}
-import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
-import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction}
-import com.wavesplatform.lang.v1.traits.domain.{Issue, Recipient}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
+import monix.eval.Coeval
 
 object Functions {
   private def getDataFromStateF(name: String, internalName: Short, dataType: DataType): BaseFunction[Environment] = {
     val resultType = UNION(dataType.innerType, UNIT)
-    val args = Seq(("addressOrAlias", addressOrAliasType), ("key", STRING))
+    val args       = Seq(("addressOrAlias", addressOrAliasType), ("key", STRING))
     NativeFunction.withEnvironment[Environment](
       name,
       Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 10L),
@@ -60,6 +61,32 @@ object Functions {
   val getBooleanFromStateF: BaseFunction[Environment] = getDataFromStateF("getBoolean", DATA_BOOLEAN_FROM_STATE, DataType.Boolean)
   val getBinaryFromStateF: BaseFunction[Environment]  = getDataFromStateF("getBinary", DATA_BYTES_FROM_STATE, DataType.ByteArray)
   val getStringFromStateF: BaseFunction[Environment]  = getDataFromStateF("getString", DATA_STRING_FROM_STATE, DataType.String)
+
+  val isDataStorageUntouchedF: BaseFunction[Environment] = {
+    val name       = "isDataStorageUntouched"
+    val resultType = BOOLEAN
+    val arg        = ("addressOrAlias", addressOrAliasType)
+    NativeFunction.withEnvironment[Environment](
+      name,
+      Map[StdLibVersion, Long](V5 -> 10L),
+      IS_UNTOUCHED,
+      resultType,
+      arg
+    ) {
+      new ContextfulNativeFunction[Environment](name, resultType, List(arg)) {
+        override def ev[F[_]: Monad](input: (Environment[F], List[Terms.EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+          input match {
+            case (env, (addressOrAlias: CaseObj) :: Nil) =>
+              val environmentFunctions = new EnvironmentFunctions[F](env)
+              environmentFunctions
+                .hasData(addressOrAlias)
+                .map(_.map(v => CONST_BOOLEAN(!v)))
+
+            case (_, xs) => notImplemented[F, EVALUATED](s"$name(s: AddressOrAlias)", xs)
+          }
+      }
+    }
+  }
 
   private def getDataFromArrayF(name: String, internalName: Short, dataType: DataType, version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction(
@@ -137,7 +164,7 @@ object Functions {
       ("@publicKey", BYTESTR)
     )(
       new ContextfulUserFunction[Environment] {
-        override def apply[F[_]: Monad](env: Environment[F]): EXPR =
+        override def apply[F[_]: Monad](env: Environment[F], startArgs: List[EXPR]): EXPR =
           FUNCTION_CALL(
             FunctionHeader.User("Address"),
             List(
@@ -213,7 +240,7 @@ object Functions {
   def addressFromStringF(version: StdLibVersion): BaseFunction[Environment] =
     UserFunction.withEnvironment("addressFromString", 124, optionAddress, ("@string", STRING)) {
       new ContextfulUserFunction[Environment] {
-        override def apply[F[_]: Monad](env: Environment[F]): EXPR =
+        override def apply[F[_]: Monad](env: Environment[F], startArgs: List[EXPR]): EXPR =
           LET_BLOCK(
             LET(
               "@afs_addrBytes",
@@ -274,21 +301,23 @@ object Functions {
       optionAddress,
       ("@string", STRING)
     ) {
-    new ContextfulNativeFunction[Environment]("addressFromString", optionAddress, Seq(("@string", STRING))) {
-      override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
-        input match {
-          case (env, CONST_STRING(address) :: Nil) =>
-            env.addressFromString(address)
-              .fold(
-                _ => unit,
-                address => CaseObj(addressType, Map("bytes" -> CONST_BYTESTR(address.bytes).explicitGet())): EVALUATED
-              )
-              .asRight[ExecutionError].pure[F]
-          case (_, other) =>
-            notImplemented[F, EVALUATED](s"addressFromString(a: String)", other)
-        }
+      new ContextfulNativeFunction[Environment]("addressFromString", optionAddress, Seq(("@string", STRING))) {
+        override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+          input match {
+            case (env, CONST_STRING(address) :: Nil) =>
+              env
+                .addressFromString(address)
+                .fold(
+                  _ => unit,
+                  address => CaseObj(addressType, Map("bytes" -> CONST_BYTESTR(address.bytes).explicitGet())): EVALUATED
+                )
+                .asRight[ExecutionError]
+                .pure[F]
+            case (_, other) =>
+              notImplemented[F, EVALUATED](s"addressFromString(a: String)", other)
+          }
+      }
     }
-  }
 
   val addressFromRecipientF: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
@@ -329,7 +358,7 @@ object Functions {
   private def caseObjToRecipient(c: CaseObj): Recipient = c.caseType.name match {
     case addressType.name => Recipient.Address(c.fields("bytes").asInstanceOf[CONST_BYTESTR].bs)
     case aliasType.name   => Recipient.Alias(c.fields("alias").asInstanceOf[CONST_STRING].s)
-    case _                => ???
+    case t                => throw new IllegalArgumentException(s"Unexpected recipient type $t")
   }
 
   val assetBalanceF: BaseFunction[Environment] =
@@ -341,7 +370,7 @@ object Functions {
       ("addressOrAlias", addressOrAliasType),
       ("assetId", UNION(UNIT, BYTESTR))
     ) {
-      new ContextfulNativeFunction[Environment]("assetBalance", LONG, Seq(("addressOrAlias", addressOrAliasType),("assetId", UNION(UNIT, BYTESTR)))) {
+      new ContextfulNativeFunction[Environment]("assetBalance", LONG, Seq(("addressOrAlias", addressOrAliasType), ("assetId", UNION(UNIT, BYTESTR)))) {
         override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, (c: CaseObj) :: u :: Nil) if u == unit =>
@@ -364,7 +393,7 @@ object Functions {
       ("addressOrAlias", addressOrAliasType),
       ("assetId", BYTESTR)
     ) {
-      new ContextfulNativeFunction[Environment]("assetBalance", LONG, Seq(("addressOrAlias", addressOrAliasType),("assetId", BYTESTR))) {
+      new ContextfulNativeFunction[Environment]("assetBalance", LONG, Seq(("addressOrAlias", addressOrAliasType), ("assetId", BYTESTR))) {
         override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, (c: CaseObj) :: CONST_BYTESTR(assetId: ByteStr) :: Nil) =>
@@ -374,7 +403,6 @@ object Functions {
           }
       }
     }
-
 
   val wavesBalanceV4F: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
@@ -388,18 +416,27 @@ object Functions {
         override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, (c: CaseObj) :: Nil) =>
-              env.accountWavesBalanceOf(caseObjToRecipient(c)).map(_.map(b => CaseObj(balanceDetailsType, Map(
-                "available" -> CONST_LONG(b.available),
-                "regular" -> CONST_LONG(b.regular),
-                "generating" -> CONST_LONG(b.generating),
-                "effective" -> CONST_LONG(b.effective)
-                ))))
+              env
+                .accountWavesBalanceOf(caseObjToRecipient(c))
+                .map(
+                  _.map(
+                    b =>
+                      CaseObj(
+                        balanceDetailsType,
+                        Map(
+                          "available"  -> CONST_LONG(b.available),
+                          "regular"    -> CONST_LONG(b.regular),
+                          "generating" -> CONST_LONG(b.generating),
+                          "effective"  -> CONST_LONG(b.effective)
+                        )
+                      )
+                  )
+                )
 
             case (_, xs) => notImplemented[F, EVALUATED](s"wavesBalance(a: Address|Alias)", xs)
           }
       }
     }
-
 
   def assetInfoF(version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
@@ -471,6 +508,73 @@ object Functions {
       }
     }
 
+  def callDAppF(version: StdLibVersion): BaseFunction[Environment] =
+    NativeFunction.withEnvironment[Environment](
+      "Invoke",
+      Map[StdLibVersion, Long](V4 -> 75L),
+      CALLDAPP,
+      ANY,
+      ("dapp", addressOrAliasType),
+      ("name", optionString),
+      ("args", LIST(ANY)),
+      ("payments", listPayment)
+    ) {
+      new ContextfulNativeFunction[Environment](
+        "Invoke",
+        ANY,
+        Seq(("dapp", BYTESTR), ("name", STRING), ("args", LIST(ANY)), ("payments", listPayment))
+      ) {
+        override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+          evaluateExtended(input._1, input._2, 0).value().map(_._1)
+
+        override def evaluateExtended[F[_]: Monad](
+            env: Environment[F],
+            args: List[EVALUATED],
+            availableComplexity: Int
+        ): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] = {
+          val dappBytes = args match {
+            case (dapp: CaseObj) :: _ if dapp.caseType == addressType =>
+              dapp.fields("bytes") match {
+                case CONST_BYTESTR(d) => d.pure[F]
+                case a                => throw new IllegalArgumentException(s"Unexpected address bytes $a")
+              }
+            case (dapp: CaseObj) :: _ if dapp.caseType == aliasType =>
+              dapp.fields("alias") match {
+                case CONST_STRING(a) => env.resolveAlias(a).map(_.explicitGet().bytes)
+              }
+            case args => throw new IllegalArgumentException(s"Unexpected recipient args $args")
+          }
+          val name = args match {
+            case _ :: CONST_STRING(name) :: _ => name
+            case _ :: CaseObj(UNIT, _) :: _   => "default"
+            case args                         => throw new IllegalArgumentException(s"Unexpected input args $args")
+          }
+          args match {
+            case _ :: _ :: ARR(args) :: ARR(payments) :: Nil =>
+              env
+                .callScript(
+                  Recipient.Address(dappBytes.asInstanceOf[ByteStr]),
+                  name,
+                  args.toList,
+                  payments.map {
+                    case p: CaseObj if p.caseType == paymentType =>
+                      List("assetId", "amount").map(p.fields) match {
+                        case List(CONST_BYTESTR(a), CONST_LONG(v)) => (Some(a.arr), v)
+                        case List(CaseObj(UNIT, _), CONST_LONG(v)) => (None, v)
+                      }
+                    case arg => throw new IllegalArgumentException(s"Unexpected payment arg $arg")
+                  },
+                  availableComplexity
+                )
+                .map(_.map { case (result, complexity) => (result.leftMap(_.toString), complexity)})
+            case xs =>
+              val err = notImplemented[F, EVALUATED](s"Invoke(dapp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
+              Coeval.now(err.map((_, 0)))
+          }
+        }
+      }
+    }
+
   private def withExtract[C[_[_]]](f: BaseFunction[C], version: StdLibVersion): BaseFunction[C] = {
     val args = f.signature.args.zip(f.args).map {
       case ((name, ty), _) => ("@" ++ name, ty)
@@ -478,7 +582,7 @@ object Functions {
     UserFunction(
       f.name ++ ExtractedFuncPostfix,
       ExtractedFuncPrefix ++ f.header.toString,
-      f.costByLibVersion,
+      f.costByLibVersionMap,
       f.signature.result.asInstanceOf[UNION].typeList.find(_ != UNIT).get,
       args: _*
     ) {
@@ -512,7 +616,7 @@ object Functions {
       txByIdReturnType(proofsEnabled, version),
       ("id", BYTESTR)
     ) {
-      new ContextfulNativeFunction[Environment]( "transactionById", txByIdReturnType(proofsEnabled, version), Seq(("id", BYTESTR))) {
+      new ContextfulNativeFunction[Environment]("transactionById", txByIdReturnType(proofsEnabled, version), Seq(("id", BYTESTR))) {
         override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, CONST_BYTESTR(id: ByteStr) :: Nil) =>
@@ -534,7 +638,11 @@ object Functions {
       UNION(buildTransferTransactionType(proofsEnabled, version), UNIT),
       ("id", BYTESTR)
     ) {
-      new ContextfulNativeFunction[Environment]("transferTransactionById", UNION(buildTransferTransactionType(proofsEnabled, version), UNIT), Seq(("id", BYTESTR))) {
+      new ContextfulNativeFunction[Environment](
+        "transferTransactionById",
+        UNION(buildTransferTransactionType(proofsEnabled, version), UNIT),
+        Seq(("id", BYTESTR))
+      ) {
         override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, CONST_BYTESTR(id: ByteStr) :: Nil) =>
@@ -574,16 +682,17 @@ object Functions {
                else if (name.getBytes("UTF-8").length > MaxAssetNameLength)
                  Left(s"Name length should not exceed $MaxAssetNameLength")
                else
-                 CONST_BYTESTR(Issue.calculateId(
-                   decimals     = fields(FieldNames.IssueDecimals).asInstanceOf[CONST_LONG].t.toInt,
-                   description  = description,
-                   isReissuable = fields(FieldNames.IssueIsReissuable).asInstanceOf[CONST_BOOLEAN].b,
-                   name         = name,
-                   quantity     = fields(FieldNames.IssueQuantity).asInstanceOf[CONST_LONG].t,
-                   nonce        = fields(FieldNames.IssueNonce).asInstanceOf[CONST_LONG].t,
-                   parent       = env.txId
-                )):Either[String, EVALUATED]
-              ).pure[F]
+                 CONST_BYTESTR(
+                   Issue.calculateId(
+                     decimals = fields(FieldNames.IssueDecimals).asInstanceOf[CONST_LONG].t.toInt,
+                     description = description,
+                     isReissuable = fields(FieldNames.IssueIsReissuable).asInstanceOf[CONST_BOOLEAN].b,
+                     name = name,
+                     quantity = fields(FieldNames.IssueQuantity).asInstanceOf[CONST_LONG].t,
+                     nonce = fields(FieldNames.IssueNonce).asInstanceOf[CONST_LONG].t,
+                     parent = env.txId
+                   )
+                 ): Either[String, EVALUATED]).pure[F]
 
             case (env, xs) => notImplemented[F, EVALUATED](s"calculateAssetId(i: Issue)", xs)
           }
@@ -603,12 +712,16 @@ object Functions {
         UNION(buildTransferTransactionType(proofsEnabled, version), UNIT),
         Seq(("bytes", BYTESTR))
       ) {
-        override def ev[F[_] : Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+        override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, List(CONST_BYTESTR(bytes))) =>
-              env.transferTransactionFromProto(bytes.arr).map(tx =>
-                (tx.map(transactionObject(_, proofsEnabled, version)): EVALUATED)
-                  .asRight[ExecutionError])
+              env
+                .transferTransactionFromProto(bytes.arr)
+                .map(
+                  tx =>
+                    (tx.map(transactionObject(_, proofsEnabled, version)): EVALUATED)
+                      .asRight[ExecutionError]
+                )
 
             case (_, xs) => notImplemented[F, EVALUATED](s"transferTransactionFromProto(bytes: ByteVector)", xs)
           }
@@ -617,31 +730,133 @@ object Functions {
 
   val simplifiedIssueActionConstructor: BaseFunction[Environment] =
     NativeFunction(
-      "Issue", 1, SIMPLIFIED_ISSUE_ACTION_CONSTRUCTOR, issueActionType,
-      FieldNames.IssueName -> STRING,
-      FieldNames.IssueDescription -> STRING,
-      FieldNames.IssueQuantity -> LONG,
-      FieldNames.IssueDecimals -> LONG,
-      FieldNames.IssueIsReissuable -> BOOLEAN,
-    ) {
-      args =>
-        val typedArgs = (issueActionType.fields.map(_._1) zip (args ::: List(unit, CONST_LONG(0)))).toMap
-        Right(CaseObj(issueActionType, typedArgs))
+      "Issue",
+      1,
+      SIMPLIFIED_ISSUE_ACTION_CONSTRUCTOR,
+      issueActionType,
+      FieldNames.IssueName         -> STRING,
+      FieldNames.IssueDescription  -> STRING,
+      FieldNames.IssueQuantity     -> LONG,
+      FieldNames.IssueDecimals     -> LONG,
+      FieldNames.IssueIsReissuable -> BOOLEAN
+    ) { args =>
+      val typedArgs = (issueActionType.fields.map(_._1) zip (args ::: List(unit, CONST_LONG(0)))).toMap
+      Right(CaseObj(issueActionType, typedArgs))
     }
 
   val detailedIssueActionConstructor: BaseFunction[Environment] =
     NativeFunction(
-      "Issue", 1, DETAILED_ISSUE_ACTION_CONSTRUCTOR, issueActionType,
-      FieldNames.IssueName -> STRING,
-      FieldNames.IssueDescription -> STRING,
-      FieldNames.IssueQuantity -> LONG,
-      FieldNames.IssueDecimals -> LONG,
+      "Issue",
+      1,
+      DETAILED_ISSUE_ACTION_CONSTRUCTOR,
+      issueActionType,
+      FieldNames.IssueName         -> STRING,
+      FieldNames.IssueDescription  -> STRING,
+      FieldNames.IssueQuantity     -> LONG,
+      FieldNames.IssueDecimals     -> LONG,
       FieldNames.IssueIsReissuable -> BOOLEAN,
-      FieldNames.IssueScriptField -> UNION(issueScriptType, UNIT),
-      FieldNames.IssueNonce -> LONG,
-    ) {
-      args =>
-        val typedArgs = (issueActionType.fields.map(_._1) zip args).toMap
-        Right(CaseObj(issueActionType, typedArgs))
+      FieldNames.IssueScriptField  -> UNION(issueScriptType, UNIT),
+      FieldNames.IssueNonce        -> LONG
+    ) { args =>
+      val typedArgs = (issueActionType.fields.map(_._1) zip args).toMap
+      Right(CaseObj(issueActionType, typedArgs))
     }
+
+  val simplifiedLeaseActionConstructor: BaseFunction[Environment] =
+    NativeFunction(
+      "Lease",
+      1,
+      SIMPLIFIED_LEASE_ACTION_CONSTRUCTOR,
+      leaseActionType,
+      FieldNames.LeaseRecipient -> addressOrAliasType,
+      FieldNames.LeaseAmount    -> LONG
+    ) { args =>
+      val typedArgs = (leaseActionType.fields.map(_._1) zip args ::: List(CONST_LONG(0))).toMap
+      Right(CaseObj(leaseActionType, typedArgs))
+    }
+
+  val detailedLeaseActionConstructor: BaseFunction[Environment] =
+    NativeFunction(
+      "Lease",
+      1,
+      DETAILED_LEASE_ACTION_CONSTRUCTOR,
+      leaseActionType,
+      FieldNames.LeaseRecipient -> addressOrAliasType,
+      FieldNames.LeaseAmount    -> LONG,
+      FieldNames.LeaseNonce     -> LONG
+    ) { args =>
+      val typedArgs = (leaseActionType.fields.map(_._1) zip args).toMap
+      Right(CaseObj(leaseActionType, typedArgs))
+    }
+
+  val calculateLeaseId: BaseFunction[Environment] =
+    NativeFunction.withEnvironment[Environment](
+      "calculateLeaseId",
+      1,
+      CALCULATE_LEASE_ID,
+      BYTESTR,
+      ("lease", leaseActionType)
+    ) {
+      val AddressLength  = 26
+      val MaxAliasLength = 30
+      new ContextfulNativeFunction[Environment]("calculateLeaseId", BYTESTR, Seq(("lease", leaseActionType))) {
+        override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+          input match {
+            case (env, CaseObj(`leaseActionType`, fields) :: Nil) =>
+              val recipient = caseObjToRecipient(fields(FieldNames.LeaseRecipient).asInstanceOf[CaseObj])
+              val r = recipient match {
+                case Recipient.Address(bytes) if bytes.arr.length > AddressLength =>
+                  Left(s"Address bytes length=${bytes.arr.length} exceeds limit=$AddressLength")
+                case Recipient.Alias(name) if name.length > MaxAliasLength =>
+                  Left(s"Alias name length=${name.length} exceeds limit=$MaxAliasLength")
+                case _ =>
+                  CONST_BYTESTR(
+                    Lease.calculateId(
+                      Lease(
+                        recipient,
+                        fields(FieldNames.LeaseAmount).asInstanceOf[CONST_LONG].t,
+                        fields(FieldNames.LeaseNonce).asInstanceOf[CONST_LONG].t
+                      ),
+                      env.txId
+                    )
+                  )
+              }
+              r.pure[F]
+            case (_, xs) => notImplemented[F, EVALUATED](s"calculateLeaseId(l: Lease)", xs)
+          }
+      }
+    }
+
+  def accountScriptHashF(global: BaseGlobal): BaseFunction[Environment] = {
+    val name    = "hashScriptAtAddress"
+    val resType = UNION(BYTESTR, UNIT)
+    val arg     = ("account", addressOrAliasType)
+    NativeFunction.withEnvironment[Environment](
+      name,
+      200,
+      ACCOUNTSCRIPTHASH,
+      resType,
+      arg
+    ) {
+      new ContextfulNativeFunction[Environment](
+        name,
+        resType,
+        Seq(arg)
+      ) {
+        override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+          input match {
+            case (env, List(addr: CaseObj)) =>
+              env
+                .accountScript(caseObjToRecipient(addr))
+                .map(
+                  _.map(si => CONST_BYTESTR(ByteStr(global.blake2b256(si.bytes().arr))))
+                    .getOrElse(Right(unit))
+                )
+
+            case (_, xs) => notImplemented[F, EVALUATED](s"hashScriptAtAddress(account: AddressOrAlias))", xs)
+          }
+      }
+    }
+  }
+
 }

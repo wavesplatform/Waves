@@ -58,7 +58,6 @@ object MicroBlockSynchronizer extends ScorexLogging {
           log.trace(s"No more attempts left to download $totalBlockId")
           Task.unit
         } else if (alreadyProcessed(totalBlockId)) {
-          log.trace(s"Not downloading $totalBlockId because it has already been processed")
           Task.unit
         } else
           randomOwner(exclude) match {
@@ -79,10 +78,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
       task(MicroBlockDownloadAttempts, Set.empty).runAsyncLogErr
     }
 
-    def tryDownloadNext(prevBlockId: ByteStr): Unit = Option(nextInvs.getIfPresent(prevBlockId)) match {
-      case Some(inv) => requestMicroBlock(inv)
-      case None      => log.trace(s"No invs are referencing $prevBlockId")
-    }
+    def tryDownloadNext(prevBlockId: ByteStr): Unit = Option(nextInvs.getIfPresent(prevBlockId)).foreach(requestMicroBlock)
 
     lastBlockIdEvents
       .mapEval { f =>
@@ -96,9 +92,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
     microblockInvs
       .mapEval {
         case (ch, mbInv @ MicroBlockInv(_, totalBlockId, reference, _)) =>
-          log.trace(s"Processing newly received $mbInv")
           Task.evalAsync {
-            log.trace(s"Validating $mbInv signature")
             val sig = try mbInv.signaturesValid()
             catch {
               case t: Throwable =>
@@ -109,7 +103,6 @@ object MicroBlockSynchronizer extends ScorexLogging {
               case Left(err) =>
                 peerDatabase.blacklistAndClose(ch, err.toString)
               case Right(_) =>
-                log.trace(s"$mbInv signature is valid, now updating caches")
                 microBlockOwners.get(totalBlockId, () => MSet.empty) += ch
                 nextInvs.get(reference, { () =>
                   BlockStats.inv(mbInv, ch)
@@ -117,8 +110,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
                 })
                 lastBlockId() match {
                   case Some(`reference`) if !alreadyRequested(totalBlockId) => tryDownloadNext(reference)
-                  case other =>
-                    log.trace(s"NOT downloading, lastBlockId=$other, prevRef=$reference, alreadyRequested=${alreadyRequested(totalBlockId)}")
+                  case _                                                    => // either the microblock has already been requested or it does no reference the last block
                 }
             }
           }.logErr

@@ -1,7 +1,10 @@
 package com.wavesplatform.http
 
+import scala.concurrent.duration._
+
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
+import com.wavesplatform.{crypto, NoShrink, TestTime, TestWallet}
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.AddressApiRoute
@@ -10,27 +13,23 @@ import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.it.util.DoubleExt
-import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.Schedulers
-import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
 import io.netty.util.HashedWheelTimer
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
-
-import scala.concurrent.duration._
 
 class AddressRouteSpec
     extends RouteSpec("/addresses")
@@ -79,7 +78,7 @@ class AddressRouteSpec
       addressApiRoute.copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(d.liquidDiff, d.db, d.blockchainUpdater)).route
     val address = TxHelpers.signer(1).toAddress
 
-    d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, 10000.waves))
+    d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress))
     for (_ <- 1 until 10) d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, address))
 
     Get(routePath(s"/balance/$address/10")) ~> route ~> check {
@@ -211,6 +210,7 @@ class AddressRouteSpec
       (response \ "address").as[String] shouldBe allAddresses(1).toString
       (response \ "script").as[String] shouldBe "base64:AQa3b8tH"
       (response \ "scriptText").as[String] shouldBe "true"
+      (response \ "version").as[Int] shouldBe 1
       (response \ "complexity").as[Long] shouldBe 123
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
@@ -223,6 +223,7 @@ class AddressRouteSpec
       (response \ "address").as[String] shouldBe allAddresses(2).toString
       (response \ "script").asOpt[String] shouldBe None
       (response \ "scriptText").asOpt[String] shouldBe None
+      (response \ "version").asOpt[Int] shouldBe None
       (response \ "complexity").as[Long] shouldBe 0
       (response \ "extraFee").as[Long] shouldBe 0
     }
@@ -267,12 +268,9 @@ class AddressRouteSpec
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3).toString
-      // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAA[QBAgMEAAAAAAAAAAAAAAABAAAAAXQBAAAABnZlcmlmeQAAAAAG65AUYw=="
       (response \ "script").as[String] should fullyMatch regex "base64:.+".r
       (response \ "scriptText").as[String] should fullyMatch regex "DApp\\(.+\\)".r
-      // [WAIT]                                           Decompiler(
-      //      testContract,
-      //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
+      (response \ "version").as[Int] shouldBe 3
       (response \ "complexity").as[Long] shouldBe 100
       (response \ "verifierComplexity").as[Long] shouldBe 11
       (response \ "callableComplexities").as[Map[String, Long]] shouldBe callableComplexities - "verify"
@@ -336,6 +334,7 @@ class AddressRouteSpec
     Get(routePath(s"/scriptInfo/${allAddresses(6)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(6).toString
+      (response \ "version").as[Int] shouldBe 3
       (response \ "complexity").as[Long] shouldBe 3
       (response \ "verifierComplexity").as[Long] shouldBe 0
       (response \ "callableComplexities").as[Map[String, Long]] shouldBe contractWithoutVerifierComplexities

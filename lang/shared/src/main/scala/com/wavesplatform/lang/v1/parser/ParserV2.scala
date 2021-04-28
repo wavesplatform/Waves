@@ -289,7 +289,7 @@ class ParserV2(val input: ParserInput) extends Parser {
       case PART.VALID(pos, "_") => None
       case _                    => Some(id)
     }
-    MATCH_CASE(Pos(startPos, endPos), newVarName, types.getOrElse(Seq.empty), expr)
+    MATCH_CASE(Pos(startPos, endPos), TypedVar(newVarName, Union(types.getOrElse(Seq.empty).map(Single(_, None)))), expr)
   }
 
   def parseBinaryOperationAtom(startPos: Int, leftExpr: EXPR, opAndExprList: Seq[BinaryOpWithExpr], endPos: Int): EXPR = {
