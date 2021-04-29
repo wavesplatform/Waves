@@ -413,7 +413,7 @@ object Parser {
   }
 
   def strictLetP[_:P]: P[Seq[LET]] = {
-    P(Index ~~ "strict" ~~ &(CharIn(" \t\n\r")) ~/ comment ~ letNameP ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
+    P(Index ~~ "strict" ~~ &(CharIn(" \t\n\r")) ~/ comment ~ (destructuredTupleValuesP | letNameP) ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
       .map {
         case (start, names, valuePosStart, valueRawOpt, end) =>
           val value = extractValue(valuePosStart, valueRawOpt)
