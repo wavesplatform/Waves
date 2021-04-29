@@ -180,7 +180,7 @@ object InvokeScriptTransactionDiff {
           InvokeDiffsCommon.getInvocationComplexity(blockchain, tx.funcCall, callableComplexities, dAppAddress)
         }
 
-        stepLimit = ContractLimits.MaxComplexityByVersion(version)
+        stepLimit = ContractLimits.MaxCallableComplexityByVersion(version)
 
         fixedInvocationComplexity = if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && callableComplexities.contains(
                                           ScriptEstimatorV2.version

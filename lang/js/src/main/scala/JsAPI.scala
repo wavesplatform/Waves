@@ -90,7 +90,9 @@ object JsAPI {
     import ContractLimits._
     js.Dynamic.literal(
       "MaxComplexityByVersion"                -> ((ver: Int) => MaxComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
+      "MaxAssetVerifierComplexityByVersion"   -> ((ver: Int) => MaxComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
       "MaxAccountVerifierComplexityByVersion" -> ((ver: Int) => MaxAccountVerifierComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
+      "MaxCallableComplexityByVersion"        -> ((ver: Int) => MaxCallableComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
       "MaxExprSizeInBytes"                    -> MaxExprSizeInBytes,
       "MaxContractSizeInBytes"                -> MaxContractSizeInBytes,
       "MaxInvokeScriptArgs"                   -> MaxInvokeScriptArgs,
