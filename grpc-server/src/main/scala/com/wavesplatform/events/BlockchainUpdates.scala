@@ -26,7 +26,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   private[this] implicit val scheduler = Schedulers.fixedPool(sys.runtime.availableProcessors(), "blockchain-updates")
 
   private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("waves.blockchain-updates")
-  private[this] val repo     = new UpdatesRepoImpl(s"${context.settings.directory}/blockchain-updates")
+  private[this] val repo     = new UpdatesRepoImpl(s"${context.settings.directory}/blockchain-updates", context.blocksApi)
 
   private[this] var grpcServer: Server = null
 
@@ -40,10 +40,13 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       val exception = new IllegalStateException(s"BlockchainUpdates at height $extensionHeight is lower than node at height $nodeHeight")
       log.error("BlockchainUpdates startup check failed", exception)
       throw exception
-    } else if (nodeHeight > 0) {
+    } else if (nodeHeight == 0) {
+      if (extensionHeight > 0) log.warn("Data has been reset, dropping entire blockchain updates data")
+      repo.rollback(ByteStr.empty, 0, sendEvent = false).get
+    } else {
       (repo.updateForHeight(nodeHeight), context.blockchain.blockHeader(nodeHeight)) match {
-        case (Success(Some(extensionBlockAtNodeHeight)), Some(lastNodeBlockHeader)) =>
-          val lastNodeBlockId = lastNodeBlockHeader.id.value()
+        case (Success(extensionBlockAtNodeHeight), Some(lastNodeBlockHeader)) =>
+          val lastNodeBlockId = lastNodeBlockHeader.id()
 
           // check if extension is on fork. Block ids must be equal at node height
           if (extensionBlockAtNodeHeight.toId != lastNodeBlockId) {
@@ -58,16 +61,10 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
           if (extensionHeight > nodeHeight) {
             log.warn(s"BlockchainUpdates at height $extensionHeight is higher than node at height $nodeHeight, rolling back BlockchainUpdates")
             repo
-              .rollback(RollbackCompleted(extensionBlockAtNodeHeight.toId, extensionBlockAtNodeHeight.toHeight))
-              .recoverWith { case _: Throwable => Failure(new RuntimeException("BlockchainUpdates failed to rollback at startup")) }
+              .rollback(extensionBlockAtNodeHeight.toId, extensionBlockAtNodeHeight.toHeight, sendEvent = false)
+              .recoverWith { case err: Throwable => Failure(new RuntimeException("BlockchainUpdates failed to rollback at startup", err)) }
               .get
           }
-        case (Success(None), Some(_)) =>
-          val exception = new RuntimeException(
-            s"BlockchainUpdates has no block at height $nodeHeight, while node has one at startup. Extension height: $extensionHeight, node height: $nodeHeight"
-          )
-          log.error("BlockchainUpdates startup check failed", exception)
-          throw exception
         case (Failure(ex), _) =>
           val exception = new RuntimeException(s"BlockchainUpdates failed to get extension block info at node height at startup", ex)
           log.error("BlockchainUpdates startup check failed", ex)
@@ -155,12 +152,10 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   }
 
   override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit = {
-    val rollbackCompleted = RollbackCompleted(toBlockId, toHeight)
-    repo.rollback(rollbackCompleted).get
+    repo.rollback(toBlockId, toHeight).get
   }
 
-  override def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit = {
-    val microBlockRollbackCompleted = MicroBlockRollbackCompleted(toBlockId, height)
-    repo.rollbackMicroBlock(microBlockRollbackCompleted).get
+  override def onMicroBlockRollback(toBlockId: ByteStr, toHeight: Int): Unit = {
+    repo.rollbackMicroBlock(toBlockId).get
   }
 }

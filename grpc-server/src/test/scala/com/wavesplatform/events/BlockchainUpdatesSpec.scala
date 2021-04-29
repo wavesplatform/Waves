@@ -245,7 +245,7 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
   ): Unit = withGenerateSubscription(request)(d => for (_ <- 1 to count) d.appendBlock())(f)
 
   def withRepo[T](blocksApi: CommonBlocksApi = stub[CommonBlocksApi])(f: (UpdatesRepoImpl, BlockchainUpdateTriggers) => T): T = {
-    val repo = new UpdatesRepoImpl(Files.createTempDirectory("bc-updates").toString)
+    val repo = new UpdatesRepoImpl(Files.createTempDirectory("bc-updates").toString, blocksApi)
     val triggers = new BlockchainUpdateTriggers {
       override def onProcessBlock(
           block: Block,
@@ -265,12 +265,12 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
           totalTransactionsRoot: ByteStr
       ): Unit = {
         val newMicroBlock = MicroBlockAppended.from(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot)
-        repo.appendMicroBlock(newMicroBlock)
+        repo.appendMicroBlock(newMicroBlock).get
       }
 
-      def onRollback(toBlockId: ByteStr, toHeight: Int): Unit = repo.rollback(RollbackCompleted(toBlockId, toHeight)).get
+      def onRollback(toBlockId: ByteStr, toHeight: Int): Unit = repo.rollback(toBlockId, toHeight).get
 
-      def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit = repo.rollbackMicroBlock(MicroBlockRollbackCompleted(toBlockId, height)).get
+      def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit = repo.rollbackMicroBlock(toBlockId).get
     }
     try f(repo, triggers)
     finally repo.shutdown()

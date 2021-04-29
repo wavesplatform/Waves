@@ -151,8 +151,7 @@ object StateUpdate {
         parentStateUpdate.copy(balances = parentStateUpdate.balances :+ ((minerAddress, Waves, minerBalance)))
     }
 
-    val (txsStateUpdates, _) = txsDiffs
-      .reverse
+    val (txsStateUpdates, _) = txsDiffs.reverse
       .zip(transactions)
       .foldLeft((ArrayBuffer.empty[StateUpdate], parentDiff)) {
         case ((updates, accDiff), (txDiff, tx)) =>
@@ -174,10 +173,9 @@ sealed trait BlockchainUpdated extends Product with Serializable {
 object BlockchainUpdated {
   implicit class BlockchainUpdatedExt(private val bu: BlockchainUpdated) extends AnyVal {
     def references(other: BlockchainUpdated): Boolean = bu match {
-      case b: BlockAppended                 => b.block.header.reference == other.toId
-      case mb: MicroBlockAppended           => mb.microBlock.reference == other.toId
-      case rb: RollbackCompleted            => rb.toHeight < other.toHeight
-      case mrb: MicroBlockRollbackCompleted => mrb.toHeight == other.toHeight
+      case b: BlockAppended       => b.block.header.reference == other.toId
+      case mb: MicroBlockAppended => mb.microBlock.reference == other.toId
+      case _                      => false
     }
   }
 }
@@ -236,6 +234,24 @@ object MicroBlockAppended {
       txsStateUpdates,
       totalTransactionsRoot
     )
+  }
+}
+
+final case class RollbackResult(removedBlocks: Seq[Block], removedTransactionIds: Seq[ByteStr])
+
+object RollbackResult {
+  def micro(removedTransactionIds: Seq[ByteStr]): RollbackResult =
+    RollbackResult(Nil, removedTransactionIds)
+
+  implicit val monoid: Monoid[RollbackResult] = new Monoid[RollbackResult] {
+    override def empty: RollbackResult = RollbackResult(Nil, Nil)
+
+    override def combine(x: RollbackResult, y: RollbackResult): RollbackResult = {
+      RollbackResult(
+        x.removedBlocks ++ y.removedBlocks,
+        x.removedTransactionIds ++ y.removedTransactionIds
+      )
+    }
   }
 }
 
