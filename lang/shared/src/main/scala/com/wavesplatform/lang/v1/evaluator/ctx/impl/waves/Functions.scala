@@ -526,11 +526,12 @@ object Functions {
       }
     }
 
-  def callDAppF(version: StdLibVersion): BaseFunction[Environment] =
+  def callDAppF(version: StdLibVersion, reentrant: Boolean): BaseFunction[Environment] = {
+    val (id, name) =  if (reentrant) (CALLDAPPREENTRANT, "reentrantInvoke") else (CALLDAPP, "invoke")
     NativeFunction.withEnvironment[Environment](
-      "Invoke",
-      Map[StdLibVersion, Long](V4 -> 75L),
-      CALLDAPP,
+      name,
+      Map[StdLibVersion, Long](V5 -> 75L),
+      id,
       ANY,
       ("dapp", addressOrAliasType),
       ("name", optionString),
@@ -538,7 +539,7 @@ object Functions {
       ("payments", listPayment)
     ) {
       new ContextfulNativeFunction[Environment](
-        "Invoke",
+        name,
         ANY,
         Seq(("dapp", BYTESTR), ("name", STRING), ("args", LIST(ANY)), ("payments", listPayment))
       ) {
@@ -550,14 +551,14 @@ object Functions {
             args: List[EVALUATED],
             availableComplexity: Int
         ): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] = {
-          val dappBytes = args match {
-            case (dapp: CaseObj) :: _ if dapp.caseType == addressType =>
-              dapp.fields("bytes") match {
+          val dAppBytes = args match {
+            case (dApp: CaseObj) :: _ if dApp.caseType == addressType =>
+              dApp.fields("bytes") match {
                 case CONST_BYTESTR(d) => d.pure[F]
                 case a                => throw new IllegalArgumentException(s"Unexpected address bytes $a")
               }
-            case (dapp: CaseObj) :: _ if dapp.caseType == aliasType =>
-              dapp.fields("alias") match {
+            case (dApp: CaseObj) :: _ if dApp.caseType == aliasType =>
+              dApp.fields("alias") match {
                 case CONST_STRING(a) => env.resolveAlias(a).map(_.explicitGet().bytes)
               }
             case args => throw new IllegalArgumentException(s"Unexpected recipient args $args")
@@ -571,7 +572,7 @@ object Functions {
             case _ :: _ :: ARR(args) :: ARR(payments) :: Nil =>
               env
                 .callScript(
-                  Recipient.Address(dappBytes.asInstanceOf[ByteStr]),
+                  Recipient.Address(dAppBytes.asInstanceOf[ByteStr]),
                   name,
                   args.toList,
                   payments.map {
@@ -582,16 +583,18 @@ object Functions {
                       }
                     case arg => throw new IllegalArgumentException(s"Unexpected payment arg $arg")
                   },
-                  availableComplexity
+                  availableComplexity,
+                  reentrant
                 )
                 .map(_.map { case (result, complexity) => (result.leftMap(_.toString), complexity)})
             case xs =>
-              val err = notImplemented[F, EVALUATED](s"Invoke(dapp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
+              val err = notImplemented[F, EVALUATED](s"invoke(dApp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
               Coeval.now(err.map((_, 0)))
           }
         }
       }
     }
+  }
 
   private def withExtract[C[_[_]]](f: BaseFunction[C], version: StdLibVersion): BaseFunction[C] = {
     val args = f.signature.args.zip(f.args).map {

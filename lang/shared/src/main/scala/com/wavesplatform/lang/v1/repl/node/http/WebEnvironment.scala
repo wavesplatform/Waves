@@ -151,5 +151,5 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
     client.get[F, A](url).map(_.map(ev))
 
   override def accountScript(addressOrAlias: Recipient): Future[Option[Script]]                                        = ???
-  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], availableComplexity: Int): Coeval[Future[(Either[ValidationError, EVALUATED], Int)]] = ???
+  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], availableComplexity: Int, reentrant: Boolean): Coeval[Future[(Either[ValidationError, EVALUATED], Int)]] = ???
 }

@@ -1001,7 +1001,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |
           | @Callable(i)
           | func foo(a:ByteVector) = {
-          |  let r = Invoke(this, "bar", [], [])
+          |  let r = invoke(this, "bar", [], [])
           |   [
           |     IntegerEntry("key", 1),
           |     BooleanEntry("key", true),
@@ -1039,7 +1039,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |
           | @Callable(i)
           | func foo(a:ByteVector) = {
-          |  let r = Invoke(this, "bar", [], [])
+          |  let r = invoke(this, "bar", [], [])
           |   [
           |     IntegerEntry("key", 1),
           |     BooleanEntry("key", true),

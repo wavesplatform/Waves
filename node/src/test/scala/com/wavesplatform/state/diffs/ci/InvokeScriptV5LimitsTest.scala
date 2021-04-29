@@ -613,8 +613,8 @@ class InvokeScriptV5LimitsTest
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
              |  if b1 == b1 && ob1 == ob1
              |  then
-             |    let r = Invoke(Alias("${alias.name}"), "bar", [this.bytes, "aaaaaaaa"], [AttachedPayment(unit, 17)])
-             |    let r1 = Invoke(Alias("${alias.name}"), "bar", [this.bytes, "bbbbbbbb"], [AttachedPayment(unit, 17)])
+             |    let r = invoke(Alias("${alias.name}"), "bar", [this.bytes, "aaaaaaaa"], [AttachedPayment(unit, 17)])
+             |    let r1 = invoke(Alias("${alias.name}"), "bar", [this.bytes, "bbbbbbbb"], [AttachedPayment(unit, 17)])
              |    if r == r1
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
@@ -718,8 +718,8 @@ class InvokeScriptV5LimitsTest
              |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
              |  if b1 == b1 && ob1 == ob1
              |  then
-             |    let r = Invoke(Alias("${alias.name}"), "bar", [this.bytes, "aaaaaaaa"], [AttachedPayment(unit, 17)])
-             |    let r1 = Invoke(Alias("${alias.name}"), "bar", [this.bytes, "bbbbbbbb"], [AttachedPayment(unit, 17)])
+             |    let r = invoke(Alias("${alias.name}"), "bar", [this.bytes, "aaaaaaaa"], [AttachedPayment(unit, 17)])
+             |    let r1 = invoke(Alias("${alias.name}"), "bar", [this.bytes, "bbbbbbbb"], [AttachedPayment(unit, 17)])
              |    if r == r1
              |    then
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")

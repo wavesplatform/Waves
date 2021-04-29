@@ -38,7 +38,7 @@ case class ErrorMessageEnvironment[F[_]](message: String) extends Environment[F]
       args: List[EVALUATED],
       payments: Seq[(Option[Array[Byte]], Long)],
       availableComplexity: Int
-  ): Coeval[F[(Either[ValidationError, EVALUATED], Int)]] = unavailable
+  , reentrant: Boolean): Coeval[F[(Either[ValidationError, EVALUATED], Int)]] = unavailable
 }
 
 case class BlockchainUnavailableException(message: String) extends RuntimeException {

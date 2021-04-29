@@ -50,7 +50,7 @@ package object utils {
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
     override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
     override def accountScript(addressOrAlias: Recipient): Option[Script]                                        = ???
-    override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], availableComplexity: Int): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
+    override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], availableComplexity: Int, reentrant: Boolean): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
   }
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {

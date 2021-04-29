@@ -38,7 +38,7 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
        |
        |@Callable (i)
        |func foo() = {
-       |  strict inv = Invoke(this, "bar", [], [AttachedPayment(unit, 100)])
+       |  strict inv = invoke(this, "bar", [], [AttachedPayment(unit, 100)])
        |  ([], nil)
        |}
        |
@@ -60,13 +60,13 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
        |
        |@Callable (i)
        |func foo() = {
-       |  strict inv = Invoke(i.caller, "foo", [], [AttachedPayment(unit, 100)])
+       |  strict inv = invoke(i.caller, "foo", [], [AttachedPayment(unit, 100)])
        |  ([], nil)
        |}
        |
        |@Callable (i)
        |func bar() = {
-       |  strict inv = Invoke(i.caller, "bar", [], [AttachedPayment(unit, 100)])
+       |  strict inv = invoke(i.caller, "bar", [], [AttachedPayment(unit, 100)])
        |  ([], nil)
        |}
        |

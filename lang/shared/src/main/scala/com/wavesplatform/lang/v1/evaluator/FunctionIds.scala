@@ -126,6 +126,7 @@ object FunctionIds {
   val ACCOUNTSCRIPTHASH: Short       = 1009
 
   val CALLDAPP: Short                = 1020
+  val CALLDAPPREENTRANT: Short       = 1021
 
   val DATA_LONG_FROM_ARRAY: Short    = 1040
   val DATA_BOOLEAN_FROM_ARRAY: Short = 1041
