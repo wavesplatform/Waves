@@ -923,7 +923,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       s"""
          | @Callable(i)
          | func foo() = {
-         |   let v1 = hashScriptAtAddress(Address(base58''))
+         |   let v1 = scriptHash(Address(base58''))
          |   nil
          | }
         """.stripMargin

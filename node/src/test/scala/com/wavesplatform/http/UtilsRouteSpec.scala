@@ -695,14 +695,14 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                    |func testCallable() = [BinaryEntry("test", i.caller.bytes)]
                    |
                    |@Callable(i)
-                   |func testSyncInvoke() = {
-                   |  strict r = Invoke(this, "testCallable", [], [AttachedPayment(unit, 100)])
+                   |func testSyncinvoke() = {
+                   |  strict r = invoke(this, "testCallable", [], [AttachedPayment(unit, 100)])
                    |  [BinaryEntry("testSyncInvoke", i.caller.bytes)]
                    |}
                    |
                    |@Callable(i)
                    |func testSyncCallComplexityExcess() = {
-                   |  strict r = Invoke(this, "testSyncCallComplexityExcess", [], [])
+                   |  strict r = invoke(this, "testSyncCallComplexityExcess", [], [])
                    |  []
                    |}
                    |
@@ -821,8 +821,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       .returning(DefaultBlockchainSettings)
       .anyNumberOfTimes()
 
-    evalScript(""" testSyncInvoke() """) ~> route ~> check {
-      responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":99,"expr":" testSyncInvoke() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    evalScript(""" testSyncinvoke() """) ~> route ~> check {
+      responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":99,"expr":" testSyncinvoke() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
     }
 
     val complexityLimit = 1234

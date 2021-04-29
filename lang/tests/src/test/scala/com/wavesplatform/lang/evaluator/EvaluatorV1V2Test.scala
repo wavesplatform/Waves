@@ -1052,9 +1052,9 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     val mul   = FUNCTION_CALL(mulLong.header, List(CONST_LONG(5), CONST_LONG(5)))
     val div   = FUNCTION_CALL(divLong.header, List(CONST_LONG(10), CONST_LONG(3)))
     val mod   = FUNCTION_CALL(modLong.header, List(CONST_LONG(10), CONST_LONG(3)))
-    val frac  = FUNCTION_CALL(fraction.header, List(CONST_LONG(Long.MaxValue), CONST_LONG(2), CONST_LONG(4)))
-    val frac2 = FUNCTION_CALL(fraction.header, List(CONST_LONG(Long.MaxValue), CONST_LONG(3), CONST_LONG(2)))
-    val frac3 = FUNCTION_CALL(fraction.header, List(CONST_LONG(-Long.MaxValue), CONST_LONG(3), CONST_LONG(2)))
+    val frac  = FUNCTION_CALL(fraction(fixLimitCheck = false).header, List(CONST_LONG(Long.MaxValue), CONST_LONG(2), CONST_LONG(4)))
+    val frac2 = FUNCTION_CALL(fraction(fixLimitCheck = false).header, List(CONST_LONG(Long.MaxValue), CONST_LONG(3), CONST_LONG(2)))
+    val frac3 = FUNCTION_CALL(fraction(fixLimitCheck = false).header, List(CONST_LONG(-Long.MaxValue), CONST_LONG(3), CONST_LONG(2)))
 
     evalPure[EVALUATED](expr = sum) shouldBe evaluated(10)
     evalPure[EVALUATED](expr = mul) shouldBe evaluated(25)

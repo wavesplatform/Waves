@@ -226,7 +226,8 @@ class WavesEnvironment(
       func: String,
       args: List[EVALUATED],
       payments: Seq[(Option[Array[Byte]], Long)],
-      availableComplexity: Int
+      availableComplexity: Int,
+      reentrant: Boolean
   ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
 }
 
@@ -295,7 +296,8 @@ class DAppEnvironment(
       func: String,
       args: List[EVALUATED],
       payments: Seq[(Option[Array[Byte]], Long)],
-      availableComplexity: Int
+      availableComplexity: Int,
+      reentrant: Boolean
   ): Coeval[(Either[ValidationError, EVALUATED], Int)] = {
     val invocation = InvokeScriptResult.Invocation(
       account.Address.fromBytes(dApp.bytes.arr).explicitGet(),
@@ -338,7 +340,7 @@ class DAppEnvironment(
         remainingCalls,
         availableActions,
         availableData,
-        calledAddresses,
+        if (reentrant) calledAddresses else calledAddresses + invoke.senderAddress,
         invocationTracker
       )(invoke).leftMap { err =>
         invocationTracker.setError(err)

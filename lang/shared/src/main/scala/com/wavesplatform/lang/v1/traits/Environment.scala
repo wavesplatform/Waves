@@ -55,6 +55,7 @@ trait Environment[F[_]] {
       func: String,
       args: List[EVALUATED],
       payments: Seq[(Option[Array[Byte]], Long)],
-      availableComplexity: Int
+      availableComplexity: Int,
+      reentrant: Boolean
   ): Coeval[F[(Either[ValidationError, EVALUATED], Int)]]
 }

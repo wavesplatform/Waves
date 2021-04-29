@@ -74,7 +74,7 @@ class IsDataStorageUntouchedTest
       d.appendBlock(invokeTx)
       d.blockchain.accountData(dApp, "virgin") shouldBe Some(BooleanDataEntry("virgin", false))
 
-      d.removeAfter(genesis)
+      d.rollbackTo(genesis)
       d.appendBlock(invokeTx)
       d.blockchain.accountData(dApp, "virgin") shouldBe Some(BooleanDataEntry("virgin", true))
     }
@@ -89,7 +89,7 @@ class IsDataStorageUntouchedTest
       d.appendBlock(invokeTx)
       d.blockchain.accountData(dApp, "virgin") shouldBe Some(BooleanDataEntry("virgin", false))
 
-      d.removeAfter(genesis)
+      d.rollbackTo(genesis)
       d.appendBlock(invokeTx)
       d.blockchain.accountData(dApp, "virgin") shouldBe Some(BooleanDataEntry("virgin", true))
     }
@@ -106,7 +106,7 @@ class IsDataStorageUntouchedTest
          | func default() = {
          |   let address  = Address(base58'$nextDApp')
          |   strict start = isDataStorageUntouched(address)
-         |   strict r     = Invoke(address, "default", [], [])
+         |   strict r     = invoke(address, "default", [], [])
          |   strict end   = isDataStorageUntouched(address)
          |   [
          |     BooleanEntry("start", start),
