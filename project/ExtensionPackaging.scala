@@ -8,11 +8,11 @@ import com.typesafe.sbt.packager.debian.DebianPlugin.Names.Postinst
 import com.typesafe.sbt.packager.debian.DebianPlugin.autoImport.Debian
 import com.typesafe.sbt.packager.debian.JDebPackaging
 import com.typesafe.sbt.packager.linux.LinuxPackageMapping
-import com.typesafe.sbt.packager.linux.LinuxPlugin.autoImport.{Linux, defaultLinuxInstallLocation, linuxPackageMappings}
-import com.typesafe.sbt.packager.linux.LinuxPlugin.{Users, mapGenericMappingsToLinux}
+import com.typesafe.sbt.packager.linux.LinuxPlugin.autoImport.{defaultLinuxInstallLocation, linuxPackageMappings, Linux}
+import com.typesafe.sbt.packager.linux.LinuxPlugin.{mapGenericMappingsToLinux, Users}
 import com.typesafe.sbt.packager.universal.UniversalDeployPlugin
 import sbt.Keys._
-import sbt._
+import sbt.{Def, _}
 
 /**
   * @note Specify "maintainer" to solve DEB warnings
@@ -26,7 +26,6 @@ object ExtensionPackaging extends AutoPlugin {
 
   override def projectSettings: Seq[Def.Setting[_]] =
     Seq(
-      packageName := s"${name.value}${network.value.packageSuffix}",
       packageDoc / publishArtifact := false,
       packageSrc / publishArtifact := false,
       Universal / javaOptions := Nil,
@@ -69,7 +68,7 @@ object ExtensionPackaging extends AutoPlugin {
       ),
       libraryDependencies ++= Dependencies.logDeps,
       javaOptions in run ++= extensionClasses.value.zipWithIndex.map { case (extension, index) => s"-Dwaves.extensions.$index=$extension" }
-    ) ++ nameFix ++ inScope(Global)(nameFix) ++ maintainerFix
+    ) ++ setPackageName(name) ++ maintainerFix
 
   private def maintainerFix =
     inConfig(Linux)(
@@ -79,9 +78,12 @@ object ExtensionPackaging extends AutoPlugin {
         packageDescription := s"Waves node ${name.value}${network.value.packageSuffix} extension"
       ))
 
-  private def nameFix = Seq(
-    packageName := s"${name.value}${network.value.packageSuffix}",
-    normalizedName := s"${name.value}${network.value.packageSuffix}"
+  def setPackageName(newName: Def.Initialize[String]): Seq[Def.Setting[_]] =
+    setPackageNameSettings(newName) ++ inScope(Global)(setPackageNameSettings(newName))
+
+  private[this] def setPackageNameSettings(newName: Def.Initialize[String]): Seq[Def.Setting[String]] = Seq(
+    packageName := s"${newName.value}${network.value.packageSuffix}",
+    normalizedName := packageName.value
   )
 
   // A copy of com.typesafe.sbt.packager.linux.LinuxPlugin.getUniversalFolderMappings

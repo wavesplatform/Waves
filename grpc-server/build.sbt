@@ -21,4 +21,6 @@ inConfig(Compile)(
   )
 )
 
+ExtensionPackaging.setPackageName(Def.setting("waves-node-grpc-server"))
+
 enablePlugins(RunApplicationSettings, ExtensionPackaging)
