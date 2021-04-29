@@ -10,8 +10,7 @@ class StrictWithTupleTest extends EvaluatorSpec {
     eval(
       """
         | strict (str, i, cond, bytes) = ("12345", 12345, true, base58'')
-        | true
-        | # str.parseInt() == i && cond && bytes.size() == 0
+        | str.parseInt() == i && cond && bytes.size() == 0
       """.stripMargin
     ) shouldBe Right(CONST_BOOLEAN(true))
   }

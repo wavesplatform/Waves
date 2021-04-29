@@ -377,8 +377,8 @@ object Parser {
   private def letNameP[_:P]: P[Seq[(Int, Option[PART[String]])]] =
     (Index ~ anyVarName.?).map(Seq(_))
 
-  def letP[_:P]: P[Seq[LET]] =
-    P(Index ~~ "let" ~~ &(CharIn(" \t\n\r")) ~/ comment ~ (destructuredTupleValuesP | letNameP) ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
+  def variableDefP[_:P](key: String): P[Seq[LET]] =
+    P(Index ~~ key ~~ &(CharIn(" \t\n\r")) ~/ comment ~ (destructuredTupleValuesP | letNameP) ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
       .map {
         case (start, names, valuePos, valueRaw, end) =>
           val value = extractValue(valuePos, valueRaw)
@@ -412,24 +412,10 @@ object Parser {
     P(CharsWhileIn(" \t\r").repX  ~~ "\n").repX(1)
   }
 
-  def strictLetP[_:P]: P[Seq[LET]] = {
-    P(Index ~~ "strict" ~~ &(CharIn(" \t\n\r")) ~/ comment ~ (destructuredTupleValuesP | letNameP) ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
-      .map {
-        case (start, names, valuePosStart, valueRawOpt, end) =>
-          val value = extractValue(valuePosStart, valueRawOpt)
-          val pos = Pos(start, end)
-
-          names.map { case (nameStart, nameRaw) =>
-            val name = extractName(Pos(nameStart, nameStart), nameRaw)
-            LET(pos, name, value)
-          }
-      }
-  }
-
   def strictLetBlockP[_:P]: P[EXPR] = {
     P(
       Index ~~
-        strictLetP ~/
+        variableDefP("strict") ~/
         Pass ~~
         (
           ("" ~ ";") ~/ (baseExpr | invalid).? |
@@ -438,10 +424,9 @@ object Parser {
           ) ~~
         Index
     ).map {
-      case (start, strictLet, body, end) => {
+      case (start, varNames, body, end) =>
         val blockPos = Pos(start, end)
-        Macro.unwrapStrict(blockPos, strictLet.head, body.getOrElse(INVALID(Pos(end, end), "expected a body")))
-      }
+        Macro.unwrapStrict(blockPos, varNames, body.getOrElse(INVALID(Pos(end, end), "expected a body")))
     }
   }
 
@@ -462,7 +447,7 @@ object Parser {
   def block[_:P]: P[EXPR] = blockOr(INVALID(_, "expected ';'"))
 
   private def blockOr(otherExpr: Pos => EXPR)(implicit c: fastparse.P[Any]): P[EXPR] = {
-    def declaration(implicit c: fastparse.P[Any]) = letP | funcP.map(Seq(_))
+    def declaration(implicit c: fastparse.P[Any]) = variableDefP("let") | funcP.map(Seq(_))
 
     P(
       Index ~~
@@ -501,7 +486,7 @@ object Parser {
 
   def singleBaseExpr[_:P] = P(binaryOp(singleBaseAtom(_), opsByPriority))
 
-  def declaration[_:P] = P(letP | funcP.map(Seq(_)))
+  def declaration[_:P] = P(variableDefP("let") | funcP.map(Seq(_)))
 
   def revp[A, B](l: A, s: Seq[(B, A)], o: Seq[(A, B)] = Seq.empty): (Seq[(A, B)], A) = {
     s.foldLeft((o, l)) { (acc, op) =>

@@ -54,7 +54,8 @@ object Macro {
     }
   }
 
-  def unwrapStrict(blockPos: Pos, strictLetDec: LET, strictBody: EXPR): EXPR = {
+  def unwrapStrict(blockPos: Pos, strictLetDecs: Seq[LET], strictBody: EXPR): EXPR = {
+    val strictLetDec :: otherLets = strictLetDecs
     val strictPos = strictLetDec.position
     val strictLetName = strictLetDec.name
     BLOCK(
@@ -62,7 +63,7 @@ object Macro {
       strictLetDec,
       IF(blockPos,
         FUNCTION_CALL(strictPos, VALID(strictPos, "=="), List(REF(strictPos, strictLetName), REF(strictPos, strictLetName))),
-        strictBody,
+        otherLets.foldLeft(strictBody)((r, let) => BLOCK(let.position, let, r)),
         FUNCTION_CALL(strictPos, VALID(strictPos, "throw"), List(CONST_STRING(strictPos, VALID(strictPos, "Strict value is not equal to itself."))))
       )
     )
