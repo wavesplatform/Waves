@@ -6,19 +6,6 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 
-trait BlockchainUpdateTriggers {
-  def onProcessBlock(block: Block, diff: DetailedDiff, minerReward: Option[Long], blockchainBeforeWithMinerReward: Blockchain): Unit
-  def onProcessMicroBlock(
-      microBlock: MicroBlock,
-      diff: DetailedDiff,
-      blockchainBeforeWithMinerReward: Blockchain,
-      totalBlockId: ByteStr,
-      totalTransactionsRoot: ByteStr
-  ): Unit
-  def onRollback(toBlockId: ByteStr, toHeight: Int): Unit
-  def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit
-}
-
 object BlockchainUpdateTriggers {
   def noop: BlockchainUpdateTriggers = new BlockchainUpdateTriggers {
     override def onProcessBlock(block: Block, diff: DetailedDiff, minerReward: Option[Long], blockchainBeforeWithMinerReward: Blockchain): Unit = {}
@@ -57,4 +44,17 @@ object BlockchainUpdateTriggers {
     override def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit =
       triggers.foreach(_.onMicroBlockRollback(toBlockId, height))
   }
+}
+
+trait BlockchainUpdateTriggers {
+  def onProcessBlock(block: Block, diff: DetailedDiff, minerReward: Option[Long], blockchainBeforeWithMinerReward: Blockchain): Unit
+  def onProcessMicroBlock(
+                           microBlock: MicroBlock,
+                           diff: DetailedDiff,
+                           blockchainBeforeWithMinerReward: Blockchain,
+                           totalBlockId: ByteStr,
+                           totalTransactionsRoot: ByteStr
+                         ): Unit
+  def onRollback(toBlockId: ByteStr, toHeight: Int): Unit
+  def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit
 }

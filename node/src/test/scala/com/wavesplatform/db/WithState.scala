@@ -3,24 +3,31 @@ package com.wavesplatform.db
 import java.nio.file.Files
 
 import cats.Monoid
+import com.wavesplatform.{NTPTime, TestHelpers}
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory, loadActiveLeases}
+import com.wavesplatform.database.{loadActiveLeases, LevelDBFactory, LevelDBWriter, TestStorageFactory}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
-import com.wavesplatform.state.diffs.{BlockDiffer, produce}
+import com.wavesplatform.settings.{
+  loadConfig,
+  BlockchainSettings,
+  FunctionalitySettings,
+  TestSettings,
+  WavesSettings,
+  TestFunctionalitySettings => TFS
+}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
+import com.wavesplatform.state.diffs.{produce, BlockDiffer}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, Transaction}
-import com.wavesplatform.{NTPTime, TestHelpers}
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import monix.reactive.Observer
 import monix.reactive.subjects.{PublishSubject, Subject}
 import org.iq80.leveldb.{DB, Options}
@@ -151,6 +158,22 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
 }
 
 trait WithDomain extends WithState { _: Suite =>
+  implicit class WavesSettingsOps(ws: WavesSettings) {
+    def withFeatures(fs: BlockchainFeature*): WavesSettings = {
+      val functionalitySettings = ws.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap)
+      ws.copy(blockchainSettings = ws.blockchainSettings.copy(functionalitySettings = functionalitySettings))
+    }
+
+    def addFeatures(fs: BlockchainFeature*): WavesSettings = {
+      val newFeatures           = ws.blockchainSettings.functionalitySettings.preActivatedFeatures ++ fs.map(_.id -> 0)
+      val functionalitySettings = ws.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = newFeatures)
+      ws.copy(blockchainSettings = ws.blockchainSettings.copy(functionalitySettings = functionalitySettings))
+    }
+  }
+
+  lazy val SettingsFromDefaultConfig: WavesSettings =
+    WavesSettings.fromRootConfig(loadConfig(None))
+
   def defaultDomainSettings: WavesSettings =
     WavesSettings.fromRootConfig(loadConfig(None))
 
@@ -162,12 +185,36 @@ trait WithDomain extends WithState { _: Suite =>
   def domainSettingsWithFeatures(fs: BlockchainFeature*): WavesSettings =
     domainSettingsWithFS(defaultDomainSettings.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap))
 
+  object DomainPresets {
+    val NG = domainSettingsWithFeatures(
+      BlockchainFeatures.MassTransfer, // Removes limit of 100 transactions per block
+      BlockchainFeatures.NG
+    )
+
+    val RideV4 = NG.addFeatures(
+      BlockchainFeatures.SmartAccounts,
+      BlockchainFeatures.DataTransaction,
+      BlockchainFeatures.Ride4DApps,
+      BlockchainFeatures.SmartAssets,
+      BlockchainFeatures.BlockV5
+    )
+  }
+
   def withDomain[A](settings: WavesSettings = defaultDomainSettings, triggers: BlockchainUpdateTriggers = ignoreBlockchainUpdateTriggers)(
       test: Domain => A
   ): A =
     withLevelDBWriter(settings) { blockchain =>
-      val bcu = new BlockchainUpdaterImpl(blockchain, Observer.stopped, settings, ntpTime, triggers, loadActiveLeases(db, _, _))
-      try test(Domain(db, bcu, blockchain))
+      var domain: Domain = null
+      val bcu = new BlockchainUpdaterImpl(
+        blockchain,
+        Observer.stopped,
+        settings,
+        ntpTime,
+        BlockchainUpdateTriggers.combined(domain.triggers),
+        loadActiveLeases(db, _, _)
+      )
+      domain = Domain(db, bcu, blockchain)
+      try test(domain)
       finally bcu.shutdown()
     }
 }

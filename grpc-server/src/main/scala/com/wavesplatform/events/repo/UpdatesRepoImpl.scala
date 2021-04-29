@@ -216,7 +216,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
       }(_._2.isEmpty)
 
     Observable.fromTry(height).flatMap { h =>
-      if (h < fromHeight) {
+      if (fromHeight > 1 && h < fromHeight) {
         Observable.raiseError(new IllegalArgumentException("Requested start height exceeds current blockchain height"))
       } else {
         def readBatchStream(from: Int): Observable[BlockchainUpdated] = Observable.defer {
