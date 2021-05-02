@@ -116,6 +116,7 @@ object ContractCompiler {
       parsedDapp: Expressions.DAPP,
       version: StdLibVersion,
       needCompaction: Boolean,
+      removeUnusedCode: Boolean,
       saveExprContext: Boolean = false
   ): CompileM[(Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
     for {
@@ -196,10 +197,12 @@ object ContractCompiler {
       parsedDappResult = parsedDapp.copy(decs = parsedNodeDecs, fs = parsedNodeAFuncs)
 
       result = if (errorList.isEmpty && !compiledAnnFuncsWithErr.exists(_._1.isEmpty)) {
+
         var resultDApp = DApp(metaWithErr._1.get, decs, callableFuncs, verifierFuncOptWithErr._1.get)
-        if (needCompaction) {
-          resultDApp = ContractScriptCompactor.compact(resultDApp)
-        }
+
+        if (removeUnusedCode) resultDApp = ContractScriptCompactor.removeUnusedCode(resultDApp)
+        if (needCompaction) resultDApp = ContractScriptCompactor.compact(resultDApp)
+
         (Some(resultDApp), parsedDappResult, subExprErrorList)
       } else {
         (None, parsedDappResult, errorList ++ subExprErrorList)
@@ -240,9 +243,9 @@ object ContractCompiler {
     t._2.fold(t._1)(typeParam => s"${t._1}[$typeParam]")
 
   private def resolveGenericType(
-    func: Expressions.ANNOTATEDFUNC,
-    funcName: PART.VALID[String],
-    t: Type
+      func: Expressions.ANNOTATEDFUNC,
+      funcName: PART.VALID[String],
+      t: Type
   ): CompileM[List[(PART.VALID[String], Option[PART.VALID[Type]])]] =
     t match {
       case Expressions.Single(name, parameter) =>
@@ -263,14 +266,15 @@ object ContractCompiler {
 
   private def checkAnnotatedParamType(t: (String, Option[Type])): Boolean = {
     t match {
-      case (singleType, None) => primitiveCallableTypes.contains(singleType)
+      case (singleType, None)                                               => primitiveCallableTypes.contains(singleType)
       case (genericType, Some(Expressions.Single(PART.VALID(_, tp), None))) => primitiveCallableTypes.contains(tp) && genericType == "List"
-      case (genericType, Some(Expressions.Union(u))) => genericType == "List" && u.forall { t => 
-        t match {
-          case Expressions.Single(PART.VALID(_, tp), None) => primitiveCallableTypes.contains(tp)
-          case _ => false
+      case (genericType, Some(Expressions.Union(u))) =>
+        genericType == "List" && u.forall { t =>
+          t match {
+            case Expressions.Single(PART.VALID(_, tp), None) => primitiveCallableTypes.contains(tp)
+            case _                                           => false
+          }
         }
-      }
       case _ => false
     }
   }
@@ -313,8 +317,14 @@ object ContractCompiler {
     } yield ()
   }
 
-  def apply(c: CompilerContext, contract: Expressions.DAPP, version: StdLibVersion, needCompaction: Boolean = false): Either[String, DApp] = {
-    compileContract(c, contract, version, needCompaction)
+  def apply(
+      c: CompilerContext,
+      contract: Expressions.DAPP,
+      version: StdLibVersion,
+      needCompaction: Boolean = false,
+      removeUnusedCode: Boolean = false
+  ): Either[String, DApp] = {
+    compileContract(c, contract, version, needCompaction, removeUnusedCode)
       .run(c)
       .map(
         _._2
@@ -326,10 +336,16 @@ object ContractCompiler {
       .value
   }
 
-  def compile(input: String, ctx: CompilerContext, version: StdLibVersion, needCompaction: Boolean = false): Either[String, DApp] = {
+  def compile(
+      input: String,
+      ctx: CompilerContext,
+      version: StdLibVersion,
+      needCompaction: Boolean = false,
+      removeUnusedCode: Boolean = false
+  ): Either[String, DApp] = {
     Parser.parseContract(input) match {
       case fastparse.Parsed.Success(xs, _) =>
-        ContractCompiler(ctx, xs, version, needCompaction) match {
+        ContractCompiler(ctx, xs, version, needCompaction, removeUnusedCode) match {
           case Left(err) => Left(err.toString)
           case Right(c)  => Right(c)
         }
@@ -342,11 +358,12 @@ object ContractCompiler {
       ctx: CompilerContext,
       version: StdLibVersion,
       needCompaction: Boolean = false,
+      removeUnusedCode: Boolean = false,
       saveExprContext: Boolean = true
   ): Either[String, (Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
     Parser.parseDAPPWithErrorRecovery(input) match {
       case Right((parseResult, removedCharPosOpt)) =>
-        compileContract(ctx, parseResult, version, needCompaction, saveExprContext)
+        compileContract(ctx, parseResult, version, needCompaction, removeUnusedCode, saveExprContext)
           .run(ctx)
           .map(
             _._2

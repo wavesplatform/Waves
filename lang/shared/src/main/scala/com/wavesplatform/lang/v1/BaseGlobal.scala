@@ -115,10 +115,12 @@ trait BaseGlobal {
       input: String,
       ctx: CompilerContext,
       stdLibVersion: StdLibVersion,
-      estimator: ScriptEstimator
+      estimator: ScriptEstimator,
+      needCompaction: Boolean,
+      removeUnusedCode: Boolean
   ): Either[String, (Array[Byte], (Long, Map[String, Long]), Expressions.DAPP, Iterable[CompilationError])] = {
     (for {
-      compRes <- ContractCompiler.compileWithParseResult(input, ctx, stdLibVersion)
+      compRes <- ContractCompiler.compileWithParseResult(input, ctx, stdLibVersion, needCompaction, removeUnusedCode)
       (compDAppOpt, exprDApp, compErrorList) = compRes
       complexityWithMap <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty)
         ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator)
@@ -177,10 +179,11 @@ trait BaseGlobal {
       ctx: CompilerContext,
       stdLibVersion: StdLibVersion,
       estimator: ScriptEstimator,
-      needCompaction: Boolean
+      needCompaction: Boolean,
+      removeUnusedCode: Boolean
   ): Either[String, DAppInfo] =
     for {
-      dApp                                   <- ContractCompiler.compile(input, ctx, stdLibVersion, needCompaction)
+      dApp                                   <- ContractCompiler.compile(input, ctx, stdLibVersion, needCompaction, removeUnusedCode)
       userFunctionComplexities               <- ContractScript.estimateUserFunctions(stdLibVersion, dApp, estimator)
       globalVariableComplexities             <- ContractScript.estimateGlobalVariables(stdLibVersion, dApp, estimator)
       (maxComplexity, annotatedComplexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator)

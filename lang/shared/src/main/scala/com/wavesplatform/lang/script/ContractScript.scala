@@ -138,7 +138,7 @@ object ContractScript {
   ): Either[String, Unit] =
     for {
       _ <- if (useReducedVerifierLimit) estimateVerifierReduced(dApp, complexities, version) else Right(())
-      limit = MaxComplexityByVersion(version)
+      limit = MaxCallableComplexityByVersion(version)
       _ <- Either.cond(
         maxComplexity._2 <= limit,
         (),
