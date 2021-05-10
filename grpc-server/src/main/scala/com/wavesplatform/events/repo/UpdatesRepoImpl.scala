@@ -46,7 +46,13 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
   private[this] val realTimeUpdates     = ConcurrentSubject.publish[BlockchainUpdated]
 
   realTimeUpdates.foreach { bu =>
-    log.trace(s"realTimeUpdates event: ${bu.id}")
+    val eventType = bu match {
+      case _: BlockAppended               => "block"
+      case _: MicroBlockAppended          => "micro"
+      case _: RollbackCompleted           => "rollback"
+      case _: MicroBlockRollbackCompleted => "micro_rollback"
+    }
+    log.trace(s"realTimeUpdates event: $eventType ${bu.height} ${bu.id}")
   }
 
   realTimeUpdates
@@ -275,7 +281,8 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
         .map { data =>
           def isLastBatch(data: Seq[_]): Boolean = data.length < LevelDBReadBatchSize
 
-          if (isLastBatch(data)) (data, None) else {
+          if (isLastBatch(data)) (data, None)
+          else {
             val nextTickFrom = data.lastOption.map(_.height + 1)
             (data, nextTickFrom)
           }
@@ -293,7 +300,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
                 readBatchStream(next, data.lastOption.ensuring(_.nonEmpty))
 
               case None =>
-                val streamId = Integer.toHexString(System.nanoTime().toInt)
+                val streamId             = Integer.toHexString(System.nanoTime().toInt)
                 val lastPersistentUpdate = data.lastOption.orElse(prevLastPersistent)
                 log.trace(s"[$streamId] lastPersistentUpdate = $lastPersistentUpdate")
                 Observable
