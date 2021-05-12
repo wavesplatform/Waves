@@ -46,13 +46,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
   private[this] val realTimeUpdates     = ConcurrentSubject.publish[BlockchainUpdated]
 
   realTimeUpdates.foreach { bu =>
-    val eventType = bu match {
-      case _: BlockAppended               => "block"
-      case _: MicroBlockAppended          => "micro"
-      case _: RollbackCompleted           => "rollback"
-      case _: MicroBlockRollbackCompleted => "micro_rollback"
-    }
-    log.trace(s"realTimeUpdates event: $eventType ${bu.height} ${bu.id}")
+    log.trace(s"realTimeUpdates event: ${bu.ref}")
   }
 
   realTimeUpdates
@@ -209,7 +203,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
                 val transactions = block.fold(Seq.empty[ByteStr])(_.transactionData.map(_.id()))
                 RollbackResult(block.toSeq, transactions.reverse, ba.reverseStateUpdate)
               }
-              log.trace(s"Rolling back block update at ${ba.height}: ${ba.id}")
+              log.trace(s"Rolling back block update: ${ba.ref}")
               changes = reverted +: changes
               batch.delete(key)
           }
@@ -248,7 +242,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
             }
             val (keep, drop) = dropUntilId(ls.microBlocks, toId)
             if (keep.isEmpty) {
-              Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback a non-existing microblock"))
+              Failure(new IllegalArgumentException(s"BlockchainUpdates attempted to rollback a non-existing microblock: $toId, existing = ${ls.microBlocks.map(_.id)}"))
             } else {
               liquidState = Some(ls.copy(microBlocks = keep))
               val removedTxs  = drop.flatMap(_.microBlock.transactionData).map(_.id()).reverse
@@ -302,16 +296,26 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
               case None =>
                 val streamId             = Integer.toHexString(System.nanoTime().toInt)
                 val lastPersistentUpdate = data.lastOption
-                log.trace(s"[$streamId] lastPersistentUpdate = $lastPersistentUpdate")
+                log.trace(s"[$streamId] lastPersistentUpdate = ${lastPersistentUpdate.map(_.ref)}")
+
+                val liquidUpdates = lastRealTimeUpdates.dropWhile(u => !lastPersistentUpdate.forall(u.references))
+                log.trace(s"[$streamId] liquidUpdates = ${liquidUpdates.map(_.ref).mkString(", ")}")
+
                 Observable
-                  .fromIterable(lastRealTimeUpdates)
-                  .++(realTimeUpdates)
-                  .dropWhile { u =>
-                    val referencesLastPersistent = lastPersistentUpdate.forall(u.references)
-                    if (referencesLastPersistent) log.trace(s"[$streamId] Found referencesLastPersistent=true ${u.id}")
-                    else log.trace(s"[$streamId] Dropping by referencesLastPersistent=false ${u.id}")
-                    !referencesLastPersistent
-                  }
+                  .fromIterable(liquidUpdates)
+                  .++(
+                    realTimeUpdates
+                      .dropWhile { u =>
+                        val referencesLiquid = u match {
+                          case b: BlockAppended => liquidUpdates.exists(b.references)
+                          case mb: MicroBlockAppended => liquidUpdates.lastOption.forall(mb.references)
+                          case _ => true // Rollbacks
+                        }
+                        if (referencesLiquid) log.trace(s"[$streamId] Found referencesLiquid=true: ${u.ref}")
+                        else log.trace(s"[$streamId] Dropping by referencesLiquid=false: ${u.ref}")
+                        !referencesLiquid
+                      }
+                  )
                   .guaranteeCase(
                     ec =>
                       Task(ec match {
@@ -324,7 +328,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
                       })
                   )
                   .map { bu =>
-                    log.trace(s"[$streamId] Sending real-time update: ${bu.id}")
+                    log.trace(s"[$streamId] Sending real-time update: ${bu.ref}")
                     bu
                   }
             })
