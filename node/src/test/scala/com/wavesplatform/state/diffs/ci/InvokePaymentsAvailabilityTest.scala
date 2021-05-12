@@ -77,9 +77,9 @@ class InvokePaymentsAvailabilityTest
 
     TestCompiler(version).compileContract(
       s"""
-         | {-# STDLIB_VERSION $version  #-}
-         | {-# CONTENT_TYPE   DAPP      #-}
-         | {-# SCRIPT_TYPE    ACCOUNT   #-}
+         | {-# STDLIB_VERSION ${version.id} #-}
+         | {-# CONTENT_TYPE   DAPP          #-}
+         | {-# SCRIPT_TYPE    ACCOUNT       #-}
          |
          | @Callable(inv)
          | func stake() = {
