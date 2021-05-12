@@ -518,6 +518,30 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       }
   }
 
+  property("sync invoke functions are disabled in expressions") {
+    def expr(v: StdLibVersion) = {
+      val script =
+        s"""
+          | {-# STDLIB_VERSION ${v.id}    #-}
+          | {-# CONTENT_TYPE   EXPRESSION #-}
+          |
+          |  let r1 = invoke(Address(base58''), "default", [], [])
+          |  let r2 = reentrantInvoke(Address(base58''), "default", [], [])
+          |  r1 == r2
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+
+    DirectiveDictionary[StdLibVersion].all
+      .filter(_ >= V3)
+      .foreach { version =>
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, expr(version))
+        val error  = result.swap.getOrElse(???)
+        error should include("Can't find a function 'invoke'")
+        error should include("Can't find a function 'reentrantInvoke'")
+      }
+  }
+
   treeTypeTest("GETTER")(
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),

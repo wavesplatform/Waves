@@ -103,7 +103,7 @@ trait BaseGlobal {
       bytes = if (compErrorList.isEmpty) serializeExpression(compExpr, stdLibVersion) else Array.empty[Byte]
 
       vars  = utils.varNames(stdLibVersion, Expression)
-      costs = utils.functionCosts(stdLibVersion)
+      costs = utils.functionCosts(stdLibVersion, DAppType)
       complexity <- if (compErrorList.isEmpty) estimator(vars, costs, compExpr) else Either.right(0L)
     } yield (bytes, complexity, exprScript, compErrorList))
       .recover {
