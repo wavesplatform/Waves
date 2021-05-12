@@ -98,10 +98,7 @@ object Importer extends ScorexLogging {
       }
   }
 
-  def loadSettings(file: Option[File]): WavesSettings = {
-    val settings = Application.loadApplicationConfig(file)
-    settings.copy(dbSettings = settings.dbSettings.copy(useBloomFilter = true))
-  }
+  def loadSettings(file: Option[File]): WavesSettings = Application.loadApplicationConfig(file)
 
   private[this] var triggers = Seq.empty[BlockchainUpdateTriggers]
 

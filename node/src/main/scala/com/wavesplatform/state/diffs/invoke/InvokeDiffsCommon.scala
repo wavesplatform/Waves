@@ -303,7 +303,7 @@ object InvokeDiffsCommon {
             if (remainingLimit < Int.MaxValue) remainingLimit - curDiff.scriptsComplexity.toInt
             else remainingLimit
 
-          val blockchain   = CompositeBlockchain(sblockchain, Some(curDiff))
+          val blockchain   = CompositeBlockchain(sblockchain, curDiff)
           val actionSender = Recipient.Address(ByteStr(tx.dAppAddressOrAlias.bytes))
 
           def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
