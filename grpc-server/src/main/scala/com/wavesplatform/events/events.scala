@@ -506,6 +506,16 @@ object BlockchainUpdated {
       case mb: MicroBlockAppended => mb.microBlock.reference == other.id
       case _                      => false
     }
+
+    def ref: String = {
+      val eventType = bu match {
+        case _: BlockAppended               => "block"
+        case _: MicroBlockAppended          => "micro"
+        case _: RollbackCompleted           => "rollback"
+        case _: MicroBlockRollbackCompleted => "micro_rollback"
+      }
+      s"$eventType/${bu.height}/${bu.id}"
+    }
   }
 }
 
