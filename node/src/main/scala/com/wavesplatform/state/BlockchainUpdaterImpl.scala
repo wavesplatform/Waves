@@ -425,7 +425,6 @@ class BlockchainUpdaterImpl(
     val result = prevNgState match {
       case Some(ng) if ng.contains(blockId) =>
         log.trace("Resetting liquid block, no rollback necessary")
-        blockchainUpdateTriggers.onMicroBlockRollback(this, blockId)
         Right(Seq.empty)
       case Some(ng) if ng.base.id() == blockId =>
         log.trace("Discarding liquid block, no rollback necessary")

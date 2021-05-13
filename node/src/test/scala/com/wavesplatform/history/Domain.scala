@@ -4,8 +4,8 @@ import cats.syntax.option._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.{AddressPortfolio, AddressTransactions, CommonBlocksApi}
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
@@ -13,8 +13,8 @@ import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{BlockchainUpdater, _}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import org.iq80.leveldb.DB
 
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
@@ -43,7 +43,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def appendMicroBlock(b: MicroBlock): BlockId = blockchainUpdater.processMicroBlock(b).explicitGet()
 
-  def lastBlockId: ByteStr = blockchainUpdater.lastBlockId.get
+  def lastBlockId: ByteStr = blockchainUpdater.lastBlockId.getOrElse(randomSig)
 
   def carryFee: Long = blockchainUpdater.carryFee
 
@@ -77,13 +77,13 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     lastBlock
   }
 
-  def appendKeyBlock(): Block = {
-    val block = createBlock(Block.NgBlockVersion, Nil)
+  def appendKeyBlock(ref: ByteStr = lastBlockId): Block = {
+    val block = createBlock(Block.NgBlockVersion, Nil, ref)
     appendBlock(block)
     lastBlock
   }
 
-  def appendMicroBlock(txs: Transaction*): Unit = {
+  def appendMicroBlock(txs: Transaction*): BlockId = {
     val lastBlock = this.lastBlock
     val block     = lastBlock.copy(transactionData = lastBlock.transactionData ++ txs)
     val signature = com.wavesplatform.crypto.sign(defaultSigner.privateKey, block.bodyBytes())
@@ -96,18 +96,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     blockchainUpdater.removeAfter(blockId).explicitGet()
   }
 
-  def rollbackMicros(offset: Int = 1): Unit = {
-    val blockId =
-      blockchainUpdater.microblockIds
-        .drop(offset)
-        .headOption
-        .getOrElse(throw new IllegalStateException("Insufficient count of microblocks"))
-
-    blockchainUpdater.removeAfter(blockId).explicitGet()
-  }
-
-  def createBlock(version: Byte, txs: Seq[Transaction]): Block = {
-    val reference = blockchainUpdater.lastBlockId.getOrElse(randomSig)
+  def createBlock(version: Byte, txs: Seq[Transaction], reference: ByteStr = lastBlockId): Block = {
     val timestamp = System.currentTimeMillis()
     Block
       .buildAndSign(
