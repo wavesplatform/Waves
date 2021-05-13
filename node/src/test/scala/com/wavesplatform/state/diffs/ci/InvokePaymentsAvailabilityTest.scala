@@ -35,19 +35,19 @@ class InvokePaymentsAvailabilityTest
   private val time = new TestTime
   private def ts   = time.getTimestamp()
 
-  private def syncDApp(dApp: Address): Script =
+  private def proxyDAppScript(callingDApp: Address): Script =
     TestCompiler(V5).compileContract(
       s"""
          | {-# STDLIB_VERSION 5       #-}
          | {-# CONTENT_TYPE   DAPP    #-}
          | {-# SCRIPT_TYPE    ACCOUNT #-}
          |
-         | let dApp2 = Address(base58'$dApp')
+         | let dApp2 = Address(base58'$callingDApp')
          |
          | @Callable(inv)
          | func default() = {
          |    let pmt = inv.payments[0]
-         |    strict invokeV4 = dApp2.invoke("stake", nil, [AttachedPayment(pmt.assetId, pmt.amount)])
+         |    strict invokeV4 = dApp2.invoke("default", nil, [AttachedPayment(pmt.assetId, pmt.amount)])
          |    [
          |       IntegerEntry("balance_self", this.assetBalance(pmt.assetId.value())),
          |       IntegerEntry("balance_calling_dApp", dApp2.assetBalance(pmt.assetId.value()))
@@ -56,7 +56,7 @@ class InvokePaymentsAvailabilityTest
        """.stripMargin
     )
 
-  private def dApp(version: StdLibVersion): Script = {
+  private def callingDAppScript(version: StdLibVersion): Script = {
     val data =
       if (version > V3)
         s"""
@@ -82,16 +82,16 @@ class InvokePaymentsAvailabilityTest
          | {-# SCRIPT_TYPE    ACCOUNT       #-}
          |
          | @Callable(inv)
-         | func stake() = {
+         | func default() = {
          |   $data
          | }
        """.stripMargin
     )
   }
 
-  private val amount = 12345
+  private val paymentAmount = 12345
 
-  private def scenario(version: StdLibVersion) =
+  private def scenario(version: StdLibVersion, syncCall: Boolean) =
     for {
       invoker     <- accountGen
       callingDApp <- accountGen
@@ -101,36 +101,65 @@ class InvokePaymentsAvailabilityTest
       gTx2     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
       gTx3     = GenesisTransaction.create(proxyDApp.toAddress, ENOUGH_AMT, ts).explicitGet()
       issue    = IssueTransaction.selfSigned(2.toByte, invoker, "name", "description", ENOUGH_AMT, 1, true, None, fee, ts).explicitGet()
-      ssTx     = SetScriptTransaction.selfSigned(1.toByte, callingDApp, Some(dApp(version)), fee, ts).explicitGet()
-      ssTx2    = SetScriptTransaction.selfSigned(1.toByte, proxyDApp, Some(syncDApp(callingDApp.toAddress)), fee, ts).explicitGet()
+      ssTx     = SetScriptTransaction.selfSigned(1.toByte, callingDApp, Some(callingDAppScript(version)), fee, ts).explicitGet()
+      ssTx2    = SetScriptTransaction.selfSigned(1.toByte, proxyDApp, Some(proxyDAppScript(callingDApp.toAddress)), fee, ts).explicitGet()
       asset    = IssuedAsset(issue.id.value())
-      payments = Seq(Payment(amount, asset))
-      invokeTx = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, proxyDApp.toAddress, None, payments, fee, Waves, ts).explicitGet()
+      payments = Seq(Payment(paymentAmount, asset))
+      dApp     = if (syncCall) proxyDApp.toAddress else callingDApp.toAddress
+      invokeTx = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, dApp, None, payments, fee, Waves, ts).explicitGet()
     } yield (Seq(gTx1, gTx2, gTx3, ssTx, ssTx2, issue), invokeTx, callingDApp.toAddress, proxyDApp.toAddress, asset)
 
-  property("payments availability") {
+  property("payments availability in usual call") {
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V3)
-      .foreach { v =>
-        val (preparingTxs, invoke, callingDApp, proxyDApp, asset) = scenario(v).sample.get
+      .foreach { callingDAppVersion =>
+        val (preparingTxs, invoke, callingDApp, _, asset) = scenario(callingDAppVersion, syncCall = false).sample.get
         withDomain(RideV5) { d =>
           d.appendBlock(preparingTxs: _*)
           d.appendBlock(invoke)
 
           d.blockchain.transactionInfo(invoke.id.value()).get._3 shouldBe true
-          d.blockchain.balance(invoke.senderAddress, asset) shouldBe ENOUGH_AMT - amount
+          d.blockchain.balance(invoke.senderAddress, asset) shouldBe ENOUGH_AMT - paymentAmount
 
-          val (proxyDAppBalance, callingDAppBalance) = if (v >= V5) (0, amount) else (amount, 0)
+          val expectingCallingDAppBalance = paymentAmount
+          d.blockchain.balance(callingDApp, asset) shouldBe expectingCallingDAppBalance
+
+          val expectingCallingDAppBalanceInsideCallingDApp = if (callingDAppVersion >= V5) paymentAmount else 0
+          val expectingInvokerBalanceInsideCallingDApp     = ENOUGH_AMT - expectingCallingDAppBalanceInsideCallingDApp
+          d.blockchain.accountData(callingDApp, "balance_self").get.value shouldBe expectingCallingDAppBalanceInsideCallingDApp
+          d.blockchain.accountData(callingDApp, "balance_caller").get.value shouldBe expectingInvokerBalanceInsideCallingDApp
+        }
+      }
+  }
+
+  property("payments availability in sync call") {
+    DirectiveDictionary[StdLibVersion].all
+      .filter(_ >= V3)
+      .foreach { callingDAppVersion =>
+        val (preparingTxs, invoke, callingDApp, proxyDApp, asset) = scenario(callingDAppVersion, syncCall = true).sample.get
+        withDomain(RideV5) { d =>
+          d.appendBlock(preparingTxs: _*)
+          d.appendBlock(invoke)
+
+          d.blockchain.transactionInfo(invoke.id.value()).get._3 shouldBe true
+          d.blockchain.balance(invoke.senderAddress, asset) shouldBe ENOUGH_AMT - paymentAmount
+
+          val expectingProxyDAppBalance = 0
           List(
             d.blockchain.balance(proxyDApp, asset),
-            d.blockchain.accountData(proxyDApp, "balance_self").get.value,
-            d.blockchain.accountData(callingDApp, "balance_caller").get.value
-          ).foreach(_ shouldBe proxyDAppBalance)
+            d.blockchain.accountData(proxyDApp, "balance_self").get.value
+          ).foreach(_ shouldBe expectingProxyDAppBalance)
+
+          val expectingCallingDAppBalance = paymentAmount
           List(
             d.blockchain.balance(callingDApp, asset),
-            d.blockchain.accountData(proxyDApp, "balance_calling_dApp").get.value,
-            d.blockchain.accountData(callingDApp, "balance_self").get.value
-          ).foreach(_ shouldBe callingDAppBalance)
+            d.blockchain.accountData(proxyDApp, "balance_calling_dApp").get.value
+          ).foreach(_ shouldBe expectingCallingDAppBalance)
+
+          val expectingCallingDAppBalanceInsideCallingDApp = if (callingDAppVersion >= V5) paymentAmount else 0
+          val expectingProxyDAppBalanceInsideCallingDApp   = paymentAmount - expectingCallingDAppBalanceInsideCallingDApp
+          d.blockchain.accountData(callingDApp, "balance_self").get.value shouldBe expectingCallingDAppBalanceInsideCallingDApp
+          d.blockchain.accountData(callingDApp, "balance_caller").get.value shouldBe expectingProxyDAppBalanceInsideCallingDApp
         }
       }
   }

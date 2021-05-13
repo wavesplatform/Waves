@@ -47,7 +47,7 @@ class InvokePaymentsAvailabilitySuite extends BaseTransactionSuite {
        | @Callable(inv)
        | func default() = {
        |    let pmt = inv.payments[0]
-       |    strict invokeV4 = dApp2.invoke("stake", nil, [AttachedPayment(pmt.assetId, pmt.amount)])
+       |    strict invokeV4 = dApp2.invoke("default", nil, [AttachedPayment(pmt.assetId, pmt.amount)])
        |    [
        |       IntegerEntry("balance_self", this.assetBalance(pmt.assetId.value())),
        |       IntegerEntry("balance_calling_dApp", dApp2.assetBalance(pmt.assetId.value()))
@@ -85,7 +85,7 @@ class InvokePaymentsAvailabilitySuite extends BaseTransactionSuite {
        | {-# SCRIPT_TYPE    ACCOUNT        #-}
        |
        | @Callable(inv)
-       | func stake() = {
+       | func default() = {
        |   $data
        | }
      """.stripMargin,
@@ -97,15 +97,15 @@ class InvokePaymentsAvailabilitySuite extends BaseTransactionSuite {
   private val paymentAmount = 12345
   private val issueAmount   = 1000 * 1000
 
-  test("payments availability") {
+  test("payments availability in sync call") {
     val assetId = sender.issue(caller, quantity = issueAmount, waitForTx = true).id
     val asset   = IssuedAsset(ByteStr.decodeBase58(assetId).get)
     sender.setScript(proxyDApp, Some(syncDApp(callingDAppAddress)), waitForTx = true)
 
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V3)
-      .foreach { v =>
-        sender.setScript(callingDApp, Some(dApp(v)), waitForTx = true)
+      .foreach { callingDAppVersion =>
+        sender.setScript(callingDApp, Some(dApp(callingDAppVersion)), waitForTx = true)
 
         val callerStartBalance      = sender.assetBalance(callerAddress, assetId).balance
         val proxyStartBalance       = sender.assetBalance(proxyDAppAddress, assetId).balance
@@ -114,17 +114,22 @@ class InvokePaymentsAvailabilitySuite extends BaseTransactionSuite {
         sender.invokeScript(caller, proxyDAppAddress, payment = Seq(Payment(paymentAmount, asset)), fee = invokeFee, waitForTx = true)
         sender.assetBalance(callerAddress, assetId).balance shouldBe callerStartBalance - paymentAmount
 
-        val (proxyDAppBalance, callingDAppBalance) = if (v >= V5) (0, paymentAmount) else (paymentAmount, 0)
+        val expectingProxyDAppBalance = 0
         List(
           sender.assetBalance(proxyDAppAddress, assetId).balance,
-          sender.getData(proxyDAppAddress, "balance_self").head.value,
-          sender.getData(callingDAppAddress, "balance_caller").head.value
-        ).foreach(_ shouldBe proxyStartBalance + proxyDAppBalance)
+          sender.getData(proxyDAppAddress, "balance_self").head.value
+        ).foreach(_ shouldBe proxyStartBalance + expectingProxyDAppBalance)
+
+        val expectingCallingDAppBalance = paymentAmount
         List(
           sender.assetBalance(callingDAppAddress, assetId).balance,
-          sender.getData(proxyDAppAddress, "balance_calling_dApp").head.value,
-          sender.getData(callingDAppAddress, "balance_self").head.value
-        ).foreach(_ shouldBe callingDAppStartBalance + callingDAppBalance)
+          sender.getData(proxyDAppAddress, "balance_calling_dApp").head.value
+        ).foreach(_ shouldBe callingDAppStartBalance + expectingCallingDAppBalance)
+
+        val expectingCallingDAppBalanceInsideCallingDApp = if (callingDAppVersion >= V5) paymentAmount else 0
+        val expectingProxyDAppBalanceInsideCallingDApp   = paymentAmount - expectingCallingDAppBalanceInsideCallingDApp
+        sender.getData(callingDAppAddress, "balance_self").head.value shouldBe callingDAppStartBalance + expectingCallingDAppBalanceInsideCallingDApp
+        sender.getData(callingDAppAddress, "balance_caller").head.value shouldBe proxyStartBalance + expectingProxyDAppBalanceInsideCallingDApp
       }
   }
 }

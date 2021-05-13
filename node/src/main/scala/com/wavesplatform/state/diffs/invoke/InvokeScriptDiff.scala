@@ -138,7 +138,7 @@ object InvokeScriptDiff {
 
           result <- for {
             (diff, (scriptResult, log), availableActions, availableData) <- {
-              val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
+              stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
                 val height = blockchain.height
                 val invocation = ContractEvaluator.Invocation(
                   tx.funcCall,
@@ -151,6 +151,8 @@ object InvokeScriptDiff {
                   tx.root.map(_.fee).getOrElse(0L),
                   tx.root.flatMap(_.feeAssetId.compatId)
                 )
+                val paymentsPart = InvokeDiffsCommon.paymentsPart(tx, tx.dAppAddress, Map())
+                val (paymentsPartInsideDApp, paymentsPartToResolve) = if (version < V5) (Diff.empty, paymentsPart) else (paymentsPart, Diff.empty)
                 val environment = new DAppEnvironment(
                   AddressScheme.current.chainId,
                   Coeval.evalOnce(input),
@@ -167,24 +169,21 @@ object InvokeScriptDiff {
                   remainingCalls - 1,
                   remainingActions,
                   remainingData,
-                  if (version < V5) Diff.empty else InvokeDiffsCommon.paymentsPart(tx, tx.dAppAddress, Map()),
+                  paymentsPartInsideDApp,
                   invocationRoot
                 )
 
-                for {
-                  result <- CoevalR(
-                    evaluateV2(
-                      version,
-                      contract,
-                      invocation,
-                      environment,
-                      complexityAfterPayments,
-                      remainingComplexity
-                    ).map(TracedResult(_))
-                  )
-                } yield (environment.currentDiff, result, environment.availableActions, environment.availableData)
+                CoevalR(
+                  evaluateV2(
+                    version,
+                    contract,
+                    invocation,
+                    environment,
+                    complexityAfterPayments,
+                    remainingComplexity
+                  ).map(TracedResult(_))
+                ).map(result => (environment.currentDiff |+| paymentsPartToResolve, result, environment.availableActions, environment.availableData))
               })
-              scriptResultE
             }
 
             doProcessActions = (actions: List[CallableAction], unusedComplexity: Int) => {
