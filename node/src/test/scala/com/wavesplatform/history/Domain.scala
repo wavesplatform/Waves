@@ -115,7 +115,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
         timestamp = timestamp,
         reference = reference,
         baseTarget = blockchainUpdater.lastBlockHeader.fold(60L)(_.header.baseTarget),
-        generationSignature = com.wavesplatform.history.generationSignature,
+        generationSignature = com.wavesplatform.history.correctGenerationSignature(version),
         txs = txs,
         featureVotes = Nil,
         rewardVote = -1L,

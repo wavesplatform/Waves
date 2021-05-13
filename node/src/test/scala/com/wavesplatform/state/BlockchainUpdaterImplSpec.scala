@@ -1,33 +1,39 @@
 package com.wavesplatform.state
 
+import com.google.common.primitives.Longs
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.TestHelpers.enableNG
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.DBCacheSettings
+import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.events.BlockchainUpdateTriggers
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.history.{chainBaseAndMicro, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.utils._
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.{EitherMatchers, NTPTime, RequestGen, WithDB}
+import com.wavesplatform.{EitherMatchers, NTPTime, RequestGen}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers}
+
+import scala.util.Random
 
 class BlockchainUpdaterImplSpec
     extends FreeSpec
     with Matchers
     with EitherMatchers
-    with WithDB
+    with WithDomain
     with RequestGen
     with NTPTime
     with DBCacheSettings
@@ -36,8 +42,7 @@ class BlockchainUpdaterImplSpec
   private val FEE_AMT = 1000000L
 
   // default settings, no NG
-  private lazy val functionalitySettings = TestFunctionalitySettings.Stub
-  private lazy val wavesSettings         = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
+  private lazy val wavesSettings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
 
   def baseTest(
       gen: Time => Gen[(KeyPair, Seq[Block])],
@@ -45,25 +50,16 @@ class BlockchainUpdaterImplSpec
       triggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
   )(
       f: (BlockchainUpdaterImpl, KeyPair) => Unit
-  ): Unit = {
-    val (fs, settings) =
-      if (enableNg) (enableNG(functionalitySettings), enableNG(wavesSettings)) else (functionalitySettings, wavesSettings)
+  ): Unit = withDomain(if (enableNg) enableNG(wavesSettings) else wavesSettings) { d =>
+    d.triggers = d.triggers :+ triggers
 
-    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs)
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, triggers, (_, _) => Seq.empty)
-    try {
-      val (account, blocks) = gen(ntpTime).sample.get
+    val (account, blocks) = gen(ntpTime).sample.get
 
-      blocks.foreach { block =>
-        bcu.processBlock(block) should beRight
-      }
-
-      bcu.shutdown()
-      f(bcu, account)
-    } finally {
-      bcu.shutdown()
-      db.close()
+    blocks.foreach { block =>
+      d.appendBlock(block)
     }
+
+    f(d.blockchainUpdater, account)
   }
 
   def createTransfer(master: KeyPair, recipient: Address, ts: Long): TransferTransaction = {
@@ -179,7 +175,7 @@ class BlockchainUpdaterImplSpec
         baseTest(time => commonPreconditions(time.correctedTime()), enableNg = true, triggersMock)((_, _) => ())
       }
 
-      "block, then 2 microblocks, then block referencing previous microblock" in {
+      "block, then 2 microblocks, then block referencing previous microblock" in withDomain(enableNG(wavesSettings)) { d =>
         def preconditions(ts: Long): Gen[(Transaction, Seq[Transaction])] =
           for {
             master    <- accountGen
@@ -196,84 +192,114 @@ class BlockchainUpdaterImplSpec
 
         val triggersMock = mock[BlockchainUpdateTriggers]
 
-        val defaultWriter =
-          TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, enableNG(functionalitySettings))
-        val bcu =
-          new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, enableNG(wavesSettings), ntpTime, triggersMock, (_, _) => Seq.empty)
+        d.triggers = d.triggers :+ triggersMock
 
-        try {
-          val (genesis, transfers)       = preconditions(0).sample.get
-          val (block1, microBlocks1And2) = chainBaseAndMicro(randomSig, genesis, Seq(transfers.take(2), Seq(transfers(2))))
-          val (block2, microBlock3)      = chainBaseAndMicro(microBlocks1And2.head.totalResBlockSig, transfers(3), Seq(Seq(transfers(4))))
+        val (genesis, transfers)       = preconditions(0).sample.get
+        val (block1, microBlocks1And2) = chainBaseAndMicro(randomSig, genesis, Seq(transfers.take(2), Seq(transfers(2))))
+        val (block2, microBlock3)      = chainBaseAndMicro(microBlocks1And2.head.totalResBlockSig, transfers(3), Seq(Seq(transfers(4))))
 
-          inSequence {
-            // genesis
-            (triggersMock.onProcessBlock _)
-              .expects(where { (block, diff, _, bc) =>
-                bc.height == 0 &&
-                block.transactionData.length == 1 &&
-                diff.parentDiff.portfolios.head._2.balance == 0 &&
-                diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
-              })
-              .once()
+        inSequence {
+          // genesis
+          (triggersMock.onProcessBlock _)
+            .expects(where { (block, diff, _, bc) =>
+              bc.height == 0 &&
+              block.transactionData.length == 1 &&
+              diff.parentDiff.portfolios.head._2.balance == 0 &&
+              diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
+            })
+            .once()
 
-            // microblock 1
-            (triggersMock.onProcessMicroBlock _)
-              .expects(where { (microBlock, diff, bc, _, _) =>
-                bc.height == 1 &&
-                microBlock.transactionData.length == 2 &&
-                // miner reward, no NG — all txs fees
-                diff.parentDiff.portfolios.size == 1 &&
-                diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 2 * 0.4
-              })
-              .once()
+          // microblock 1
+          (triggersMock.onProcessMicroBlock _)
+            .expects(where { (microBlock, diff, bc, _, _) =>
+              bc.height == 1 &&
+              microBlock.transactionData.length == 2 &&
+              // miner reward, no NG — all txs fees
+              diff.parentDiff.portfolios.size == 1 &&
+              diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 2 * 0.4
+            })
+            .once()
 
-            // microblock 2
-            (triggersMock.onProcessMicroBlock _)
-              .expects(where { (microBlock, diff, bc, _, _) =>
-                bc.height == 1 &&
-                microBlock.transactionData.length == 1 &&
-                // miner reward, no NG — all txs fees
-                diff.parentDiff.portfolios.size == 1 &&
-                diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 0.4
-              })
-              .once()
+          // microblock 2
+          (triggersMock.onProcessMicroBlock _)
+            .expects(where { (microBlock, diff, bc, _, _) =>
+              bc.height == 1 &&
+              microBlock.transactionData.length == 1 &&
+              // miner reward, no NG — all txs fees
+              diff.parentDiff.portfolios.size == 1 &&
+              diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 0.4
+            })
+            .once()
 
-            // rollback microblock
-            (triggersMock.onMicroBlockRollback _)
-              .expects(where { (_, toSig) =>
-                toSig == microBlocks1And2.head.totalResBlockSig
-              })
-              .once()
+          // rollback microblock
+          (triggersMock.onMicroBlockRollback _)
+            .expects(where { (_, toSig) =>
+              toSig == microBlocks1And2.head.totalResBlockSig
+            })
+            .once()
 
-            // next keyblock
-            (triggersMock.onProcessBlock _)
-              .expects(where { (block, _, _, bc) =>
-                bc.height == 1 &&
-                block.header.reference == microBlocks1And2.head.totalResBlockSig
-              })
-              .once()
+          // next keyblock
+          (triggersMock.onProcessBlock _)
+            .expects(where { (block, _, _, bc) =>
+              bc.height == 1 &&
+              block.header.reference == microBlocks1And2.head.totalResBlockSig
+            })
+            .once()
 
-            // microblock 3
-            (triggersMock.onProcessMicroBlock _)
-              .expects(where { (microBlock, _, bc, _, _) =>
-                bc.height == 2 && microBlock.reference == block2.signature
-              })
-              .once()
-          }
-
-          bcu.processBlock(block1) should beRight
-          bcu.processMicroBlock(microBlocks1And2.head) should beRight
-          bcu.processMicroBlock(microBlocks1And2.last) should beRight
-          bcu.processBlock(block2) should beRight // this should remove previous microblock
-          bcu.processMicroBlock(microBlock3.head) should beRight
-          bcu.shutdown()
-        } finally {
-          bcu.shutdown()
-          db.close()
+          // microblock 3
+          (triggersMock.onProcessMicroBlock _)
+            .expects(where { (microBlock, _, bc, _, _) =>
+              bc.height == 2 && microBlock.reference == block2.signature
+            })
+            .once()
         }
+
+        d.blockchainUpdater.processBlock(block1) should beRight
+        d.blockchainUpdater.processMicroBlock(microBlocks1And2.head) should beRight
+        d.blockchainUpdater.processMicroBlock(microBlocks1And2.last) should beRight
+        d.blockchainUpdater.processBlock(block2) should beRight // this should remove previous microblock
+        d.blockchainUpdater.processMicroBlock(microBlock3.head) should beRight
+        d.blockchainUpdater.shutdown()
       }
     }
-  }
 
+    "VRF" in withDomain(
+      domainSettingsWithFeatures(
+        BlockchainFeatures.NG,
+        BlockchainFeatures.BlockV5,
+        BlockchainFeatures.Ride4DApps
+      )
+    ) { d =>
+
+      val script = ScriptCompiler.compile("""
+          |{-# STDLIB_VERSION 4 #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |
+          |@Callable(i)
+          |func default() = {
+          |  [
+          |    BinaryEntry("vrf", value(value(blockInfoByHeight(height)).vrf))
+          |  ]
+          |}
+          |""".stripMargin, ScriptEstimatorV2).explicitGet()._1
+
+      val dapp   = KeyPair(Longs.toByteArray(Random.nextLong()))
+      val sender = KeyPair(Longs.toByteArray(Random.nextLong()))
+
+      d.appendBlock(
+        GenesisTransaction.create(dapp.toAddress, 10_00000000, ntpTime.getTimestamp()).explicitGet(),
+        GenesisTransaction.create(sender.toAddress, 10_00000000, ntpTime.getTimestamp()).explicitGet()
+      )
+
+      d.appendBlock(
+        SetScriptTransaction.selfSigned(2.toByte, dapp, Some(script), 500_0000L, ntpTime.getTimestamp()).explicitGet()
+      )
+
+      val invoke =
+        InvokeScriptTransaction.selfSigned(3.toByte, sender, dapp.toAddress, None, Seq.empty, 50_0000L, Waves, ntpTime.getTimestamp()).explicitGet()
+
+      d.appendBlock(d.createBlock(5.toByte, Seq(invoke)))
+    }
+  }
 }

@@ -72,7 +72,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
   def assertDiffEi(preconditions: Seq[Block], block: Block, state: LevelDBWriter)(
       assertion: Either[ValidationError, Diff] => Unit
   ): Unit = {
-    def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited)
+    def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature)
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).explicitGet()
@@ -85,7 +85,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
   def assertDiffEiTraced(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
       assertion: TracedResult[ValidationError, Diff] => Unit
   ): Unit = withLevelDBWriter(fs) { state =>
-    def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlockTraced(blockchain, None, b, MiningConstraint.Unlimited)
+    def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlockTraced(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature, verify = true)
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).resultE.explicitGet()
@@ -99,7 +99,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
       assertion: (Diff, Blockchain) => Unit
   ): Unit = withLevelDBWriter(fs) { state =>
     def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): Either[ValidationError, BlockDiffer.Result] =
-      BlockDiffer.fromBlock(blockchain, if (withNg) prevBlock else None, b, MiningConstraint.Unlimited)
+      BlockDiffer.fromBlock(blockchain, if (withNg) prevBlock else None, b, MiningConstraint.Unlimited, b.header.generationSignature)
 
     preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
       val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, prevBlock, curBlock).explicitGet()
@@ -108,7 +108,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     }
 
     val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, preconditions.lastOption, block).explicitGet()
-    val cb                                             = CompositeBlockchain(state, Some(diff))
+    val cb                                             = CompositeBlockchain(state, diff)
     assertion(diff, cb)
 
     state.append(diff, fees, totalFee, None, block.header.generationSignature, block)
@@ -127,7 +127,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
 
   def assertDiffAndState(fs: FunctionalitySettings)(test: (Seq[Transaction] => Either[ValidationError, Unit]) => Unit): Unit =
     withLevelDBWriter(fs) { state =>
-      def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited)
+      def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature)
 
       test(txs => {
         val nextHeight = state.height + 1

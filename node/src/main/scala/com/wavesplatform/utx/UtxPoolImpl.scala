@@ -341,7 +341,7 @@ class UtxPoolImpl(
                 val newScriptedAddresses = scriptedAddresses(tx)
                 if (!priority && r.checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
                 else {
-                  val updatedBlockchain   = CompositeBlockchain(blockchain, Some(r.totalDiff))
+                  val updatedBlockchain   = CompositeBlockchain(blockchain, r.totalDiff)
                   val newCheckedAddresses = newScriptedAddresses ++ r.checkedAddresses
                   differ(updatedBlockchain, tx).resultE match {
                     case Right(newDiff) =>

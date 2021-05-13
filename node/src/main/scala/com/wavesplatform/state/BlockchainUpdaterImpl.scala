@@ -6,8 +6,8 @@ import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.Storage
 import com.wavesplatform.events.BlockchainUpdateTriggers
@@ -18,15 +18,15 @@ import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.utils.{forceStopApplication, ScorexLogging, Time, UnsupportedFeature}
+import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
-import monix.reactive.{Observable, Observer}
 import monix.reactive.subjects.ReplaySubject
+import monix.reactive.{Observable, Observer}
 
 class BlockchainUpdaterImpl(
     leveldb: Blockchain with Storage,
@@ -206,17 +206,18 @@ class BlockchainUpdaterImpl(
                     val miningConstraints = MiningConstraints(leveldb, height)
                     val reward            = nextReward()
 
-                    val referencedBlockchain = CompositeBlockchain(leveldb, carry = leveldb.carryFee, reward = reward)
+                    val referencedBlockchain = CompositeBlockchain(leveldb, reward)
                     BlockDiffer
                       .fromBlock(
                         referencedBlockchain,
                         leveldb.lastBlock,
                         block,
                         miningConstraints.total,
+                        hitSource,
                         verify
                       )
                       .map { r =>
-                        val updatedBlockchain = CompositeBlockchain(leveldb, Some(r.diff), Some(block), r.carry, reward, Some(hitSource))
+                        val updatedBlockchain = CompositeBlockchain(leveldb, r.diff, block, hitSource, r.carry, reward)
                         miner.scheduleMining(Some(updatedBlockchain))
                         blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, reward, referencedBlockchain)
                         Option((r, Nil, reward, hitSource))
@@ -230,13 +231,14 @@ class BlockchainUpdaterImpl(
 
                     blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, leveldb.height)
 
-                    val referencedBlockchain = CompositeBlockchain(leveldb, carry = leveldb.carryFee, reward = ng.reward)
+                    val referencedBlockchain = CompositeBlockchain(leveldb, ng.reward)
                     BlockDiffer
                       .fromBlock(
                         referencedBlockchain,
                         leveldb.lastBlock,
                         block,
                         miningConstraints.total,
+                        hitSource,
                         verify
                       )
                       .map { r =>
@@ -259,13 +261,14 @@ class BlockchainUpdaterImpl(
 
                       blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, leveldb.height)
 
-                      val referencedBlockchain = CompositeBlockchain(leveldb, carry = leveldb.carryFee, reward = ng.reward)
+                      val referencedBlockchain = CompositeBlockchain(leveldb, ng.reward)
                       BlockDiffer
                         .fromBlock(
                           referencedBlockchain,
                           leveldb.lastBlock,
                           block,
                           miningConstraints.total,
+                          hitSource,
                           verify
                         )
                         .map { r =>
@@ -307,13 +310,21 @@ class BlockchainUpdaterImpl(
                         val liquidDiffWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidDiff)
 
                         val referencedBlockchain =
-                          CompositeBlockchain(leveldb, Some(liquidDiffWithCancelledLeases), Some(referencedForgedBlock), carry, reward)
+                          CompositeBlockchain(
+                            leveldb,
+                            liquidDiffWithCancelledLeases,
+                            referencedForgedBlock,
+                            ng.hitSource,
+                            carry,
+                            reward
+                          )
                         val maybeDiff = BlockDiffer
                           .fromBlock(
                             referencedBlockchain,
                             Some(referencedForgedBlock),
                             block,
                             constraint,
+                            hitSource,
                             verify
                           )
 
@@ -321,11 +332,11 @@ class BlockchainUpdaterImpl(
                           differResult =>
                             val tempBlockchain = CompositeBlockchain(
                               referencedBlockchain,
-                              Some(differResult.diff),
-                              Some(block),
+                              differResult.diff,
+                              block,
+                              hitSource,
                               differResult.carry,
-                              reward,
-                              Some(hitSource)
+                              reward
                             )
                             miner.scheduleMining(Some(tempBlockchain))
 
@@ -663,7 +674,8 @@ class BlockchainUpdaterImpl(
   }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readLock {
-    CompositeBlockchain(leveldb, to.fold(ngState.map(_.bestLiquidDiff))(id => ngState.map(_.diffFor(id)._1)))
+    to.fold(ngState.map(_.bestLiquidDiff))(id => ngState.map(_.diffFor(id)._1))
+      .fold[Blockchain](leveldb)(CompositeBlockchain(leveldb, _))
       .balanceSnapshots(address, from, to)
   }
 
