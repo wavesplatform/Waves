@@ -144,6 +144,30 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       }
     }
 
+    "should survive invalid micro rollback" in withDomainAndRepo { case (d, repo) =>
+      d.appendKeyBlock()
+      val sub = repo.createSubscription(SubscribeRequest(1))
+      val mb1Id = d.appendMicroBlock(TxHelpers.transfer())
+      val mb2Id = d.appendMicroBlock(TxHelpers.transfer())
+      d.appendMicroBlock(TxHelpers.transfer())
+
+      d.blockchain.removeAfter(mb1Id) // Should not do anything
+      d.appendKeyBlock(ref = Some(mb2Id))
+
+      sub.cancel()
+      val result = sub.futureValue.map(_.toUpdate)
+      result should matchPattern {
+        case Seq(
+          E.Block(1, _),
+          E.Micro(1, _),
+          E.Micro(1, _),
+          E.Micro(1, _),
+          E.MicroRollback(1, `mb2Id`),
+          E.Block(2, _)
+        ) =>
+      }
+    }
+
     "should include correct waves amount" in withNEmptyBlocksSubscription() { result =>
       val balances = result.collect { case b: BlockAppended => b.updatedWavesAmount }
       balances shouldBe Seq(10000000000000000L, 10000000600000000L, 10000001200000000L)
