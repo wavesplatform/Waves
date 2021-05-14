@@ -106,6 +106,29 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
         }
     }
 
+    "should not duplicate blocks" in withDomainAndRepo {
+      case (d, repo) =>
+        for (_ <- 1 to 99) d.appendBlock()
+        d.appendKeyBlock()
+        d.appendMicroBlock(TxHelpers.transfer())
+        d.appendKeyBlock()
+
+        val events = {
+          val sub = repo.createSubscription(SubscribeRequest.of(1, 0))
+          Thread.sleep(1000)
+          sub.cancel()
+          sub.futureValue.map(_.toUpdate)
+        }
+
+        val lastEvents = events.dropWhile(_.height < 100)
+        lastEvents should matchPattern {
+        case Seq(
+          E.Block(100, _),
+          E.Block(101, _)
+        ) =>
+      }
+    }
+
     "should not freeze on block rollback without key-block" in withDomainAndRepo {
       case (d, repo) =>
         val block1Id = d.appendBlock().id()
