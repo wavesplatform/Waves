@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4, V5}
@@ -44,21 +45,39 @@ class CallableV5LimitTest
      """.stripMargin
   )
 
+  private def syncDAppScript(address: Address) = TestCompiler(V5).compileContract(
+    s"""
+       |{-# STDLIB_VERSION 5       #-}
+       |{-# CONTENT_TYPE   DAPP    #-}
+       |{-#SCRIPT_TYPE     ACCOUNT #-}
+       |
+       | @Callable(i)
+       | func default() = {
+       |   strict r = invoke(Address(base58'$address'), "default", [], [])
+       |   []
+       | }
+     """.stripMargin
+  )
+
   private val scenario =
     for {
-      master  <- accountGen
-      invoker <- accountGen
-      fee     <- ciFee()
-      gTx1                = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2                = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      setAcceptableScript = SetScriptTransaction.selfSigned(1.toByte, master, Some(contract(5, V5)), fee, ts).explicitGet()
-      setProhibitedScript = SetScriptTransaction.selfSigned(1.toByte, master, Some(contract(6, V5)), fee, ts).explicitGet()
-      setProhibitedV4Script = SetScriptTransaction.selfSigned(1.toByte, master, Some(contract(5, V4)), fee, ts).explicitGet()
-      invoke              = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, master.toAddress, None, Nil, fee, Waves, ts).explicitGet()
-    } yield (Seq(gTx1, gTx2), setAcceptableScript, setProhibitedScript, setProhibitedV4Script, invoke)
+      dApp     <- accountGen
+      syncDApp <- accountGen
+      invoker  <- accountGen
+      fee      <- ciFee()
+      gTx1                  = GenesisTransaction.create(dApp.toAddress, ENOUGH_AMT, ts).explicitGet()
+      gTx2                  = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+      gTx3                  = GenesisTransaction.create(syncDApp.toAddress, ENOUGH_AMT, ts).explicitGet()
+      setAcceptableScript   = SetScriptTransaction.selfSigned(1.toByte, dApp, Some(contract(5, V5)), fee, ts).explicitGet()
+      setProhibitedScript   = SetScriptTransaction.selfSigned(1.toByte, dApp, Some(contract(6, V5)), fee, ts).explicitGet()
+      setProhibitedV4Script = SetScriptTransaction.selfSigned(1.toByte, dApp, Some(contract(5, V4)), fee, ts).explicitGet()
+      setSyncDApp           = SetScriptTransaction.selfSigned(1.toByte, syncDApp, Some(syncDAppScript(dApp.toAddress)), fee, ts).explicitGet()
+      invoke                = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, dApp.toAddress, None, Nil, fee, Waves, ts).explicitGet()
+      syncInvoke            = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, syncDApp.toAddress, None, Nil, fee, Waves, ts).explicitGet()
+    } yield (Seq(gTx1, gTx2, gTx3), setAcceptableScript, setProhibitedScript, setProhibitedV4Script, setSyncDApp, invoke, syncInvoke)
 
   property("callable limit is 10000 from V5") {
-    val (genesisTxs, setAcceptable, setProhibitedScript, setProhibitedV4Script, invoke) = scenario.sample.get
+    val (genesisTxs, setAcceptable, setProhibitedScript, setProhibitedV4Script, setSyncDApp, invoke, syncInvoke) = scenario.sample.get
     withDomain(RideV4) { d =>
       d.appendBlock(genesisTxs: _*)
       (the[RuntimeException] thrownBy d.appendBlock(setProhibitedV4Script)).getMessage should include(
@@ -75,6 +94,9 @@ class CallableV5LimitTest
       )
       d.appendBlock(setAcceptable, invoke)
       d.blockchain.transactionInfo(invoke.id.value()).get._3 shouldBe true
+
+      d.appendBlock(setSyncDApp, syncInvoke)
+      d.blockchain.transactionInfo(syncInvoke.id.value()).get._3 shouldBe true
     }
   }
 }

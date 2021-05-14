@@ -52,7 +52,7 @@ object WavesContext {
     CTX(
       variableTypes(version, proofsEnabled),
       variableVars(isTokenContext, version, ds.contentType, proofsEnabled),
-      variableFuncs(global, version, ds.scriptType, proofsEnabled)
+      variableFuncs(global, version, ds.scriptType, ds.contentType, proofsEnabled)
     )
   }
 
@@ -72,15 +72,18 @@ object WavesContext {
       detailedIssueActionConstructor
     ) ++ balanceV4Functions
 
-  private def fromV5Funcs(proofsEnabled: Boolean, version: StdLibVersion) =
+  private def fromV5Funcs(proofsEnabled: Boolean, version: StdLibVersion, contentType: ContentType) =
     fromV4Funcs(proofsEnabled, version) ++ Array(
       simplifiedLeaseActionConstructor,
       detailedLeaseActionConstructor,
       calculateLeaseId,
-      callDAppF(version, reentrant = false),
-      callDAppF(version, reentrant = true),
       isDataStorageUntouchedF
-    )
+    ) ++ (if (contentType == DApp)
+            Array(
+              callDAppF(version, reentrant = false),
+              callDAppF(version, reentrant = true)
+            )
+          else Array())
 
   private def selfCallFunctions(v: StdLibVersion) =
     Array(
@@ -90,7 +93,7 @@ object WavesContext {
       getStringFromStateSelfF
     ) ++ extractedStateSelfFuncs(v)
 
-  private def variableFuncs(global: BaseGlobal, version: StdLibVersion, scriptType: ScriptType, proofsEnabled: Boolean) = {
+  private def variableFuncs(global: BaseGlobal, version: StdLibVersion, scriptType: ScriptType, contentType: ContentType, proofsEnabled: Boolean) = {
     val commonFuncs =
       Array(
         getIntegerFromArrayF(version),
@@ -110,8 +113,8 @@ object WavesContext {
         case V1 | V2                     => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
         case V3                          => fromV3Funcs(proofsEnabled, version) ++ balanceV123Functions
         case V4                          => fromV4Funcs(proofsEnabled, version)
-        case V5 if scriptType == Account => fromV5Funcs(proofsEnabled, version) ++ selfCallFunctions(V5)
-        case V5                          => fromV5Funcs(proofsEnabled, version)
+        case V5 if scriptType == Account => fromV5Funcs(proofsEnabled, version, contentType) ++ selfCallFunctions(V5)
+        case V5                          => fromV5Funcs(proofsEnabled, version, contentType)
       }
     commonFuncs ++ versionSpecificFuncs
   }

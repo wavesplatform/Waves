@@ -70,7 +70,7 @@ object InvokeScriptDiff {
 
           _ <- traced(
             Either.cond(
-              invocationComplexity <= ContractLimits.MaxComplexityByVersion(version),
+              invocationComplexity <= ContractLimits.MaxCallableComplexityByVersion(version),
               (),
               GenericError("Continuation is not allowed for Invoke by script")
             )
