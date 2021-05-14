@@ -81,8 +81,8 @@ package object utils {
   private val lazyFunctionCosts: Map[DirectiveSet, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
     lazyContexts.map(el => (el._1, el._2.map(ctx => estimate(el._1.stdLibVersion, ctx.evaluationContext[Id](environment)))))
 
-  def functionCosts(version: StdLibVersion): Map[FunctionHeader, Coeval[Long]] =
-    functionCosts(DirectiveSet(version, Account, Expression).explicitGet())
+  def functionCosts(version: StdLibVersion, contentType: ContentType = Expression): Map[FunctionHeader, Coeval[Long]] =
+    functionCosts(DirectiveSet(version, Account, contentType).explicitGet())
 
   def functionCosts(ds: DirectiveSet): Map[FunctionHeader, Coeval[Long]] =
     lazyFunctionCosts(ds)()
