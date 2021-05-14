@@ -111,6 +111,11 @@ class BigIntTest extends EvaluatorSpec {
     eval("toBigInt(16) <= toBigInt(16)") shouldBe Right(CONST_BOOLEAN(true))
   }
 
+  property("BigInt comparison result") {
+    eval("if (toBigInt(16) > toBigInt(2)) then 1 else 0") shouldBe Right(CONST_LONG(1))
+    eval("if (toBigInt(16) < toBigInt(2)) then 1 else 0") shouldBe Right(CONST_LONG(0))
+  }
+
   property("BigInt min and max") {
     eval("[toBigInt(16), toBigInt(8)].max()") shouldBe Right(CONST_BIGINT(BigInt(16)))
     eval("[toBigInt(16), toBigInt(8)].min()") shouldBe Right(CONST_BIGINT(BigInt(8)))
