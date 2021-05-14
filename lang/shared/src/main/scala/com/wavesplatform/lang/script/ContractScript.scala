@@ -88,7 +88,7 @@ object ContractScript {
       case (annotationArgName, funcExpr) =>
         estimator(
           varNames(version, DAppType),
-          functionCosts(version),
+          functionCosts(version, DAppType),
           constructExprFromDeclAndContext(dApp.decs, annotationArgName, funcExpr)
         ).map((funcExpr.name, _))
     }
