@@ -13,7 +13,7 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types, WavesContext}
@@ -1113,5 +1113,21 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val result = compiler.ContractCompiler(ctx.compilerContext, expr, V4)
     result should produce("Undefined field `originCaller` of variable of type `Invocation`")
     result should produce("Undefined field `originCallerPublicKey` of variable of type `Invocation`")
+  }
+
+  property("matching types error message") {
+    TestCompiler(V4).compile(
+      """
+        |
+        | {-# CONTENT_TYPE DAPP    #-}
+        | {-# SCRIPT_TYPE  ACCOUNT #-}
+        |
+        | @Callable(i)
+        | func call() = {
+        |   let x = assetBalance(this, i.payments[0].assetId)
+        |   []
+        | }
+      """.stripMargin
+    ) should produce("Non-matching types: expected: ByteVector, actual: ByteVector|Unit")
   }
 }
