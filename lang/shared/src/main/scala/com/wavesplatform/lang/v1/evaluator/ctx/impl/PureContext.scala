@@ -1139,7 +1139,7 @@ object PureContext {
   def bigIntConditionOp(op: BinaryOperation, func: Short, complexity: Int = 8)(
       body: (BigInt, BigInt) => Boolean
   ): BaseFunction[NoContext] =
-    NativeFunction(opsToFunctions(op), complexity, func, BIGINT, ("a", BIGINT), ("b", BIGINT)) {
+    NativeFunction(opsToFunctions(op), complexity, func, BOOLEAN, ("a", BIGINT), ("b", BIGINT)) {
       case CONST_BIGINT(a) :: CONST_BIGINT(b) :: Nil => Try(body(a, b)).toEither.bimap(_.getMessage, CONST_BOOLEAN)
       case xs                                        => notImplemented[Id, EVALUATED](s"${opsToFunctions(op)}(a: BIGINT, b: BIGINT)", xs)
     }

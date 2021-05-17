@@ -38,7 +38,7 @@ object ExprScript {
       version: StdLibVersion,
       estimator: ScriptEstimator
   ): Either[String, Long] =
-    estimator(varNames(version, Expression), functionCosts(version), expr)
+    estimator(varNames(version, Expression), functionCosts(version, Expression), expr)
 
   def estimate(
       expr: EXPR,
