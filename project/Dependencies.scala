@@ -15,6 +15,8 @@ object Dependencies {
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.11.0"
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
+  private def iq80leveldb(module: String) = "org.iq80.leveldb" % module % "0.12"
+
   private def catsModule(module: String, version: String = "2.1.0") = Def.setting("org.typelevel" %%% s"cats-$module"  % version)
   def monixModule(module: String)                                   = Def.setting("io.monix"      %%% s"monix-$module" % "3.3.0")
 
@@ -151,9 +153,8 @@ object Dependencies {
       kamonModule("influxdb"),
       "org.influxdb" % "influxdb-java" % "2.14",
       googleGuava,
-      "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs
-      "com.typesafe.play"        %% "play-json"     % "2.9.0",
-      "org.ethereum"             % "leveldbjni-all" % "1.18.3",
+      "com.google.code.findbugs" % "jsr305"     % "3.0.2" % Compile, // javax.annotation stubs
+      "com.typesafe.play"        %% "play-json" % "2.9.0",
       akkaModule("actor"),
       akkaModule("stream"),
       akkaHttp,
@@ -161,9 +162,10 @@ object Dependencies {
       kindProjector,
       monixModule("reactive").value,
       nettyHandler,
-      akkaModule("testkit")               % Test,
-      akkaHttpModule("akka-http-testkit") % Test,
-      ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
+      iq80leveldb("leveldb-api"),
+      akkaModule("testkit")                                       % Test,
+      akkaHttpModule("akka-http-testkit")                         % Test,
+      iq80leveldb("leveldb").exclude("com.google.guava", "guava") % Test
     ) ++ test ++ console ++ logDeps ++ levelDBJNA ++ protobuf.value
   )
 
