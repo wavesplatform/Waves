@@ -1,13 +1,12 @@
 package com.wavesplatform.lang
 
-import java.math.{BigInteger, BigDecimal => BD}
 import cats.implicits._
-import com.google.common.base.Utf8
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
+import java.math.{BigInteger, BigDecimal => BD}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future

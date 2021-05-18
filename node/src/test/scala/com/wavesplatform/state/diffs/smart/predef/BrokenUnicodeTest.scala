@@ -45,17 +45,22 @@ class BrokenUnicodeTest
     ),
     estimatorPreCheckHeight = Int.MaxValue
   )
+  
+  private val u1 = "\ud87e"
+  private val u2 = "\udc1a"
+  private val u3 = "\ud83e"
+  private val u4 = "\udd26"
 
   private val checkNoFixV1V2 =
-    """
+    s"""
        | {-# CONTENT_TYPE EXPRESSION #-}
        | {-# SCRIPT_TYPE  ACCOUNT    #-}
        |
-       | take("x冬x", 2)      == "x\ud87e" &&
-       | size("x冬x")         == 4         &&
-       | drop("x冬x", 2)      == "\udc1ax" &&
-       | takeRight("x冬x", 2) == "\udc1ax" &&
-       | dropRight("x冬x", 2) == "x\ud87e"
+       | take("x冬x", 2)      == "x$u1"   &&
+       | size("x冬x")         == 4        &&
+       | drop("x冬x", 2)      == "${u2}x" &&
+       | takeRight("x冬x", 2) == "${u2}x" &&
+       | dropRight("x冬x", 2) == "x$u1"
      """.stripMargin
 
   private val checkFixV1V2 =
@@ -79,14 +84,14 @@ class BrokenUnicodeTest
        | "x冬xqweqwe".lastIndexOf("we")    == 8 &&
        | "x冬xqweqwe".lastIndexOf("we", 5) == 5 &&
        |
-       | "aaa冬bbb".indexOf("\ud87e")        == 3 &&
-       | "aaa冬bbb".indexOf("\ud87e", 2)     == 3 &&
-       | "aaa冬bbb".lastIndexOf("\ud87e")    == 3 &&
-       | "aaa冬bbb".lastIndexOf("\ud87e", 5) == 3 &&
+       | "aaa冬bbb".indexOf("$u1")        == 3 &&
+       | "aaa冬bbb".indexOf("$u1", 2)     == 3 &&
+       | "aaa冬bbb".lastIndexOf("$u1")    == 3 &&
+       | "aaa冬bbb".lastIndexOf("$u1", 5) == 3 &&
        |
-       |  "x冬x".split("").size()   == 4                                                                   &&
-       |  "冬x🤦冬".split("")       == [ "\ud87e", "\udc1a", "x", "\ud83e", "\udd26", "\ud87e", "\udc1a" ] &&
-       |  "冬x🤦冬".split("\ud87e") == [ "", "\udc1ax🤦", "\udc1a"]
+       |  "x冬x".split("").size() == 4                                                 &&
+       |  "冬x🤦冬".split("")     == [ "$u1", "$u2", "x", "$u3", "$u4", "$u1", "$u2" ] &&
+       |  "冬x🤦冬".split("$u1")  == [ "", "${u2}x🤦", "$u2"]
      """.stripMargin
 
   private val checkFixV3 =
@@ -98,26 +103,26 @@ class BrokenUnicodeTest
        | "x冬xqweqwe".lastIndexOf("we")    == 7 &&
        | "x冬xqweqwe".lastIndexOf("we", 5) == 4 &&
        |
-       | "aaa冬bbb".indexOf("\ud87e")        == unit &&
-       | "aaa冬bbb".indexOf("\ud87e", 2)     == unit &&
-       | "aaa冬bbb".lastIndexOf("\ud87e")    == unit &&
-       | "aaa冬bbb".lastIndexOf("\ud87e", 5) == unit &&
+       | "aaa冬bbb".indexOf("$u1")        == unit &&
+       | "aaa冬bbb".indexOf("$u1", 2)     == unit &&
+       | "aaa冬bbb".lastIndexOf("$u1")    == unit &&
+       | "aaa冬bbb".lastIndexOf("$u1", 5) == unit &&
        |
        | "x冬x".split("").size()   == 3                        &&
        | "冬x🤦冬".split("")       == [ "冬", "x", "🤦", "冬" ] &&
-       | "冬x🤦冬".split("\ud87e") == [ "冬x🤦冬" ]
+       | "冬x🤦冬".split("$u1")    == [ "冬x🤦冬" ]
      """.stripMargin
 
   private val checkNoFixV4 =
     s"""
        | $checkNoFixV3 &&
-       | "x冬x".contains("x\ud87e")
+       | "x冬x".contains("x$u1")
      """.stripMargin
 
   private val checkFixV4AndNext =
     s"""
        | $checkFixV3 &&
-       | !"x冬x".contains("x\ud87e")
+       | !"x冬x".contains("x$u1")
      """.stripMargin
 
   private def checkNoFixScript(v: StdLibVersion) = TestCompiler(v).compileExpression(
