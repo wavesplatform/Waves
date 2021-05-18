@@ -1211,7 +1211,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("List[Int] median - list with non int elements - error") {
     val src =
       s"""["1", "2"].median()"""
-    eval(src, version = V4) should produce("Compilation failed: [Non-matching types: expected: Int, actual: String")
+    eval(src, version = V4) should produce("Compilation failed: [Non-matching types: expected: List[Int], actual: List[String]")
   }
 
   property("List[Int] median - list with big elements - error") {

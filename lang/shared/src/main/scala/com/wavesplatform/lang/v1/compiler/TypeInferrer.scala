@@ -8,7 +8,7 @@ object TypeInferrer {
 
   case class MatchResult(tpe: FINAL, name: TYPEPARAM)
   def apply(seq: Seq[(FINAL, TYPE)], knownTypes: Map[String, FINAL] = Map.empty): Either[String, Map[TYPEPARAM, FINAL]] = {
-    val matching = seq.map(x => matchTypes(x._1, x._2, knownTypes, x._1.name))
+    val matching = seq.map(x => matchTypes(x._1, x._2, knownTypes, x._1.name, x._2.toString))
     matching.find(_.isLeft) match {
       case Some(left) => left.asInstanceOf[Left[String, Nothing]]
       case None =>
@@ -73,12 +73,12 @@ object TypeInferrer {
       case (list, acc) => (list zip acc).map { case (element, p) => element :: p }
     }
 
-  private def matchTypes(argType: FINAL, placeholder: TYPE, knownTypes: Map[String, FINAL], argTypeStr: String): Either[String, Option[MatchResult]] = {
-    lazy val err = s"Non-matching types: expected: $placeholder, actual: $argTypeStr"
+  private def matchTypes(argType: FINAL, placeholder: TYPE, knownTypes: Map[String, FINAL], argTypeStr: String, matchingTypeStr: String): Either[String, Option[MatchResult]] = {
+    lazy val err = s"Non-matching types: expected: $matchingTypeStr, actual: $argTypeStr"
 
     (placeholder, argType) match {
       case (tp @ TYPEPARAM(char), _)                             => Right(Some(MatchResult(argType, tp)))
-      case (tp @ PARAMETERIZEDLIST(innerTypeParam), LIST(t))     => matchTypes(t, innerTypeParam, knownTypes, argTypeStr)
+      case (tp @ PARAMETERIZEDLIST(innerTypeParam), LIST(t))     => matchTypes(t, innerTypeParam, knownTypes, argTypeStr, matchingTypeStr)
       case (tp @ PARAMETERIZEDLIST(innerTypeParam), UNION(l, _)) => l.foldLeft(Right(UNION(List(), None)):Either[String, FINAL]) {
         (u, tl) => u match {
           case Left(e) => Left(e)
@@ -89,7 +89,7 @@ object TypeInferrer {
           case _ => ???
         }
       } flatMap {
-          t => matchTypes(t, innerTypeParam, knownTypes, argTypeStr)
+          t => matchTypes(t, innerTypeParam, knownTypes, argTypeStr, matchingTypeStr)
       }
       case (tp @ PARAMETERIZEDLIST(_), _)                        => Left(err)
       case (tp @ PARAMETERIZEDTUPLE(typeParams), TUPLE(types))   => matchTupleTypes(err, typeParams, types, knownTypes)
@@ -112,18 +112,18 @@ object TypeInferrer {
                 case ANY                => ANY
                 case s: SINGLE          => s
               }
-              matchTypes(nonMatchedArgTypes, singlePlaceholder, knownTypes, argTypeStr)
+              matchTypes(nonMatchedArgTypes, singlePlaceholder, knownTypes, argTypeStr, matchingTypeStr)
             case _ => Left(s"Can't resolve correct type for parameterized $placeholder, actual: $argType")
           }
 
       case (_:REAL, UNION(types, _))      => types.foldLeft(Right(None):Either[String, Option[MatchResult]]) {
         (acc, t) => for {
           a <- acc
-          b <- matchTypes(t, placeholder, knownTypes, argTypeStr)
+          b <- matchTypes(t, placeholder, knownTypes, argTypeStr, matchingTypeStr)
         } yield b
       }
 
-      case (LIST(tp), LIST(t))            => matchTypes(t, tp, knownTypes, argTypeStr)
+      case (LIST(tp), LIST(t))            => matchTypes(t, tp, knownTypes, argTypeStr, matchingTypeStr)
       case (TUPLE(types1), TUPLE(types2)) => matchTupleTypes(err, types1, types2, knownTypes)
       case (placeholder: FINAL, _) =>
         Either.cond(placeholder >= argType, None, err)
@@ -140,7 +140,7 @@ object TypeInferrer {
       Left(err)
     else
       (placeholderTypes zip targetTypes)
-        .traverse { case (typeParam, t) => matchTypes(t, typeParam, knownTypes, t.name) }
+        .traverse { case (typeParam, t) => matchTypes(t, typeParam, knownTypes, t.name, typeParam.toString) }
         .map(_ => None)
 
   // match, e.g. many ifs
