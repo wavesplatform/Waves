@@ -3,7 +3,6 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 import cats.implicits._
 import cats.{Id, Monad}
 import com.google.common.annotations.VisibleForTesting
-import com.google.common.base.Utf8
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.DirectiveDictionary
@@ -852,9 +851,8 @@ object PureContext {
     ) {
       case CONST_STRING(m) :: CONST_STRING(sub) :: Nil =>
         Right {
-          val isLegalSubstring = Try(Utf8.encodedLength(sub)).isSuccess
-          val i                = m.indexOf(sub)
-          if (isLegalSubstring && i != -1)
+          val i = m.indexOf(sub)
+          if (!global.isIllFormed(sub) && i != -1)
             CONST_LONG(m.codePointCount(0, i).toLong)
           else
             unit
@@ -897,9 +895,8 @@ object PureContext {
       ("offset", LONG)
     ) {
       case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil =>
-        val l                = m.codePointCount(0, m.length)
-        val isLegalSubstring = Try(Utf8.encodedLength(sub)).isSuccess
-        Right(if (isLegalSubstring && off >= 0 && off <= l) {
+        val l = m.codePointCount(0, m.length)
+        Right(if (!global.isIllFormed(sub) && off >= 0 && off <= l) {
           val i = m.indexOf(sub, m.offsetByCodePoints(0, off.toInt))
           if (i != -1) {
             CONST_LONG(m.codePointCount(0, i).toLong)
@@ -944,9 +941,8 @@ object PureContext {
     ) {
       case CONST_STRING(m) :: CONST_STRING(sub) :: Nil =>
         Right({
-          val isLegalSubstring = Try(Utf8.encodedLength(sub)).isSuccess
-          val i                = m.lastIndexOf(sub)
-          if (isLegalSubstring && i != -1) {
+          val i = m.lastIndexOf(sub)
+          if (!global.isIllFormed(sub) && i != -1) {
             CONST_LONG(m.codePointCount(0, i).toLong)
           } else {
             unit
@@ -992,10 +988,9 @@ object PureContext {
     ) {
       case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil =>
         Right(if (off >= 0) {
-          val isLegalSubstring = Try(Utf8.encodedLength(sub)).isSuccess
-          val offset           = Math.min(off, m.codePointCount(0, m.length)).toInt
-          val i                = m.lastIndexOf(sub, m.offsetByCodePoints(0, offset))
-          if (isLegalSubstring && i != -1) {
+          val offset = Math.min(off, m.codePointCount(0, m.length)).toInt
+          val i      = m.lastIndexOf(sub, m.offsetByCodePoints(0, offset))
+          if (!global.isIllFormed(sub) && i != -1) {
             CONST_LONG(m.codePointCount(0, i).toLong)
           } else {
             unit
@@ -1024,7 +1019,7 @@ object PureContext {
 
   private def split(str: String, sep: String, unicode: Boolean): Iterable[CONST_STRING] = {
     if (str == "") listWithEmptyStr
-    else if (unicode && Try(Utf8.encodedLength(sep)).isFailure) List(CONST_STRING(str).explicitGet())
+    else if (unicode && global.isIllFormed(sep)) List(CONST_STRING(str).explicitGet())
     else if (sep == "")
       if (unicode) {
         (1 to str.codePointCount(0, str.length))

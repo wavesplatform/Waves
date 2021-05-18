@@ -1,7 +1,8 @@
 package com.wavesplatform.lang
 
-import java.math.{BigDecimal => BD, BigInteger}
+import java.math.{BigInteger, BigDecimal => BD}
 import cats.implicits._
+import com.google.common.base.Utf8
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
@@ -160,4 +161,7 @@ object Global extends BaseGlobal {
 
   override def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte] =
     ???
+
+  override def isIllFormed(s: String): Boolean =
+    false
 }
