@@ -753,25 +753,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     )
   }
 
-  property("split empty separator") {
-    val src =
-      """ "冬x🤦冬".split("") """
-    eval[EVALUATED](src) shouldBe Right(
-      ARR(
-        IndexedSeq(
-          CONST_STRING("\ud87e").explicitGet(),
-          CONST_STRING("\udc1a").explicitGet(),
-          CONST_STRING("\u0078").explicitGet(),
-          CONST_STRING("\ud83e").explicitGet(),
-          CONST_STRING("\udd26").explicitGet(),
-          CONST_STRING("\ud87e").explicitGet(),
-          CONST_STRING("\udc1a").explicitGet()
-        ),
-        false
-      ).explicitGet()
-    )
-  }
-
   property("parseInt") {
     val src =
       """ "42".parseInt() """
