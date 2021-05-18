@@ -265,14 +265,14 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
       if (h < fromHeight) {
         Observable.raiseError(new IllegalArgumentException("Requested start height exceeds current blockchain height"))
       } else {
-        def readBatchStream(from: Int): Observable[BlockchainUpdated] = Observable.fromTask(readBatchTask(from)).flatMap {
+        def readBatchStream(from: Int, prevLastPersistent: Option[BlockchainUpdated] = None): Observable[BlockchainUpdated] = Observable.fromTask(readBatchTask(from)).flatMap {
           case (data, next) =>
             Observable.fromIterable(data) ++ (next match {
               case Some(next) =>
-                readBatchStream(next)
+                readBatchStream(next, data.lastOption.ensuring(_.nonEmpty))
 
               case None =>
-                val lastPersistentUpdate = data.lastOption
+                val lastPersistentUpdate = data.lastOption.orElse(prevLastPersistent)
                 Observable
                   .fromIterable(lastRealTimeUpdates)
                   .++(realTimeUpdates)
