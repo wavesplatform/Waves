@@ -89,16 +89,18 @@ package object utils {
   private val lazyFunctionCosts: Map[DirectiveSet, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
     lazyContexts.map(el => (el._1, el._2.map(ctx => estimate(el._1.stdLibVersion, ctx.evaluationContext[Id](environment)))))
 
-  private val dAppVerifierProhibitedFunctions: Set[FunctionHeader] =
-    Set(
-      Native(FunctionIds.CALLDAPP),
-      Native(FunctionIds.CALLDAPPREENTRANT)
-    )
+  private val dAppVerifierProhibitedFunctions: Map[Native, Coeval[Long]] =
+    List(Native(FunctionIds.CALLDAPP), Native(FunctionIds.CALLDAPPREENTRANT))
+      .map(f => (f, Coeval.raiseError[Long](new RuntimeException("DApp-to-dApp invocations are not allowed from verifier"))))
+      .toMap
 
   private val dAppVerifierFunctionCosts: Map[StdLibVersion, Map[FunctionHeader, Coeval[Long]]] =
     lazyFunctionCosts.collect {
       case (ds, functions) if ds.contentType == DApp =>
-        (ds.stdLibVersion, functions().filterNot(f => dAppVerifierProhibitedFunctions.contains(f._1)))
+        if (ds.stdLibVersion >= V5)
+          (ds.stdLibVersion, functions() ++ dAppVerifierProhibitedFunctions)
+        else
+          (ds.stdLibVersion, functions())
     }
 
   def functionCosts(

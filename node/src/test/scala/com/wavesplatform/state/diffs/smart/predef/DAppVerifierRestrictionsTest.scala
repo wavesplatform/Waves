@@ -55,8 +55,8 @@ class DAppVerifierRestrictionsTest
     val (genesis, setInvoke, setReentrantInvoke) = scenario.sample.get
     withDomain(RideV5) { d =>
       d.appendBlock(genesis: _*)
-      (the[RuntimeException] thrownBy d.appendBlock(setInvoke)).getMessage should include(s"function 'Native(1020)' not found")
-      (the[RuntimeException] thrownBy d.appendBlock(setReentrantInvoke)).getMessage should include(s"function 'Native(1021)' not found")
+      (the[RuntimeException] thrownBy d.appendBlock(setInvoke)).getMessage should include(s"DApp-to-dApp invocations are not allowed from verifier")
+      (the[RuntimeException] thrownBy d.appendBlock(setReentrantInvoke)).getMessage should include(s"DApp-to-dApp invocations are not allowed from verifier")
     }
   }
 }
