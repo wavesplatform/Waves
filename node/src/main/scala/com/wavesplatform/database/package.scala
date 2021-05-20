@@ -4,38 +4,38 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util.{Map => JMap}
 
-import scala.collection.mutable
-
 import com.google.common.base.Charsets.UTF_8
-import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
+import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.{ByteString, CodedInputStream, WireFormat}
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.block.validation.Validators
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
-import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.database.protobuf.DataEntry.Value
+import com.wavesplatform.database.protobuf.TransactionData.Transaction.{LegacyBytes, NewTransaction}
+import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
-import com.wavesplatform.state._
 import com.wavesplatform.state.StateHash.SectionId
+import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb._
-import pb.TransactionData.Transaction.{LegacyBytes, NewTransaction}
 import supertagged.TaggedType
+
+import scala.collection.mutable
 
 //noinspection UnstableApiUsage
 package object database extends ScorexLogging {
@@ -188,47 +188,41 @@ package object database extends ScorexLogging {
     LeaseBalance(ndi.readLong(), ndi.readLong())
   }
 
-  def writeLeaseDetails(lde: Either[Boolean, LeaseDetails]): Array[Byte] =
-    lde.fold(
-      _ => throw new IllegalArgumentException("Can not write boolean flag instead of LeaseDetails"),
-      ld =>
-        pb.LeaseDetails(
-            ByteString.copyFrom(ld.sender.arr),
-            Some(PBRecipients.create(ld.recipient)),
-            ld.amount,
-            ByteString.copyFrom(ld.sourceId.arr),
-            ld.height,
-            ld.status match {
-              case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
-              case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
-                pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, ByteString.copyFrom(cancelTxId.arr)))
-              case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
-            }
-          )
-          .toByteArray
-    )
-
-  def readLeaseDetails(data: Array[Byte]): Either[Boolean, LeaseDetails] =
-    if (data.length == 1) Left(data(0) == 1)
-    else {
-      val d = pb.LeaseDetails.parseFrom(data)
-      Right(
-        LeaseDetails(
-          d.senderPublicKey.toPublicKey,
-          PBRecipients.toAddressOrAlias(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
-          d.amount,
-          d.status match {
-            case pb.LeaseDetails.Status.Active(_)                                => LeaseDetails.Status.Active
-            case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height)) => LeaseDetails.Status.Expired(height)
-            case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId)) =>
-              LeaseDetails.Status.Cancelled(height, transactionId.toByteStr)
-            case pb.LeaseDetails.Status.Empty => ???
-          },
-          d.sourceId.toByteStr,
-          d.height
-        )
+  def writeLeaseDetails(ld: LeaseDetails): Array[Byte] =
+    pb.LeaseDetails(
+        ByteString.copyFrom(ld.sender.arr),
+        Some(PBRecipients.create(ld.recipient)),
+        ByteString.copyFrom(PBRecipients.publicKeyHash(ld.recipientAddress)),
+        ld.amount,
+        ByteString.copyFrom(ld.sourceId.arr),
+        ld.height,
+        ld.status match {
+          case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
+          case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
+            pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, ByteString.copyFrom(cancelTxId.arr)))
+          case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
+        }
       )
-    }
+      .toByteArray
+
+  def readLeaseDetails(data: Array[Byte]): LeaseDetails = {
+    val d = pb.LeaseDetails.parseFrom(data)
+    LeaseDetails(
+      d.senderPublicKey.toPublicKey,
+      PBRecipients.toAddressOrAlias(d.getRecipient, AddressScheme.current.chainId).explicitGet(),
+      PBRecipients.toAddress(d.recipientAddress.toByteArray, AddressScheme.current.chainId).explicitGet(),
+      d.amount,
+      d.status match {
+        case pb.LeaseDetails.Status.Active(_)                                => LeaseDetails.Status.Active
+        case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height)) => LeaseDetails.Status.Expired(height)
+        case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId)) =>
+          LeaseDetails.Status.Cancelled(height, transactionId.toByteStr)
+        case pb.LeaseDetails.Status.Empty => ???
+      },
+      d.sourceId.toByteStr,
+      d.height
+    )
+  }
 
   def readVolumeAndFee(data: Array[Byte]): VolumeAndFee = Option(data).fold(VolumeAndFee.empty) { d =>
     val ndi = newDataInput(d)
@@ -644,7 +638,7 @@ package object database extends ScorexLogging {
     (for {
       id      <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
       details <- fromHistory(r, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id))
-      if details.exists(_.fold(identity, _.isActive))
+      if details.exists(_.isActive)
       pb.TransactionMeta(h, n, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
       tx                             <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
     } yield tx).collect {
@@ -666,7 +660,7 @@ package object database extends ScorexLogging {
     while (iterator.hasNext && keyInRange()) {
       val e       = iterator.next()
       val leaseId = ByteStr(e.getKey.drop(6))
-      if (includeCancelled || readLeaseDetails(e.getValue).fold(identity, _.isActive))
+      if (includeCancelled || readLeaseDetails(e.getValue).isActive)
         leaseIds += leaseId
       else
         leaseIds -= leaseId

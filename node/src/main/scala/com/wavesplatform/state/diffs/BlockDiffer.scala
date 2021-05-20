@@ -193,10 +193,7 @@ object BlockDiffer extends ScorexLogging {
       .map { result =>
         def applyAll(patches: DiffPatchFactory*): (Diff, Diff) = patches.foldLeft((result.diff, result.detailedDiff.parentDiff)) {
           case (prevResult @ (previousDiff, previousPatchDiff), p) =>
-            if (p.isApplicable(blockchain)) {
-              val patchDiff = p()
-              (Monoid.combine(previousDiff, patchDiff), Monoid.combine(previousPatchDiff, patchDiff))
-            } else prevResult
+            p.lift(blockchain).fold(prevResult)(patchDiff => (Monoid.combine(previousDiff, patchDiff), Monoid.combine(previousPatchDiff, patchDiff)))
         }
 
         val (diffWithPatches, patchDiff) = applyAll(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn)

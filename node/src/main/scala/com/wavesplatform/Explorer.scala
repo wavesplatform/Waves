@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import java.util
 
 import com.google.common.primitives.{Longs, Shorts}
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.AddressPortfolio
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
@@ -14,6 +14,7 @@ import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactio
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
@@ -276,6 +277,22 @@ object Explorer extends ScorexLogging {
             counter += 1
           }
           log.info(s"Found $counter orders")
+
+        case "CDA" =>
+          val disabledAliases = db.get(Keys.disabledAliases)
+          val leaseIds = Seq.newBuilder[ByteStr]
+          db.iterateOver(KeyTags.NthTransactionInfoAtHeight) { e =>
+            database.readTransaction(e.getValue) match {
+              case (lt: LeaseTransaction, true) =>
+                lt.recipient match {
+                  case a: Alias if disabledAliases(a) && reader.leaseDetails(lt.id()).exists(_.isActive) =>
+                    leaseIds += lt.id()
+                  case _ =>
+                }
+              case _ =>
+            }
+          }
+          println(leaseIds.result().mkString("\n"))
       }
     } finally db.close()
   }

@@ -158,7 +158,7 @@ object LevelDBWriter extends ScorexLogging {
 }
 
 //noinspection UnstableApiUsage
-abstract class LevelDBWriter private[database](
+abstract class LevelDBWriter private[database] (
     writableDB: DB,
     spendableBalanceChanged: Observer[(Address, Asset)],
     val settings: BlockchainSettings,
@@ -468,7 +468,7 @@ abstract class LevelDBWriter private[database](
       }
 
       for ((leaseId, details) <- leaseStates) {
-        rw.put(Keys.leaseDetails(leaseId)(height), Some(Right(details)))
+        rw.put(Keys.leaseDetails(leaseId)(height), Some(details))
         expiredKeys ++= updateHistory(rw, Keys.leaseDetailsHistory(leaseId), threshold, Keys.leaseDetails(leaseId))
       }
 
@@ -832,17 +832,8 @@ abstract class LevelDBWriter private[database](
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
     for {
-      h             <- db.get(Keys.leaseDetailsHistory(leaseId)).headOption
-      detailsOrFlag <- db.get(Keys.leaseDetails(leaseId)(h))
-      details <- detailsOrFlag.fold(
-        isActive =>
-          transactionInfo(leaseId, db).collect {
-            case (leaseHeight, lt: LeaseTransaction, _) =>
-              LeaseDetails(lt.sender, lt.recipient, lt.amount, if (isActive) LeaseDetails.Status.Active
-                else LeaseDetails.Status.Cancelled(leaseHeight, ByteStr.empty), leaseId, leaseHeight)
-          },
-        Some(_)
-      )
+      h       <- db.get(Keys.leaseDetailsHistory(leaseId)).headOption
+      details <- db.get(Keys.leaseDetails(leaseId)(h))
     } yield details
   }
 
