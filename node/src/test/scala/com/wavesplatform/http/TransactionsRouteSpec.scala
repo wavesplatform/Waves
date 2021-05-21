@@ -829,6 +829,8 @@ class TransactionsRouteSpec
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.transactionInfo _).when(lease.id()).returns(Some((1, lease, true)))
         (blockchain.transactionInfo _).when(leaseCancel.id()).returns(Some((1, leaseCancel, true)))
+        (blockchain.transactionMeta _).when(lease.id()).returns(Some((1, true)))
+        (blockchain.leaseDetails _).when(lease.id()).returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Active, lease.id(), 1)))
       }
 
       val transactionsApi = stub[CommonTransactionsApi]
@@ -840,14 +842,24 @@ class TransactionsRouteSpec
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
 
+      val leaseDetailsJson = Json.obj(
+        "id" -> lease.id(),
+        "originTransactionId" -> lease.id(),
+        "sender" -> lease.sender.toAddress,
+        "recipient" -> lease.recipient,
+        "amount" -> lease.amount,
+        "height" -> 1,
+        "status" -> LeaseDetails.Status.Active.toString.toLowerCase
+      )
+
       Get(routePath(s"/unconfirmed")) ~> route ~> check {
         val json = (responseAs[JsArray] \ 0).as[JsObject]
-        json shouldBe leaseCancel.json() ++ Json.obj("lease" -> lease.json())
+        json shouldBe leaseCancel.json() ++ Json.obj("lease" -> leaseDetailsJson)
       }
 
       Get(routePath(s"/unconfirmed/info/${leaseCancel.id()}")) ~> route ~> check {
         val json = responseAs[JsObject]
-        json shouldBe leaseCancel.json() ++ Json.obj("lease" -> lease.json())
+        json shouldBe leaseCancel.json() ++ Json.obj("lease" -> leaseDetailsJson)
       }
     }
 

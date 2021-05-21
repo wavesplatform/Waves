@@ -307,10 +307,7 @@ object TransactionsApiRoute {
 
     def unconfirmedTxExtendedJson(tx: Transaction): JsObject = tx match {
       case leaseCancel: LeaseCancelTransaction =>
-        val leaseTx = blockchain.transactionInfo(leaseCancel.leaseId) map {
-          case (_, tx, _) => tx.json()
-        }
-        leaseCancel.json() ++ Json.obj("lease" -> leaseTx)
+        leaseCancel.json() ++ Json.obj("lease" -> leaseIdToLeaseRef(leaseCancel.leaseId))
 
       case t => t.json()
     }
