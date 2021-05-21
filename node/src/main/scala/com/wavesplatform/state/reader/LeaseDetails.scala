@@ -1,6 +1,6 @@
 package com.wavesplatform.state.reader
 
-import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
+import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 
 object LeaseDetails {
@@ -23,14 +23,6 @@ object LeaseDetails {
   }
 }
 
-case class LeaseDetails(
-    sender: PublicKey,
-    recipient: AddressOrAlias,
-    recipientAddress: Address,
-    amount: Long,
-    status: LeaseDetails.Status,
-    sourceId: ByteStr,
-    height: Int
-) {
+case class LeaseDetails(sender: PublicKey, recipient: AddressOrAlias, amount: Long, status: LeaseDetails.Status, sourceId: ByteStr, height: Int) {
   def isActive: Boolean = status == LeaseDetails.Status.Active
 }

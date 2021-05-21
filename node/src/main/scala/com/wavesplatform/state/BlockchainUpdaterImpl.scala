@@ -415,7 +415,7 @@ class BlockchainUpdaterImpl(
         lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount), Map.empty),
         recipient           -> Portfolio(0, LeaseBalance(-lt.amount, 0), Map.empty)
       ),
-      leaseState = Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, recipient, lt.amount, LeaseDetails.Status.Expired(height), lt.id(), leaseHeight)))
+      leaseState = Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.amount, LeaseDetails.Status.Expired(height), lt.id(), leaseHeight)))
     )).toMap
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[(Block, ByteStr)]] = writeLock {
@@ -510,7 +510,7 @@ class BlockchainUpdaterImpl(
                   MicroBlockAppendError("Invalid total block signature", microBlock)
                 )
               blockDifferResult <- {
-                BlockDiffer.fromMicroBlock(this, leveldb.lastBlockTimestamp, microBlock, ng.base.header.timestamp, restTotalConstraint, verify)
+                BlockDiffer.fromMicroBlock(this, leveldb.lastBlockTimestamp, microBlock, restTotalConstraint, verify)
               }
             } yield {
               val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff) = blockDifferResult

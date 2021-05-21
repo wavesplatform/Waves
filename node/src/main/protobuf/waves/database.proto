@@ -82,10 +82,9 @@ message LeaseDetails {
 
     bytes sender_public_key = 1;
     Recipient recipient = 2;
-    bytes recipient_address = 3;
-    int64 amount = 4;
-    bytes source_id = 5;
-    int32 height = 6;
+    int64 amount = 3;
+    bytes source_id = 4;
+    int32 height = 5;
 
     oneof status {
         google.protobuf.Empty active = 10;

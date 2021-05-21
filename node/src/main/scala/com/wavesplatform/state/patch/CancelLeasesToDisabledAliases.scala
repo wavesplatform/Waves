@@ -2,7 +2,7 @@ package com.wavesplatform.state.patch
 
 import cats.instances.map._
 import cats.syntax.semigroup._
-import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.account.{Address, AddressScheme, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
@@ -10,12 +10,13 @@ import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
 import play.api.libs.json.{Json, Reads}
 
-case object CancelLeasesToDisabledAliases extends DiffPatchFactory {
+case object CancelLeasesToDisabledAliases extends PatchDataLoader with DiffPatchFactory {
   private case class CancelDetails(id: String, amount: Long, senderPublicKey: String, recipientAddress: String, recipientAlias: String, height: Int)
   private implicit val reads: Reads[CancelDetails] = Json.reads
 
   override def isDefinedAt(blockchain: Blockchain): Boolean =
-    blockchain.featureActivationHeight(BlockchainFeatures.SynchronousCalls.id).contains(blockchain.height)
+    AddressScheme.current.chainId == 'W' &&
+      blockchain.featureActivationHeight(BlockchainFeatures.SynchronousCalls.id).contains(blockchain.height)
 
   override def apply(blockchain: Blockchain): Diff =
     readPatchData[Seq[CancelDetails]]()
@@ -27,7 +28,6 @@ case object CancelLeasesToDisabledAliases extends DiffPatchFactory {
             ByteStr(Base58.decode(cd.id)) -> LeaseDetails(
               senderPublicKey,
               Alias.fromString(cd.recipientAlias).explicitGet(),
-              recipientAddress,
               cd.amount,
               LeaseDetails.Status.Cancelled(blockchain.height, ByteStr.empty),
               ByteStr(Base58.decode(cd.id)),

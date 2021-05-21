@@ -1,18 +1,25 @@
 package com.wavesplatform.state.patch
 
-import com.google.common.io.Resources
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.state.{Blockchain, Diff}
 import play.api.libs.json.{Json, Reads}
 
-trait PatchDataLoader {
+import scala.io.Source
+
+trait PatchDataLoader extends {
   protected def readPatchData[T: Reads](): T =
-    Json.parse(Resources.getResource(s"patches/$this-${AddressScheme.current.chainId.toChar}").openStream()).as[T]
+    Json
+      .parse(
+        Source
+          .fromResource(s"patches/${getClass.getSimpleName.replace("$", "")}-${AddressScheme.current.chainId.toChar}.json")
+          .mkString
+      )
+      .as[T]
 }
 
-trait DiffPatchFactory extends PartialFunction[Blockchain, Diff] with PatchDataLoader
+trait DiffPatchFactory extends PartialFunction[Blockchain, Diff]
 
-abstract class PatchAtHeight(chainIdToHeight: (Char, Int)*) extends DiffPatchFactory {
+abstract class PatchAtHeight(chainIdToHeight: (Char, Int)*) extends PatchDataLoader with DiffPatchFactory {
   protected lazy val patchHeight: Option[Int] = chainIdToHeight.collectFirst {
     case (chainId, height) if AddressScheme.current.chainId == chainId.toByte => height
   }

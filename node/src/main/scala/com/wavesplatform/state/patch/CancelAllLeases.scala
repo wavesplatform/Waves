@@ -16,7 +16,7 @@ case object CancelAllLeases extends PatchAtHeight('W' -> 462000, 'T' -> 51500) {
       val sender    = PublicKey(ByteStr.decodeBase58(data.senderPublicKey).get)
       val recipient = Address.fromString(data.recipient).explicitGet()
       val id        = ByteStr.decodeBase58(data.id).get
-      (id, LeaseDetails(sender, recipient, recipient, data.amount, status = LeaseDetails.Status.Expired(height), id, height))
+      (id, LeaseDetails(sender, recipient, data.amount, status = LeaseDetails.Status.Expired(height), id, height))
     }.toMap
   }
   private[patch] object CancelledLeases {

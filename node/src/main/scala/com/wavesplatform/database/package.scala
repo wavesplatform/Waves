@@ -188,41 +188,47 @@ package object database extends ScorexLogging {
     LeaseBalance(ndi.readLong(), ndi.readLong())
   }
 
-  def writeLeaseDetails(ld: LeaseDetails): Array[Byte] =
-    pb.LeaseDetails(
-        ByteString.copyFrom(ld.sender.arr),
-        Some(PBRecipients.create(ld.recipient)),
-        ByteString.copyFrom(PBRecipients.publicKeyHash(ld.recipientAddress)),
-        ld.amount,
-        ByteString.copyFrom(ld.sourceId.arr),
-        ld.height,
-        ld.status match {
-          case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
-          case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
-            pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, ByteString.copyFrom(cancelTxId.arr)))
-          case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
-        }
-      )
-      .toByteArray
-
-  def readLeaseDetails(data: Array[Byte]): LeaseDetails = {
-    val d = pb.LeaseDetails.parseFrom(data)
-    LeaseDetails(
-      d.senderPublicKey.toPublicKey,
-      PBRecipients.toAddressOrAlias(d.getRecipient, AddressScheme.current.chainId).explicitGet(),
-      PBRecipients.toAddress(d.recipientAddress.toByteArray, AddressScheme.current.chainId).explicitGet(),
-      d.amount,
-      d.status match {
-        case pb.LeaseDetails.Status.Active(_)                                => LeaseDetails.Status.Active
-        case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height)) => LeaseDetails.Status.Expired(height)
-        case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId)) =>
-          LeaseDetails.Status.Cancelled(height, transactionId.toByteStr)
-        case pb.LeaseDetails.Status.Empty => ???
-      },
-      d.sourceId.toByteStr,
-      d.height
+  def writeLeaseDetails(lde: Either[Boolean, LeaseDetails]): Array[Byte] =
+    lde.fold(
+      _ => throw new IllegalArgumentException("Can not write boolean flag instead of LeaseDetails"),
+      ld =>
+        pb.LeaseDetails(
+            ByteString.copyFrom(ld.sender.arr),
+            Some(PBRecipients.create(ld.recipient)),
+            ld.amount,
+            ByteString.copyFrom(ld.sourceId.arr),
+            ld.height,
+            ld.status match {
+              case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
+              case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
+                pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, ByteString.copyFrom(cancelTxId.arr)))
+              case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
+            }
+          )
+          .toByteArray
     )
-  }
+
+  def readLeaseDetails(data: Array[Byte]): Either[Boolean, LeaseDetails] =
+    if (data.length == 1) Left(data(0) == 1)
+    else {
+      val d = pb.LeaseDetails.parseFrom(data)
+      Right(
+        LeaseDetails(
+          d.senderPublicKey.toPublicKey,
+          PBRecipients.toAddressOrAlias(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
+          d.amount,
+          d.status match {
+            case pb.LeaseDetails.Status.Active(_)                                => LeaseDetails.Status.Active
+            case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height)) => LeaseDetails.Status.Expired(height)
+            case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId)) =>
+              LeaseDetails.Status.Cancelled(height, transactionId.toByteStr)
+            case pb.LeaseDetails.Status.Empty => ???
+          },
+          d.sourceId.toByteStr,
+          d.height
+        )
+      )
+    }
 
   def readVolumeAndFee(data: Array[Byte]): VolumeAndFee = Option(data).fold(VolumeAndFee.empty) { d =>
     val ndi = newDataInput(d)
@@ -638,7 +644,7 @@ package object database extends ScorexLogging {
     (for {
       id      <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
       details <- fromHistory(r, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id))
-      if details.exists(_.isActive)
+      if details.exists(_.fold(identity, _.isActive))
       pb.TransactionMeta(h, n, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
       tx                             <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
     } yield tx).collect {
@@ -660,7 +666,7 @@ package object database extends ScorexLogging {
     while (iterator.hasNext && keyInRange()) {
       val e       = iterator.next()
       val leaseId = ByteStr(e.getKey.drop(6))
-      if (includeCancelled || readLeaseDetails(e.getValue).isActive)
+      if (includeCancelled || readLeaseDetails(e.getValue).fold(identity, _.isActive))
         leaseIds += leaseId
       else
         leaseIds -= leaseId
