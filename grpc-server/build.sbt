@@ -1,6 +1,6 @@
 import sbt.nio.file.FileAttributes
 
-name := "grpc-server"
+name := "waves-grpc-server"
 
 libraryDependencies ++= Dependencies.grpc
 
@@ -21,6 +21,12 @@ inConfig(Compile)(
   )
 )
 
-ExtensionPackaging.setPackageName(Def.setting("waves-node-grpc-server"))
-
 enablePlugins(RunApplicationSettings, ExtensionPackaging)
+
+Debian / debianControlFile := {
+  val generatedFile = (Debian / debianControlFile).value
+  IO.append(generatedFile, s"""Conflicts: grpc-server${network.value.packageSuffix}
+      |Replaces: grpc-server${network.value.packageSuffix}
+      |""".stripMargin)
+  generatedFile
+}

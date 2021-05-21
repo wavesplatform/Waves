@@ -8,11 +8,11 @@ import com.typesafe.sbt.packager.debian.DebianPlugin.Names.Postinst
 import com.typesafe.sbt.packager.debian.DebianPlugin.autoImport.Debian
 import com.typesafe.sbt.packager.debian.JDebPackaging
 import com.typesafe.sbt.packager.linux.LinuxPackageMapping
-import com.typesafe.sbt.packager.linux.LinuxPlugin.autoImport.{defaultLinuxInstallLocation, linuxPackageMappings, Linux}
-import com.typesafe.sbt.packager.linux.LinuxPlugin.{mapGenericMappingsToLinux, Users}
+import com.typesafe.sbt.packager.linux.LinuxPlugin.autoImport.{Linux, defaultLinuxInstallLocation, linuxPackageMappings}
+import com.typesafe.sbt.packager.linux.LinuxPlugin.{Users, mapGenericMappingsToLinux}
 import com.typesafe.sbt.packager.universal.UniversalDeployPlugin
 import sbt.Keys._
-import sbt.{Def, _}
+import sbt._
 
 /**
   * @note Specify "maintainer" to solve DEB warnings
@@ -53,7 +53,8 @@ object ExtensionPackaging extends AutoPlugin {
       },
       classpath := makeRelativeClasspathNames(classpathOrdering.value),
       nodePackageName := (LocalProject("node") / Linux / packageName).value,
-      debianPackageDependencies := Seq((LocalProject("node") / Debian / packageName).value),
+      debianPackageDependencies +=
+        s"${(LocalProject("node") / Debian / packageName).value} (= ${(LocalProject("node") / version).value})",
       // To write files to Waves NODE directory
       linuxPackageMappings := getUniversalFolderMappings(
         nodePackageName.value,
@@ -66,25 +67,20 @@ object ExtensionPackaging extends AutoPlugin {
              |set -e
              |chown -R ${nodePackageName.value}:${nodePackageName.value} /usr/share/${nodePackageName.value}""".stripMargin
       ),
+      Debian / normalizedName := s"${name.value}${network.value.packageSuffix}",
+      Debian / packageName := s"${name.value}${network.value.packageSuffix}",
       libraryDependencies ++= Dependencies.logDeps,
-      javaOptions in run ++= extensionClasses.value.zipWithIndex.map { case (extension, index) => s"-Dwaves.extensions.$index=$extension" }
-    ) ++ setPackageName(name) ++ maintainerFix
+      javaOptions in run ++= extensionClasses.value.zipWithIndex.map { case (extension, index) => s"-Dwaves.extensions.$index=$extension" },
+      maintainer := "wavesplatform.com"
+    ) ++ maintainerFix
 
   private def maintainerFix =
     inConfig(Linux)(
       Seq(
-        maintainer := "wavesplatform.com",
         packageSummary := s"Waves node ${name.value}${network.value.packageSuffix} extension",
         packageDescription := s"Waves node ${name.value}${network.value.packageSuffix} extension"
-      ))
-
-  def setPackageName(newName: Def.Initialize[String]): Seq[Def.Setting[_]] =
-    setPackageNameSettings(newName) ++ inScope(Global)(setPackageNameSettings(newName))
-
-  private[this] def setPackageNameSettings(newName: Def.Initialize[String]): Seq[Def.Setting[String]] = Seq(
-    packageName := s"${newName.value}${network.value.packageSuffix}",
-    normalizedName := packageName.value
-  )
+      )
+    )
 
   // A copy of com.typesafe.sbt.packager.linux.LinuxPlugin.getUniversalFolderMappings
   private def getUniversalFolderMappings(pkg: String, installLocation: String, mappings: Seq[(File, String)]): Seq[LinuxPackageMapping] = {
