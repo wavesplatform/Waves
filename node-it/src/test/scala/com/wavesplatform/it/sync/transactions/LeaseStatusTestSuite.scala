@@ -24,7 +24,7 @@ class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure 
     nodes.waitForHeightArise()
     val status1 = getStatus(createdLeaseTxId)
     status1 shouldBe LeaseStatus.canceled.toString
-    val sizeActiveLeases = sender.activeLeasesOld(firstAddress).size
+    val sizeActiveLeases = sender.activeLeases(firstAddress).size
     sizeActiveLeases shouldBe 0
   }
 

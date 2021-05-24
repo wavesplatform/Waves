@@ -7,12 +7,10 @@ import com.wavesplatform.api.http.requests.{LeaseCancelRequest, LeaseRequest}
 import com.wavesplatform.api.http.ApiError.{InvalidIds, TooBigArrayAllocation, TransactionDoesNotExist}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import play.api.libs.json._
@@ -45,18 +43,7 @@ case class LeaseApiRoute(
 
   private[this] def active: Route = (pathPrefix("active") & get & extractScheduler) { implicit sc =>
     path(AddrSegment) { address =>
-      val leaseInfoJson =
-        if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls))
-          commonAccountApi.activeLeases(address).map(Json.toJson(_))
-        else
-          commonAccountApi
-            .activeLeasesOld(address)
-            .collect {
-              case (height, leaseTransaction: LeaseTransaction) =>
-                leaseTransaction.json() + ("height" -> JsNumber(height))
-            }
-
-      complete(leaseInfoJson.toListL.runToFuture)
+      complete(commonAccountApi.activeLeases(address).map(Json.toJson(_)).toListL.runToFuture)
     }
   }
 

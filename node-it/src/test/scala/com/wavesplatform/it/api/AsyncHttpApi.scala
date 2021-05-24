@@ -397,8 +397,6 @@ object AsyncHttpApi extends Assertions {
         ).signWith(sender.privateKey).json()
       )
 
-    def activeLeasesOld(sourceAddress: String): Future[Seq[Transaction]] = get(s"/leasing/active/$sourceAddress").as[Seq[Transaction]]
-
     def activeLeases(sourceAddress: String): Future[Seq[LeaseInfo]] = get(s"/leasing/active/$sourceAddress").as[Seq[LeaseInfo]]
 
     def issue(

@@ -1,16 +1,12 @@
 package com.wavesplatform.history
 
-import scala.concurrent.duration._
-import scala.concurrent.Future
-
 import cats.syntax.option._
-import com.wavesplatform.{database, Application}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.api.common.{AddressPortfolio, AddressTransactions, CommonBlocksApi, CommonTransactionsApi}
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.api.common.{AddressPortfolio, AddressTransactions, CommonBlocksApi, CommonTransactionsApi}
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
@@ -22,15 +18,19 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.{BlockchainUpdater, _}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.{BlockchainUpdater, _}
 import com.wavesplatform.utils.SystemTime
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{Application, database}
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
+
+import scala.concurrent.Future
+import scala.concurrent.duration._
 
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter, settings: WavesSettings) {
   import Domain._

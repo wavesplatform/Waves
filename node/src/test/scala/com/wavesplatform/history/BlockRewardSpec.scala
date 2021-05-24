@@ -256,7 +256,7 @@ class BlockRewardSpec
     } yield (miner1, miner2, Seq(genesisBlock, b2, b3, b4), b5, m5s)
 
     def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): BlockDiffer.Result =
-      BlockDiffer.fromBlock(blockchain, prevBlock, b, MiningConstraint.Unlimited: MiningConstraint).explicitGet()
+      BlockDiffer.fromBlock(blockchain, prevBlock, b, MiningConstraint.Unlimited: MiningConstraint, b.header.generationSignature).explicitGet()
 
     "when NG state is empty" in forAll(ngEmptyScenario) {
       case (miner1, miner2, b2s, b3, m3s) =>

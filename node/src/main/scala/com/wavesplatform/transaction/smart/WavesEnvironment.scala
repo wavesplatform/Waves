@@ -287,7 +287,7 @@ class DAppEnvironment(
     invocationRoot: DAppEnvironment.InvocationTreeTracker
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.map(_.id()).getOrElse(ByteStr.empty)) {
 
-  private[this] var mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
+  private[this] var mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
 
   override def currentBlockchain(): CompositeBlockchain = this.mutableBlockchain
 
@@ -351,8 +351,8 @@ class DAppEnvironment(
         scriptResults = Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))),
         scriptsRun = diff.scriptsRun + 1
       )
-      currentDiff = currentDiff combine fixedDiff
-      mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
+      currentDiff = currentDiff |+| fixedDiff
+      mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions
       availableData = remainingData

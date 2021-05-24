@@ -135,7 +135,7 @@ object InvokeScriptTransactionDiff {
           pk,
           _,
           tx,
-          CompositeBlockchain(blockchain, Some(invocationDiff)),
+          CompositeBlockchain(blockchain, invocationDiff),
           blockTime,
           isSyncCall = false,
           limitedExecution,
