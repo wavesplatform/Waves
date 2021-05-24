@@ -7,16 +7,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 class BrokenUnicodeTest extends EvaluatorSpec {
   implicit val v: StdLibVersion = V5
 
-  property("unicode broken") {
-    implicit val v: StdLibVersion = V4
-    implicit val checkNext: Boolean = false
-    eval(s"""take("x冬x", 2)""") shouldBe CONST_STRING("x\ud87e")
-    eval(s"""size("x冬x")""") shouldBe Right(CONST_LONG(4))
-    eval(s"""drop("x冬x", 2)""") shouldBe CONST_STRING("\udc1ax")
-    eval(s"""takeRight("x冬x", 2)""") shouldBe CONST_STRING("\udc1ax")
-    eval(s"""dropRight("x冬x", 2)""") shouldBe CONST_STRING("x\ud87e")
-  }
-
   property("unicode indexOf") {
     eval(""" "x冬xqweqwe".indexOf("we") """) shouldBe Right(CONST_LONG(4L))
     eval(""" "世界x冬x".take(4).indexOf("冬".take(1)) """)(V4) shouldBe Right(CONST_LONG(3L))
