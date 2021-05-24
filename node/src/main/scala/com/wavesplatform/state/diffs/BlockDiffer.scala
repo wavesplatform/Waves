@@ -4,6 +4,7 @@ import cats.implicits._
 import cats.kernel.Monoid
 import cats.syntax.either.catsSyntaxEitherId
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
@@ -31,16 +32,18 @@ object BlockDiffer extends ScorexLogging {
       maybePrevBlock: Option[Block],
       block: Block,
       constraint: MiningConstraint,
+      hitSource: ByteStr,
       verify: Boolean = true
   ): Either[ValidationError, Result] =
-    fromBlockTraced(blockchain, maybePrevBlock, block, constraint, verify).resultE
+    fromBlockTraced(blockchain, maybePrevBlock, block, constraint, hitSource, verify).resultE
 
   def fromBlockTraced(
       blockchain: Blockchain,
       maybePrevBlock: Option[Block],
       block: Block,
       constraint: MiningConstraint,
-      verify: Boolean = true
+      hitSource: ByteStr,
+      verify: Boolean
   ): TracedResult[ValidationError, Result] = {
     val stateHeight = blockchain.height
 
@@ -73,7 +76,7 @@ object BlockDiffer extends ScorexLogging {
     for {
       _ <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
       r <- apply(
-        CompositeBlockchain(blockchain, newBlock = Some(block)),
+        CompositeBlockchain(blockchain, Diff.empty, block, hitSource, 0, None),
         constraint,
         maybePrevBlock.map(_.header.timestamp),
         Diff.empty.copy(portfolios = Map(block.sender.toAddress -> (minerReward |+| initialFeeFromThisBlock |+| feeFromPreviousBlock))),
@@ -154,7 +157,7 @@ object BlockDiffer extends ScorexLogging {
       .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil)).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _), _) => acc
         case (TracedResult(Right(Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs))), _), tx) =>
-          val currBlockchain = CompositeBlockchain(blockchain, Some(currDiff))
+          val currBlockchain = CompositeBlockchain(blockchain, currDiff)
           txDiffer(currBlockchain, tx).flatMap { thisTxDiff =>
             val updatedConstraint = updateConstraint(currConstraint, currBlockchain, tx, thisTxDiff)
             if (updatedConstraint.isOverfilled)
