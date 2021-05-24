@@ -1,7 +1,6 @@
 package com.wavesplatform.http
 
 import scala.concurrent.duration._
-
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKey
@@ -12,6 +11,7 @@ import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
@@ -189,7 +189,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   val badScriptBase64 =
     "AwoBAAAAAmYwAAAAAAYKAQAAAAJmMQAAAAADBgkBAAAAAmYwAAAAAAkBAAAAAmYwAAAAAAoBAAAAAmYyAAAAAAMGCQEAAAACZjEAAAAACQEAAAACZjEAAAAACgEAAAACZjMAAAAAAwYJAQAAAAJmMgAAAAAJAQAAAAJmMgAAAAAKAQAAAAJmNAAAAAADBgkBAAAAAmYzAAAAAAkBAAAAAmYzAAAAAAoBAAAAAmY1AAAAAAMGCQEAAAACZjQAAAAACQEAAAACZjQAAAAACgEAAAACZjYAAAAAAwYJAQAAAAJmNQAAAAAJAQAAAAJmNQAAAAAKAQAAAAJmNwAAAAADBgkBAAAAAmY2AAAAAAkBAAAAAmY2AAAAAAoBAAAAAmY4AAAAAAMGCQEAAAACZjcAAAAACQEAAAACZjcAAAAACgEAAAACZjkAAAAAAwYJAQAAAAJmOAAAAAAJAQAAAAJmOAAAAAAKAQAAAANmMTAAAAAAAwYJAQAAAAJmOQAAAAAJAQAAAAJmOQAAAAAKAQAAAANmMTEAAAAAAwYJAQAAAANmMTAAAAAACQEAAAADZjEwAAAAAAoBAAAAA2YxMgAAAAADBgkBAAAAA2YxMQAAAAAJAQAAAANmMTEAAAAACgEAAAADZjEzAAAAAAMGCQEAAAADZjEyAAAAAAkBAAAAA2YxMgAAAAAKAQAAAANmMTQAAAAAAwYJAQAAAANmMTMAAAAACQEAAAADZjEzAAAAAAoBAAAAA2YxNQAAAAADBgkBAAAAA2YxNAAAAAAJAQAAAANmMTQAAAAACgEAAAADZjE2AAAAAAMGCQEAAAADZjE1AAAAAAkBAAAAA2YxNQAAAAAKAQAAAANmMTcAAAAAAwYJAQAAAANmMTYAAAAACQEAAAADZjE2AAAAAAoBAAAAA2YxOAAAAAADBgkBAAAAA2YxNwAAAAAJAQAAAANmMTcAAAAACgEAAAADZjE5AAAAAAMGCQEAAAADZjE4AAAAAAkBAAAAA2YxOAAAAAAKAQAAAANmMjAAAAAAAwYJAQAAAANmMTkAAAAACQEAAAADZjE5AAAAAAoBAAAAA2YyMQAAAAADBgkBAAAAA2YyMAAAAAAJAQAAAANmMjAAAAAACgEAAAADZjIyAAAAAAMGCQEAAAADZjIxAAAAAAkBAAAAA2YyMQAAAAAKAQAAAANmMjMAAAAAAwYJAQAAAANmMjIAAAAACQEAAAADZjIyAAAAAAoBAAAAA2YyNAAAAAADBgkBAAAAA2YyMwAAAAAJAQAAAANmMjMAAAAACgEAAAADZjI1AAAAAAMGCQEAAAADZjI0AAAAAAkBAAAAA2YyNAAAAAAKAQAAAANmMjYAAAAAAwYJAQAAAANmMjUAAAAACQEAAAADZjI1AAAAAAoBAAAAA2YyNwAAAAADBgkBAAAAA2YyNgAAAAAJAQAAAANmMjYAAAAACgEAAAADZjI4AAAAAAMGCQEAAAADZjI3AAAAAAkBAAAAA2YyNwAAAAAKAQAAAANmMjkAAAAAAwYJAQAAAANmMjgAAAAACQEAAAADZjI4AAAAAAoBAAAAA2YzMAAAAAADBgkBAAAAA2YyOQAAAAAJAQAAAANmMjkAAAAACgEAAAADZjMxAAAAAAMGCQEAAAADZjMwAAAAAAkBAAAAA2YzMAAAAAAKAQAAAANmMzIAAAAAAwYJAQAAAANmMzEAAAAACQEAAAADZjMxAAAAAAoBAAAAA2YzMwAAAAADBgkBAAAAA2YzMgAAAAAJAQAAAANmMzIAAAAACgEAAAADZjM0AAAAAAMGCQEAAAADZjMzAAAAAAkBAAAAA2YzMwAAAAAKAQAAAANmMzUAAAAAAwYJAQAAAANmMzQAAAAACQEAAAADZjM0AAAAAAoBAAAAA2YzNgAAAAADBgkBAAAAA2YzNQAAAAAJAQAAAANmMzUAAAAACgEAAAADZjM3AAAAAAMGCQEAAAADZjM2AAAAAAkBAAAAA2YzNgAAAAAKAQAAAANmMzgAAAAAAwYJAQAAAANmMzcAAAAACQEAAAADZjM3AAAAAAoBAAAAA2YzOQAAAAADBgkBAAAAA2YzOAAAAAAJAQAAAANmMzgAAAAACgEAAAADZjQwAAAAAAMGCQEAAAADZjM5AAAAAAkBAAAAA2YzOQAAAAAKAQAAAANmNDEAAAAAAwYJAQAAAANmNDAAAAAACQEAAAADZjQwAAAAAAoBAAAAA2Y0MgAAAAADBgkBAAAAA2Y0MQAAAAAJAQAAAANmNDEAAAAACgEAAAADZjQzAAAAAAMGCQEAAAADZjQyAAAAAAkBAAAAA2Y0MgAAAAAKAQAAAANmNDQAAAAAAwYJAQAAAANmNDMAAAAACQEAAAADZjQzAAAAAAoBAAAAA2Y0NQAAAAADBgkBAAAAA2Y0NAAAAAAJAQAAAANmNDQAAAAACgEAAAADZjQ2AAAAAAMGCQEAAAADZjQ1AAAAAAkBAAAAA2Y0NQAAAAAKAQAAAANmNDcAAAAAAwYJAQAAAANmNDYAAAAACQEAAAADZjQ2AAAAAAoBAAAAA2Y0OAAAAAADBgkBAAAAA2Y0NwAAAAAJAQAAAANmNDcAAAAACgEAAAADZjQ5AAAAAAMGCQEAAAADZjQ4AAAAAAkBAAAAA2Y0OAAAAAAKAQAAAANmNTAAAAAAAwYJAQAAAANmNDkAAAAACQEAAAADZjQ5AAAAAAoBAAAAA2Y1MQAAAAADBgkBAAAAA2Y1MAAAAAAJAQAAAANmNTAAAAAACgEAAAADZjUyAAAAAAMGCQEAAAADZjUxAAAAAAkBAAAAA2Y1MQAAAAAKAQAAAANmNTMAAAAAAwYJAQAAAANmNTIAAAAACQEAAAADZjUyAAAAAAoBAAAAA2Y1NAAAAAADBgkBAAAAA2Y1MwAAAAAJAQAAAANmNTMAAAAACgEAAAADZjU1AAAAAAMGCQEAAAADZjU0AAAAAAkBAAAAA2Y1NAAAAAAKAQAAAANmNTYAAAAAAwYJAQAAAANmNTUAAAAACQEAAAADZjU1AAAAAAoBAAAAA2Y1NwAAAAADBgkBAAAAA2Y1NgAAAAAJAQAAAANmNTYAAAAACgEAAAADZjU4AAAAAAMGCQEAAAADZjU3AAAAAAkBAAAAA2Y1NwAAAAAKAQAAAANmNTkAAAAAAwYJAQAAAANmNTgAAAAACQEAAAADZjU4AAAAAAoBAAAAA2Y2MAAAAAADBgkBAAAAA2Y1OQAAAAAJAQAAAANmNTkAAAAACgEAAAADZjYxAAAAAAMGCQEAAAADZjYwAAAAAAkBAAAAA2Y2MAAAAAAKAQAAAANmNjIAAAAAAwYJAQAAAANmNjEAAAAACQEAAAADZjYxAAAAAAoBAAAAA2Y2MwAAAAADBgkBAAAAA2Y2MgAAAAAJAQAAAANmNjIAAAAACgEAAAADZjY0AAAAAAMGCQEAAAADZjYzAAAAAAkBAAAAA2Y2MwAAAAAKAQAAAANmNjUAAAAAAwYJAQAAAANmNjQAAAAACQEAAAADZjY0AAAAAAoBAAAAA2Y2NgAAAAADBgkBAAAAA2Y2NQAAAAAJAQAAAANmNjUAAAAACgEAAAADZjY3AAAAAAMGCQEAAAADZjY2AAAAAAkBAAAAA2Y2NgAAAAAKAQAAAANmNjgAAAAAAwYJAQAAAANmNjcAAAAACQEAAAADZjY3AAAAAAoBAAAAA2Y2OQAAAAADBgkBAAAAA2Y2OAAAAAAJAQAAAANmNjgAAAAACgEAAAADZjcwAAAAAAMGCQEAAAADZjY5AAAAAAkBAAAAA2Y2OQAAAAAKAQAAAANmNzEAAAAAAwYJAQAAAANmNzAAAAAACQEAAAADZjcwAAAAAAoBAAAAA2Y3MgAAAAADBgkBAAAAA2Y3MQAAAAAJAQAAAANmNzEAAAAACgEAAAADZjczAAAAAAMGCQEAAAADZjcyAAAAAAkBAAAAA2Y3MgAAAAAKAQAAAANmNzQAAAAAAwYJAQAAAANmNzMAAAAACQEAAAADZjczAAAAAAoBAAAAA2Y3NQAAAAADBgkBAAAAA2Y3NAAAAAAJAQAAAANmNzQAAAAACgEAAAADZjc2AAAAAAMGCQEAAAADZjc1AAAAAAkBAAAAA2Y3NQAAAAAKAQAAAANmNzcAAAAAAwYJAQAAAANmNzYAAAAACQEAAAADZjc2AAAAAAoBAAAAA2Y3OAAAAAADBgkBAAAAA2Y3NwAAAAAJAQAAAANmNzcAAAAACgEAAAADZjc5AAAAAAMGCQEAAAADZjc4AAAAAAkBAAAAA2Y3OAAAAAAKAQAAAANmODAAAAAAAwYJAQAAAANmNzkAAAAACQEAAAADZjc5AAAAAAoBAAAAA2Y4MQAAAAADBgkBAAAAA2Y4MAAAAAAJAQAAAANmODAAAAAACgEAAAADZjgyAAAAAAMGCQEAAAADZjgxAAAAAAkBAAAAA2Y4MQAAAAAKAQAAAANmODMAAAAAAwYJAQAAAANmODIAAAAACQEAAAADZjgyAAAAAAoBAAAAA2Y4NAAAAAADBgkBAAAAA2Y4MwAAAAAJAQAAAANmODMAAAAACgEAAAADZjg1AAAAAAMGCQEAAAADZjg0AAAAAAkBAAAAA2Y4NAAAAAAKAQAAAANmODYAAAAAAwYJAQAAAANmODUAAAAACQEAAAADZjg1AAAAAAoBAAAAA2Y4NwAAAAADBgkBAAAAA2Y4NgAAAAAJAQAAAANmODYAAAAACgEAAAADZjg4AAAAAAMGCQEAAAADZjg3AAAAAAkBAAAAA2Y4NwAAAAAKAQAAAANmODkAAAAAAwYJAQAAAANmODgAAAAACQEAAAADZjg4AAAAAAoBAAAAA2Y5MAAAAAADBgkBAAAAA2Y4OQAAAAAJAQAAAANmODkAAAAACgEAAAADZjkxAAAAAAMGCQEAAAADZjkwAAAAAAkBAAAAA2Y5MAAAAAAKAQAAAANmOTIAAAAAAwYJAQAAAANmOTEAAAAACQEAAAADZjkxAAAAAAoBAAAAA2Y5MwAAAAADBgkBAAAAA2Y5MgAAAAAJAQAAAANmOTIAAAAACgEAAAADZjk0AAAAAAMGCQEAAAADZjkzAAAAAAkBAAAAA2Y5MwAAAAAKAQAAAANmOTUAAAAAAwYJAQAAAANmOTQAAAAACQEAAAADZjk0AAAAAAoBAAAAA2Y5NgAAAAADBgkBAAAAA2Y5NQAAAAAJAQAAAANmOTUAAAAACgEAAAADZjk3AAAAAAMGCQEAAAADZjk2AAAAAAkBAAAAA2Y5NgAAAAAKAQAAAANmOTgAAAAAAwYJAQAAAANmOTcAAAAACQEAAAADZjk3AAAAAAoBAAAAA2Y5OQAAAAADBgkBAAAAA2Y5OAAAAAAJAQAAAANmOTgAAAAACgEAAAAEZjEwMAAAAAADBgkBAAAAA2Y5OQAAAAAJAQAAAANmOTkAAAAACQEAAAAEZjEwMAAAAAD7+x+p"
 
-  val dApp =
+  val dAppWithFreeVerifier =
     """
       |{-# STDLIB_VERSION 3 #-}
       |{-# CONTENT_TYPE DAPP #-}
@@ -214,7 +214,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       |}
       |
       |@Verifier(tx)
-      |func verify() = true
+      |func verify() = sigVerify(base58'', base58'', base58'')
     """.stripMargin
 
   val dAppWithoutVerifier =
@@ -249,7 +249,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       |{-# SCRIPT_TYPE ACCOUNT #-}
     """.stripMargin
 
-  val dAppWithMaxComplexityVerifier =
+  val dAppWithPaidVerifier =
     """
       |{-# STDLIB_VERSION 3 #-}
       |{-# CONTENT_TYPE DAPP #-}
@@ -261,7 +261,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       |}
       |
       |@Verifier(tx)
-      |func verify() = true && true && true && true && true && true && true && true && true && true
+      |func verify() = sigVerify(base58'', base58'', base58'') && sigVerify(base58'', base58'', base58'')
     """.stripMargin
 
   routePath("/script/decompile") in {
@@ -509,10 +509,10 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
-    Post(routePath("/script/compileCode"), dApp) ~> route ~> check {
+    Post(routePath("/script/compileCode"), dAppWithFreeVerifier) ~> route ~> check {
       val json = responseAs[JsValue]
-      (json \ "complexity").as[Long] shouldBe 68
-      (json \ "verifierComplexity").as[Long] shouldBe 11
+      (json \ "complexity").as[Long] shouldBe 113
+      (json \ "verifierComplexity").as[Long] shouldBe 113
       (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("write" -> 27, "sendAsset" -> 66, "writeAndSendWaves" -> 68)
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
@@ -533,10 +533,10 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
-    Post(routePath("/script/compileCode"), dAppWithMaxComplexityVerifier) ~> route ~> check {
+    Post(routePath("/script/compileCode"), dAppWithPaidVerifier) ~> route ~> check {
       val json = responseAs[JsValue]
-      (json \ "complexity").as[Long] shouldBe 29
-      (json \ "verifierComplexity").as[Long] shouldBe 29
+      (json \ "complexity").as[Long] shouldBe 217
+      (json \ "verifierComplexity").as[Long] shouldBe 217
       (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("callable" -> 27)
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
@@ -545,6 +545,36 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       val json = responseAs[JsValue]
       (json \ "error").as[Int] shouldBe 305
       (json \ "message").as[String] shouldBe "Script estimation was interrupted"
+    }
+  }
+
+  routePath(s"/script/compileCode after ${BlockchainFeatures.SynchronousCalls}") in {
+    val blockchain = stub[Blockchain]("blockchain")
+    val route      = seal(utilsApi.copy(blockchain = blockchain).route)
+    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0))
+
+    Post(routePath("/script/compileCode"), dAppWithoutVerifier) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "complexity").as[Long] shouldBe 68
+      (json \ "verifierComplexity").as[Long] shouldBe 0
+      (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("write" -> 27, "sendAsset" -> 66, "writeAndSendWaves" -> 68)
+      (json \ "extraFee").as[Long] shouldBe 0
+    }
+
+    Post(routePath("/script/compileCode"), dAppWithFreeVerifier) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "complexity").as[Long] shouldBe 113
+      (json \ "verifierComplexity").as[Long] shouldBe 113
+      (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("write" -> 27, "sendAsset" -> 66, "writeAndSendWaves" -> 68)
+      (json \ "extraFee").as[Long] shouldBe 0
+    }
+
+    Post(routePath("/script/compileCode"), dAppWithPaidVerifier) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "complexity").as[Long] shouldBe 217
+      (json \ "verifierComplexity").as[Long] shouldBe 217
+      (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("callable" -> 27)
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
   }
 
@@ -616,15 +646,15 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       } yield ByteStr(serialized).base64)
         .explicitGet()
 
-    val dAppBase64                = dAppToBase64(dApp)
+    val dAppBase64                = dAppToBase64(dAppWithFreeVerifier)
     val dAppWithoutVerifierBase64 = dAppToBase64(dAppWithoutVerifier)
     val emptyDAppBase64           = dAppToBase64(emptyDApp)
 
     Post(routePath("/script/estimate"), dAppBase64) ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "script").as[String] shouldBe dAppBase64
-      (json \ "complexity").as[Long] shouldBe 68
-      (json \ "verifierComplexity").as[Long] shouldBe 11
+      (json \ "complexity").as[Long] shouldBe 113
+      (json \ "verifierComplexity").as[Long] shouldBe 113
       (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("write" -> 27, "sendAsset" -> 66, "writeAndSendWaves" -> 68)
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
