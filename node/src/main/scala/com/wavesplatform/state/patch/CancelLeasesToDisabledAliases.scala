@@ -18,26 +18,29 @@ case object CancelLeasesToDisabledAliases extends PatchDataLoader with DiffPatch
     AddressScheme.current.chainId == 'W' &&
       blockchain.featureActivationHeight(BlockchainFeatures.SynchronousCalls.id).contains(blockchain.height)
 
+  lazy val patchData: Map[ByteStr, (LeaseDetails, Address)] = readPatchData[Seq[CancelDetails]]().map { cd =>
+    ByteStr(Base58.decode(cd.id)) -> (LeaseDetails(
+      PublicKey(Base58.decode(cd.senderPublicKey)),
+      Alias.fromString(cd.recipientAlias).explicitGet(),
+      cd.amount,
+      LeaseDetails.Status.Cancelled(0, ByteStr.empty),
+      ByteStr(Base58.decode(cd.id)),
+      cd.height
+    ) -> Address.fromString(cd.recipientAddress).explicitGet())
+  }.toMap
+
   override def apply(blockchain: Blockchain): Diff =
-    readPatchData[Seq[CancelDetails]]()
-      .map { cd =>
-        val recipientAddress = Address.fromString(cd.recipientAddress).explicitGet()
-        val senderPublicKey  = PublicKey(Base58.decode(cd.senderPublicKey))
-        Diff(
-          leaseState = Map(
-            ByteStr(Base58.decode(cd.id)) -> LeaseDetails(
-              senderPublicKey,
-              Alias.fromString(cd.recipientAlias).explicitGet(),
-              cd.amount,
-              LeaseDetails.Status.Cancelled(blockchain.height, ByteStr.empty),
-              ByteStr(Base58.decode(cd.id)),
-              cd.height
-            )
-          ),
-          portfolios =
-            Map(senderPublicKey.toAddress -> Portfolio(lease = LeaseBalance(0, -cd.amount))) |+|
-              Map(recipientAddress        -> Portfolio(lease = LeaseBalance(-cd.amount, 0)))
-        )
+    patchData
+      .map {
+        case (id, (ld, recipientAddress)) =>
+          Diff(
+            leaseState = Map(
+              id -> ld.copy(status = LeaseDetails.Status.Cancelled(blockchain.height, ByteStr.empty))
+            ),
+            portfolios =
+              Map(ld.sender.toAddress -> Portfolio(lease = LeaseBalance(0, -ld.amount))) |+|
+                Map(recipientAddress  -> Portfolio(lease = LeaseBalance(-ld.amount, 0)))
+          )
       }
       .reduceLeft(_ |+| _)
 }
