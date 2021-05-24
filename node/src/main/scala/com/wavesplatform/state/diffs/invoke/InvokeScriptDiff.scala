@@ -197,7 +197,7 @@ object InvokeScriptDiff {
                     pk,
                     storingComplexity.toInt,
                     tx,
-                    CompositeBlockchain(blockchain, Some(diff)),
+                    CompositeBlockchain(blockchain, diff),
                     blockTime,
                     isSyncCall = true,
                     limitedExecution,

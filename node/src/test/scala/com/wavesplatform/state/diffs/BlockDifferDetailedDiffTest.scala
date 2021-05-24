@@ -23,7 +23,7 @@ class BlockDifferDetailedDiffTest extends FreeSpec with Matchers with PropertyCh
   ): Unit =
     withLevelDBWriter(fs) { state =>
       def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block) =
-        BlockDiffer.fromBlock(blockchain, prevBlock, b, MiningConstraint.Unlimited)
+        BlockDiffer.fromBlock(blockchain, prevBlock, b, MiningConstraint.Unlimited, b.header.generationSignature)
 
       preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
         val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, prevBlock, curBlock).explicitGet()
