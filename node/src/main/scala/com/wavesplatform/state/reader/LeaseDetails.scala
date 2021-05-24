@@ -6,20 +6,23 @@ import com.wavesplatform.common.state.ByteStr
 object LeaseDetails {
   sealed trait Status
   object Status {
-    case object Active                                     extends Status
-    final case class Cancelled(height: Int, txId: ByteStr) extends Status
-    final case class Expired(height: Int)                  extends Status
+    case object Active                                             extends Status
+    final case class Cancelled(height: Int, txId: Option[ByteStr]) extends Status
+    final case class Expired(height: Int)                          extends Status
 
-    def getCancelHeight(status: Status): Option[Int] = status match {
-      case Status.Cancelled(height, _) => Some(height)
-      case Status.Expired(height)      => Some(height)
-      case Status.Active               => None
+    implicit class StatusExt(val status: Status) extends AnyVal {
+      def cancelHeight: Option[Int] = status match {
+        case Status.Cancelled(height, _) => Some(height)
+        case Status.Expired(height)      => Some(height)
+        case Status.Active               => None
+      }
+
+      def cancelTransactionId: Option[ByteStr] = status match {
+        case Status.Cancelled(_, txId) => txId
+        case _                         => None
+      }
     }
 
-    def getCancelTransactionId(status: Status): Option[ByteStr] = status match {
-      case Status.Cancelled(_, txId) => Some(txId)
-      case _                         => None
-    }
   }
 }
 

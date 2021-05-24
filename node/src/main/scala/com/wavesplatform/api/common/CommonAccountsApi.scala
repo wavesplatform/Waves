@@ -10,7 +10,6 @@ import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -184,8 +183,8 @@ object CommonAccountsApi extends ScorexLogging {
           case Status.Cancelled(_, _) => LeaseInfo.Status.Canceled
           case Status.Expired(_)      => LeaseInfo.Status.Expired
         },
-        LeaseDetails.Status.getCancelHeight(ld.status),
-        LeaseDetails.Status.getCancelTransactionId(ld.status)
+        ld.status.cancelHeight,
+        ld.status.cancelTransactionId
       )
     }
 

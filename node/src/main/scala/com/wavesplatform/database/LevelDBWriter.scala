@@ -839,7 +839,7 @@ abstract class LevelDBWriter private[database] (
           transactionInfo(leaseId, db).collect {
             case (leaseHeight, lt: LeaseTransaction, _) =>
               LeaseDetails(lt.sender, lt.recipient, lt.amount, if (isActive) LeaseDetails.Status.Active
-                else LeaseDetails.Status.Cancelled(leaseHeight, ByteStr.empty), leaseId, leaseHeight)
+                else LeaseDetails.Status.Cancelled(h, None), leaseId, leaseHeight)
           },
         Some(_)
       )

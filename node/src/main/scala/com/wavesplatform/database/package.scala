@@ -201,7 +201,7 @@ package object database extends ScorexLogging {
             ld.status match {
               case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
               case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
-                pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, ByteString.copyFrom(cancelTxId.arr)))
+                pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
               case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
             }
           )
@@ -221,7 +221,7 @@ package object database extends ScorexLogging {
             case pb.LeaseDetails.Status.Active(_)                                => LeaseDetails.Status.Active
             case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height)) => LeaseDetails.Status.Expired(height)
             case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId)) =>
-              LeaseDetails.Status.Cancelled(height, transactionId.toByteStr)
+              LeaseDetails.Status.Cancelled(height, Some(transactionId.toByteStr).filter(!_.isEmpty))
             case pb.LeaseDetails.Status.Empty => ???
           },
           d.sourceId.toByteStr,
