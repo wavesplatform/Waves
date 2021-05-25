@@ -1,7 +1,5 @@
 package com.wavesplatform.lang.v1.compiler
 
-import java.nio.charset.StandardCharsets
-
 import cats.implicits._
 import cats.{Id, Show}
 import com.wavesplatform.common.state.ByteStr
@@ -13,11 +11,12 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos, TypedVar, ConstsPat, CompositePattern, ObjPat}
+import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, CompositePattern, ConstsPat, MATCH_CASE, ObjPat, PART, Pos, TypedVar}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 
+import java.nio.charset.StandardCharsets
 import scala.util.Try
 
 object ExpressionCompiler {
@@ -135,6 +134,7 @@ object ExpressionCompiler {
         case Expressions.REF(p, key, _, _)                  => compileRef(p, key, saveExprContext)
         case Expressions.FUNCTION_CALL(p, name, args, _, _) => compileFunctionCall(p, name, args, saveExprContext)
         case Expressions.MATCH(p, ex, cases, _, _)          => compileMatch(p, ex, cases.toList, saveExprContext)
+        case Expressions.FOLD(p, limit, list, acc, f, _, _) => compileFold(p, limit, list, acc, f.key)
         case Expressions.BINARY_OP(p, a, op, b, _, _) =>
           op match {
             case AND_OP => compileIf(p, a, b, Expressions.FALSE(p), saveExprContext)
@@ -626,6 +626,37 @@ object ExpressionCompiler {
         )
       }
     } yield result
+
+  private def compileFold(
+      p: Pos,
+      limit: Int,
+      list: Expressions.EXPR,
+      acc: Expressions.EXPR,
+      func: PART[String]
+  ): CompileM[CompilationStepResultExpr] =
+    for {
+      (list, listType, _) <- compileExpr(list)
+      listInnerType <- (listType match {
+        case list: LIST => Right(list.innerType)
+        case other      => Left(Generic(p.start, p.end, s"FOLD first argument should be List[T], but $other found"))
+      }).toCompileM
+      (acc, accType, accRaw) <- compileExpr(acc)
+      funcName               <- handlePart(func)
+      ctx                    <- get[Id, CompilerContext, CompilationError]
+      function <- ctx
+        .functionTypeSignaturesByName(funcName)
+        .collectFirst {
+          case s @ FunctionTypeSignature(_, Seq((_, type1: FINAL), (_, type2: FINAL)), _) if type1 >= accType && type2 >= listInnerType =>
+            Right(s)
+        }
+        .getOrElse {
+          val accTypeStr       = if (accType == NOTHING) ANY else accType
+          val listInnerTypeStr = if (listInnerType == NOTHING) ANY else listInnerType
+          Left(Generic(p.start, p.end, s"Can't find suitable function $funcName(a: $accTypeStr, b: $listInnerTypeStr) for FOLD"))
+        }
+        .toCompileM
+      r <- Right(CompilerMacro.unwrapFold(limit, list, acc, function.header)).toCompileM
+    } yield CompilationStepResultExpr(ctx, r, function.args.head._2.asInstanceOf[FINAL], accRaw)
 
   private def matchFuncOverload(
       p: Pos,
