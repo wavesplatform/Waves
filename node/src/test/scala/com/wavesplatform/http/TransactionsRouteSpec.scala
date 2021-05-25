@@ -310,7 +310,7 @@ class TransactionsRouteSpec
       (blockchain.transactionMeta _).when(lease.id()).returns(Some((1, true)))
       (blockchain.leaseDetails _)
         .when(lease.id())
-        .returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Cancelled(2, leaseCancel.id()), lease.id(), 1)))
+        .returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Cancelled(2, Some(leaseCancel.id())), lease.id(), 1)))
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
       Get(routePath(s"/address/${TxHelpers.secondAddress}/limit/10")) ~> route ~> check {
@@ -433,7 +433,7 @@ class TransactionsRouteSpec
       (blockchain.leaseDetails _)
         .expects(leaseCancelId)
         .returning(
-          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, leaseCancelId), leaseCancelId, 1))
+          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, Some(leaseCancelId)), leaseCancelId, 1))
         )
         .anyNumberOfTimes()
       (blockchain.transactionMeta _).expects(leaseId1).returning(Some((1, true))).anyNumberOfTimes()
@@ -510,7 +510,7 @@ class TransactionsRouteSpec
       (blockchain.transactionMeta _).when(lease.id()).returns(Some((1, true)))
       (blockchain.leaseDetails _)
         .when(lease.id())
-        .returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Cancelled(2, leaseCancel.id()), lease.id(), 1)))
+        .returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Cancelled(2, Some(leaseCancel.id())), lease.id(), 1)))
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
       Get(routePath(s"/info/${leaseCancel.id()}")) ~> route ~> check {
@@ -637,7 +637,7 @@ class TransactionsRouteSpec
       (blockchain.leaseDetails _)
         .expects(leaseCancelId)
         .returning(
-          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, leaseCancelId), leaseCancelId, 1))
+          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, Some(leaseCancelId)), leaseCancelId, 1))
         )
         .anyNumberOfTimes()
       (blockchain.leaseDetails _)
@@ -647,7 +647,7 @@ class TransactionsRouteSpec
       (blockchain.leaseDetails _)
         .expects(nestedLeaseCancelId)
         .returning(
-          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, nestedLeaseCancelId), nestedLeaseCancelId, 1))
+          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, Some(nestedLeaseCancelId)), nestedLeaseCancelId, 1))
         )
         .anyNumberOfTimes()
 

@@ -13,6 +13,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
+import play.api.libs.json.JsonConfiguration.Aux
 import play.api.libs.json._
 
 case class LeaseApiRoute(
@@ -89,6 +90,8 @@ case class LeaseApiRoute(
 object LeaseApiRoute {
   implicit val leaseStatusWrites: Writes[LeaseInfo.Status] =
     Writes(s => JsString(s.toString.toLowerCase))
+
+  implicit val config: Aux[Json.MacroOptions] = JsonConfiguration(optionHandlers = OptionHandlers.WritesNull)
 
   implicit val leaseInfoWrites: OWrites[LeaseInfo] = {
     import com.wavesplatform.utils.byteStrFormat

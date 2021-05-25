@@ -91,17 +91,15 @@ object BlockDiffer extends ScorexLogging {
       blockchain: Blockchain,
       prevBlockTimestamp: Option[Long],
       micro: MicroBlock,
-      timestamp: Long,
       constraint: MiningConstraint,
       verify: Boolean = true
   ): Either[ValidationError, Result] =
-    fromMicroBlockTraced(blockchain, prevBlockTimestamp, micro, timestamp, constraint, verify).resultE
+    fromMicroBlockTraced(blockchain, prevBlockTimestamp, micro, constraint, verify).resultE
 
   def fromMicroBlockTraced(
       blockchain: Blockchain,
       prevBlockTimestamp: Option[Long],
       micro: MicroBlock,
-      timestamp: Long,
       constraint: MiningConstraint,
       verify: Boolean = true
   ): TracedResult[ValidationError, Result] = {
@@ -153,8 +151,13 @@ object BlockDiffer extends ScorexLogging {
     val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify) _
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
+    val initDiffWithPatches = Seq(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn, CancelLeasesToDisabledAliases).foldLeft(initDiff) {
+      case (prevDiff, patch) =>
+        patch.lift(CompositeBlockchain(blockchain, prevDiff)).fold(prevDiff)(prevDiff |+| _)
+    }
+
     txs
-      .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil)).asRight[ValidationError])) {
+      .foldLeft(TracedResult(Result(initDiffWithPatches, 0L, 0L, initConstraint, DetailedDiff(initDiffWithPatches, Nil)).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _), _) => acc
         case (TracedResult(Right(Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs))), _), tx) =>
           val currBlockchain = CompositeBlockchain(blockchain, currDiff)
@@ -184,23 +187,11 @@ object BlockDiffer extends ScorexLogging {
                   carryFee + carry,
                   totalWavesFee,
                   updatedConstraint,
-                  DetailedDiff(parentDiff.combine(minerDiff), thisTxDiff :: txDiffs)
+                  DetailedDiff(parentDiff |+| minerDiff, thisTxDiff :: txDiffs)
                 )
               )
             }
           }
-      }
-      .map { result =>
-        def applyAll(patches: DiffPatchFactory*): (Diff, Diff) = patches.foldLeft((result.diff, result.detailedDiff.parentDiff)) {
-          case (prevResult @ (previousDiff, previousPatchDiff), p) =>
-            if (p.isApplicable(blockchain)) {
-              val patchDiff = p()
-              (Monoid.combine(previousDiff, patchDiff), Monoid.combine(previousPatchDiff, patchDiff))
-            } else prevResult
-        }
-
-        val (diffWithPatches, patchDiff) = applyAll(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn)
-        result.copy(diff = diffWithPatches, detailedDiff = result.detailedDiff.copy(parentDiff = patchDiff))
       }
   }
 }
