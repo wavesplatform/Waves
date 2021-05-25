@@ -179,7 +179,7 @@ object StateUpdate {
         v.amount,
         v.sender.toByteString,
         v.recipient.toByteString,
-        v.leaseId.toByteString
+        v.originTransactionId.toByteString
       )
     }
   }
@@ -454,13 +454,11 @@ object StateUpdate {
       .toVector
   }
 
-  def referencedAssets(blockchain: Blockchain, txsStateUpdates: Seq[StateUpdate]): Seq[AssetInfo] = {
+  def referencedAssets(blockchain: Blockchain, txsStateUpdates: Seq[StateUpdate]): Seq[AssetInfo] =
     txsStateUpdates
       .flatMap(st => st.assets.map(_.assetId) ++ st.balances.flatMap(_.asset.compatId))
       .distinct
-      .flatMap(id => blockchain.assetDescription(IssuedAsset(id)))
-      .map(ad => AssetInfo(ad.originTransactionId, ad.decimals, ad.name.toStringUtf8))
-  }
+      .flatMap(id => blockchain.assetDescription(IssuedAsset(id)).map(ad => AssetInfo(id, ad.decimals, ad.name.toStringUtf8)))
 
   def container(
       blockchainBeforeWithMinerReward: Blockchain,
