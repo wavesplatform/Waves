@@ -23,7 +23,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.{AssetDescription, BinaryDataEntry, Blockchain, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
+import com.wavesplatform.state.{AssetDescription, Blockchain, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
@@ -32,6 +32,7 @@ import io.grpc.StatusException
 import io.grpc.stub.{CallStreamObserver, StreamObserver}
 import monix.execution.CancelableFuture
 import monix.execution.Scheduler.Implicits.global
+import org.scalactic.source.Position
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FreeSpec, Matchers}
@@ -49,7 +50,8 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.DataTransaction,
       BlockchainFeatures.FeeSponsorship,
-      BlockchainFeatures.BlockV5
+      BlockchainFeatures.BlockV5,
+      BlockchainFeatures.SynchronousCalls
     )
   )
 
@@ -396,51 +398,67 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       blocks.map(_.height) shouldBe Seq(3, 4, 5)
     }
 
-    "should return asseit id in related assets" in withDomainAndRepo { (d, repo) =>
+    "should return correct ids for assets and leases from invoke" in withDomainAndRepo { (d, repo) =>
       val issuer        = KeyPair(Longs.toByteArray(Random.nextLong()))
+      val invoker       = KeyPair(Longs.toByteArray(Random.nextLong()))
       val issuerAddress = issuer.toAddress
       val (dAppScript, _) = ScriptCompiler
         .compile(
           s"""
-           |{-# STDLIB_VERSION 4 #-}
+           |{-# STDLIB_VERSION 5 #-}
            |{-# SCRIPT_TYPE ACCOUNT #-}
            |{-# CONTENT_TYPE DAPP #-}
            |
            |@Callable(i)
            |func issue() = {
            |  let issue = Issue("name", "description", 1000, 4, true, unit, 0)
+           |  let lease = Lease(i.caller, 500000000)
            |  [
            |    issue,
-           |    BinaryEntry("assetId", calculateAssetId(issue))
+           |    BinaryEntry("assetId", calculateAssetId(issue)),
+           |    lease,
+           |    BinaryEntry("leaseId", calculateLeaseId(lease))
            |  ]
            |}
            |""".stripMargin,
           ScriptEstimatorV3
         )
         .explicitGet()
+      val invoke = InvokeScriptTransaction
+        .selfSigned(
+          2.toByte,
+          invoker,
+          issuer.toAddress,
+          Some(FUNCTION_CALL(FunctionHeader.User("issue"), Nil)),
+          Seq.empty,
+          2.waves,
+          Asset.Waves,
+          ntpTime.getTimestamp()
+        )
+        .explicitGet()
       d.appendBlock(
         GenesisTransaction.create(issuerAddress, 1000.waves, ntpTime.getTimestamp()).explicitGet(),
+        GenesisTransaction.create(invoker.toAddress, 1000.waves, ntpTime.getTimestamp()).explicitGet(),
         SetScriptTransaction.selfSigned(2.toByte, issuer, Some(dAppScript), 0.005.waves, ntpTime.getTimestamp()).explicitGet(),
-        InvokeScriptTransaction
-          .selfSigned(
-            2.toByte,
-            issuer,
-            issuer.toAddress,
-            Some(FUNCTION_CALL(FunctionHeader.User("issue"), Nil)),
-            Seq.empty,
-            2.waves,
-            Asset.Waves,
-            ntpTime.getTimestamp()
-          )
-          .explicitGet()
+        invoke
       )
-      val assetId = d.blockchain
-        .accountData(issuer.toAddress, "assetId")
-        .collect {
-          case BinaryDataEntry(_, value) => value
-        }.get
 
-      repo.updateForHeight(1).get.referencedAssets.head.id shouldEqual assetId
+      val assetId = d.blockchain.binaryData(issuer.toAddress, "assetId").get
+      val leaseId = d.blockchain.binaryData(issuerAddress, "leaseId").get
+
+      def check()(implicit pos: Position): Unit = {
+        val genesisUpdate = repo.updateForHeight(1).get
+        genesisUpdate.referencedAssets.head.id shouldEqual assetId
+        val leaseUpdate = genesisUpdate.transactionStateUpdates(3).leases.head
+        leaseUpdate.originTransactionId shouldEqual invoke.id()
+        leaseUpdate.leaseId shouldEqual leaseId
+      }
+
+      check()
+
+      d.appendBlock()
+
+      check()
     }
   }
 

@@ -179,7 +179,7 @@ object StateUpdate {
         v.amount,
         v.sender.toByteString,
         v.recipient.toByteString,
-        v.leaseId.toByteString
+        v.originTransactionId.toByteString
       )
     }
   }
