@@ -2,36 +2,45 @@ package com.wavesplatform.events
 
 import java.nio.file.Files
 
-import scala.concurrent.{Await, Promise}
-import scala.concurrent.duration._
-import scala.reflect.ClassTag
-
-import com.wavesplatform.account.Address
+import com.google.common.primitives.Longs
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
+import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
 import com.wavesplatform.events.api.grpc.BlockchainUpdatesApiGrpcImpl
 import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdatesRangeRequest, SubscribeEvent, SubscribeRequest}
 import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.repo.UpdatesRepoImpl
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
+import com.wavesplatform.it.util._
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
-import com.wavesplatform.state.{AssetDescription, Blockchain, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.transaction.{PaymentTransaction, TxHelpers}
+import com.wavesplatform.state.{AssetDescription, Blockchain, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, PaymentTransaction, TxHelpers}
 import io.grpc.StatusException
 import io.grpc.stub.{CallStreamObserver, StreamObserver}
 import monix.execution.CancelableFuture
 import monix.execution.Scheduler.Implicits.global
+import org.scalactic.source.Position
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{FreeSpec, Matchers}
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.{FreeSpec, Matchers}
+
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Promise}
+import scala.reflect.ClassTag
+import scala.util.Random
 
 class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with ScalaFutures with PathMockFactory {
   var currentSettings: WavesSettings = domainSettingsWithFS(
@@ -40,7 +49,9 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       BlockchainFeatures.NG,
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.DataTransaction,
-      BlockchainFeatures.FeeSponsorship
+      BlockchainFeatures.FeeSponsorship,
+      BlockchainFeatures.BlockV5,
+      BlockchainFeatures.SynchronousCalls
     )
   )
 
@@ -122,11 +133,11 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
 
         val lastEvents = events.dropWhile(_.height < 100)
         lastEvents should matchPattern {
-        case Seq(
-          E.Block(100, _),
-          E.Block(101, _)
-        ) =>
-      }
+          case Seq(
+              E.Block(100, _),
+              E.Block(101, _)
+              ) =>
+        }
     }
 
     "should not freeze on block rollback without key-block" in withDomainAndRepo {
@@ -167,28 +178,29 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       }
     }
 
-    "should survive invalid micro rollback" in withDomainAndRepo { case (d, repo) =>
-      d.appendKeyBlock()
-      val sub = repo.createSubscription(SubscribeRequest(1))
-      val mb1Id = d.appendMicroBlock(TxHelpers.transfer())
-      val mb2Id = d.appendMicroBlock(TxHelpers.transfer())
-      d.appendMicroBlock(TxHelpers.transfer())
+    "should survive invalid micro rollback" in withDomainAndRepo {
+      case (d, repo) =>
+        d.appendKeyBlock()
+        val sub   = repo.createSubscription(SubscribeRequest(1))
+        val mb1Id = d.appendMicroBlock(TxHelpers.transfer())
+        val mb2Id = d.appendMicroBlock(TxHelpers.transfer())
+        d.appendMicroBlock(TxHelpers.transfer())
 
-      d.blockchain.removeAfter(mb1Id) // Should not do anything
-      d.appendKeyBlock(ref = Some(mb2Id))
+        d.blockchain.removeAfter(mb1Id) // Should not do anything
+        d.appendKeyBlock(ref = Some(mb2Id))
 
-      sub.cancel()
-      val result = sub.futureValue.map(_.toUpdate)
-      result should matchPattern {
-        case Seq(
-          E.Block(1, _),
-          E.Micro(1, _),
-          E.Micro(1, _),
-          E.Micro(1, _),
-          E.MicroRollback(1, `mb2Id`),
-          E.Block(2, _)
-        ) =>
-      }
+        sub.cancel()
+        val result = sub.futureValue.map(_.toUpdate)
+        result should matchPattern {
+          case Seq(
+              E.Block(1, _),
+              E.Micro(1, _),
+              E.Micro(1, _),
+              E.Micro(1, _),
+              E.MicroRollback(1, `mb2Id`),
+              E.Block(2, _)
+              ) =>
+        }
     }
 
     "should include correct waves amount" in withNEmptyBlocksSubscription() { result =>
@@ -367,25 +379,86 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       }
     }
 
-    "should skip rollback in real time updates" in {
-      withDomainAndRepo { (d, repo) =>
-        d.appendKeyBlock()
-        d.appendKeyBlock()
-        d.rollbackTo(1)
-        d.appendKeyBlock()
-        d.appendKeyBlock()
+    "should skip rollback in real time updates" in withDomainAndRepo { (d, repo) =>
+      d.appendKeyBlock()
+      d.appendKeyBlock()
+      d.rollbackTo(1)
+      d.appendKeyBlock()
+      d.appendKeyBlock()
 
-        val subscription = repo.createSubscription(SubscribeRequest(1))
-        Thread.sleep(1000)
-        subscription.cancel()
-        subscription.futureValue.map(_.getUpdate.height) shouldBe Seq(1, 2, 3)
-      }
+      val subscription = repo.createSubscription(SubscribeRequest(1))
+      Thread.sleep(1000)
+      subscription.cancel()
+      subscription.futureValue.map(_.getUpdate.height) shouldBe Seq(1, 2, 3)
     }
 
     "should get valid range" in withDomainAndRepo { (d, repo) =>
       for (_ <- 1 to 10) d.appendBlock()
       val blocks = repo.getBlockUpdatesRange(GetBlockUpdatesRangeRequest(3, 5)).futureValue.updates
       blocks.map(_.height) shouldBe Seq(3, 4, 5)
+    }
+
+    "should return correct ids for assets and leases from invoke" in withDomainAndRepo { (d, repo) =>
+      val issuer        = KeyPair(Longs.toByteArray(Random.nextLong()))
+      val invoker       = KeyPair(Longs.toByteArray(Random.nextLong()))
+      val issuerAddress = issuer.toAddress
+      val (dAppScript, _) = ScriptCompiler
+        .compile(
+          s"""
+           |{-# STDLIB_VERSION 5 #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |
+           |@Callable(i)
+           |func issue() = {
+           |  let issue = Issue("name", "description", 1000, 4, true, unit, 0)
+           |  let lease = Lease(i.caller, 500000000)
+           |  [
+           |    issue,
+           |    BinaryEntry("assetId", calculateAssetId(issue)),
+           |    lease,
+           |    BinaryEntry("leaseId", calculateLeaseId(lease))
+           |  ]
+           |}
+           |""".stripMargin,
+          ScriptEstimatorV3
+        )
+        .explicitGet()
+      val invoke = InvokeScriptTransaction
+        .selfSigned(
+          2.toByte,
+          invoker,
+          issuer.toAddress,
+          Some(FUNCTION_CALL(FunctionHeader.User("issue"), Nil)),
+          Seq.empty,
+          2.waves,
+          Asset.Waves,
+          ntpTime.getTimestamp()
+        )
+        .explicitGet()
+      d.appendBlock(
+        GenesisTransaction.create(issuerAddress, 1000.waves, ntpTime.getTimestamp()).explicitGet(),
+        GenesisTransaction.create(invoker.toAddress, 1000.waves, ntpTime.getTimestamp()).explicitGet(),
+        SetScriptTransaction.selfSigned(2.toByte, issuer, Some(dAppScript), 0.005.waves, ntpTime.getTimestamp()).explicitGet(),
+        invoke
+      )
+
+      val assetId = d.blockchain.binaryData(issuer.toAddress, "assetId").get
+      val leaseId = d.blockchain.binaryData(issuerAddress, "leaseId").get
+
+      def check()(implicit pos: Position): Unit = {
+        val genesisUpdate = repo.updateForHeight(1).get
+        genesisUpdate.referencedAssets.head.id shouldEqual assetId
+        val leaseUpdate = genesisUpdate.transactionStateUpdates(3).leases.head
+        leaseUpdate.originTransactionId shouldEqual invoke.id()
+        leaseUpdate.leaseId shouldEqual leaseId
+      }
+
+      check()
+
+      d.appendBlock()
+
+      check()
     }
   }
 
