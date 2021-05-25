@@ -552,6 +552,12 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     )
   }
 
+  property("\\u notation is allowed") {
+    val u1 = "\u0064"
+    TestCompiler(V4).compileExpression(s""" "$u1" == "$u1" """) shouldBe
+      TestCompiler(V4).compileExpression(s""" "d" == "d" """)
+  }
+
   treeTypeTest("GETTER")(
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
