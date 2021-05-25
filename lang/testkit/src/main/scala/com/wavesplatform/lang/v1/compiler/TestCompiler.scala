@@ -33,8 +33,8 @@ class TestCompiler(version: StdLibVersion) {
   def compileContract(script: String): Script =
     ContractScript(version, compile(script).explicitGet()).explicitGet()
 
-  def compileExpression(script: String): Script =
-    ExprScript(version, ExpressionCompiler.compile(script, expressionCompilerContext).explicitGet()._1).explicitGet()
+  def compileExpression(script: String, allowIllFormedStrings: Boolean = false): Script =
+    ExprScript(version, ExpressionCompiler.compile(script, expressionCompilerContext, allowIllFormedStrings).explicitGet()._1).explicitGet()
 }
 
 object TestCompiler {

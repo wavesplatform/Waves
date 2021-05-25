@@ -77,7 +77,7 @@ object ContractCompiler {
         .getOrElse(List.empty)
       compiledBody <- local {
         modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings)).flatMap(
-          _ => compiler.ExpressionCompiler.compileFunc(af.f.position, af.f, saveExprContext, annotationBindings.map(_._1))
+          _ => compiler.ExpressionCompiler.compileFunc(af.f.position, af.f, saveExprContext, annotationBindings.map(_._1), allowIllFormedStrings = false)
         )
       }
       annotatedFuncWithErr <- getCompiledAnnotatedFunc(annotationsWithErr, compiledBody._1).handleError()
@@ -98,12 +98,12 @@ object ContractCompiler {
     dec match {
       case l: Expressions.LET =>
         for {
-          compiledLet      <- compileLet(dec.position, l, saveExprContext)
+          compiledLet      <- compileLet(dec.position, l, saveExprContext, allowIllFormedStrings = false)
           updateCtxWithErr <- updateCtx(compiledLet.dec.name, compiledLet.t, dec.position).handleError()
         } yield compiledLet.copy(errors = compiledLet.errors ++ updateCtxWithErr._2)
       case f: FUNC =>
         for {
-          compiledFunc <- compileFunc(dec.position, f, saveExprContext)
+          compiledFunc <- compileFunc(dec.position, f, saveExprContext, allowIllFormedStrings = false)
           (funcName, compiledFuncBodyType, argTypes) = (compiledFunc._1.dec.name, compiledFunc._1.t, compiledFunc._2)
           typeSig                                    = FunctionTypeSignature(compiledFuncBodyType, argTypes, FunctionHeader.User(funcName))
           updateCtxWithErr <- updateCtx(funcName, typeSig, dec.position).handleError()
