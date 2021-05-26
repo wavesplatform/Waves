@@ -8,9 +8,6 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 import akka.actor.ActorSystem
-import com.google.common.io.ByteStreams
-import com.google.common.primitives.Ints
-import com.wavesplatform.Exporter.Formats
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonBlocksApi, CommonTransactionsApi}
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -40,6 +37,33 @@ import monix.reactive.{Observable, Observer}
 import org.iq80.leveldb.DB
 import scopt.OParser
 
+import scala.annotation.tailrec
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
+import scala.util.{Failure, Random, Success, Try}
+
+class BackoffPolicy(initialBackoff: Duration, maxBackoff: Duration) {
+  private final val Multiplier = 1.6
+  private final val Jitter     = .2
+
+  private var nextBackoffNanos = initialBackoff.toMillis
+
+  def nextBackoff(): Long = {
+    val currentBackoff = nextBackoffNanos
+    nextBackoffNanos = (nextBackoffNanos * Multiplier).toLong.min(maxBackoff.toMillis)
+    currentBackoff + jitter(currentBackoff)
+  }
+
+  private def jitter(baseValue: Long): Long = {
+    val jitterValue = baseValue * Jitter
+    ((-jitterValue * .5) + Random.nextDouble() * jitterValue).toLong
+  }
+
+  def reset(): Unit = {
+    nextBackoffNanos = initialBackoff.toMillis
+  }
+}
+
 object Importer extends ScorexLogging {
   import monix.execution.Scheduler.Implicits.global
 
@@ -49,7 +73,6 @@ object Importer extends ScorexLogging {
       configFile: Option[File] = None,
       blockchainFile: String = "blockchain",
       importHeight: Int = Int.MaxValue,
-      format: String = Formats.Binary,
       verify: Boolean = true,
       dryRun: Boolean = false
   )
@@ -75,19 +98,10 @@ object Importer extends ScorexLogging {
           .text("Import to height")
           .action((h, c) => c.copy(importHeight = h))
           .validate(h => if (h > 0) success else failure("Import height must be > 0")),
-        opt[String]('f', "format")
-          .hidden()
-          .text("Blockchain data file format")
-          .action((f, c) => c.copy(format = f))
-          .valueName(s"<${Formats.importerList.mkString("|")}> (default is ${Formats.default})")
-          .validate {
-            case f if Formats.isSupportedInImporter(f) => success
-            case f                                     => failure(s"Unsupported format: $f")
-          },
-        opt[Unit]("dry-run").action((_, c) => c.copy(dryRun = true)),
         opt[Unit]('n', "no-verify")
           .text("Disable signatures verification")
           .action((_, c) => c.copy(verify = false)),
+        opt[Unit]("dry-run").action((_, c) => c.copy(dryRun = true)),
         help("help").hidden()
       )
     }
@@ -170,113 +184,86 @@ object Importer extends ScorexLogging {
   @volatile private var quit = false
   private val lock           = new Object
 
-  //noinspection UnstableApiUsage
-  def startImport(
-      inputStream: BufferedInputStream,
-      blockchain: Blockchain,
-      appendBlock: AppendBlock,
-      importOptions: ImportOptions,
-      skipBlocks: Boolean
-  ): Unit = {
-    val lenBytes = new Array[Byte](Ints.BYTES)
-    val start    = System.nanoTime()
-    var counter  = 0
+  private val backoffPolicy = new BackoffPolicy(1.second, 2.minutes)
 
-    val startHeight   = blockchain.height
-    var blocksToSkip  = if (skipBlocks) startHeight - 1 else 0
-    val blocksToApply = importOptions.importHeight - startHeight + 1
-
-    if (blocksToSkip > 0) log.info(s"Skipping $blocksToSkip block(s)")
-
-    sys.addShutdownHook {
-      import scala.concurrent.duration._
-      val millis = (System.nanoTime() - start).nanos.toMillis
-      log.info(
-        s"Imported $counter block(s) from $startHeight to ${startHeight + counter} in ${humanReadableDuration(millis)}"
-      )
+  @tailrec
+  def withBackoff(f: => Unit): Unit =
+    try f
+    catch {
+      case e: IOException =>
+        val delay = backoffPolicy.nextBackoff()
+        log.info(f"Next attempt in ${delay * 1e-3}%.3f seconds", e)
+        Thread.sleep(delay)
+        withBackoff(f)
     }
 
-    while (!quit && counter < blocksToApply) lock.synchronized {
-      val s1 = ByteStreams.read(inputStream, lenBytes, 0, Ints.BYTES)
-      if (s1 == Ints.BYTES) {
-        val blockSize = Ints.fromByteArray(lenBytes)
+  def importStep(data: DataInputStream, appendBlock: AppendBlock, blockchain: Blockchain, targetHeight: Int): Unit =
+    while (!quit && blockchain.height < targetHeight) lock.synchronized {
+      data.readInt() // block size is ignored
+      val block =
+        (if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, blockchain.height + 1))
+           PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(data)), unsafe = true)
+         else Block.parseBytes(data)) match {
+          case Success(value) =>
+            if (value.signatureValid()) {
+              backoffPolicy.reset()
+              value
+            } else
+              throw new IOException("Error parsing block: invalid signature")
 
-        lazy val blockBytes = new Array[Byte](blockSize)
-        val factReadSize =
-          if (blocksToSkip > 0) {
-            // File IO optimization
-            ByteStreams.skipFully(inputStream, blockSize)
-            blockSize
-          } else {
-            ByteStreams.read(inputStream, blockBytes, 0, blockSize)
-          }
-
-        if (factReadSize == blockSize) {
-          if (blocksToSkip > 0) {
-            blocksToSkip -= 1
-          } else {
-            val blockV5 = blockchain.isFeatureActivated(
-              BlockchainFeatures.BlockV5,
-              blockchain.height + 1
-            )
-            val block =
-              (if (importOptions.format == Formats.Binary && !blockV5) Block.parseBytes(blockBytes)
-               else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)).get
-            if (blockchain.lastBlockId.contains(block.header.reference)) {
-              Await.result(appendBlock(block).runAsyncLogErr, Duration.Inf) match {
-                case Left(ve) =>
-                  log.error(s"Error appending block: $ve")
-                  quit = true
-                case _ =>
-                  counter = counter + 1
-              }
-            } else {
-              log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
-            }
-          }
-        } else {
-          log.info(s"$factReadSize != expected $blockSize")
-          quit = true
+          case Failure(exception) =>
+            throw new IOException("Error parsing block", exception)
         }
-      } else {
-        if (inputStream.available() > 0) log.info(s"Expecting to read ${Ints.BYTES} but got $s1 (${inputStream.available()})")
-        quit = true
+
+      Await.result(appendBlock(block).runAsyncLogErr, Duration.Inf) match {
+        case Left(error) => throw new IllegalArgumentException(error.toString)
+        case Right(_) =>
+          if (targetHeight == blockchain.height) quit = true
       }
     }
+
+  def readOffsetFromDB(db: DB): Long = {
+    var result = 0L
+    db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
+      e.getKey match {
+        case Array(_, _, 0, 0, 0, 1) => // Skip genesis
+        case _ =>
+          result += com.wavesplatform.database.readBlockMeta(e.getValue).size + 4
+      }
+    }
+    result
   }
+
+  def initInputStream(file: String, offset: Long): InputStream =
+    file match {
+      case "-" =>
+        System.in
+
+      case _ =>
+        try {
+          val url        = new URL(file)
+          val connection = url.openConnection()
+          connection.setReadTimeout(1000)
+          connection.setRequestProperty("user-agent", s"waves-node/${Version.VersionString}")
+          if (offset > 0) connection.setRequestProperty("Range", s"bytes=$offset-")
+          log.info(s"Offset: $offset")
+          connection.connect()
+          connection.getInputStream
+        } catch {
+          case _: MalformedURLException =>
+            val fs = new FileInputStream(file)
+            if (offset > 0) fs.skip(offset)
+            fs
+        }
+    }
 
   def main(args: Array[String]): Unit = {
     val importOptions = parseOptions(args)
     val settings      = loadSettings(importOptions.configFile)
-
-    def initFileStream(file: String, offset: Long): InputStream = {
-      log.info(s"Opening import file: $file, offset=$offset")
-      file match {
-        case "-" =>
-          System.in
-
-        case _ =>
-          System.setProperty("http.agent", s"waves-node/${Version.VersionString}")
-          try {
-            val url        = new URL(file)
-            val connection = url.openConnection()
-            if (offset > 0) connection.setRequestProperty("Range", s"bytes=$offset-")
-            connection.connect()
-            connection.getInputStream
-          } catch {
-            case _: MalformedURLException =>
-              val fs = new FileInputStream(file)
-              if (offset > 0) fs.skip(offset)
-              fs
-          }
-      }
-    }
-
-    val scheduler = Schedulers.singleThread("appender")
-    val time      = new NTP(settings.ntpServer)
-
-    val actorSystem = ActorSystem("wavesplatform-import")
-    val db          = openDB(settings.dbSettings.directory)
+    val scheduler     = Schedulers.singleThread("appender")
+    val time          = new NTP(settings.ntpServer)
+    val actorSystem   = ActorSystem("wavesplatform-import")
+    val db            = openDB(settings.dbSettings.directory)
     val (blockchainUpdater, levelDb) =
       StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.combined(triggers))
     val utxPool     = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings)
@@ -285,23 +272,8 @@ object Importer extends ScorexLogging {
 
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, db, actorSystem)
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)
-
-    val importFileOffset = if (importOptions.dryRun) 0 else importOptions.format match {
-      case Formats.Binary =>
-        var result = 0L
-        db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
-          e.getKey match {
-            case Array(_, _, 0, 0, 0, 1) => // Skip genesis
-            case _ =>
-              val meta = com.wavesplatform.database.readBlockMeta(e.getValue)
-              result += meta.size + 4
-          }
-        }
-        result
-
-      case _ => 0L
-    }
-    val inputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, importFileOffset), 2 * 1024 * 1024)
+    val initialHeight = blockchainUpdater.height
+    val startupTime   = System.currentTimeMillis()
 
     if (importOptions.dryRun) {
       def readNextBlock(): Future[Option[Block]] = Future.successful(None)
@@ -315,7 +287,6 @@ object Importer extends ScorexLogging {
 
     sys.addShutdownHook {
       quit = true
-      Await.result(actorSystem.terminate(), 10.second)
       lock.synchronized {
         if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) {
           // Force store liquid block in leveldb
@@ -338,9 +309,7 @@ object Importer extends ScorexLogging {
           blockchainUpdater.processBlock(pseudoBlock, ByteStr.empty, verify = false)
         }
 
-        // Terminate appender
-        scheduler.shutdown()
-        scheduler.awaitTermination(10 seconds)
+        log.info(s"Imported ${blockchainUpdater.height - initialHeight} blocks in ${humanReadableDuration(System.currentTimeMillis() - startupTime)}")
 
         // Terminate extensions
         Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
@@ -348,11 +317,18 @@ object Importer extends ScorexLogging {
         blockchainUpdater.shutdown()
         levelDb.close()
         db.close()
+        Await.result(Kamon.stopModules(), 10.seconds)
       }
-      inputStream.close()
     }
 
-    startImport(inputStream, blockchainUpdater, extAppender, importOptions, importFileOffset == 0)
-    Await.result(Kamon.stopModules(), 10.seconds)
+    withBackoff {
+      importStep(
+        new DataInputStream(new BufferedInputStream(initInputStream(importOptions.blockchainFile, readOffsetFromDB(db)), 2 * 1024 * 1024)),
+        extAppender,
+        blockchainUpdater,
+        importOptions.importHeight
+      )
+    }
+
   }
 }

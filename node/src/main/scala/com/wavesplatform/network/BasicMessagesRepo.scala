@@ -1,5 +1,6 @@
 package com.wavesplatform.network
 
+import java.io.{ByteArrayInputStream, DataInputStream}
 import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
@@ -181,7 +182,7 @@ object BlockSpec extends MessageSpec[Block] {
 
   override def serializeData(block: Block): Array[Byte] = block.bytes()
 
-  override def deserializeData(bytes: Array[Byte]): Try[Block] = Block.parseBytes(bytes)
+  override def deserializeData(bytes: Array[Byte]): Try[Block] = Block.parseBytes(new DataInputStream(new ByteArrayInputStream(bytes)))
 }
 
 object ScoreSpec extends MessageSpec[BigInt] {

@@ -1,5 +1,6 @@
 package com.wavesplatform.block.serialization
 
+import java.io.{DataInput, DataInputStream}
 import java.nio.ByteBuffer
 
 import com.google.common.io.ByteStreams.newDataOutput
@@ -11,7 +12,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.utils.PBUtils
-import com.wavesplatform.serialization.ByteBufferOps
+import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import play.api.libs.json.{JsArray, JsNumber, JsObject, Json}
@@ -130,42 +131,40 @@ object BlockSerializer {
     )
   }
 
-  def parseBytes(bytes: Array[Byte]): Try[Block] =
+  def parseBytes(in: DataInput): Try[Block] =
     Try {
-      val buf = ByteBuffer.wrap(bytes).asReadOnlyBuffer()
-
-      val Prefix(version, timestamp, reference, baseTarget, generationSignature)   = parsePrefix(buf)
-      val transactionData                                                          = parseTxs(buf, version)
-      val Suffix(generator, featureVotes, rewardVote, transactionsRoot, signature) = parseSuffix(buf, version)
+      val Prefix(version, timestamp, reference, baseTarget, generationSignature)   = parsePrefix(in)
+      val transactionData                                                          = parseTxs(in, version)
+      val Suffix(generator, featureVotes, rewardVote, transactionsRoot, signature) = parseSuffix(in, version)
 
       val header = BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, transactionsRoot)
 
       Block(header, signature, transactionData)
     }
 
-  def parsePrefix(buf: ByteBuffer): Prefix = {
-    val version   = buf.getByte
-    val timestamp = buf.getLong
-    val reference = ByteStr(buf.getByteArray(SignatureLength))
+  def parsePrefix(in: DataInput): Prefix = {
+    val version   = in.readByte()
+    val timestamp = in.readLong()
 
-    val consensusBytesLength = buf.getInt
-    val baseTarget           = Longs.fromByteArray(buf.getByteArray(Block.BaseTargetLength))
-    val generationSignature  = ByteStr(buf.getByteArray(consensusBytesLength - Longs.BYTES))
+    val reference = ByteStr(in.readByteArray(SignatureLength))
+
+    val consensusBytesLength = in.readInt()
+    val baseTarget           = in.readLong()
+    val generationSignature  = ByteStr(in.readByteArray(consensusBytesLength - Longs.BYTES))
     Prefix(version, timestamp, reference, baseTarget, generationSignature)
   }
 
-  def parseTxs(buf: ByteBuffer, version: Byte): Seq[Transaction] = {
-    buf.getInt // transactions data size
-    readTransactionData(version, buf)
+  def parseTxs(in: DataInput, version: Byte): Seq[Transaction] = {
+    in.readInt() // transactions data size
+    readTransactionData(version, in)
   }
 
-  def parseSuffix(buf: ByteBuffer, version: Byte): Suffix = {
-    val featureVotes     = if (version > Block.PlainBlockVersion) buf.getShortArray(buf.getInt).toSeq else Seq.empty[Short]
-    val rewardVote       = if (version > Block.NgBlockVersion) buf.getLong else -1L
-    val generator        = buf.getPublicKey
-    val transactionsRoot = ByteStr.empty
-    val signature        = ByteStr(buf.getByteArray(SignatureLength))
-    Suffix(generator, featureVotes, rewardVote, transactionsRoot, signature)
+  def parseSuffix(in: DataInput, version: Byte): Suffix = {
+    val featureVotes     = if (version > Block.PlainBlockVersion) in.readShortArray() else Seq.empty[Short]
+    val rewardVote       = if (version > Block.NgBlockVersion) in.readLong() else -1L
+    val generator        = in.readPublicKey()
+    val signature        = ByteStr(in.readByteArray(SignatureLength))
+    Suffix(generator, featureVotes, rewardVote, ByteStr.empty, signature)
   }
 
   case class Prefix(

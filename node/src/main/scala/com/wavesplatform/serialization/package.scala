@@ -1,5 +1,6 @@
 package com.wavesplatform
 
+import java.io.DataInput
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.Shorts
@@ -13,6 +14,18 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
 
 package object serialization {
+  implicit class DataInputStreamOps(val di: DataInput) extends AnyVal {
+    def readByteArray(length: Int): Array[Byte] = {
+      val bs = new Array[Byte](length)
+      di.readFully(bs)
+      bs
+    }
+
+    def readPublicKey(): PublicKey = PublicKey(readByteArray(KeyLength))
+
+    def readShortArray(): Seq[Short] = Array.fill[Short](di.readInt())(di.readShort()).toIndexedSeq
+  }
+
   implicit class ByteBufferOps(private val buf: ByteBuffer) extends AnyVal {
     def getByteArrayWithLength: Array[Byte] = {
       val prefix = buf.getShort
