@@ -72,39 +72,6 @@ paths:
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
         - APIKey: []
-  '/addresses/verify/{address}':
-    post:
-      tags:
-        - addresses
-      summary: Verify
-      description: Check a signature of a message signed by an account
-      operationId: verifyMessageSignature
-      parameters:
-        - $ref: '#/components/parameters/address'
-      requestBody:
-        description: JSON with data
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Signed'
-        required: true
-      responses:
-        '200':
-          description: successful operation
-          content:
-            application/json:
-              schema:
-                required:
-                  - isValid
-                type: object
-                properties:
-                  isValid:
-                    type: boolean
-        '403':
-          $ref: '#/components/responses/ApiKeyNotValid'
-      security:
-        - APIKey: []
-      x-codegen-request-body-name: body
   '/addresses/seq/{from}/{to}':
     get:
       tags:
@@ -380,34 +347,6 @@ paths:
                 items:
                   $ref: '#/components/schemas/DataEntry'
       x-codegen-request-body-name: keys
-  '/addresses/sign/{address}':
-    post:
-      tags:
-        - addresses
-      summary: Sign
-      description: 'Sign a message with a private key associated with {address}'
-      operationId: signMessage
-      parameters:
-        - $ref: '#/components/parameters/address'
-      requestBody:
-        description: Message to sign as a plain string
-        content:
-          application/json:
-            schema:
-              type: string
-        required: true
-      responses:
-        '200':
-          description: successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Signed'
-        '403':
-          $ref: '#/components/responses/ApiKeyNotValid'
-      security:
-        - APIKey: []
-      x-codegen-request-body-name: message
   '/addresses/validate/{address}':
     get:
       tags:
@@ -531,67 +470,6 @@ paths:
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
         - APIKey: []
-  '/addresses/signText/{address}':
-    post:
-      tags:
-        - addresses
-      summary: Sign
-      description: 'Sign a message with a private key associated with {address}'
-      operationId: signText
-      parameters:
-        - $ref: '#/components/parameters/address'
-      requestBody:
-        description: Message to sign as a plain string
-        content:
-          application/json:
-            schema:
-              type: string
-        required: true
-      responses:
-        '200':
-          description: successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Signed'
-        '403':
-          $ref: '#/components/responses/ApiKeyNotValid'
-      security:
-        - APIKey: []
-      x-codegen-request-body-name: message
-  '/addresses/verifyText/{address}':
-    post:
-      tags:
-        - addresses
-      summary: Verify text
-      description: Check a signature of a message signed by an account
-      operationId: verifyTextSignature
-      parameters:
-        - $ref: '#/components/parameters/address'
-      requestBody:
-        description: JSON with data
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Signed'
-        required: true
-      responses:
-        '200':
-          description: successful operation
-          content:
-            application/json:
-              schema:
-                required:
-                  - isValid
-                type: object
-                properties:
-                  isValid:
-                    type: boolean
-        '403':
-          $ref: '#/components/responses/ApiKeyNotValid'
-      security:
-        - APIKey: []
-      x-codegen-request-body-name: body
   '/addresses/balance/details/{address}':
     get:
       tags:
