@@ -9,7 +9,7 @@ import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
@@ -25,6 +25,8 @@ import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Common, Global}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+
+import scala.util.Try
 
 class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
@@ -540,6 +542,20 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
         error should include("Can't find a function 'invoke'")
         error should include("Can't find a function 'reentrantInvoke'")
       }
+  }
+
+  property("forbidden broken unicode") {
+    val u1 = "\ud87e"
+    Try(TestCompiler(V4).compileExpression(s""" "aaa${u1}aaa" == "${u1}aaa$u1" """)).toEither should produce(
+      s"String 'aaa${u1}aaa' contains ill-formed characters in 1-10; " +
+        s"String '${u1}aaa${u1}' contains ill-formed characters in 14-21"
+    )
+  }
+
+  property("\\u notation is allowed") {
+    val u1 = "\u0064"
+    TestCompiler(V4).compileExpression(s""" "$u1" == "$u1" """) shouldBe
+      TestCompiler(V4).compileExpression(s""" "d" == "d" """)
   }
 
   treeTypeTest("GETTER")(
