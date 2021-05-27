@@ -600,6 +600,10 @@ paths:
   '/blocks/heightByTimestamp/{timestamp}':
     get:
       tags: [blocks]
+      operationId: getHeightByTimestamp
+      summary: Blockchain height for timestamp
+      description: >-
+        Get height of the most recent block such that its timestamp does not exceed the given `{timestamp}`.
       parameters:
         - name: timestamp
           in: path
