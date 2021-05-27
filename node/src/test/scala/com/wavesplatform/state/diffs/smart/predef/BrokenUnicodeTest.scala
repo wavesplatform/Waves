@@ -131,7 +131,8 @@ class BrokenUnicodeTest
       case V3      => checkNoFixV3
       case V4      => checkNoFixV4
       case _       => throw new RuntimeException(s"Unexpected $v")
-    }
+    },
+    allowIllFormedStrings = true
   )
 
   private def checkFixScript(v: StdLibVersion) = TestCompiler(v).compileExpression(
@@ -139,7 +140,8 @@ class BrokenUnicodeTest
       case V1 | V2 => checkFixV1V2
       case V3      => checkFixV3
       case _       => checkFixV4AndNext
-    }
+    },
+    allowIllFormedStrings = true
   )
 
   private val allVersions              = DirectiveDictionary[StdLibVersion].all
