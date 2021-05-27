@@ -21,10 +21,11 @@ import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 
 object ContractCompiler {
 
-  def compileAnnotatedFunc(
+  private def compileAnnotatedFunc(
       af: Expressions.ANNOTATEDFUNC,
       version: StdLibVersion,
-      saveExprContext: Boolean
+      saveExprContext: Boolean,
+      allowIllFormedStrings: Boolean
   ): CompileM[(Option[AnnotatedFunction], List[(String, Types.FINAL)], Expressions.ANNOTATEDFUNC, Iterable[CompilationError])] = {
 
     def getCompiledAnnotatedFunc(
@@ -77,7 +78,7 @@ object ContractCompiler {
         .getOrElse(List.empty)
       compiledBody <- local {
         modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings)).flatMap(
-          _ => compiler.ExpressionCompiler.compileFunc(af.f.position, af.f, saveExprContext, annotationBindings.map(_._1), allowIllFormedStrings = false)
+          _ => compiler.ExpressionCompiler.compileFunc(af.f.position, af.f, saveExprContext, annotationBindings.map(_._1), allowIllFormedStrings)
         )
       }
       annotatedFuncWithErr <- getCompiledAnnotatedFunc(annotationsWithErr, compiledBody._1).handleError()
@@ -94,16 +95,16 @@ object ContractCompiler {
     } yield (resultAnnFunc, typedParams, parseNodeExpr, errorList)
   }
 
-  def compileDeclaration(dec: Expressions.Declaration, saveExprContext: Boolean): CompileM[CompilationStepResultDec] = {
+  private def compileDeclaration(dec: Expressions.Declaration, saveExprContext: Boolean, allowIllFormedStrings: Boolean): CompileM[CompilationStepResultDec] = {
     dec match {
       case l: Expressions.LET =>
         for {
-          compiledLet      <- compileLet(dec.position, l, saveExprContext, allowIllFormedStrings = false)
+          compiledLet      <- compileLet(dec.position, l, saveExprContext, allowIllFormedStrings)
           updateCtxWithErr <- updateCtx(compiledLet.dec.name, compiledLet.t, dec.position).handleError()
         } yield compiledLet.copy(errors = compiledLet.errors ++ updateCtxWithErr._2)
       case f: FUNC =>
         for {
-          compiledFunc <- compileFunc(dec.position, f, saveExprContext, allowIllFormedStrings = false)
+          compiledFunc <- compileFunc(dec.position, f, saveExprContext, allowIllFormedStrings = allowIllFormedStrings)
           (funcName, compiledFuncBodyType, argTypes) = (compiledFunc._1.dec.name, compiledFunc._1.t, compiledFunc._2)
           typeSig                                    = FunctionTypeSignature(compiledFuncBodyType, argTypes, FunctionHeader.User(funcName))
           updateCtxWithErr <- updateCtx(funcName, typeSig, dec.position).handleError()
@@ -117,17 +118,18 @@ object ContractCompiler {
       version: StdLibVersion,
       needCompaction: Boolean,
       removeUnusedCode: Boolean,
-      saveExprContext: Boolean = false
+      saveExprContext: Boolean = false,
+      allowIllFormedStrings: Boolean = false
   ): CompileM[(Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
     for {
-      decsCompileResult <- parsedDapp.decs.traverse[CompileM, CompilationStepResultDec](dec => compileDeclaration(dec, saveExprContext))
+      decsCompileResult <- parsedDapp.decs.traverse[CompileM, CompilationStepResultDec](dec => compileDeclaration(dec, saveExprContext, allowIllFormedStrings))
       decs           = decsCompileResult.map(_.dec)
       parsedNodeDecs = decsCompileResult.map(_.parseNodeExpr)
       duplicateVarsErr   <- validateDuplicateVarsInContract(parsedDapp).handleError()
       annFuncArgTypesErr <- validateAnnotatedFuncsArgTypes(ctx, parsedDapp).handleError()
       compiledAnnFuncsWithErr <- parsedDapp.fs
         .traverse[CompileM, (Option[AnnotatedFunction], List[(String, Types.FINAL)], Expressions.ANNOTATEDFUNC, Iterable[CompilationError])](
-          af => local(compileAnnotatedFunc(af, version, saveExprContext))
+          af => local(compileAnnotatedFunc(af, version, saveExprContext, allowIllFormedStrings))
         )
       annotatedFuncs   = compiledAnnFuncsWithErr.filter(_._1.nonEmpty).map(_._1.get)
       parsedNodeAFuncs = compiledAnnFuncsWithErr.map(_._3)
@@ -322,9 +324,10 @@ object ContractCompiler {
       contract: Expressions.DAPP,
       version: StdLibVersion,
       needCompaction: Boolean = false,
-      removeUnusedCode: Boolean = false
+      removeUnusedCode: Boolean = false,
+      allowIllFormedStrings: Boolean = false
   ): Either[String, DApp] = {
-    compileContract(c, contract, version, needCompaction, removeUnusedCode)
+    compileContract(c, contract, version, needCompaction, removeUnusedCode, allowIllFormedStrings = allowIllFormedStrings)
       .run(c)
       .map(
         _._2
@@ -341,12 +344,13 @@ object ContractCompiler {
       ctx: CompilerContext,
       version: StdLibVersion,
       needCompaction: Boolean = false,
-      removeUnusedCode: Boolean = false
+      removeUnusedCode: Boolean = false,
+      allowIllFormedStrings: Boolean = false
   ): Either[String, DApp] = {
     Parser.parseContract(input) match {
       case fastparse.Parsed.Success(xs, _) =>
-        ContractCompiler(ctx, xs, version, needCompaction, removeUnusedCode) match {
-          case Left(err) => Left(err.toString)
+        ContractCompiler(ctx, xs, version, needCompaction, removeUnusedCode, allowIllFormedStrings) match {
+          case Left(err) => Left(err)
           case Right(c)  => Right(c)
         }
       case f @ fastparse.Parsed.Failure(_, _, _) => Left(f.toString)

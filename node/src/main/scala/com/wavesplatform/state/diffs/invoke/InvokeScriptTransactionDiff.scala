@@ -269,7 +269,7 @@ object InvokeScriptTransactionDiff {
       paymentsComplexity: Int,
       blockchain: Blockchain
   ): Either[ValidationError with WithLog, (ScriptResult, Log[Id])] = {
-    val evaluationCtx = CachedDAppCTX.forVersion(version).completeContext(environment)
+    val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     val startLimit    = limit - paymentsComplexity
     ContractEvaluator
       .applyV2Coeval(evaluationCtx, Map(), contract, invocation, version, startLimit)

@@ -229,46 +229,6 @@ class InvokeScriptV5LimitsTest
     )
   }
 
-  def simpleContract(funcName: String): Either[String, DApp] = {
-    val expr = {
-      val script =
-        s"""
-          |
-          |{-# STDLIB_VERSION 3 #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |
-          |@Callable(xx)
-          |func $funcName(str: String, num: Int) = {
-          |    if (parseInt(str) == num) then throw() else throw()
-          |}
-          |
-          |@Verifier(txx)
-          |func verify() = {
-          |    false
-          |}
-          |
-        """.stripMargin
-      Parser.parseContract(script).get.value
-    }
-
-    val ctx = {
-      utils.functionCosts(V3)
-      Monoid
-        .combineAll(
-          Seq(
-            PureContext.build(V3).withEnvironment[Environment],
-            CryptoContext.build(Global, V3).withEnvironment[Environment],
-            WavesContext.build(
-              Global,
-              DirectiveSet(V3, Account, Expression).explicitGet()
-            )
-          )
-        )
-    }
-
-    compiler.ContractCompiler(ctx.compilerContext, expr, V3)
-  }
-
   def writeSet(funcName: String, count: Int): DApp = {
     val DataEntries = Array.tabulate(count)(i => s"""DataEntry("$i", $i)""").mkString(",")
 
@@ -328,7 +288,7 @@ class InvokeScriptV5LimitsTest
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(stdLibVersion).withEnvironment[Environment],
+            PureContext.build(stdLibVersion, fixUnicodeFunctions = true).withEnvironment[Environment],
             CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment],
             WavesContext.build(
               Global,

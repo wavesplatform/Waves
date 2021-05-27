@@ -718,7 +718,7 @@ class TransactionBindingsTest
     val expr       = Parser.parseExpr(script).get.value
     val directives = DirectiveSet(V2, Asset, Expression).explicitGet()
     val ctx =
-      PureContext.build(V2).withEnvironment[Environment] |+|
+      PureContext.build(V2, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V2, Asset, Expression).explicitGet())
 
@@ -749,7 +749,7 @@ class TransactionBindingsTest
     (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
 
     val ctx =
-      PureContext.build(V2).withEnvironment[Environment] |+|
+      PureContext.build(V2, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
         WavesContext.build(Global, directives)
 

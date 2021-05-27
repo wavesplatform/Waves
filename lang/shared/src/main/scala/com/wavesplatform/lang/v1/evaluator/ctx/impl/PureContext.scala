@@ -1757,7 +1757,7 @@ object PureContext {
       v5Functions
     )
 
-  def build(version: StdLibVersion, fixUnicodeFunctions: Boolean = true): CTX[NoContext] =
+  def build(version: StdLibVersion, fixUnicodeFunctions: Boolean): CTX[NoContext] =
     version match {
       case V1 | V2 if fixUnicodeFunctions => v1V2CtxFixed
       case V3 if fixUnicodeFunctions      => v3CtxFixed

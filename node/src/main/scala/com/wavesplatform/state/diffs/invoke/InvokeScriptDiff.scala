@@ -176,6 +176,7 @@ object InvokeScriptDiff {
                 CoevalR(
                   evaluateV2(
                     version,
+                    blockchain,
                     contract,
                     invocation,
                     environment,
@@ -249,13 +250,14 @@ object InvokeScriptDiff {
 
   private def evaluateV2(
       version: StdLibVersion,
+      blockchain: Blockchain,
       contract: DApp,
       invocation: ContractEvaluator.Invocation,
       environment: Environment[Id],
       limit: Int,
       startComplexity: Int
   ): Coeval[Either[ValidationError, (ScriptResult, Log[Id])]] = {
-    val evaluationCtx = CachedDAppCTX.forVersion(version).completeContext(environment)
+    val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     ContractEvaluator
       .applyV2Coeval(evaluationCtx, Map(), contract, invocation, version, limit)
       .map(
