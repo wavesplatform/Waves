@@ -12,7 +12,7 @@ import play.api.libs.json.Json
 
 class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
   val ContractFunction            = "default"
-  val compileV5: String => Script = TestCompiler(StdLibVersion.V5).compileContract _
+  val compileV5: String => Script = TestCompiler(StdLibVersion.V5).compileContract(_)
 
   "Invoke state changes" should "include intermediate invokes" in withDomain(DomainPresets.RideV5) { d =>
     // Root DApp, calls addr2s and addr2f

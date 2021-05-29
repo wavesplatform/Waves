@@ -22,7 +22,7 @@ class FoldTest extends PropSpec with PropertyChecks with Matchers with NoShrink 
     val ctx: CTX[Environment] =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V3).withEnvironment[Environment],
+          PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet.contractDirectiveSet),
           CryptoContext.build(Global, V3).withEnvironment[Environment]
         )

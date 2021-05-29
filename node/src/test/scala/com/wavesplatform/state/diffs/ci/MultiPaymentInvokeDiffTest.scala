@@ -315,7 +315,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
   }
 
   private def verifier(version: StdLibVersion, scriptType: ScriptType, result: String = "true"): Script =
-    compileExpr(
+    TestCompiler(version).compileExpression(
       s"""
          | {-# STDLIB_VERSION ${version.id}      #-}
          | {-# CONTENT_TYPE   EXPRESSION         #-}
@@ -323,9 +323,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
          |
          | $result
          |
-       """.stripMargin,
-      version,
-      scriptType
+       """.stripMargin
     )
 
   private def accountVerifierGen(version: StdLibVersion) =
