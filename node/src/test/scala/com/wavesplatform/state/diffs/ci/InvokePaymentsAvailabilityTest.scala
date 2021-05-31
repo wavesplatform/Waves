@@ -134,7 +134,7 @@ class InvokePaymentsAvailabilityTest
       ).foreach(_ shouldBe expectingCallingDAppBalance)
 
       val expectingCallingDAppBalanceInsideCallingDApp = paymentAmount
-      val expectingProxyDAppBalanceInsideCallingDApp   = paymentAmount - expectingCallingDAppBalanceInsideCallingDApp
+      val expectingProxyDAppBalanceInsideCallingDApp   = 0
       d.blockchain.accountData(callingDApp, "balance_self").get.value shouldBe expectingCallingDAppBalanceInsideCallingDApp
       d.blockchain.accountData(callingDApp, "balance_caller").get.value shouldBe expectingProxyDAppBalanceInsideCallingDApp
     }

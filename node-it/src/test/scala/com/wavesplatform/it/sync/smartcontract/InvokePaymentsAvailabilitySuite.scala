@@ -8,9 +8,6 @@ import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values.StdLibVersion.V5
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -59,40 +56,25 @@ class InvokePaymentsAvailabilitySuite extends BaseTransactionSuite {
       ScriptEstimatorV3
     ).explicitGet()._1.bytes().base64
 
-  private def dApp(version: StdLibVersion) = {
-    val data =
-      if (version > V3)
-        s"""
-           |let pmtAssetId = inv.payments[0].assetId.value()
-           |[
-           |  IntegerEntry("balance_self", this.assetBalance(pmtAssetId)),
-           |  IntegerEntry("balance_caller", inv.caller.assetBalance(pmtAssetId))
-           |]
-         """.stripMargin
-      else
-        s"""
-           |let pmtAssetId = inv.payment.value().assetId.value()
-           |WriteSet([
-           |  DataEntry("balance_self", this.assetBalance(pmtAssetId)),
-           |  DataEntry("balance_caller", inv.caller.assetBalance(pmtAssetId))
-           |])
-         """.stripMargin
-
+  private val dApp =
     ScriptCompiler(
       s"""
-       | {-# STDLIB_VERSION ${version.id}  #-}
-       | {-# CONTENT_TYPE   DAPP           #-}
-       | {-# SCRIPT_TYPE    ACCOUNT        #-}
+       | {-# STDLIB_VERSION 5       #-}
+       | {-# CONTENT_TYPE   DAPP    #-}
+       | {-# SCRIPT_TYPE    ACCOUNT #-}
        |
        | @Callable(inv)
        | func default() = {
-       |   $data
+       |   let pmtAssetId = inv.payments[0].assetId.value()
+       |   [
+       |     IntegerEntry("balance_self", this.assetBalance(pmtAssetId)),
+       |     IntegerEntry("balance_caller", inv.caller.assetBalance(pmtAssetId))
+       |   ]
        | }
      """.stripMargin,
       isAssetScript = false,
       ScriptEstimatorV3
     ).explicitGet()._1.bytes().base64
-  }
 
   private val paymentAmount = 12345
   private val issueAmount   = 1000 * 1000
@@ -102,34 +84,30 @@ class InvokePaymentsAvailabilitySuite extends BaseTransactionSuite {
     val asset   = IssuedAsset(ByteStr.decodeBase58(assetId).get)
     sender.setScript(proxyDApp, Some(syncDApp(callingDAppAddress)), waitForTx = true)
 
-    DirectiveDictionary[StdLibVersion].all
-      .filter(_ >= V3)
-      .foreach { callingDAppVersion =>
-        sender.setScript(callingDApp, Some(dApp(callingDAppVersion)), waitForTx = true)
+    sender.setScript(callingDApp, Some(dApp), waitForTx = true)
 
-        val callerStartBalance      = sender.assetBalance(callerAddress, assetId).balance
-        val proxyStartBalance       = sender.assetBalance(proxyDAppAddress, assetId).balance
-        val callingDAppStartBalance = sender.assetBalance(callingDAppAddress, assetId).balance
+    val callerStartBalance      = sender.assetBalance(callerAddress, assetId).balance
+    val proxyStartBalance       = sender.assetBalance(proxyDAppAddress, assetId).balance
+    val callingDAppStartBalance = sender.assetBalance(callingDAppAddress, assetId).balance
 
-        sender.invokeScript(caller, proxyDAppAddress, payment = Seq(Payment(paymentAmount, asset)), fee = invokeFee, waitForTx = true)
-        sender.assetBalance(callerAddress, assetId).balance shouldBe callerStartBalance - paymentAmount
+    sender.invokeScript(caller, proxyDAppAddress, payment = Seq(Payment(paymentAmount, asset)), fee = invokeFee, waitForTx = true)
+    sender.assetBalance(callerAddress, assetId).balance shouldBe callerStartBalance - paymentAmount
 
-        val expectingProxyDAppBalance = 0
-        List(
-          sender.assetBalance(proxyDAppAddress, assetId).balance,
-          sender.getData(proxyDAppAddress, "balance_self").head.value
-        ).foreach(_ shouldBe proxyStartBalance + expectingProxyDAppBalance)
+    val expectingProxyDAppBalance = 0
+    List(
+      sender.assetBalance(proxyDAppAddress, assetId).balance,
+      sender.getData(proxyDAppAddress, "balance_self").head.value
+    ).foreach(_ shouldBe proxyStartBalance + expectingProxyDAppBalance)
 
-        val expectingCallingDAppBalance = paymentAmount
-        List(
-          sender.assetBalance(callingDAppAddress, assetId).balance,
-          sender.getData(proxyDAppAddress, "balance_calling_dApp").head.value
-        ).foreach(_ shouldBe callingDAppStartBalance + expectingCallingDAppBalance)
+    val expectingCallingDAppBalance = paymentAmount
+    List(
+      sender.assetBalance(callingDAppAddress, assetId).balance,
+      sender.getData(proxyDAppAddress, "balance_calling_dApp").head.value
+    ).foreach(_ shouldBe callingDAppStartBalance + expectingCallingDAppBalance)
 
-        val expectingCallingDAppBalanceInsideCallingDApp = if (callingDAppVersion >= V5) paymentAmount else 0
-        val expectingProxyDAppBalanceInsideCallingDApp   = paymentAmount - expectingCallingDAppBalanceInsideCallingDApp
-        sender.getData(callingDAppAddress, "balance_self").head.value shouldBe callingDAppStartBalance + expectingCallingDAppBalanceInsideCallingDApp
-        sender.getData(callingDAppAddress, "balance_caller").head.value shouldBe proxyStartBalance + expectingProxyDAppBalanceInsideCallingDApp
-      }
+    val expectingCallingDAppBalanceInsideCallingDApp = paymentAmount
+    val expectingProxyDAppBalanceInsideCallingDApp   = 0
+    sender.getData(callingDAppAddress, "balance_self").head.value shouldBe callingDAppStartBalance + expectingCallingDAppBalanceInsideCallingDApp
+    sender.getData(callingDAppAddress, "balance_caller").head.value shouldBe proxyStartBalance + expectingProxyDAppBalanceInsideCallingDApp
   }
 }
