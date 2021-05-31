@@ -59,6 +59,13 @@ object InvokeScriptDiff {
         for {
           _ <- traced(
             Either.cond(
+              version >= V5,
+              (),
+              GenericError(s"Calling DApp is available only from V5, but DApp $version at address $dAppAddress was called from $invoker")
+            )
+          )
+          _ <- traced(
+            Either.cond(
               remainingCalls > 0,
               (),
               ValidationError.ScriptRunsLimitError(s"DApp calls limit = ${ContractLimits.MaxSyncDAppCalls(version)} is exceeded")
@@ -151,7 +158,7 @@ object InvokeScriptDiff {
                   tx.root.map(_.fee).getOrElse(0L),
                   tx.root.flatMap(_.feeAssetId.compatId)
                 )
-                val paymentsPart = InvokeDiffsCommon.paymentsPart(tx, tx.dAppAddress, Map())
+                val paymentsPart                                    = InvokeDiffsCommon.paymentsPart(tx, tx.dAppAddress, Map())
                 val (paymentsPartInsideDApp, paymentsPartToResolve) = if (version < V5) (Diff.empty, paymentsPart) else (paymentsPart, Diff.empty)
                 val environment = new DAppEnvironment(
                   AddressScheme.current.chainId,
