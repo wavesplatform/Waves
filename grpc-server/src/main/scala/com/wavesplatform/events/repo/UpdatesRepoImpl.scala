@@ -20,7 +20,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import monix.eval.Task
 import monix.execution.{Ack, Scheduler}
-import monix.reactive.Observable
+import monix.reactive.{Observable, OverflowStrategy}
 import monix.reactive.subjects.ConcurrentSubject
 
 class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val scheduler: Scheduler)
@@ -43,7 +43,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
 
   @volatile
   private[this] var lastRealTimeUpdates = Seq.empty[BlockchainUpdated]
-  private[this] val realTimeUpdates     = ConcurrentSubject.publish[BlockchainUpdated]
+  private[this] val realTimeUpdates     = ConcurrentSubject.publish[BlockchainUpdated](OverflowStrategy.DropOld(2))
 
   realTimeUpdates.foreach { bu =>
     log.trace(s"realTimeUpdates event: ${bu.ref}")
