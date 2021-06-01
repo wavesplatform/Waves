@@ -58,8 +58,6 @@ class SyncDAppForbidOldVersionsTest
     )
   }
 
-  private val paymentAmount = 12345
-
   private def scenario(version: StdLibVersion) =
     for {
       invoker     <- accountGen
