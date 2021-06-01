@@ -19,11 +19,16 @@ import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.utils.{Schedulers, ScorexLogging}
 import io.grpc.{Metadata, Server, ServerStreamTracer, Status}
 import io.grpc.netty.NettyServerBuilder
-import monix.execution.Scheduler
+import monix.execution.{Scheduler, UncaughtExceptionReporter}
+import monix.execution.schedulers.SchedulerService
 import net.ceedubs.ficus.Ficus._
 
 class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging with BlockchainUpdateTriggers {
-  private[this] implicit val scheduler = Schedulers.fixedPool(sys.runtime.availableProcessors(), "blockchain-updates")
+  private[this] implicit val scheduler: SchedulerService = Schedulers.fixedPool(
+    sys.runtime.availableProcessors(),
+    "blockchain-updates",
+    UncaughtExceptionReporter(err => log.error("Uncaught exception in BlockchainUpdates scheduler", err))
+  )
 
   private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("waves.blockchain-updates")
   private[this] val repo     = new UpdatesRepoImpl(s"${context.settings.directory}/blockchain-updates", context.blocksApi)

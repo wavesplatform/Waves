@@ -47,6 +47,9 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
 
   realTimeUpdates.foreach { bu =>
     log.trace(s"realTimeUpdates event: ${bu.ref}")
+  }.onComplete { result =>
+    log.error(s"realTimeUpdates logging stopped: $result")
+    result.failed.foreach(err => log.error("realTimeUpdates logging error", err))
   }
 
   realTimeUpdates
@@ -68,10 +71,13 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
     val currentHeight  = height.toOption
     this.lastRealTimeUpdates = currentUpdates.dropWhile(u => currentHeight.exists(_ - 1 > u.height)) :+ upd
     realTimeUpdates.onNext(upd) match {
-      case Ack.Continue => // OK
+      case Ack.Continue =>
+        log.trace(s"realTimeUpdates returned Ack.Continue on ${upd.ref}")
       case Ack.Stop =>
-        log.error("realTimeUpdates returned Ack.Stop")
+        log.error(s"realTimeUpdates returned Ack.Stop on ${upd.ref}")
         throw new IllegalStateException("Real time updates subject is stopped")
+      case ack =>
+        log.error(s"realTimeUpdates returned Ack with isSynchronous=${ack.isSynchronous}: $ack")
     }
   }
 
