@@ -95,7 +95,6 @@ object Dependencies {
       catsCore.value.exclude("org.scala-js", "scalajs-library_2.13"),
       ("org.rudogma"   %%% "supertagged" % "1.5").exclude("org.scala-js", "scalajs-library_2.13"),
       ("com.lihaoyi"   %%% "fastparse"   % "2.2.4").exclude("org.scala-js", "scalajs-library_2.13"),
-      ("org.parboiled" %%% "parboiled"   % "2.1.8").exclude("org.scala-js", "scalajs-library_2.13"),
       shapeless.value.exclude("org.scala-js", "scalajs-library_2.13"),
       machinist.exclude("org.scala-js", "scalajs-library_2.13"),
       catsEffect.value,
