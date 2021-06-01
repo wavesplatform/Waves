@@ -464,7 +464,7 @@ object Parser {
         declarations.flatten
           .reverse
           .foldLeft(body.getOrElse(INVALID(Pos(end, end), "expected a body"))) { (acc, l) =>
-            BLOCK(Pos(start, end), l, acc)
+            BLOCK(Pos(l.position.start, acc.position.end), l, acc)
           }
       }
     }
