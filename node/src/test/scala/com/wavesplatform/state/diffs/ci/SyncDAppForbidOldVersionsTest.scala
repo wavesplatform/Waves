@@ -70,17 +70,17 @@ class SyncDAppForbidOldVersionsTest
       ssTx     = SetScriptTransaction.selfSigned(1.toByte, callingDApp, Some(callingDAppScript(version)), fee, ts).explicitGet()
       ssTx2    = SetScriptTransaction.selfSigned(1.toByte, proxyDApp, Some(proxyDAppScript(callingDApp.toAddress)), fee, ts).explicitGet()
       invokeTx = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, proxyDApp.toAddress, None, Nil, fee, Waves, ts).explicitGet()
-    } yield (Seq(gTx1, gTx2, gTx3, ssTx, ssTx2), invokeTx)
+    } yield (Seq(gTx1, gTx2, gTx3, ssTx, ssTx2), invokeTx, proxyDApp.toAddress, callingDApp.toAddress)
 
   property("sync call is forbidden for V3 and V4 DApps") {
     Seq(V3, V4)
       .foreach { callingDAppVersion =>
-        val (preparingTxs, invoke) = scenario(callingDAppVersion).sample.get
+        val (preparingTxs, invoke, proxyDApp, callingDApp) = scenario(callingDAppVersion).sample.get
         withDomain(RideV5) { d =>
           d.appendBlock(preparingTxs: _*)
           (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include(
             s"Calling DApp is available only from V5, " +
-              s"but DApp $callingDAppVersion at address ${invoke.dAppAddressOrAlias} was called from ${invoke.senderAddress}"
+              s"but DApp $callingDAppVersion at address $callingDApp was called from $proxyDApp"
           )
         }
       }
