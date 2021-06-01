@@ -298,23 +298,15 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
                 val lastPersistentUpdate = data.lastOption.orElse(prevLastPersistent)
                 log.trace(s"[$streamId] lastPersistentUpdate = ${lastPersistentUpdate.map(_.ref)}")
 
-                val liquidUpdates = lastRealTimeUpdates.dropWhile(u => !lastPersistentUpdate.forall(u.references))
-                log.trace(s"[$streamId] liquidUpdates = ${liquidUpdates.map(_.ref).mkString(", ")}")
                 Observable
-                  .fromIterable(liquidUpdates)
-                  .++(
-                    realTimeUpdates
-                      .dropWhile { u =>
-                        val referencesLiquid = u match {
-                          case b: BlockAppended => liquidUpdates.exists(b.references)
-                          case mb: MicroBlockAppended => liquidUpdates.lastOption.forall(mb.references)
-                          case _ => true // Rollbacks
-                        }
-                        if (referencesLiquid) log.trace(s"[$streamId] Found referencesLiquid=true: ${u.ref}")
-                        else log.trace(s"[$streamId] Dropping by referencesLiquid=false: ${u.ref}")
-                        !referencesLiquid
-                      }
-                  )
+                  .fromIterable(lastRealTimeUpdates)
+                  .++(realTimeUpdates)
+                  .dropWhile(u => {
+                    val drop = !lastPersistentUpdate.forall(u.references)
+                    if (drop) log.trace(s"[$streamId] Dropping by referencesLastPersistent=false: ${u.ref}")
+                    else log.trace(s"[$streamId] Found referencesLastPersistent=true: ${u.ref}")
+                    drop
+                  })
                   .guaranteeCase(
                     ec =>
                       Task(ec match {
