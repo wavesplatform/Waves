@@ -17,6 +17,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.database.protobuf.DataEntry.Value
+import com.wavesplatform.database.protobuf.TransactionData.Transaction.{LegacyBytes, NewTransaction}
 import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.ByteStringExt
@@ -36,6 +37,7 @@ import supertagged.TaggedType
 
 import scala.collection.mutable
 
+//noinspection UnstableApiUsage
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
     log.debug(s"Open DB at $path")
@@ -193,9 +195,15 @@ package object database extends ScorexLogging {
         pb.LeaseDetails(
             ByteString.copyFrom(ld.sender.arr),
             Some(PBRecipients.create(ld.recipient)),
-            ByteString.copyFrom(ld.sourceId.arr),
             ld.amount,
-            ld.isActive
+            ByteString.copyFrom(ld.sourceId.arr),
+            ld.height,
+            ld.status match {
+              case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
+              case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
+                pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
+              case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
+            }
           )
           .toByteArray
     )
@@ -208,9 +216,16 @@ package object database extends ScorexLogging {
         LeaseDetails(
           d.senderPublicKey.toPublicKey,
           PBRecipients.toAddressOrAlias(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
-          d.sourceId.toByteStr,
           d.amount,
-          d.isActive
+          d.status match {
+            case pb.LeaseDetails.Status.Active(_)                                => LeaseDetails.Status.Active
+            case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height)) => LeaseDetails.Status.Expired(height)
+            case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId)) =>
+              LeaseDetails.Status.Cancelled(height, Some(transactionId.toByteStr).filter(!_.isEmpty))
+            case pb.LeaseDetails.Status.Empty => ???
+          },
+          d.sourceId.toByteStr,
+          d.height
         )
       )
     }
@@ -529,7 +544,6 @@ package object database extends ScorexLogging {
   }
 
   def readTransaction(b: Array[Byte]): (Transaction, Boolean) = {
-    import pb.TransactionData.Transaction._
 
     val data = pb.TransactionData.parseFrom(b)
     data.transaction match {
@@ -540,7 +554,6 @@ package object database extends ScorexLogging {
   }
 
   def writeTransaction(v: (Transaction, Boolean)): Array[Byte] = {
-    import pb.TransactionData.Transaction._
     val (tx, succeeded) = v
     val ptx = tx match {
       case lps: LegacyPBSwitch if !lps.isProtobufVersion => LegacyBytes(ByteString.copyFrom(tx.bytes()))

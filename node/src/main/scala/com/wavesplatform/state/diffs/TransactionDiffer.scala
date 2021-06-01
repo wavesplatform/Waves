@@ -6,8 +6,8 @@ import cats.instances.either._
 import cats.instances.map._
 import cats.kernel.Monoid
 import cats.syntax.either._
-import cats.syntax.semigroup._
 import cats.syntax.functor._
+import cats.syntax.semigroup._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
@@ -79,7 +79,7 @@ object TransactionDiffer {
           acceptFailed(blockchain) && blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
 
         if (transactionDiff.scriptsComplexity > ContractLimits.FailFreeInvokeComplexity && transactionMayFail(tx) && acceptFailedByBalance())
-          FailedTransactionError(FailedTransactionError.Cause.DAppExecution, transactionDiff.scriptsComplexity, Nil, Some(err.toString), None)
+          FailedTransactionError(FailedTransactionError.Cause.DAppExecution, transactionDiff.scriptsComplexity, Nil, Some(err.toString))
         else
           err
       }
@@ -127,7 +127,7 @@ object TransactionDiffer {
       } yield ()
 
   private def verifierDiff(blockchain: Blockchain, tx: Transaction) =
-    Verifier(blockchain)(tx).as(Diff.empty.copy(scriptsComplexity = DiffsCommon.getAccountsComplexity(blockchain, tx)))
+    Verifier(blockchain)(tx).map(complexity => Diff.empty.copy(scriptsComplexity = complexity))
 
   private def assetsVerifierDiff(
       blockchain: Blockchain,
@@ -262,9 +262,11 @@ object TransactionDiffer {
     for {
       portfolios <- feePortfolios(blockchain, tx)
       maybeDApp  <- extractDAppAddress
+      calledAddresses = scriptResult.map(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes)).getOrElse(Nil)
     } yield {
+      val affectedAddresses = portfolios.keySet ++ maybeDApp ++ calledAddresses
       Diff.empty.copy(
-        transactions = mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, (portfolios.keys ++ maybeDApp.toList).toSet, applied = false))),
+        transactions = mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, affectedAddresses, applied = false))),
         portfolios = portfolios,
         scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
         scriptsComplexity = spentComplexity
@@ -280,7 +282,7 @@ object TransactionDiffer {
       }
 
     private[this] def scriptResult(cf: FailedTransactionError): Option[InvokeScriptResult] =
-      Some(InvokeScriptResult(error = Some(ErrorMessage(cf.code, cf.message))))
+      Some(InvokeScriptResult(error = Some(ErrorMessage(cf.code, cf.message)), invokes = cf.invocations))
   }
 
   // helpers

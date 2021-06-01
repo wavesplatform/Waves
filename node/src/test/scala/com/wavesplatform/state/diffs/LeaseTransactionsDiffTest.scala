@@ -2,21 +2,24 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import com.wavesplatform.account.Address
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithState
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain._
+import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with WithDomain with TransactionGen with NoShrink {
 
   private val allowMultipleLeaseCancelTransactionUntilTimestamp = Long.MaxValue / 2
   private val settings =
@@ -201,6 +204,36 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with WithSt
 
         assertDiffEi(Seq(TestBlock.create(ts, Seq(genesis, lease))), TestBlock.create(ts + 1, Seq(leaseCancel)), afterFailedTxs) { ei =>
           ei.explicitGet()
+        }
+    }
+  }
+
+  private val totalBalance = 1000.waves
+  private val scenario: Gen[(GenesisTransaction, LeaseTransaction)] = for {
+    sender    <- accountGen
+    recipient <- accountGen
+    fee       <- smallFeeGen
+  } yield (
+    GenesisTransaction.create(sender.toAddress, totalBalance, ntpTime.getTimestamp()).explicitGet(),
+    LeaseTransaction.selfSigned(TxVersion.V1, sender, recipient.toAddress, totalBalance, fee, ntpTime.getTimestamp()).explicitGet()
+  )
+
+  property(s"fee is not required prior to ${BlockchainFeatures.SynchronousCalls}") {
+    forAll(scenario) {
+      case (gt, lt) =>
+        withDomain(domainSettingsWithFeatures(BlockchainFeatures.SynchronousCalls -> 5)) { d =>
+          d.appendBlock(gt)
+          d.appendBlock(lt)
+        }
+    }
+  }
+
+  property(s"fee is not required once ${BlockchainFeatures.SynchronousCalls} is activated") {
+    forAll(scenario) {
+      case (gt, lt) =>
+        withDomain(domainSettingsWithFeatures(BlockchainFeatures.SynchronousCalls -> 1)) { d =>
+          d.appendBlock(gt)
+          d.blockchainUpdater.processBlock(d.createBlock(Block.PlainBlockVersion, Seq(lt))) should produce("Cannot lease more than own")
         }
     }
   }

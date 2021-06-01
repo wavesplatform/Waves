@@ -31,7 +31,7 @@ object Common {
   val addCtx: CTX[NoContext]     = CTX[NoContext](Seq(dataEntryType), Map.empty, Array.empty)
 
   def ev[T <: EVALUATED](
-      context: EvaluationContext[NoContext, Id] = Monoid.combine(PureContext.build(V1).evaluationContext, addCtx.evaluationContext),
+      context: EvaluationContext[NoContext, Id] = Monoid.combine(PureContext.build(V1, fixUnicodeFunctions = true).evaluationContext, addCtx.evaluationContext),
       expr: EXPR
   ): Either[ExecutionError, T] =
     new EvaluatorV1[Id, NoContext]().apply[T](context, expr)
@@ -98,7 +98,7 @@ object Common {
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
     override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
     def accountScript(addressOrAlias: Recipient): Option[Script]                                                 = ???
-    override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], remainingComplexity: Int): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
+    override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], remainingComplexity: Int, reentrant: Boolean): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
     }
 
   def addressFromPublicKey(chainId: Byte, pk: Array[Byte], addressVersion: Byte = EnvironmentFunctions.AddressVersion): Array[Byte] = {

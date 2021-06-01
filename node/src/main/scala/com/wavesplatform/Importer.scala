@@ -18,6 +18,7 @@ import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.mining.Miner
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.BlockAppender
@@ -98,10 +99,7 @@ object Importer extends ScorexLogging {
       }
   }
 
-  def loadSettings(file: Option[File]): WavesSettings = {
-    val settings = Application.loadApplicationConfig(file)
-    settings.copy(dbSettings = settings.dbSettings.copy(useBloomFilter = true))
-  }
+  def loadSettings(file: Option[File]): WavesSettings = Application.loadApplicationConfig(file)
 
   private[this] var triggers = Seq.empty[BlockchainUpdateTriggers]
 
@@ -285,7 +283,7 @@ object Importer extends ScorexLogging {
     val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
 
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, db, actorSystem)
-    checkGenesis(settings, blockchainUpdater)
+    checkGenesis(settings, blockchainUpdater, Miner.Disabled)
 
     val importFileOffset = importOptions.format match {
       case Formats.Binary =>

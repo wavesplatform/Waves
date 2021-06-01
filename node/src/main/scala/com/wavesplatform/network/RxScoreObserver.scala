@@ -14,16 +14,11 @@ import monix.reactive.Observable
 import scala.jdk.CollectionConverters._
 import scala.concurrent.duration.FiniteDuration
 
+case class BestChannel(channel: Channel, score: BigInt) {
+  override def toString: String = s"BestChannel(${id(channel)},$score)"
+}
+
 object RxScoreObserver extends ScorexLogging {
-
-  case class BestChannel(channel: Channel, score: BigInt) {
-    override def toString: String = s"BestChannel(${id(channel)},score: $score)"
-  }
-
-  implicit val bestChannelEq: Eq[BestChannel] = { (x, y) =>
-    x.channel == y.channel && x.score == y.score
-  }
-
   type SyncWith = Option[BestChannel]
 
   case class ChannelClosedAndSyncWith(closed: Option[Channel], syncWith: SyncWith)

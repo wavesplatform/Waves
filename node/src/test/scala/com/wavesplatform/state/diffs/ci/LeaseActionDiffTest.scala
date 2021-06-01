@@ -620,7 +620,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe s"Cannot lease more than own: Balance:$dAppBalance, already leased: 0"
+            diff.errorMessage(invoke.id.value()).get.text shouldBe s"Cannot lease more than own: Balance: $dAppBalance, already leased: 0"
         }
     }
   }
@@ -637,7 +637,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
         ) {
           case (diff, _) =>
             diff.errorMessage(invoke.id.value()).get.text shouldBe
-              s"Cannot lease more than own: Balance:${dAppBalance - leaseFromDApp.fee}, already leased: ${leaseFromDApp.amount}"
+              s"Cannot lease more than own: Balance: ${dAppBalance - leaseFromDApp.fee}, already leased: ${leaseFromDApp.amount}"
         }
     }
   }

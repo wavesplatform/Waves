@@ -15,7 +15,6 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
-import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
@@ -24,6 +23,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
@@ -112,10 +112,11 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
+      val v5Activated = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
       def stdLib: StdLibVersion = {
-        if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls, blockchain.height)) {
+        if (v5Activated) {
           V5
-        } else if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
+        } else if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps)) {
           V4
         } else {
           StdLibVersion.VersionDic.default
@@ -127,12 +128,17 @@ case class UtilsApiRoute(
             .fold(
               e => ScriptCompilerError(e), {
                 case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
+                  val extraFee =
+                    if (verifierComplexity <= ContractLimits.FreeVerifierComplexity && v5Activated)
+                      0
+                    else
+                      FeeValidation.ScriptExtraFee
                   Json.obj(
                     "script"               -> script.bytes().base64,
                     "complexity"           -> maxComplexity,
                     "verifierComplexity"   -> verifierComplexity,
                     "callableComplexities" -> callableComplexities,
-                    "extraFee"             -> FeeValidation.ScriptExtraFee
+                    "extraFee"             -> extraFee
                   )
               }
             )
@@ -252,13 +258,12 @@ case class UtilsApiRoute(
 
       val result =
         for {
-          expr   <- parseCall(obj \ "expr")
-          result <- ScriptCallEvaluator.executeExpression(blockchain, script, address, settings.evaluateScriptComplexityLimit)(expr)
-        } yield result
+          expr                 <- parseCall(obj \ "expr")
+          (result, complexity) <- ScriptCallEvaluator.executeExpression(blockchain, script, address, settings.evaluateScriptComplexityLimit)(expr)
+        } yield Json.obj("result" -> ScriptValuesJson.serializeValue(result), "complexity" -> complexity)
 
       val requestData = obj ++ Json.obj("address" -> address.stringRepr)
       val responseJson = result
-        .map(r => Json.obj("result" -> ScriptValuesJson.serializeValue(r)))
         .recover {
           case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
           case other                   => ApiError.fromValidationError(other).json
@@ -281,11 +286,12 @@ object UtilsApiRoute {
   private object ScriptCallEvaluator {
     def compile(stdLibVersion: StdLibVersion)(str: String): Either[GenericError, EXPR] = {
       val ctx =
-        PureContext.build(stdLibVersion).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(stdLibVersion, Account, Expression).explicitGet())
+        PureContext.build(stdLibVersion, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+          CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment] |+|
+          WavesContext.build(Global, DirectiveSet(stdLibVersion, Account, Expression).explicitGet())
 
-      ExpressionCompiler.compileUntyped(str, ctx.compilerContext.copy(arbitraryDeclarations = true))
+      ExpressionCompiler
+        .compileUntyped(str, ctx.compilerContext.copy(arbitraryDeclarations = true))
         .leftMap(GenericError(_))
     }
 
@@ -297,7 +303,9 @@ object UtilsApiRoute {
         .map(_._1)
     }
 
-    def executeExpression(blockchain: Blockchain, script: Script, address: Address, limit: Int)(expr: EXPR): Either[ValidationError, EVALUATED] = {
+    def executeExpression(blockchain: Blockchain, script: Script, address: Address, limit: Int)(
+        expr: EXPR
+    ): Either[ValidationError, (EVALUATED, Int)] = {
       for {
         ds <- DirectiveSet(script.stdLibVersion, Account, DAppType).leftMap(GenericError(_))
         ctx = BlockchainContext
@@ -313,21 +321,24 @@ object UtilsApiRoute {
               tx = None,
               address,
               PublicKey(ByteStr.fill(KeyLength)(1)),
-              Set(),
+              Set.empty[Address],
               limitedExecution = false,
+              limit,
               remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
-              avaliableActions = ContractLimits.MaxCallableActionsAmount(script.stdLibVersion),
-              avaliableData = ContractLimits.MaxWriteSetSize(script.stdLibVersion),
-              currentDiff = Diff.empty
+              availableActions = ContractLimits.MaxCallableActionsAmount(script.stdLibVersion),
+              availableData = ContractLimits.MaxWriteSetSize(script.stdLibVersion),
+              currentDiff = Diff.empty,
+              invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(address, null, Nil))
             )
           )
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
         limitedResult <- EvaluatorV2
-          .applyLimited(call, limit, ctx, script.stdLibVersion)
-          .leftMap { case (err, log) => ScriptExecutionError.dAppExecution(err, log) }
+          .applyLimitedCoeval(call, limit, ctx, script.stdLibVersion, checkConstructorArgsTypes = true)
+          .value()
+          .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err, log) }
         result <- limitedResult match {
-          case (eval: EVALUATED, _, _) => Right(eval)
-          case (_: EXPR, _, log)       => Left(ScriptExecutionError.dAppExecution(s"Calculation complexity limit exceeded", log))
+          case (eval: EVALUATED, unusedComplexity, _) => Right((eval, limit - unusedComplexity))
+          case (_: EXPR, _, log)                      => Left(ScriptExecutionError.dAppExecution(s"Calculation complexity limit exceeded", log))
         }
       } yield result
     }

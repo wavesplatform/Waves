@@ -179,7 +179,7 @@ object StateUpdate {
         v.amount,
         v.sender.toByteString,
         v.recipient.toByteString,
-        v.leaseId.toByteString
+        v.originTransactionId.toByteString
       )
     }
   }
@@ -362,7 +362,7 @@ object StateUpdate {
 
   def atomic(blockchainBeforeWithMinerReward: Blockchain, diff: Diff): StateUpdate = {
     val blockchain      = blockchainBeforeWithMinerReward
-    val blockchainAfter = CompositeBlockchain(blockchain, Some(diff))
+    val blockchainAfter = CompositeBlockchain(blockchain, diff)
 
     val PortfolioUpdates(updatedBalances, updatedLeaseBalances) = DiffToStateApplier.portfolios(blockchain, diff)
 
@@ -454,13 +454,11 @@ object StateUpdate {
       .toVector
   }
 
-  def referencedAssets(blockchain: Blockchain, txsStateUpdates: Seq[StateUpdate]): Seq[AssetInfo] = {
+  def referencedAssets(blockchain: Blockchain, txsStateUpdates: Seq[StateUpdate]): Seq[AssetInfo] =
     txsStateUpdates
       .flatMap(st => st.assets.map(_.assetId) ++ st.balances.flatMap(_.asset.compatId))
       .distinct
-      .flatMap(id => blockchain.assetDescription(IssuedAsset(id)))
-      .map(ad => AssetInfo(ad.originTransactionId, ad.decimals, ad.name.toStringUtf8))
-  }
+      .flatMap(id => blockchain.assetDescription(IssuedAsset(id)).map(ad => AssetInfo(id, ad.decimals, ad.name.toStringUtf8)))
 
   def container(
       blockchainBeforeWithMinerReward: Blockchain,
@@ -485,11 +483,11 @@ object StateUpdate {
       .foldLeft((Seq.empty[StateUpdate], parentDiff)) {
         case ((updates, accDiff), txDiff) =>
           (
-            updates :+ atomic(CompositeBlockchain(blockchainBeforeWithMinerReward, Some(accDiff)), txDiff),
+            updates :+ atomic(CompositeBlockchain(blockchainBeforeWithMinerReward, accDiff), txDiff),
             accDiff.combine(txDiff)
           )
       }
-    val blockchainAfter = CompositeBlockchain(blockchainBeforeWithMinerReward, Some(totalDiff))
+    val blockchainAfter = CompositeBlockchain(blockchainBeforeWithMinerReward, totalDiff)
     val metadata        = transactionsMetadata(blockchainAfter, totalDiff)
     val refAssets       = referencedAssets(blockchainAfter, txsStateUpdates)
     (parentStateUpdateWithMinerReward, txsStateUpdates, metadata, refAssets)

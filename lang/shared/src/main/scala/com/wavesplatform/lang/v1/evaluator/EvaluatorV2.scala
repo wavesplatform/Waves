@@ -17,7 +17,8 @@ import scala.collection.mutable.ListBuffer
 
 class EvaluatorV2(
     val ctx: LoggedEvaluationContext[Environment, Id],
-    val stdLibVersion: StdLibVersion
+    val stdLibVersion: StdLibVersion,
+    val checkConstructorArgsTypes: Boolean = false
 ) {
   def apply(expr: EXPR, limit: Int): (EXPR, Int) =
     applyCoeval(expr, limit).value()
@@ -95,15 +96,28 @@ class EvaluatorV2(
         }
     }
 
-    def evaluateConstructor(fc: FUNCTION_CALL, limit: Int, name: String): Coeval[Int] = {
-      val caseType =
-        ctx.ec.typeDefs.get(name) match {
+    def evaluateConstructor(fc: FUNCTION_CALL, limit: Int, name: String): Coeval[Int] =
+      for {
+        objectType <- ctx.ec.typeDefs.get(name) match {
           case Some(caseType: CASETYPEREF) => Coeval.now(caseType)
           case _                           => Coeval.raiseError(new NoSuchElementException(s"Function or type '$name' not found"))
         }
-      caseType.flatMap { objectType =>
-        val fields = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
-        root(CaseObj(objectType, fields.toMap), update, limit, parentBlocks)
+        passedArgs = fc.args.asInstanceOf[List[EVALUATED]]
+        _ <- Coeval(if (checkConstructorArgsTypes) doCheckConstructorArgsTypes(objectType, passedArgs, limit) else ())
+        fields = objectType.fields.map(_._1) zip passedArgs
+        r <- root(CaseObj(objectType, fields.toMap), update, limit, parentBlocks)
+      } yield r
+
+    def doCheckConstructorArgsTypes(objectType: CASETYPEREF, passedArgs: List[EVALUATED], limit: Int): Unit = {
+      def str[T](l: List[T]) = l.mkString("(", ", ", ")")
+
+      if (objectType.fields.size != passedArgs.size)
+        throw EvaluationException(s"Constructor ${objectType.name} expected ${objectType.fields.size} args, but ${str(passedArgs)} was passed", limit)
+      else {
+        val fieldTypes      = objectType.fields.map(_._2)
+        val passedArgsTypes = passedArgs.map(_.getType)
+        if (!(fieldTypes zip passedArgsTypes).forall { case (fieldType, passedType) => fieldType >= passedType })
+          throw EvaluationException(s"Passed args ${str(passedArgs)} are unsuitable for constructor ${objectType.name}${str(fieldTypes)}", limit)
       }
     }
 
@@ -275,9 +289,10 @@ object EvaluatorV2 {
       expr: EXPR,
       limit: Int,
       ctx: EvaluationContext[Environment, Id],
-      stdLibVersion: StdLibVersion
+      stdLibVersion: StdLibVersion,
+      checkConstructorArgsTypes: Boolean = false
   ): Either[(ExecutionError, Log[Id]), (EXPR, Int, Log[Id])] =
-    applyLimitedCoeval(expr, limit, ctx, stdLibVersion)
+    applyLimitedCoeval(expr, limit, ctx, stdLibVersion, checkConstructorArgsTypes)
       .value()
       .leftMap { case (e, _, unused) => (e, unused) }
 
@@ -285,11 +300,12 @@ object EvaluatorV2 {
       expr: EXPR,
       limit: Int,
       ctx: EvaluationContext[Environment, Id],
-      stdLibVersion: StdLibVersion
+      stdLibVersion: StdLibVersion,
+      checkConstructorArgsTypes: Boolean = false
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (EXPR, Int, Log[Id])]] = {
     val log       = ListBuffer[LogItem[Id]]()
     val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
-    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion)
+    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion, checkConstructorArgsTypes)
     evaluator
       .applyCoeval(expr, limit)
       .redeem(
@@ -305,32 +321,27 @@ object EvaluatorV2 {
       expr: EXPR,
       stdLibVersion: StdLibVersion,
       complexityLimit: Int,
-      default: EVALUATED
-  ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
+      handleExpr: EXPR => Either[ExecutionError, EVALUATED]
+  ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
     EvaluatorV2
-      .applyLimited(expr, complexityLimit, ctx, stdLibVersion)
-      .map {
-        case (expr, _, log) =>
-          expr match {
-            case evaluated: EVALUATED => (evaluated, log)
-            case _                    => (default, log)
-          }
-      }
+      .applyLimitedCoeval(expr, complexityLimit, ctx, stdLibVersion)
+      .value()
+      .fold(
+        { case (error, complexity, log) => (log, complexity, Left(error)) }, {
+          case (expr, complexity, log) =>
+            expr match {
+              case evaluated: EVALUATED => (log, complexity, Right(evaluated))
+              case expr: EXPR           => (log, complexity, handleExpr(expr))
+            }
+        }
+      )
 
   def applyCompleted(
       ctx: EvaluationContext[Environment, Id],
       expr: EXPR,
       stdLibVersion: StdLibVersion
-  ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
-    EvaluatorV2
-      .applyLimited(expr, Int.MaxValue, ctx, stdLibVersion)
-      .flatMap {
-        case (expr, _, log) =>
-          expr match {
-            case evaluated: EVALUATED => Right((evaluated, log))
-            case expr: EXPR           => Left((s"Unexpected incomplete evaluation result $expr", log))
-          }
-      }
+  ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
+    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, expr => Left(s"Unexpected incomplete evaluation result $expr"))
 
   case class EvaluationException(message: String, unusedComplexity: Int) extends RuntimeException(message)
 }

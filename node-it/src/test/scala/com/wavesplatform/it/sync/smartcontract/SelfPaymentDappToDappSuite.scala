@@ -38,7 +38,7 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
        |
        |@Callable (i)
        |func foo() = {
-       |  strict inv = Invoke(this, "bar", [], [AttachedPayment(unit, 100)])
+       |  strict inv = invoke(this, "bar", [], [AttachedPayment(unit, 100)])
        |  ([], nil)
        |}
        |
@@ -60,13 +60,13 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
        |
        |@Callable (i)
        |func foo() = {
-       |  strict inv = Invoke(i.caller, "foo", [], [AttachedPayment(unit, 100)])
+       |  strict inv = invoke(i.caller, "foo", [], [AttachedPayment(unit, 100)])
        |  ([], nil)
        |}
        |
        |@Callable (i)
        |func bar() = {
-       |  strict inv = Invoke(i.caller, "bar", [], [AttachedPayment(unit, 100)])
+       |  strict inv = invoke(i.caller, "bar", [], [AttachedPayment(unit, 100)])
        |  ([], nil)
        |}
        |
@@ -88,15 +88,16 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
       sender.invokeScript(caller, dAppAddress1, Some("foo"), fee = 2 * invokeFee, waitForTx = true),
       AssertiveApiError(
         ScriptExecutionError.Id,
-        "Error while executing account-script: FailedTransactionError(code = 1, error = DApp self-payment is forbidden since V4, log =)"
+        "DApp self-payment is forbidden since V4",
+        matchMessage = true
       )
     )
     assertApiError(
       sender.invokeScript(dApp1, dAppAddress2, Some("foo"), fee = 2 * invokeFee, waitForTx = true),
       AssertiveApiError(
         ScriptExecutionError.Id,
-        s"Error while executing account-script: " +
-          s"GenericError(The invocation stack contains multiple invocations of the dApp at address $dAppAddress1 with invocations of another dApp between them)"
+        s"The invocation stack contains multiple invocations of the dApp at address $dAppAddress1 with invocations of another dApp between them",
+        matchMessage = true
       )
     )
     sender.balance(callerAddress).balance shouldBe callerBalanceBefore
@@ -110,8 +111,8 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
       sender.invokeScript(dApp1, dAppAddress2, Some("bar"), fee = invFee, waitForTx = true),
       AssertiveApiError(
         ScriptExecutionError.Id,
-        s"Error while executing account-script: " +
-          s"GenericError(The invocation stack contains multiple invocations of the dApp at address $dAppAddress1 with invocations of another dApp between them)"
+        s"The invocation stack contains multiple invocations of the dApp at address $dAppAddress1 with invocations of another dApp between them",
+        matchMessage = true
       )
     )
     sender.balance(dAppAddress1).balance shouldBe callerBalanceBefore

@@ -32,7 +32,7 @@
       complexity: 100
     }
     {
-      name: "powBigInt"
+      name: "pow"
       params: [ "BigInt", "Int", "BigInt", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Returns a number raised to a power"
       paramsDoc: [
@@ -46,7 +46,7 @@
       complexity: 200
     }
     {
-      name: "logBigInt"
+      name: "log"
       params: [ "BigInt", "Int", "BigInt", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Returns the logarithm of a number."
       paramsDoc: [
@@ -65,21 +65,28 @@
     {
       name: "fraction"
       params: [ "Int", "Int", "Int" ]
-      doc: "Multiply and division with big integer intermediate representation"
+      doc: "Multiply and division with unlimited intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]
-      complexity: 1
+      complexity: 14
     }
     {
-      name: "fractionBigInt"
-      params: [ "BigInt", "BigInt", "BigInt" ]
+      name: "fraction"
+      params: [ "Int", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Multiply and division with big integer intermediate representation"
+      paramsDoc: [ "Multiplier", "Multiplier", "Divisor", "Rounding mode" ]
+      complexity: 17
+    }
+    {
+      name: "fraction"
+      params: [ "BigInt", "BigInt", "BigInt" ]
+      doc: "Multiply and division with unlimited intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]
       complexity: 128
     }
     {
-      name: "fractionBigInt"
+      name: "fraction"
       params: [ "BigInt", "BigInt", "BigInt", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
-      doc: "Multiply and division with big integer intermediate representation"
+      doc: "Multiply and division with unlimited intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor", "Rounding mode" ]
       complexity: 128
     }

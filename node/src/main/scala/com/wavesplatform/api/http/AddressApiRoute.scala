@@ -50,7 +50,7 @@ case class AddressApiRoute(
 
   override lazy val route: Route =
     pathPrefix("addresses") {
-      balanceDetails ~ validate ~ seed ~ balanceWithConfirmations ~ balance ~ balances ~ balancesPost ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
+      balanceDetails ~ validate ~ seed ~ balance ~ balances ~ balancesPost ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
         signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ postData ~ scriptInfo ~ scriptMeta
     } ~ root ~ create
 
@@ -75,10 +75,11 @@ case class AddressApiRoute(
         "address"              -> address.stringRepr,
         "script"               -> scriptInfoOpt.map(_.script.bytes().base64),
         "scriptText"           -> scriptInfoOpt.map(_.script.expr.toString),
+        "version"              -> scriptInfoOpt.map(_.script.stdLibVersion.id),
         "complexity"           -> maxComplexity,
         "verifierComplexity"   -> verifierComplexity,
         "callableComplexities" -> callableComplexities,
-        "extraFee"             -> (if (scriptInfoOpt.isEmpty) 0L else FeeValidation.ScriptExtraFee)
+        "extraFee"             -> (if (blockchain.hasPaidVerifier(address)) FeeValidation.ScriptExtraFee else 0L)
       )
     }
   }

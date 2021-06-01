@@ -3,6 +3,7 @@ package com.wavesplatform.transaction.smart
 import cats.Id
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{ContentType, ScriptType, StdLibVersion}
 import com.wavesplatform.lang.v1.CTX
@@ -20,7 +21,7 @@ object BlockchainContext {
 
   type In = WavesEnvironment.In
 
-  private[this] val cache = new util.HashMap[(StdLibVersion, DirectiveSet), CTX[Environment]]()
+  private[this] val cache = new util.HashMap[(StdLibVersion, Boolean, DirectiveSet), CTX[Environment]]()
 
   def build(
       version: StdLibVersion,
@@ -37,19 +38,22 @@ object BlockchainContext {
       version,
       ScriptType.isAssetScript(isTokenContext),
       ContentType.isDApp(isContract)
-    ).map(
-      ds => build(ds, new WavesEnvironment(nByte, in, h, blockchain, address, ds, txId))
-    )
+    ).map { ds =>
+      val environment         = new WavesEnvironment(nByte, in, h, blockchain, address, ds, txId)
+      val fixUnicodeFunctions = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+      build(ds, environment, fixUnicodeFunctions)
+    }
 
   def build(
       ds: DirectiveSet,
-      environment: Environment[Id]
+      environment: Environment[Id],
+      fixUnicodeFunctions: Boolean = true
   ): EvaluationContext[Environment, Id] =
     cache
       .synchronized(
         cache.computeIfAbsent(
-          (ds.stdLibVersion, ds), { _ =>
-            PureContext.build(ds.stdLibVersion).withEnvironment[Environment] |+|
+          (ds.stdLibVersion, fixUnicodeFunctions, ds), { _ =>
+            PureContext.build(ds.stdLibVersion, fixUnicodeFunctions).withEnvironment[Environment] |+|
               CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment] |+|
               WavesContext.build(Global, ds)
           }

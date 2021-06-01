@@ -1,5 +1,7 @@
 package com.wavesplatform.state
 
+import scala.collection.immutable.VectorMap
+
 import cats.data.Ior
 import cats.implicits._
 import cats.kernel.{Monoid, Semigroup}
@@ -10,10 +12,8 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
-
-import scala.collection.immutable.VectorMap
+import com.wavesplatform.transaction.Asset.IssuedAsset
 
 case class LeaseBalance(in: Long, out: Long)
 
@@ -191,7 +191,12 @@ object Diff {
     def hashString: String =
       Integer.toHexString(d.hashCode())
 
-    def bindTransaction(tx: Transaction): Diff =
-      d.copy(transactions = VectorMap(tx.id() -> NewTransactionInfo(tx, (d.portfolios.keys ++ d.accountData.keys).toSet, applied = true)))
+    def bindTransaction(tx: Transaction): Diff = {
+      val calledScripts = d.scriptResults.values
+        .flatMap(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes))
+
+      val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts
+      d.copy(transactions = VectorMap(tx.id() -> NewTransactionInfo(tx, affectedAddresses, applied = true)))
+    }
   }
 }

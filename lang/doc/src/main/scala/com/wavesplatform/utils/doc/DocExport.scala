@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL, UNION}
 import scala.jdk.CollectionConverters._
 
 object DocExport {
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
     if (args.length != 4 || args(0) != "--gen-doc") {
       System.err.println("Expected args: --gen-doc <version> <template> <output>")
     } else {
@@ -33,7 +33,7 @@ object DocExport {
         fullContext.functions
           .map(
             f => {
-              val (funcDoc, paramsDoc) = DocSource.funcData((
+              val (funcDoc, paramsDoc, _) = DocSource.funcData((
                 f.name,
                 f.signature.args.map(_._2.toString).toList,
                 version.value.asInstanceOf[Int]

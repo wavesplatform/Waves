@@ -17,14 +17,14 @@ class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure 
     val createdLeaseTxId = sender.lease(firstKeyPair, secondAddress, leasingAmount, leasingFee = minFee).id
     nodes.waitForHeightAriseAndTxPresent(createdLeaseTxId)
     val status = getStatus(createdLeaseTxId)
-    status shouldBe LeaseStatus.Active
+    status shouldBe LeaseStatus.active.toString
 
     val cancelLeaseTxId = sender.cancelLease(firstKeyPair, createdLeaseTxId, fee = minFee).id
     miner.waitForTransaction(cancelLeaseTxId)
     nodes.waitForHeightArise()
     val status1 = getStatus(createdLeaseTxId)
-    status1 shouldBe LeaseStatus.Canceled
-    val sizeActiveLeases = sender.activeLeasesOld(firstAddress).size
+    status1 shouldBe LeaseStatus.canceled.toString
+    val sizeActiveLeases = sender.activeLeases(firstAddress).size
     sizeActiveLeases shouldBe 0
   }
 

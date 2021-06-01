@@ -4,6 +4,7 @@ import java.math.{MathContext, BigDecimal => BD}
 import java.security.spec.InvalidKeySpecException
 import cats.implicits._
 import ch.obermuhlner.math.big.BigDecimalMath
+import com.google.common.base.Utf8
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.v1.BaseGlobal
@@ -101,21 +102,20 @@ object Global extends BaseGlobal {
   def toJBig(v: BigInt, p: Long) = BigDecimal(v).bigDecimal.multiply(BD.valueOf(1L, p.toInt))
 
   def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =
-    (Try {
+    toEither {
       val base = toJBig(b, bp)
       val exp  = toJBig(e, ep)
       val res  = BigDecimalMath.pow(base, exp, bigMathContext)
       BigInt(res.setScale(rp.toInt, round.mode).unscaledValue)
-    }).toEither.left.map(_.toString)
+    }
 
   def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =
-    (Try {
+    toEither {
       val base = toJBig(b, bp)
       val exp  = toJBig(e, ep)
       val res  = BigDecimalMath.log(base, bigMathContext).divide(BigDecimalMath.log(exp, bigMathContext), bigMathContext)
       BigInt(res.setScale(rp.toInt, round.mode).unscaledValue)
-    }).toEither.left.map(_.toString)
-
+    }
 
   private val client = new SttpClient()
   override def requestNode(url: String): Future[NodeResponse] =
@@ -139,4 +139,7 @@ object Global extends BaseGlobal {
     val pk = Sign.signedMessageHashToKey(messageHash, signatureData)
     base16Encoder.decode(pk.toString(16))
   }
+
+  override def isIllFormed(s: String): Boolean =
+    Try(Utf8.encodedLength(s)).isFailure
 }

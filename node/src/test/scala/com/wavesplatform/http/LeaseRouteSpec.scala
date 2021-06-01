@@ -1,8 +1,12 @@
 package com.wavesplatform.http
 
+import scala.concurrent.Future
+
+import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity}
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.{AddressOrAlias, KeyPair}
-import com.wavesplatform.api.common.CommonAccountsApi
+import com.wavesplatform.{NoShrink, NTPTime, TestWallet, TransactionGen}
+import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
+import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
 import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.common.state.ByteStr
@@ -15,18 +19,19 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.network.TransactionPublisher
+import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Diff}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{BinaryDataEntry, Diff}
+import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{Asset, TxVersion}
-import com.wavesplatform.{NTPTime, NoShrink, TestWallet, TransactionGen}
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.utils.SystemTime
+import com.wavesplatform.wallet.Wallet
 import org.scalacheck.Gen
+import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import play.api.libs.json.JsObject
-
-import scala.concurrent.Future
+import play.api.libs.json.{JsArray, JsObject, Json}
 
 class LeaseRouteSpec
     extends RouteSpec("/leasing")
@@ -36,7 +41,8 @@ class LeaseRouteSpec
     with NoShrink
     with NTPTime
     with WithDomain
-    with TestWallet {
+    with TestWallet
+    with PathMockFactory {
   private def route(domain: Domain) =
     LeaseApiRoute(
       restAPISettings,
@@ -48,7 +54,7 @@ class LeaseRouteSpec
     )
 
   private def withRoute(f: (Domain, Route) => Unit): Unit =
-    withDomain(domainSettingsWithFeatures(BlockchainFeatures.implemented.flatMap(BlockchainFeatures.feature).toSeq: _*)) { d =>
+    withDomain(domainSettingsWithPreactivatedFeatures(BlockchainFeatures.implemented.flatMap(BlockchainFeatures.feature).toSeq: _*)) { d =>
       f(d, route(d).route)
     }
 
@@ -106,7 +112,7 @@ class LeaseRouteSpec
     LeaseCancelTransaction.selfSigned(TxVersion.V3, sender, leaseId, 0.001.waves, ntpTime.getTimestamp()).explicitGet()
 
   private def checkDetails(id: ByteStr, details: LeaseDetails, json: JsObject): Unit = {
-    (json \ "leaseId").as[ByteStr] shouldEqual id
+    (json \ "id").as[ByteStr] shouldEqual id
     (json \ "originTransactionId").as[ByteStr] shouldEqual details.sourceId
     (json \ "sender").as[String] shouldEqual details.sender.toAddress.toString
     (json \ "amount").as[Long] shouldEqual details.amount
@@ -121,14 +127,15 @@ class LeaseRouteSpec
       }
     }
 
-  private def toDetails(lt: LeaseTransaction) = LeaseDetails(lt.sender, lt.recipient, lt.id(), lt.amount, isActive = true)
+  private def toDetails(lt: LeaseTransaction) = LeaseDetails(lt.sender, lt.recipient, lt.amount, LeaseDetails.Status.Active, lt.id(), 1)
 
-  private def leaseGen(sender: KeyPair, maxAmount: Long, timestamp: Long): Gen[LeaseTransaction] = for {
-    fee <- smallFeeGen
-    recipient <- accountGen
-    amount <- Gen.chooseNum(1, maxAmount)
-    version <- Gen.oneOf(1.toByte, 2.toByte, 3.toByte)
-  } yield LeaseTransaction.selfSigned(version, sender, recipient.toAddress, amount, fee, timestamp).explicitGet()
+  private def leaseGen(sender: KeyPair, maxAmount: Long, timestamp: Long): Gen[LeaseTransaction] =
+    for {
+      fee       <- smallFeeGen
+      recipient <- accountGen
+      amount    <- Gen.chooseNum(1, (maxAmount - fee).max(1))
+      version   <- Gen.oneOf(1.toByte, 2.toByte, 3.toByte)
+    } yield LeaseTransaction.selfSigned(version, sender, recipient.toAddress, amount, fee, timestamp).explicitGet()
 
   "returns active leases which were" - {
     val genesisWithLease = for {
@@ -229,7 +236,7 @@ class LeaseRouteSpec
               case i: BinaryDataEntry => i.value
             }
             .get
-          val expectedDetails = Seq(leaseId -> LeaseDetails(setScript.sender, recipient, invoke.id(), 10_000.waves, isActive = true))
+          val expectedDetails = Seq(leaseId -> LeaseDetails(setScript.sender, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
           // check liquid block
           checkActiveLeasesFor(sender.toAddress, r, expectedDetails)
           checkActiveLeasesFor(recipient, r, expectedDetails)
@@ -254,13 +261,16 @@ class LeaseRouteSpec
         withRoute { (d, r) =>
           d.appendBlock(genesis, setScript)
           d.appendBlock(invoke)
+          val (_, invokeStatus) = d.blockchain.transactionMeta(invoke.id()).get
+          assert(invokeStatus, "Invoke has failed")
+
           val leaseId = d.blockchain
             .accountData(genesis.recipient, "leaseId")
             .collect {
               case i: BinaryDataEntry => i.value
             }
             .get
-          val expectedDetails = Seq(leaseId -> LeaseDetails(setScript.sender, recipient, invoke.id(), 10_000.waves, isActive = true))
+          val expectedDetails = Seq(leaseId -> LeaseDetails(setScript.sender, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
           // check liquid block
           checkActiveLeasesFor(sender.toAddress, r, expectedDetails)
           checkActiveLeasesFor(recipient, r, expectedDetails)
@@ -303,7 +313,7 @@ class LeaseRouteSpec
               |
               |@Callable(inv)
               |func callProxy(targetDapp: ByteVector, recipient: ByteVector, amount: Int) = {
-              |  strict result = Invoke(Address(targetDapp), "leaseTo", [recipient, amount], [])
+              |  strict result = invoke(Address(targetDapp), "leaseTo", [recipient, amount], [])
               |  []
               |}
               |""".stripMargin)),
@@ -348,7 +358,7 @@ class LeaseRouteSpec
             }
             .get
 
-          val expectedDetails = Seq(leaseId -> LeaseDetails(target.publicKey, recipient, ist.id(), 10_000.waves, isActive = true))
+          val expectedDetails = Seq(leaseId -> LeaseDetails(target.publicKey, recipient, 10_000.waves, LeaseDetails.Status.Active, ist.id(), 1))
           // check liquid block
           checkActiveLeasesFor(target.toAddress, r, expectedDetails)
           checkActiveLeasesFor(recipient, r, expectedDetails)
@@ -357,6 +367,118 @@ class LeaseRouteSpec
           checkActiveLeasesFor(target.toAddress, r, expectedDetails)
           checkActiveLeasesFor(recipient, r, expectedDetails)
         }
+    }
+  }
+
+  routePath("/info") in {
+    val blockchain = stub[Blockchain]
+    val commonApi  = stub[CommonAccountsApi]
+
+    val route = LeaseApiRoute(restAPISettings, stub[Wallet], blockchain, stub[TransactionPublisher], SystemTime, commonApi).route
+
+    val lease       = TxHelpers.lease()
+    val leaseCancel = TxHelpers.leaseCancel(lease.id())
+    (blockchain.transactionInfo _).when(lease.id()).returning(Some((1, lease, true)))
+    (commonApi.leaseInfo _)
+      .when(lease.id())
+      .returning(
+        Some(
+          LeaseInfo(
+            lease.id(),
+            lease.id(),
+            lease.sender.toAddress,
+            lease.recipient.asInstanceOf[Address],
+            lease.amount,
+            1,
+            LeaseInfo.Status.Canceled,
+            Some(2),
+            Some(leaseCancel.id())
+          )
+        )
+      )
+    (commonApi.leaseInfo _).when(*).returning(None)
+
+    Get(routePath(s"/info/${lease.id()}")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      response should matchJson(s"""{
+                               |  "id" : "${lease.id()}",
+                               |  "originTransactionId" : "${lease.id()}",
+                               |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                               |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                               |  "amount" : 1000000000,
+                               |  "height" : 1,
+                               |  "status" : "canceled",
+                               |  "cancelHeight" : 2,
+                               |  "cancelTransactionId" : "${leaseCancel.id()}"
+                               |}""".stripMargin)
+    }
+
+    val leasesListJson = Json.parse(s"""[{
+                                       |  "id" : "${lease.id()}",
+                                       |  "originTransactionId" : "${lease.id()}",
+                                       |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                       |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                                       |  "amount" : 1000000000,
+                                       |  "height" : 1,
+                                       |  "status" : "canceled",
+                                       |  "cancelHeight" : 2,
+                                       |  "cancelTransactionId" : "${leaseCancel.id()}"
+                                       |},
+                                       {
+                                       |  "id" : "${lease.id()}",
+                                       |  "originTransactionId" : "${lease.id()}",
+                                       |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                       |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                                       |  "amount" : 1000000000,
+                                       |  "height" : 1,
+                                       |  "status" : "canceled",
+                                       |  "cancelHeight" : 2,
+                                       |  "cancelTransactionId" : "${leaseCancel.id()}"
+                                       |}]""".stripMargin)
+
+    Get(routePath(s"/info?id=${lease.id()}&id=${lease.id()}")) ~> route ~> check {
+      val response = responseAs[JsArray]
+      response should matchJson(leasesListJson)
+    }
+
+    Post(
+      routePath(s"/info"),
+      HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Seq(lease.id().toString, lease.id().toString)).toString())
+    ) ~> route ~> check {
+      val response = responseAs[JsArray]
+      response should matchJson(leasesListJson)
+    }
+
+    Post(
+      routePath(s"/info"),
+      HttpEntity(
+        ContentTypes.`application/json`,
+        Json.obj("ids" -> (0 to restAPISettings.transactionsByAddressLimit).map(_ => lease.id().toString)).toString()
+      )
+    ) ~> route ~> check {
+      val response = responseAs[JsObject]
+      response should matchJson("""{
+                                  |  "error" : 10,
+                                  |  "message" : "Too big sequence requested: max limit is 10000 entries"
+                                  |}""".stripMargin)
+    }
+
+    Post(
+      routePath(s"/info"),
+      FormData("id" -> lease.id().toString, "id" -> lease.id().toString)
+    ) ~> route ~> check {
+      val response = responseAs[JsArray]
+      response should matchJson(leasesListJson)
+    }
+
+    Get(routePath(s"/info?id=nonvalid&id=${leaseCancel.id()}")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      response should matchJson(s"""
+                               |{
+                               |  "error" : 116,
+                               |  "message" : "Request contains invalid IDs. nonvalid, ${leaseCancel.id()}",
+                               |  "ids" : [ "nonvalid", "${leaseCancel.id()}" ]
+                               |}""".stripMargin)
     }
   }
 }

@@ -21,9 +21,8 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
 
-  val pureEvalContext : EvaluationContext[Environment, Id] =
-    PureContext.build(V3).withEnvironment[Environment].evaluationContext(utils.environment)
-
+  val pureEvalContext: EvaluationContext[Environment, Id] =
+    PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment].evaluationContext(utils.environment)
 
   val el       = List.empty[(String, FINAL)]
   val address1 = ByteStr.fromBytes(19: Byte)
@@ -33,42 +32,55 @@ class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with N
 
   val writeSetObj = CaseObj(
     CASETYPEREF("WriteSet", el),
-    Map("data" -> ARR(IndexedSeq(CaseObj(
-      CASETYPEREF("DataEntry", el),
-      Map(
-        "key"   -> CONST_STRING("xxx").explicitGet(),
-        "value" -> CONST_LONG(42)
-      )
-    ): EVALUATED), false).explicitGet())
+    Map(
+      "data" -> ARR(
+        IndexedSeq(
+          CaseObj(
+            CASETYPEREF("DataEntry", el),
+            Map(
+              "key"   -> CONST_STRING("xxx").explicitGet(),
+              "value" -> CONST_LONG(42)
+            )
+          ): EVALUATED
+        ),
+        false
+      ).explicitGet()
+    )
   )
 
   val transferSetObj = CaseObj(
     CASETYPEREF("TransferSet", el),
     Map(
-      "transfers" -> ARR(IndexedSeq(
-        CaseObj(
-          CASETYPEREF("ScriptTransfer", el),
-          Map(
-            "recipient" -> CaseObj(CASETYPEREF("Address", el), Map("bytes" -> CONST_BYTESTR(address1).explicitGet())),
-            "amount"    -> CONST_LONG(41),
-            "asset"     -> CONST_BYTESTR(asset).explicitGet()
+      "transfers" -> ARR(
+        IndexedSeq(
+          CaseObj(
+            CASETYPEREF("ScriptTransfer", el),
+            Map(
+              "recipient" -> CaseObj(CASETYPEREF("Address", el), Map("bytes" -> CONST_BYTESTR(address1).explicitGet())),
+              "amount"    -> CONST_LONG(41),
+              "asset"     -> CONST_BYTESTR(asset).explicitGet()
+            )
+          ),
+          CaseObj(
+            CASETYPEREF("ScriptTransfer", el),
+            Map(
+              "recipient" -> CaseObj(CASETYPEREF("Address", el), Map("bytes" -> CONST_BYTESTR(address2).explicitGet())),
+              "amount"    -> CONST_LONG(42),
+              "asset"     -> noAsset
+            )
           )
         ),
-        CaseObj(
-          CASETYPEREF("ScriptTransfer", el),
-          Map(
-            "recipient" -> CaseObj(CASETYPEREF("Address", el), Map("bytes" -> CONST_BYTESTR(address2).explicitGet())),
-            "amount"    -> CONST_LONG(42),
-            "asset"     -> noAsset
-          )
-        )
-      ), false).explicitGet())
+        false
+      ).explicitGet()
+    )
   )
 
-  val scriptResultObj = CaseObj(CASETYPEREF("ScriptResult", el), Map(FieldNames.ScriptWriteSet -> writeSetObj, FieldNames.ScriptTransferSet -> transferSetObj))
+  val scriptResultObj =
+    CaseObj(CASETYPEREF("ScriptResult", el), Map(FieldNames.ScriptWriteSet -> writeSetObj, FieldNames.ScriptTransferSet -> transferSetObj))
 
-  val writeResult    = List(DataItem.Lng("xxx", 42))
-  val transferResult = List(AssetTransfer(Address(address1), 41L, Some(asset)), AssetTransfer(Address(address2), 42L, None))
+  val writeResult = List(DataItem.Lng("xxx", 42))
+  val transferResult =
+    List(AssetTransfer(Address(address1), Address(address1), 41L, Some(asset)), AssetTransfer(Address(address2), Address(address2), 42L, None))
 
   property("ScriptResult from WriteSet") {
     ScriptResult.fromObj(pureEvalContext, asset, writeSetObj, V3, 0) shouldBe Right(ScriptResultV3(writeResult, List.empty, 0))

@@ -40,7 +40,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   implicit val version: StdLibVersion = V4
 
-  private def pureContext(implicit version: StdLibVersion) = PureContext.build(version)
+  private def pureContext(implicit version: StdLibVersion) = PureContext.build(version, fixUnicodeFunctions = true)
 
   private def defaultCryptoContext(implicit version: StdLibVersion) = CryptoContext.build(Global, version)
 
@@ -59,7 +59,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     )
 
   private def pureEvalContext(implicit version: StdLibVersion): EvaluationContext[NoContext, Id] =
-    PureContext.build(version).evaluationContext
+    PureContext.build(version, fixUnicodeFunctions = true).evaluationContext
 
   private val defaultEvaluator = new EvaluatorV1[Id, Environment]()
 
@@ -67,7 +67,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     defaultEvaluator[T](context, expr)
 
   private def evalV2[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] =
-    EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion]).bimap(_._1, _._1.asInstanceOf[T])
+    EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion])._3.asInstanceOf[Either[ExecutionError, T]]
 
   private def eval[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] = {
     val evaluatorV1Result = evalV1[T](context, expr)
@@ -82,9 +82,9 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   private def evalWithLogging(context: EvaluationContext[Environment, Id], expr: EXPR): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
     val evaluatorV1Result = defaultEvaluator.applyWithLogging[EVALUATED](context, expr)
-    val evaluatorV2Result = EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion])
+    val (evaluatorV2Log, _, evaluatorV2Result) = EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion])
 
-    evaluatorV2Result shouldBe evaluatorV1Result
+    evaluatorV2Result.bimap((_, evaluatorV2Log), (_, evaluatorV2Log)) shouldBe evaluatorV1Result
     evaluatorV1Result
   }
 
@@ -1052,9 +1052,9 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     val mul   = FUNCTION_CALL(mulLong.header, List(CONST_LONG(5), CONST_LONG(5)))
     val div   = FUNCTION_CALL(divLong.header, List(CONST_LONG(10), CONST_LONG(3)))
     val mod   = FUNCTION_CALL(modLong.header, List(CONST_LONG(10), CONST_LONG(3)))
-    val frac  = FUNCTION_CALL(fraction.header, List(CONST_LONG(Long.MaxValue), CONST_LONG(2), CONST_LONG(4)))
-    val frac2 = FUNCTION_CALL(fraction.header, List(CONST_LONG(Long.MaxValue), CONST_LONG(3), CONST_LONG(2)))
-    val frac3 = FUNCTION_CALL(fraction.header, List(CONST_LONG(-Long.MaxValue), CONST_LONG(3), CONST_LONG(2)))
+    val frac  = FUNCTION_CALL(fraction(fixLimitCheck = false).header, List(CONST_LONG(Long.MaxValue), CONST_LONG(2), CONST_LONG(4)))
+    val frac2 = FUNCTION_CALL(fraction(fixLimitCheck = false).header, List(CONST_LONG(Long.MaxValue), CONST_LONG(3), CONST_LONG(2)))
+    val frac3 = FUNCTION_CALL(fraction(fixLimitCheck = false).header, List(CONST_LONG(-Long.MaxValue), CONST_LONG(3), CONST_LONG(2)))
 
     evalPure[EVALUATED](expr = sum) shouldBe evaluated(10)
     evalPure[EVALUATED](expr = mul) shouldBe evaluated(25)

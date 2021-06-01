@@ -26,7 +26,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
 
   private val ctx: CTX[Environment] =
-      PureContext.build(V3).withEnvironment[Environment] |+|
+      PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
       CTX[Environment](sampleTypes, Map.empty, Array.empty) |+|
       WavesContext.build(
         Global,
@@ -91,7 +91,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         DataItem.Bin("feeAssetId", ByteStr.empty),
       ),
       List(),
-      0
+      2147483615
     )
   }
 
@@ -105,7 +105,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       """.stripMargin,
       "foo",
       Range(1, 23).map(i => Terms.CONST_LONG(i)).toList
-    ).explicitGet()._1 shouldBe ScriptResultV3(List(DataItem.Lng("1", 22)), List(), 0)
+    ).explicitGet()._1 shouldBe ScriptResultV3(List(DataItem.Lng("1", 22)), List(), 2147483641)
   }
 
   property("@Callable exception error contains initialised values") {
@@ -157,8 +157,9 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed, V3).explicitGet()
 
-    ContractEvaluator(
+    ContractEvaluator.applyV2Coeval(
       ctx.evaluationContext(environment),
+      Map(),
       compiled,
       Invocation(
         Terms.FUNCTION_CALL(FunctionHeader.User(func), args),
@@ -171,8 +172,9 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         fee,
         feeAssetId
       ),
-      V3
-    )
+      V3,
+      Int.MaxValue
+    ).value().leftMap { case (e, _, log) => (e, log) }
   }
 
   def parseCompileAndVerify(script: String, tx: Tx): Either[ExecutionError, EVALUATED] = {
@@ -185,7 +187,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       ctx.evaluationContext(environment),
       EvaluatorV2.applyCompleted(_, _, V3),
       txObject
-    ).bimap(_._1, _._1)
+    )._3
   }
 
   property("Simple verify") {
@@ -302,10 +304,10 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         DataItem.Bin("d", ByteStr.fromLong(256L))
       ),
       List(
-        AssetTransfer(Recipient.Address(callerAddress), 1L, None),
-        AssetTransfer(Recipient.Address(callerAddress), 2L, None)
+        AssetTransfer(Recipient.Address(callerAddress), Recipient.Address(callerAddress), 1L, None),
+        AssetTransfer(Recipient.Address(callerAddress), Recipient.Address(callerAddress), 2L, None)
       ),
-      0
+      2147483626
     )
   }
 
@@ -371,10 +373,10 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         DataItem.Lng("b", 2)
       ),
       List(
-        AssetTransfer(Recipient.Address(callerAddress), 3, None),
-        AssetTransfer(Recipient.Address(callerAddress), 4, None)
+        AssetTransfer(Recipient.Address(callerAddress), Recipient.Address(callerAddress), 3, None),
+        AssetTransfer(Recipient.Address(callerAddress), Recipient.Address(callerAddress), 4, None)
       ),
-      0
+      2147483605
     )
   }
 }
