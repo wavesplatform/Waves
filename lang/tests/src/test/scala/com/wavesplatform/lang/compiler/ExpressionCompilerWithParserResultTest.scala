@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.parser.Expressions._
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ExpressionCompilerWithParserV2Test extends PropSpec with PropertyChecks with Matchers with NoShrink {
+class ExpressionCompilerWithParserResultTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
 
   def compile(script: String, saveExprContext: Boolean = false): Either[String, Expressions.EXPR] = {
 
@@ -62,13 +62,13 @@ class ExpressionCompilerWithParserV2Test extends PropSpec with PropertyChecks wi
                 FUNCTION_CALL(
                   AnyPos,
                   PART.VALID(AnyPos, "+"),
-                  List(REF(AnyPos, PART.VALID(AnyPos, "foo"), None, None), REF(AnyPos, PART.VALID(AnyPos, "bar"), None, None)),
-                  None,
+                  List(REF(AnyPos, PART.VALID(AnyPos, "foo"), Some(LONG), None), REF(AnyPos, PART.VALID(AnyPos, "bar"), Some(LONG), None)),
+                  Some(LONG),
                   None
                 ),
                 CONST_LONG(AnyPos, 123456, None)
               ),
-              None,
+              Some(BOOLEAN),
               None
             ),
             TRUE(AnyPos, None),

@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.parser.Expressions
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ContractCompilerWithParserV2Test extends PropSpec with PropertyChecks with Matchers with NoShrink {
+class ContractCompilerWithParserResultTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
 
   def compile(script: String, saveExprContext: Boolean = false): Either[String, (Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
 
