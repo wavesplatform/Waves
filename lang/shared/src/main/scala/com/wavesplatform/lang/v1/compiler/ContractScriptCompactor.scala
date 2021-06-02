@@ -24,16 +24,20 @@ object ContractScriptCompactor {
       val compName = originalToCompactedNameMap.getOrElse(
         oldName,
         {
-          val cName = s"${charRange(currentNameCharIdx)}${currentNameNum}"
-          originalToCompactedNameMap += oldName -> cName
-          currentNameNum += 1
-          if (currentNameCharIdx < 25) {
-            if (currentNameNum > 9) {
-              currentNameCharIdx += 1
-              currentNameNum = 1
+          if (oldName.length <= 2 && !originalToCompactedNameMap.values.exists(_ == oldName)) {
+            oldName
+          } else {
+            val cName = s"${charRange(currentNameCharIdx)}${currentNameNum}"
+            originalToCompactedNameMap += oldName -> cName
+            currentNameNum += 1
+            if (currentNameCharIdx < 25) {
+              if (currentNameNum > 9) {
+                currentNameCharIdx += 1
+                currentNameNum = 1
+              }
             }
+            cName
           }
-          cName
         }
       )
 
