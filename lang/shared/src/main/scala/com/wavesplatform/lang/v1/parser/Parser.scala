@@ -3,12 +3,13 @@ package com.wavesplatform.lang.v1.parser
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.ContractLimits
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.UnaryOperation._
-import fastparse._
 import fastparse.MultiLineWhitespace._
+import fastparse._
 
 object Parser {
 
@@ -168,15 +169,15 @@ object Parser {
     case (_, id, None, _)                                     => id
   }
 
-  val limlim = com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
   def foldP[_:P]: P[EXPR] = (Index ~~ P("FOLD<") ~~ Index ~~ digit.repX(1).! ~~ Index ~~ ">(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ refP ~ ")" ~~ Index)
     .map { case (start, limStart, limit, limEnd, list, acc, f, end) =>
       val lim = limit.toInt
-      if(lim <= limlim) {
-        Macro.unwrapFold(Pos(start, end), lim, list, acc, f)
-      } else {
-        INVALID(Pos(limStart, limEnd), s"List size limit in FOLD is oversized, $lim must be less or equal $limlim")
-      }
+      if (lim < 1)
+        INVALID(Pos(limStart, limEnd), "FOLD limit should be natural")
+      else if (lim > MaxListLengthV4)
+        INVALID(Pos(limStart, limEnd), s"List size limit in FOLD is too big, $lim must be less or equal $MaxListLengthV4")
+      else
+        FOLD(Pos(start, end), lim, list, acc, f)
     }
 
   def list[_:P]: P[EXPR] = (Index ~~ P("[") ~ functionCallArgs ~ P("]") ~~ Index).map {
