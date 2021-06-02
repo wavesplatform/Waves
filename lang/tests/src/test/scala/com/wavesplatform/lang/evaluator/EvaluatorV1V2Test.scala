@@ -40,7 +40,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   implicit val version: StdLibVersion = V4
 
-  private def pureContext(implicit version: StdLibVersion) = PureContext.build(version)
+  private def pureContext(implicit version: StdLibVersion) = PureContext.build(version, fixUnicodeFunctions = true)
 
   private def defaultCryptoContext(implicit version: StdLibVersion) = CryptoContext.build(Global, version)
 
@@ -59,7 +59,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     )
 
   private def pureEvalContext(implicit version: StdLibVersion): EvaluationContext[NoContext, Id] =
-    PureContext.build(version).evaluationContext
+    PureContext.build(version, fixUnicodeFunctions = true).evaluationContext
 
   private val defaultEvaluator = new EvaluatorV1[Id, Environment]()
 

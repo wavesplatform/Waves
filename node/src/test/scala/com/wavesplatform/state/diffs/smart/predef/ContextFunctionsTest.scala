@@ -778,7 +778,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
           val expr = Parser.parseContract(script).get.value
 
           val ctx =
-            PureContext.build(version).withEnvironment[Environment] |+|
+            PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
               CryptoContext.build(Global, version).withEnvironment[Environment] |+|
               WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet())
 
