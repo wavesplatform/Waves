@@ -61,7 +61,7 @@ object InvokeScriptDiff {
             Either.cond(
               version >= V5,
               (),
-              GenericError(s"Calling DApp is available only from V5, but DApp $version at address $dAppAddress was called from $invoker")
+              GenericError(s"DApp $invoker invoked DApp $dAppAddress that uses RIDE $version, but dApp-to-dApp invocation requires version 5 or higher")
             )
           )
           _ <- traced(
