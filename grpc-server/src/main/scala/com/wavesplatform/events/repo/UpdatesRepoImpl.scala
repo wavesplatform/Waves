@@ -3,6 +3,7 @@ package com.wavesplatform.events.repo
 import java.nio.{ByteBuffer, ByteOrder}
 
 import scala.annotation.tailrec
+import scala.collection.concurrent.TrieMap
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
@@ -20,7 +21,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import monix.eval.Task
 import monix.execution.{Ack, Scheduler}
-import monix.reactive.{Observable, OverflowStrategy}
+import monix.reactive.{Observable, Observer, OverflowStrategy}
 import monix.reactive.subjects.ConcurrentSubject
 
 class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val scheduler: Scheduler)
@@ -43,38 +44,23 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
 
   @volatile
   private[this] var lastRealTimeUpdates = Seq.empty[BlockchainUpdated]
-  private[this] val realTimeUpdates     = ConcurrentSubject.publish[BlockchainUpdated]
-
-  realTimeUpdates.guaranteeCase(
-    ec =>
-      Task(ec match {
-        case ExitCase.Completed =>
-          log.error("realTimeUpdates completed")
-        case ExitCase.Error(e) =>
-          log.error("realTimeUpdates error", e)
-        case ExitCase.Canceled =>
-          log.error("realTimeUpdates cancelled")
-      })
-  ).foreach { bu =>
-    log.trace(s"realTimeUpdates event: ${bu.ref}")
-  }.onComplete { result =>
-    log.error(s"realTimeUpdates logging stopped: $result")
-    result.failed.foreach(err => log.error("realTimeUpdates logging error", err))
-  }
+  private[this] val realTimeStreams     = TrieMap.empty[Observer[BlockchainUpdated], Unit]
 
   private[this] def sendRealTimeUpdate(upd: BlockchainUpdated): Unit = {
     val currentUpdates = this.lastRealTimeUpdates
     val currentHeight  = height.toOption
     this.lastRealTimeUpdates = currentUpdates.dropWhile(u => currentHeight.exists(_ - 1 > u.height)) :+ upd
-    realTimeUpdates.onNext(upd) match {
-      case Ack.Continue =>
-        log.trace(s"realTimeUpdates returned Ack.Continue on ${upd.ref}")
-      case Ack.Stop =>
-        log.error(s"realTimeUpdates returned Ack.Stop on ${upd.ref}")
-        throw new IllegalStateException("Real time updates subject is stopped")
-      case ack =>
-        log.error(s"realTimeUpdates returned Ack with isSynchronous=${ack.isSynchronous}: $ack")
-    }
+    realTimeStreams.keys.foreach(
+      subj =>
+        subj.onNext(upd) match {
+          case Ack.Continue =>
+          // log.trace(s"$subj returned Ack.Continue on ${upd.ref}")
+          case Ack.Stop =>
+            log.error(s"$subj returned Ack.Stop on ${upd.ref}")
+          case ack =>
+            log.error(s"$subj returned Ack with isSynchronous=${ack.isSynchronous}: $ack")
+        }
+    )
   }
 
   // UpdatesRepo.Read impl
@@ -244,7 +230,11 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
             }
             val (keep, drop) = dropUntilId(ls.microBlocks, toId)
             if (keep.isEmpty) {
-              Failure(new IllegalArgumentException(s"BlockchainUpdates attempted to rollback a non-existing microblock: $toId, existing = ${ls.microBlocks.map(_.id)}"))
+              Failure(
+                new IllegalArgumentException(
+                  s"BlockchainUpdates attempted to rollback a non-existing microblock: $toId, existing = ${ls.microBlocks.map(_.id)}"
+                )
+              )
             } else {
               liquidState = Some(ls.copy(microBlocks = keep))
               val removedTxs  = drop.flatMap(_.microBlock.transactionData).map(_.id()).reverse
@@ -289,43 +279,55 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
       if (h < fromHeight) {
         Observable.raiseError(new IllegalArgumentException("Requested start height exceeds current blockchain height"))
       } else {
-        def readBatchStream(from: Int, prevLastPersistent: Option[BlockchainUpdated] = None): Observable[BlockchainUpdated] = Observable.fromTask(readBatchTask(from)).flatMap {
-          case (data, next) =>
-            Observable.fromIterable(data) ++ (next match {
-              case Some(next) =>
-                readBatchStream(next, data.lastOption.ensuring(_.nonEmpty))
+        def readBatchStream(from: Int, prevLastPersistent: Option[BlockchainUpdated] = None): Observable[BlockchainUpdated] =
+          Observable.fromTask(readBatchTask(from)).flatMap {
+            case (data, next) =>
+              Observable.fromIterable(data) ++ (next match {
+                case Some(next) =>
+                  readBatchStream(next, data.lastOption.ensuring(_.nonEmpty))
 
-              case None =>
-                val streamId             = Integer.toHexString(System.nanoTime().toInt)
-                val lastPersistentUpdate = data.lastOption.orElse(prevLastPersistent)
-                log.trace(s"[$streamId] lastPersistentUpdate = ${lastPersistentUpdate.map(_.ref)}")
+                case None =>
+                  val streamId             = Integer.toHexString(System.nanoTime().toInt)
+                  val lastPersistentUpdate = data.lastOption.orElse(prevLastPersistent)
+                  log.trace(s"[$streamId] lastPersistentUpdate = ${lastPersistentUpdate.map(_.ref)}")
 
-                Observable
-                  .fromIterable(lastRealTimeUpdates)
-                  .++(realTimeUpdates.whileBusyBuffer(OverflowStrategy.Fail(100)))
-                  .dropWhile(u => {
-                    val drop = !lastPersistentUpdate.forall(u.references)
-                    if (drop) log.trace(s"[$streamId] Dropping by referencesLastPersistent=false: ${u.ref}")
-                    else log.trace(s"[$streamId] Found referencesLastPersistent=true: ${u.ref}")
-                    drop
-                  })
-                  .guaranteeCase(
-                    ec =>
-                      Task(ec match {
-                        case ExitCase.Completed =>
-                          log.error(s"[$streamId] Stream is completed")
-                        case ExitCase.Error(e) =>
-                          log.error(s"[$streamId] Stream error", e)
-                        case ExitCase.Canceled =>
-                          log.error(s"[$streamId] Stream cancelled")
-                      })
-                  )
-                  .map { bu =>
-                    log.trace(s"[$streamId] Sending real-time update: ${bu.ref}")
-                    bu
-                  }
-            })
-        }
+                  Observable
+                    .fromIterable(lastRealTimeUpdates)
+                    .++(Observable.defer {
+                      val subject = ConcurrentSubject.publishToOne[BlockchainUpdated]
+                      realTimeStreams += subject -> ()
+                      log.trace(s"[$streamId] Added subscription: $subject")
+
+                      subject
+                        .whileBusyBuffer(OverflowStrategy.Fail(50))
+                        .guarantee(Task {
+                          realTimeStreams -= subject
+                          log.trace(s"[$streamId] Removed subscription: $subject")
+                        })
+                    })
+                    .dropWhile(u => {
+                      val drop = !lastPersistentUpdate.forall(u.references)
+                      if (drop) log.trace(s"[$streamId] Dropping by referencesLastPersistent=false: ${u.ref}")
+                      else log.trace(s"[$streamId] Found referencesLastPersistent=true: ${u.ref}")
+                      drop
+                    })
+                    .guaranteeCase(
+                      ec =>
+                        Task(ec match {
+                          case ExitCase.Completed =>
+                            log.error(s"[$streamId] Stream is completed")
+                          case ExitCase.Error(e) =>
+                            log.error(s"[$streamId] Stream error", e)
+                          case ExitCase.Canceled =>
+                            log.error(s"[$streamId] Stream cancelled")
+                        })
+                    )
+                    .map { bu =>
+                      log.trace(s"[$streamId] Sending real-time update: ${bu.ref}")
+                      bu
+                    }
+              })
+          }
         readBatchStream(fromHeight)
       }
     }
