@@ -43,28 +43,24 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
 
   @volatile
   private[this] var lastRealTimeUpdates = Seq.empty[BlockchainUpdated]
-  private[this] val realTimeUpdates     = ConcurrentSubject.publish[BlockchainUpdated](OverflowStrategy.DropOld(2))
+  private[this] val realTimeUpdates     = ConcurrentSubject.publish[BlockchainUpdated]
 
-  realTimeUpdates.foreach { bu =>
+  realTimeUpdates.guaranteeCase(
+    ec =>
+      Task(ec match {
+        case ExitCase.Completed =>
+          log.error("realTimeUpdates completed")
+        case ExitCase.Error(e) =>
+          log.error("realTimeUpdates error", e)
+        case ExitCase.Canceled =>
+          log.error("realTimeUpdates cancelled")
+      })
+  ).foreach { bu =>
     log.trace(s"realTimeUpdates event: ${bu.ref}")
   }.onComplete { result =>
     log.error(s"realTimeUpdates logging stopped: $result")
     result.failed.foreach(err => log.error("realTimeUpdates logging error", err))
   }
-
-  realTimeUpdates
-    .guaranteeCase(
-      ec =>
-        Task(ec match {
-          case ExitCase.Completed =>
-            log.error("realTimeUpdates completed")
-          case ExitCase.Error(e) =>
-            log.error("realTimeUpdates error", e)
-          case ExitCase.Canceled =>
-            log.error("realTimeUpdates cancelled")
-        })
-    )
-    .subscribe()
 
   private[this] def sendRealTimeUpdate(upd: BlockchainUpdated): Unit = {
     val currentUpdates = this.lastRealTimeUpdates
@@ -306,7 +302,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
 
                 Observable
                   .fromIterable(lastRealTimeUpdates)
-                  .++(realTimeUpdates)
+                  .++(realTimeUpdates.whileBusyBuffer(OverflowStrategy.Fail(100)))
                   .dropWhile(u => {
                     val drop = !lastPersistentUpdate.forall(u.references)
                     if (drop) log.trace(s"[$streamId] Dropping by referencesLastPersistent=false: ${u.ref}")
