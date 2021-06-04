@@ -1,35 +1,11 @@
 package com.wavesplatform.lang.v1
 
-import cats.kernel.Monoid
-import com.wavesplatform.lang.utils.environment
-import com.wavesplatform.lang.Common.NoShrink
-import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.V3
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, EVALUATED}
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.traits.Environment
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
+import com.wavesplatform.lang.evaluator.EvaluatorSpec
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG}
 
-class FoldTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
-  private def eval[T <: EVALUATED](code: String): Either[String, T] = {
-    val untyped = Parser.parseExpr(code).get.value
-    val ctx: CTX[Environment] =
-      Monoid.combineAll(
-        Seq(
-          PureContext.build(V3).withEnvironment[Environment],
-          WavesContext.build(DirectiveSet.contractDirectiveSet),
-          CryptoContext.build(Global, V3).withEnvironment[Environment]
-        )
-      )
-    val typed = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => EvaluatorV1().apply[T](ctx.evaluationContext(environment), v._1))
-  }
+class FoldTest extends EvaluatorSpec {
+  implicit val startVersion: StdLibVersion = V3
 
   property("sum") {
     val script =
@@ -66,7 +42,7 @@ class FoldTest extends PropSpec with PropertyChecks with Matchers with NoShrink 
          |
       """.stripMargin
 
-    eval(script) shouldBe Left("List size exceed 4")
+    eval(script) shouldBe Left("List size exceeds 4")
   }
 
   property("limit for limit") {
@@ -80,14 +56,14 @@ class FoldTest extends PropSpec with PropertyChecks with Matchers with NoShrink 
       """.stripMargin
 
     val index = script.indexOf("1001")
-    eval(script) shouldBe Left(s"Compilation failed: [List size limit in FOLD is oversized, 1001 must be less or equal 1000 in $index-${index+4}]")
+    eval(script) shouldBe Left(s"Compilation failed: [List size limit in FOLD is too big, 1001 must be less or equal 1000 in $index-${index + 4}]")
   }
 
-  property("Maximun limit") {
+  property("Maximum limit") {
     val script =
       s"""
          | func sum(a:Int, b:Int) = a + b
-         | let arr = [${"1,"*999}1]
+         | let arr = [${"1," * 999}1]
          | let total = FOLD<1000>(arr, 2, sum)
          | total
          |
@@ -95,7 +71,6 @@ class FoldTest extends PropSpec with PropertyChecks with Matchers with NoShrink 
 
     eval(script) shouldBe Right(CONST_LONG(1002L))
   }
-
 
   property("FOLD as FOLD param") {
     val script =
@@ -108,5 +83,39 @@ class FoldTest extends PropSpec with PropertyChecks with Matchers with NoShrink 
       """.stripMargin
 
     eval(script) shouldBe Right(CONST_LONG(9 + 2 * (1 + 2 + 3 + 4 + 5)))
+  }
+
+  property("first argument should be list") {
+    eval(
+      s"""
+         | func sum(a:Int, b:Int) = a + b
+         | FOLD<5>(1, 9, sum)
+         |
+      """.stripMargin
+    ) shouldBe Left("Compilation failed: FOLD first argument should be List[T], but Int found in 34-52")
+  }
+
+  property("suitable function is not found") {
+    eval(
+      s"""
+         | func sum(a:Int, b:String) = a
+         | FOLD<5>([1], 0, sum)
+         |
+      """.stripMargin
+    ) shouldBe Left("Compilation failed: Can't find suitable function sum(a: Int, b: Int) for FOLD in 33-53")
+    eval(
+      s"""
+         | func sum(a:String, b:Int) = a
+         | FOLD<5>([1], 0, sum)
+         |
+      """.stripMargin
+    ) shouldBe Left("Compilation failed: Can't find suitable function sum(a: Int, b: Int) for FOLD in 33-53")
+    eval(
+      s"""
+         | func sum(a:String, b:Int) = a
+         | FOLD<5>([], 0, sum)
+         |
+      """.stripMargin
+    ) shouldBe Left("Compilation failed: Can't find suitable function sum(a: Int, b: Any) for FOLD in 33-52")
   }
 }

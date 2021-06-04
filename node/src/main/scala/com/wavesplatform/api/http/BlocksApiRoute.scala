@@ -1,16 +1,23 @@
 package com.wavesplatform.api.http
 
+import scala.annotation.tailrec
+import scala.util.Try
+
 import akka.http.scaladsl.server.{Route, StandardRoute}
+import cats.syntax.either._
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, TooBigArrayAllocation}
+import com.wavesplatform.api.http.TransactionsApiRoute.TransactionJsonSerializer
 import com.wavesplatform.block.Block
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.utils.Time
 import play.api.libs.json._
 
-case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi) extends ApiRoute {
+case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi, time: Time) extends ApiRoute {
   import BlocksApiRoute._
   private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
 
@@ -60,6 +67,15 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
       } ~ path(BlockId) { id =>
         complete(commonApi.meta(id).map(_.json()).toRight(BlockDoesNotExist))
       }
+    } ~ path("heightByTimestamp" / LongNumber) { timestamp =>
+      val heightE = (for {
+        _ <- Either.cond(timestamp <= time.correctedTime(), (), "Indicated timestamp belongs to the future")
+        genesisTimestamp = commonApi.metaAtHeight(1).fold(0L)(_.header.timestamp)
+        _ <- Either.cond(timestamp >= genesisTimestamp, (), "Indicated timestamp is before the start of the blockchain")
+        result <- Try(heightByTimestamp(timestamp)).toEither.leftMap(_.getMessage)
+      } yield result)
+
+      complete(heightE.bimap(GenericError(_), h => Json.obj("height" -> h)))
     } ~ path(BlockId) { id =>
       complete(commonApi.block(id).map(toJson).toRight(BlockDoesNotExist))
     }
@@ -86,17 +102,56 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
       complete(TooBigArrayAllocation)
     }
   }
+
+  @throws[IllegalStateException]("if the state is altered while executing")
+  private[this] def heightByTimestamp(target: Long): Int = {
+    def timestampOf(height: Int, default: => Long = throw new IllegalStateException("State was altered")): Long =
+      commonApi.metaAtHeight(height).fold(default)(_.header.timestamp)
+
+    @tailrec
+    def findHeightRec(lowerBound: Int = 1, upperBound: Int = commonApi.currentHeight): Int = {
+      val lowerTimestamp = timestampOf(lowerBound)
+      val upperTimestamp = timestampOf(upperBound)
+
+      require(lowerTimestamp <= target)
+
+      val averageBlockTime = (upperTimestamp - lowerTimestamp) / (upperBound - lowerBound).max(1)
+      val offset = {
+        val blocksBetween = ((target - lowerTimestamp) / averageBlockTime).toInt
+        blocksBetween
+      }
+
+      val predictedHeight = (lowerBound + offset).max(lowerBound).min(upperBound)
+
+      val timestamp      = timestampOf(predictedHeight)
+      val rightTimestmap = timestampOf(predictedHeight + 1, Long.MaxValue)
+      val leftHit        = timestamp <= target
+      val rightHit       = rightTimestmap <= target
+
+      val (newLower, newUpper) = {
+        if (!leftHit) (lowerBound, (predictedHeight - 1).max(lowerBound))
+        else if (rightHit) ((predictedHeight + 1).min(upperBound), upperBound)
+        else (predictedHeight, predictedHeight)
+      }
+
+      if (newLower == newUpper) predictedHeight else findHeightRec(newLower, newUpper)
+    }
+
+    findHeightRec()
+  }
 }
 
 object BlocksApiRoute {
-  import TransactionsApiRoute.applicationStatus
-
-  private def toJson(v: (BlockMeta, Seq[(Transaction, Boolean)])): JsObject = v._1.json() ++ transactionField(v._1.header.version, v._2)
+  private def toJson(v: (BlockMeta, Seq[(Transaction, Boolean)])): JsObject = v match {
+    case (meta, transactions) =>
+      meta.json() ++ transactionField(meta.header.version, transactions)
+  }
 
   private def transactionField(blockVersion: Byte, transactions: Seq[(Transaction, Boolean)]): JsObject = Json.obj(
     "fee" -> transactions.map(_._1.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum,
     "transactions" -> JsArray(transactions.map {
-      case (transaction, succeeded) => transaction.json() ++ applicationStatus(blockVersion >= Block.ProtoBlockVersion, succeeded)
+      case (transaction, succeeded) =>
+        transaction.json() ++ TransactionJsonSerializer.applicationStatus(blockVersion >= Block.ProtoBlockVersion, succeeded)
     })
   )
 }

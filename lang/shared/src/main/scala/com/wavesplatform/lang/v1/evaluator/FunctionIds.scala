@@ -18,6 +18,9 @@ object FunctionIds {
   val POW: Short = 108
   val LOG: Short = 109
 
+  val POW_BIGINT: Short = 118
+  val LOG_BIGINT: Short = 119
+
   val SIZE_BYTES: Short = 200
   val TAKE_BYTES: Short = 201
   val DROP_BYTES: Short = 202
@@ -28,16 +31,38 @@ object FunctionIds {
   val DROP_STRING: Short = 304
   val SIZE_STRING: Short = 305
 
+  val TO_BIGINT: Short  = 310
+  val SUM_BIGINT: Short = 311
+  val SUB_BIGINT: Short = 312
+  val MUL_BIGINT: Short = 313
+  val DIV_BIGINT: Short = 314
+  val MOD_BIGINT: Short = 315
+  val FRACTION_BIGINT: Short = 316
+  val FRACTION_BIGINT_ROUNDS: Short = 317
+  val UMINUS_BIGINT: Short = 318
+  val GT_BIGINT: Short  = 319
+  val GE_BIGINT: Short  = 320
+
   val SIZE_LIST: Short         = 400
   val GET_LIST: Short          = 401
   val MEDIAN_LIST: Short       = 405
   val MAX_LIST: Short          = 406
   val MIN_LIST: Short          = 407
+  val MAX_LIST_BIGINT: Short   = 408
+  val MIN_LIST_BIGINT: Short   = 409
   val LONG_TO_BYTES: Short     = 410
   val STRING_TO_BYTES: Short   = 411
   val BOOLEAN_TO_BYTES: Short  = 412
+  val BIGINT_TO_BYTES: Short   = 413
+  val BYTES_TO_BIGINT: Short   = 414
+  val BYTES_TO_BIGINT_LIM: Short = 415
+  val BIGINT_TO_INT: Short     = 416
   val LONG_TO_STRING: Short    = 420
   val BOOLEAN_TO_STRING: Short = 421
+  val BIGINT_TO_STRING: Short  = 422
+  val STRING_TO_BIGINT: Short  = 423
+  val STRING_TO_BIGINTOPT: Short  = 424
+  val MEDIAN_LISTBIGINT: Short    = 425
 
   val CREATE_LIST: Short             = 1100
   val APPEND_LIST: Short             = 1101
@@ -98,6 +123,10 @@ object FunctionIds {
   val TRANSFERTRANSACTIONBYID: Short = 1006
   val ACCOUNTWAVESBALANCE: Short     = 1007
   val ACCOUNTASSETONLYBALANCE: Short = 1008
+  val ACCOUNTSCRIPTHASH: Short       = 1009
+
+  val CALLDAPP: Short                = 1020
+  val CALLDAPPREENTRANT: Short       = 1021
 
   val DATA_LONG_FROM_ARRAY: Short    = 1040
   val DATA_BOOLEAN_FROM_ARRAY: Short = 1041
@@ -109,6 +138,13 @@ object FunctionIds {
   val DATA_BYTES_FROM_STATE: Short   = 1052
   val DATA_STRING_FROM_STATE: Short  = 1053
 
+  val IS_UNTOUCHED: Short            = 1054
+
+  val DATA_LONG_FROM_STATE_SELF: Short    = 1055
+  val DATA_BOOLEAN_FROM_STATE_SELF: Short = 1056
+  val DATA_BYTES_FROM_STATE_SELF: Short   = 1057
+  val DATA_STRING_FROM_STATE_SELF: Short  = 1058
+
   val ADDRESSFROMRECIPIENT: Short     = 1060
   val ADDRESSTOSTRING: Short          = 1061
   val ADDRESSFROMSTRING_NATIVE: Short = 1062
@@ -116,7 +152,26 @@ object FunctionIds {
   val TRANSFER_TRANSACTION_FROM_PROTO: Short = 1070
 
   val CALCULATE_ASSET_ID: Short = 1080
+  val CALCULATE_LEASE_ID: Short = 1081
 
   val SIMPLIFIED_ISSUE_ACTION_CONSTRUCTOR: Short = 1090
   val DETAILED_ISSUE_ACTION_CONSTRUCTOR: Short   = 1091
+  val SIMPLIFIED_LEASE_ACTION_CONSTRUCTOR: Short = 1092
+  val DETAILED_LEASE_ACTION_CONSTRUCTOR: Short   = 1093
+
+  val ExternalFunctionIds =
+    Set(
+      GETTRANSACTIONBYID,
+      TRANSACTIONHEIGHTBYID,
+      ACCOUNTASSETBALANCE,
+      GETASSETINFOBYID,
+      BLOCKINFOBYHEIGHT,
+      TRANSFERTRANSACTIONBYID,
+      ACCOUNTWAVESBALANCE,
+      ACCOUNTASSETONLYBALANCE,
+      DATA_LONG_FROM_STATE,
+      DATA_BOOLEAN_FROM_STATE,
+      DATA_BYTES_FROM_STATE,
+      DATA_STRING_FROM_STATE
+    )
 }

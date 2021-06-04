@@ -96,7 +96,7 @@ class DataTransactionBodyBytesByteVectorSuite extends BaseTransactionSuite {
     val increasedData = data.head.copy(value = data.head.value ++ ByteStr.fromBytes(1)) :: data.tail
     assertBadRequestAndMessage(
       sender.putData(address, increasedData, version = version, fee = calcDataFee(data, version) + smartFee),
-      "Too big sequences requested"
+      "Too big sequence requested"
     )
   }
 }

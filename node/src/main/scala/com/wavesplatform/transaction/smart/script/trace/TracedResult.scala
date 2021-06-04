@@ -1,8 +1,8 @@
 package com.wavesplatform.transaction.smart.script.trace
 
 import cats.implicits._
-import cats.{Applicative, Apply, Functor}
 import cats.kernel.Semigroup
+import cats.{Applicative, Apply, Functor}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.transaction.Transaction
 import play.api.libs.json.{JsObject, Json}
@@ -29,6 +29,10 @@ final case class TracedResult[+E, +A](
 
   def leftMap[E1](f: E => E1): TracedResult[E1, A] = copy(resultE.leftMap(f))
 
+  // added for for-comprehension destructuring
+  def withFilter(f: A => Boolean): TracedResult[E, A] =
+    copy(resultE.filterOrElse(f, throw new MatchError("TracedResult destructuring error")))
+
   def json(implicit ev1: E => ApiError, ev2: A => Transaction): JsObject = {
     val resultJson = resultE match {
       case Right(value) => value.json()
@@ -49,13 +53,13 @@ final case class TracedResult[+E, +A](
 object TracedResult {
   implicit def wrapE[A, E](e: Either[E, A]): TracedResult[E, A] = TracedResult(e)
 
-  implicit def wrapValue[A, E](value: A): TracedResult[E, A] = TracedResult(Right(value))
+  def wrapValue[A, E](value: A): TracedResult[E, A] = TracedResult(Right(value))
 
   implicit def tracedResultSemigroup[A: Semigroup, E]: Semigroup[TracedResult[E, A]] =
     (a, b) =>
       TracedResult(
         a.resultE |+| b.resultE,
-        if (a.resultE.isRight) a.trace |+| b.trace else a.trace
+        a.trace |+| b.trace
       )
 
   implicit def applicativeTracedResult[L]: Applicative[TracedResult[L, ?]] with Apply[TracedResult[L, ?]] with Functor[TracedResult[L, ?]]  = new Applicative[TracedResult[L, ?]] {

@@ -17,14 +17,14 @@ package object repl {
   val internalVarPrefixes: Set[Char] = Set('@', '$')
   val internalFuncPrefix: String = "_"
 
-  val version = V4
+  val version = V5
   val directives: DirectiveSet = DirectiveSet(version, Account, DApp).explicitGet()
 
   val initialCtx: CTX[Environment] =
     CryptoContext.build(global, version).withEnvironment[Environment]  |+|
-    PureContext.build(version).withEnvironment[Environment] |+|
-    WavesContext.build(directives)
+    PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+    WavesContext.build(global, directives)
 
   def buildEnvironment(settings: Option[NodeConnectionSettings]): Environment[Future] =
-    settings.fold(ErrorMessageEnvironment: Environment[Future])(WebEnvironment)
+    settings.fold(ErrorMessageEnvironment[Future]("Blockchain state is unavailable from REPL"): Environment[Future])(WebEnvironment)
 }

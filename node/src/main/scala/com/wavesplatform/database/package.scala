@@ -9,7 +9,7 @@ import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.{ByteString, CodedInputStream, WireFormat}
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -17,12 +17,15 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.database.protobuf.DataEntry.Value
+import com.wavesplatform.database.protobuf.TransactionData.Transaction.{LegacyBytes, NewTransaction}
 import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state._
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
@@ -34,6 +37,7 @@ import supertagged.TaggedType
 
 import scala.collection.mutable
 
+//noinspection UnstableApiUsage
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
     log.debug(s"Open DB at $path")
@@ -184,6 +188,48 @@ package object database extends ScorexLogging {
     LeaseBalance(ndi.readLong(), ndi.readLong())
   }
 
+  def writeLeaseDetails(lde: Either[Boolean, LeaseDetails]): Array[Byte] =
+    lde.fold(
+      _ => throw new IllegalArgumentException("Can not write boolean flag instead of LeaseDetails"),
+      ld =>
+        pb.LeaseDetails(
+            ByteString.copyFrom(ld.sender.arr),
+            Some(PBRecipients.create(ld.recipient)),
+            ld.amount,
+            ByteString.copyFrom(ld.sourceId.arr),
+            ld.height,
+            ld.status match {
+              case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
+              case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
+                pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
+              case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
+            }
+          )
+          .toByteArray
+    )
+
+  def readLeaseDetails(data: Array[Byte]): Either[Boolean, LeaseDetails] =
+    if (data.length == 1) Left(data(0) == 1)
+    else {
+      val d = pb.LeaseDetails.parseFrom(data)
+      Right(
+        LeaseDetails(
+          d.senderPublicKey.toPublicKey,
+          PBRecipients.toAddressOrAlias(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
+          d.amount,
+          d.status match {
+            case pb.LeaseDetails.Status.Active(_)                                => LeaseDetails.Status.Active
+            case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height)) => LeaseDetails.Status.Expired(height)
+            case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId)) =>
+              LeaseDetails.Status.Cancelled(height, Some(transactionId.toByteStr).filter(!_.isEmpty))
+            case pb.LeaseDetails.Status.Empty => ???
+          },
+          d.sourceId.toByteStr,
+          d.height
+        )
+      )
+    }
+
   def readVolumeAndFee(data: Array[Byte]): VolumeAndFee = Option(data).fold(VolumeAndFee.empty) { d =>
     val ndi = newDataInput(d)
     VolumeAndFee(ndi.readLong(), ndi.readLong())
@@ -293,7 +339,7 @@ package object database extends ScorexLogging {
   def readAssetStaticInfo(bb: Array[Byte]): AssetStaticInfo = {
     val sai = pb.StaticAssetInfo.parseFrom(bb)
     AssetStaticInfo(
-      TransactionId(ByteStr(sai.sourceId.toByteArray)),
+      TransactionId(sai.sourceId.toByteStr),
       PublicKey(sai.issuerPublicKey.toByteArray),
       sai.decimals,
       sai.isNft
@@ -314,18 +360,18 @@ package object database extends ScorexLogging {
       )
       .toByteArray
 
-  def readBlockMeta(height: Int)(bs: Array[Byte]): BlockMeta = {
+  def readBlockMeta(bs: Array[Byte]): BlockMeta = {
     val pbbm = pb.BlockMeta.parseFrom(bs)
     BlockMeta(
       PBBlocks.vanilla(pbbm.header.get),
-      ByteStr(pbbm.signature.toByteArray),
-      Option(pbbm.headerHash).collect { case bs if !bs.isEmpty => ByteStr(bs.toByteArray) },
+      pbbm.signature.toByteStr,
+      Option(pbbm.headerHash).collect { case bs if !bs.isEmpty => bs.toByteStr },
       pbbm.height,
       pbbm.size,
       pbbm.transactionCount,
       pbbm.totalFeeInWaves,
       Option(pbbm.reward).filter(_ >= 0),
-      Option(pbbm.vrf).collect { case bs if !bs.isEmpty => ByteStr(bs.toByteArray) }
+      Option(pbbm.vrf).collect { case bs if !bs.isEmpty => bs.toByteStr }
     )
   }
 
@@ -360,11 +406,11 @@ package object database extends ScorexLogging {
   }
 
   def readStateHash(bs: Array[Byte]): StateHash = {
-    val ndi = newDataInput(bs)
+    val ndi           = newDataInput(bs)
     val sectionsCount = ndi.readByte()
     val sections = (0 until sectionsCount).map { _ =>
       val sectionId = ndi.readByte()
-      val value = ndi.readByteStr(DigestLength)
+      val value     = ndi.readByteStr(DigestLength)
       SectionId(sectionId) -> value
     }
     val totalHash = ndi.readByteStr(DigestLength)
@@ -373,11 +419,12 @@ package object database extends ScorexLogging {
 
   def writeStateHash(sh: StateHash): Array[Byte] = {
     val sorted = sh.sectionHashes.toSeq.sortBy(_._1)
-    val ndo = newDataOutput(crypto.DigestLength + 1 + sorted.length * (1 + crypto.DigestLength))
+    val ndo    = newDataOutput(crypto.DigestLength + 1 + sorted.length * (1 + crypto.DigestLength))
     ndo.writeByte(sorted.length)
-    sorted.foreach { case (sectionId, value) =>
-      ndo.writeByte(sectionId.id.toByte)
-      ndo.writeByteStr(value.ensuring(_.arr.length == DigestLength))
+    sorted.foreach {
+      case (sectionId, value) =>
+        ndo.writeByte(sectionId.id.toByte)
+        ndo.writeByteStr(value.ensuring(_.arr.length == DigestLength))
     }
     ndo.writeByteStr(sh.totalHash.ensuring(_.arr.length == DigestLength))
     ndo.toByteArray
@@ -388,7 +435,7 @@ package object database extends ScorexLogging {
       case Value.Empty              => EmptyDataEntry(key)
       case Value.IntValue(value)    => IntegerDataEntry(key, value)
       case Value.BoolValue(value)   => BooleanDataEntry(key, value)
-      case Value.BinaryValue(value) => BinaryDataEntry(key, ByteStr(value.toByteArray))
+      case Value.BinaryValue(value) => BinaryDataEntry(key, value.toByteStr)
       case Value.StringValue(value) => StringDataEntry(key, value)
     }
 
@@ -497,7 +544,6 @@ package object database extends ScorexLogging {
   }
 
   def readTransaction(b: Array[Byte]): (Transaction, Boolean) = {
-    import pb.TransactionData.Transaction._
 
     val data = pb.TransactionData.parseFrom(b)
     data.transaction match {
@@ -508,7 +554,6 @@ package object database extends ScorexLogging {
   }
 
   def writeTransaction(v: (Transaction, Boolean)): Array[Byte] = {
-    import pb.TransactionData.Transaction._
     val (tx, succeeded) = v
     val ptx = tx match {
       case lps: LegacyPBSwitch if !lps.isProtobufVersion => LegacyBytes(ByteString.copyFrom(tx.bytes()))
@@ -554,18 +599,19 @@ package object database extends ScorexLogging {
   }
 
   def loadTransactions(height: Height, db: ReadOnlyDB): Option[Seq[(Transaction, Boolean)]] =
-    for {
-      meta <- db.get(Keys.blockMetaAt(height))
-    } yield (0 until meta.transactionCount).toList.flatMap { n =>
-      db.get(Keys.transactionAt(height, TxNum(n.toShort)))
+    if (height < 1 || db.get(Keys.height) < height) None
+    else {
+      val transactions = Seq.newBuilder[(Transaction, Boolean)]
+      db.iterateOver(KeyTags.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height)) { e =>
+        transactions += readTransaction(e.getValue)
+      }
+      Some(transactions.result())
     }
 
   def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] =
     for {
-      meta <- db.get(Keys.blockMetaAt(height))
-      txs = (0 until meta.transactionCount).toList.flatMap { n =>
-        db.get(Keys.transactionAt(height, TxNum(n.toShort)))
-      }
+      meta  <- db.get(Keys.blockMetaAt(height))
+      txs   <- loadTransactions(height, db)
       block <- createBlock(meta.header, meta.signature, txs.map(_._1)).toOption
     } yield block
 
@@ -595,31 +641,38 @@ package object database extends ScorexLogging {
     )
 
   def loadActiveLeases(db: DB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = db.withResource { r =>
-    val leaseIds = mutable.Set.empty[ByteStr]
-    val iterator = r.iterator
-
-    @inline
-    def keyInRange(): Boolean = {
-      val actualKey = iterator.peekNext().getKey
-      actualKey.startsWith(KeyTags.LeaseStatus.prefixBytes) && Ints.fromByteArray(actualKey.slice(2, 6)) <= toHeight
-    }
-
-    iterator.seek(KeyTags.LeaseStatus.prefixBytes ++ Ints.toByteArray(fromHeight))
-    while (iterator.hasNext && keyInRange()) {
-      val e       = iterator.next()
-      val leaseId = ByteStr(e.getKey.drop(6))
-      if (Option(e.getValue).exists(_(0) == 1)) leaseIds += leaseId else leaseIds -= leaseId
-    }
-
     (for {
-      id          <- leaseIds
-      leaseStatus <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
-      if leaseStatus
+      id      <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
+      details <- fromHistory(r, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id))
+      if details.exists(_.fold(identity, _.isActive))
       pb.TransactionMeta(h, n, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
       tx                             <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
     } yield tx).collect {
       case (lt: LeaseTransaction, true) => lt
     }.toSeq
+  }
+
+  def loadLeaseIds(resource: DBResource, fromHeight: Int, toHeight: Int, includeCancelled: Boolean): Set[ByteStr] = {
+    val leaseIds = mutable.Set.empty[ByteStr]
+    val iterator = resource.iterator
+
+    @inline
+    def keyInRange(): Boolean = {
+      val actualKey = iterator.peekNext().getKey
+      actualKey.startsWith(KeyTags.LeaseDetails.prefixBytes) && Ints.fromByteArray(actualKey.slice(2, 6)) <= toHeight
+    }
+
+    iterator.seek(KeyTags.LeaseDetails.prefixBytes ++ Ints.toByteArray(fromHeight))
+    while (iterator.hasNext && keyInRange()) {
+      val e       = iterator.next()
+      val leaseId = ByteStr(e.getKey.drop(6))
+      if (includeCancelled || readLeaseDetails(e.getValue).fold(identity, _.isActive))
+        leaseIds += leaseId
+      else
+        leaseIds -= leaseId
+    }
+
+    leaseIds.toSet
   }
 
   object AddressId extends TaggedType[Long] {

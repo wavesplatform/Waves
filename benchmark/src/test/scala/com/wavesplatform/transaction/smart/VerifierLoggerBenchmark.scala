@@ -8,6 +8,7 @@ import cats.Id
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
+import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EVALUATED}
 import com.wavesplatform.lang.v1.evaluator.Log
@@ -28,7 +29,7 @@ class VerifierLoggerBenchmark {
 
   @Benchmark
   def verifierLogged(bh: Blackhole, log: BigLog): Unit = {
-    val logs = Verifier.buildLogs("id", log.value)
+    val logs = Verifier.buildLogs("id", log.value._1, log.value._2)
     bh.consume(log.writer.write(logs))
   }
 }
@@ -47,7 +48,8 @@ object VerifierLoggerBenchmark {
 
     private val dataTxObj: Terms.CaseObj = Bindings.transactionObject(
       RealTransactionWrapper(dataTx, ???, ???, ???).explicitGet(),
-      proofsEnabled = true
+      proofsEnabled = true,
+      V4
     )
 
     val value: (Log[Id], Either[String, EVALUATED]) =

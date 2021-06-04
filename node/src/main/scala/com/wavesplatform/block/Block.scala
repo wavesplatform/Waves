@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.block.{PBBlockHeaders, PBBlocks}
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
@@ -29,7 +29,9 @@ case class BlockHeader(
     featureVotes: Seq[Short],
     rewardVote: Long,
     transactionsRoot: ByteStr
-)
+) {
+  val score: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / baseTarget).ensuring(_ > 0))
+}
 
 case class Block(
     header: BlockHeader,
@@ -45,7 +47,7 @@ case class Block(
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(BlockSerializer.toBytes(this))
   val json: Coeval[JsObject]     = Coeval.evalOnce(BlockSerializer.toJson(this))
 
-  val blockScore: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / header.baseTarget).ensuring(_ > 0))
+  val blockScore: Coeval[BigInt] = header.score
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     if (header.version < Block.ProtoBlockVersion) copy(signature = ByteStr.empty).bytes()
@@ -78,7 +80,7 @@ object Block extends ScorexLogging {
 
   def protoHeaderHash(h: BlockHeader): ByteStr = {
     require(h.version >= ProtoBlockVersion)
-    ByteStr(crypto.fastHash(PBBlockHeaders.protobuf(h).toByteArray))
+    ByteStr(crypto.fastHash(PBBlocks.protobuf(h).toByteArray))
   }
 
   def referenceLength(version: Byte): Int =

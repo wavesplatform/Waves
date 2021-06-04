@@ -7,14 +7,13 @@ import java.util.{NoSuchElementException, UUID}
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
-import com.wavesplatform.api.http.ConnectReq
+import com.wavesplatform.api.http.DebugMessage._
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
+import com.wavesplatform.api.http.{ConnectReq, DebugMessage, RollbackParams, `X-Api-Key`}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.features.api.ActivationStatus
-import com.wavesplatform.http.DebugMessage._
-import com.wavesplatform.http.{DebugMessage, RollbackParams, `X-Api-Key`}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
@@ -23,7 +22,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.state.DataEntry.Format
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Portfolio}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{Order, ExchangeTransaction => ExchangeTx}
@@ -398,7 +397,7 @@ object AsyncHttpApi extends Assertions {
         ).signWith(sender.privateKey).json()
       )
 
-    def activeLeases(sourceAddress: String): Future[Seq[Transaction]] = get(s"/leasing/active/$sourceAddress").as[Seq[Transaction]]
+    def activeLeases(sourceAddress: String): Future[Seq[LeaseInfo]] = get(s"/leasing/active/$sourceAddress").as[Seq[LeaseInfo]]
 
     def issue(
         sender: KeyPair,
@@ -928,6 +927,12 @@ object AsyncHttpApi extends Assertions {
       get(s"/debug/balances/history/$address", withApiKey = true, amountsAsStrings = amountsAsStrings)
         .as[Seq[BalanceHistory]](amountsAsStrings)
     }
+
+    implicit val assetMapReads: Reads[Map[IssuedAsset, Long]] = implicitly[Reads[Map[String, Long]]].map(_.map {
+      case (k, v) => IssuedAsset(ByteStr.decodeBase58(k).get) -> v
+    })
+    implicit val leaseBalanceFormat: Reads[LeaseBalance] = Json.reads[LeaseBalance]
+    implicit val portfolioFormat: Reads[Portfolio]       = Json.reads[Portfolio]
 
     def debugPortfoliosFor(address: String, considerUnspent: Boolean, amountsAsStrings: Boolean = false): Future[Portfolio] = {
       get(s"/debug/portfolios/$address?considerUnspent=$considerUnspent", withApiKey = true, amountsAsStrings = amountsAsStrings)

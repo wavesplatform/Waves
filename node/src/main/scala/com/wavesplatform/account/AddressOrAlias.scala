@@ -3,6 +3,7 @@ package com.wavesplatform.account
 import java.nio.ByteBuffer
 
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.TxValidationError._
 
@@ -58,4 +59,10 @@ object AddressOrAlias {
       Alias.fromString(s)
     else Address.fromString(s)
   }
+
+  def fromRide(r: Recipient): Either[ValidationError, AddressOrAlias] =
+    r match {
+      case Recipient.Address(bytes) => Address.fromBytes(bytes.arr)
+      case Recipient.Alias(name)    => Alias.create(name)
+    }
 }

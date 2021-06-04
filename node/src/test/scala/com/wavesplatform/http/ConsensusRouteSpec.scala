@@ -3,9 +3,9 @@ package com.wavesplatform.http
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.BlockGen
 import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
+import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.JsObject

@@ -5,11 +5,11 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
@@ -25,6 +25,8 @@ import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Common, Global}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+
+import scala.util.Try
 
 class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
@@ -118,11 +120,11 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
 
   property("tuple type checks") {
     val script = """ ("a", true, 123, base58'aaaa')._3 == true  """
-    val expr = Parser.parseExpr(script).get.value
+    val expr   = Parser.parseExpr(script).get.value
     ExpressionCompiler(compilerContextV4, expr) should produce("Can't match inferred types of T over Int, Boolean")
 
     val script2 = """ ("a", true, 123, base58'aaaa') == ("a", true, "b", base58'aaaa') """
-    val expr2 = Parser.parseExpr(script2).get.value
+    val expr2   = Parser.parseExpr(script2).get.value
     ExpressionCompiler(compilerContextV4, expr2) should produce(
       "Can't match inferred types of T over (String, Boolean, Int, ByteVector), (String, Boolean, String, ByteVector)"
     )
@@ -301,14 +303,15 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ExpressionCompiler(compilerContextV4, expr5) shouldBe Symbol("right")
   }
 
-
   property("JS API compile limit exceeding error") {
     val expr = s" ${"sigVerify(base58'', base58'', base58'') &&" * 350} true "
-    val ctx = Monoid.combineAll(
+    val ctx = Monoid
+      .combineAll(
         Seq(
-          PureContext.build(V4).withEnvironment[Environment],
+          PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
           WavesContext.build(
+            Global,
             DirectiveSet(V4, Account, Expression).explicitGet()
           )
         )
@@ -329,6 +332,230 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     checkExtract(V2) shouldBe Symbol("right")
     checkExtract(V3) shouldBe Symbol("right")
     checkExtract(V4) should produce("Can't find a function 'extract'")
+  }
+
+  property("DataTransaction data composite type") {
+    val expr =
+      """
+        | match tx {
+        |    case dataTx: DataTransaction =>
+        |       match dataTx.data[0] {
+        |         case e: BinaryEntry  => e.key == "" && e.value == base58''
+        |         case e: BooleanEntry => e.key == "" && e.value == true
+        |         case e: IntegerEntry => e.key == "" && e.value == 1
+        |         case e: StringEntry  => e.key == "" && e.value == ""
+        |         case e: DeleteEntry  => e.key == ""
+        |       }
+        |     case _ =>
+        |       false
+        | }
+      """.stripMargin
+
+    DirectiveDictionary[StdLibVersion].all
+      .foreach { version =>
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, Parser.parseExpr(expr).get.value)
+        if (version >= V4)
+          result shouldBe Symbol("right")
+        else
+          result should produce("Undefined type: `BinaryEntry`")
+      }
+  }
+
+  // should be works with continuations
+  ignore("self-functions are unavailable for previous versions and asset scripts") {
+    def expr(v: StdLibVersion, scriptType: ScriptType) = {
+      val script =
+        s"""
+           | {-# STDLIB_VERSION ${v.id}    #-}
+           | {-# SCRIPT_TYPE    ${scriptType.value}    #-}
+           | {-# CONTENT_TYPE   EXPRESSION #-}
+           |
+           | getInteger("key") == 1             &&
+           | getIntegerValue("key") == 1        &&
+           | getString("key")  == "text"        &&
+           | getStringValue("key")  == "text"   &&
+           | getBinary("key")  == base58''      &&
+           | getBinaryValue("key")  == base58'' &&
+           | getBoolean("key")  == false        &&
+           | getBooleanValue("key")  == false
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+    for {
+      version    <- DirectiveDictionary[StdLibVersion].all
+      scriptType <- DirectiveDictionary[ScriptType].all
+    } {
+      val result = ExpressionCompiler(getTestContext(version, scriptType).compilerContext, expr(version, scriptType))
+      if (version < V5 || scriptType != Account)
+        result.swap.getOrElse(???).split("Can't find a function").length shouldBe 9
+      else
+        result shouldBe Symbol("right")
+    }
+  }
+
+  property("V5 functions are unavailable for previous versions") {
+    def expr(v: StdLibVersion) = {
+      val script =
+        s"""
+          | {-# STDLIB_VERSION ${v.id}    #-}
+          | {-# CONTENT_TYPE   EXPRESSION #-}
+          |
+          | let a = Lease(Address(base58''), 1)
+          | let b = Lease(Address(base58''), 1, 0)
+          | let c = calculateLeaseId(b)
+          | true
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+
+    DirectiveDictionary[StdLibVersion].all
+      .foreach { version =>
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, expr(version))
+        if (version < V5)
+          result should produce(
+            "Compilation failed: [" +
+              "Can't find a function 'Lease'(Address, Int) or it is @Callable in 75-102; " +
+              "Can't find a function 'Lease'(Address, Int, Int) or it is @Callable in 112-142; " +
+              "Can't find a function 'calculateLeaseId'(Nothing) or it is @Callable in 152-171" +
+              "]"
+          )
+        else
+          result shouldBe Symbol("right")
+      }
+  }
+
+  property("Field feeAssetId is unavailable for MassTransferTransaction") {
+    def expr(v: StdLibVersion) = {
+      val script =
+        s"""
+          | {-# STDLIB_VERSION ${v.id}    #-}
+          | {-# CONTENT_TYPE   EXPRESSION #-}
+          |
+          | match tx {
+          |   case m: MassTransferTransaction => m.feeAssetId == unit
+          |   case _                          => throw()
+          | }
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+
+    DirectiveDictionary[StdLibVersion].all
+      .foreach { version =>
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, expr(version))
+        if (version < V5)
+          result shouldBe Symbol("right")
+        else
+          result should produce(
+            "Compilation failed: [Undefined field `feeAssetId` of variable of type `MassTransferTransaction` in 116-128]"
+          )
+      }
+  }
+
+  property("Rounding modes DOWN, HALFUP, HALFEVEN, CEILING, FLOOR are available for all versions") {
+    def expr(v: StdLibVersion) = {
+      val script =
+        s"""
+          | {-# STDLIB_VERSION ${v.id}    #-}
+          | {-# CONTENT_TYPE   EXPRESSION #-}
+          |
+          | let r = 
+          |  if (true) then
+          |   DOWN 
+          |  else if (true) then
+          |   HALFUP 
+          |  else if (true) then
+          |   HALFEVEN 
+          |  else if (true) then
+          |   CEILING 
+          |  else
+          |   FLOOR
+          |   
+          | func f(r: Ceiling|Down|Floor|HalfEven|HalfUp) = true
+          | f(r)
+          |
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+
+    DirectiveDictionary[StdLibVersion].all
+      .foreach { version =>
+        ExpressionCompiler(getTestContext(version).compilerContext, expr(version)) shouldBe Symbol("right")
+      }
+  }
+
+  property("Rounding modes UP, HALFDOWN are not available from V5") {
+    def expr(v: StdLibVersion) = {
+      val script =
+        s"""
+          | {-# STDLIB_VERSION ${v.id}    #-}
+          | {-# CONTENT_TYPE   EXPRESSION #-}
+          |
+          | let r =
+          |  if (true) then
+          |   UP
+          |  else
+          |   HALFDOWN
+          |
+          | func f(r: HalfDown) = true
+          | func g(r: Up) = true
+          |
+          | true
+          |
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+
+    DirectiveDictionary[StdLibVersion].all
+      .foreach { version =>
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, expr(version))
+        if (version < V5)
+          result shouldBe Symbol("right")
+        else {
+          val error = result.swap.getOrElse(???)
+          error should include("A definition of 'UP' is not found")
+          error should include("Undefined type: `Up` of variable")
+          error should include("A definition of 'HALFDOWN' is not found")
+          error should include("Undefined type: `HalfDown` of variable")
+        }
+      }
+  }
+
+  property("sync invoke functions are disabled in expressions") {
+    def expr(v: StdLibVersion) = {
+      val script =
+        s"""
+          | {-# STDLIB_VERSION ${v.id}    #-}
+          | {-# CONTENT_TYPE   EXPRESSION #-}
+          |
+          |  let r1 = invoke(Address(base58''), "default", [], [])
+          |  let r2 = reentrantInvoke(Address(base58''), "default", [], [])
+          |  r1 == r2
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+
+    DirectiveDictionary[StdLibVersion].all
+      .filter(_ >= V3)
+      .foreach { version =>
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, expr(version))
+        val error  = result.swap.getOrElse(???)
+        error should include("Can't find a function 'invoke'")
+        error should include("Can't find a function 'reentrantInvoke'")
+      }
+  }
+
+  property("forbidden broken unicode") {
+    val u1 = "\ud87e"
+    Try(TestCompiler(V4).compileExpression(s""" "aaa${u1}aaa" == "${u1}aaa$u1" """)).toEither should produce(
+      s"String 'aaa${u1}aaa' contains ill-formed characters in 1-10; " +
+        s"String '${u1}aaa${u1}' contains ill-formed characters in 14-21"
+    )
+  }
+
+  property("\\u notation is allowed") {
+    val u1 = "\u0064"
+    TestCompiler(V4).compileExpression(s""" "$u1" == "$u1" """) shouldBe
+      TestCompiler(V4).compileExpression(s""" "d" == "d" """)
   }
 
   treeTypeTest("GETTER")(
@@ -512,12 +739,12 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
                 )
               ),
               LET_BLOCK(
-               LET("p", REF("$match0")),
-               FUNCTION_CALL(
-                 FunctionHeader.Native(FunctionIds.EQ),
-                 List(REF("p"), REF("p"))
-               )
-             ),
+                LET("p", REF("$match0")),
+                FUNCTION_CALL(
+                  FunctionHeader.Native(FunctionIds.EQ),
+                  List(REF("p"), REF("p"))
+                )
+              ),
               FALSE
             )
           ),

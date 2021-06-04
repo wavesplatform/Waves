@@ -14,7 +14,7 @@ object Tx {
       assetId: Option[ByteStr],
       sender: Recipient.Address,
       senderPk: ByteStr,
-      recipient: Recipient.Address,
+      recipient: Recipient,
       amount: Long,
       timestamp: Long,
       id: ByteStr

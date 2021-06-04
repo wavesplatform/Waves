@@ -137,8 +137,8 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       ("base64:AQa3b8tZ", "Invalid checksum"),
       ("base64:AA==", "Illegal length of script: 1"),
       ("base64:AAQB", "Invalid content type of script: 4"),
-      ("base64:AAEF", "Invalid version of script: 5"),
-      ("base64:BQEE", "Invalid version of script: 5")
+      ("base64:AAEF", "Invalid checksum"),
+      ("base64:CAEF", "Invalid version of script: 8")
     )
 
   forAll(invalidScript) { (script: String, error: String) =>
@@ -157,9 +157,9 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
     Table(
       ("assetVal", "decimals", "message"),
       (0L, 2, "non-positive amount"),
-      (1L, IssueTransaction.MaxAssetDecimals + 1, "Too big sequences requested"),
+      (1L, IssueTransaction.MaxAssetDecimals + 1, "Too big sequence requested"),
       (-1L, 1, "non-positive amount"),
-      (1L, -1, "Too big sequences requested")
+      (1L, -1, "Too big sequence requested")
     )
 
   forAll(invalidAssetValue) { (assetVal: Long, decimals: Int, error: String) =>
@@ -196,7 +196,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
     val tooBigDescription = Random.nextString(1000 + 1)
     assertGrpcError(
       sender.broadcastIssue(issuer, "assetName", someAssetAmount, 2, description = tooBigDescription, reissuable = false, fee = issueFee),
-      "Too big sequences requested",
+      "Too big sequence requested",
       Code.INVALID_ARGUMENT
     )
   }

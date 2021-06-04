@@ -2,19 +2,35 @@ package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats._
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms.LET
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.{Contextful, LetLogCallback}
+import com.wavesplatform.lang.v1.evaluator.{Contextful, LetExecResult, LetLogCallback}
 import shapeless.{Lens, lens}
+
+import java.util
 
 case class EvaluationContext[C[_[_]], F[_]](
    environment: C[F],
    typeDefs : Map[String, FINAL],
    letDefs  : Map[String, LazyVal[F]],
    functions: Map[FunctionHeader, BaseFunction[C]]
-)
+) {
+  def mapK[G[_] : Monad](f: F ~> G): EvaluationContext[C, G] =
+    EvaluationContext(
+      environment.asInstanceOf[C[G]],
+      typeDefs,
+      letDefs.view.mapValues(_.mapK(f)).toMap,
+      functions
+    )
+}
 
-case class LoggedEvaluationContext[C[_[_]], F[_]](l: LetLogCallback[F], ec: EvaluationContext[C, F])
+case class LoggedEvaluationContext[C[_[_]], F[_]](l: LetLogCallback[F], ec: EvaluationContext[C, F]) {
+  val loggedLets: util.IdentityHashMap[LET, Unit] = new util.IdentityHashMap()
+
+  def log(let: LET, result: LetExecResult[F]): Unit =
+    loggedLets.computeIfAbsent(let, _ => l(let.name)(result))
+}
 
 object LoggedEvaluationContext {
   class Lenses[F[_], C[_[_]]] {

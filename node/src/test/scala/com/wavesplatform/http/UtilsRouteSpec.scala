@@ -1,53 +1,56 @@
 package com.wavesplatform.http
 
+import scala.concurrent.duration._
 import akka.http.scaladsl.testkit.RouteTestTimeout
-import cats.implicits._
 import com.google.protobuf.ByteString
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
+import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.UtilsApiRoute
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
-import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
-import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{V2, V3}
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
-import com.wavesplatform.lang.v1.compiler.ContractCompiler
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, IntegerDataEntry}
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.{JsArray, JsObject, JsString, JsValue}
+import play.api.libs.json._
 
-import scala.concurrent.duration._
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory {
   implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
   implicit val timeout          = routeTestTimeout.duration
 
   private val estimator = ScriptEstimatorV2
-  private val route = UtilsApiRoute(
+
+  private val utilsApi: UtilsApiRoute = UtilsApiRoute(
     new Time {
       def correctedTime(): Long = System.currentTimeMillis()
-      def getTimestamp(): Long  = System.currentTimeMillis()
+
+      def getTimestamp(): Long = System.currentTimeMillis()
     },
     restAPISettings,
-    estimator,
+    () => estimator,
     Schedulers.timeBoundedFixedPool(
       new HashedWheelTimer(),
       5.seconds,
@@ -55,7 +58,10 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       "rest-time-limited"
     ),
     stub[Blockchain]("globalBlockchain")
-  ).route
+  )
+
+  (() => utilsApi.blockchain.activatedFeatures).when().returning(Map()).anyNumberOfTimes()
+  private val route = utilsApi.route
 
   val script = FUNCTION_CALL(
     function = PureContext.eq.header,
@@ -183,7 +189,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   val badScriptBase64 =
     "AwoBAAAAAmYwAAAAAAYKAQAAAAJmMQAAAAADBgkBAAAAAmYwAAAAAAkBAAAAAmYwAAAAAAoBAAAAAmYyAAAAAAMGCQEAAAACZjEAAAAACQEAAAACZjEAAAAACgEAAAACZjMAAAAAAwYJAQAAAAJmMgAAAAAJAQAAAAJmMgAAAAAKAQAAAAJmNAAAAAADBgkBAAAAAmYzAAAAAAkBAAAAAmYzAAAAAAoBAAAAAmY1AAAAAAMGCQEAAAACZjQAAAAACQEAAAACZjQAAAAACgEAAAACZjYAAAAAAwYJAQAAAAJmNQAAAAAJAQAAAAJmNQAAAAAKAQAAAAJmNwAAAAADBgkBAAAAAmY2AAAAAAkBAAAAAmY2AAAAAAoBAAAAAmY4AAAAAAMGCQEAAAACZjcAAAAACQEAAAACZjcAAAAACgEAAAACZjkAAAAAAwYJAQAAAAJmOAAAAAAJAQAAAAJmOAAAAAAKAQAAAANmMTAAAAAAAwYJAQAAAAJmOQAAAAAJAQAAAAJmOQAAAAAKAQAAAANmMTEAAAAAAwYJAQAAAANmMTAAAAAACQEAAAADZjEwAAAAAAoBAAAAA2YxMgAAAAADBgkBAAAAA2YxMQAAAAAJAQAAAANmMTEAAAAACgEAAAADZjEzAAAAAAMGCQEAAAADZjEyAAAAAAkBAAAAA2YxMgAAAAAKAQAAAANmMTQAAAAAAwYJAQAAAANmMTMAAAAACQEAAAADZjEzAAAAAAoBAAAAA2YxNQAAAAADBgkBAAAAA2YxNAAAAAAJAQAAAANmMTQAAAAACgEAAAADZjE2AAAAAAMGCQEAAAADZjE1AAAAAAkBAAAAA2YxNQAAAAAKAQAAAANmMTcAAAAAAwYJAQAAAANmMTYAAAAACQEAAAADZjE2AAAAAAoBAAAAA2YxOAAAAAADBgkBAAAAA2YxNwAAAAAJAQAAAANmMTcAAAAACgEAAAADZjE5AAAAAAMGCQEAAAADZjE4AAAAAAkBAAAAA2YxOAAAAAAKAQAAAANmMjAAAAAAAwYJAQAAAANmMTkAAAAACQEAAAADZjE5AAAAAAoBAAAAA2YyMQAAAAADBgkBAAAAA2YyMAAAAAAJAQAAAANmMjAAAAAACgEAAAADZjIyAAAAAAMGCQEAAAADZjIxAAAAAAkBAAAAA2YyMQAAAAAKAQAAAANmMjMAAAAAAwYJAQAAAANmMjIAAAAACQEAAAADZjIyAAAAAAoBAAAAA2YyNAAAAAADBgkBAAAAA2YyMwAAAAAJAQAAAANmMjMAAAAACgEAAAADZjI1AAAAAAMGCQEAAAADZjI0AAAAAAkBAAAAA2YyNAAAAAAKAQAAAANmMjYAAAAAAwYJAQAAAANmMjUAAAAACQEAAAADZjI1AAAAAAoBAAAAA2YyNwAAAAADBgkBAAAAA2YyNgAAAAAJAQAAAANmMjYAAAAACgEAAAADZjI4AAAAAAMGCQEAAAADZjI3AAAAAAkBAAAAA2YyNwAAAAAKAQAAAANmMjkAAAAAAwYJAQAAAANmMjgAAAAACQEAAAADZjI4AAAAAAoBAAAAA2YzMAAAAAADBgkBAAAAA2YyOQAAAAAJAQAAAANmMjkAAAAACgEAAAADZjMxAAAAAAMGCQEAAAADZjMwAAAAAAkBAAAAA2YzMAAAAAAKAQAAAANmMzIAAAAAAwYJAQAAAANmMzEAAAAACQEAAAADZjMxAAAAAAoBAAAAA2YzMwAAAAADBgkBAAAAA2YzMgAAAAAJAQAAAANmMzIAAAAACgEAAAADZjM0AAAAAAMGCQEAAAADZjMzAAAAAAkBAAAAA2YzMwAAAAAKAQAAAANmMzUAAAAAAwYJAQAAAANmMzQAAAAACQEAAAADZjM0AAAAAAoBAAAAA2YzNgAAAAADBgkBAAAAA2YzNQAAAAAJAQAAAANmMzUAAAAACgEAAAADZjM3AAAAAAMGCQEAAAADZjM2AAAAAAkBAAAAA2YzNgAAAAAKAQAAAANmMzgAAAAAAwYJAQAAAANmMzcAAAAACQEAAAADZjM3AAAAAAoBAAAAA2YzOQAAAAADBgkBAAAAA2YzOAAAAAAJAQAAAANmMzgAAAAACgEAAAADZjQwAAAAAAMGCQEAAAADZjM5AAAAAAkBAAAAA2YzOQAAAAAKAQAAAANmNDEAAAAAAwYJAQAAAANmNDAAAAAACQEAAAADZjQwAAAAAAoBAAAAA2Y0MgAAAAADBgkBAAAAA2Y0MQAAAAAJAQAAAANmNDEAAAAACgEAAAADZjQzAAAAAAMGCQEAAAADZjQyAAAAAAkBAAAAA2Y0MgAAAAAKAQAAAANmNDQAAAAAAwYJAQAAAANmNDMAAAAACQEAAAADZjQzAAAAAAoBAAAAA2Y0NQAAAAADBgkBAAAAA2Y0NAAAAAAJAQAAAANmNDQAAAAACgEAAAADZjQ2AAAAAAMGCQEAAAADZjQ1AAAAAAkBAAAAA2Y0NQAAAAAKAQAAAANmNDcAAAAAAwYJAQAAAANmNDYAAAAACQEAAAADZjQ2AAAAAAoBAAAAA2Y0OAAAAAADBgkBAAAAA2Y0NwAAAAAJAQAAAANmNDcAAAAACgEAAAADZjQ5AAAAAAMGCQEAAAADZjQ4AAAAAAkBAAAAA2Y0OAAAAAAKAQAAAANmNTAAAAAAAwYJAQAAAANmNDkAAAAACQEAAAADZjQ5AAAAAAoBAAAAA2Y1MQAAAAADBgkBAAAAA2Y1MAAAAAAJAQAAAANmNTAAAAAACgEAAAADZjUyAAAAAAMGCQEAAAADZjUxAAAAAAkBAAAAA2Y1MQAAAAAKAQAAAANmNTMAAAAAAwYJAQAAAANmNTIAAAAACQEAAAADZjUyAAAAAAoBAAAAA2Y1NAAAAAADBgkBAAAAA2Y1MwAAAAAJAQAAAANmNTMAAAAACgEAAAADZjU1AAAAAAMGCQEAAAADZjU0AAAAAAkBAAAAA2Y1NAAAAAAKAQAAAANmNTYAAAAAAwYJAQAAAANmNTUAAAAACQEAAAADZjU1AAAAAAoBAAAAA2Y1NwAAAAADBgkBAAAAA2Y1NgAAAAAJAQAAAANmNTYAAAAACgEAAAADZjU4AAAAAAMGCQEAAAADZjU3AAAAAAkBAAAAA2Y1NwAAAAAKAQAAAANmNTkAAAAAAwYJAQAAAANmNTgAAAAACQEAAAADZjU4AAAAAAoBAAAAA2Y2MAAAAAADBgkBAAAAA2Y1OQAAAAAJAQAAAANmNTkAAAAACgEAAAADZjYxAAAAAAMGCQEAAAADZjYwAAAAAAkBAAAAA2Y2MAAAAAAKAQAAAANmNjIAAAAAAwYJAQAAAANmNjEAAAAACQEAAAADZjYxAAAAAAoBAAAAA2Y2MwAAAAADBgkBAAAAA2Y2MgAAAAAJAQAAAANmNjIAAAAACgEAAAADZjY0AAAAAAMGCQEAAAADZjYzAAAAAAkBAAAAA2Y2MwAAAAAKAQAAAANmNjUAAAAAAwYJAQAAAANmNjQAAAAACQEAAAADZjY0AAAAAAoBAAAAA2Y2NgAAAAADBgkBAAAAA2Y2NQAAAAAJAQAAAANmNjUAAAAACgEAAAADZjY3AAAAAAMGCQEAAAADZjY2AAAAAAkBAAAAA2Y2NgAAAAAKAQAAAANmNjgAAAAAAwYJAQAAAANmNjcAAAAACQEAAAADZjY3AAAAAAoBAAAAA2Y2OQAAAAADBgkBAAAAA2Y2OAAAAAAJAQAAAANmNjgAAAAACgEAAAADZjcwAAAAAAMGCQEAAAADZjY5AAAAAAkBAAAAA2Y2OQAAAAAKAQAAAANmNzEAAAAAAwYJAQAAAANmNzAAAAAACQEAAAADZjcwAAAAAAoBAAAAA2Y3MgAAAAADBgkBAAAAA2Y3MQAAAAAJAQAAAANmNzEAAAAACgEAAAADZjczAAAAAAMGCQEAAAADZjcyAAAAAAkBAAAAA2Y3MgAAAAAKAQAAAANmNzQAAAAAAwYJAQAAAANmNzMAAAAACQEAAAADZjczAAAAAAoBAAAAA2Y3NQAAAAADBgkBAAAAA2Y3NAAAAAAJAQAAAANmNzQAAAAACgEAAAADZjc2AAAAAAMGCQEAAAADZjc1AAAAAAkBAAAAA2Y3NQAAAAAKAQAAAANmNzcAAAAAAwYJAQAAAANmNzYAAAAACQEAAAADZjc2AAAAAAoBAAAAA2Y3OAAAAAADBgkBAAAAA2Y3NwAAAAAJAQAAAANmNzcAAAAACgEAAAADZjc5AAAAAAMGCQEAAAADZjc4AAAAAAkBAAAAA2Y3OAAAAAAKAQAAAANmODAAAAAAAwYJAQAAAANmNzkAAAAACQEAAAADZjc5AAAAAAoBAAAAA2Y4MQAAAAADBgkBAAAAA2Y4MAAAAAAJAQAAAANmODAAAAAACgEAAAADZjgyAAAAAAMGCQEAAAADZjgxAAAAAAkBAAAAA2Y4MQAAAAAKAQAAAANmODMAAAAAAwYJAQAAAANmODIAAAAACQEAAAADZjgyAAAAAAoBAAAAA2Y4NAAAAAADBgkBAAAAA2Y4MwAAAAAJAQAAAANmODMAAAAACgEAAAADZjg1AAAAAAMGCQEAAAADZjg0AAAAAAkBAAAAA2Y4NAAAAAAKAQAAAANmODYAAAAAAwYJAQAAAANmODUAAAAACQEAAAADZjg1AAAAAAoBAAAAA2Y4NwAAAAADBgkBAAAAA2Y4NgAAAAAJAQAAAANmODYAAAAACgEAAAADZjg4AAAAAAMGCQEAAAADZjg3AAAAAAkBAAAAA2Y4NwAAAAAKAQAAAANmODkAAAAAAwYJAQAAAANmODgAAAAACQEAAAADZjg4AAAAAAoBAAAAA2Y5MAAAAAADBgkBAAAAA2Y4OQAAAAAJAQAAAANmODkAAAAACgEAAAADZjkxAAAAAAMGCQEAAAADZjkwAAAAAAkBAAAAA2Y5MAAAAAAKAQAAAANmOTIAAAAAAwYJAQAAAANmOTEAAAAACQEAAAADZjkxAAAAAAoBAAAAA2Y5MwAAAAADBgkBAAAAA2Y5MgAAAAAJAQAAAANmOTIAAAAACgEAAAADZjk0AAAAAAMGCQEAAAADZjkzAAAAAAkBAAAAA2Y5MwAAAAAKAQAAAANmOTUAAAAAAwYJAQAAAANmOTQAAAAACQEAAAADZjk0AAAAAAoBAAAAA2Y5NgAAAAADBgkBAAAAA2Y5NQAAAAAJAQAAAANmOTUAAAAACgEAAAADZjk3AAAAAAMGCQEAAAADZjk2AAAAAAkBAAAAA2Y5NgAAAAAKAQAAAANmOTgAAAAAAwYJAQAAAANmOTcAAAAACQEAAAADZjk3AAAAAAoBAAAAA2Y5OQAAAAADBgkBAAAAA2Y5OAAAAAAJAQAAAANmOTgAAAAACgEAAAAEZjEwMAAAAAADBgkBAAAAA2Y5OQAAAAAJAQAAAANmOTkAAAAACQEAAAAEZjEwMAAAAAD7+x+p"
 
-  val dApp =
+  val dAppWithFreeVerifier =
     """
       |{-# STDLIB_VERSION 3 #-}
       |{-# CONTENT_TYPE DAPP #-}
@@ -208,7 +214,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       |}
       |
       |@Verifier(tx)
-      |func verify() = true
+      |func verify() = sigVerify(base58'', base58'', base58'')
     """.stripMargin
 
   val dAppWithoutVerifier =
@@ -243,7 +249,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       |{-# SCRIPT_TYPE ACCOUNT #-}
     """.stripMargin
 
-  val dAppWithMaxComplexityVerifier =
+  val dAppWithPaidVerifier =
     """
       |{-# STDLIB_VERSION 3 #-}
       |{-# CONTENT_TYPE DAPP #-}
@@ -255,7 +261,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       |}
       |
       |@Verifier(tx)
-      |func verify() = true && true && true && true && true && true && true && true && true && true
+      |func verify() = sigVerify(base58'', base58'', base58'') && sigVerify(base58'', base58'', base58'')
     """.stripMargin
 
   routePath("/script/decompile") in {
@@ -503,10 +509,10 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
-    Post(routePath("/script/compileCode"), dApp) ~> route ~> check {
+    Post(routePath("/script/compileCode"), dAppWithFreeVerifier) ~> route ~> check {
       val json = responseAs[JsValue]
-      (json \ "complexity").as[Long] shouldBe 68
-      (json \ "verifierComplexity").as[Long] shouldBe 11
+      (json \ "complexity").as[Long] shouldBe 113
+      (json \ "verifierComplexity").as[Long] shouldBe 113
       (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("write" -> 27, "sendAsset" -> 66, "writeAndSendWaves" -> 68)
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
@@ -527,10 +533,10 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
-    Post(routePath("/script/compileCode"), dAppWithMaxComplexityVerifier) ~> route ~> check {
+    Post(routePath("/script/compileCode"), dAppWithPaidVerifier) ~> route ~> check {
       val json = responseAs[JsValue]
-      (json \ "complexity").as[Long] shouldBe 29
-      (json \ "verifierComplexity").as[Long] shouldBe 29
+      (json \ "complexity").as[Long] shouldBe 217
+      (json \ "verifierComplexity").as[Long] shouldBe 217
       (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("callable" -> 27)
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
@@ -539,6 +545,36 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       val json = responseAs[JsValue]
       (json \ "error").as[Int] shouldBe 305
       (json \ "message").as[String] shouldBe "Script estimation was interrupted"
+    }
+  }
+
+  routePath(s"/script/compileCode after ${BlockchainFeatures.SynchronousCalls}") in {
+    val blockchain = stub[Blockchain]("blockchain")
+    val route      = seal(utilsApi.copy(blockchain = blockchain).route)
+    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0))
+
+    Post(routePath("/script/compileCode"), dAppWithoutVerifier) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "complexity").as[Long] shouldBe 68
+      (json \ "verifierComplexity").as[Long] shouldBe 0
+      (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("write" -> 27, "sendAsset" -> 66, "writeAndSendWaves" -> 68)
+      (json \ "extraFee").as[Long] shouldBe 0
+    }
+
+    Post(routePath("/script/compileCode"), dAppWithFreeVerifier) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "complexity").as[Long] shouldBe 113
+      (json \ "verifierComplexity").as[Long] shouldBe 113
+      (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("write" -> 27, "sendAsset" -> 66, "writeAndSendWaves" -> 68)
+      (json \ "extraFee").as[Long] shouldBe 0
+    }
+
+    Post(routePath("/script/compileCode"), dAppWithPaidVerifier) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "complexity").as[Long] shouldBe 217
+      (json \ "verifierComplexity").as[Long] shouldBe 217
+      (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("callable" -> 27)
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
   }
 
@@ -570,6 +606,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/compileWithImports"), request) ~> route ~> check {
       val expectedScript =
         """
+          | {-# STDLIB_VERSION 3 #-}
           | {-# SCRIPT_TYPE ACCOUNT #-}
           | func inc(a: Int) = a + 1
           | let a = 5
@@ -602,31 +639,22 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
-    val ctx = {
-      val directives = DirectiveSet.contractDirectiveSet
-      PureContext.build(V3).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, V3).withEnvironment[Environment] |+|
-        WavesContext.build(directives)
-    }
-
-    def dAppToBase64(dApp: String) = {
-      val r = for {
-        compiled   <- ContractCompiler.compile(dApp, ctx.compilerContext, V3)
+    def dAppToBase64(dApp: String) =
+      (for {
+        compiled   <- TestCompiler(V3).compile(dApp)
         serialized <- Global.serializeContract(compiled, V3)
-      } yield ByteStr(serialized).base64
+      } yield ByteStr(serialized).base64)
+        .explicitGet()
 
-      r.explicitGet()
-    }
-
-    val dAppBase64                = dAppToBase64(dApp)
+    val dAppBase64                = dAppToBase64(dAppWithFreeVerifier)
     val dAppWithoutVerifierBase64 = dAppToBase64(dAppWithoutVerifier)
     val emptyDAppBase64           = dAppToBase64(emptyDApp)
 
     Post(routePath("/script/estimate"), dAppBase64) ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "script").as[String] shouldBe dAppBase64
-      (json \ "complexity").as[Long] shouldBe 68
-      (json \ "verifierComplexity").as[Long] shouldBe 11
+      (json \ "complexity").as[Long] shouldBe 113
+      (json \ "verifierComplexity").as[Long] shouldBe 113
       (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("write" -> 27, "sendAsset" -> 66, "writeAndSendWaves" -> 68)
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
@@ -671,6 +699,177 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         val seed = Base58.tryDecodeWithLimit((responseAs[JsValue] \ "seed").as[String])
         seed.get.length shouldEqual l
       }
+    }
+  }
+
+  routePath("/script/evaluate/{address}") in {
+    val letFromContract = 1000
+    val testScript = {
+      val str = s"""
+                   |{-# STDLIB_VERSION 5 #-}
+                   |{-# CONTENT_TYPE DAPP #-}
+                   |{-# SCRIPT_TYPE ACCOUNT #-}
+                   |
+                   |let letFromContract = $letFromContract
+                   |
+                   |func test(i: Int) = i * 10
+                   |func testB() = true
+                   |func testBS() = base58'MATCHER'
+                   |func testS() = "Test"
+                   |func testF() = throw("Test")
+                   |func testCompl() = ${"sigVerify(base58'', base58'', base58'') ||" * 200} true
+                   |func testThis() = this
+                   |func testListArg(list: List[String|ByteVector|Int], str: String, bytes: ByteVector) = list.containsElement(str)
+                   |
+                   |@Callable(i)
+                   |func testCallable() = [BinaryEntry("test", i.caller.bytes)]
+                   |
+                   |@Callable(i)
+                   |func testSyncinvoke() = {
+                   |  strict r = invoke(this, "testCallable", [], [AttachedPayment(unit, 100)])
+                   |  [BinaryEntry("testSyncInvoke", i.caller.bytes)]
+                   |}
+                   |
+                   |@Callable(i)
+                   |func testSyncCallComplexityExcess() = {
+                   |  strict r = invoke(this, "testSyncCallComplexityExcess", [], [])
+                   |  []
+                   |}
+                   |
+                   |@Callable(i)
+                   |func testWriteEntryType(b: ByteVector) = [ BinaryEntry("bytes", b) ]
+                   |
+                 """.stripMargin
+
+      val (script, _) = ScriptCompiler.compile(str, ScriptEstimatorV2).explicitGet()
+      AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map(1 -> Map("testCallable" -> 10, "testSyncCallComplexityExcess" -> 10)))
+    }
+
+    val dAppAddress = TxHelpers.defaultSigner.toAddress
+
+    def evalScript(text: String) =
+      Post(routePath(s"/script/evaluate/$dAppAddress"), Json.obj("expr" -> text))
+
+    def evalBin(expr: EXPR) = {
+      val serialized = ByteStr(Serde.serialize(expr))
+      Post(routePath(s"/script/evaluate/$dAppAddress"), Json.obj("expr" -> serialized.toString))
+    }
+
+    def responseJson: JsObject = {
+      val fullJson = responseAs[JsObject]
+      (fullJson \ "address").as[String] shouldBe dAppAddress.stringRepr
+      (fullJson \ "expr").as[String] should not be empty
+      (fullJson \ "result").asOpt[JsObject].getOrElse(fullJson - "address" - "expr")
+    }
+
+    (utilsApi.blockchain.hasAccountScript _).when(dAppAddress).returning(false).once()
+
+    evalScript("testNone()") ~> route ~> check {
+      responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> s"Address $dAppAddress is not dApp")
+    }
+
+    (utilsApi.blockchain.hasAccountScript _).when(dAppAddress).returning(true).anyNumberOfTimes()
+    (utilsApi.blockchain.accountScript _).when(dAppAddress).returning(Some(testScript)).anyNumberOfTimes()
+
+    evalScript("testListArg([\"test\", 111, base64'dGVzdA==', false], \"test\", base58'aaa')") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
+    }
+
+    evalScript("testCallable()") ~> route ~> check {
+      responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"test"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":5,"expr":"testCallable()","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    }
+
+    evalScript("testThis()") ~> route ~> check {
+      responseJson shouldBe Json.obj(
+        "type"  -> "Address",
+        "value" -> Json.obj("bytes" -> Json.obj("type" -> "ByteVector", "value" -> "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"))
+      )
+    }
+
+    evalScript("testNone()") ~> route ~> check {
+      responseJson shouldBe Json.obj("error" -> 306, "message" -> "Function or type 'testNone' not found")
+    }
+
+    evalScript("testCompl()") ~> route ~> check {
+      responseJson shouldBe Json.obj("error" -> 306, "message" -> "Calculation complexity limit exceeded")
+    }
+
+    evalScript("testF()") ~> route ~> check {
+      responseJson shouldBe Json.obj("error" -> 306, "message" -> "Test")
+    }
+
+    evalScript("test(123)") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Int", "value" -> 1230)
+    }
+
+    evalBin(FUNCTION_CALL(FunctionHeader.User("test"), List(CONST_LONG(123)))) ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Int", "value" -> 1230)
+    }
+
+    evalScript("testS()") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "String", "value" -> "Test")
+    }
+
+    evalScript("testB()") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
+    }
+
+    evalScript("testBS()") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "ByteVector", "value" -> "MATCHER")
+    }
+
+    evalScript("""match test(123) {
+        |  case i: Int => i * 123
+        |  case _ => throw("")
+        |}""".stripMargin) ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Int", "value" -> 151290)
+    }
+
+    val expectingKey   = "some"
+    val expectingValue = 1234
+
+    (utilsApi.blockchain.accountData _)
+      .when(dAppAddress, expectingKey)
+      .returning(Some(IntegerDataEntry(expectingKey, expectingValue)))
+      .anyNumberOfTimes()
+
+    evalScript(
+      s"""
+         | this.getInteger("$expectingKey") == $expectingValue &&
+         | height == height
+       """.stripMargin
+    ) ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
+    }
+
+    evalScript("letFromContract - 1") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Int", "value" -> (letFromContract - 1))
+    }
+
+    (() => utilsApi.blockchain.settings)
+      .when()
+      .returning(DefaultBlockchainSettings)
+      .anyNumberOfTimes()
+
+    evalScript(""" testSyncinvoke() """) ~> route ~> check {
+      responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":99,"expr":" testSyncinvoke() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    }
+
+    val complexityLimit = 1234
+    val customApi       = utilsApi.copy(settings = restAPISettings.copy(evaluateScriptComplexityLimit = complexityLimit))
+    evalScript(""" testSyncCallComplexityExcess() """.stripMargin) ~> customApi.route ~> check {
+      responseAs[String] shouldBe s"""{"error":306,"message":"FailedTransactionError(code = 1, error = Invoke complexity limit = $complexityLimit is exceeded, log =)","expr":" testSyncCallComplexityExcess() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    }
+
+    evalScript(""" testWriteEntryType("abc") """.stripMargin) ~> route ~> check {
+      responseAs[String] shouldBe """{"error":306,"message":"Passed args (bytes, abc) are unsuitable for constructor BinaryEntry(String, ByteVector)","expr":" testWriteEntryType(\"abc\") ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    }
+    evalScript(""" testWriteEntryType(base58'aaaa') """.stripMargin) ~> route ~> check {
+      responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"bytes"},"value":{"type":"ByteVector","value":"aaaa"}}}]},"complexity":3,"expr":" testWriteEntryType(base58'aaaa') ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+    }
+
+    evalScript(s"""parseBigIntValue("${PureContext.BigIntMax}")""") ~> route ~> check {
+      responseAs[String] shouldBe s"""{"result":{"type":"BigInt","value":${PureContext.BigIntMax}},"complexity":65,"expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
     }
   }
 

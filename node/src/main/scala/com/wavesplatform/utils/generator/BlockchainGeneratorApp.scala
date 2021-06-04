@@ -3,8 +3,13 @@ package com.wavesplatform.utils.generator
 import java.io.{File, FileOutputStream, PrintWriter}
 import java.util.concurrent.TimeUnit
 
+import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.duration._
+import scala.language.reflectiveCalls
+
 import cats.implicits._
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions}
+import com.wavesplatform.{GenesisBlockGenerator, Version}
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
@@ -12,7 +17,7 @@ import com.wavesplatform.database.openDB
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.mining.MinerImpl
+import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.settings._
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction.Asset
@@ -20,17 +25,12 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{GenesisBlockGenerator, Version}
 import io.netty.channel.group.DefaultChannelGroup
 import monix.reactive.subjects.ConcurrentSubject
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import play.api.libs.json.Json
 import scopt.OParser
-
-import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.duration._
-import scala.language.reflectiveCalls
 
 object BlockchainGeneratorApp extends ScorexLogging {
   final case class BlockchainGeneratorAppSettings(
@@ -117,7 +117,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
       val db = openDB(wavesSettings.dbSettings.directory, recreate = true)
       val (blockchainUpdater, leveldb) =
         StorageFactory(wavesSettings, db, fakeTime, spendableBalance, BlockchainUpdateTriggers.noop)
-      com.wavesplatform.checkGenesis(wavesSettings, blockchainUpdater)
+      com.wavesplatform.checkGenesis(wavesSettings, blockchainUpdater, Miner.Disabled)
       sys.addShutdownHook(synchronized {
         blockchainUpdater.shutdown()
         leveldb.close()

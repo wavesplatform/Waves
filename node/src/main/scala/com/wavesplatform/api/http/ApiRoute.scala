@@ -4,7 +4,6 @@ import akka.http.scaladsl.server._
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
-import com.wavesplatform.http.{ApiMarshallers, `X-Api-Key`, api_key}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils._
 
@@ -23,7 +22,7 @@ trait AuthRoute { this: ApiRoute =>
       case _ =>
         optionalHeaderValueByType[api_key](()).flatMap {
           case Some(k) if java.util.Arrays.equals(crypto.secureHash(k.value.utf8Bytes), hashFromSettings) => pass
-          case _                                                                                                  => complete(ApiKeyNotValid)
+          case _                                                                                          => complete(ApiKeyNotValid)
         }
     }
   }

@@ -37,43 +37,16 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
   ): Either[String, Long] =
     estimator(ctx.evaluationContext(environment).letDefs.keySet, funcCosts, expr)
 
-  private val ctxV1 = {
-    utils.functionCosts(V1)
+  private def ctx(version: StdLibVersion): CTX[Environment] = {
+    utils.functionCosts(version)
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V1).withEnvironment[Environment],
-          CryptoContext.build(Global, V1).withEnvironment[Environment],
+          PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[Environment],
+          CryptoContext.build(Global, version).withEnvironment[Environment],
           WavesContext.build(
-            DirectiveSet(V1, Account, Expression).explicitGet()
-          )
-        )
-      )
-  }
-
-  private val ctxV2 = {
-    utils.functionCosts(V2)
-    Monoid
-      .combineAll(
-        Seq(
-          PureContext.build(V2).withEnvironment[Environment],
-          CryptoContext.build(Global, V2).withEnvironment[Environment],
-          WavesContext.build(
-            DirectiveSet(V2, Account, Expression).explicitGet()
-          )
-        )
-      )
-  }
-
-  private val ctxV3 = {
-    utils.functionCosts(V3)
-    Monoid
-      .combineAll(
-        Seq(
-          PureContext.build(V3).withEnvironment[Environment],
-          CryptoContext.build(Global, V3).withEnvironment[Environment],
-          WavesContext.build(
-            DirectiveSet(V3, Account, Expression).explicitGet()
+            Global,
+            DirectiveSet(version, Account, Expression).explicitGet()
           )
         )
       )
@@ -119,28 +92,27 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
     Parser.parseExpr(adaptedScript).get.value
   }
 
-  property("func complexity map size is equal stdLib SupportedVersions count") {
-    ctxV1.functions.foreach { func =>
-      func.costByLibVersion.size shouldBe DirectiveDictionary[StdLibVersion].all.size
-    }
-
-    ctxV2.functions.foreach { func =>
-      func.costByLibVersion.size shouldBe >= (DirectiveDictionary[StdLibVersion].all.count(_ >= V2))
-    }
-
-    ctxV3.functions.foreach { func =>
-      func.costByLibVersion.size shouldBe >= (DirectiveDictionary[StdLibVersion].all.count(_ >= V3))
-    }
+  property("function complexities are correctly defined ") {
+    DirectiveDictionary[StdLibVersion].all
+      .foreach { version =>
+        ctx(version).functions
+          .foreach { function =>
+            noException should be thrownBy
+              DirectiveDictionary[StdLibVersion].all
+                .filter(_ >= version)
+                .map(function.costByLibVersion)
+          }
+      }
   }
 
   property("estimate script with all functions") {
-    val exprV1 = ExpressionCompiler(ctxV1.compilerContext, getAllFuncExpression(V1)).explicitGet()._1
-    estimate(exprV1, ctxV1, utils.functionCosts(V1)) shouldBe Right(2317)
+    def check(version: StdLibVersion, expectedCost: Int) = {
+      val expr = ExpressionCompiler(ctx(version).compilerContext, getAllFuncExpression(version)).explicitGet()._1
+      estimate(expr, ctx(version), utils.functionCosts(version)) shouldBe Right(expectedCost)
+    }
 
-    val exprV2 = ExpressionCompiler(ctxV2.compilerContext, getAllFuncExpression(V2)).explicitGet()._1
-    estimate(exprV2, ctxV2, utils.functionCosts(V2)) shouldBe Right(2317)
-
-    val exprV3 = ExpressionCompiler(ctxV3.compilerContext, getAllFuncExpression(V3)).explicitGet()._1
-    estimate(exprV3, ctxV3, utils.functionCosts(V3)) shouldBe Right(1882)
+    check(V1, 2317)
+    check(V2, 2317)
+    check(V3, 1882)
   }
 }

@@ -3,30 +3,30 @@ package com.wavesplatform
 import java.io.{File, FileNotFoundException}
 import java.nio.file.Files
 
+import scala.annotation.tailrec
+import scala.concurrent.duration._
+
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{Address, AddressScheme, Alias, KeyPair}
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.PoSCalculator.{generationSignature, hit}
 import com.wavesplatform.consensus.{FairPoSCalculator, NxtPoSCalculator, PoSCalculator}
+import com.wavesplatform.consensus.PoSCalculator.{generationSignature, hit}
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, Transaction}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, GenesisTransaction, Transaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.wallet.Wallet
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
-
-import scala.annotation.tailrec
-import scala.concurrent.duration._
 
 object GenesisBlockGenerator {
   private type SeedText = String
@@ -203,7 +203,7 @@ object GenesisBlockGenerator {
           else FairPoSCalculator.V1
         else NxtPoSCalculator
 
-      val hitSource = ByteStr(Array.fill(crypto.DigestLength)(0: Byte))
+      val hitSource = ByteStr(new Array[Byte](crypto.DigestLength))
 
       def getHit(account: KeyPair): BigInt = {
         val gs = if (settings.preActivated(BlockchainFeatures.BlockV5)) {
@@ -214,33 +214,24 @@ object GenesisBlockGenerator {
         hit(gs)
       }
 
-      val (bt, delay, account, balance) =
-        shares
-          .filter(_._1.miner)
-          .map {
-            case (accountInfo, amount) =>
-              def calc(delay: FiniteDuration) = posCalculator.calculateInitialBaseTarget(getHit(accountInfo.account), delay.toMillis, amount)
+      shares.collect {
+        case (accountInfo, amount) if accountInfo.miner =>
+          val hit = getHit(accountInfo.account)
 
-              @tailrec
-              def search(delay: FiniteDuration): Long = {
-                val bt = calc(delay)
-                if (bt > 0) bt else search(delay + 10.millis)
+          @tailrec def calculateBaseTarget(keyPair: KeyPair, minBT: Long, maxBT: Long, balance: Long): Long =
+            if (maxBT - minBT <= 1) maxBT
+            else {
+              val newBT = (maxBT + minBT) / 2
+              val delay = posCalculator.calculateDelay(hit, newBT, balance)
+              if (math.abs(delay - settings.averageBlockDelay.toMillis) < 100) newBT
+              else {
+                val (min, max) = if (delay > settings.averageBlockDelay.toMillis) (newBT, maxBT) else (minBT, newBT)
+                calculateBaseTarget(keyPair, min, max, balance)
               }
+            }
 
-              val calculatedBT = calc(settings.averageBlockDelay)
-              val initialBT =
-                if (calculatedBT > 0) calculatedBT
-                else search(settings.averageBlockDelay + 10.millis)
-
-              val calcDelay = posCalculator.calculateDelay(getHit(accountInfo.account), initialBT, amount)
-              (initialBT, calcDelay, accountInfo.account, amount)
-          }
-          .filter(_._2 >= settings.averageBlockDelay.toMillis)
-          .minBy(_._2 - settings.averageBlockDelay.toMillis)
-
-      //noinspection ScalaStyle
-      println(s"First generated block timestamp: ${timestamp + posCalculator.calculateDelay(getHit(account), bt, balance)}, delay: $delay")
-      bt
+          calculateBaseTarget(accountInfo.account, PoSCalculator.MinBaseTarget, 1000000, amount)
+      }.max
     }
 
     generateAndReport(
@@ -279,4 +270,5 @@ final case class InitialBlockchain(hitSource: ByteStr, settings: BlockchainSetti
   def accountData(acc: Address, key: String): Option[DataEntry[_]]                             = None
   def leaseBalance(address: Address): LeaseBalance                                             = LeaseBalance.empty
   def balance(address: Address, mayBeAssetId: Asset): Long                                     = 0
+  def hasData(address: Address): Boolean                                                       = false
 }

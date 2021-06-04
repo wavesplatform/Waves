@@ -27,13 +27,14 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
       )
 
   def docCost(function: BaseFunction[Environment], version: StdLibVersion): Int =
-    DocSource
-      .funcData(
+    DocSource.funcData
+      .getOrElse(
         (
           function.name,
           function.signature.args.map(_._2.toString).toList,
           version.id
-        )
+        ),
+        throw new Exception(s"Function ${function.name}(${function.signature.args.map(_._2.toString).toList.mkString(", ")}) not found in $version")
       )
       ._3
 
@@ -46,7 +47,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
           val expr = FUNCTION_CALL(function.header, List.fill(function.args.size)(Terms.TRUE))
           val estimatedCost = ScriptEstimatorV3(
             varNames(ds.stdLibVersion, ds.contentType),
-            functionCosts(ds.stdLibVersion),
+            functionCosts(ds.stdLibVersion, ds.contentType),
             expr
           ).explicitGet() - function.args.size
 

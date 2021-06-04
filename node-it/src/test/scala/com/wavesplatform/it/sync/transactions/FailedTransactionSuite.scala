@@ -3,9 +3,9 @@ package com.wavesplatform.it.sync.transactions
 import com.google.common.primitives.Longs
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.{ScriptExecutionError, TransactionNotAllowedByAccountScript, TransactionNotAllowedByAssetScript}
+import com.wavesplatform.api.http.DebugMessage
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{DebugStateChanges, TransactionStatus}
 import com.wavesplatform.it.sync._
@@ -189,10 +189,15 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
         sender.assetBalance(contractAddress, smartAsset) shouldBe prevAssetBalance
         sender.assetsBalance(contractAddress).balances should contain theSameElementsAs prevAssets.balances
 
-        val minFee        = if (typeName == "issue") invokeFee + issueFee else invokeFee + smartFee
-        val scriptInvoked = if (typeName == "issue") 0 else 1
+        val (scriptInvokedInfo, issuedInfo) =
+          if (typeName == "issue")
+            ("", " with 1 assets issued")
+          else
+            (" with 1 total scripts invoked", "")
+
+        val minFee = if (typeName == "issue") invokeFee + issueFee else invokeFee + smartFee
         val text = s"Fee in WAVES for InvokeScriptTransaction ($invokeFee in WAVES)" +
-          s" with $scriptInvoked total scripts invoked does not exceed minimal value of $minFee WAVES."
+          s"$scriptInvokedInfo$issuedInfo does not exceed minimal value of $minFee WAVES."
 
         failed.foreach { s =>
           checkStateChange(sender.debugStateChanges(s.id), 2, text)

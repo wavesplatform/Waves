@@ -9,7 +9,7 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, CASETYPEREF, LIST, LONG, NOTHING, REAL, STRING, TUPLE}
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import monix.eval.Coeval
 
@@ -149,18 +149,22 @@ object Terms {
     def prettyString(level: Int): String = toString
     def toStr: Coeval[String]            = Coeval.now(toString)
     def weight: Long
-    var wasLogged: Boolean = false
-
     val getType: REAL // used for _isInstanceOf and therefore for match
 
     override def deepCopy: Eval[EXPR] =
       Eval.now(this)
   }
+
   case class CONST_LONG(t: Long) extends EVALUATED {
     override def toString: String = t.toString
     override val weight: Long     = 8L
     override val getType: REAL = LONG
-}
+  }
+  case class CONST_BIGINT(t: BigInt) extends EVALUATED {
+    override def toString: String = t.toString
+    override val weight: Long     = 64L
+    override val getType: REAL = BIGINT
+  }
 
   class CONST_BYTESTR private (val bs: ByteStr) extends EVALUATED {
     override def toString: String = bs.toString
@@ -294,7 +298,7 @@ object Terms {
     lazy val elementsWeightSum: Long =
       weight - EMPTYARR_WEIGHT - ELEM_WEIGHT * xs.size
 
-    override val getType: REAL = LIST(NOTHING) // currently should not be used
+    override val getType: REAL = LIST(ANY)
   }
 
   object ARR {
@@ -324,5 +328,8 @@ object Terms {
   val runtimeTupleType: CASETYPEREF = CASETYPEREF("Tuple", Nil)
 
   implicit val orderingConstLong: Ordering[CONST_LONG] =
+    (a, b) => a.t compare b.t
+
+  implicit val orderingConstBigInt: Ordering[CONST_BIGINT] =
     (a, b) => a.t compare b.t
 }

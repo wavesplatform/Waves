@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 
-case object EmptyBlockchain extends Blockchain {
+trait EmptyBlockchain extends Blockchain {
   override lazy val settings: BlockchainSettings = BlockchainSettings.fromRootConfig(ConfigFactory.load())
 
   override def height: Int = 0
@@ -70,7 +70,11 @@ case object EmptyBlockchain extends Blockchain {
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = None
 
+  override def hasData(acc: Address): Boolean = false
+
   override def balance(address: Address, mayBeAssetId: Asset): Long = 0
 
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
 }
+
+object EmptyBlockchain extends EmptyBlockchain

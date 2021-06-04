@@ -14,13 +14,13 @@ object JavaAdapter {
     Monoid.combineAll(
       Seq(
         CryptoContext.compilerContext(Global, version),
-        WavesContext.build(???).compilerContext,
-        PureContext.build(version).compilerContext
+        WavesContext.build(Global, ???).compilerContext,
+        PureContext.build(version, fixUnicodeFunctions = true).compilerContext
       ))
 
   def compile(input: String): EXPR = {
     ExpressionCompiler
-      .compile(input, ctx)
+      .compileBoolean(input, ctx)
       .fold(
         error => throw new IllegalArgumentException(error),
         res => res

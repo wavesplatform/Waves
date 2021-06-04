@@ -1,7 +1,5 @@
 package com.wavesplatform.lang.v1
 
-import java.math.RoundingMode
-
 import cats.implicits._
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.meta.{FunctionSignatures, MetaMapper, ParsedMeta}
@@ -11,14 +9,14 @@ import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
-import com.wavesplatform.lang.v1.BaseGlobal.DAppInfo
-import com.wavesplatform.lang.v1.BaseGlobal.ArrayView
+import com.wavesplatform.lang.v1.BaseGlobal.{ArrayView, DAppInfo}
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
@@ -105,7 +103,7 @@ trait BaseGlobal {
       bytes = if (compErrorList.isEmpty) serializeExpression(compExpr, stdLibVersion) else Array.empty[Byte]
 
       vars  = utils.varNames(stdLibVersion, Expression)
-      costs = utils.functionCosts(stdLibVersion)
+      costs = utils.functionCosts(stdLibVersion, DAppType)
       complexity <- if (compErrorList.isEmpty) estimator(vars, costs, compExpr) else Either.right(0L)
     } yield (bytes, complexity, exprScript, compErrorList))
       .recover {
@@ -117,10 +115,12 @@ trait BaseGlobal {
       input: String,
       ctx: CompilerContext,
       stdLibVersion: StdLibVersion,
-      estimator: ScriptEstimator
+      estimator: ScriptEstimator,
+      needCompaction: Boolean,
+      removeUnusedCode: Boolean
   ): Either[String, (Array[Byte], (Long, Map[String, Long]), Expressions.DAPP, Iterable[CompilationError])] = {
     (for {
-      compRes <- ContractCompiler.compileWithParseResult(input, ctx, stdLibVersion)
+      compRes <- ContractCompiler.compileWithParseResult(input, ctx, stdLibVersion, needCompaction, removeUnusedCode)
       (compDAppOpt, exprDApp, compErrorList) = compRes
       complexityWithMap <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty)
         ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator)
@@ -133,7 +133,7 @@ trait BaseGlobal {
   }
 
   val compileExpression =
-    compile(_, _, _, _, ExpressionCompiler.compile)
+    compile(_, _, _, _, ExpressionCompiler.compileBoolean)
 
   val compileDecls =
     compile(_, _, _, _, ExpressionCompiler.compileDecls)
@@ -178,10 +178,12 @@ trait BaseGlobal {
       input: String,
       ctx: CompilerContext,
       stdLibVersion: StdLibVersion,
-      estimator: ScriptEstimator
+      estimator: ScriptEstimator,
+      needCompaction: Boolean,
+      removeUnusedCode: Boolean
   ): Either[String, DAppInfo] =
     for {
-      dApp                                   <- ContractCompiler.compile(input, ctx, stdLibVersion)
+      dApp                                   <- ContractCompiler.compile(input, ctx, stdLibVersion, needCompaction, removeUnusedCode)
       userFunctionComplexities               <- ContractScript.estimateUserFunctions(stdLibVersion, dApp, estimator)
       globalVariableComplexities             <- ContractScript.estimateGlobalVariables(stdLibVersion, dApp, estimator)
       (maxComplexity, annotatedComplexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator)
@@ -250,21 +252,10 @@ trait BaseGlobal {
 
   // Math functions
 
-  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long]
-  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long]
-
-  import RoundingMode._
-
-  protected def roundMode(round: BaseGlobal.Rounds): RoundingMode =
-    round match {
-      case BaseGlobal.RoundUp()       => UP
-      case BaseGlobal.RoundHalfUp()   => HALF_UP
-      case BaseGlobal.RoundHalfDown() => HALF_DOWN
-      case BaseGlobal.RoundDown()     => DOWN
-      case BaseGlobal.RoundHalfEven() => HALF_EVEN
-      case BaseGlobal.RoundCeiling()  => CEILING
-      case BaseGlobal.RoundFloor()    => FLOOR
-    }
+  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long]
+  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long]
+  def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt]
+  def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt]
 
   def requestNode(url: String): Future[NodeResponse]
 
@@ -274,9 +265,10 @@ trait BaseGlobal {
 
   def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte]
 
-  def median(seq: Seq[Long]): Long = {
+  def median[@specialized T](seq: Array[T])(implicit num: Integral[T]): T = {
+    import num._
     @tailrec
-    def findKMedianInPlace(arr: ArrayView, k: Int)(implicit choosePivot: ArrayView => Long): Long = {
+    def findKMedianInPlace(arr: ArrayView[T], k: Int)(implicit choosePivot: ArrayView[T] => T): T = {
       val a = choosePivot(arr)
       val (s, b) = arr partitionInPlace (a >)
       if (s.size == k) a
@@ -290,34 +282,43 @@ trait BaseGlobal {
     }
 
     val pivot =
-      (arr: ArrayView) => arr(Random.nextInt(arr.size))
+      (arr: ArrayView[T]) => arr(Random.nextInt(arr.size))
 
     if (seq.length % 2 == 1)
-      findKMedianInPlace(ArrayView(seq.toArray), (seq.size - 1) / 2)(pivot)
+      findKMedianInPlace(ArrayView[T](seq), (seq.size - 1) / 2)(pivot)
     else {
-      val r1 = findKMedianInPlace(ArrayView(seq.toArray), seq.size / 2 - 1)(pivot)
-      val r2 = findKMedianInPlace(ArrayView(seq.toArray), seq.size / 2)(pivot)
-      Math.floorDiv(r1 + r2, 2)
+      val r1 = findKMedianInPlace(ArrayView[T](seq), seq.size / 2 - 1)(pivot)
+      val r2 = findKMedianInPlace(ArrayView[T](seq), seq.size / 2)(pivot)
+      // save Math.floorDiv(r1 + r2, 2) semantic and avoid overflow
+      if(num.sign(r1) == num.sign(r2)) {
+        if(r1 < r2) {
+          num.abs(r2-r1)/num.fromInt(2) + r1
+        } else {
+          num.abs(r1-r2)/num.fromInt(2) + r2
+        }
+      } else {
+        val d = r1 + r2
+        val two = num.fromInt(2)
+        if(d >= num.zero || d % two == 0) {   // handle Long.MinValue for T=Long
+          d/two
+        } else {
+          (d-num.one)/two
+        }
+      }
     }
   }
+
+  def isIllFormed(s: String): Boolean
 }
 
 object BaseGlobal {
-  sealed trait Rounds
-  case class RoundDown()     extends Rounds
-  case class RoundUp()       extends Rounds
-  case class RoundHalfDown() extends Rounds
-  case class RoundHalfUp()   extends Rounds
-  case class RoundHalfEven() extends Rounds
-  case class RoundCeiling()  extends Rounds
-  case class RoundFloor()    extends Rounds
 
-  private case class ArrayView(arr: Array[Long], from: Int, until: Int) {
-    def apply(n: Int): Long =
+  private case class ArrayView[@specialized T](arr: Array[T], from: Int, until: Int)(implicit num: Integral[T]) {
+    def apply(n: Int): T =
       if (from + n < until) arr(from + n)
       else throw new ArrayIndexOutOfBoundsException(n)
 
-    def partitionInPlace(p: Long => Boolean): (ArrayView, ArrayView) = {
+    def partitionInPlace(p: T => Boolean): (ArrayView[T], ArrayView[T]) = {
       var upper = until - 1
       var lower = from
       while (lower < upper) {
@@ -333,7 +334,7 @@ object BaseGlobal {
   }
 
   private object ArrayView {
-    def apply(arr: Array[Long]) =
+    def apply[@specialized T](arr: Array[T])(implicit num: Integral[T]) =
       new ArrayView(arr, 0, arr.length)
   }
 

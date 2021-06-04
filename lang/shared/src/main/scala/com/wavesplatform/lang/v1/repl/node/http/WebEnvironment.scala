@@ -12,7 +12,11 @@ import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import io.circe.{Decoder, HCursor}
+import monix.eval.Coeval
 import shapeless.Coproduct
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -88,6 +92,8 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
       filteredResult = entity.filter(_.`type` == dataType).map(_.value)
     } yield filteredResult
 
+  override def hasData(recipient: Recipient): Future[Boolean] = Future.failed(new Exception("Not implemented"))
+
   implicit val addressResponseDecoder: Decoder[AddressResponse] = new Decoder[AddressResponse] {
     final def apply(c: HCursor): Decoder.Result[AddressResponse] =
       for {
@@ -143,4 +149,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
 
   private def getEntity[F[_]: Functor: ResponseWrapper, A : Decoder, B](url: String)(implicit ev: A => B): Future[F[B]] =
     client.get[F, A](url).map(_.map(ev))
+
+  override def accountScript(addressOrAlias: Recipient): Future[Option[Script]]                                        = ???
+  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], availableComplexity: Int, reentrant: Boolean): Coeval[Future[(Either[ValidationError, EVALUATED], Int)]] = ???
 }

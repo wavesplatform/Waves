@@ -207,8 +207,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   }
 
   def createLeaseCancel(sender: KeyPair, leaseId: ByteStr, cancelFee: Long, timestamp: Long): Gen[LeaseCancelTransaction] = {
-    val v1 = LeaseCancelTransaction.signed(1.toByte, sender.publicKey, leaseId, cancelFee, timestamp + 1, sender.privateKey).explicitGet()
-    val v2 = LeaseCancelTransaction.signed(2.toByte, sender.publicKey, leaseId, cancelFee, timestamp + 1, sender.privateKey).explicitGet()
+    val v1 = LeaseCancelTransaction.selfSigned(1.toByte, sender, leaseId, cancelFee, timestamp + 1).explicitGet()
+    val v2 = LeaseCancelTransaction.selfSigned(2.toByte, sender, leaseId, cancelFee, timestamp + 1).explicitGet()
     Gen.oneOf(v1, v2)
   }
   val leaseAndCancelGen: Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
@@ -251,6 +251,11 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     timestamp2                                  <- positiveLongGen
     leaseCancel                                 <- createLeaseCancel(otherSender, lease.id(), fee2, timestamp2)
   } yield (lease, leaseCancel)
+
+  def leaseGen(sender: KeyPair, timestamp: Long): Gen[LeaseTransaction] = for {
+    (_, amount, fee, _, recipient) <- leaseParamGen
+    version <- Gen.oneOf(1.toByte, 2.toByte, 3.toByte)
+  } yield LeaseTransaction.selfSigned(version, sender, recipient.toAddress, amount, fee, timestamp).explicitGet()
 
   val leaseGen: Gen[LeaseTransaction]             = leaseAndCancelGen.map(_._1)
   val leaseCancelGen: Gen[LeaseCancelTransaction] = leaseAndCancelGen.map(_._2)
@@ -463,8 +468,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       reissuable2                                                           <- Arbitrary.arbitrary[Boolean]
       fee                                                                   <- smallFeeGen
       issue                                                                 <- createLegacyIssue(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp)
-      reissue                                                               <- createReissue(sender, IssuedAsset(issue.assetId), reissueQuantity, reissuable2, fee, timestamp)
-      burn                                                                  <- createBurn(sender, IssuedAsset(issue.assetId), burnQuantity, fee, timestamp)
+      reissue                                                               <- createReissue(sender, issue.asset, reissueQuantity, reissuable2, fee, timestamp)
+      burn                                                                  <- createBurn(sender, issue.asset, burnQuantity, fee, timestamp)
     } yield (issue, reissue, burn)
   }
 
@@ -475,9 +480,9 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     val issue = IssueTransaction(TxVersion.V1, sender.publicKey, assetName, description, quantity, decimals, reissuable = true, script = None, iFee, timestamp)
       .signWith(sender.privateKey)
     val reissue1 =
-      ReissueTransaction.selfSigned(1.toByte, sender, IssuedAsset(issue.assetId), quantity, reissuable = false, fee, timestamp).explicitGet()
+      ReissueTransaction.selfSigned(1.toByte, sender, issue.asset, quantity, reissuable = false, fee, timestamp).explicitGet()
     val reissue2 =
-      ReissueTransaction.selfSigned(1.toByte, sender, IssuedAsset(issue.assetId), quantity, reissuable = true, fee, timestamp + 1).explicitGet()
+      ReissueTransaction.selfSigned(1.toByte, sender, issue.asset, quantity, reissuable = true, fee, timestamp + 1).explicitGet()
     (issue, reissue1, reissue2)
   }
 
@@ -538,7 +543,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       ).signWith(sender.privateKey)
       minFee  <- smallFeeGen
       minFee1 <- smallFeeGen
-      assetId = IssuedAsset(issue.assetId)
+      assetId = issue.asset
       fee = (if (reducedFee) 0.001 * Constants.UnitsInWave else 1 * Constants.UnitsInWave.toDouble).toLong
     } yield (
       issue,

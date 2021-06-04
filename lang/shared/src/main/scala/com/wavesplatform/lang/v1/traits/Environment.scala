@@ -1,8 +1,12 @@
 package com.wavesplatform.lang.v1.traits
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain._
+import monix.eval.Coeval
 import shapeless._
 
 object Environment {
@@ -12,10 +16,10 @@ object Environment {
 
   implicit val BalanceDetailsDecoder: Decoder[BalanceDetails] = (c: HCursor) =>
     for {
-      available <- c.downField("available").as[Long]
-      regular <- c.downField("regular").as[Long]
+      available  <- c.downField("available").as[Long]
+      regular    <- c.downField("regular").as[Long]
       generating <- c.downField("generating").as[Long]
-      effective <- c.downField("effective").as[Long]
+      effective  <- c.downField("effective").as[Long]
     } yield BalanceDetails(available, regular, generating, effective)
 
   type InputEntity = Tx :+: Ord :+: PseudoTx :+: CNil
@@ -36,6 +40,7 @@ trait Environment[F[_]] {
   def lastBlockOpt(): F[Option[BlockInfo]]
   def blockInfoByHeight(height: Int): F[Option[BlockInfo]]
   def data(addressOrAlias: Recipient, key: String, dataType: DataType): F[Option[Any]]
+  def hasData(addressOrAlias: Recipient): F[Boolean]
   def resolveAlias(name: String): F[Either[String, Recipient.Address]]
   def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): F[Either[String, Long]]
   def accountWavesBalanceOf(addressOrAlias: Recipient): F[Either[String, Environment.BalanceDetails]]
@@ -44,4 +49,13 @@ trait Environment[F[_]] {
   def transferTransactionFromProto(b: Array[Byte]): F[Option[Tx.Transfer]]
   def addressFromString(address: String): Either[String, Address]
   def dAppAlias: Boolean = false
+  def accountScript(addressOrAlias: Recipient): F[Option[Script]]
+  def callScript(
+      dApp: Address,
+      func: String,
+      args: List[EVALUATED],
+      payments: Seq[(Option[Array[Byte]], Long)],
+      availableComplexity: Int,
+      reentrant: Boolean
+  ): Coeval[F[(Either[ValidationError, EVALUATED], Int)]]
 }

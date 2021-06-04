@@ -1,15 +1,16 @@
 package com.wavesplatform.transaction
 
+import scala.util.Either
+
 import cats.Id
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.evaluator.Log
+import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.transaction.TxValidationError.FailedTransactionError.Cause
 import com.wavesplatform.transaction.assets.exchange.Order
-
-import scala.util.Either
 
 object TxValidationError {
   type Validation[T] = Either[ValidationError, T]
@@ -58,8 +59,10 @@ object TxValidationError {
       spentComplexity: Long,
       log: Log[Id],
       error: Option[String],
-      assetId: Option[ByteStr]
-  ) extends ValidationError with WithLog {
+      assetId: Option[ByteStr] = None,
+      invocations: Seq[InvokeScriptResult.Invocation] = Nil
+  ) extends ValidationError
+      with WithLog {
     import FailedTransactionError._
 
     def code: Int = cause.code
@@ -76,7 +79,11 @@ object TxValidationError {
     private def assetScriptError(assetId: ByteStr, error: Option[String]): String =
       s"Transaction is not allowed by script of the asset $assetId" + error.fold("")(e => s": $e")
 
-    override def toString: String = s"FailedTransactionError(code = ${cause.code}, error = $message, log =${logToString(log)})"
+    override def toString: String =
+      if (message.startsWith("FailedTransactionError"))
+        message
+      else
+        s"FailedTransactionError(code = ${cause.code}, error = $message, log =${logToString(log)})"
   }
 
   object FailedTransactionError {
@@ -98,6 +105,13 @@ object TxValidationError {
     def notAllowedByAsset(spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
       FailedTransactionError(Cause.AssetScript, spentComplexity, log, None, Some(assetId))
 
+    def asFailedScriptError(ve: ValidationError): FailedTransactionError =
+      ve match {
+        case fte: FailedTransactionError => fte
+        case GenericError(err)           => this.dAppExecution(err, spentComplexity = 0L)
+        case err                         => this.dAppExecution(err.toString, spentComplexity = 0L)
+      }
+
     sealed trait Cause extends Product with Serializable {
       def code: Int
     }
@@ -118,9 +132,13 @@ object TxValidationError {
   }
 
   case class ScriptExecutionError(error: String, log: Log[Id], assetId: Option[ByteStr]) extends ValidationError with WithLog {
-    def isAssetScript: Boolean    = assetId.isDefined
-    private val target: String    = assetId.fold("Account")(_ => "Asset")
-    override def toString: String = s"ScriptExecutionError(error = $error, type = $target, log =${logToString(log)})"
+    def isAssetScript: Boolean = assetId.isDefined
+    private val target: String = assetId.fold("Account")(_ => "Asset")
+    override def toString: String =
+      if (error.startsWith("ScriptExecutionError"))
+        error
+      else
+        s"ScriptExecutionError(error = $error, type = $target, log =${logToString(log)})"
   }
 
   object ScriptExecutionError {

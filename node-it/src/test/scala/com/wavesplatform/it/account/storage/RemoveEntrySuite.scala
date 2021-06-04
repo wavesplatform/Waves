@@ -9,7 +9,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG, CONST_STRING}
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
@@ -115,7 +115,7 @@ class RemoveEntrySuite extends BaseSuite {
 
       assertApiError(
         invokeScript(keyPair, s"delete101Entries"),
-        AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: WriteSet can't contain more than 100 entries")
+        AssertiveApiError(ScriptExecutionError.Id, "Stored data count limit is exceeded", matchMessage = true)
       )
 
       miner.getData(keyPair.toAddress.toString) should have size 101
@@ -135,7 +135,7 @@ class RemoveEntrySuite extends BaseSuite {
     val compiledScript = ScriptCompiler
       .compile(
         script,
-        ScriptEstimatorV2
+        ScriptEstimatorV3
       )
       .explicitGet()
       ._1

@@ -115,6 +115,6 @@ object Address extends ScorexLogging {
   // Optimization, should not be used externally
   private[wavesplatform] def createUnsafe(addressBytes: Array[Byte]): Address = new Address {
     override val bytes: Array[Byte] = addressBytes
-    override val chainId: Byte = addressBytes(1)
+    override val chainId: Byte      = addressBytes(1)
   }
 }

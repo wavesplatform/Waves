@@ -142,9 +142,10 @@ class IssueTransactionV2Specification
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(V3).withEnvironment[Environment],
+            PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
             CryptoContext.build(Global, V3).withEnvironment[Environment],
             WavesContext.build(
+              Global,
               DirectiveSet(V3, Account, Expression).explicitGet()
             )
           )

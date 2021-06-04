@@ -1,35 +1,41 @@
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
-import sbt.Keys._
 import sbt._
+import sbt.Keys._
 
 //noinspection TypeAnnotation
 object Dependencies {
+  // Node protobuf schemas
+  private[this] val protoSchemasLib =
+    "com.wavesplatform" % "protobuf-schemas" % "1.3.1" classifier "proto" intransitive ()
 
   def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.4"
 
   private def akkaHttpModule(module: String)               = "com.typesafe.akka"             %% module            % "10.1.12"
-  private def nettyModule(module: String)                  = "io.netty"                      % s"netty-$module"   % "4.1.51.Final"
   private def kamonModule(module: String)                  = "io.kamon"                      %% s"kamon-$module"  % "2.1.0"
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.11.0"
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
+  private def iq80leveldb(module: String) = "org.iq80.leveldb" % module % "0.12"
+
   private def catsModule(module: String, version: String = "2.1.0") = Def.setting("org.typelevel" %%% s"cats-$module"  % version)
-  private def monixModule(module: String)                           = Def.setting("io.monix"      %%% s"monix-$module" % "3.2.1")
+  def monixModule(module: String)                                   = Def.setting("io.monix"      %%% s"monix-$module" % "3.3.0")
 
   private val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.11.0" cross CrossVersion.full)
 
-  val akkaHttp                   = akkaHttpModule("akka-http")
-  private val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
-  private val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
-  private val kamonCore          = kamonModule("core")
-  private val machinist          = "org.typelevel" %% "machinist" % "0.6.8"
-  val logback                    = "ch.qos.logback" % "logback-classic" % "1.2.3"
-  val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
-  val asyncHttpClient            = "org.asynchttpclient" % "async-http-client" % "2.7.0"
+  val akkaHttp               = akkaHttpModule("akka-http")
+  val jacksonModuleScala     = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
+  val googleGuava            = "com.google.guava" % "guava" % "27.0.1-jre"
+  val kamonCore              = kamonModule("core")
+  val machinist              = "org.typelevel" %% "machinist" % "0.6.8"
+  val logback                = "ch.qos.logback" % "logback-classic" % "1.2.3"
+  val janino                 = "org.codehaus.janino" % "janino" % "3.0.12"
+  val asyncHttpClient        = "org.asynchttpclient" % "async-http-client" % "2.7.0"
+  val curve25519             = "com.wavesplatform" % "curve25519-java" % "0.6.4"
+  val nettyHandler: ModuleID = "io.netty" % "netty-handler" % "4.1.59.Final"
 
-  private val catsEffect = catsModule("effect", "2.1.3")
-  private val catsCore   = catsModule("core")
-  private val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.3")
+  val catsEffect = catsModule("effect", "2.1.3")
+  val catsCore   = catsModule("core")
+  val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.3")
 
   val scalaTest = "org.scalatest" %% "scalatest" % "3.0.8" % Test
 
@@ -56,7 +62,7 @@ object Dependencies {
       "com.squareup.okhttp3" % "okhttp"      % "3.11.0",
       "com.squareup.okio"    % "okio"        % "1.14.0",
       "com.lihaoyi"          %% "sourcecode" % "0.2.1",
-      nettyModule("handler"),
+      nettyHandler,
       bouncyCastle("bcpkix"),
       bouncyCastle("bcprov"),
       "org.apache.httpcomponents" % "httpcore"         % "4.4.5",
@@ -96,7 +102,7 @@ object Dependencies {
       ("org.typelevel" %% "cats-mtl-core" % "0.7.1").exclude("org.scalacheck", "scalacheck_2.13"),
       "ch.obermuhlner" % "big-math" % "2.1.0",
       ("org.scorexfoundation" %% "scrypto" % "2.1.8").exclude("org.whispersystems", "curve25519-java"),
-      "com.wavesplatform" % "curve25519-java" % "0.6.3",
+      curve25519,
       bouncyCastle("bcpkix"),
       bouncyCastle("bcprov"),
       kindProjector,
@@ -147,24 +153,21 @@ object Dependencies {
       kamonModule("influxdb"),
       "org.influxdb" % "influxdb-java" % "2.14",
       googleGuava,
-      "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs
-      "com.typesafe.play"        %% "play-json"     % "2.9.0",
-      "org.ethereum"             % "leveldbjni-all" % "1.18.3",
+      "com.google.code.findbugs" % "jsr305"     % "3.0.2" % Compile, // javax.annotation stubs
+      "com.typesafe.play"        %% "play-json" % "2.9.0",
       akkaModule("actor"),
       akkaModule("stream"),
       akkaHttp,
       "org.bitlet" % "weupnp" % "0.1.4",
       kindProjector,
       monixModule("reactive").value,
-      nettyModule("handler"),
-      akkaModule("testkit")               % Test,
-      akkaHttpModule("akka-http-testkit") % Test,
-      ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
+      nettyHandler,
+      iq80leveldb("leveldb-api"),
+      akkaModule("testkit")                                       % Test,
+      akkaHttpModule("akka-http-testkit")                         % Test,
+      iq80leveldb("leveldb").exclude("com.google.guava", "guava") % Test
     ) ++ test ++ console ++ logDeps ++ levelDBJNA ++ protobuf.value
   )
-
-  private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.2.8" classifier "proto" intransitive()
 
   lazy val scalapbRuntime = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion
@@ -180,7 +183,7 @@ object Dependencies {
   }
 
   lazy val grpc: Seq[ModuleID] = Seq(
-    "io.grpc"              % "grpc-netty" % "1.31.1" /* scalapb.compiler.Version.grpcJavaVersion */,
+    "io.grpc"              % "grpc-netty" % "1.35.0" /* scalapb.compiler.Version.grpcJavaVersion */,
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
     protoSchemasLib        % "protobuf"
   )

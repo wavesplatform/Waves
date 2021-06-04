@@ -1,0 +1,94 @@
+{
+  funcs: [
+    {
+      name: "pow"
+      params: [ "Int", "Int", "Int", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
+      doc: "Returns a number raised to a power"
+      paramsDoc: [
+        "The base."
+        "The number of decimals of the base."
+        "The exponent."
+        "The number of decimals of the exponent."
+        "The number of decimals of the resulting value."
+        "One of the rounding functions. The HalfUp() function may be used as the default value."
+      ]
+      complexity: 100
+    }
+    {
+      name: "log"
+      params: [ "Int", "Int", "Int", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
+      doc: "Returns the logarithm of a number."
+      paramsDoc: [
+        "The base."
+        "The number of decimals of the base."
+        "The exponent."
+        "The number of decimals of the exponent."
+        "The number of decimals of the resulting value."
+        '''
+        The rounding function.
+        The HalfUp() function may be used as the default value.
+        '''
+      ]
+      complexity: 100
+    }
+    {
+      name: "pow"
+      params: [ "BigInt", "Int", "BigInt", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
+      doc: "Returns a number raised to a power"
+      paramsDoc: [
+        "The base."
+        "The number of decimals of the base."
+        "The exponent."
+        "The number of decimals of the exponent."
+        "The number of decimals of the resulting value."
+        "One of the rounding functions. The HalfUp() function may be used as the default value."
+      ]
+      complexity: 200
+    }
+    {
+      name: "log"
+      params: [ "BigInt", "Int", "BigInt", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
+      doc: "Returns the logarithm of a number."
+      paramsDoc: [
+        "The base."
+        "The number of decimals of the base."
+        "The exponent."
+        "The number of decimals of the exponent."
+        "The number of decimals of the resulting value."
+        '''
+        The rounding function.
+        The HalfUp() function may be used as the default value.
+        '''
+      ]
+      complexity: 200
+    }
+    {
+      name: "fraction"
+      params: [ "Int", "Int", "Int" ]
+      doc: "Multiply and division with unlimited intermediate representation"
+      paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]
+      complexity: 14
+    }
+    {
+      name: "fraction"
+      params: [ "Int", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
+      doc: "Multiply and division with big integer intermediate representation"
+      paramsDoc: [ "Multiplier", "Multiplier", "Divisor", "Rounding mode" ]
+      complexity: 17
+    }
+    {
+      name: "fraction"
+      params: [ "BigInt", "BigInt", "BigInt" ]
+      doc: "Multiply and division with unlimited intermediate representation"
+      paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]
+      complexity: 128
+    }
+    {
+      name: "fraction"
+      params: [ "BigInt", "BigInt", "BigInt", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
+      doc: "Multiply and division with unlimited intermediate representation"
+      paramsDoc: [ "Multiplier", "Multiplier", "Divisor", "Rounding mode" ]
+      complexity: 128
+    }
+  ]
+}

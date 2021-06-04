@@ -91,8 +91,8 @@ class AssetTransactionsDiffTest
       reissuable2            <- Arbitrary.arbitrary[Boolean]
       fee                    <- Gen.choose(1L, 2000000L)
       timestamp              <- timestampGen
-      reissue = ReissueTransaction.selfSigned(1.toByte, other, IssuedAsset(issue.assetId), quantity, reissuable2, fee, timestamp).explicitGet()
-      burn    = BurnTransaction.selfSigned(1.toByte, other, IssuedAsset(issue.assetId), quantity, fee, timestamp).explicitGet()
+      reissue = ReissueTransaction.selfSigned(1.toByte, other, issue.asset, quantity, reissuable2, fee, timestamp).explicitGet()
+      burn    = BurnTransaction.selfSigned(1.toByte, other, issue.asset, quantity, fee, timestamp).explicitGet()
     } yield ((gen, issue), reissue, burn)
 
     forAll(setup) {
@@ -113,10 +113,10 @@ class AssetTransactionsDiffTest
       timestamp <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(issuer.toAddress, ENOUGH_AMT, timestamp).explicitGet()
       (issue, _, _) <- issueReissueBurnGeneratorP(ENOUGH_AMT, issuer)
-      assetTransfer <- transferGeneratorP(issuer, burner.toAddress, IssuedAsset(issue.assetId), Waves)
+      assetTransfer <- transferGeneratorP(issuer, burner.toAddress, issue.asset, Waves)
       wavesTransfer <- wavesTransferGeneratorP(issuer, burner.toAddress)
       burn = BurnTransaction
-        .selfSigned(1.toByte, burner, IssuedAsset(issue.assetId), assetTransfer.amount, wavesTransfer.amount, timestamp)
+        .selfSigned(1.toByte, burner, issue.asset, assetTransfer.amount, wavesTransfer.amount, timestamp)
         .explicitGet()
     } yield (genesis, issue, assetTransfer, wavesTransfer, burn)
 
@@ -146,7 +146,7 @@ class AssetTransactionsDiffTest
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
       issue       <- createLegacyIssue(issuer, assetName, description, quantity, decimals, reissuable = true, fee, timestamp)
-      assetId = IssuedAsset(issue.assetId)
+      assetId = issue.asset
       reissue = ReissueTransaction.selfSigned(1.toByte, issuer, assetId, Long.MaxValue, reissuable = true, 1, timestamp).explicitGet()
     } yield (issuer, assetId, genesis, issue, reissue)
 
@@ -175,7 +175,7 @@ class AssetTransactionsDiffTest
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
       issue       <- createLegacyIssue(issuer, assetName, description, quantity, decimals, reissuable = true, fee, timestamp)
-      assetId = IssuedAsset(issue.assetId)
+      assetId = issue.asset
       reissue = ReissueTransaction.selfSigned(1.toByte, issuer, assetId, Long.MaxValue, reissuable = true, 1, timestamp).explicitGet()
     } yield (issuer, assetId, genesis, issue, reissue)
 
@@ -202,7 +202,7 @@ class AssetTransactionsDiffTest
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
       issue       <- createLegacyIssue(issuer, assetName, description, quantity, decimals, reissuable = true, fee, timestamp)
-      assetId = IssuedAsset(issue.assetId)
+      assetId = issue.asset
       attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
       transfer = TransferTransaction.selfSigned(1.toByte, issuer, holder.toAddress, assetId, quantity - 1, Waves, fee, ByteStr(attachment), timestamp)
         .explicitGet()
@@ -423,11 +423,11 @@ class AssetTransactionsDiffTest
           val microBlockId = d.appendMicroBlock(microBlock)
 
           { // Check liquid block
-            val desc = blockchain.assetDescription(IssuedAsset(issue.assetId)).get
+            val desc = blockchain.assetDescription(issue.asset).get
             desc.name shouldBe issue.name
             desc.description shouldBe issue.description
 
-            val desc1 = blockchain.assetDescription(IssuedAsset(issue1.assetId)).get
+            val desc1 = blockchain.assetDescription(issue1.asset).get
             desc1.name.toStringUtf8 shouldBe update1.name
             desc1.description.toStringUtf8 shouldBe update1.description
 
@@ -440,11 +440,11 @@ class AssetTransactionsDiffTest
           d.appendBlock(keyBlock1)
 
           { // Check after new key block
-            val desc = blockchain.assetDescription(IssuedAsset(issue.assetId)).get
+            val desc = blockchain.assetDescription(issue.asset).get
             desc.name shouldBe issue.name
             desc.description shouldBe issue.description
 
-            val desc1 = blockchain.assetDescription(IssuedAsset(issue1.assetId)).get
+            val desc1 = blockchain.assetDescription(issue1.asset).get
             desc1.name.toStringUtf8 shouldBe update1.name
             desc1.description.toStringUtf8 shouldBe update1.description
 

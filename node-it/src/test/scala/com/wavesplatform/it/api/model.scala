@@ -1,5 +1,7 @@
 package com.wavesplatform.it.api
 
+import scala.util.{Failure, Success}
+
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.DataEntry
@@ -7,8 +9,6 @@ import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import io.grpc.{Metadata, Status => GrpcStatus}
 import play.api.libs.json._
-
-import scala.util.{Failure, Success}
 
 // USCE no longer contains references to non-serializable Request/Response objects
 // to work around https://github.com/scalatest/scalatest/issues/556
@@ -416,6 +416,31 @@ object AssetPairResponse {
   implicit val pairResponseFormat: Format[AssetPairResponse] = Json.format
 }
 
+case class Call(function: String, args: Seq[JsObject])
+object Call {
+  implicit val callFormat: Reads[Call] = Json.reads[Call]
+}
+
+case class AttachedPayment(asset: Option[String], amount: Long)
+object AttachedPayment {
+  implicit val attachedPaymentFormat: Reads[AttachedPayment] = Json.reads[AttachedPayment]
+}
+
+case class Invocation(dApp: String, call: Call, payments: Seq[AttachedPayment], stateChanges: StateChangesDetails)
+object Invocation {
+  implicit val invokationFormat: Reads[Invocation] = new Reads[Invocation] {
+    override def reads(json: JsValue) =
+      JsSuccess(
+        Invocation(
+          (json \ "dApp").as[String],
+          (json \ "call").as[Call],
+          (json \ "payments").as[Seq[AttachedPayment]],
+          (json \ "stateChanges").as[StateChangesDetails]
+        )
+      )
+  }
+}
+
 case class StateChangesDetails(
     data: Seq[DataResponse],
     transfers: Seq[TransfersInfoResponse],
@@ -423,7 +448,8 @@ case class StateChangesDetails(
     reissues: Seq[ReissueInfoResponse],
     burns: Seq[BurnInfoResponse],
     sponsorFees: Seq[SponsorFeeResponse],
-    error: Option[ErrorMessageInfoResponse]
+    error: Option[ErrorMessageInfoResponse],
+    invokes: Seq[Invocation] = Nil
 )
 object StateChangesDetails {
   implicit val stateChangeResponseFormat: Reads[StateChangesDetails] = Json.reads[StateChangesDetails]
@@ -1038,4 +1064,16 @@ object FeeInfo {
 case class PaymentRequest(amount: Long, fee: Long, sender: String, recipient: String)
 object PaymentRequest {
   implicit val paymentFormat: Format[PaymentRequest] = Json.format
+}
+
+case class LeaseInfo(
+    id: String,
+    originTransactionId: String,
+    sender: String,
+    recipient: String,
+    amount: Long,
+    height: Int
+)
+object LeaseInfo {
+  implicit val format: Format[LeaseInfo] = Json.format
 }

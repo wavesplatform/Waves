@@ -100,24 +100,10 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     sender.transactionInfo[TransactionInfo](setScriptId2).script.get.startsWith("base64:") shouldBe true
   }
 
-  test("disable use this with alias") {
-    assertApiErrorRaised(
-      sender.invokeScript(
-        caller,
-        "alias:I:alias",
-        func = Some("baz"),
-        args = List(),
-        payment = Seq(),
-        fee = 1.waves,
-        waitForTx = true
-      )
-    )
-  }
-
-  test("but enable use this with address") {
+  ignore("""Allow to use "this" if DApp is called by alias""") {
     sender.invokeScript(
       caller,
-      firstContractAddress,
+      "alias:I:alias",
       func = Some("baz"),
       args = List(),
       payment = Seq(),

@@ -7,7 +7,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
-import com.wavesplatform.protobuf.Amount
+import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
@@ -74,21 +74,24 @@ object PBTransactions {
             feeAmount._2,
             feeAmount._1,
             parsedTx.timestamp,
-            Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
+            Proofs(signedTx.proofs.map(_.toByteStr)),
             parsedTx.data
           )
         )
       else
-        createVanilla(
-          parsedTx.version,
-          parsedTx.chainId.toByte,
-          sender,
-          feeAmount._2,
-          feeAmount._1,
-          parsedTx.timestamp,
-          Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
-          parsedTx.data
-        )
+        for {
+          proofs <- Proofs.create(signedTx.proofs.map(_.toByteStr))
+          tx <- createVanilla(
+            parsedTx.version,
+            parsedTx.chainId.toByte,
+            sender,
+            feeAmount._2,
+            feeAmount._1,
+            parsedTx.timestamp,
+            proofs,
+            parsedTx.data
+          )
+        } yield tx
     } yield tx
   }
 

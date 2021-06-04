@@ -31,7 +31,7 @@ class ReissueTransactionDiffTest
     for {
       (issuer, b1) <- genesis
       issue        <- issueTx(issuer)
-      reissue      <- reissueTx(issuer, IssuedAsset(issue.assetId), BeforeActivationFee)
+      reissue      <- reissueTx(issuer, issue.asset, BeforeActivationFee)
       b2 = TestBlock.create(
         ntpNow,
         b1.id(),
@@ -88,7 +88,7 @@ class ReissueTransactionDiffTest
     withLevelDBWriter(fs) { blockchain =>
       preconditions.foreach { block =>
         val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
-          BlockDiffer.fromBlock(blockchain, blockchain.lastBlock, block, MiningConstraint.Unlimited).explicitGet()
+          BlockDiffer.fromBlock(blockchain, blockchain.lastBlock, block, MiningConstraint.Unlimited, block.header.generationSignature).explicitGet()
         blockchain.append(preconditionDiff, preconditionFees, totalFee, None, block.header.generationSignature, block)
       }
       f((FeeValidation(blockchain, txs._1), FeeValidation(blockchain, txs._2), FeeValidation(blockchain, txs._3)))

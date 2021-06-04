@@ -1,20 +1,14 @@
 package com.wavesplatform.state.patch
 
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.state.{Diff, _}
+import com.wavesplatform.state._
 
-case object CancelInvalidLeaseIn extends DiffPatchFactory {
-  val height: Int = AddressScheme.current.chainId.toChar match {
-    case 'W' => 1060000
-    case _   => 0
-  }
-
-  def apply(): Diff = {
-    val pfs = PatchLoader.read[Map[String, LeaseBalance]](this).map {
+case object CancelInvalidLeaseIn extends PatchAtHeight('W' -> 1060000) {
+  def apply(blockchain: Blockchain): Diff = {
+    Diff.empty.copy(portfolios = readPatchData[Map[String, LeaseBalance]]().map {
       case (address, lb) =>
         Address.fromString(address).explicitGet() -> Portfolio(lease = lb)
-    }
-    Diff.empty.copy(portfolios = pfs)
+    })
   }
 }

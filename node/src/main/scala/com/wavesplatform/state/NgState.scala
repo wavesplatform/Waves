@@ -9,41 +9,64 @@ import com.wavesplatform.block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.state.NgState.{CachedMicroDiff, MicroBlockInfo, NgStateCaches}
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
 
-import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
-
-/* This is not thread safe, used only from BlockchainUpdaterImpl */
-class NgState(
-    val base: Block,
-    baseBlockDiff: Diff,
-    baseBlockCarry: Long,
-    baseBlockTotalFee: Long,
-    val approvedFeatures: Set[Short],
-    val reward: Option[Long],
-    val hitSource: ByteStr,
-    leasesToCancel: Map[ByteStr, Diff]
-) {
-
-  private[this] case class MicroBlockInfo(totalBlockId: BlockId, microBlock: MicroBlock) {
+object NgState {
+  case class MicroBlockInfo(totalBlockId: BlockId, microBlock: MicroBlock) {
     def idEquals(id: ByteStr): Boolean = totalBlockId == id
   }
 
-  private[this] case class CachedMicroDiff(diff: Diff, carryFee: Long, totalFee: Long, timestamp: Long)
-  private[this] val MaxTotalDiffs = 15
+  case class CachedMicroDiff(diff: Diff, carryFee: Long, totalFee: Long, timestamp: Long)
 
-  private[this] val microDiffs: MMap[BlockId, CachedMicroDiff] = MMap.empty
-  private[this] val microBlocks: MList[MicroBlockInfo]         = MList.empty // fresh head
+  class NgStateCaches {
+    val blockDiffCache = CacheBuilder
+      .newBuilder()
+      .maximumSize(NgState.MaxTotalDiffs)
+      .expireAfterWrite(10, TimeUnit.MINUTES)
+      .build[BlockId, (Diff, Long, Long)]()
 
+    val forgedBlockCache = CacheBuilder
+      .newBuilder()
+      .maximumSize(NgState.MaxTotalDiffs)
+      .expireAfterWrite(10, TimeUnit.MINUTES)
+      .build[BlockId, Option[(Block, DiscardedMicroBlocks)]]()
+
+    @volatile
+    var bestBlockCache = Option.empty[Block]
+
+    def invalidate(newBlockId: BlockId): Unit = {
+      forgedBlockCache.invalidateAll()
+      blockDiffCache.invalidate(newBlockId)
+      bestBlockCache = None
+    }
+  }
+
+  private val MaxTotalDiffs = 15
+}
+
+case class NgState(
+    base: Block,
+    baseBlockDiff: Diff,
+    baseBlockCarry: Long,
+    baseBlockTotalFee: Long,
+    approvedFeatures: Set[Short],
+    reward: Option[Long],
+    hitSource: ByteStr,
+    leasesToCancel: Map[ByteStr, Diff],
+    microDiffs: Map[BlockId, CachedMicroDiff] = Map.empty,
+    microBlocks: List[MicroBlockInfo] = List.empty,
+    internalCaches: NgStateCaches = new NgStateCaches
+) {
   def cancelExpiredLeases(diff: Diff): Diff =
     leasesToCancel
-      .collect { case (id, ld) if diff.leaseState.getOrElse(id, true) => ld }
+      .collect { case (id, ld) if diff.leaseState.get(id).forall(_.isActive) => ld }
       .foldLeft(diff) {
         case (d, ld) =>
           Monoid.combine(d, ld)
       }
 
-  def microBlockIds: Seq[BlockId] = microBlocks.map(_.totalBlockId).toSeq
+  def microBlockIds: Seq[BlockId] = microBlocks.map(_.totalBlockId)
 
   def diffFor(totalResBlockRef: BlockId): (Diff, Long, Long) = {
     val (diff, carry, totalFee) =
@@ -130,12 +153,13 @@ class NgState(
       microblockTotalFee: Long,
       timestamp: Long,
       totalBlockId: Option[BlockId] = None
-  ): BlockId = {
+  ): NgState = {
     val blockId = totalBlockId.getOrElse(this.createBlockId(microBlock))
-    microDiffs.put(blockId, CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
-    microBlocks.prepend(MicroBlockInfo(blockId, microBlock))
+
+    val microDiffs = this.microDiffs + (blockId -> CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
+    val microBlocks = MicroBlockInfo(blockId, microBlock) :: this.microBlocks
     internalCaches.invalidate(blockId)
-    blockId
+    this.copy(microDiffs = microDiffs, microBlocks = microBlocks)
   }
 
   def carryFee: Long =
@@ -189,27 +213,4 @@ class NgState(
         }
       }
     )
-
-  private[this] object internalCaches {
-    val blockDiffCache = CacheBuilder
-      .newBuilder()
-      .maximumSize(MaxTotalDiffs)
-      .expireAfterWrite(10, TimeUnit.MINUTES)
-      .build[BlockId, (Diff, Long, Long)]()
-
-    val forgedBlockCache = CacheBuilder
-      .newBuilder()
-      .maximumSize(MaxTotalDiffs)
-      .expireAfterWrite(10, TimeUnit.MINUTES)
-      .build[BlockId, Option[(Block, DiscardedMicroBlocks)]]()
-
-    @volatile
-    var bestBlockCache = Option.empty[Block]
-
-    def invalidate(newBlockId: BlockId): Unit = {
-      forgedBlockCache.invalidateAll()
-      blockDiffCache.invalidate(newBlockId)
-      bestBlockCache = None
-    }
-  }
 }

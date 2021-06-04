@@ -19,9 +19,9 @@ import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 
 //noinspection ScalaStyle
@@ -36,7 +36,7 @@ object Explorer extends ScorexLogging {
     )
 
   def main(argsRaw: Array[String]): Unit = {
-    if (argsRaw.isEmpty) {
+    if (argsRaw.isEmpty || Seq("-h", "--help").exists(argsRaw.contains)) {
       System.err.println("Usage: waves explore <command> [args] [--config|-c <cfg file>]")
       return
     }
@@ -244,7 +244,7 @@ object Explorer extends ScorexLogging {
 
               for {
                 idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-                tx  =  readTransactionBytes(entry.getValue) match {
+                tx = readTransactionBytes(entry.getValue) match {
                   case (_, Left(legacyBytes)) => TransactionParsers.parseBytes(legacyBytes).get
                   case (_, Right(newBytes))   => PBTransactions.vanilla(PBSignedTransaction.parseFrom(newBytes)).explicitGet()
                 }

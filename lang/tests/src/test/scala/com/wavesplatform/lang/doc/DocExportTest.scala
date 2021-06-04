@@ -16,22 +16,28 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class DocExportTest extends PropSpec with PropertyChecks with Matchers {
 
   def buildFullContext(ds: DirectiveSet): CTX[Environment] = {
-    val wavesCtx  = WavesContext.build(ds)
+    val wavesCtx  = WavesContext.build(Global, ds)
     val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment]
-    val pureCtx = PureContext.build(ds.stdLibVersion).withEnvironment[Environment]
+    val pureCtx = PureContext.build(ds.stdLibVersion, fixUnicodeFunctions = true).withEnvironment[Environment]
     pureCtx |+| cryptoCtx |+| wavesCtx
   }
 
-  property("declared ride FUNCs have doc for all contexts") {
+  for( ds <- directives ) {
+    property(s"declared ride FUNCs have doc for $ds contexts") {
 
-    val totalFuncDocs = for {
-      ds <- directives
-      ctx = buildFullContext(ds)
-      doc <- funcDoc(ctx, ds.stdLibVersion)
-    } yield doc
+      val ctx = buildFullContext(ds)
+      val totalFuncDocs = funcDoc(ctx, ds.stdLibVersion)
 
-    val funcsWithoutDocInfo = totalFuncDocs.filter(_._1.isEmpty).map(_._2).mkString(", ")
-    funcsWithoutDocInfo shouldBe ""
+      totalFuncDocs.filter(_._1.isEmpty).foreach { v =>
+        ctx.functions
+        .filter(_.name == v._2)
+        .foreach { f =>
+          println((f.name, f.signature.args.map(_._2.toString).toList))
+        }
+      }
+      val funcsWithoutDocInfo = totalFuncDocs.filter(_._1.isEmpty).map(_._2).mkString(", ")
+      funcsWithoutDocInfo shouldBe ""
+    }
   }
 
   property("declared ride VARs have doc for all contexts") {

@@ -7,7 +7,7 @@ import cats.kernel.Monoid
 import com.google.common.primitives.Longs
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.lang.directives.values.V4
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.PureFunctionsRebenchmark._
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -128,17 +128,121 @@ class PureFunctionsRebenchmark {
   @Benchmark
   def listGetElement3(st: ListGetElement3, bh: Blackhole): Unit =
     bh.consume(eval(st.expr))
+
+  // V5
+  @Benchmark
+  def parseIntValueV5(st: ParseIntVal, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def splitStringV5(st: SplitString, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def toBase58V5(st: ToBase58, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def fromBase58V5(st: FromBase58, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def toBase64V5(st: ToBase64, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def fromBase64V5(st: FromBase64, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def sumStringV5(st: SumString, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def sumByteStringV5(st: SumByteString, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def longToBytesV5(st: LongToBytes, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def stringToBytesV5(st: StringToBytes, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def takeBytesV5(st: TakeBytes, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def dropBytesV5(st: DropBytes, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def takeStringV5(st: TakeString, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def dropStringV5(st: DropString, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def listAppendV5(st: ListAppend, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def listConstructorV5(st: ListConstructor, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def listConcat1V5(st: ListConcat1, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def listConcat2V5(st: ListConcat2, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def listConcat3V5(st: ListConcat3, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def toUtf8StringV5(st: ToUtf8String, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def bytesToLongV5(st: BytesToLong, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def stringIndexOfV5(st: StringIndexOf, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def listGetElement1V5(st: ListGetElement1, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def listGetElement2V5(st: ListGetElement2, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def listGetElement3V5(st: ListGetElement3, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
 }
 
 object PureFunctionsRebenchmark {
   val context: EvaluationContext[Environment, Id] =
     Monoid.combine(
-      PureContext.build(V4).evaluationContext,
+      PureContext.build(V4, fixUnicodeFunctions = true).evaluationContext,
       CryptoContext.build(Global, V4).evaluationContext
     ).asInstanceOf[EvaluationContext[Environment, Id]]
 
-  val eval: EXPR => Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
+  val eval: EXPR => (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
     EvaluatorV2.applyCompleted(context, _, V4)
+
+  val evalV5: EXPR => (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
+    EvaluatorV2.applyCompleted(context, _, V5)
 
   def randomBytes(length: Int): Array[Byte] = {
     val bytes = new Array[Byte](length)
