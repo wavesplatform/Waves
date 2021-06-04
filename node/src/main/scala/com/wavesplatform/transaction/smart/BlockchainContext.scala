@@ -34,13 +34,37 @@ object BlockchainContext {
       address: Environment.Tthis,
       txId: ByteStr
   ): Either[ExecutionError, EvaluationContext[Environment, Id]] =
+    buildGeneric(
+      version,
+      nByte,
+      in,
+      h,
+      blockchain,
+      isTokenContext,
+      isContract,
+      address,
+      txId,
+      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+    )
+
+  def buildGeneric(
+      version: StdLibVersion,
+      nByte: Byte,
+      in: Coeval[Environment.InputEntity],
+      h: Coeval[Int],
+      blockchain: Blockchain,
+      isTokenContext: Boolean,
+      isContract: Boolean,
+      address: Environment.Tthis,
+      txId: ByteStr,
+      fixUnicodeFunctions: Boolean
+  ): Either[ExecutionError, EvaluationContext[Environment, Id]] =
     DirectiveSet(
       version,
       ScriptType.isAssetScript(isTokenContext),
       ContentType.isDApp(isContract)
     ).map { ds =>
-      val environment         = new WavesEnvironment(nByte, in, h, blockchain, address, ds, txId)
-      val fixUnicodeFunctions = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+      val environment = new WavesEnvironment(nByte, in, h, blockchain, address, ds, txId)
       build(ds, environment, fixUnicodeFunctions)
     }
 
