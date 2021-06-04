@@ -29,6 +29,6 @@ class ScriptRunnerTest extends PropSpec with ScalaCheckPropertyChecks with Match
       default = null,
       useCorrectScriptVersion = true,
       fixUnicodeFunctions = true
-    ) shouldBe (Nil, 0, Right(CONST_BOOLEAN(true)))
+    ) shouldBe ((Nil, 0, Right(CONST_BOOLEAN(true))))
   }
 }
