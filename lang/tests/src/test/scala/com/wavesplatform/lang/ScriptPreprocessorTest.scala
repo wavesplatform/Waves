@@ -31,7 +31,7 @@ class ScriptPreprocessorTest extends PropSpec with PropertyChecks with Matchers 
 
   private def eval(code: String): Either[String, EVALUATED] = {
     val untyped  = Parser.parseExpr(code).get.value
-    val ctx: CTX[NoContext] = Monoid.combineAll(Seq(PureContext.build(V3)))
+    val ctx: CTX[NoContext] = Monoid.combineAll(Seq(PureContext.build(V3, fixUnicodeFunctions = true)))
     val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => evaluator.apply[EVALUATED](ctx.evaluationContext, v._1))
   }
@@ -41,6 +41,40 @@ class ScriptPreprocessorTest extends PropSpec with PropertyChecks with Matchers 
       """
         | {-# SCRIPT_TYPE ACCOUNT #-}
         | {-# IMPORT lib1,lib2,lib3 #-}
+        | let a = 5
+        | multiply(inc(a), dec(a)) == (5 + 1) * (5 - 1)
+      """.stripMargin
+
+    val libraries =
+      Map(
+        "lib1" ->
+          """
+            | {-# SCRIPT_TYPE  ACCOUNT #-}
+            | {-# CONTENT_TYPE LIBRARY #-}
+            | func inc(a: Int) = a + 1
+          """.stripMargin,
+        "lib2" ->
+          """
+            | {-# SCRIPT_TYPE  ACCOUNT #-}
+            | {-# CONTENT_TYPE LIBRARY #-}
+            | func dec(a: Int) = a - 1
+          """.stripMargin,
+        "lib3" ->
+          """
+            | {-# SCRIPT_TYPE  ACCOUNT #-}
+            | {-# CONTENT_TYPE LIBRARY #-}
+            | func multiply(a: Int, b: Int) = a * b
+          """.stripMargin
+      )
+
+    processAndEval(script, libraries) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("multiple libraries list with spaces") {
+    val script =
+      """
+        | {-# SCRIPT_TYPE ACCOUNT #-}
+        | {-# IMPORT lib1, lib2 , lib3 #-}
         | let a = 5
         | multiply(inc(a), dec(a)) == (5 + 1) * (5 - 1)
       """.stripMargin

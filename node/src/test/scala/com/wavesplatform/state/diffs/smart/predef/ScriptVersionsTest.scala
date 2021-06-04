@@ -12,7 +12,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.{BinaryDataEntry, Blockchain, BooleanDataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
@@ -117,7 +117,7 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
   "ScriptV4" - {
     "DataTransaction entry mapping" in {
       def compile(scriptText: String) =
-        ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
+        ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1
 
       def script(dApp: Boolean, version: StdLibVersion): Script =
         compile(

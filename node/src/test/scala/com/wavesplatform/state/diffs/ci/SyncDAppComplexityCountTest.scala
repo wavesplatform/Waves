@@ -65,7 +65,7 @@ class SyncDAppComplexityCountTest
       |    ) then {
       |      let payment = ${paymentAsset.fold("[]")(id => s"[AttachedPayment(base58'$id', 1)]")}
       |      let transfer = ${transferAsset.fold("[]")(id => s"[ScriptTransfer(i.caller, 1, base58'$id')]")}
-      |      ${otherDApps.mapWithIndex((a, i) => s""" strict r$i = Invoke(Address(base58'$a'), "default", [], payment) """).mkString("\n")}
+      |      ${otherDApps.mapWithIndex((a, i) => s""" strict r$i = invoke(Address(base58'$a'), "default", [], payment) """).mkString("\n")}
       |      transfer
       |    } else {
       |      throw("Error raised")

@@ -26,7 +26,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
 
   private val ctx: CTX[Environment] =
-      PureContext.build(V3).withEnvironment[Environment] |+|
+      PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
       CTX[Environment](sampleTypes, Map.empty, Array.empty) |+|
       WavesContext.build(
         Global,

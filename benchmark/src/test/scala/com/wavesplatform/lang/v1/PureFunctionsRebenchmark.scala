@@ -234,14 +234,14 @@ class PureFunctionsRebenchmark {
 object PureFunctionsRebenchmark {
   val context: EvaluationContext[Environment, Id] =
     Monoid.combine(
-      PureContext.build(V4).evaluationContext,
+      PureContext.build(V4, fixUnicodeFunctions = true).evaluationContext,
       CryptoContext.build(Global, V4).evaluationContext
     ).asInstanceOf[EvaluationContext[Environment, Id]]
 
-  val eval: EXPR => Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
+  val eval: EXPR => (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
     EvaluatorV2.applyCompleted(context, _, V4)
 
-  val evalV5: EXPR => Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
+  val evalV5: EXPR => (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
     EvaluatorV2.applyCompleted(context, _, V5)
 
   def randomBytes(length: Int): Array[Byte] = {

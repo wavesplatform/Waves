@@ -1,17 +1,15 @@
 package com.wavesplatform.lang.evaluator
+
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common.{NoShrink, produce}
+import com.wavesplatform.lang.Common.produce
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V5}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BIGINT, CONST_BOOLEAN, CONST_LONG, CONST_STRING}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, unit}
-import com.wavesplatform.lang.v1.testing.ScriptGen
-import org.scalatest.{Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.math.BigDecimal.RoundingMode._
 import scala.util.Random
 
-class BigIntTest extends PropSpec with EvaluatorSpec with ScalaCheckPropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
+class BigIntTest extends EvaluatorSpec {
   implicit val startVersion: StdLibVersion = V5
 
   private val maxValue = s"""parseBigIntValue("${PureContext.BigIntMax}")"""
@@ -95,6 +93,13 @@ class BigIntTest extends PropSpec with EvaluatorSpec with ScalaCheckPropertyChec
     }
   }
 
+  property("BigInt fraction returning limits") {
+    eval(s"""fraction($maxValue, $maxValue, $maxValue)""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
+    eval(s"""fraction($minValue, $minValue, $minValue)""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
+    eval(s"""fraction($maxValue, $maxValue, $maxValue, CEILING)""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
+    eval(s"""fraction($minValue, $minValue, $minValue, CEILING)""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
+  }
+
   property("BigInt comparison") {
     eval("toBigInt(16) > toBigInt(2)") shouldBe Right(CONST_BOOLEAN(true))
     eval("toBigInt(1) > toBigInt(2)") shouldBe Right(CONST_BOOLEAN(false))
@@ -104,6 +109,11 @@ class BigIntTest extends PropSpec with EvaluatorSpec with ScalaCheckPropertyChec
     eval("toBigInt(16) < toBigInt(2)") shouldBe Right(CONST_BOOLEAN(false))
     eval("toBigInt(16) <= toBigInt(2)") shouldBe Right(CONST_BOOLEAN(false))
     eval("toBigInt(16) <= toBigInt(16)") shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("BigInt comparison result") {
+    eval("if (toBigInt(16) > toBigInt(2)) then 1 else 0") shouldBe Right(CONST_LONG(1))
+    eval("if (toBigInt(16) < toBigInt(2)) then 1 else 0") shouldBe Right(CONST_LONG(0))
   }
 
   property("BigInt min and max") {

@@ -1,10 +1,6 @@
 package com.wavesplatform.http
 
-import scala.concurrent.Future
-import scala.util.Random
-
 import akka.http.scaladsl.model._
-import com.wavesplatform.{BlockchainStubHelpers, BlockGen, NoShrink, TestTime, TestValues, TestWallet, TransactionGen}
 import com.wavesplatform.account.{AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
@@ -16,14 +12,17 @@ import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, _}
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL, TRUE}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.{Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
+import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
+import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxVersion}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -31,14 +30,19 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.{BlockGen, BlockchainStubHelpers, NoShrink, TestTime, TestValues, TestWallet, TransactionGen}
 import monix.reactive.Observable
-import org.scalacheck.{Arbitrary, Gen}
 import org.scalacheck.Gen._
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, OptionValues}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json._
 import play.api.libs.json.Json.JsValueWrapper
+import play.api.libs.json._
+
+import scala.concurrent.Future
+import scala.util.Random
 
 class TransactionsRouteSpec
     extends RouteSpec("/transactions")
@@ -201,6 +205,85 @@ class TransactionsRouteSpec
           (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 45
         }
       }
+
+      s"after ${BlockchainFeatures.SynchronousCalls}" in {
+        val blockchain = createBlockchainStub { blockchain =>
+          val settings = TestFunctionalitySettings.Enabled.copy(
+            preActivatedFeatures = Map(
+              BlockchainFeatures.SmartAccounts.id    -> 0,
+              BlockchainFeatures.SmartAssets.id      -> 0,
+              BlockchainFeatures.Ride4DApps.id       -> 0,
+              BlockchainFeatures.FeeSponsorship.id   -> 0,
+              BlockchainFeatures.DataTransaction.id  -> 0,
+              BlockchainFeatures.BlockReward.id      -> 0,
+              BlockchainFeatures.BlockV5.id          -> 0,
+              BlockchainFeatures.SynchronousCalls.id -> 0
+            ),
+            featureCheckBlocksPeriod = 1,
+            blocksForFeatureActivation = 1
+          )
+          (() => blockchain.settings).when().returns(WavesSettings.default().blockchainSettings.copy(functionalitySettings = settings))
+          (() => blockchain.activatedFeatures).when().returns(settings.preActivatedFeatures)
+          (blockchain.balance _).when(*, *).returns(ENOUGH_AMT)
+
+          val script                = ExprScript(TRUE).explicitGet()
+          def info(complexity: Int) = Some(AccountScriptInfo(TxHelpers.secondSigner.publicKey, script, complexity))
+
+          (blockchain.accountScript _).when(TxHelpers.defaultSigner.toAddress).returns(info(199))
+          (blockchain.accountScript _).when(TxHelpers.secondSigner.toAddress).returns(info(201))
+          (blockchain.accountScript _).when(TxHelpers.signer(3).toAddress).returns(None)
+        }
+        val route = seal(transactionsApiRoute.copy(blockchain = blockchain).route)
+
+        (addressTransactions.calculateFee _)
+          .expects(*)
+          .onCall(
+            (tx: Transaction) =>
+              FeeValidation
+                .getMinFee(blockchain, tx)
+                .map {
+                  case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
+                    (asset, feeInAsset, feeInWaves)
+                }
+          )
+          .anyNumberOfTimes()
+
+        val tx1 = Json.obj(
+          "type"            -> 4,
+          "version"         -> 2,
+          "amount"          -> 1,
+          "senderPublicKey" -> Base58.encode(TxHelpers.defaultSigner.publicKey.arr),
+          "recipient"       -> accountGen.sample.get.toAddress
+        )
+        Post(routePath("/calculateFee"), tx1) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 100000
+        }
+
+        val tx2 = Json.obj(
+          "type"            -> 4,
+          "version"         -> 2,
+          "amount"          -> 1,
+          "senderPublicKey" -> Base58.encode(TxHelpers.secondSigner.publicKey.arr),
+          "recipient"       -> accountGen.sample.get.toAddress
+        )
+        Post(routePath("/calculateFee"), tx2) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 500000
+        }
+
+        val tx3 = Json.obj(
+          "type"            -> 4,
+          "version"         -> 2,
+          "amount"          -> 1,
+          "senderPublicKey" -> Base58.encode(TxHelpers.signer(3).publicKey.arr),
+          "recipient"       -> accountGen.sample.get.toAddress
+        )
+        Post(routePath("/calculateFee"), tx3) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 100000
+        }
+      }
     }
   }
 
@@ -227,7 +310,7 @@ class TransactionsRouteSpec
       (blockchain.transactionMeta _).when(lease.id()).returns(Some((1, true)))
       (blockchain.leaseDetails _)
         .when(lease.id())
-        .returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Cancelled(2, leaseCancel.id()), lease.id(), 1)))
+        .returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Cancelled(2, Some(leaseCancel.id())), lease.id(), 1)))
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
       Get(routePath(s"/address/${TxHelpers.secondAddress}/limit/10")) ~> route ~> check {
@@ -350,7 +433,7 @@ class TransactionsRouteSpec
       (blockchain.leaseDetails _)
         .expects(leaseCancelId)
         .returning(
-          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, leaseCancelId), leaseCancelId, 1))
+          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, Some(leaseCancelId)), leaseCancelId, 1))
         )
         .anyNumberOfTimes()
       (blockchain.transactionMeta _).expects(leaseId1).returning(Some((1, true))).anyNumberOfTimes()
@@ -427,7 +510,7 @@ class TransactionsRouteSpec
       (blockchain.transactionMeta _).when(lease.id()).returns(Some((1, true)))
       (blockchain.leaseDetails _)
         .when(lease.id())
-        .returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Cancelled(2, leaseCancel.id()), lease.id(), 1)))
+        .returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Cancelled(2, Some(leaseCancel.id())), lease.id(), 1)))
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
       Get(routePath(s"/info/${leaseCancel.id()}")) ~> route ~> check {
@@ -515,15 +598,32 @@ class TransactionsRouteSpec
 
     "provides lease and lease cancel action stateChanges" in {
       val invokeAddress    = accountGen.sample.get.toAddress
-      val leaseId1         = ByteStr(bytes32gen.sample.get)
-      val leaseId2         = ByteStr(bytes32gen.sample.get)
-      val leaseCancelId    = ByteStr(bytes32gen.sample.get)
       val recipientAddress = accountGen.sample.get.toAddress
       val recipientAlias   = aliasGen.sample.get
-      val invoke           = TxHelpers.invoke(invokeAddress, "test")
+
+      val leaseId1      = ByteStr(bytes32gen.sample.get)
+      val leaseId2      = ByteStr(bytes32gen.sample.get)
+      val leaseCancelId = ByteStr(bytes32gen.sample.get)
+
+      val nestedInvokeAddress = accountGen.sample.get.toAddress
+      val nestedLeaseId       = ByteStr(bytes32gen.sample.get)
+      val nestedLeaseCancelId = ByteStr(bytes32gen.sample.get)
+
+      val invoke = TxHelpers.invoke(invokeAddress, "test")
       val scriptResult = InvokeScriptResult(
         leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, leaseId1), InvokeScriptResult.Lease(recipientAlias, 200, 3, leaseId2)),
-        leaseCancels = Seq(LeaseCancel(leaseCancelId))
+        leaseCancels = Seq(LeaseCancel(leaseCancelId)),
+        invokes = Seq(
+          InvokeScriptResult.Invocation(
+            nestedInvokeAddress,
+            InvokeScriptResult.Call("nested", Nil),
+            Nil,
+            InvokeScriptResult(
+              leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, nestedLeaseId)),
+              leaseCancels = Seq(LeaseCancel(nestedLeaseCancelId))
+            )
+          )
+        )
       )
 
       (blockchain.leaseDetails _)
@@ -537,12 +637,25 @@ class TransactionsRouteSpec
       (blockchain.leaseDetails _)
         .expects(leaseCancelId)
         .returning(
-          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, leaseCancelId), leaseCancelId, 1))
+          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, Some(leaseCancelId)), leaseCancelId, 1))
         )
         .anyNumberOfTimes()
+      (blockchain.leaseDetails _)
+        .expects(nestedLeaseId)
+        .returning(Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Active, nestedLeaseId, 1)))
+        .anyNumberOfTimes()
+      (blockchain.leaseDetails _)
+        .expects(nestedLeaseCancelId)
+        .returning(
+          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, Some(nestedLeaseCancelId)), nestedLeaseCancelId, 1))
+        )
+        .anyNumberOfTimes()
+
       (blockchain.transactionMeta _).expects(leaseId1).returning(Some((1, true))).anyNumberOfTimes()
       (blockchain.transactionMeta _).expects(leaseId2).returning(Some((1, true))).anyNumberOfTimes()
       (blockchain.transactionMeta _).expects(leaseCancelId).returning(Some((1, true))).anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(nestedLeaseId).returning(Some((1, true))).anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(nestedLeaseCancelId).returning(Some((1, true))).anyNumberOfTimes()
 
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
       (addressTransactions.transactionById _)
@@ -553,7 +666,7 @@ class TransactionsRouteSpec
       Get(routePath(s"/info/${invoke.id()}")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
         val json = (responseAs[JsObject] \ "stateChanges").as[JsObject]
-        json shouldBe Json.parse(s"""{
+        json should matchJson(s"""{
                                    |  "data" : [ ],
                                    |  "transfers" : [ ],
                                    |  "issues" : [ ],
@@ -586,7 +699,41 @@ class TransactionsRouteSpec
                                    |    "height" : 1,
                                    |    "status" : "canceled"
                                    |  } ],
-                                   |  "invokes" : [ ]
+                                   |  "invokes" : [ {
+                                   |    "dApp" : "$nestedInvokeAddress",
+                                   |    "call" : {
+                                   |      "function" : "nested",
+                                   |      "args" : [ ]
+                                   |    },
+                                   |    "payments" : [ ],
+                                   |    "stateChanges" : {
+                                   |      "data" : [ ],
+                                   |      "transfers" : [ ],
+                                   |      "issues" : [ ],
+                                   |      "reissues" : [ ],
+                                   |      "burns" : [ ],
+                                   |      "sponsorFees" : [ ],
+                                   |      "leases" : [ {
+                                   |        "id" : "$nestedLeaseId",
+                                   |        "originTransactionId" : "$nestedLeaseId",
+                                   |        "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |        "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |        "amount" : 123,
+                                   |        "height" : 1,
+                                   |        "status" : "active"
+                                   |      } ],
+                                   |      "leaseCancels" : [ {
+                                   |        "id" : "$nestedLeaseCancelId",
+                                   |        "originTransactionId" : "$nestedLeaseCancelId",
+                                   |        "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |        "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |        "amount" : 123,
+                                   |        "height" : 1,
+                                   |        "status" : "canceled"
+                                   |      } ],
+                                   |      "invokes" : [ ]
+                                   |    }
+                                   |  } ]
                                    |}
                                    |""".stripMargin)
       }
@@ -682,6 +829,8 @@ class TransactionsRouteSpec
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.transactionInfo _).when(lease.id()).returns(Some((1, lease, true)))
         (blockchain.transactionInfo _).when(leaseCancel.id()).returns(Some((1, leaseCancel, true)))
+        (blockchain.transactionMeta _).when(lease.id()).returns(Some((1, true)))
+        (blockchain.leaseDetails _).when(lease.id()).returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Active, lease.id(), 1)))
       }
 
       val transactionsApi = stub[CommonTransactionsApi]
@@ -693,14 +842,24 @@ class TransactionsRouteSpec
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
 
+      val leaseDetailsJson = Json.obj(
+        "id" -> lease.id(),
+        "originTransactionId" -> lease.id(),
+        "sender" -> lease.sender.toAddress,
+        "recipient" -> lease.recipient,
+        "amount" -> lease.amount,
+        "height" -> 1,
+        "status" -> LeaseDetails.Status.Active.toString.toLowerCase
+      )
+
       Get(routePath(s"/unconfirmed")) ~> route ~> check {
         val json = (responseAs[JsArray] \ 0).as[JsObject]
-        json shouldBe leaseCancel.json() ++ Json.obj("lease" -> lease.json())
+        json shouldBe leaseCancel.json() ++ Json.obj("lease" -> leaseDetailsJson)
       }
 
       Get(routePath(s"/unconfirmed/info/${leaseCancel.id()}")) ~> route ~> check {
         val json = responseAs[JsObject]
-        json shouldBe leaseCancel.json() ++ Json.obj("lease" -> lease.json())
+        json shouldBe leaseCancel.json() ++ Json.obj("lease" -> leaseDetailsJson)
       }
     }
 

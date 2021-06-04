@@ -1,0 +1,4068 @@
+openapi: 3.0.1
+info:
+  title: Waves Full Node (???)
+  description: >-
+    The Waves node REST API is the main interface for interacting with the
+    blockchain. See
+    [documentation](https://docs.waves.tech/en/waves-node/node-api/) for more
+    info. If this API lacks data you need, check the [Waves Data Services
+    API](https://docs.waves.tech/en/building-apps/waves-api-and-sdk/waves-data-service-api).
+  termsOfService: ''
+  license:
+    name: MIT License
+    url: 'https://github.com/wavesplatform/Waves/blob/master/LICENSE'
+  version: '???'
+servers:
+  - url: /
+tags:
+  - name: addresses
+  - name: blocks
+  - name: peers
+  - name: blockchain
+  - name: transactions
+  - name: utils
+  - name: wallet
+  - name: alias
+  - name: assets
+  - name: leasing
+  - name: consensus
+  - name: activation
+  - name: debug
+  - name: node
+paths:
+  /addresses:
+    get:
+      tags:
+        - addresses
+      summary: Wallet addresses
+      description: >-
+        Get a list of account addresses in the [node
+        wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet)
+      operationId: getWalletAddresses
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+    post:
+      tags:
+        - addresses
+      summary: Create wallet address
+      description: >-
+        Generate a new account address in the [node
+        wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet)
+      operationId: createWalletAddress
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - address
+                type: object
+                properties:
+                  address:
+                    type: string
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+  '/addresses/seq/{from}/{to}':
+    get:
+      tags:
+        - addresses
+      summary: Wallet addresses by range
+      description: >-
+        Get a list addresses in the [node
+        wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet)
+        by a given range of indices. Max range {from}-{to} is 100 addresses
+      operationId: getWalletAddressesRange
+      parameters:
+        - name: from
+          in: path
+          description: Start address
+          required: true
+          schema:
+            type: integer
+        - name: to
+          in: path
+          description: End address (not included)
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+  '/addresses/seed/{address}':
+    get:
+      tags:
+        - addresses
+      summary: Seed
+      description: 'Export seed value for the {address}'
+      operationId: getAccountSeed
+      parameters:
+        - $ref: '#/components/parameters/address'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - address
+                  - seed
+                type: object
+                properties:
+                  address:
+                    type: string
+                  seed:
+                    type: string
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+  '/addresses/publicKey/{publicKey}':
+    get:
+      tags:
+        - addresses
+      summary: Address from a public key
+      description: Generate an address from a given public key
+      operationId: getAddressByPublicKey
+      parameters:
+        - name: publicKey
+          in: path
+          description: Public key base58 encoded
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - address
+                type: object
+                properties:
+                  address:
+                    type: string
+  '/addresses/balance/{address}':
+    get:
+      tags:
+        - addresses
+      summary: Regular balance
+      description: Get the regular balance in WAVES at a given address
+      operationId: getRegularBalance
+      parameters:
+        - $ref: '#/components/parameters/address'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+  /addresses/balance:
+    get:
+      tags:
+        - addresses
+      summary: Multiple accounts balances
+      description: >-
+        Get regular balances for multiple addresses. For dozens of addresses,
+        better use the POST method
+      operationId: getMultipleBalances
+      parameters:
+        - name: address
+          in: query
+          description: Addresses base58 encoded
+          required: true
+          style: form
+          explode: true
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 47
+            items:
+              type: string
+              pattern: '^[1-9A-HJ-NP-Za-km-z]{35}$'
+        - name: height
+          in: query
+          description: >-
+            For balance at height requests. Max number of blocks back from the
+            current height is set by `waves.db.max-rollback-depth`, 2000 by
+            default
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Balance'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    post:
+      tags:
+        - addresses
+      summary: Multiple accounts balances
+      description: >-
+        Get regular balances for multiple addresses. Max number of addresses is
+        set by `waves.rest-api.transactions-by-address-limit`, 1000 by default
+      operationId: getMultipleBalancesViaPost
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - addresses
+              properties:
+                addresses:
+                  type: array
+                  description: Addresses base58 encoded
+                  items:
+                    type: string
+                    pattern: '^[1-9A-HJ-NP-Za-km-z]{35}$'
+                  minItems: 1
+                  maxItems: 1000
+                height:
+                  $ref: '#/components/schemas/Height'
+                  description: >-
+                    For balance at height requests. Max number of blocks back
+                    from the current height is set by
+                    `waves.db.max-rollback-depth`, 2000 by default
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Balance'
+  '/addresses/effectiveBalance/{address}':
+    get:
+      tags:
+        - addresses
+      summary: Effective balance
+      description: Get the effective balance in WAVES at a given address
+      operationId: getEffectiveBalance
+      parameters:
+        - $ref: '#/components/parameters/address'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+  '/addresses/data/{address}':
+    get:
+      tags:
+        - addresses
+      summary: Data by keys or regexp
+      description: Read account data entries by given keys or a regular expression
+      operationId: getDataByFilter
+      parameters:
+        - $ref: '#/components/parameters/address'
+        - name: matches
+          in: query
+          description: >-
+            URL encoded (percent-encoded) <a
+            href='https://www.tutorialspoint.com/scala/scala_regular_expressions.htm'>regular
+            expression</a> to filter keys
+          schema:
+            type: string
+        - name: key
+          in: query
+          description: Exact keys to query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DataEntry'
+    post:
+      tags:
+        - addresses
+      summary: Data by keys
+      description: Read account data entries by given keys
+      operationId: getDataByMultipleKeysViaPost
+      parameters:
+        - $ref: '#/components/parameters/address'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                keys:
+                  type: array
+                  description: Exact keys to query
+                  items:
+                    type: string
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                key:
+                  type: array
+                  description: Exact keys to query
+                  items:
+                    type: string
+            encoding:
+              key:
+                style: form
+                explode: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DataEntry'
+      x-codegen-request-body-name: keys
+  '/addresses/validate/{address}':
+    get:
+      tags:
+        - addresses
+      summary: Validate
+      description: 'Check whether address {address} is valid or not'
+      operationId: validateAddress
+      parameters:
+        - $ref: '#/components/parameters/address'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - address
+                  - valid
+                type: object
+                properties:
+                  address:
+                    type: string
+                  valid:
+                    type: boolean
+  '/addresses/scriptInfo/{address}/meta':
+    get:
+      tags:
+        - addresses
+      summary: Meta by address
+      description: Account script meta
+      operationId: getScriptMeta
+      parameters:
+        - $ref: '#/components/parameters/address'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScriptMeta'
+  '/addresses/scriptInfo/{address}':
+    get:
+      tags:
+        - addresses
+      summary: Account script info
+      description: >-
+        Get an account script or a dApp script with additional info by a given
+        address
+      operationId: getScriptInfo
+      parameters:
+        - $ref: '#/components/parameters/address'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - address
+                  - complexity
+                  - extraFee
+                type: object
+                properties:
+                  address:
+                    type: string
+                  script:
+                    type: string
+                    format: byte
+                    nullable: true
+                    description: Compiled script in base64 representation
+                  scriptText:
+                    type: string
+                    nullable: true
+                    description: Compiled script in text representation
+                  complexity:
+                    type: integer
+                    format: int64
+                    description: >-
+                      The maximum of `callableComplexities` and
+                      `verifierComplexity`
+                  verifierComplexity:
+                    type: integer
+                    format: int64
+                    description: >-
+                      [Complexity](https://docs.waves.tech/en/ride/base-concepts/complexity)
+                      of an account script or the verifier function of the dApp
+                      script
+                  callableComplexities:
+                    type: object
+                    description: >-
+                      Complexity of callable functions of the dApp script. Empty
+                      for an account script
+                  extraFee:
+                    type: integer
+                    format: int64
+                    description: >-
+                      Extra fee for transactions sending on behalf of the
+                      account
+  '/addresses/{address}':
+    delete:
+      tags:
+        - addresses
+      summary: Delete
+      description: 'Remove the account with address {address} from the wallet'
+      operationId: deleteWalletAddress
+      parameters:
+        - $ref: '#/components/parameters/address'
+      responses:
+        '200':
+          description: Deletion result
+          content:
+            application/json:
+              schema:
+                required:
+                  - deleted
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+  '/addresses/balance/details/{address}':
+    get:
+      tags:
+        - addresses
+      summary: All types of balances in WAVES
+      description: >-
+        Get the available, regular, generating, and effective balance, see
+        [definitions](https://docs.waves.tech/en/blockchain/account/account-balance#account-balance-in-waves)
+      operationId: getWavesBalances
+      parameters:
+        - $ref: '#/components/parameters/address'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - address
+                  - available
+                  - effective
+                  - generating
+                  - regular
+                type: object
+                properties:
+                  address:
+                    type: string
+                  regular:
+                    type: integer
+                    format: int64
+                  generating:
+                    type: integer
+                    format: int64
+                  available:
+                    type: integer
+                    format: int64
+                  effective:
+                    type: integer
+                    format: int64
+  '/addresses/balance/{address}/{confirmations}':
+    get:
+      tags:
+        - addresses
+      summary: Confirmed regular balance in WAVES
+      description: >-
+        Get the minimum regular balance at a given address for {confirmations}
+        blocks back from the current height. Max number of confirmations is set
+        by `waves.db.max-rollback-depth`, 2000 by default
+      operationId: getConfirmedRegularBalance
+      parameters:
+        - $ref: '#/components/parameters/address'
+        - name: confirmations
+          in: path
+          description: Number of blocks
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+  '/addresses/effectiveBalance/{address}/{confirmations}':
+    get:
+      tags:
+        - addresses
+      summary: Confirmed effective balance in WAVES
+      description: >-
+        Get the minimum effective balance at a given address for {confirmations}
+        blocks from the current height. Max number of confirmations is set by
+        `waves.db.max-rollback-depth`, 2000 by default
+      operationId: getConfirmedEffectiveBalance
+      parameters:
+        - $ref: '#/components/parameters/address'
+        - name: confirmations
+          in: path
+          description: Number of blocks
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+  '/addresses/data/{address}/{key}':
+    get:
+      tags:
+        - addresses
+      summary: Data by key
+      description: Read account data entries by a given key
+      operationId: getDataByKey
+      parameters:
+        - $ref: '#/components/parameters/address'
+        - name: key
+          in: path
+          description: Data key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataEntry'
+  '/blocks/{id}':
+    get:
+      tags:
+        - blocks
+      summary: Block by ID
+      description: Get a block by its ID
+      operationId: getBlockById
+      parameters:
+        - $ref: '#/components/parameters/blockId'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Block'
+  '/blocks/heightByTimestamp/{timestamp}':
+    get:
+      tags: [blocks]
+      operationId: getHeightByTimestamp
+      summary: Blockchain height for timestamp
+      description: >-
+        Get height of the most recent block such that its timestamp does not exceed the given `{timestamp}`.
+      parameters:
+        - name: timestamp
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Timestamp'
+      responses:
+        '200':
+          $ref: '#/components/responses/Height'
+
+  '/blocks/address/{address}/{from}/{to}':
+    get:
+      tags:
+        - blocks
+      summary: Blocks forged by address
+      description: >-
+        Get a list of blocks forged by a given address. Max range {from}-{to} is
+        100 blocks
+      operationId: getBlocksByAddress
+      parameters:
+        - name: from
+          in: path
+          description: Start block height
+          required: true
+          schema:
+            type: integer
+        - name: to
+          in: path
+          description: End block height
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/address'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Block'
+  '/blocks/seq/{from}/{to}':
+    get:
+      tags:
+        - blocks
+      summary: Block range
+      description: >-
+        Get blocks at a given range of heights. Max range {from}-{to} is 100
+        blocks
+      operationId: getBlocksRange
+      parameters:
+        - name: from
+          in: path
+          description: Start block height
+          required: true
+          schema:
+            type: integer
+        - name: to
+          in: path
+          description: End block height
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Block'
+  '/blocks/delay/{id}/{blockNum}':
+    get:
+      tags:
+        - blocks
+      summary: Average block delay
+      description: >-
+        Average delay in milliseconds between last `blockNum` blocks starting
+        from block with `id`
+      operationId: getBlockDelay
+      parameters:
+        - $ref: '#/components/parameters/blockId'
+        - name: blockNum
+          in: path
+          description: Number of blocks to count delay
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - delay
+                type: object
+                properties:
+                  delay:
+                    type: integer
+                    format: int64
+  /blocks/height:
+    get:
+      tags:
+        - blocks
+      summary: Blockchain height
+      description: Get the current blockchain height
+      operationId: getHeight
+      responses:
+        '200':
+          $ref: '#/components/responses/Height'
+  '/blocks/at/{height}':
+    get:
+      tags:
+        - blocks
+      summary: Block at height
+      description: Get a block at a given height
+      operationId: getBlockByHeight
+      parameters:
+        - name: height
+          in: path
+          description: Block height
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Block'
+  /blocks/last:
+    get:
+      tags:
+        - blocks
+      summary: Last block
+      description: Get the block at the current blockchain height
+      operationId: getLastBlock
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Block'
+  '/blocks/height/{id}':
+    get:
+      tags:
+        - blocks
+      summary: Block height
+      description: Get the height of a block by its ID
+      operationId: getBlockHeightbyId
+      parameters:
+        - $ref: '#/components/parameters/blockId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Height'
+  '/blocks/headers/at/{height}':
+    get:
+      tags:
+        - blocks
+      summary: Block headers at height
+      description: Get block headers at a given height
+      operationId: getBlockHeadersByHeight
+      parameters:
+        - name: height
+          in: path
+          description: Block height
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockHeader'
+  '/blocks/headers/{id}':
+    get:
+      tags:
+        - blocks
+      summary: Block headers by ID
+      description: Get headers of a given block
+      operationId: getBlockHeadersById
+      parameters:
+        - $ref: '#/components/parameters/blockId'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockHeader'
+  '/blocks/headers/seq/{from}/{to}':
+    get:
+      tags:
+        - blocks
+      summary: Block headers at range
+      description: >-
+        Get block headers at a given range of heights. Max range {from}-{to} is
+        100 blocks
+      operationId: getBlockHeadersRange
+      parameters:
+        - name: from
+          in: path
+          description: Start block height
+          required: true
+          schema:
+            type: integer
+        - name: to
+          in: path
+          description: End block height
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BlockHeader'
+  /blocks/headers/last:
+    get:
+      tags:
+        - blocks
+      summary: Last block headers
+      description: Get headers of the block at the current blockchain height
+      operationId: getLastBlockHeaders
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockHeader'
+  /peers/connect:
+    post:
+      tags:
+        - peers
+      summary: Connect to peer
+      description: Connect to peer
+      operationId: connectPeer
+      requestBody:
+        description: JSON with data
+        content:
+          application/json:
+            schema:
+              required:
+                - host
+                - port
+              type: object
+              properties:
+                host:
+                  type: string
+                  example: 127.0.0.1
+                port:
+                  type: integer
+                  format: int32
+                  example: 6868
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - hostname
+                  - status
+                type: object
+                properties:
+                  hostname:
+                    type: string
+                  status:
+                    type: string
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+      x-codegen-request-body-name: body
+  /peers/clearblacklist:
+    post:
+      tags:
+        - peers
+      summary: Clear ban list
+      description: Clear the list of banned peers
+      operationId: clearBanList
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - result
+                type: object
+                properties:
+                  result:
+                    type: string
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+  /peers/all:
+    get:
+      tags:
+        - peers
+      summary: Peer list
+      description: >-
+        Get a list of all ever known not banned peers with a publicly available
+        declared address
+      operationId: getPeers
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  required:
+                    - address
+                    - lastSeen
+                  type: object
+                  properties:
+                    address:
+                      type: string
+                    lastSeen:
+                      type: integer
+                      format: int64
+  /peers/connected:
+    get:
+      tags:
+        - peers
+      summary: Connected peers list
+      description: Get a list of all peers currently connected to the node
+      operationId: getConnectedPeers
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - peers
+                type: object
+                properties:
+                  peers:
+                    type: array
+                    items:
+                      required:
+                        - address
+                        - applicationName
+                        - applicationVersion
+                        - declaredAddress
+                        - peerName
+                        - peerNonce
+                      type: object
+                      properties:
+                        address:
+                          type: string
+                        declaredAddress:
+                          type: string
+                        peerName:
+                          type: string
+                        peerNonce:
+                          type: integer
+                          format: int64
+                        applicationName:
+                          type: string
+                        applicationVersion:
+                          type: string
+  /peers/blacklisted:
+    get:
+      tags:
+        - peers
+      summary: Ban list
+      description: Get a list of all currently banned peers of the node
+      operationId: getBannedPeers
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  required:
+                    - hostname
+                    - reason
+                    - timestamp
+                  type: object
+                  properties:
+                    hostname:
+                      type: string
+                    timestamp:
+                      type: integer
+                      format: int64
+                    reason:
+                      type: string
+  /peers/suspended:
+    get:
+      tags:
+        - peers
+      summary: Suspended peers list
+      description: Suspended peers list
+      operationId: getSuspendedPeers
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  required:
+                    - hostname
+                    - reason
+                    - timestamp
+                  type: object
+                  properties:
+                    hostname:
+                      type: string
+                    timestamp:
+                      type: integer
+                      format: int64
+                    reason:
+                      type: string
+  /blockchain/rewards:
+    get:
+      tags:
+        - blockchain
+      summary: Current reward status
+      description: Get current status of block reward
+      operationId: getRewardStatus
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RewardStatus'
+  '/blockchain/rewards/{height}':
+    get:
+      tags:
+        - blockchain
+      summary: Reward status
+      description: Get status of block reward at height
+      operationId: getRewardStatusAtHeight
+      parameters:
+        - name: height
+          in: path
+          description: Target block height
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RewardStatus'
+  /transactions/status:
+    get:
+      tags:
+        - transactions
+      summary: Transaction statuses
+      description: >-
+        Get transaction statuses by their ID. For dozens of transactions, better
+        use the POST method.<br>Transactions in the response are in the same
+        order as in the request.
+      operationId: getTxStatuses
+      parameters:
+        - name: id
+          in: query
+          required: true
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/TransactionId'
+            minItems: 1
+            maxItems: 42
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionStatus'
+    post:
+      tags:
+        - transactions
+      summary: Transaction statuses
+      description: >-
+        Get transaction statuses by their ID. Max number of transactions is set
+        by `waves.rest-api.transactions-by-address-limit`, 1000 by
+        default.<br>Transactions in the response are in the same order as in the
+        request.
+      operationId: getTxStatusesViaPost
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                ids:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TransactionId'
+                  minItems: 1
+                  maxItems: 1000
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TransactionId'
+            encoding:
+              id:
+                style: form
+                explode: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TransactionStatus'
+      x-codegen-request-body-name: ids
+  '/transactions/info/{id}':
+    get:
+      tags:
+        - transactions
+      summary: Transaction info
+      description: Get a transaction by its ID
+      operationId: getTxById
+      parameters:
+        - $ref: '#/components/parameters/txId'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+  /transactions/info:
+    get:
+      tags:
+        - transactions
+      summary: Transaction info
+      description: Get transactions by IDs
+      operationId: getMultipleTxs
+      parameters:
+        - name: id
+          in: query
+          description: Transaction IDs base58 encoded
+          required: true
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: '#/components/parameters/txId'
+            minItems: 1
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+  /transactions/sign:
+    post:
+      tags:
+        - transactions
+      summary: Sign transaction on behalf of wallet account
+      description: >-
+        Sign a transaction with the private key corresponding to the `sender`.
+        Sender must exist in the [node's
+        wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet)
+      operationId: signTx
+      requestBody:
+        description: >-
+          Transaction [data in
+          JSON](https://docs.waves.tech/en/blockchain/transaction/#json-representation)
+          including
+          [`type`](https://docs.waves.tech/en/blockchain/transaction-type/) and
+          `sender`. If `timestamp` is omitted, current node's time is used.
+          `senderPublicKey` is ignored.
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+      x-codegen-request-body-name: json
+  /transactions/unconfirmed:
+    get:
+      tags:
+        - transactions
+      summary: Unconfirmed transactions
+      description: Get a list of transactions in node's UTX pool
+      operationId: getUnconfirmedTxs
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+  '/transactions/address/{address}/limit/{limit}':
+    get:
+      tags:
+        - transactions
+      summary: List of transactions by address
+      description: >-
+        Get a list of the latest transactions involving a given address. Max
+        number of transactions is set by
+        `waves.rest-api.transactions-by-address-limit`, 1000 by default. For
+        pagination, use the field {after}
+      operationId: getTxsByAddress
+      parameters:
+        - $ref: '#/components/parameters/address'
+        - name: limit
+          in: path
+          description: Number of transactions to be returned
+          required: true
+          schema:
+            type: integer
+        - name: after
+          in: query
+          description: ID of the transaction to paginate after
+          schema:
+            type: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+  /transactions/unconfirmed/size:
+    get:
+      tags:
+        - transactions
+      summary: Number of unconfirmed transactions
+      description: Get the number of transactions in the UTX pool
+      operationId: getUtxPoolSize
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - size
+                type: object
+                properties:
+                  size:
+                    type: integer
+                    format: int32
+  '/transactions/unconfirmed/info/{id}':
+    get:
+      tags:
+        - transactions
+      summary: Unconfirmed transaction info
+      description: Get an unconfirmed transaction by its ID
+      operationId: getUnconfirmedTxById
+      parameters:
+        - $ref: '#/components/parameters/txId'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+  /transactions/calculateFee:
+    post:
+      tags:
+        - transactions
+      summary: Calculate transaction fee
+      description: Get the minimum fee for a given transaction
+      operationId: calculateTxFee
+      requestBody:
+        description: >-
+          Transaction [data in
+          JSON](https://docs.waves.tech/en/blockchain/transaction/#json-representation)
+          including
+          [`type`](https://docs.waves.tech/en/blockchain/transaction-type/) and
+          `senderPublicKey`. To calculate a sponsored fee, specify `feeAssetId`.
+          `fee` and `sender` are ignored.
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - feeAmount
+                  - feeAssetId
+                type: object
+                properties:
+                  feeAssetId:
+                    type: string
+                  feeAmount:
+                    type: integer
+                    format: int64
+      x-codegen-request-body-name: json
+  '/transactions/sign/{signerAddress}':
+    post:
+      tags:
+        - transactions
+      summary: Sign transaction on behalf of wallet account
+      description: >-
+        Sign a transaction with the private key corresponding to a given
+        address. The address must exist in the [node's
+        wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet)
+      operationId: signTxWithAddress
+      parameters:
+        - name: signerAddress
+          in: path
+          description: Wallet address base58 encoded
+          required: true
+          schema:
+            type: string
+            pattern: '^[1-9A-HJ-NP-Za-km-z]{35}$'
+      requestBody:
+        description: >-
+          Transaction [data in
+          JSON](https://docs.waves.tech/en/blockchain/transaction/#json-representation)
+          including
+          [`type`](https://docs.waves.tech/en/blockchain/transaction-type/) and
+          `sender`. If `timestamp` is omitted, current node's time is used.
+          `senderPublicKey` is ignored.
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+      x-codegen-request-body-name: json
+  /transactions/broadcast:
+    post:
+      tags:
+        - transactions
+      summary: Broadcast transaction
+      description: Broadcast a signed transaction
+      operationId: broadcastSignedTx
+      requestBody:
+        description: >-
+          Transaction [data in
+          JSON](https://docs.waves.tech/en/blockchain/transaction/#json-representation)
+          including
+          [`type`](https://docs.waves.tech/en/blockchain/transaction-type/) and
+          `signature`/`proofs`
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+      x-codegen-request-body-name: json
+  /transactions/merkleProof:
+    get:
+      tags:
+        - transactions
+      summary: Merkle proofs
+      description: >-
+        Get [merkle
+        proofs](https://docs.waves.tech/en/blockchain/block/merkle-root#proof-of-transaction-in-block)
+        for given transactions. For dozens of transactions, better use the POST
+        method
+      operationId: getMerkleProofs
+      parameters:
+        - name: id
+          in: query
+          description: Transaction ID
+          required: true
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionMerkleProofs'
+    post:
+      tags:
+        - transactions
+      summary: Merkle proofs
+      description: >-
+        Get [merkle
+        proofs](https://docs.waves.tech/en/blockchain/block/merkle-root#proof-of-transaction-in-block)
+        for given transactions
+      operationId: getMerkleProofsViaPost
+      requestBody:
+        description: Transaction IDs
+        content:
+          application/json:
+            schema:
+              required:
+                - ids
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+        required: false
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TransactionMerkleProofs'
+      x-codegen-request-body-name: ids
+  '/utils/seed/{length}':
+    get:
+      tags:
+        - utils
+      summary: Seed of specified length
+      description: >-
+        Generate random seed of a given length in bytes. The returned value is
+        base58 encoded
+      operationId: generateSeedByLength
+      parameters:
+        - name: length
+          in: path
+          description: Seed length
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - seed
+                type: object
+                properties:
+                  seed:
+                    type: string
+  /utils/script/compile:
+    post:
+      tags:
+        - utils
+      summary: Compile
+      description: Compiles string code to base64 script representation
+      operationId: compileScript
+      requestBody:
+        description: Script code
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompiledScript'
+      deprecated: true
+      x-codegen-request-body-name: code
+  /utils/time:
+    get:
+      tags:
+        - utils
+      summary: Time
+      description: Current Node time (UTC)
+      operationId: getTime
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - NTP
+                  - system
+                type: object
+                properties:
+                  system:
+                    type: integer
+                    format: int64
+                  NTP:
+                    type: integer
+                    format: int64
+  /utils/script/decompile:
+    post:
+      tags:
+        - utils
+      summary: Decompile
+      description: Decompiles base64 script representation to string code
+      operationId: decompileScript
+      requestBody:
+        description: Script code
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - script
+                type: object
+                properties:
+                  script:
+                    type: string
+      x-codegen-request-body-name: code
+  /utils/script/compileCode:
+    post:
+      tags:
+        - utils
+      summary: Compile script
+      description: Compiles string code to base64 script representation
+      operationId: compileCode
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompiledScript'
+      x-codegen-request-body-name: code
+  /utils/script/compileWithImports:
+    post:
+      tags:
+        - utils
+      summary: Compile script
+      description: Compiles string code with imports to base64 script representation
+      operationId: compileWithImports
+      requestBody:
+        description: Script code with imports
+        content:
+          application/json:
+            schema:
+              required:
+                - imports
+                - script
+              type: object
+              properties:
+                script:
+                  type: string
+                imports:
+                  type: object
+                  additionalProperties:
+                    type: string
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompiledScript'
+      x-codegen-request-body-name: code
+  /utils/script/estimate:
+    post:
+      tags:
+        - utils
+      summary: Estimate
+      description: Estimates complexity of a given compiled code
+      operationId: estimateScript
+      requestBody:
+        description: Compiled code in base64 script representation
+        content:
+          text/plain:
+            schema:
+              type: string
+              format: byte
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - script
+                  - scriptText
+                  - complexity
+                  - verifierComplexity
+                  - callableComplexities
+                  - extraFee
+                type: object
+                properties:
+                  script:
+                    type: string
+                    format: byte
+                    nullable: true
+                    description: Compiled script in base64 script representation
+                  scriptText:
+                    type: string
+                    nullable: true
+                    description: Compiled script in text representation
+                  complexity:
+                    type: integer
+                    format: int64
+                    description: >-
+                      The maximum of `callableComplexities` and
+                      `verifierComplexity`
+                  verifierComplexity:
+                    type: integer
+                    format: int64
+                    description: >-
+                      [Complexity](https://docs.waves.tech/en/ride/base-concepts/complexity)
+                      of the account or asset script or the verifier function of
+                      the dApp script
+                  callableComplexities:
+                    type: object
+                    description: >-
+                      Complexity of callable functions of the dApp script. Empty
+                      for an account script or asset script
+                  extraFee:
+                    type: integer
+                    format: int64
+                    description: >-
+                      Extra fee for transactions sending on behalf of the dApp
+                      or smart account or transactions involving the asset
+      x-codegen-request-body-name: code
+  '/utils/script/evaluate/{address}':
+    post:
+      tags:
+        - utils
+      summary: Evaluate
+      description: >-
+        Evaluates the provided expression, taking into account the deployed dApp
+        contract
+      operationId: evaluateScript
+      parameters:
+        - name: address
+          in: path
+          description: Address of the deployed dApp contract
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Expression to evaluate
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expr:
+                  type: string
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  address:
+                    type: string
+                  expr:
+                    type: string
+                  result:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      value: {}
+  /utils/seed:
+    get:
+      tags:
+        - utils
+      summary: Seed
+      description: Generate random seed. The returned value is base58 encoded
+      operationId: generateSeed
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - seed
+                type: object
+                properties:
+                  seed:
+                    type: string
+  /utils/hash/secure:
+    post:
+      tags:
+        - utils
+      summary: Secure hash
+      description: >-
+        Calculate the
+        [Keccak-256](https://keccak.team/files/Keccak-submission-3.pdf) hash of
+        the
+        [BLAKE2b-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29)
+        hash of a given message
+      operationId: hashSecure
+      requestBody:
+        description: Message to hash
+        content:
+          text/plain:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HashedMessage'
+      x-codegen-request-body-name: message
+  /utils/hash/fast:
+    post:
+      tags:
+        - utils
+      summary: Fast hash
+      description: >-
+        Calculate the
+        [BLAKE2b-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29)
+        hash of a given message
+      operationId: hashFast
+      requestBody:
+        description: Message to hash
+        content:
+          text/plain:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HashedMessage'
+      x-codegen-request-body-name: message
+  /utils/transactionSerialize:
+    post:
+      tags:
+        - utils
+      summary: Serialize transaction
+      description: Serialize transaction
+      operationId: serializeTx
+      requestBody:
+        description: >-
+          Transaction [data in
+          JSON](https://docs.waves.tech/en/blockchain/transaction/#json-representation)
+          including
+          [`type`](https://docs.waves.tech/en/blockchain/transaction-type/)
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - bytes
+                type: object
+                properties:
+                  bytes:
+                    type: array
+                    items:
+                      type: number
+      x-codegen-request-body-name: json
+  /wallet/seed:
+    get:
+      tags:
+        - wallet
+      summary: Seed
+      description: Export wallet seed
+      operationId: getSeed
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - seed
+                type: object
+                properties:
+                  seed:
+                    type: string
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+  '/alias/by-alias/{alias}':
+    get:
+      tags:
+        - alias
+      summary: Address by alias
+      description: >-
+        Get an address associated with a given alias. Alias should be plain text
+        without an 'alias' prefix and chain ID.
+      operationId: getAddressByAlias
+      parameters:
+        - name: alias
+          in: path
+          description: Alias
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - address
+                type: object
+                properties:
+                  address:
+                    type: string
+  '/alias/by-address/{address}':
+    get:
+      tags:
+        - alias
+      summary: Aliases by address
+      description: Get a list of aliases associated with a given address
+      operationId: getAliasesByAddress
+      parameters:
+        - $ref: '#/components/parameters/address'
+      responses:
+        '200':
+          description: Aliases
+          content:
+            application/json:
+              schema:
+                uniqueItems: true
+                type: array
+                items:
+                  type: string
+  '/assets/balance/{address}':
+    get:
+      tags:
+        - assets
+      summary: Account balances in all assets
+      description: >-
+        Get account balances in all assets (excluding WAVES and NFTs) at a given
+        address
+      operationId: getAllAssetBalancesByAddress
+      parameters:
+        - $ref: '#/components/parameters/address'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - address
+                  - balances
+                type: object
+                properties:
+                  address:
+                    type: string
+                  balances:
+                    type: array
+                    items:
+                      required:
+                        - assetId
+                        - balance
+                        - issueTransaction
+                        - minSponsoredAssetFee
+                        - quantity
+                        - reissuable
+                        - sponsorBalance
+                      type: object
+                      properties:
+                        assetId:
+                          type: string
+                          description: Asset ID base58 encoded
+                        balance:
+                          type: integer
+                          format: int64
+                          description: Account balance in the asset
+                        reissuable:
+                          type: boolean
+                          description: Indicates if the asset is reissuable
+                        minSponsoredAssetFee:
+                          type: integer
+                          format: int64
+                          nullable: true
+                          description: >-
+                            For [sponsored
+                            asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee)
+                            only: the equivalent of 0.001 WAVES
+                        sponsorBalance:
+                          type: integer
+                          format: int64
+                          nullable: true
+                          description: >-
+                            For [sponsored
+                            asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee)
+                            only: the sponsor balance in WAVES
+                        quantity:
+                          type: integer
+                          format: int64
+                          description: Total supply of the asset
+                        issueTransaction:
+                          $ref: '#/components/schemas/IssueTransaction'
+  '/assets/details/{assetId}':
+    get:
+      tags:
+        - assets
+      summary: Information about asset
+      description: >-
+        Get detailed information about a given asset. See [fields
+        descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters)
+      operationId: getAssetDetails
+      parameters:
+        - $ref: '#/components/parameters/assetId'
+        - name: full
+          in: query
+          description: 'false'
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDetails'
+  /assets/details:
+    get:
+      tags:
+        - assets
+      summary: Information about multiple assets
+      description: >-
+        Get detailed information about given assets. See [fields
+        descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters)
+      operationId: getMultipleAssetDetails
+      parameters:
+        - name: id
+          in: query
+          description: Asset ID base58 encoded
+          required: true
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: full
+          in: query
+          description: 'false'
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssetDetails'
+  '/assets/balance/{address}/{assetId}':
+    get:
+      tags:
+        - assets
+      summary: Account balance in asset
+      description: >-
+        Get the account balance in a given asset. 0 for non-existent asset (use
+        [GET /assets/details/{assetId}](#/assets/getAssetDetails) to check if
+        the asset exists)
+      operationId: getAssetBalanceByAddress
+      parameters:
+        - $ref: '#/components/parameters/address'
+        - $ref: '#/components/parameters/assetId'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - address
+                  - assetId
+                  - balance
+                type: object
+                properties:
+                  address:
+                    type: string
+                  assetId:
+                    type: string
+                  balance:
+                    type: integer
+                    format: int64
+  '/assets/{assetId}/distribution':
+    get:
+      tags:
+        - assets
+      summary: Asset balance distribution
+      description: Get asset balance distribution by addresses
+      operationId: getAssetDistributionOld
+      parameters:
+        - $ref: '#/components/parameters/assetId'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDistribution'
+      deprecated: true
+  '/assets/{assetId}/distribution/{height}/limit/{limit}':
+    get:
+      tags:
+        - assets
+      summary: Asset balance distribution at height
+      description: >-
+        Get asset balance distribution by addresses at a given height. Max
+        number of addresses is set by
+        `waves.rest-api.distribution-address-limit`, 1000 by default. For
+        pagination, use the field {after}
+      operationId: getAssetDistribution
+      parameters:
+        - $ref: '#/components/parameters/assetId'
+        - name: height
+          in: path
+          description: >-
+            For balance at height requests. Max number of blocks back from the
+            current height is set by `waves.db.max-rollback-depth`, 2000 by
+            default
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: path
+          description: Number of addresses to be returned
+          required: true
+          schema:
+            type: integer
+        - name: after
+          in: query
+          description: Address to paginate after
+          schema:
+            type: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDistribution'
+  '/assets/nft/{address}/limit/{limit}':
+    get:
+      tags:
+        - assets
+      summary: Account NFTs
+      description: >-
+        Get a list of [non-fungible
+        tokens](https://docs.waves.tech/en/blockchain/token/non-fungible-token)
+        at a given address. Max for 1000 tokens. For pagination, use the field
+        {after}. See [fields
+        descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters).<br>Since
+        activation of [feature
+        #15](https://docs.waves.tech/en/waves-node/features/) this method
+        returns only tokens that are issued as NFT (amount: 1, decimal places:
+        0, reissuable: false) after activation of feature #13. Before activation
+        of feature #15 the method returned all the assets that are issued as
+        NFT.
+      operationId: getNfts
+      parameters:
+        - $ref: '#/components/parameters/address'
+        - name: limit
+          in: path
+          description: Number of tokens to be returned
+          required: true
+          schema:
+            type: integer
+        - name: after
+          in: query
+          description: ID of the token to paginate after
+          schema:
+            type: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssetDetails'
+  '/leasing/active/{address}':
+    get:
+      tags:
+        - leasing
+      summary: Active leases by address
+      description: Get all active leases involving a given address
+      operationId: getActiveLeases
+      parameters:
+        - $ref: '#/components/parameters/address'
+      responses:
+        '200':
+          description: Lease info
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaseInfo'
+  '/leasing/info/{id}':
+    get:
+      tags:
+        - leasing
+      summary: Lease info
+      description: Get lease info.
+      operationId: lease_info_get
+      parameters:
+        - name: id
+          in: path
+          description: Lease ID base58 encoded
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaseInfo'
+  /leasing/info:
+    get:
+      tags:
+        - leasing
+      summary: Lease transactions
+      description: Get lease transactions info.
+      operationId: lease_infos_get
+      parameters:
+        - name: id
+          in: query
+          description: Transaction IDs base58 encoded
+          required: true
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              pattern: '^[1-9A-HJ-NP-Za-km-z]{32,44}$'
+            minItems: 1
+            maxItems: 1000
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaseInfo'
+    post:
+      tags:
+        - leasing
+      summary: Lease transactions
+      description: Get lease transactions info.
+      operationId: lease_infos_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                ids:
+                  type: array
+                  description: Lease IDs base58 encoded
+                  items:
+                    type: string
+                    pattern: '^[1-9A-HJ-NP-Za-km-z]{32,44}$'
+                  minItems: 1
+                  maxItems: 1000
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: array
+                  description: Lease IDs base58 encoded
+                  items:
+                    type: string
+                    pattern: '^[1-9A-HJ-NP-Za-km-z]{32,44}$'
+            encoding:
+              id:
+                style: form
+                explode: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaseInfo'
+      x-codegen-request-body-name: ids
+  /activation/status:
+    get:
+      tags:
+        - activation
+      summary: Feature activation status
+      description: >-
+        Activation statuses of [blockchain
+        features](https://docs.waves.tech/en/waves-node/features/)
+      operationId: getFeatureStatuses
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - features
+                  - height
+                  - nextCheck
+                  - votingInterval
+                  - votingThreshold
+                type: object
+                properties:
+                  height:
+                    $ref: '#/components/schemas/Height'
+                    description: Current blockchain height on the node
+                  votingInterval:
+                    type: integer
+                    format: int32
+                    description: Voting period length in blocks
+                  votingThreshold:
+                    type: integer
+                    format: int32
+                    description: Number of blocks that support a feature to approve it
+                  nextCheck:
+                    type: integer
+                    format: int32
+                    description: Next height to calculate feature statuses
+                  features:
+                    type: array
+                    items:
+                      required:
+                        - blockchainStatus
+                        - description
+                        - id
+                        - nodeStatus
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          format: int32
+                          description: Feature ID
+                        description:
+                          type: string
+                        blockchainStatus:
+                          type: string
+                          enum:
+                            - VOTING
+                            - APPROVED
+                            - ACTIVATED
+                          description: Feature status
+                        nodeStatus:
+                          type: string
+                          enum:
+                            - NOT_IMPLEMENTED
+                            - IMPLEMENTED
+                            - VOTED
+                          description: Support for the feature on the node
+                        activationHeight:
+                          $ref: '#/components/schemas/Height'
+                        supportingBlocks:
+                          type: integer
+                          format: int32
+                          description: Number of blocks that support for the feature
+  /debug/print:
+    post:
+      tags:
+        - debug
+      summary: Print
+      description: 'Prints a string at DEBUG level, strips to 100 chars'
+      operationId: print
+      requestBody:
+        description: JSON with data
+        content:
+          application/json:
+            schema:
+              required:
+                - message
+              type: object
+              properties:
+                message:
+                  type: string
+        required: true
+      responses:
+        '200':
+          description: Success
+          content: {}
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+      x-codegen-request-body-name: body
+  /debug/state:
+    get:
+      tags:
+        - debug
+      summary: Regular address balance
+      description: Regular address balance at the current height
+      operationId: getWavesDistribution
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: integer
+                  format: int64
+                description: map of address <-> balance
+                example:
+                  addr1: 0
+                  addr2: 100
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+  /debug/info:
+    get:
+      tags:
+        - debug
+      summary: State
+      description: All info you need to debug
+      operationId: getDebugInfo
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - extensionLoaderState
+                  - historyReplierCacheSizes
+                  - microBlockSynchronizerCacheSizes
+                  - minerState
+                  - scoreObserverStats
+                  - stateHeight
+                type: object
+                properties:
+                  stateHeight:
+                    $ref: '#/components/schemas/Height'
+                  extensionLoaderState:
+                    type: string
+                  historyReplierCacheSizes:
+                    required:
+                      - awaiting
+                      - microBlockOwners
+                      - nextInvs
+                      - successfullyReceived
+                    type: object
+                    properties:
+                      microBlockOwners:
+                        type: integer
+                        format: int64
+                      nextInvs:
+                        type: integer
+                        format: int64
+                      awaiting:
+                        type: integer
+                        format: int64
+                      successfullyReceived:
+                        type: integer
+                        format: int64
+                  microBlockSynchronizerCacheSizes:
+                    required:
+                      - awaiting
+                      - microBlockOwners
+                      - nextInvs
+                      - successfullyReceived
+                    type: object
+                    properties:
+                      microBlockOwners:
+                        type: integer
+                        format: int64
+                      nextInvs:
+                        type: integer
+                        format: int64
+                      awaiting:
+                        type: integer
+                        format: int64
+                      successfullyReceived:
+                        type: integer
+                        format: int64
+                  scoreObserverStats:
+                    required:
+                      - currentBestChannel
+                      - localScore
+                      - scoresCacheSize
+                    type: object
+                    properties:
+                      localScore:
+                        type: integer
+                        format: int64
+                      currentBestChannel:
+                        type: string
+                      scoresCacheSize:
+                        type: integer
+                        format: int64
+                  minerState:
+                    type: string
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+  '/debug/stateHash/{height}':
+    get:
+      tags:
+        - debug
+      summary: State hash
+      description: >-
+        Get state hash at height. Available only if node configuration contains
+        `waves.db.store-state-hashes = true` option
+      operationId: getStateHash
+      parameters:
+        - name: height
+          in: path
+          description: Target block height
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: State hash
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  blockId:
+                    type: string
+                  wavesBalanceHash:
+                    type: string
+                  assetsBalanceHash:
+                    type: string
+                  dataEntryHash:
+                    type: string
+                  accountScriptHash:
+                    type: string
+                  assetScriptHash:
+                    type: string
+                  leaseBalanceHash:
+                    type: string
+                  leaseStatusHash:
+                    type: string
+                  sponsorshipHash:
+                    type: string
+                  aliasHash:
+                    type: string
+                  stateHash:
+                    type: string
+  /debug/blacklist:
+    post:
+      tags:
+        - debug
+      summary: Ban peer
+      description: >-
+        Move a given peer to the ban list for the time specified in
+        `waves.network.black-list-residence-time`, 15 min by default. The
+        connection to the peer is immediately closed (if it was open)
+      operationId: banPeer
+      requestBody:
+        description: IP address of node
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: Success
+          content: {}
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+        '404':
+          description: There are no peer with such address
+          content: {}
+      security:
+        - APIKey: []
+      x-codegen-request-body-name: address
+  '/debug/portfolios/{address}':
+    get:
+      tags:
+        - debug
+      summary: Portfolio
+      description: >-
+        Get current portfolio considering pessimistic transactions in the UTX
+        pool
+      operationId: getPortfolios
+      parameters:
+        - $ref: '#/components/parameters/address'
+        - name: considerUnspent
+          in: query
+          description: Taking into account pessimistic transactions from UTX pool
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Json portfolio
+          content:
+            application/json:
+              schema:
+                required:
+                  - assets
+                  - balance
+                  - lease
+                type: object
+                properties:
+                  balance:
+                    type: integer
+                    format: int64
+                  lease:
+                    required:
+                      - in
+                      - out
+                    type: object
+                    properties:
+                      in:
+                        type: integer
+                        format: int64
+                      out:
+                        type: integer
+                        format: int64
+                  assets:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                      format: int64
+                    description: map of assetId <-> balance
+                    example:
+                      assetId1: 0
+                      assetId2: 100
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+  '/debug/rollback-to/{id}':
+    delete:
+      tags:
+        - debug
+      summary: Block id
+      description: Rollback the state to the block with a given ID
+      operationId: rollbackToId
+      parameters:
+        - $ref: '#/components/parameters/blockId'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - BlockId
+                type: object
+                properties:
+                  BlockId:
+                    type: string
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+  /debug/validate:
+    post:
+      tags:
+        - debug
+      summary: Validate Transaction
+      description: >-
+        Validates a transaction and measures time spent in milliseconds. You
+        should use the JSON transaction format with proofs
+      operationId: validateTx
+      requestBody:
+        description: Signed transaction
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - trace
+                  - valid
+                  - validationTime
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  validationTime:
+                    type: integer
+                    format: int32
+                  trace:
+                    type: array
+                    items:
+                      type: string
+      x-codegen-request-body-name: transaction
+  '/debug/balances/history/{address}':
+    get:
+      tags:
+        - debug
+      summary: History of regular balance
+      description: >-
+        Get history of the regular balance at a given address. Max depth is set
+        by `waves.db.max-rollback-depth`, 2000 by default
+      operationId: getBalanceHistory
+      parameters:
+        - $ref: '#/components/parameters/address'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  required:
+                    - balance
+                    - height
+                  type: object
+                  properties:
+                    height:
+                      $ref: '#/components/schemas/Height'
+                    balance:
+                      type: integer
+                      format: int64
+  '/debug/stateWaves/{height}':
+    get:
+      tags:
+        - debug
+      summary: Regular address balance at the height
+      description: >-
+        Regular address balance at the height. Max number of blocks back from
+        the current height is set by `waves.db.max-rollback-depth`, 2000 by
+        default
+      operationId: getWavesDistributionAtHeight
+      parameters:
+        - name: height
+          in: path
+          description: Height
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: integer
+                  format: int64
+                description: map of address <-> balance
+                example:
+                  addr1: 0
+                  addr2: 100
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+  /debug/rollback:
+    post:
+      tags:
+        - debug
+      summary: Rollback to height
+      description: >-
+        Removes all blocks after a given height. Max number of blocks back from
+        the current height is set by `waves.db.max-rollback-depth`, 2000 by
+        default
+      operationId: rollbackToHeight
+      requestBody:
+        description: JSON with data
+        content:
+          application/json:
+            schema:
+              required:
+                - returnTransactionsToUtx
+                - rollbackTo
+              type: object
+              properties:
+                rollbackTo:
+                  type: integer
+                  format: int32
+                returnTransactionsToUtx:
+                  type: boolean
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - BlockId
+                type: object
+                properties:
+                  BlockId:
+                    type: string
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+      x-codegen-request-body-name: body
+  /debug/minerInfo:
+    get:
+      tags:
+        - debug
+      summary: State
+      description: All miner info you need to debug
+      operationId: getGeneratingInfo
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - address
+                  - miningBalance
+                  - timestamp
+                type: object
+                properties:
+                  address:
+                    type: string
+                  miningBalance:
+                    type: integer
+                    format: int64
+                  timestamp:
+                    type: integer
+                    format: int64
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+  /debug/configInfo:
+    get:
+      tags:
+        - debug
+      summary: Config
+      description: Currently running node config
+      operationId: getConfig
+      parameters:
+        - name: full
+          in: query
+          description: Exposes full typesafe config
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Json config
+          content: {}
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+  /node/stop:
+    post:
+      tags:
+        - node
+      summary: Stop
+      description: Stop the node
+      operationId: stopNode
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - stopped
+                type: object
+                properties:
+                  stopped:
+                    type: boolean
+        '403':
+          $ref: '#/components/responses/ApiKeyNotValid'
+      security:
+        - APIKey: []
+  /node/status:
+    get:
+      tags:
+        - node
+      summary: Status
+      description: Get status of the running core
+      operationId: getNodeStatus
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - blockchainHeight
+                  - stateHeight
+                  - updatedDate
+                  - updatedTimestamp
+                type: object
+                properties:
+                  blockchainHeight:
+                    $ref: '#/components/schemas/Height'
+                  stateHeight:
+                    $ref: '#/components/schemas/Height'
+                  updatedTimestamp:
+                    $ref: '#/components/schemas/Timestamp'
+                  updatedDate:
+                    type: string
+  /node/version:
+    get:
+      tags:
+        - node
+      summary: Version
+      description: Get Waves node version
+      operationId: getNodeVersion
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - version
+                type: object
+                properties:
+                  version:
+                    type: string
+components:
+  schemas:
+    Timestamp:
+      type: integer
+      format: int64
+      minimum: 0
+      example: 1460678400000
+    Height:
+      type: integer
+      format: int32
+      minimum: 1
+      example: 1610000
+    Hash:
+      type: string
+      pattern: '^[1-9A-HJ-NP-Za-km-z]{32,44}$'
+      example: DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p
+    Signature:
+      type: string
+    Proof:
+      type: string
+    AssetId:
+      allOf:
+        - $ref: '#/components/schemas/Hash'
+    BlockId:
+      oneOf:
+        - $ref: '#/components/schemas/Signature'
+        - $ref: '#/components/schemas/Hash'
+    AssetName:
+      type: string
+      minLength: 4
+      maxLength: 16
+    AssetDescription:
+      type: string
+      maxLength: 1000
+    AssetDecimals:
+      type: integer
+      minimum: 0
+      maximum: 8
+      example: 2
+    LeaseId:
+      description: Lease ID
+      allOf:
+        - $ref: '#/components/schemas/Hash'
+    TransactionId:
+      allOf:
+        - $ref: '#/components/schemas/Hash'
+    Address:
+      type: string
+      pattern: '^[1-9A-HJ-NP-Za-km-z]{35}$'
+      example: 3P274YB5qseSE9DTTL3bpSjosZrYBPDpJ8k
+    Alias:
+      type: string
+      pattern: '^alias\:.:[\-\.0-9@_a-z]{4,30}$'
+    AddressOrAlias:
+      oneOf:
+        - $ref: '#/components/schemas/Address'
+        - $ref: '#/components/schemas/Alias'
+    PublicKey:
+      type: string
+      example: 2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY
+    Amount:
+      type: integer
+      format: int64
+      minimum: 0
+    TransactionBase:
+      type: object
+      required: [id, timestamp, type, fee]
+      properties:
+        timestamp:
+          $ref: '#/components/schemas/Timestamp'
+        sender:
+          $ref: '#/components/schemas/Address'
+          readOnly: true
+        senderPublicKey:
+          $ref: '#/components/schemas/PublicKey'
+        id:
+          $ref: '#/components/schemas/TransactionId'
+          readOnly: true
+        applicationStatus:
+          $ref: '#/components/schemas/ApplicationStatus'
+          readOnly: true
+        version:
+          type: integer
+          minimum: 1
+        type:
+          type: integer
+          minimum: 1
+        proofs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Proof'
+        signature:
+          $ref: '#/components/schemas/Signature'
+        fee:
+          $ref: '#/components/schemas/Amount'
+        feeAssetId:
+          $ref: '#/components/schemas/AssetId'
+          nullable: true
+    TransactionInfo:
+      allOf:
+        - $ref: '#/components/schemas/TransactionBase'
+        - type: object
+          required: [height, sender, senderPublicKey, proofs, signature]
+    ApiError:
+      required:
+        - error
+        - message
+      type: object
+      properties:
+        error:
+          type: integer
+          format: int32
+        message:
+          type: string
+    AssetDistribution:
+      required:
+        - hasNext
+        - last
+        - values
+      type: object
+      properties:
+        hasNext:
+          type: boolean
+        last:
+          $ref: '#/components/schemas/Address'
+        values:
+          additionalProperties:
+            type: integer
+            format: int64
+          description: map of assetId <-> balance
+          example:
+            2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY: 15
+            3PPqZ623dAfbmxmnpTjwV6yD5GA5s3PJiUG: 25
+    AssetDetailsBase:
+      type: object
+      required:
+        - assetId
+        - name
+        - description
+        - quantity
+        - decimals
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        name:
+          $ref: '#/components/schemas/AssetName'
+        description:
+          $ref: '#/components/schemas/AssetDescription'
+        decimals:
+          $ref: '#/components/schemas/AssetDecimals'
+    AssetDetails:
+      allOf:
+        - $ref: '#/components/schemas/AssetDetailsBase'
+        - type: object
+          required:
+            - issueHeight
+            - issueTimestamp
+            - issuer
+            - minSponsoredAssetFee
+            - reissuable
+            - scriptDetails
+            - scripted
+            - originTransactionId
+          properties:
+            issueHeight:
+              $ref: '#/components/schemas/Height'
+            issueTimestamp:
+              $ref: '#/components/schemas/Timestamp'
+            issuer:
+              $ref: '#/components/schemas/Address'
+            issuerPublicKey:
+              $ref: '#/components/schemas/PublicKey'
+            reissuable:
+              type: boolean
+            scripted:
+              type: boolean
+            minSponsoredAssetFee:
+              type: integer
+              format: int64
+            originTransactionId:
+              type: string
+            scriptDetails:
+              type: object
+              required:
+                - script
+                - scriptComplexity
+                - scriptText
+              properties:
+                scriptComplexity:
+                  type: integer
+                  format: int32
+                script:
+                  type: string
+                  format: byte
+                scriptText:
+                  type: string
+    Balance:
+      required:
+        - address
+        - balance
+        - confirmations
+      type: object
+      properties:
+        address:
+          type: string
+        confirmations:
+          type: integer
+          format: int32
+        balance:
+          type: integer
+          format: int64
+    BlockHeader:
+      required:
+        - blocksize
+        - generator
+        - generatorPublicKey
+        - height
+        - nxt-consensus
+        - reference
+        - signature
+        - timestamp
+        - totalFee
+        - transactionCount
+        - version
+        - VRF
+        - transactionsRoot
+      type: object
+      properties:
+        timestamp:
+          type: integer
+          format: int64
+        version:
+          type: integer
+          format: int32
+        height:
+          $ref: '#/components/schemas/Height'
+        totalFee:
+          type: integer
+          format: int64
+        reference:
+          type: string
+        generator:
+          $ref: '#/components/schemas/Address'
+        generatorPublicKey:
+          $ref: '#/components/schemas/PublicKey'
+        signature:
+          type: string
+        id:
+          type: string
+        nxt-consensus:
+          required:
+            - base-target
+            - generation-signature
+          type: object
+          properties:
+            base-target:
+              type: integer
+              format: int64
+            generation-signature:
+              type: string
+        blocksize:
+          type: integer
+          format: int32
+        transactionCount:
+          type: integer
+          format: int32
+        features:
+          type: array
+          items:
+            type: integer
+            format: int32
+        reward:
+          type: integer
+          format: int64
+        desiredReward:
+          type: integer
+          format: int64
+        VRF:
+          type: string
+        transactionsRoot:
+          type: string
+    Block:
+      allOf:
+        - $ref: '#/components/schemas/BlockHeader'
+        - type: object
+          required:
+            - transactions
+          properties:
+            transactions:
+              type: array
+              items:
+                $ref: '#/components/schemas/Transaction'
+    CompiledScript:
+      required:
+        - script
+        - complexity
+        - verifierComplexity
+        - callableComplexities
+        - extraFee
+      type: object
+      properties:
+        script:
+          type: string
+          format: byte
+          nullable: true
+          description: Compiled script in base64 representation
+        complexity:
+          type: integer
+          format: int64
+          description: The maximum of `callableComplexities` and `verifierComplexity`
+        verifierComplexity:
+          type: integer
+          format: int64
+          description: >-
+            [Complexity](https://docs.waves.tech/en/ride/base-concepts/complexity)
+            of an account or asset script or the verifier function of the dApp
+            script
+        callableComplexities:
+          type: object
+          description: >-
+            Complexity of callable functions of the dApp script. Empty for an
+            account script or asset script
+        extraFee:
+          type: integer
+          format: int64
+          description: >-
+            Extra fee for transactions sending on behalf of the dApp or smart
+            account or transactions involving the asset
+    ScriptMeta:
+      required:
+        - callableFuncTypes
+        - version
+      type: object
+      properties:
+        version:
+          type: string
+        isArrayArguments:
+          type: boolean
+        callableFuncTypes:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              required:
+                - name
+                - type
+              type: object
+              properties:
+                name:
+                  type: string
+                type:
+                  type: string
+    BinaryEntry:
+      required:
+        - key
+        - type
+        - value
+      type: object
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          enum:
+            - binary
+        value:
+          type: string
+          format: byte
+    BooleanEntry:
+      required:
+        - key
+        - type
+        - value
+      type: object
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          enum:
+            - boolean
+        value:
+          type: boolean
+    IntegerEntry:
+      required:
+        - key
+        - type
+        - value
+      type: object
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          enum:
+            - integer
+        value:
+          type: integer
+          format: int64
+    StringEntry:
+      required:
+        - key
+        - type
+        - value
+      type: object
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          enum:
+            - string
+        value:
+          type: string
+    DataEntry:
+      oneOf:
+        - $ref: '#/components/schemas/BinaryEntry'
+        - $ref: '#/components/schemas/BooleanEntry'
+        - $ref: '#/components/schemas/IntegerEntry'
+        - $ref: '#/components/schemas/StringEntry'
+      discriminator:
+        propertyName: type
+        mapping:
+          binary: '#/components/schemas/BinaryEntry'
+          boolean: '#/components/schemas/BooleanEntry'
+          integer: '#/components/schemas/IntegerEntry'
+          string: '#/components/schemas/StringEntry'
+    DeleteEntry:
+      required:
+        - key
+        - value
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          nullable: true
+          description: null for entry deletion
+    HashedMessage:
+      required:
+        - hash
+        - message
+      type: object
+      properties:
+        message:
+          type: string
+        hash:
+          $ref: '#/components/schemas/Hash'
+    Order:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+        id:
+          type: string
+        sender:
+          $ref: '#/components/schemas/Address'
+          readOnly: true
+        senderPublicKey:
+          $ref: '#/components/schemas/PublicKey'
+        matcherPublicKey:
+          $ref: '#/components/schemas/PublicKey'
+        assetPair:
+          type: object
+          properties:
+            amountAsset:
+              type: string
+              nullable: true
+            priceAsset:
+              type: string
+              nullable: true
+        orderType:
+          type: string
+          enum:
+            - buy
+            - sell
+        amount:
+          $ref: '#/components/schemas/Amount'
+        price:
+          $ref: '#/components/schemas/Amount'
+        timestamp:
+          $ref: '#/components/schemas/Timestamp'
+        expiration:
+          $ref: '#/components/schemas/Timestamp'
+        matcherFee:
+          $ref: '#/components/schemas/Amount'
+        signature:
+          $ref: '#/components/schemas/Signature'
+        proofs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Signature'
+        matcherFeeAssetId:
+          $ref: '#/components/schemas/AssetId'
+    RewardStatus:
+      required:
+        - currentReward
+        - height
+        - minIncrement
+        - nextCheck
+        - term
+        - totalWavesAmount
+        - votes
+        - votingInterval
+        - votingIntervalStart
+        - votingThreshold
+      type: object
+      properties:
+        height:
+          $ref: '#/components/schemas/Height'
+        totalWavesAmount:
+          $ref: '#/components/schemas/Amount'
+        currentReward:
+          $ref: '#/components/schemas/Amount'
+        minIncrement:
+          $ref: '#/components/schemas/Amount'
+        term:
+          type: integer
+          format: int32
+        nextCheck:
+          $ref: '#/components/schemas/Height'
+        votingIntervalStart:
+          $ref: '#/components/schemas/Height'
+        votingInterval:
+          type: integer
+          format: int32
+        votingThreshold:
+          type: integer
+          format: int32
+        votes:
+          type: object
+          required: [decrease, increase]
+          properties:
+            increase:
+              type: integer
+              format: int32
+            decrease:
+              type: integer
+              format: int32
+    Signed:
+      type: object
+      properties:
+        message:
+          type: string
+          description: plain text
+        publicKey:
+          $ref: '#/components/schemas/PublicKey'
+        signature:
+          $ref: '#/components/schemas/Signature'
+    NonGenesisTransaction:
+      required: [sender, senderPublicKey, applicationStatus, version, proofs, signature, feeAssetId]
+      allOf:
+        - $ref: '#/components/schemas/TransactionBase'
+      oneOf:
+        - $ref: '#/components/schemas/BurnTransaction'
+        - $ref: '#/components/schemas/CreateAliasTransaction'
+        - $ref: '#/components/schemas/DataTransaction'
+        - $ref: '#/components/schemas/ExchangeTransaction'
+        - $ref: '#/components/schemas/GenesisTransaction'
+        - $ref: '#/components/schemas/InvokeScriptTransaction'
+        - $ref: '#/components/schemas/IssueTransaction'
+        - $ref: '#/components/schemas/LeaseCancelTransaction'
+        - $ref: '#/components/schemas/LeaseTransaction'
+        - $ref: '#/components/schemas/MassTransferTransaction'
+        - $ref: '#/components/schemas/ReissueTransaction'
+        - $ref: '#/components/schemas/SetAssetScriptTransaction'
+        - $ref: '#/components/schemas/SetScriptTransaction'
+        - $ref: '#/components/schemas/SponsorFeeTransaction'
+        - $ref: '#/components/schemas/TransferTransaction'
+        - $ref: '#/components/schemas/UpdateAssetInfoTransaction'
+    Transaction:
+      oneOf:
+        - $ref: '#/components/schemas/GenesisTransaction'
+        - $ref: '#/components/schemas/NonGenesisTransaction'
+    ApplicationStatus:
+      type: string
+      enum:
+        - succeeded
+        - script_execution_failed
+      description: |
+        * `succeeded`: transaction is successful
+        * `script_execution_failed`: the dApp script or the asset script failed
+
+        See [Transaction Validation](https://docs.waves.tech/en/blockchain/transaction/transaction-validation) for details.
+    LeaseStatus:
+      type: string
+      enum:
+        - active
+        - canceled
+        - expired
+      description: |
+        * `active`: lease is active; 
+        * `canceled`: lease was cancelled by transaction; 
+        * `expired`: lease has expired
+    LeaseInfo:
+      required:
+        - id
+        - originTransactionId
+        - sender
+        - recipient
+        - amount
+        - height
+        - status
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/LeaseId'
+        originTransactionId:
+          $ref: '#/components/schemas/TransactionId'
+        sender:
+          $ref: '#/components/schemas/Address'
+        recipient:
+          $ref: '#/components/schemas/Address'
+          description: Lease recipient id
+        amount:
+          type: integer
+          format: int32
+          description: Leased Waves amount
+        height:
+          $ref: '#/components/schemas/Height'
+          description: >-
+            The sequential number of the block that contains the lease
+            transaction
+        status:
+          $ref: '#/components/schemas/LeaseStatus'
+          description: >-
+            active: lease is active; canceled: lease was cancelled by
+            transaction; expired: lease has expired
+        cancelHeight:
+          $ref: '#/components/schemas/Height'
+          description: >-
+            The sequential number of the block that contains the lease cancel
+            transaction
+        cancelTransactionId:
+          $ref: '#/components/schemas/TransactionId'
+          description: Lease cancel/invoke with cancellation transaction ID
+    TransactionStatus:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/TransactionId'
+        status:
+          type: string
+          enum:
+            - confirmed
+            - unconfirmed
+            - not_found
+          description: |
+            * `not_found`: transaction is not found
+            * `unconfirmed`: transaction is in the UTX pool
+            * `confirmed`: transaction is added to the block or microblock
+        height:
+          $ref: '#/components/schemas/Height'
+          description: The sequential number of the block that contains the transaction
+        confirmations:
+          type: integer
+          format: int32
+          description: >-
+            Number of blocks added on top of the one that contains the
+            transaction
+        applicationStatus:
+          $ref: '#/components/schemas/ApplicationStatus'
+    TransactionMerkleProofs:
+      required:
+        - id
+        - merkleProof
+        - transactionIndex
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/TransactionId'
+        transactionIndex:
+          type: integer
+          format: int32
+          description: Sequential number of the transaction in the block
+        merkleProof:
+          type: array
+          description: 'Array of sibling hashes of the Merkle tree, bottom-to-top'
+          items:
+            $ref: '#/components/schemas/Hash'
+    BurnTransaction:
+      type: object
+      required: [assetId, amount]
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        amount:
+          $ref: '#/components/schemas/Amount'
+    CreateAliasTransaction:
+      type: object
+      required: [alias]
+      properties:
+        alias:
+          type: string
+          pattern: '^[\-\.0-9@_a-z]{4,30}$'
+    DataTransaction:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/DataEntry'
+              - $ref: '#/components/schemas/DeleteEntry'
+    ExchangeTransaction:
+      type: object
+      required:
+        - order1
+        - order2
+        - amount
+        - price
+        - buyMatcherFee
+        - sellMatcherFee
+      properties:
+        order1:
+          $ref: '#/components/schemas/Order'
+        order2:
+          $ref: '#/components/schemas/Order'
+        amount:
+          $ref: '#/components/schemas/Amount'
+        price:
+          $ref: '#/components/schemas/Amount'
+        buyMatcherFee:
+          $ref: '#/components/schemas/Amount'
+        sellMatcherFee:
+          $ref: '#/components/schemas/Amount'
+    GenesisTransaction:
+      type: object
+      required:
+        - id
+        - fee
+        - timestamp
+        - signature
+        - recipient
+        - amount
+      properties:
+        id:
+          $ref: '#/components/schemas/Signature'
+        signature:
+          $ref: '#/components/schemas/Signature'
+        fee:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 0
+        timestamp:
+          $ref: '#/components/schemas/Timestamp'
+        recipient:
+          $ref: '#/components/schemas/Address'
+        amount:
+          $ref: '#/components/schemas/Amount'
+    InvokeScriptTransaction:
+      type: object
+      required:
+        - dApp
+        - payment
+        - call
+        - stateChanges
+      properties:
+        dApp:
+          $ref: '#/components/schemas/AddressOrAlias'
+        payment:
+          type: array
+          items:
+            type: object
+            properties:
+              amount:
+                $ref: '#/components/schemas/Amount'
+              assetId:
+                $ref: '#/components/schemas/AssetId'
+                nullable: true
+        call:
+          type: object
+          properties:
+            function:
+              type: string
+            args:
+              type: array
+              items:
+                required:
+                  - type
+                  - value
+                type: object
+                properties:
+                  type:
+                    type: string
+                    enum:
+                      - binary
+                      - boolean
+                      - integer
+                      - list
+                      - string
+                  value:
+                    type: object
+                    properties: {}
+                    description: >-
+                      binary/boolean/integer/string value or list of { type,
+                      value } objects
+        stateChanges:
+          $ref: '#/components/schemas/StateChanges'
+    IssueTransaction:
+      type: object
+      required:
+        - assetId
+        - name
+        - quantity
+        - reissuable
+        - decimals
+        - description
+        - script
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+          readOnly: true
+        name:
+          $ref: '#/components/schemas/AssetName'
+        quantity:
+          type: integer
+          format: int64
+        reissuable:
+          type: boolean
+        decimals:
+          $ref: '#/components/schemas/AssetDecimals'
+        description:
+          $ref: '#/components/schemas/AssetDescription'
+        script:
+          type: string
+          format: byte
+    LeaseCancelTransaction:
+      type: object
+      required:
+        - leaseId
+        - lease
+      properties:
+        leaseId:
+          $ref: '#/components/schemas/LeaseId'
+        lease:
+          $ref: '#/components/schemas/LeaseInfo'
+    LeaseTransaction:
+      type: object
+      required:
+        - amount
+        - recipient
+      properties:
+        amount:
+          $ref: '#/components/schemas/Amount'
+        recipient:
+          $ref: '#/components/schemas/AddressOrAlias'
+    MassTransferTransaction:
+      type: object
+      required:
+        - assetId
+        - attachment
+        - transfersCount
+        - totalAmount
+        - transfers
+      properties:
+        assetId:
+          type: string
+          nullable: true
+        attachment:
+          type: string
+        transferCount:
+          type: integer
+          format: int32
+          readOnly: true
+        totalAmount:
+          $ref: '#/components/schemas/Amount'
+          readOnly: true
+        transfers:
+          type: array
+          items:
+            type: object
+            properties:
+              recipient:
+                $ref: '#/components/schemas/AddressOrAlias'
+              amount:
+                $ref: '#/components/schemas/Amount'
+    ReissueTransaction:
+      type: object
+      required:
+        - assetId
+        - quantity
+        - reissuable
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        quantity:
+          $ref: '#/components/schemas/Amount'
+        reissuable:
+          type: boolean
+    SetAssetScriptTransaction:
+      type: object
+      required:
+        - assetId
+        - script
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        script:
+          type: string
+          format: byte
+    SetScriptTransaction:
+      type: object
+      required:
+        - script
+      properties:
+        script:
+          type: string
+          format: byte
+    SponsorFeeTransaction:
+      type: object
+      required:
+        - assetId
+        - minSponsoredAssetFee
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        minSponsoredAssetFee:
+          type: integer
+          format: int64
+          minimum: 1
+    TransferTransaction:
+      type: object
+      required:
+        - recipient
+        - assetId
+        - amount
+        - attachment
+        - feeAsset
+      properties:
+        recipient:
+          $ref: '#/components/schemas/AddressOrAlias'
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+          nullable: true
+        feeAsset:
+          $ref: '#/components/schemas/AssetId'
+          nullable: true
+        amount:
+          $ref: '#/components/schemas/Amount'
+        attachment:
+          type: string
+    UpdateAssetInfoTransaction:
+      type: object
+      required:
+        - assetId
+        - name
+        - description
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        name:
+          $ref: '#/components/schemas/AssetName'
+        description:
+          $ref: '#/components/schemas/AssetDescription'
+    DataAction:
+      oneOf:
+        - $ref: '#/components/schemas/DataEntry'
+        - $ref: '#/components/schemas/DeleteEntry'
+    TransferAction:
+      type: object
+      required:
+        - address
+        - asset
+        - amount
+      properties:
+        address: 
+          $ref: '#/components/schemas/Address'
+        asset:
+          $ref: '#/components/schemas/AssetId'
+          nullable: true
+        amount:
+          $ref: '#/components/schemas/Amount'
+    IssueAction:
+      allOf:
+        - $ref: '#/components/schemas/AssetDetailsBase'
+        - type: object
+          required:
+            - isReissuable
+            - compiledScript
+          properties:
+            isReissuable:
+              type: boolean
+            compiledScript:
+              type: string
+    ReissueAction:
+      type: object
+      required:
+        - assetId
+        - isReissuable
+        - quantity
+      properties: 
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        isReissuable:
+          type: boolean
+        quantity:
+          type: integer
+          format: int64
+    BurnAction:
+      type: object
+      required:
+        - assetId
+        - quantity
+      properties: {}
+    SponsorFeeAction:
+      type: object
+      required:
+        - assetId
+        - minSponsoredAssetFee
+      properties: {}
+    LeaseAction:
+      allOf:
+        - $ref: '#/components/schemas/LeaseInfo'
+    LeaseCancelAction:
+      type: object
+      required:
+        - recipient
+      properties: {}
+    InvokeAction:
+      type: object
+      required:
+        - dApp
+        - payment
+        - call
+        - stateCahnges
+      properties:
+        error:
+          type: object
+        stateChanges:
+          $ref: '#/components/schemas/StateChanges'
+    StateChanges:
+      type: object
+      required:
+        - data
+        - transfers
+        - issues
+        - reissues
+        - burns
+        - sponsorFees
+        - leases
+        - leaseCancel
+        - invokes
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataAction'
+        transfers:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransferAction'
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/IssueAction'
+        reissues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReissueAction'
+        burns:
+          type: array
+          items:
+            $ref: '#/components/schemas/BurnAction'
+        sponsorFees:
+          type: array
+          items:
+            $ref: '#/components/schemas/SponsorFeeAction'
+        leases:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaseAction'
+        leaseCancel:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaseCancelAction'
+        invokes:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvokeAction'
+  responses:
+    Height:
+      description: Block height
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [height]
+            properties:
+              height:
+                $ref: '#/components/schemas/Height'
+    ApiKeyNotValid:
+      description: Provided API key is not correct
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            error: 2
+            message: Provided API key is not correct
+    BadRequest:
+      description: The request cannot be fulfilled due to bad syntax
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+  parameters:
+    address:
+      name: address
+      in: path
+      description: Address base58 encoded
+      required: true
+      schema:
+        $ref: '#/components/schemas/Address'
+    assetId:
+      name: assetId
+      in: path
+      description: Asset ID base58 encoded
+      required: true
+      schema:
+        $ref: '#/components/schemas/AssetId'
+    blockId:
+      name: id
+      in: path
+      description: Block ID base58 encoded
+      required: true
+      schema:
+        $ref: '#/components/schemas/BlockId'
+    txId:
+      name: id
+      in: path
+      description: Transaction ID base58 encoded
+      required: true
+      schema:
+        $ref: '#/components/schemas/TransactionId'
+
+  securitySchemes:
+    APIKey:
+      type: apiKey
+      name: X-API-Key
+      in: header

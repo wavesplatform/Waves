@@ -27,7 +27,7 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
   def priorityTransactions: Seq[Transaction] = priorityDiffs.flatMap(_.diff.transactionsValues)
   def priorityTransactionIds: Seq[ByteStr]   = priorityTransactions.map(_.id())
 
-  def compositeBlockchain: CompositeBlockchain = CompositeBlockchain(base, Some(priorityDiffsCombined))
+  def compositeBlockchain: CompositeBlockchain = CompositeBlockchain(base, priorityDiffsCombined)
 
   def lockedWrite[T](f: => T): T =
     this.writeLock(f)

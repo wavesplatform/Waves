@@ -307,10 +307,7 @@ object TransactionsApiRoute {
 
     def unconfirmedTxExtendedJson(tx: Transaction): JsObject = tx match {
       case leaseCancel: LeaseCancelTransaction =>
-        val leaseTx = blockchain.transactionInfo(leaseCancel.leaseId) map {
-          case (_, tx, _) => tx.json()
-        }
-        leaseCancel.json() ++ Json.obj("lease" -> leaseTx)
+        leaseCancel.json() ++ Json.obj("lease" -> leaseIdToLeaseRef(leaseCancel.leaseId))
 
       case t => t.json()
     }
@@ -328,13 +325,21 @@ object TransactionsApiRoute {
       LeaseRef(leaseId, ld.sourceId, ld.sender.toAddress, recipient, ld.amount, height, LeaseStatus(ld.isActive))
     }
 
-    private[http] implicit val leaseFormat: OWrites[InvokeScriptResult.Lease] =
+    private[http] implicit val leaseWrites: OWrites[InvokeScriptResult.Lease] =
       LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.Lease) => leaseIdToLeaseRef(l.id))
 
-    private[http] implicit val leaseCancelFormat: OWrites[InvokeScriptResult.LeaseCancel] =
+    private[http] implicit val leaseCancelWrites: OWrites[InvokeScriptResult.LeaseCancel] =
       LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.LeaseCancel) => leaseIdToLeaseRef(l.id))
 
-    private[http] implicit val invokeScriptResultWrites: OWrites[InvokeScriptResult] = {
+    // To override nested InvokeScriptResult writes
+    private[http] implicit lazy val invocationWrites: OWrites[InvokeScriptResult.Invocation] = (i: InvokeScriptResult.Invocation) => Json.obj(
+      "dApp" -> i.dApp,
+      "call" -> i.call,
+      "payments" -> i.payments,
+      "stateChanges" -> invokeScriptResultWrites.writes(i.stateChanges)
+    )
+
+    private[http] implicit lazy val invokeScriptResultWrites: OWrites[InvokeScriptResult] = {
       import InvokeScriptResult.{issueFormat, reissueFormat, burnFormat, sponsorFeeFormat}
       Json.writes[InvokeScriptResult]
     }

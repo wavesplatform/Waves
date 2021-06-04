@@ -34,7 +34,7 @@
 	 {
       name: "fraction"
       params: [ "Int", "Int", "Int" ]
-      doc: "Multiply and division with big integer intermediate representation"
+      doc: "Multiply and division with unlimited intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]
       complexity: 1
     }

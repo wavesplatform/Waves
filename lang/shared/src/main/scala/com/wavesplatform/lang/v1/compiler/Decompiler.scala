@@ -251,7 +251,8 @@ object Decompiler {
 
     def intersperse(s: Seq[Coeval[String]]): Coeval[String] = s.toVector.sequence.map(v => v.mkString(NEWLINE + NEWLINE))
 
-    import e._
+    val dApp = ContractScriptCompactor.decompact(e)
+    import dApp._
 
     val decls: Seq[Coeval[String]] = decs.map(expr => decl(pure(expr), ctx))
     val callables: Seq[Coeval[String]] = callableFuncs

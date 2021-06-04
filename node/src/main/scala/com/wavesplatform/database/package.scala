@@ -4,38 +4,38 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util.{Map => JMap}
 
-import scala.collection.mutable
-
 import com.google.common.base.Charsets.UTF_8
-import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
+import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.{ByteString, CodedInputStream, WireFormat}
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.block.validation.Validators
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
-import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.database.protobuf.DataEntry.Value
+import com.wavesplatform.database.protobuf.TransactionData.Transaction.{LegacyBytes, NewTransaction}
+import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
-import com.wavesplatform.state._
 import com.wavesplatform.state.StateHash.SectionId
+import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb._
-import pb.TransactionData.Transaction.{LegacyBytes, NewTransaction}
 import supertagged.TaggedType
+
+import scala.collection.mutable
 
 //noinspection UnstableApiUsage
 package object database extends ScorexLogging {
@@ -201,7 +201,7 @@ package object database extends ScorexLogging {
             ld.status match {
               case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
               case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
-                pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, ByteString.copyFrom(cancelTxId.arr)))
+                pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
               case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
             }
           )
@@ -221,7 +221,7 @@ package object database extends ScorexLogging {
             case pb.LeaseDetails.Status.Active(_)                                => LeaseDetails.Status.Active
             case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height)) => LeaseDetails.Status.Expired(height)
             case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId)) =>
-              LeaseDetails.Status.Cancelled(height, transactionId.toByteStr)
+              LeaseDetails.Status.Cancelled(height, Some(transactionId.toByteStr).filter(!_.isEmpty))
             case pb.LeaseDetails.Status.Empty => ???
           },
           d.sourceId.toByteStr,

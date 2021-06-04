@@ -6,10 +6,6 @@ import sbtassembly.MergeStrategy
 
 enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning, VersionObject)
 
-resolvers ++= Seq(
-  Resolver.bintrayRepo("ethereum", "maven")
-)
-
 libraryDependencies ++= Dependencies.node.value
 coverageExcludedPackages := ""
 

@@ -319,9 +319,9 @@ object InvokeDiffsCommon {
   def checkAsset(blockchain: Blockchain, assetId: ByteStr): Either[String, Unit] =
     if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls))
       if (assetId.size != AssetIdLength)
-        Left(s"Invalid transferring asset '$assetId' length = ${assetId.size} bytes != $AssetIdLength")
+        Left(s"Transfer error: invalid asset ID '$assetId' length = ${assetId.size} bytes, must be $AssetIdLength")
       else if (blockchain.assetDescription(IssuedAsset(assetId)).isEmpty)
-        Left(s"Transferring asset '$assetId' is not found in the blockchain")
+        Left(s"Transfer error: asset '$assetId' is not found on the blockchain")
       else
         Right(())
     else
@@ -394,7 +394,7 @@ object InvokeDiffsCommon {
             if (remainingLimit < Int.MaxValue) remainingLimit - curDiff.scriptsComplexity.toInt
             else remainingLimit
 
-          val blockchain   = CompositeBlockchain(sblockchain, Some(curDiff))
+          val blockchain   = CompositeBlockchain(sblockchain, curDiff)
           val actionSender = Recipient.Address(ByteStr(tx.dAppAddressOrAlias.bytes)) // XXX Is it correct for aliases&
 
           def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {

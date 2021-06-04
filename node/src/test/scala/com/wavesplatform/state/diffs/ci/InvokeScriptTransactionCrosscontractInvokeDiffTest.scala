@@ -67,7 +67,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
       |
       |    strict invEntry3BeforeIsDefined = isDefined(getString(nextDAppAddr, "$invokeEntry3Key"))
       |
-      |    strict invResult = Invoke(nextDAppAddr, "bar", [], [])
+      |    strict invResult = invoke(nextDAppAddr, "bar", [], [])
       |
       |    let invEntry1ValIsOK = getIntegerValue(nextDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
       |    let invEntry2IsNotString = isDefined(getString(nextDAppAddr, "$invokeEntry2Key")) == false
@@ -166,7 +166,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
       |
       |    strict invEntry3BeforeIsDefined = isDefined(getString(this, "$invokeEntry3Key"))
       |
-      |    strict invResult = Invoke(this, "bar", [], [])
+      |    strict invResult = invoke(this, "bar", [], [])
       |
       |    let invEntry1ValIsOK = getIntegerValue(this, "$invokeEntry1Key") == $invokeEntry1Val
       |    let invEntry2IsNotString = isDefined(getString(this, "$invokeEntry2Key")) == false
@@ -278,11 +278,11 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
       |    let secondDAppAddr = Address(base58'$secondAcc')
       |    let thirdDAppAddr = Address(base58'$thirdAcc')
       |
-      |    strict invBarResult = Invoke(secondDAppAddr, "bar", [], [])
+      |    strict invBarResult = invoke(secondDAppAddr, "bar", [], [])
       |
       |    let thirdDAppDataEntryIsOK = getIntegerValue(thirdDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
       |
-      |    strict invAnotherBazResult = Invoke(
+      |    strict invAnotherBazResult = invoke(
       |      thirdDAppAddr,
       |      "anotherBaz",
       |      [],
@@ -305,7 +305,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
       | func bar() = {
       |    let thirdDAppAddr = Address(base58'$thirdAcc')
       |
-      |    strict invBazResult = Invoke(thirdDAppAddr, "baz", [], [])
+      |    strict invBazResult = invoke(thirdDAppAddr, "baz", [], [])
       |
       |    let thirdDAppDataEntryIsOK = getIntegerValue(thirdDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
       |

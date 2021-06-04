@@ -184,5 +184,9 @@ object Blockchain {
       else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight + 1 < height) NgBlockVersion
       else if (height > 1) PlainBlockVersion
       else GenesisBlockVersion
+
+    def binaryData(address: Address, key: String): Option[ByteStr] = blockchain.accountData(address, key).collect {
+      case BinaryDataEntry(_, value) => value
+    }
   }
 }
