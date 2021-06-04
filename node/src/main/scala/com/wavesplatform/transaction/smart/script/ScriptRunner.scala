@@ -41,6 +41,7 @@ object ScriptRunner {
       scriptContainerAddress,
       complexityLimit,
       default,
+      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls),
       blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
     )
 
@@ -52,7 +53,8 @@ object ScriptRunner {
       scriptContainerAddress: Environment.Tthis,
       complexityLimit: Int,
       default: EVALUATED,
-      useCorrectScriptVersion: Boolean
+      useCorrectScriptVersion: Boolean,
+      fixUnicodeFunctions: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(
@@ -74,7 +76,8 @@ object ScriptRunner {
               isAssetScript,
               isContract,
               scriptContainerAddress,
-              txId
+              txId,
+              fixUnicodeFunctions
             )
         } yield (ds, ctx)
 

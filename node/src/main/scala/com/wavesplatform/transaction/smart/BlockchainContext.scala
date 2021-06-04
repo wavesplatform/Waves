@@ -3,7 +3,6 @@ package com.wavesplatform.transaction.smart
 import cats.Id
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{ContentType, ScriptType, StdLibVersion}
 import com.wavesplatform.lang.v1.CTX
@@ -24,30 +23,6 @@ object BlockchainContext {
   private[this] val cache = new util.HashMap[(StdLibVersion, Boolean, DirectiveSet), CTX[Environment]]()
 
   def build(
-      version: StdLibVersion,
-      nByte: Byte,
-      in: Coeval[Environment.InputEntity],
-      h: Coeval[Int],
-      blockchain: Blockchain,
-      isTokenContext: Boolean,
-      isContract: Boolean,
-      address: Environment.Tthis,
-      txId: ByteStr
-  ): Either[ExecutionError, EvaluationContext[Environment, Id]] =
-    buildGeneric(
-      version,
-      nByte,
-      in,
-      h,
-      blockchain,
-      isTokenContext,
-      isContract,
-      address,
-      txId,
-      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
-    )
-
-  def buildGeneric(
       version: StdLibVersion,
       nByte: Byte,
       in: Coeval[Environment.InputEntity],

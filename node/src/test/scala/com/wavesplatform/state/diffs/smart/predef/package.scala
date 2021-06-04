@@ -36,7 +36,8 @@ package object predef {
                                              isTokenContext = false,
                                              isContract = false,
                                              Coproduct[Environment.Tthis](Environment.AssetId(Array())),
-                                             ByteStr.empty)
+                                             ByteStr.empty,
+                                             fixUnicodeFunctions = true)
       r <- EvaluatorV1().apply[T](evalContext, typedExpr)
     } yield r
   }
