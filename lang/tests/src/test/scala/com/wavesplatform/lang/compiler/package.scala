@@ -37,7 +37,7 @@ package object compiler {
   def getTestContext(v: StdLibVersion, t: ScriptType = Account): CTX[Environment] = {
     Monoid
       .combineAll(Seq(
-        PureContext.build(v).withEnvironment[Environment],
+        PureContext.build(v, fixUnicodeFunctions = true).withEnvironment[Environment],
         CryptoContext.build(Global, v).withEnvironment[Environment],
         WavesContext.build(Global, DirectiveSet(v, t, Expression).explicitGet()),
         CTX[NoContext](

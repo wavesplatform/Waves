@@ -162,7 +162,7 @@ class BigIntInvokeTest
          | @Callable(i)
          | func default() = {
          |   let address = Address(base58'$nextDApp')
-         |   strict r = Invoke(address, "default", [], [])
+         |   strict r = invoke(address, "default", [], [])
          |   if (r == toBigInt($bigIntValue))
          |     then []
          |     else throw("")

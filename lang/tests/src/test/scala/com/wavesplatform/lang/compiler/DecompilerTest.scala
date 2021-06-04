@@ -799,7 +799,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
     val ctx =
       Monoid.combine(
-        PureContext.build(V4).withEnvironment[Environment],
+        PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment],
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
       )
 
@@ -860,7 +860,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V4).withEnvironment[Environment],
+          PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment],
           CryptoContext.build(Global, V4).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
         )
@@ -901,7 +901,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V4).withEnvironment[Environment],
+          PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment],
           CryptoContext.build(Global, V4).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
         )
@@ -923,7 +923,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       s"""
          | @Callable(i)
          | func foo() = {
-         |   let v1 = hashScriptAtAddress(Address(base58''))
+         |   let v1 = scriptHash(Address(base58''))
          |   nil
          | }
         """.stripMargin
@@ -933,7 +933,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V5).withEnvironment[Environment],
+          PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment],
           CryptoContext.build(Global, V5).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
         )
@@ -967,7 +967,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V5).withEnvironment[Environment],
+          PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment],
           CryptoContext.build(Global, V5).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
         )
@@ -976,5 +976,50 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V5).explicitGet()
     val res  = Decompiler(dApp, ctx.decompilerContext)
     res shouldEq script("")
+  }
+
+  property("compacted script") {
+    val directives =
+      """
+        | {-# STDLIB_VERSION 5    #-}
+        | {-#CONTENT_TYPE    DAPP #-}
+      """.stripMargin
+
+    val script =
+      """
+        | let fooVar = 42
+        |
+        | func barFunc(barFuncArg1: Int) = (100500 + barFuncArg1)
+        |
+        | @Callable(invocation)
+        | func bazCallableFunc(bazCallableFuncArg1: Int, bazCallableFuncArg2: String) = {
+        |   let result = (barFunc(fooVar) + bazCallableFuncArg1)
+        |   [
+        |     IntegerEntry("integerEntryKey", result),
+        |     StringEntry("stringEntryKey", bazCallableFuncArg2)
+        |   ]
+        | }
+        |
+        """.stripMargin
+
+    val scriptWithoutTypes =
+      script
+        .replace(": Int", "")
+        .replace(": String", "")
+
+    val parsedExpr = Parser.parseContract(directives ++ script).get.value
+
+    val ctx =
+      Monoid.combineAll(
+        Seq(
+          PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment],
+          CryptoContext.build(Global, V5).withEnvironment[Environment],
+          WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
+        )
+      )
+
+    val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V5, needCompaction = true).explicitGet()
+    val res  = Decompiler(dApp, ctx.decompilerContext)
+    res shouldEq scriptWithoutTypes
   }
 }

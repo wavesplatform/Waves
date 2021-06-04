@@ -4,6 +4,7 @@ import java.math.{MathContext, BigDecimal => BD}
 import java.security.spec.InvalidKeySpecException
 import cats.implicits._
 import ch.obermuhlner.math.big.BigDecimalMath
+import com.google.common.base.Utf8
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.v1.BaseGlobal
@@ -138,4 +139,7 @@ object Global extends BaseGlobal {
     val pk = Sign.signedMessageHashToKey(messageHash, signatureData)
     base16Encoder.decode(pk.toString(16))
   }
+
+  override def isIllFormed(s: String): Boolean =
+    Try(Utf8.encodedLength(s)).isFailure
 }

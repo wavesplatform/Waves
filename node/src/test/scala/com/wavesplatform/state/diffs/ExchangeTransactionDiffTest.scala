@@ -1178,7 +1178,7 @@ class ExchangeTransactionDiffTest
       ) { d =>
         d.appendBlock(Seq(amountAssetIssue, priceAssetIssue, order1FeeAssetIssue, order2FeeAssetIssue).distinct: _*)
         val newBlock = d.createBlock(2.toByte, Seq(exchange))
-        val diff     = BlockDiffer.fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited).explicitGet()
+        val diff     = BlockDiffer.fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited, newBlock.header.generationSignature).explicitGet()
         diff.diff.scriptsComplexity shouldBe complexity
       }
     }
@@ -1252,7 +1252,7 @@ class ExchangeTransactionDiffTest
       ) { d =>
         d.appendBlock(Seq(tradeableAssetIssue, feeAssetIssue).distinct: _*)
         val newBlock = d.createBlock(2.toByte, Seq(exchange))
-        val diff     = BlockDiffer.fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited).explicitGet()
+        val diff     = BlockDiffer.fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited, newBlock.header.generationSignature).explicitGet()
         diff.diff.scriptsComplexity shouldBe complexity
 
         val feeUnits = FeeValidation.getMinFee(d.blockchainUpdater, exchange).explicitGet().minFeeInWaves / FeeValidation.FeeUnit

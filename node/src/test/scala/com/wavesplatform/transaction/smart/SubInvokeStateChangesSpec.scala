@@ -12,7 +12,7 @@ import play.api.libs.json.Json
 
 class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
   val ContractFunction            = "default"
-  val compileV5: String => Script = TestCompiler(StdLibVersion.V5).compileContract _
+  val compileV5: String => Script = TestCompiler(StdLibVersion.V5).compileContract(_)
 
   "Invoke state changes" should "include intermediate invokes" in withDomain(DomainPresets.RideV5) { d =>
     // Root DApp, calls addr2s and addr2f
@@ -169,7 +169,7 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
        |@Callable(i)
        |func $ContractFunction() = {
        |  ${calls.zipWithIndex
-         .map { case (address, i) => s"""strict r$i = Invoke(Address(base58'$address'), "$ContractFunction", [], [])""" }
+         .map { case (address, i) => s"""strict r$i = invoke(Address(base58'$address'), "$ContractFunction", [], [])""" }
          .mkString("\n")}
        |  if ($fail && !(${(1 to 10).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")})) then throw("boom") else []
        |}""".stripMargin

@@ -29,7 +29,7 @@ class VerifierLoggerBenchmark {
 
   @Benchmark
   def verifierLogged(bh: Blackhole, log: BigLog): Unit = {
-    val logs = Verifier.buildLogs("id", log.value)
+    val logs = Verifier.buildLogs("id", log.value._1, log.value._2)
     bh.consume(log.writer.write(logs))
   }
 }

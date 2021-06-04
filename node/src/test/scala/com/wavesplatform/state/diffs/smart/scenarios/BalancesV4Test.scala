@@ -10,8 +10,8 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Asset => AssetType, _}
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
@@ -135,7 +135,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
     def assetScript(acc: ByteStr): Script = {
       val ctx = {
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
-        PureContext.build(V4).withEnvironment[Environment] |+|
+        PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
           WavesContext.build(Global, directives)
       }
@@ -220,7 +220,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
     def assetScript(acc: ByteStr): Script = {
       val ctx = {
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
-        PureContext.build(V4).withEnvironment[Environment] |+|
+        PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
           WavesContext.build(Global, directives)
       }

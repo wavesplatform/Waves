@@ -9,6 +9,9 @@ object ContractLimits {
     case V3 | V4 | V5 => 4000
   }
 
+  val MaxCallableComplexityByVersion: StdLibVersion => Int =
+    v => if (v < V5) 4000 else 10000
+
   val MaxTotalInvokeComplexity: StdLibVersion => Int = {
     case V5 => 26000
     case v => MaxComplexityByVersion(v) * (MaxAttachedPaymentAmount + MaxCallableActionsAmount(V4) + 1)

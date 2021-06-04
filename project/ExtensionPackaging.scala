@@ -26,7 +26,6 @@ object ExtensionPackaging extends AutoPlugin {
 
   override def projectSettings: Seq[Def.Setting[_]] =
     Seq(
-      packageName := s"${name.value}${network.value.packageSuffix}",
       packageDoc / publishArtifact := false,
       packageSrc / publishArtifact := false,
       Universal / javaOptions := Nil,
@@ -54,7 +53,8 @@ object ExtensionPackaging extends AutoPlugin {
       },
       classpath := makeRelativeClasspathNames(classpathOrdering.value),
       nodePackageName := (LocalProject("node") / Linux / packageName).value,
-      debianPackageDependencies := Seq((LocalProject("node") / Debian / packageName).value),
+      debianPackageDependencies +=
+        s"${(LocalProject("node") / Debian / packageName).value} (= ${(LocalProject("node") / version).value})",
       // To write files to Waves NODE directory
       linuxPackageMappings := getUniversalFolderMappings(
         nodePackageName.value,
@@ -67,22 +67,20 @@ object ExtensionPackaging extends AutoPlugin {
              |set -e
              |chown -R ${nodePackageName.value}:${nodePackageName.value} /usr/share/${nodePackageName.value}""".stripMargin
       ),
+      Debian / normalizedName := s"${name.value}${network.value.packageSuffix}",
+      Debian / packageName := s"${name.value}${network.value.packageSuffix}",
       libraryDependencies ++= Dependencies.logDeps,
-      javaOptions in run ++= extensionClasses.value.zipWithIndex.map { case (extension, index) => s"-Dwaves.extensions.$index=$extension" }
-    ) ++ nameFix ++ inScope(Global)(nameFix) ++ maintainerFix
+      javaOptions in run ++= extensionClasses.value.zipWithIndex.map { case (extension, index) => s"-Dwaves.extensions.$index=$extension" },
+      maintainer := "wavesplatform.com"
+    ) ++ maintainerFix
 
   private def maintainerFix =
     inConfig(Linux)(
       Seq(
-        maintainer := "wavesplatform.com",
         packageSummary := s"Waves node ${name.value}${network.value.packageSuffix} extension",
         packageDescription := s"Waves node ${name.value}${network.value.packageSuffix} extension"
-      ))
-
-  private def nameFix = Seq(
-    packageName := s"${name.value}${network.value.packageSuffix}",
-    normalizedName := s"${name.value}${network.value.packageSuffix}"
-  )
+      )
+    )
 
   // A copy of com.typesafe.sbt.packager.linux.LinuxPlugin.getUniversalFolderMappings
   private def getUniversalFolderMappings(pkg: String, installLocation: String, mappings: Seq[(File, String)]): Seq[LinuxPackageMapping] = {

@@ -29,7 +29,9 @@ case class BlockHeader(
     featureVotes: Seq[Short],
     rewardVote: Long,
     transactionsRoot: ByteStr
-)
+) {
+  val score: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / baseTarget).ensuring(_ > 0))
+}
 
 case class Block(
     header: BlockHeader,
@@ -45,7 +47,7 @@ case class Block(
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(BlockSerializer.toBytes(this))
   val json: Coeval[JsObject]     = Coeval.evalOnce(BlockSerializer.toJson(this))
 
-  val blockScore: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / header.baseTarget).ensuring(_ > 0))
+  val blockScore: Coeval[BigInt] = header.score
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     if (header.version < Block.ProtoBlockVersion) copy(signature = ByteStr.empty).bytes()

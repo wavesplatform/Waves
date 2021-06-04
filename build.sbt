@@ -100,7 +100,7 @@ inScope(Global)(
     scalaVersion := "2.13.3",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 3, 2),
+    V.fallback := (1, 3, 5),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
@@ -151,10 +151,8 @@ packageAll := {
   (node / assembly).value
   (`grpc-server` / Universal / packageZipTarball).value
 
-  val nodeDebFile = (node / Debian / packageBin).value
-  val grpcDebFile = (`grpc-server` / Debian / packageBin).value
-  IO.copyFile(nodeDebFile, new File(baseDirectory.value, "docker/target/waves.deb"))
-  IO.copyFile(grpcDebFile, new File(baseDirectory.value, "docker/target/grpc-server.deb"))
+  IO.copyFile((node / Debian / packageBin).value, new File(baseDirectory.value, "docker/target/waves.deb"))
+  IO.copyFile((`grpc-server` / Debian / packageBin).value, new File(baseDirectory.value, "docker/target/waves-grpc-server.deb"))
 }
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")

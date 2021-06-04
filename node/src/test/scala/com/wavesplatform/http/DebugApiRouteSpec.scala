@@ -1,9 +1,6 @@
 package com.wavesplatform.http
 
-import scala.util.Random
-
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
-import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet, TransactionGen}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
@@ -12,25 +9,32 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.util._
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.PeerDatabase
-import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash}
+import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.StateHash.SectionId
+import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash}
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet, TransactionGen}
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json.{JsArray, JsObject, Json, JsValue}
+import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
+
+import scala.util.Random
 
 //noinspection ScalaStyle
 class DebugApiRouteSpec
@@ -723,6 +727,56 @@ class DebugApiRouteSpec
         (json \ "transaction").as[JsObject] shouldBe tx.json()
       }
     }
+
+    "txs with empty and small verifier" in {
+      val blockchain = createBlockchainStub { blockchain =>
+        val settings = TestFunctionalitySettings.Enabled.copy(
+          preActivatedFeatures = Map(
+            BlockchainFeatures.SmartAccounts.id    -> 0,
+            BlockchainFeatures.SmartAssets.id      -> 0,
+            BlockchainFeatures.Ride4DApps.id       -> 0,
+            BlockchainFeatures.FeeSponsorship.id   -> 0,
+            BlockchainFeatures.DataTransaction.id  -> 0,
+            BlockchainFeatures.BlockReward.id      -> 0,
+            BlockchainFeatures.BlockV5.id          -> 0,
+            BlockchainFeatures.SynchronousCalls.id -> 0
+          ),
+          featureCheckBlocksPeriod = 1,
+          blocksForFeatureActivation = 1
+        )
+        (() => blockchain.settings).when().returns(WavesSettings.default().blockchainSettings.copy(functionalitySettings = settings))
+        (() => blockchain.activatedFeatures).when().returns(settings.preActivatedFeatures)
+        (blockchain.balance _).when(*, *).returns(ENOUGH_AMT)
+
+        val script                = ExprScript(TRUE).explicitGet()
+        def info(complexity: Int) = Some(AccountScriptInfo(TxHelpers.secondSigner.publicKey, script, complexity))
+
+        (blockchain.accountScript _).when(TxHelpers.defaultSigner.toAddress).returns(info(199))
+        (blockchain.accountScript _).when(TxHelpers.secondSigner.toAddress).returns(info(201))
+        (blockchain.accountScript _).when(TxHelpers.signer(3).toAddress).returns(None)
+      }
+      val route       = routeWithBlockchain(blockchain)
+      val transferFee = 100000
+
+      val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TxHelpers.secondSigner.toAddress, 1.waves, fee = transferFee, version = TxVersion.V2)
+      validatePost(tx) ~> route ~> check {
+        val json = Json.parse(responseAs[String])
+        (json \ "valid").as[Boolean] shouldBe true
+      }
+
+      val tx2 = TxHelpers.transfer(TxHelpers.secondSigner, TestValues.address, 1.waves, fee = transferFee, version = TxVersion.V2)
+      validatePost(tx2) ~> route ~> check {
+        val json = Json.parse(responseAs[String])
+        (json \ "valid").as[Boolean] shouldBe false
+        (json \ "error").as[String] should include("Requires 400000 extra fee")
+      }
+
+      val tx3 = TxHelpers.transfer(TxHelpers.signer(3), TestValues.address, 1.waves, fee = transferFee, version = TxVersion.V2)
+      validatePost(tx3) ~> route ~> check {
+        val json = Json.parse(responseAs[String])
+        (json \ "valid").as[Boolean] shouldBe true
+      }
+    }
   }
 
   routePath("/stateChanges/info/") - {
@@ -753,7 +807,7 @@ class DebugApiRouteSpec
         .returning(Some(LeaseDetails(invoke.sender, recipientAddress, 100, LeaseDetails.Status.Active, invoke.id(), 1)))
       (blockchain.leaseDetails _)
         .when(leaseCancelId)
-        .returning(Some(LeaseDetails(invoke.sender, recipientAddress, 100, LeaseDetails.Status.Cancelled(2, leaseCancelId), invoke.id(), 1)))
+        .returning(Some(LeaseDetails(invoke.sender, recipientAddress, 100, LeaseDetails.Status.Cancelled(2, Some(leaseCancelId)), invoke.id(), 1)))
       (blockchain.transactionMeta _).when(invoke.id()).returning(Some((1, true)))
 
       Get(routePath(s"/stateChanges/info/${invoke.id()}")) ~> route ~> check {

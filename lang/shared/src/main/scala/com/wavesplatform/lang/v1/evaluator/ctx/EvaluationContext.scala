@@ -15,7 +15,15 @@ case class EvaluationContext[C[_[_]], F[_]](
    typeDefs : Map[String, FINAL],
    letDefs  : Map[String, LazyVal[F]],
    functions: Map[FunctionHeader, BaseFunction[C]]
-)
+) {
+  def mapK[G[_] : Monad](f: F ~> G): EvaluationContext[C, G] =
+    EvaluationContext(
+      environment.asInstanceOf[C[G]],
+      typeDefs,
+      letDefs.view.mapValues(_.mapK(f)).toMap,
+      functions
+    )
+}
 
 case class LoggedEvaluationContext[C[_[_]], F[_]](l: LetLogCallback[F], ec: EvaluationContext[C, F]) {
   val loggedLets: util.IdentityHashMap[LET, Unit] = new util.IdentityHashMap()
