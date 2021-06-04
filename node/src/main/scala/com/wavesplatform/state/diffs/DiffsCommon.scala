@@ -193,7 +193,7 @@ object DiffsCommon {
       )
       senderPortfolio    = Map(sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
       recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
-      actionInfo         = lease.copy(status = LeaseDetails.Status.Cancelled(blockchain.height, cancelTxId))
+      actionInfo         = lease.copy(status = LeaseDetails.Status.Cancelled(blockchain.height, Some(cancelTxId)))
     } yield Diff(
       portfolios = senderPortfolio |+| recipientPortfolio,
       leaseState = Map((leaseId, actionInfo))

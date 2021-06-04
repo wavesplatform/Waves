@@ -3,6 +3,7 @@ package com.wavesplatform.lang.script
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.VerifierFunction
 import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.ContractLimits._
@@ -56,8 +57,11 @@ object ContractScript {
       version: StdLibVersion,
       dApp: DApp,
       estimator: ScriptEstimator
-  ): Either[String, List[(String, Long)]] =
-    estimateDeclarations(version, dApp, estimator, annotatedFunctions(dApp))
+  ): Either[String, Iterable[(String, Long)]] =
+    for {
+      callables <- estimateDeclarations(version, dApp, estimator, callables(dApp))
+      verifier  <- dApp.verifierFuncOpt.traverse(estimateVerifier(version, dApp, estimator, _))
+    } yield verifier ++ callables
 
   def estimateUserFunctions(
       version: StdLibVersion,
@@ -73,10 +77,9 @@ object ContractScript {
   ): Either[String, List[(String, Long)]] =
     estimateDeclarations(version, dApp, estimator, dApp.decs.collect { case l: LET => (None, l) })
 
-  private def annotatedFunctions(dApp: DApp): List[(Some[String], FUNC)] =
-    (dApp.verifierFuncOpt ++ dApp.callableFuncs)
+  private def callables(dApp: DApp): List[(Some[String], FUNC)] =
+    dApp.callableFuncs
       .map(func => (Some(func.annotation.invocationArgName), func.u))
-      .toList
 
   private def estimateDeclarations(
       version: StdLibVersion,
@@ -88,21 +91,33 @@ object ContractScript {
       case (annotationArgName, funcExpr) =>
         estimator(
           varNames(version, DAppType),
-          functionCosts(version),
+          functionCosts(version, DAppType),
           constructExprFromDeclAndContext(dApp.decs, annotationArgName, funcExpr)
         ).map((funcExpr.name, _))
     }
 
+  private def estimateVerifier(
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator,
+      verifier: VerifierFunction
+  ): Either[String, (String, Long)] =
+    estimator(
+      varNames(version, DAppType),
+      functionCosts(version, DAppType, isDAppVerifier = true),
+      constructExprFromDeclAndContext(dApp.decs, Some(verifier.annotation.invocationArgName), verifier.u)
+    ).map((verifier.u.name, _))
+
   private[script] def constructExprFromDeclAndContext(
-    dec: List[DECLARATION],
-    annotationArgNameOpt: Option[String],
-    decl: DECLARATION
+      dec: List[DECLARATION],
+      annotationArgNameOpt: Option[String],
+      decl: DECLARATION
   ): EXPR = {
     val declExpr =
       decl match {
-        case let@LET(name, _) =>
+        case let @ LET(name, _) =>
           BLOCK(let, REF(name))
-        case func@FUNC(name, args, _) =>
+        case func @ FUNC(name, args, _) =>
           BLOCK(
             func,
             FUNCTION_CALL(FunctionHeader.User(name), List.fill(args.size)(TRUE))
@@ -112,8 +127,7 @@ object ContractScript {
       }
     val funcWithContext =
       annotationArgNameOpt.fold(declExpr)(
-        annotationArgName =>
-          BLOCK(LET(annotationArgName, TRUE), declExpr)
+        annotationArgName => BLOCK(LET(annotationArgName, TRUE), declExpr)
       )
     dec.foldRight(funcWithContext)((declaration, expr) => BLOCK(declaration, expr))
   }
@@ -138,7 +152,7 @@ object ContractScript {
   ): Either[String, Unit] =
     for {
       _ <- if (useReducedVerifierLimit) estimateVerifierReduced(dApp, complexities, version) else Right(())
-      limit = MaxComplexityByVersion(version)
+      limit = MaxCallableComplexityByVersion(version)
       _ <- Either.cond(
         maxComplexity._2 <= limit,
         (),
@@ -168,6 +182,6 @@ object ContractScript {
   ): Either[String, ((String, Long), Map[String, Long])] =
     for {
       annotatedFunctionComplexities <- estimateAnnotatedFunctions(version, dApp, estimator)
-      max = annotatedFunctionComplexities.maximumOption(_._2 compareTo _._2).getOrElse(("", 0L))
+      max = annotatedFunctionComplexities.toList.maximumOption(_._2 compareTo _._2).getOrElse(("", 0L))
     } yield (max, annotatedFunctionComplexities.toMap)
 }

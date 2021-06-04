@@ -135,7 +135,7 @@ object InvokeScriptTransactionDiff {
           pk,
           _,
           tx,
-          CompositeBlockchain(blockchain, Some(invocationDiff)),
+          CompositeBlockchain(blockchain, invocationDiff),
           blockTime,
           isSyncCall = false,
           limitedExecution,
@@ -180,7 +180,7 @@ object InvokeScriptTransactionDiff {
           InvokeDiffsCommon.getInvocationComplexity(blockchain, tx.funcCall, callableComplexities, dAppAddress)
         }
 
-        stepLimit = ContractLimits.MaxComplexityByVersion(version)
+        stepLimit = ContractLimits.MaxCallableComplexityByVersion(version)
 
         fixedInvocationComplexity = if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && callableComplexities.contains(
                                           ScriptEstimatorV2.version
@@ -238,7 +238,7 @@ object InvokeScriptTransactionDiff {
             Some(tx),
             dAppAddress,
             pk,
-            Set(tx.senderAddress, dAppAddress),
+            Set(tx.senderAddress),
             limitedExecution,
             ContractLimits.MaxTotalInvokeComplexity(version),
             ContractLimits.MaxSyncDAppCalls(version),
@@ -269,7 +269,7 @@ object InvokeScriptTransactionDiff {
       paymentsComplexity: Int,
       blockchain: Blockchain
   ): Either[ValidationError with WithLog, (ScriptResult, Log[Id])] = {
-    val evaluationCtx = CachedDAppCTX.forVersion(version).completeContext(environment)
+    val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     val startLimit    = limit - paymentsComplexity
     ContractEvaluator
       .applyV2Coeval(evaluationCtx, Map(), contract, invocation, version, startLimit)

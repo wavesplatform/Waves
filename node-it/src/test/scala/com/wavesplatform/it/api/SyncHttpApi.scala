@@ -546,10 +546,6 @@ object SyncHttpApi extends Assertions {
     def broadcastRequest[A: Writes](req: A): Transaction =
       sync(async(n).broadcastRequest(req))
 
-
-    def activeLeasesOld(sourceAddress: String): Seq[Transaction] =
-      sync(async(n).activeLeasesOld(sourceAddress))
-
     // since activation of SynchronousCalls
     def activeLeases(sourceAddress: String): Seq[LeaseInfo] =
       sync(async(n).activeLeases(sourceAddress))

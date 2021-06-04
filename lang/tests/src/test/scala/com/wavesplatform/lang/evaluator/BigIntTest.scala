@@ -93,6 +93,13 @@ class BigIntTest extends EvaluatorSpec {
     }
   }
 
+  property("BigInt fraction returning limits") {
+    eval(s"""fraction($maxValue, $maxValue, $maxValue)""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
+    eval(s"""fraction($minValue, $minValue, $minValue)""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
+    eval(s"""fraction($maxValue, $maxValue, $maxValue, CEILING)""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
+    eval(s"""fraction($minValue, $minValue, $minValue, CEILING)""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
+  }
+
   property("BigInt comparison") {
     eval("toBigInt(16) > toBigInt(2)") shouldBe Right(CONST_BOOLEAN(true))
     eval("toBigInt(1) > toBigInt(2)") shouldBe Right(CONST_BOOLEAN(false))
@@ -102,6 +109,11 @@ class BigIntTest extends EvaluatorSpec {
     eval("toBigInt(16) < toBigInt(2)") shouldBe Right(CONST_BOOLEAN(false))
     eval("toBigInt(16) <= toBigInt(2)") shouldBe Right(CONST_BOOLEAN(false))
     eval("toBigInt(16) <= toBigInt(16)") shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("BigInt comparison result") {
+    eval("if (toBigInt(16) > toBigInt(2)) then 1 else 0") shouldBe Right(CONST_LONG(1))
+    eval("if (toBigInt(16) < toBigInt(2)) then 1 else 0") shouldBe Right(CONST_LONG(0))
   }
 
   property("BigInt min and max") {

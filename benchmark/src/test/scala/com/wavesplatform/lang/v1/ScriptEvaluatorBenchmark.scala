@@ -217,7 +217,7 @@ class Concat {
 
 @State(Scope.Benchmark)
 class Median {
-  val context: EvaluationContext[NoContext, Id] = PureContext.build(V4).evaluationContext
+  val context: EvaluationContext[NoContext, Id] = PureContext.build(V4, fixUnicodeFunctions = true).evaluationContext
 
   val randomElements: Array[EXPR] =
     (1 to 10000).map { _ =>
@@ -260,7 +260,7 @@ class Median {
 @State(Scope.Benchmark)
 class SigVerify32Kb {
   val context: EvaluationContext[NoContext, Id] =
-    Monoid.combine(PureContext.build(V4).evaluationContext, CryptoContext.build(Global, V4).evaluationContext)
+    Monoid.combine(PureContext.build(V4, fixUnicodeFunctions = true).evaluationContext, CryptoContext.build(Global, V4).evaluationContext)
 
 
   val expr: EXPR = {
@@ -283,7 +283,7 @@ class SigVerify32Kb {
 class ListRemoveByIndex {
   val context: EvaluationContext[NoContext, Id] =
     Monoid.combine(
-      PureContext.build(V4).evaluationContext,
+      PureContext.build(V4, fixUnicodeFunctions = true).evaluationContext,
       CryptoContext.build(Global, V4).evaluationContext
     )
 

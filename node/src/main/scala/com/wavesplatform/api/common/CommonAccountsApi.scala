@@ -1,19 +1,19 @@
 package com.wavesplatform.api.common
 
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.api.common
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
-import com.wavesplatform.database.{DBExt, Keys, KeyTags}
+import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
-import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
 import com.wavesplatform.state.reader.LeaseDetails.Status
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.ScorexLogging
@@ -41,8 +41,6 @@ trait CommonAccountsApi {
   def data(address: Address, key: String): Option[DataEntry[_]]
 
   def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[_]]
-
-  def activeLeasesOld(address: Address): Observable[(Height, LeaseTransaction)]
 
   def activeLeases(address: Address): Observable[LeaseInfo]
 
@@ -123,10 +121,6 @@ object CommonAccountsApi extends ScorexLogging {
 
     override def resolveAlias(alias: Alias): Either[ValidationError, Address] = blockchain.resolveAlias(alias)
 
-    override def activeLeasesOld(address: Address): Observable[(Height, LeaseTransaction)] = {
-      common.activeLeases(db, Some(Height(blockchain.height) -> diff), address, leaseIsActive)
-    }
-
     override def activeLeases(address: Address): Observable[LeaseInfo] =
       addressTransactions(
         db,
@@ -169,12 +163,19 @@ object CommonAccountsApi extends ScorexLogging {
         case _ => Seq()
       }
 
+    private def resolveDisabledAlias(leaseId: ByteStr): Either[ValidationError, Address] =
+      CancelLeasesToDisabledAliases.patchData
+        .get(leaseId)
+        .fold[Either[ValidationError, Address]](Left(GenericError("Unknown lease ID"))) {
+          case (_, recipientAddress) => Right(recipientAddress)
+        }
+
     def leaseInfo(leaseId: ByteStr): Option[LeaseInfo] = blockchain.leaseDetails(leaseId) map { ld =>
       LeaseInfo(
         leaseId,
         ld.sourceId,
         ld.sender.toAddress,
-        blockchain.resolveAlias(ld.recipient).explicitGet(),
+        blockchain.resolveAlias(ld.recipient).orElse(resolveDisabledAlias(leaseId)).explicitGet(),
         ld.amount,
         ld.height,
         ld.status match {
@@ -182,8 +183,8 @@ object CommonAccountsApi extends ScorexLogging {
           case Status.Cancelled(_, _) => LeaseInfo.Status.Canceled
           case Status.Expired(_)      => LeaseInfo.Status.Expired
         },
-        LeaseDetails.Status.getCancelHeight(ld.status),
-        LeaseDetails.Status.getCancelTransactionId(ld.status)
+        ld.status.cancelHeight,
+        ld.status.cancelTransactionId
       )
     }
 

@@ -900,7 +900,7 @@ class UtxPoolSpecification
                  |      let input = base64'IfZhAypdtgvecKDWzVyRuvXatmFf2ZYcMWVkCJ0/MQo='
                  |      bn256Groth16Verify_1inputs(key, proof, input)
                  |    ) then {
-                 |      ${otherDApp.fold("")(address => s""" strict r = Invoke(Address(base58'$address'), "default", [], []) """)}
+                 |      ${otherDApp.fold("")(address => s""" strict r = invoke(Address(base58'$address'), "default", [], []) """)}
                  |      []
                  |    } else {
                  |      throw("Error raised")

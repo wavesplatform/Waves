@@ -244,7 +244,7 @@ object Explorer extends ScorexLogging {
 
               for {
                 idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-                tx  =  readTransactionBytes(entry.getValue) match {
+                tx = readTransactionBytes(entry.getValue) match {
                   case (_, Left(legacyBytes)) => TransactionParsers.parseBytes(legacyBytes).get
                   case (_, Right(newBytes))   => PBTransactions.vanilla(PBSignedTransaction.parseFrom(newBytes)).explicitGet()
                 }

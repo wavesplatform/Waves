@@ -156,13 +156,13 @@ class InvokeAssetChecksTest
          |
          |@Callable(i)
          |func invalidLength() = {
-         |  strict r = Invoke(callingDApp, "default", [], [AttachedPayment(base58'$invalidLengthAsset', 1)])
+         |  strict r = invoke(callingDApp, "default", [], [AttachedPayment(base58'$invalidLengthAsset', 1)])
          |  []
          |}
          |
          |@Callable(i)
          |func unexisting() = {
-         |  strict r = Invoke(callingDApp, "default", [], [AttachedPayment(base58'$unexistingAsset', 1)])
+         |  strict r = invoke(callingDApp, "default", [], [AttachedPayment(base58'$unexistingAsset', 1)])
          |  []
          |}
        """.stripMargin

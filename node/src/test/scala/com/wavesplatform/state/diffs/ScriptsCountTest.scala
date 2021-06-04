@@ -216,7 +216,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
       assertDiffAndState(Nil, TestBlock.create(Seq(genesis)), fs) {
         case (_, state) =>
           txs.foldLeft(Diff.empty) { (diff, tx) =>
-            val newState = CompositeBlockchain(state, Some(diff))
+            val newState = CompositeBlockchain(state, diff)
             val newDiff  = TransactionDiffer(Some(tx.timestamp), tx.timestamp)(newState, tx).resultE.explicitGet()
             val oldRuns  = ScriptsCountTest.calculateLegacy(newState, tx)
             if (newDiff.scriptsRun != oldRuns) throw new IllegalArgumentException(s"$tx ${newDiff.scriptsRun} != $oldRuns")

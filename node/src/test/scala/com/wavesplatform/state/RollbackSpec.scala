@@ -211,7 +211,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               sender.publicKey,
               recipient.toAddress,
               leaseAmount,
-              LeaseDetails.Status.Cancelled(d.blockchain.height, leaseCancel.id()),
+              LeaseDetails.Status.Cancelled(d.blockchain.height, Some(leaseCancel.id())),
               lt.id(),
               2
             )
@@ -761,7 +761,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               invoker.toAddress,
               leaseAmount,
               if (cancelId.isEmpty) LeaseDetails.Status.Active
-              else LeaseDetails.Status.Cancelled(cancelHeight, cancelId),
+              else LeaseDetails.Status.Cancelled(cancelHeight, Some(cancelId)),
               sourceId,
               2
             )

@@ -84,7 +84,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val ctx: CTX[C] =
       Monoid.combineAll(
         Seq(
-          PureContext.build(version).withEnvironment[C],
+          PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[C],
           CryptoContext.build(Global, version).withEnvironment[C],
           addCtx.withEnvironment[C],
           CTX[C](sampleTypes, stringToTuple, Array(f, f2)),
@@ -431,7 +431,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }
 
     val context = Monoid.combine(
-      PureContext.build(V1).evaluationContext[Id],
+      PureContext.build(V1, fixUnicodeFunctions = true).evaluationContext[Id],
       EvaluationContext.build(
         typeDefs = Map.empty,
         letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3L))),
@@ -445,7 +445,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("context won't change after execution of an inner block") {
     val context = Monoid.combine(
-      PureContext.build(V1).evaluationContext[Id],
+      PureContext.build(V1, fixUnicodeFunctions = true).evaluationContext[Id],
       EvaluationContext.build(
         typeDefs = Map.empty,
         letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3L))),
@@ -747,25 +747,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           CONST_STRING("").explicitGet(),
           CONST_STRING("str2").explicitGet(),
           CONST_STRING("str3").explicitGet()
-        ),
-        false
-      ).explicitGet()
-    )
-  }
-
-  property("split empty separator") {
-    val src =
-      """ "冬x🤦冬".split("") """
-    eval[EVALUATED](src) shouldBe Right(
-      ARR(
-        IndexedSeq(
-          CONST_STRING("\ud87e").explicitGet(),
-          CONST_STRING("\udc1a").explicitGet(),
-          CONST_STRING("\u0078").explicitGet(),
-          CONST_STRING("\ud83e").explicitGet(),
-          CONST_STRING("\udd26").explicitGet(),
-          CONST_STRING("\ud87e").explicitGet(),
-          CONST_STRING("\udc1a").explicitGet()
         ),
         false
       ).explicitGet()
@@ -1211,7 +1192,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("List[Int] median - list with non int elements - error") {
     val src =
       s"""["1", "2"].median()"""
-    eval(src, version = V4) should produce("Compilation failed: [Non-matching types: expected: Int, actual: String")
+    eval(src, version = V4) should produce("Compilation failed: [Non-matching types: expected: List[Int], actual: List[String]")
   }
 
   property("List[Int] median - list with big elements - error") {

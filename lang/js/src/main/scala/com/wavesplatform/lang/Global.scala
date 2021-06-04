@@ -1,12 +1,12 @@
 package com.wavesplatform.lang
 
-import java.math.{BigDecimal => BD, BigInteger}
 import cats.implicits._
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
+import java.math.{BigInteger, BigDecimal => BD}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -160,4 +160,7 @@ object Global extends BaseGlobal {
 
   override def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte] =
     ???
+
+  override def isIllFormed(s: String): Boolean =
+    false
 }

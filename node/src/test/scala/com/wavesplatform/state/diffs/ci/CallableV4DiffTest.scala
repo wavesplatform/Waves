@@ -6,7 +6,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values.{Asset, V4}
+import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
@@ -347,7 +347,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     }.explicitGet()
 
   private def assetVerifier(body: String): Script =
-    compileExpr(
+    TestCompiler(V4).compileAsset(
       s"""
          | {-# STDLIB_VERSION 4          #-}
          | {-# CONTENT_TYPE   EXPRESSION #-}
@@ -355,9 +355,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
          |
          | $body
          |
-       """.stripMargin,
-      V4,
-      Asset
+       """.stripMargin
     )
 
   private def reissueAndBurnDApp(assetId: ByteStr, reissueAmount: Long, burnAmount: Long): Script =
