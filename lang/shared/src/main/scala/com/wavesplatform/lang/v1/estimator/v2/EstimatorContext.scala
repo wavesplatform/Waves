@@ -3,8 +3,8 @@ package com.wavesplatform.lang.v1.estimator.v2
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNC
-import com.wavesplatform.lang.v1.task.TaskM
 import com.wavesplatform.lang.v1.estimator.v2.EstimatorContext.EvalM
+import com.wavesplatform.lang.v1.task.TaskM
 import shapeless.{Lens, lens}
 
 private[v2] case class EstimatorContext(
