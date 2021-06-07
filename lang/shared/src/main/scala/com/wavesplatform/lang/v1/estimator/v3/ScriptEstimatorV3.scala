@@ -10,9 +10,9 @@ import com.wavesplatform.lang.utils.getDecompilerContext
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.EvalM
 import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.Lenses._
-import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.{EvalM, highOrderFunctions}
+import com.wavesplatform.lang.v1.estimator.{HighOrderFunctionInfo, ScriptEstimator}
 import com.wavesplatform.lang.v1.task.imports._
 import monix.eval.Coeval
 
@@ -117,16 +117,18 @@ object ScriptEstimatorV3 extends ScriptEstimator {
     } yield argsCost.sum + bodyCost.value() + internalCallsCost
 
   private def evalHighOrderFunc(ctx: EstimatorContext, header: FunctionHeader, args: List[EXPR]): EvalM[Long] = {
-    val functionName =
-      header match {
-        case Native(id) =>
-          val version = DirectiveDictionary[StdLibVersion].all.last
-          getDecompilerContext(version, Expression).opCodes.getOrElse(id, header.toString)
-        case u: User =>
-          u.name
-      }
-    def errorPrefix = s"Unexpected call of high-order function $functionName: "
-    val r = highOrderFunctions
+    def errorPrefix = {
+      val functionName =
+        header match {
+          case Native(id) =>
+            val version = DirectiveDictionary[StdLibVersion].all.last
+            getDecompilerContext(version, Expression).opCodes.getOrElse(id, header.toString)
+          case u: User =>
+            u.name
+        }
+      s"Unexpected call of high-order function $functionName: "
+    }
+    val r = HighOrderFunctionInfo.all
       .get(header)
       .map(
         info =>
