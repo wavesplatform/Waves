@@ -82,20 +82,6 @@ object NativeFunction {
       override def ev[F[_]: Monad](a: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
         evl(a._2).pure[F]
     })
-
-  def apply[C[_[_]]](name: String,
-            costByLibVersion: Map[StdLibVersion, Long],
-            internalName: Short,
-            resultType: TYPE,
-            args: (String, TYPE, String)*)(ev: ContextfulNativeFunction[C]): NativeFunction[C] =
-    new NativeFunction(
-      name = name,
-      costByLibVersionMap = costByLibVersion,
-      signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.Native(internalName)),
-      ev = ev,
-      args = args.map(_._1)
-    )
-
 }
 
 @JSExportTopLevel("UserFunction")

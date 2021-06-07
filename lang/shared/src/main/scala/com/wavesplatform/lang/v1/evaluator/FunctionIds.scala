@@ -64,6 +64,8 @@ object FunctionIds {
   val STRING_TO_BIGINTOPT: Short  = 424
   val MEDIAN_LISTBIGINT: Short    = 425
 
+  val FOLD: Short = 450
+
   val CREATE_LIST: Short             = 1100
   val APPEND_LIST: Short             = 1101
   val CONCAT_LIST: Short             = 1102

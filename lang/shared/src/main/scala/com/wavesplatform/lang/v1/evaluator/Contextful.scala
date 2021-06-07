@@ -34,7 +34,12 @@ abstract class ContextfulNativeFunction[C[_[_]]](name: String, resultType: TYPE,
     }
   }
 
-  def evaluateExtended[F[_]: Monad](env: C[F], args: List[EVALUATED], availableComplexity: Int): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] =
+  def evaluateExtended[F[_]: Monad](
+    env: C[F],
+    args: List[EVALUATED],
+    availableComplexity: Int,
+    evaluateUserFunction: (String, List[EVALUATED], Int) => Coeval[(Either[ExecutionError, EVALUATED], Int)]
+  ): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] =
     Coeval.now(apply((env, args)).map((_, 0)))
 }
 

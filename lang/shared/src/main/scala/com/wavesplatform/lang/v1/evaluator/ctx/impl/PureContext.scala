@@ -11,6 +11,7 @@ import cats.{Id, Monad}
 import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils.getDecompilerContext
@@ -22,10 +23,11 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.evaluator.{ContextfulUserFunction, ContextfulVal}
+import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction, ContextfulVal}
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
+import monix.eval.Coeval
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
@@ -411,35 +413,35 @@ object PureContext {
           presult = rm._1
           m       = rm._2
           result <- r.caseType match {
-            case RoundDown => Right(presult * s)
-            case RoundUp   => Right((presult + m.sign) * s)
-            case RoundHalfUp =>
+            case Rounding.Down.`type` => Right(presult * s)
+            case Rounding.Up.`type`   => Right((presult + m.sign) * s)
+            case Rounding.HalfUp.`type` =>
               val x = d.abs - m * 2
               if (x <= 0) {
                 Right((presult + 1) * s)
               } else {
                 Right(presult * s)
               }
-            case RoundHalfDown =>
+            case Rounding.HalfDown.`type` =>
               val x = d.abs - m * 2
               if (x < 0) {
                 Right((presult + 1) * s)
               } else {
                 Right(presult * s)
               }
-            case RoundCeiling =>
+            case Rounding.Ceiling.`type` =>
               Right((if (s > 0) {
                        presult + m.sign
                      } else {
                        presult
                      }) * s)
-            case RoundFloor =>
+            case Rounding.Floor.`type` =>
               Right((if (s < 0) {
                        presult + m.sign
                      } else {
                        presult
                      }) * s)
-            case RoundHalfEven =>
+            case Rounding.HalfEven.`type` =>
               val x = d.abs - m * 2
               if (x < 0) {
                 Right((presult + 1) * s)
@@ -1351,32 +1353,6 @@ object PureContext {
       IF(REF("@p"), FALSE, TRUE)
     }
 
-  val RoundCeiling  = CASETYPEREF("Ceiling", List.empty, true)
-  val RoundFloor    = CASETYPEREF("Floor", List.empty, true)
-  val RoundHalfEven = CASETYPEREF("HalfEven", List.empty, true)
-  val RoundDown     = CASETYPEREF("Down", List.empty, true)
-  val RoundUp       = CASETYPEREF("Up", List.empty, true)
-  val RoundHalfUp   = CASETYPEREF("HalfUp", List.empty, true)
-  val RoundHalfDown = CASETYPEREF("HalfDown", List.empty, true)
-  val rounds        = UNION(RoundDown, RoundUp, RoundHalfUp, RoundHalfDown, RoundCeiling, RoundFloor, RoundHalfEven)
-
-//  private def roundMode(m: EVALUATED): BaseGlobal.Rounds = {
-//    m match {
-//      case (p: CaseObj) =>
-//        p.caseType.name match {
-//          case "Down"     => BaseGlobal.RoundDown()
-//          case "Up"       => BaseGlobal.RoundUp()
-//          case "HalfUp"   => BaseGlobal.RoundHalfUp()
-//          case "HalfDown" => BaseGlobal.RoundHalfDown()
-//          case "HalfEven" => BaseGlobal.RoundHalfEven()
-//          case "Ceiling"  => BaseGlobal.RoundCeiling()
-//          case "Floor"    => BaseGlobal.RoundFloor()
-//          case v          => throw new Exception(s"Type error: $v isn't in $rounds")
-//        }
-//      case v => throw new Exception(s"Type error: $v isn't rounds CaseObj")
-//    }
-//  }
-
   def pow(roundTypes: UNION): BaseFunction[NoContext] = {
     NativeFunction("pow", 100, POW, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", roundTypes)) {
       case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
@@ -1497,6 +1473,61 @@ object PureContext {
         }
       case xs => notImplemented[Id, EVALUATED](s"median(arr: List[BigInt])", xs)
     }
+
+  private def fold(index: Int, limit: Int, complexity: Long): BaseFunction[NoContext] =
+    NativeFunction.withEnvironment[NoContext](
+      s"fold_$limit",
+      Map[StdLibVersion, Long](V5 -> complexity),
+      (FOLD + index).toShort,
+      TYPEPARAM('B'),
+      ("list", PARAMETERIZEDLIST(TYPEPARAM('A'))),
+      ("accumulator", TYPEPARAM('B')),
+      ("function", STRING)
+    ) {
+      new ContextfulNativeFunction[NoContext](
+        s"fold_$limit",
+        TYPEPARAM('B'),
+        Nil
+      ) {
+        override def ev[F[_]: Monad](input: (NoContext[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+          evaluateExtended(input._1, input._2, 0, (_, _, _) => Coeval.raiseError(throw new RuntimeException("unexpected")))
+            .value()
+            .map(_._1)
+
+        override def evaluateExtended[F[_]: Monad](
+            env: NoContext[F],
+            args: List[EVALUATED],
+            availableComplexity: Int,
+            evaluateUserFunction: (String, List[EVALUATED], Int) => Coeval[(Either[ExecutionError, EVALUATED], Int)]
+        ): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] =
+          args match {
+            case ARR(list) :: accumulator :: CONST_STRING(function) :: Nil =>
+              if (list.size > limit) {
+                val err = s"List with size ${list.size} was passed to function fold_$limit requiring max size $limit".asLeft[EVALUATED].pure[F]
+                Coeval.now(err.map((_, 0)))
+              } else
+                list
+                  .foldLeft(
+                    Coeval((accumulator.asRight[ExecutionError], availableComplexity))
+                  )(
+                    (result, element) =>
+                      result.flatMap {
+                        case (Right(value), complexity) => evaluateUserFunction(function, List(value, element), complexity)
+                        case (error, complexity)        => Coeval((error, complexity))
+                      }
+                  )
+                  .map(_.pure[F])
+            case xs =>
+              val err = notImplemented[F, EVALUATED](s"fold_$limit(list: List[A], accumulator: B, function: String)", xs)
+              Coeval.now(err.map((_, 0)))
+          }
+      }
+    }
+
+  val folds: Array[(Int, BaseFunction[NoContext])] =
+    Array((20, 3), (50, 7), (100, 9), (200, 20), (500, 56), (1000, 115))
+      .zipWithIndex
+      .map { case ((limit, complexity), index) => (limit, fold(index, limit, complexity)) }
 
   val unitVarName = "unit"
 
@@ -1730,8 +1761,8 @@ object PureContext {
         logBigInt(UNION(fromV5RoundTypes)),
         pow(UNION(fromV5RoundTypes)),
         log(UNION(fromV5RoundTypes)),
-        fraction(fixLimitCheck = true)
-      )
+        fraction(fixLimitCheck = true),
+      ) ++ folds.map(_._2)
 
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =
     CTX[NoContext](

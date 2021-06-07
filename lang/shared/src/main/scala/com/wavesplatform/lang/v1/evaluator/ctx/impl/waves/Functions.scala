@@ -546,12 +546,15 @@ object Functions {
         Seq(("dapp", BYTESTR), ("name", STRING), ("args", LIST(ANY)), ("payments", listPayment))
       ) {
         override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
-          evaluateExtended(input._1, input._2, 0).value().map(_._1)
+          evaluateExtended(input._1, input._2, 0, (_, _, _) => Coeval.raiseError(throw new RuntimeException("unexpected")))
+            .value()
+            .map(_._1)
 
         override def evaluateExtended[F[_]: Monad](
             env: Environment[F],
             args: List[EVALUATED],
-            availableComplexity: Int
+            availableComplexity: Int,
+            evaluateUserFunction: (String, List[EVALUATED], Int) => Coeval[(Either[ExecutionError, EVALUATED], Int)]
         ): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] = {
           val dAppBytes = args match {
             case (dApp: CaseObj) :: _ if dApp.caseType == addressType =>
