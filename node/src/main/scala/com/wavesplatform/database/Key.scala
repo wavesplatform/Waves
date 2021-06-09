@@ -1,5 +1,7 @@
 package com.wavesplatform.database
 
+import scala.collection.concurrent.TrieMap
+
 import com.google.common.base.CaseFormat
 import com.google.common.io.BaseEncoding
 import com.google.common.primitives.{Bytes, Shorts}
@@ -20,10 +22,18 @@ abstract class Key[V](prefix: Short, val name: String, val suffix: Array[Byte]) 
 }
 
 object Key {
-  private[this] val converter = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.LOWER_HYPHEN)
+  // Optimisation due to synchronization block in scala.Enumeration#nameOf
+  private[this] object KeyToString {
+    private[this] val converter = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.LOWER_HYPHEN)
+    private[this] val cache     = TrieMap.empty[KeyTags.KeyTag, String]
+
+    def toString(keyTag: KeyTags.KeyTag): String = {
+      cache.getOrElseUpdate(keyTag, converter.convert(keyTag.toString))
+    }
+  }
 
   def apply[V](keyTag: KeyTags.KeyTag, keySuffix: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[V] =
-    new Key[V](keyTag.id.toShort, converter.convert(keyTag.toString), keySuffix) {
+    new Key[V](keyTag.id.toShort, KeyToString.toString(keyTag), keySuffix) {
       override def parse(bytes: Array[Byte]): V = parser(bytes)
       override def encode(v: V): Array[Byte]    = encoder(v)
     }
