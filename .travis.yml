@@ -4,7 +4,7 @@ sudo: false
 jdk:
   - openjdk8
 scala:
-  - 2.12.8
+  - 2.13.3
 env:
   global:
     - secure: NYdeuFBQVVjN5gon2KQEDfNfyp9Bk6AZJ7V1tfLJW54y5Dd/4PHdWGWeOyhCMIqwX3UaUmWExY1KcKXpbDMLwTmahNLjiDc3e3rCqxghL5cDgqs6OHcwNGw+CwNiw3tufo5PZ9mhK/ZJh0qgOHWyETs/ifq4VyacvgYH9IZzK4YdKYdwf+T9c3Q7VO3KmzOXiHkvPvLfkc8I8cSZlT1kJFCGawRdE/0nygPd8HYfCxiEFuXOKpRz0hlm8njjZdlZpMcou8TLeH5fFSvHtELIHFvSTEj/QilSTmCXgFRVUd8sd53n3uTouwtVbdCHsXNm4Nphf0lUJnN7fTzbD2xpOZN9zS+SO/YTkIxZpSgQLwsJsWzIHI+6IOlcjeNwZHbYBfsAdv1c4GMkgFfxsWWtb4r7+ooXDTbyy1qeZgVU4caGBMwoNE+l0Y60JdGYT4hrTfJ5c+GpcPzIV3CYVOUkHmoCYXRCtxnfDFXCR0mDVfYAA14osLi3v+EKdTxHDfqP6fICIW9y7oZd//38iEQrDy+k9iCyNmvOsqvDxXZithmSP0WzeGCXQDI+s3FxB5ywt8yDvzFbF5JYY74o1tnNFG7TlSF5v8EHSHxzXBeBtnE9V1g2wxYnvW2HYk5kW6WZJgYE9LCc6ubpQ2W387PRfCJjoLNjHqNlNGkEYlkPuaw=
@@ -12,15 +12,13 @@ env:
 script:
   - unset _JAVA_OPTIONS
   - unset SBT_OPTS
-  - travis_wait 30 sbt -Dsbt.supershell=false -Dquill.macro.log=false -J-Xms3G -J-Xmx3G -J-XX:+UseConcMarkSweepGC -J-XX:+CMSClassUnloadingEnabled ";coverage;checkPR;coverageReport"
-after_success:
-  - bash <(curl -s https://codecov.io/bash)
+  - travis_wait 30 sbt -Dsbt.supershell=false -Dquill.macro.log=false -J-Xms3G -J-Xmx3G -J-XX:+UseConcMarkSweepGC -J-XX:+CMSClassUnloadingEnabled "checkPR"
 # These directories are cached to S3 at the end of the build
 cache:
   directories:
-    - $HOME/.ivy2/cache
+    - $HOME/.cache/coursier/v1
     - $HOME/.sbt
 before_cache:
   # Cleanup the cached directories to avoid unnecessary cache updates
-  - find $HOME/.ivy2/cache -name "ivydata-*.properties" -print -delete
+  - find $HOME/.cache/coursier/v1 -type d -name "*SNAPSHOT" | xargs rm -rf {} \;
   - find $HOME/.sbt        -name "*.lock"               -print -delete
