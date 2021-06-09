@@ -250,8 +250,7 @@ class ContractCompilerCompactorTest extends PropSpec with PropertyChecks with Ma
             ("a1", "barFunc"),
             ("a2", "fooVar"),
             ("a3", "bazFunc"),
-            ("a4", "tx"),
-            ("a5", "verify")
+            ("a4", "verify")
           ).map(el => CompactNameAndOriginalNamePair(el._1, el._2))
         ),
         List(
@@ -275,9 +274,9 @@ class ContractCompilerCompactorTest extends PropSpec with PropertyChecks with Ma
         List.empty,
         Some(
           VerifierFunction(
-            VerifierAnnotation("a4"),
+            VerifierAnnotation("tx"),
             Terms.FUNC(
-              "a5",
+              "a4",
               List(),
               FUNCTION_CALL(
                 Native(0),
@@ -326,9 +325,8 @@ class ContractCompilerCompactorTest extends PropSpec with PropertyChecks with Ma
           List.empty,
           Seq(
             ("a1", "fooVar"),
-            ("a2", "tx"),
-            ("a3", "verify"),
-            ("a4", "a1")
+            ("a2", "verify"),
+            ("a3", "a1")
           ).map(el => CompactNameAndOriginalNamePair(el._1, el._2))
         ),
         List(
@@ -337,17 +335,17 @@ class ContractCompilerCompactorTest extends PropSpec with PropertyChecks with Ma
         List.empty,
         Some(
           VerifierFunction(
-            VerifierAnnotation("a2"),
+            VerifierAnnotation("tx"),
             Terms.FUNC(
-              "a3",
+              "a2",
               List(),
               LET_BLOCK(
-                LET("a4", CONST_STRING("some value").explicitGet()),
+                LET("a3", CONST_STRING("some value").explicitGet()),
                 FUNCTION_CALL(
                   Native(0),
                   List(
                     REF("a1"),
-                    REF("a4")
+                    REF("a3")
                   )
                 )
               )
@@ -443,10 +441,8 @@ class ContractCompilerCompactorTest extends PropSpec with PropertyChecks with Ma
             ("a2", "varY"),
             ("a3", "func2"),
             ("a4", "func1"),
-            ("a5", "i"),
-            ("a6", "tmp1"),
-            ("a7", "tx"),
-            ("a8", "verify")
+            ("a5", "tmp1"),
+            ("a6", "verify")
           ).map(el => CompactNameAndOriginalNamePair(el._1, el._2))
         ),
         List(
@@ -465,19 +461,19 @@ class ContractCompilerCompactorTest extends PropSpec with PropertyChecks with Ma
         ),
         List(
           CallableFunction(
-            CallableAnnotation("a5"),
+            CallableAnnotation("i"),
             Terms.FUNC(
               "call",
               List(),
               LET_BLOCK(
                 LET(
-                  "a6",
+                  "a5",
                   FUNCTION_CALL(Native(100), List(FUNCTION_CALL(User("a4"), List()), REF("a1")))
                 ),
                 FUNCTION_CALL(
                   Native(1100),
                   List(
-                    FUNCTION_CALL(User("IntegerEntry"), List(CONST_STRING("somekey").explicitGet(), REF("a6"))),
+                    FUNCTION_CALL(User("IntegerEntry"), List(CONST_STRING("somekey").explicitGet(), REF("a5"))),
                     REF("nil")
                   )
                 )
@@ -487,9 +483,9 @@ class ContractCompilerCompactorTest extends PropSpec with PropertyChecks with Ma
         ),
         Some(
           VerifierFunction(
-            VerifierAnnotation("a7"),
+            VerifierAnnotation("tx"),
             Terms.FUNC(
-              "a8",
+              "a6",
               List(),
               FUNCTION_CALL(User("!="), List(FUNCTION_CALL(User("a3"), List()), REF("a1")))
             )

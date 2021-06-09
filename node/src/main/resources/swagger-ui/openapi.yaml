@@ -1,6 +1,7 @@
 openapi: 3.0.1
 info:
-  title: Waves Full Node (???)
+  version: '{{version}}'
+  title: Waves Full Node ({{chainId}})
   description: >-
     The Waves node REST API is the main interface for interacting with the
     blockchain. See
@@ -10,8 +11,7 @@ info:
   termsOfService: ''
   license:
     name: MIT License
-    url: 'https://github.com/wavesplatform/Waves/blob/master/LICENSE'
-  version: '???'
+    url: 'https://github.com/wavesplatform/Waves/blob/version-1.3.x/LICENSE'
 servers:
   - url: /
 tags:

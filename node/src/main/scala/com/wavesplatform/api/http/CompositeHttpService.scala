@@ -4,7 +4,7 @@ import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, Th
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
+import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.RouteResult.Complete
 import akka.http.scaladsl.server._
@@ -14,6 +14,7 @@ import com.wavesplatform.utils.ScorexLogging
 import io.netty.util.concurrent.DefaultThreadFactory
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
+import scala.io.Source
 
 case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings) extends ScorexLogging {
   // Only affects extractScheduler { implicit sc => ... } routes
@@ -38,7 +39,7 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
     (pathEndOrSingleSlash | path("swagger"))(redirectToSwagger) ~
       pathPrefix("api-docs") {
         pathEndOrSingleSlash(redirectToSwagger) ~
-          path("swagger.json")(complete(patchedSwaggerJson)) ~
+          path("openapi.yaml")(complete(patchedSwaggerJson)) ~
           getFromResourceDirectory("swagger-ui")
       }
 
@@ -77,17 +78,18 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
   private[this] lazy val patchedSwaggerJson = {
     import com.wavesplatform.Version
     import com.wavesplatform.account.AddressScheme
-    import play.api.libs.json.{JsObject, Json}
 
     def chainIdString: String =
       if (Character.isAlphabetic(AddressScheme.current.chainId)) AddressScheme.current.chainId.toChar.toString
       else s"#${AddressScheme.current.chainId}"
 
-    val json = Json.parse(getClass.getClassLoader.getResourceAsStream("swagger-ui/swagger.json")).as[JsObject]
-    val patchedInfo = (json \ "info").as[JsObject] ++ Json.obj(
-      "version" -> Version.VersionString,
-      "title"   -> s"Waves Full Node ($chainIdString)"
+    HttpEntity(
+      MediaType.customWithFixedCharset("text", "x-yaml", HttpCharsets.`UTF-8`, List("yaml")),
+      Source
+        .fromResource("swagger-ui/openapi.yaml")
+        .mkString
+        .replace("{{version}}", Version.VersionString)
+        .replace("{{chainId}}", chainIdString)
     )
-    json ++ Json.obj("info" -> patchedInfo)
   }
 }
