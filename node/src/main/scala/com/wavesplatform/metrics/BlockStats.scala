@@ -1,10 +1,10 @@
 package com.wavesplatform.metrics
 
+import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.network.{HandshakeHandler, MicroBlockInv}
 import io.netty.channel.Channel
 import org.influxdb.dto.Point
-import com.wavesplatform.block.{Block, MicroBlock}
-import com.wavesplatform.common.state.ByteStr
 
 object BlockStats {
 
@@ -120,10 +120,25 @@ object BlockStats {
     Seq.empty
   )
 
-  private def block(b: Block, source: Source): Point.Builder =
+  private def block(b: Block, source: Source): Point.Builder = {
+    val isWhitelistMiner = {
+      val whitelistAddrs = Set(
+        "3P2HNUd5VUPLMQkJmctTPEeeHumiPN2GkTb",
+        "3PA1KvFfq9VuJjg45p2ytGgaNjrgnLSgf4r",
+        "3P9DEDP5VbyXQyKtXDUt2crRPn5B7gs6ujc",
+        "3P23fi1qfVw6RVDn4CH2a5nNouEtWNQ4THs",
+        "3PEDjPSkKrMtaaJJLGfL849Fg39TSZ7WGzY",
+        "3P5dg6PtSAQmdH1qCGKJWu7bkzRG27mny5i",
+        "3PNDoRLsFoPtW1P3nvVHAt7V6hfpyQ8Az9w"
+      )
+      whitelistAddrs(b.sender.toAddress.stringRepr)
+    }
+
     measurement(Type.Block)
       .tag("id", id(b.id()))
       .tag("source", source.name)
+      .tag("whitelist", isWhitelistMiner.toString)
+  }
 
   private def micro(m: MicroBlock): Point.Builder =
     measurement(Type.Micro)

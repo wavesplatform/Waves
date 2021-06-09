@@ -4,8 +4,13 @@ import java.time.Duration
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 
+import scala.annotation.tailrec
+import scala.jdk.CollectionConverters._
+import scala.util.{Left, Right}
+
 import cats.Monoid
 import cats.syntax.monoid._
+import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
@@ -14,14 +19,14 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
+import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted}
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -36,10 +41,6 @@ import monix.execution.atomic.AtomicBoolean
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observer
 import org.slf4j.LoggerFactory
-
-import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
-import scala.util.{Left, Right}
 
 //noinspection ScalaStyle
 class UtxPoolImpl(
@@ -166,7 +167,8 @@ class UtxPoolImpl(
 
     val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify, forceValidate))
     tracedIsNew.resultE match {
-      case Right(isNew) => log.trace(s"putIfNew(${tx.id()}) succeeded, isNew = $isNew")
+      case Right(isNew) =>
+        log.trace(s"putIfNew(${tx.id()}) succeeded, isNew = $isNew")
       case Left(err) =>
         log.debug(s"putIfNew(${tx.id()}) failed with ${extractErrorMessage(err)}")
         traceLogger.trace(err.toString)
@@ -201,7 +203,10 @@ class UtxPoolImpl(
   private[this] def removeIds(removed: Set[ByteStr]): Unit = {
     val priorityRemoved = priorityPool.removeIds(removed)
     val factRemoved     = priorityRemoved ++ removed.flatMap(id => removeFromOrdPool(id))
-    factRemoved.foreach(tx => onEvent(UtxEvent.TxRemoved(tx, None)))
+    factRemoved.foreach { tx =>
+      ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Mined)
+      onEvent(UtxEvent.TxRemoved(tx, None))
+    }
   }
 
   private[utx] def addTransaction(
@@ -230,6 +235,7 @@ class UtxPoolImpl(
     if (!verify || diffEi.resultE.isRight) {
       transactions.computeIfAbsent(tx.id(), { _ =>
         PoolMetrics.addTransaction(tx)
+        ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Received)
         addPortfolio()
         tx
       })
@@ -334,6 +340,7 @@ class UtxPoolImpl(
                 r // don't run any checks here to speed up mining
               else if (TxCheck.isExpired(tx)) {
                 log.debug(s"Transaction ${tx.id()} expired")
+                ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Expired)
                 this.removeFromOrdPool(tx.id())
                 onEvent(UtxEvent.TxRemoved(tx, Some(GenericError("Expired"))))
                 r.copy(iterations = r.iterations + 1, removedTransactions = r.removedTransactions + tx.id())
@@ -384,6 +391,7 @@ class UtxPoolImpl(
                       r
 
                     case Left(error) =>
+                      ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Invalidated, Some(extractErrorClass(error)))
                       log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
                       traceLogger.trace(error.toString)
                       this.removeFromOrdPool(tx.id())
@@ -444,6 +452,12 @@ class UtxPoolImpl(
 
   private[this] val traceLogger = LoggerFacade(LoggerFactory.getLogger(this.getClass.getCanonicalName + ".trace"))
   traceLogger.trace("Validation trace reporting is enabled")
+
+  @scala.annotation.tailrec
+  private def extractErrorClass(error: ValidationError): ValidationError = error match {
+    case TransactionValidationError(cause, _) => extractErrorClass(cause)
+    case other                                => other
+  }
 
   @scala.annotation.tailrec
   private def extractErrorMessage(error: ValidationError): String = error match {
@@ -515,8 +529,9 @@ class UtxPoolImpl(
   private[this] object PoolMetrics {
     private[this] val SampleInterval: Duration = Duration.of(500, ChronoUnit.MILLIS)
 
-    private[this] val sizeStats  = Kamon.rangeSampler("utx.pool-size", MeasurementUnit.none, SampleInterval).withoutTags()
-    private[this] val bytesStats = Kamon.rangeSampler("utx.pool-bytes", MeasurementUnit.information.bytes, SampleInterval).withoutTags()
+    private[this] val sizeStats         = Kamon.rangeSampler("utx.pool-size", MeasurementUnit.none, SampleInterval).withoutTags()
+    private[this] val neutrinoSizeStats = Kamon.rangeSampler("neutrino.utx-pool-size", MeasurementUnit.none, SampleInterval).withoutTags()
+    private[this] val bytesStats        = Kamon.rangeSampler("utx.pool-bytes", MeasurementUnit.information.bytes, SampleInterval).withoutTags()
 
     val putTimeStats    = Kamon.timer("utx.put-if-new").withoutTags()
     val putRequestStats = Kamon.counter("utx.put-if-new.requests").withoutTags()
@@ -532,11 +547,13 @@ class UtxPoolImpl(
     def addTransaction(tx: Transaction): Unit = {
       sizeStats.increment()
       bytesStats.increment(tx.bytesSize)
+      if (ResponsivenessLogs.isNeutrino(tx)) neutrinoSizeStats.increment()
     }
 
     def removeTransaction(tx: Transaction): Unit = {
       sizeStats.decrement()
       bytesStats.decrement(tx.bytesSize)
+      if (ResponsivenessLogs.isNeutrino(tx)) neutrinoSizeStats.decrement()
     }
   }
 }
