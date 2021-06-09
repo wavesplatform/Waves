@@ -34,6 +34,7 @@ inTask(assembly)(
             p.endsWith("io.netty.versions.properties") =>
         MergeStrategy.discard
       case "scala-collection-compat.properties" => MergeStrategy.discard
+      case PathList("com", "sun", "jna", _*)                    => MergeStrategy.first
       case other                                => (assembly / assemblyMergeStrategy).value(other)
     }
   )
