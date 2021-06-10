@@ -1,14 +1,12 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.test.FreeSpec
 import io.netty.channel.embedded.EmbeddedChannel
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{FreeSpec, Matchers}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.concurrent.duration.DurationInt
 
-class BrokenConnectionDetectorSpec extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen {
+class BrokenConnectionDetectorSpec extends FreeSpec with MockFactory {
 
   "should not close an active connection until the timeout" in {
     val handler = new BrokenConnectionDetector(400.millis)

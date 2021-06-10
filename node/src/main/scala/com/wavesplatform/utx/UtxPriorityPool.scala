@@ -97,7 +97,7 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
 
   def nextMicroBlockSize(limit: Int): Int = {
     @tailrec
-    def nextMicroBlockSizeRec(last: Int, diffs: Seq[Diff]): Int = diffs match {
+    def nextMicroBlockSizeRec(last: Int, diffs: Seq[Diff]): Int = (diffs: @unchecked) match {
       case Nil => last.max(limit)
       case diff +: _ if last + diff.transactions.size > limit =>
         if (last == 0) diff.transactions.size // First micro

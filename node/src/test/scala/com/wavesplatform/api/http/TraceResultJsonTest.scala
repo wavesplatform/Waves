@@ -9,14 +9,14 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING, FUNCT
 import com.wavesplatform.lang.v1.evaluator.ScriptResultV3
 import com.wavesplatform.lang.v1.traits.domain.DataItem.Lng
 import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, Recipient}
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.{Proofs, TxValidationError}
-import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json.Json
 
-class TraceResultJsonTest extends PropSpec with Matchers {
+class TraceResultJsonTest extends PropSpec {
   private val tx = (
     for {
       publicKey <- PublicKey.fromBase58String("9utotH1484Hb1WdAHuAKLjuGAmocPZg7jZDtnc35MuqT")
@@ -44,7 +44,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
     val recipient = Recipient.Address(ByteStr(tx.dAppAddressOrAlias.bytes))
     val trace = List(
       InvokeScriptTrace(
-        tx.id.value(),
+        tx.id(),
         tx.dAppAddressOrAlias,
         tx.funcCall,
         Right(
@@ -221,7 +221,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
 
     val trace = List(
       InvokeScriptTrace(
-        tx.id.value(),
+        tx.id(),
         tx.dAppAddressOrAlias,
         tx.funcCall,
         Left(TxValidationError.ScriptExecutionError(reason, vars, None)),

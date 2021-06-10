@@ -3,28 +3,19 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
+import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{Node, ReportingTestName}
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
+import org.scalatest.OptionValues
 
 import scala.concurrent.duration._
 
-class RewardsTestSuite
-    extends FreeSpec
-    with Matchers
-    with CancelAfterFailure
-    with NodesFromDocker
-    with ActivationStatusRequest
-    with ReportingTestName
-    with OptionValues {
+class RewardsTestSuite extends BaseFreeSpec with ActivationStatusRequest with OptionValues {
   import RewardsTestSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  val miner: Node                 = nodes.head
   lazy val initMinerBalance: Long = miner.balanceAtHeight(miner.address, 1)
   val InitialAmount               = 6400000000000000L
 

@@ -4,12 +4,10 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.settings.TestFunctionalitySettings.Enabled
 import com.wavesplatform.state._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class CommonValidationTimeTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithState {
+class CommonValidationTimeTest extends PropSpec with WithState {
 
   property("disallows too old transacions") {
     forAll(for {

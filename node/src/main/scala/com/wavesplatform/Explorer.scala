@@ -43,7 +43,7 @@ object Explorer extends ScorexLogging {
 
     @tailrec
     def parseArgs(buffer: Seq[String], args: Seq[String] = Nil, flags: Map[String, String] = Map.empty): (Seq[String], Map[String, String]) =
-      buffer match {
+      (buffer: @unchecked) match {
         case flag +: value +: rest if flag.startsWith("-") =>
           parseArgs(rest, args, flags + (flag -> value))
 

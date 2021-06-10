@@ -1,7 +1,8 @@
 package com.wavesplatform.lang.v1.task
 
 import cats.data.Kleisli
-import cats.implicits._
+import cats.syntax.either._
+import cats.syntax.functor._
 import cats.{Eval, Functor, Monad}
 import com.wavesplatform.lang.EvalF
 import monix.execution.atomic.{Atomic, AtomicBuilder}
@@ -32,7 +33,7 @@ trait TaskMT[F[_], S, E, R] {
       case Left(err) => Left(err)
     }))
 
-  def flatMap[B](f: R => TaskMT[F, S, E, B])(implicit m: Monad[EvalF[F, ?]]): TaskMT[F, S, E, B] = {
+  def flatMap[B](f: R => TaskMT[F, S, E, B])(implicit m: Monad[EvalF[F, *]]): TaskMT[F, S, E, B] = {
     TaskMT.fromEvalRef[F, S, E, B] { s =>
       m.flatMap(inner.run(s)) {
         case Right(v)  => f(v).inner.run(s)
@@ -41,7 +42,7 @@ trait TaskMT[F[_], S, E, R] {
     }
   }
 
-  def handleErrorWith(f: E => TaskMT[F, S, E, R])(implicit m: Monad[EvalF[F, ?]]): TaskMT[F, S, E, R] =
+  def handleErrorWith(f: E => TaskMT[F, S, E, R])(implicit m: Monad[EvalF[F, *]]): TaskMT[F, S, E, R] =
     TaskMT.fromEvalRef[F, S, E, R] { s =>
       m.flatMap(inner.run(s)) {
         case Right(v)  => m.pure(v.asRight[E])
@@ -49,7 +50,7 @@ trait TaskMT[F[_], S, E, R] {
       }
     }
 
-  def handleError()(implicit m: Monad[EvalF[F, ?]]): TaskMT[F, S, E, (Option[R], List[E])] = {
+  def handleError()(implicit m: Monad[EvalF[F, *]]): TaskMT[F, S, E, (Option[R], List[E])] = {
     TaskMT.fromEvalRef[F, S, E, (Option[R], List[E])] { s =>
       m.flatMap(inner.run(s)) {
         case Right(v)  => m.pure((Some(v), List.empty).asRight[E])

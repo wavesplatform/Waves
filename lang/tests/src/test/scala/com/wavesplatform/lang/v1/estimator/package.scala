@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1
 
-import cats.implicits._
+import cats.syntax.semigroup._
 import com.wavesplatform.lang.{Global, Common}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V3

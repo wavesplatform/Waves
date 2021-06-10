@@ -2,20 +2,18 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.crypto
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.{TransactionGen, crypto}
-import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
 import scala.util.Success
 
-class MassTransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class MassTransferTransactionSpecification extends PropSpec {
 
   property("serialization roundtrip") {
     forAll(massTransferGen) { tx: MassTransferTransaction =>

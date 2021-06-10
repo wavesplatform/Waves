@@ -1,7 +1,8 @@
 package com.wavesplatform.api.http.requests
 
-import cats.implicits._
-import com.wavesplatform.account.{AddressScheme, PublicKey}
+import cats.instances.list._
+import cats.syntax.traverse._
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.ReissueTransaction
@@ -20,7 +21,6 @@ case class SignedReissueV2Request(
   def toTx: Either[ValidationError, ReissueTransaction] =
     for {
       _sender <- PublicKey.fromBase58String(senderPublicKey)
-      chainId = AddressScheme.current.chainId
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       _assetId    <- parseBase58ToIssuedAsset(assetId)

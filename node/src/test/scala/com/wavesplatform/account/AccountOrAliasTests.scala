@@ -1,11 +1,10 @@
 package com.wavesplatform.account
 
-import com.wavesplatform.EitherMatchers
 import com.wavesplatform.common.utils.EitherExt2
-import org.scalatest.{Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test.PropSpec
+import org.scalatest.Inside
 
-class AccountOrAliasTests extends PropSpec with PropertyChecks with Matchers with EitherMatchers with Inside {
+class AccountOrAliasTests extends PropSpec with Inside {
 
   property("Account should get parsed correctly") {
     AddressOrAlias.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet() shouldBe an[Address]

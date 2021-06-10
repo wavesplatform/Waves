@@ -1,4 +1,5 @@
 package com.wavesplatform.state.diffs.smart.predef
+import com.wavesplatform.TestTime
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -8,21 +9,12 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.{BooleanDataEntry, EmptyDataEntry}
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
-import org.scalatest.{EitherValues, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IsDataStorageUntouchedTest
-    extends PropSpec
-    with ScalaCheckPropertyChecks
-    with Matchers
-    with TransactionGen
-    with NoShrink
-    with WithDomain
-    with EitherValues {
+class IsDataStorageUntouchedTest extends PropSpec with WithDomain {
 
   import DomainPresets._
 

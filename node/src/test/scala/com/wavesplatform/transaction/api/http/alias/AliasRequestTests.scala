@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction.api.http.alias
 
 import com.wavesplatform.api.http.requests.{CreateAliasV1Request, SignedCreateAliasV1Request}
-import org.scalatest.{FunSuite, Matchers}
+import com.wavesplatform.test.FunSuite
 import play.api.libs.json.Json
 
-class AliasRequestTests extends FunSuite with Matchers {
+class AliasRequestTests extends FunSuite {
   test("CreateAliasRequest") {
     val json =
       """

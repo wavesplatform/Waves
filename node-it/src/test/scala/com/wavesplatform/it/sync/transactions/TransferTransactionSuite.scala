@@ -7,7 +7,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransferTransactionInfo
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.util._
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer._
 import org.scalatest.CancelAfterFailure
@@ -17,7 +17,9 @@ import scala.concurrent.duration._
 
 class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
   test("transfer with empty string assetId") {
-    val tx = TransferTransaction.selfSigned(2.toByte, sender.keyPair, sender.keyPair.toAddress, Waves, 100L, Waves, minFee, ByteStr.empty, System.currentTimeMillis()).explicitGet()
+    val tx = TransferTransaction
+      .selfSigned(2.toByte, sender.keyPair, sender.keyPair.toAddress, Waves, 100L, Waves, minFee, ByteStr.empty, System.currentTimeMillis())
+      .explicitGet()
     val json = tx.json() ++ Json.obj("assetId" -> "", "feeAssetId" -> "")
     sender.signedBroadcast(json, waitForTx = true)
   }

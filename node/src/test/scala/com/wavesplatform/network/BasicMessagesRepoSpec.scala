@@ -3,18 +3,17 @@ package com.wavesplatform.network
 import java.io.ByteArrayOutputStream
 
 import com.google.protobuf.{ByteString, CodedOutputStream, WireFormat}
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.mining.MiningConstraints
 import com.wavesplatform.protobuf.block._
 import com.wavesplatform.protobuf.transaction._
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.{DataTransaction, Proofs, TxVersion}
-import org.scalatest._
 
-class BasicMessagesRepoSpec extends FreeSpec with Matchers with TransactionGen {
+class BasicMessagesRepoSpec extends FreeSpec {
   "PBBlockSpec max length" in {
     val maxSizedHeader = PBBlock.Header(
       Byte.MaxValue,
