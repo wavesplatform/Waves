@@ -3,12 +3,11 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.Config
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api._
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
-import org.scalatest._
+import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
+
 import scala.concurrent.duration._
 
-class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure with ReportingTestName with NodesFromDocker {
+class BlacklistTestSuite extends BaseFreeSpec {
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder

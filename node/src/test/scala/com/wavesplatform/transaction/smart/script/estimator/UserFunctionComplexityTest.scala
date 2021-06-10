@@ -15,13 +15,12 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state.diffs.smart.predef.chainId
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
+class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with TypedScriptGen {
   private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, DirectiveSet.contractDirectiveSet, ByteStr.empty)
 
   private def estimate(expr: EXPR, ctx: CTX[Environment], funcCosts: Map[FunctionHeader, Coeval[Long]]): Either[String, Long] = {

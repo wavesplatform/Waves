@@ -19,10 +19,9 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test.PropSpec
 
-class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
+class DecompilerTest extends PropSpec {
 
   val sp = "\\s+".r
   implicit class StringCmp(s1: String) {

@@ -1,8 +1,8 @@
 package com.wavesplatform.state.diffs
 
-import cats.implicits._
 import cats.kernel.Monoid
 import cats.syntax.either.catsSyntaxEitherId
+import cats.syntax.semigroup._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures

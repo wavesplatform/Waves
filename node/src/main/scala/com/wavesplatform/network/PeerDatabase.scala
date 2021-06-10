@@ -36,7 +36,7 @@ trait PeerDatabase extends AutoCloseable {
 
 object PeerDatabase extends ScorexLogging {
 
-  trait NoOp extends PeerDatabase {
+  object NoOp extends PeerDatabase {
     override def addCandidate(socketAddress: InetSocketAddress): Boolean = true
 
     override def touch(socketAddress: InetSocketAddress): Unit = {}
@@ -65,7 +65,4 @@ object PeerDatabase extends ScorexLogging {
 
     override def close(): Unit = {}
   }
-
-  object NoOp extends NoOp
-
 }

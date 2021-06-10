@@ -1,23 +1,17 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.{EitherMatchers, TransactionGen}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer._
 import org.scalacheck.Gen
-import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class BlockchainUpdaterBadReferencesTest
     extends PropSpec
-    with PropertyChecks
-    with DomainScenarioDrivenPropertyCheck
-    with Matchers
-    with EitherMatchers
-    with TransactionGen {
+    with DomainScenarioDrivenPropertyCheck {
 
   val preconditionsAndPayments: Gen[(GenesisTransaction, TransferTransaction, TransferTransaction, TransferTransaction)] = for {
     master    <- accountGen

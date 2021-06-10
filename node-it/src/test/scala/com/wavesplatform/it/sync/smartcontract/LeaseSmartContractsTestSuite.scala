@@ -6,8 +6,8 @@ import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee, transferAmount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler

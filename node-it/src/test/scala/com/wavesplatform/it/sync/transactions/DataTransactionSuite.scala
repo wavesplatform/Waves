@@ -11,7 +11,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{TransactionInfo, UnexpectedStatusCodeException}
 import com.wavesplatform.it.sync.{calcDataFee, minFee, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.util._
+import com.wavesplatform.test._
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -93,7 +93,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     // can put data
     val putDataEntries = (1 to 25).flatMap(i => dataEntries(i)).toList
     val putTxId        = sender.putData(sender.keyPair, putDataEntries, calcDataFee(putDataEntries, TxVersion.V1)).id
-    nodes.waitForHeightAriseAndTxPresent(putTxId)
+    nodes.waitForTransaction(putTxId)
 
     // can put new, update and remove existed in the same transaction
     val updatedDatEntries = putDataEntries.take(25).map(updateDataEntry)
@@ -107,7 +107,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     val updateAndRemoveTxId =
       sender.broadcastData(sender.keyPair, updateAndRemoveDataEntries, calcDataFee(updateAndRemoveDataEntries, TxVersion.V2)).id
 
-    nodes.waitForHeightAriseAndTxPresent(updateAndRemoveTxId)
+    nodes.waitForTransaction(updateAndRemoveTxId)
 
     sender.getData(sender.address) should contain theSameElementsAs updatedDatEntries ++ putDataEntries.slice(25, 75) ++ newDataEntries
 
@@ -116,7 +116,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     val reuseTxId =
       sender.broadcastData(sender.keyPair, reusedData, calcDataFee(reusedData, TxVersion.V1), version = TxVersion.V1).id
 
-    nodes.waitForHeightAriseAndTxPresent(reuseTxId)
+    nodes.waitForTransaction(reuseTxId)
 
     sender.getData(sender.address) should contain theSameElementsAs updatedDatEntries ++ putDataEntries.slice(25, 75) ++ reusedData ++ newDataEntries
 
@@ -167,7 +167,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       val data             = List(entry)
       val dataFee          = calcDataFee(data, v)
       val dataTx           = sender.putData(firstKeyPair, data, version = v, fee = dataFee)
-      nodes.waitForHeightAriseAndTxPresent(dataTx.id)
+      nodes.waitForTransaction(dataTx.id)
       if (v > 2) {
         dataTx.chainId shouldBe Some(AddressScheme.current.chainId)
         sender.transactionInfo[TransactionInfo](dataTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
@@ -182,15 +182,13 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
 
       val data = List(BooleanDataEntry("bool", false))
       assertBadRequestAndResponse(sender.putData(firstKeyPair, data, balance1 + 1, version = v), "Accounts balance errors")
-      nodes.waitForHeightArise()
       miner.assertBalances(firstAddress, balance1, eff1)
 
       val leaseAmount = 1.waves
       val leaseId     = sender.lease(firstKeyPair, secondAddress, leaseAmount, minFee).id
-      nodes.waitForHeightAriseAndTxPresent(leaseId)
+      nodes.waitForTransaction(leaseId)
 
       assertBadRequestAndResponse(sender.putData(firstKeyPair, data, balance1 - leaseAmount, version = v), "Accounts balance errors")
-      nodes.waitForHeightArise()
       miner.assertBalances(firstAddress, balance1 - minFee, eff1 - leaseAmount - minFee)
     }
   }
@@ -232,7 +230,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     val data         = List.tabulate(26)(n => BinaryDataEntry(key + n.toChar, ByteStr(Array.fill(5599)(n.toByte))))
     val fee          = calcDataFee(data, TxVersion.V1)
     val txId         = sender.putData(firstKeyPair, data, fee, version = TxVersion.V1).id
-    nodes.waitForHeightAriseAndTxPresent(txId)
+    nodes.waitForTransaction(txId)
 
     //Max size of transaction V2
     val maxKeySizeV2 = 400
@@ -240,7 +238,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     val data2        = List.tabulate(5)(n => BinaryDataEntry(key2 + n.toChar, ByteStr(Array.fill(Short.MaxValue)(n.toByte))))
     val fee2         = calcDataFee(data2, TxVersion.V2)
     val txId2        = sender.putData(firstKeyPair, data2, fee2, version = TxVersion.V2).id
-    nodes.waitForHeightAriseAndTxPresent(txId2)
+    nodes.waitForTransaction(txId2)
 
   }
 
@@ -251,7 +249,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       val intEntry = IntegerDataEntry("int", 8)
       val intList  = List(intEntry)
       val tx1      = sender.putData(txSender, intList, calcDataFee(intList, v), version = v).id
-      nodes.waitForHeightAriseAndTxPresent(tx1)
+      nodes.waitForTransaction(tx1)
 
       val txSenderAddress = txSender.toAddress.toString
       sender.getDataByKey(txSenderAddress, "int") shouldBe intEntry
@@ -261,13 +259,13 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       val boolEntry = BooleanDataEntry("bool", true)
       val boolList  = List(boolEntry)
       val tx2       = sender.putData(txSender, boolList, calcDataFee(boolList, v), version = v).id
-      nodes.waitForHeightAriseAndTxPresent(tx2)
+      nodes.waitForTransaction(tx2)
 
       // define string entry
       val stringEntry = StringDataEntry("str", "AAA")
       val stringList  = List(stringEntry)
       val txS         = sender.putData(txSender, stringList, calcDataFee(stringList, v), version = v).id
-      nodes.waitForHeightAriseAndTxPresent(txS)
+      nodes.waitForTransaction(txS)
 
       sender.getDataByKey(txSenderAddress, "int") shouldBe intEntry
       sender.getDataByKey(txSenderAddress, "bool") shouldBe boolEntry
@@ -278,7 +276,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       val reIntEntry = IntegerDataEntry("int", 10)
       val reIntList  = List(reIntEntry)
       val tx3        = sender.putData(txSender, reIntList, calcDataFee(reIntList, v), version = v).id
-      nodes.waitForHeightAriseAndTxPresent(tx3)
+      nodes.waitForTransaction(tx3)
 
       sender.getDataByKey(txSenderAddress, "int") shouldBe reIntEntry
       sender.getDataByKey(txSenderAddress, "bool") shouldBe boolEntry
@@ -294,7 +292,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       val dataAllTypes       = List(intEntry2, boolEntry2, blobEntry2, stringEntry2, unicodeStringEntry)
       val fee                = calcDataFee(dataAllTypes, v)
       val txId               = sender.putData(txSender, dataAllTypes, fee, version = v).id
-      nodes.waitForHeightAriseAndTxPresent(txId)
+      nodes.waitForTransaction(txId)
 
       sender.getDataByKey(txSenderAddress, "int") shouldBe intEntry2
       sender.getDataByKey(txSenderAddress, "bool") shouldBe boolEntry2
@@ -342,13 +340,13 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       val boolData    = List(BooleanDataEntry(nonLatinKey, true))
       val boolDataFee = calcDataFee(boolData, v)
       val firstTx     = sender.putData(firstKeyPair, boolData, boolDataFee, version = v).id
-      nodes.waitForHeightAriseAndTxPresent(firstTx)
+      nodes.waitForTransaction(firstTx)
       sender.getDataByKey(firstAddress, nonLatinKey) shouldBe boolData.head
 
       val longData    = List(IntegerDataEntry(nonLatinKey, 100500))
       val longDataFee = calcDataFee(longData, v)
       val secondTx    = sender.putData(firstKeyPair, longData, longDataFee, version = v).id
-      nodes.waitForHeightAriseAndTxPresent(secondTx)
+      nodes.waitForTransaction(secondTx)
       sender.getDataByKey(firstAddress, nonLatinKey) shouldBe longData.head
     }
   }
@@ -423,7 +421,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       val withProof = request
       assert((withProof \ "proofs").as[Seq[String]].lengthCompare(1) == 0)
       sender.postJson("/transactions/broadcast", withProof)
-      nodes.waitForHeightAriseAndTxPresent(id(withProof))
+      nodes.waitForTransaction(id(withProof))
     }
   }
 
@@ -459,26 +457,22 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
 
       val extraValueData = List(BinaryDataEntry("key", ByteStr(Array.fill(maxValueSize + 1)(1.toByte))))
       assertBadRequestAndResponse(postDataTxJson(firstKeyPair, extraValueData, 1.waves, version = v), TooBig)
-      nodes.waitForHeightArise()
 
       val largeBinData = List.tabulate(5)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(maxValueSize)(n.toByte))))
       assertBadRequestAndResponse(postDataTxJson(firstKeyPair, largeBinData, 1.waves, version = v), TooBig)
-      nodes.waitForHeightArise()
 
       val largeStrData = List.tabulate(5)(n => StringDataEntry(extraKey, "A" * maxValueSize))
       assertBadRequestAndResponse(postDataTxJson(firstKeyPair, largeStrData, 1.waves, version = v), TooBig)
-      nodes.waitForHeightArise()
 
       val tooManyEntriesData = List.fill(maxEntryCount + 1)(IntegerDataEntry("key", 88))
       assertBadRequestAndResponse(postDataTxJson(firstKeyPair, tooManyEntriesData, 1.waves, version = v), TooBig)
-      nodes.waitForHeightArise()
     }
   }
 
   test("try to put empty data") {
     for (v <- dataTxSupportedVersions) {
       val noDataTx = sender.putData(fourthKeyPair, List.empty, calcDataFee(List.empty, v), version = v).id
-      nodes.waitForHeightAriseAndTxPresent(noDataTx)
+      nodes.waitForTransaction(noDataTx)
       sender.getData(fourthAddress) shouldBe List.empty
     }
   }

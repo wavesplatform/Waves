@@ -4,20 +4,12 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.{EitherMatchers, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class BlockchainUpdaterBlockOnlyTest
-    extends PropSpec
-    with PropertyChecks
-    with DomainScenarioDrivenPropertyCheck
-    with Matchers
-    with EitherMatchers
-    with TransactionGen {
+class BlockchainUpdaterBlockOnlyTest extends PropSpec with DomainScenarioDrivenPropertyCheck {
 
   def preconditionsAndPayments(paymentsAmt: Int): Gen[(GenesisTransaction, Seq[TransferTransaction])] =
     for {

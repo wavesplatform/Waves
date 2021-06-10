@@ -5,22 +5,19 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.requests.SignedSetScriptRequest
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{NodeConfigs, TransferSending}
+import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs, TransferSending}
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.mining.MiningConstraints.MaxScriptRunsInBlock
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import org.scalatest._
 import play.api.libs.json.{JsNumber, Json}
 
 import scala.concurrent.Await.result
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with TransferSending with NodesFromDocker {
+class SmartTransactionsConstraintsSuite extends BaseFreeSpec with TransferSending {
 
   override protected val nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
     .overrideBase(
@@ -48,7 +45,6 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
     .withDefault(1)
     .build(false)
 
-  private def miner                   = nodes.head
   private val smartPrivateKey  = KeyPair.fromSeed(NodeConfigs.Default(1).getString("account-seed")).explicitGet()
   private val simplePrivateKey = KeyPair.fromSeed(NodeConfigs.Default(2).getString("account-seed")).explicitGet()
 

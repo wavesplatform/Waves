@@ -3,7 +3,10 @@ package com.wavesplatform.lang.v1
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
-import cats.implicits._
+import cats.instances.lazyList._
+import cats.instances.list._
+import cats.syntax.apply._
+import cats.syntax.traverse._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.utils.Serialize._
@@ -55,7 +58,7 @@ object Serde {
   }
 
   def deserializeDeclaration(bb: ByteBuffer, aux: => Coeval[EXPR], decType: Byte): Coeval[DECLARATION] = {
-    decType match {
+    (decType: @unchecked) match {
       case DEC_LET =>
         for {
           name <- Coeval.now(bb.getString)
@@ -81,7 +84,7 @@ object Serde {
     desAuxR(bb, allowObjects, acc)
 
   private def desAuxR(bb: ByteBuffer, allowObjects: Boolean, acc: Coeval[Unit]): Coeval[EXPR] = acc.flatMap { _ =>
-    bb.get() match {
+    (bb.get(): @unchecked) match {
       case E_LONG   => Coeval.now(CONST_LONG(bb.getLong))
       case E_BYTES  => Coeval.now(CONST_BYTESTR(ByteStr(bb.getBytes)).explicitGet())
       case E_STRING => Coeval.now(CONST_STRING(bb.getString).explicitGet())
@@ -123,7 +126,8 @@ object Serde {
           .flatMap(
             argsCount =>
               if (argsCount <= (bb.limit() - bb.position()) && argsCount >= 0)
-                (1 to argsCount).to(LazyList)
+                (1 to argsCount)
+                  .to(LazyList)
                   .traverse(_ => evaluatedOnly(desAuxR(bb, allowObjects, acc)))
                   .map(elements => ARR(elements.toIndexedSeq, limited = false).explicitGet())
               else
@@ -132,7 +136,8 @@ object Serde {
       case E_CASE_OBJ if allowObjects =>
         for {
           (typeName, fieldsNumber) <- Coeval((bb.getString, bb.getInt))
-          fields <- (1 to fieldsNumber).to(LazyList)
+          fields <- (1 to fieldsNumber)
+            .to(LazyList)
             .traverse(
               _ =>
                 for {

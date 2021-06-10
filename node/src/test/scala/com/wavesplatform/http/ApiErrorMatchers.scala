@@ -3,7 +3,7 @@ package com.wavesplatform.http
 import akka.http.scaladsl.testkit.RouteTest
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiMarshallers._
-import org.scalatest.Matchers
+import org.scalatest.matchers.should.Matchers
 import org.scalatest.matchers.{MatchResult, Matcher}
 import play.api.libs.json._
 

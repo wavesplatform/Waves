@@ -15,17 +15,16 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
     tx.copy(proofs = p)
   }
 
-  def assertTxs(f: Transaction, second: ReissueTransaction): Unit = f match {
-    case first: ReissueTransaction =>
-      first.sender shouldEqual second.sender
-      first.timestamp shouldEqual second.timestamp
-      first.fee shouldEqual second.fee
-      first.version shouldEqual second.version
-      first.quantity shouldEqual second.quantity
-      first.reissuable shouldEqual second.reissuable
-      first.asset shouldEqual second.asset
-      first.proofs shouldEqual second.proofs
-      first.bytes() shouldEqual second.bytes()
+  def assertTxs(first: ReissueTransaction, second: ReissueTransaction): Unit = {
+    first.sender shouldEqual second.sender
+    first.timestamp shouldEqual second.timestamp
+    first.fee shouldEqual second.fee
+    first.version shouldEqual second.version
+    first.quantity shouldEqual second.quantity
+    first.reissuable shouldEqual second.reissuable
+    first.asset shouldEqual second.asset
+    first.proofs shouldEqual second.proofs
+    first.bytes() shouldEqual second.bytes()
   }
 
   def generator: Gen[(Seq[com.wavesplatform.transaction.Transaction], ReissueTransaction)] =
@@ -34,8 +33,18 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
       fee                                                                      <- smallFeeGen
       reissuable                                                               <- Gen.oneOf(true, false)
     } yield {
-      val issue = IssueTransaction(TxVersion.V1, sender.publicKey, assetName, description, quantity, decimals, reissuable = true, script = None, iFee, timestamp)
-        .signWith(sender.privateKey)
+      val issue = IssueTransaction(
+        TxVersion.V1,
+        sender.publicKey,
+        assetName,
+        description,
+        quantity,
+        decimals,
+        reissuable = true,
+        script = None,
+        iFee,
+        timestamp
+      ).signWith(sender.privateKey)
       val reissue1 = ReissueTransaction
         .selfSigned(2.toByte, sender, issue.asset, quantity, reissuable = reissuable, fee, timestamp)
         .explicitGet()

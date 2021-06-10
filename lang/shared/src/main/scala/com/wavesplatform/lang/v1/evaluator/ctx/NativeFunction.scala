@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats.data.EitherT
-import cats.implicits._
+import cats.syntax.applicative._
 import cats.{Eval, Monad}
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.StdLibVersion
@@ -43,7 +43,7 @@ case class NativeFunction[C[_[_]]](
                                     @(JSExport @field) args: Seq[String]
 ) extends BaseFunction[C] {
   def eval[F[_] : Monad](context: C[F], args: List[EVALUATED]): TrampolinedExecResult[F, EVALUATED] =
-    EitherT.apply[EvalF[F, ?], ExecutionError, EVALUATED](ev((context, args)).pure[Eval])
+    EitherT.apply[EvalF[F, *], ExecutionError, EVALUATED](ev((context, args)).pure[Eval])
 }
 
 object NativeFunction {

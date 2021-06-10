@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import cats.implicits._
+import cats.syntax.semigroup._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Functions.{addressFromStringF, _}
@@ -80,8 +80,8 @@ object WavesContext {
       isDataStorageUntouchedF
     ) ++ (if (contentType == DApp)
             Array(
-              callDAppF(version, reentrant = false),
-              callDAppF(version, reentrant = true)
+              callDAppF(reentrant = false),
+              callDAppF(reentrant = true)
             )
           else Array())
 

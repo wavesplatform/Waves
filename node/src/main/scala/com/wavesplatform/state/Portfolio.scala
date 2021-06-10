@@ -1,7 +1,8 @@
 package com.wavesplatform.state
 
-import cats._
-import cats.kernel.instances.map._
+import cats.Monoid
+import cats.instances.map._
+import cats.kernel.CommutativeSemigroup
 import com.wavesplatform.state.diffs.BlockDiffer.Fraction
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset._
@@ -32,7 +33,7 @@ object Portfolio {
 
   val empty: Portfolio = Portfolio()
 
-  implicit val longSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
+  implicit val longSemigroup: CommutativeSemigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
 
   implicit val monoid: Monoid[Portfolio] = new Monoid[Portfolio] {
     override val empty: Portfolio = Portfolio.empty

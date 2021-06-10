@@ -192,14 +192,9 @@ object InvokeScriptResult {
         val transfers    = actions.collect { case t: lang.AssetTransfer => langTransferToPayment(t) }
         val leases       = actions.collect { case l: lang.Lease         => langLeaseToLease(l) }
         val leaseCancels = actions.collect { case l: lang.LeaseCancel   => l }
-        val invokes = result.invokes.map {
-          case (dApp, fname, args, payments, r) =>
-            Invocation(
-              langAddressToAddress(dApp),
-              Call(fname, args),
-              (payments.map {
-                case CaseObj(t, fields) =>
-                  (fields("assetId"), fields("amount")) match {
+        val invokes     = result.invokes.map {
+          case (dApp, fname, args, payments, r) => Invocation(langAddressToAddress(dApp), Call(fname, args), (payments.map { case CaseObj(t, fields) =>
+            ((fields("assetId"), fields("amount")): @unchecked) match {
                     case (CONST_BYTESTR(b), CONST_LONG(a)) => InvokeScriptResult.AttachedPayment(IssuedAsset(b), a)
                     case (_, CONST_LONG(a))                => InvokeScriptResult.AttachedPayment(Waves, a)
                   }

@@ -7,14 +7,12 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api._
-import com.wavesplatform.it.transactions.BaseTransactionSuiteLike
-import com.wavesplatform.it.util._
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils._
-import org.scalatest.FreeSpec
 import play.api.libs.json._
 
 import scala.concurrent.Future.traverse
@@ -22,7 +20,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
+class NFTBalanceSuite extends BaseFreeSpec {
   import NFTBalanceSuite._
 
   override protected def nodeConfigs: Seq[Config] =

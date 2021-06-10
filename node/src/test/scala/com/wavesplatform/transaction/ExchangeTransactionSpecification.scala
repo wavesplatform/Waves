@@ -4,19 +4,18 @@ import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
-import com.wavesplatform.{NTPTime, NoShrink, TransactionGen, crypto}
+import com.wavesplatform.{NTPTime, crypto}
 import org.scalacheck.Gen
-import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
 import scala.math.pow
 
-class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with NTPTime with NoShrink {
+class ExchangeTransactionSpecification extends PropSpec with NTPTime {
   val versionsGen: Gen[(Byte, Byte, Byte)] = Gen.oneOf(
     (1.toByte, 1.toByte, 1.toByte),
     (1.toByte, 2.toByte, 2.toByte),

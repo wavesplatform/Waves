@@ -8,7 +8,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, VolumeAndFee}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Transaction, TxHelpers}
+import com.wavesplatform.transaction.TxHelpers
 import org.scalamock.MockFactoryBase
 
 import scala.concurrent.Future
@@ -44,14 +44,7 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
     blockchain
   }
 
-  def createTxPublisherStub(blockchain: Blockchain): TransactionPublisher = {
-    val publisher = stub[TransactionPublisher]
-    (publisher.validateAndBroadcast _).when(*, *).onCall {
-      case (transaction: Transaction, _) =>
-        val differ = TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
-        val result = differ(transaction)
-        Future.successful(result.map(_ => true))
-    }
-    publisher
+  def createTxPublisherStub(blockchain: Blockchain): TransactionPublisher = { (transaction, _) =>
+    Future.successful(TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, transaction).map(_ => true))
   }
 }

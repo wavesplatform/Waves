@@ -1,11 +1,14 @@
 package com.wavesplatform.lang
 
+import java.nio.charset.StandardCharsets
+
 import cats.Id
-import cats.implicits._
 import cats.kernel.Monoid
+import cats.syntax.either._
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto.Keccak256
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -20,21 +23,17 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
 import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV2}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease}
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
-import org.scalatest.{Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test._
+import org.scalatest.Inside
 import org.web3j.crypto.Keys
-import scorex.crypto.hash.Keccak256
-import scorex.util.encode.Base16
 
-import java.nio.charset.StandardCharsets
 import scala.util.{Random, Try}
 
-class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
+class IntegrationTest extends PropSpec with Inside {
   private def eval[T <: EVALUATED](
       code: String,
       pointInstance: Option[CaseObj] = None,
@@ -95,13 +94,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
     val loggedCtx = LoggedEvaluationContext[C, Id](_ => _ => (), ctx.evaluationContext(env))
       .asInstanceOf[LoggedEvaluationContext[Environment, Id]]
-    typed.flatMap(v =>
-      Try(new EvaluatorV2(loggedCtx, version).apply(v._1, Int.MaxValue)._1.asInstanceOf[T])
-        .toEither
-        .leftMap(_.getMessage)
+    typed.flatMap(
+      v =>
+        Try(new EvaluatorV2(loggedCtx, version).apply(v._1, Int.MaxValue)._1.asInstanceOf[T]).toEither
+          .leftMap(_.getMessage)
     )
   }
-  
+
   private val v5Ctx = WavesContext.build(Global, DirectiveSet(V5, Account, DApp).explicitGet())
 
   property("simple let") {
@@ -1197,14 +1196,14 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("List[Int] median - list with big elements - error") {
     val src =
-      s"""[${Long.MaxValue}, ${Long.MaxValue-2}].median()"""
-    eval(src, version = V4) shouldBe Right(CONST_LONG(Long.MaxValue-1))
+      s"""[${Long.MaxValue}, ${Long.MaxValue - 2}].median()"""
+    eval(src, version = V4) shouldBe Right(CONST_LONG(Long.MaxValue - 1))
   }
 
   property("List[Int] median - list with MinValue - error") {
     val src =
       s"""[0, ${Long.MinValue}].median()"""
-    eval(src, version = V4) shouldBe Right(CONST_LONG(Long.MinValue/2))
+    eval(src, version = V4) shouldBe Right(CONST_LONG(Long.MinValue / 2))
   }
 
   property("groth16Verify") {
@@ -1402,7 +1401,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("different Issue action constructors") {
     val script =
-     """
+      """
        | Issue("name", "description", 1234567, 100, true) ==
        | Issue("name", "description", 1234567, 100, true, unit, 0)
      """.stripMargin
@@ -1561,7 +1560,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("ecrecover positive cases") {
     def hash(message: String): String = {
       val prefix = "\u0019Ethereum Signed Message:\n" + message.length
-      Base16.encode(Keccak256.hash((prefix + message).getBytes))
+      BaseEncoding.base16().lowerCase().encode(Keccak256.hash((prefix + message).getBytes))
     }
 
     def recoverPublicKey(message: String, signature: String): Array[Byte] = {
@@ -1572,22 +1571,22 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     //source: https://etherscan.io/verifySig/2006
     val signature1 =
       "3b163bbd90556272b57c35d1185b46824f8e16ca229bdb3" +
-      "6f8dfd5eaaee9420723ef7bc3a6c0236568217aa990617c" +
-      "f292b1bef1e7d1d936fb2faef3d846c5751b"
-    val message1 = "what's up jim"
+        "6f8dfd5eaaee9420723ef7bc3a6c0236568217aa990617c" +
+        "f292b1bef1e7d1d936fb2faef3d846c5751b"
+    val message1         = "what's up jim"
     val expectedAddress1 = "85db9634489b76e238368e4a075cc6e5a56a714c"
 
-    Keys.getAddress(recoverPublicKey(message1, signature1)) shouldBe Base16.decode(expectedAddress1).get
+    Keys.getAddress(recoverPublicKey(message1, signature1)) shouldBe BaseEncoding.base16().lowerCase().decode(expectedAddress1)
 
     //source: https://etherscan.io/verifySig/2007
     val signature2 =
       "848ffb6a07e7ce335a2bfe373f1c17573eac320f658ea8" +
-      "cf07426544f2203e9d52dbba4584b0b6c0ed5333d84074" +
-      "002878082aa938fdf68c43367946b2f615d01b"
-    val message2 = "i am the owner"
+        "cf07426544f2203e9d52dbba4584b0b6c0ed5333d84074" +
+        "002878082aa938fdf68c43367946b2f615d01b"
+    val message2         = "i am the owner"
     val expectedAddress2 = "73f32c743e5928ff800ab8b05a52c73cd485f9c3"
 
-    Keys.getAddress(recoverPublicKey(message2, signature2)) shouldBe Base16.decode(expectedAddress2).get
+    Keys.getAddress(recoverPublicKey(message2, signature2)) shouldBe BaseEncoding.base16().lowerCase().decode(expectedAddress2)
   }
 
   property("ecrecover negative cases") {
@@ -1614,16 +1613,16 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         ("unit", "Unit")
       ) #::: getElement
 
-   /*  Example for size = 2
-    *
-    *  let a = (true, 123)
-    *  func f(x: (Boolean, Int)) == x
-    *
-    *  let (a1, a2) = a
-    *  a._1 == true && a1 == true && a._2 == 123 && a2 == 123 &&
-    *  a == (true, 123) &&
-    *  f(a) == a
-    */
+    /*  Example for size = 2
+     *
+     *  let a = (true, 123)
+     *  func f(x: (Boolean, Int)) == x
+     *
+     *  let (a1, a2) = a
+     *  a._1 == true && a1 == true && a._2 == 123 && a2 == 123 &&
+     *  a == (true, 123) &&
+     *  f(a) == a
+     */
     def check(size: Int) = {
       val valueDefinition = (1 to size).map(i => getElement(i)._1).mkString("(", ", ", ")")
       val typeDefinition  = (1 to size).map(i => getElement(i)._2).mkString("(", ", ", ")")
@@ -1737,10 +1736,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         ii
       }
       val src = lets ++ (if (i != 16) {
-        s"bn256Groth16Verify_${i}inputs(vk, proof, inputs)"
-      } else {
-        "bn256Groth16Verify(vk, proof, inputs)"
-      })
+                           s"bn256Groth16Verify_${i}inputs(vk, proof, inputs)"
+                         } else {
+                           "bn256Groth16Verify(vk, proof, inputs)"
+                         })
       eval(src, version = V4) shouldBe Right(CONST_BOOLEAN(false))
     }
   }
@@ -1786,10 +1785,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         ii
       }
       val src = lets ++ (if (i != 16) {
-        s"bn256Groth16Verify_${i}inputs(vk, proof, inputs)"
-      } else {
-        "bn256Groth16Verify(vk, proof, inputs)"
-      })
+                           s"bn256Groth16Verify_${i}inputs(vk, proof, inputs)"
+                         } else {
+                           "bn256Groth16Verify(vk, proof, inputs)"
+                         })
       eval(src, version = V4) shouldBe Right(CONST_BOOLEAN(true))
     }
   }
@@ -1797,10 +1796,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("bn256Groth16Verify_*inputs fail if too many inputs") {
     for ((i, lets) <- bn256GrothsFail ++ bn256GrothsOk if (i > 1)) {
       val src = lets ++ (if (i <= 16) {
-        s"bn256Groth16Verify_${i - 1}inputs(vk, proof, inputs)"
-      } else {
-        "bn256Groth16Verify(vk, proof, inputs)"
-      })
+                           s"bn256Groth16Verify_${i - 1}inputs(vk, proof, inputs)"
+                         } else {
+                           "bn256Groth16Verify(vk, proof, inputs)"
+                         })
       eval(src, version = V4) shouldBe Left(s"Invalid inputs size ${i * 32} bytes, must be not greater than ${i * 32 - 32} bytes")
     }
   }
@@ -1821,17 +1820,17 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         ii
       }
       val src = lets ++ (if (i != 16) {
-        s"bn256Groth16Verify_${i}inputs(vk, proof, inputs)"
-      } else {
-        "bn256Groth16Verify(vk, proof, inputs)"
-      })
+                           s"bn256Groth16Verify_${i}inputs(vk, proof, inputs)"
+                         } else {
+                           "bn256Groth16Verify(vk, proof, inputs)"
+                         })
       eval(src, version = V4) shouldBe Left(s"Invalid vk size ${n} bytes, must be equal to ${(8 + ii) * 32} bytes for ${ii} inputs")
     }
   }
 
   property("bn256Groth16Verify_*inputs with invalid proof size") {
     def lets(proofSize: Int) =
-     s"""
+      s"""
         |let vk = base64'mY//hEITCBCZUJUN/wsOlw1iUSSOESL6PFSbN1abGK80t5jPNICNlPuSorio4mmWpf+4uOyv3gPZe54SYGM4pfhteqJpwFQxdlpwXWyYxMTNaSLDj8VtSn/EJaSu+P6nFmWsda3mTYUPYMZzWE4hMqpDgFPcJhw3prArMThDPbR3Hx7E6NRAAR0LqcrdtsbDqu2T0tto1rpnFILdvHL4PqEUfTmF2mkM+DKj7lKwvvZUbukqBwLrnnbdfyqZJryzGAMIa2JvMEMYszGsYyiPXZvYx6Luk54oWOlOrwEKrCY4NMPwch6DbFq6KpnNSQwOpgRYCz7wpjk57X+NGJmo85tYKc+TNa1rT4/DxG9v6SHkpXmmPeHhzIIW8MOdkFjxB5o6Qn8Fa0c6Tt6br2gzkrGr1eK5/+RiIgEzVhcRrqdY/p7PLmKXqawrEvIv9QZ3ijytPNwinlC8XdRLO/YvP33PjcI9WSMcHV6POP9KPMo1rngaIPMegKgAvTEouNFKp4v3wAXRXX5xEjwXAmM5wyB/SAOaPPCK/emls9kqolHsaj7nuTTbrvSV8bqzUwzQ'
         |let proof = base64'${ByteStr.fill(proofSize)(1).base64}'
         |let inputs = base64'aZ8tqrOeEJKt4AMqiRF/WJhIKTDC0HeDTgiJVLZ8OEs='
@@ -1843,10 +1842,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         ii
       }
       val src = lets(proofSize) ++ (if (i != 16) {
-        s"bn256Groth16Verify_${i}inputs(vk, proof, inputs)"
-      } else {
-        "bn256Groth16Verify(vk, proof, inputs)"
-      })
+                                      s"bn256Groth16Verify_${i}inputs(vk, proof, inputs)"
+                                    } else {
+                                      "bn256Groth16Verify(vk, proof, inputs)"
+                                    })
       eval(src, version = V4) shouldBe Left(s"Invalid proof size $proofSize bytes, must be equal to 128 bytes")
     }
   }
@@ -1865,10 +1864,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         ii
       }
       val src = lets ++ (if (i != 16) {
-        s"bn256Groth16Verify_${i}inputs(vk, proof, inputs)"
-      } else {
-        "bn256Groth16Verify(vk, proof, inputs)"
-      })
+                           s"bn256Groth16Verify_${i}inputs(vk, proof, inputs)"
+                         } else {
+                           "bn256Groth16Verify(vk, proof, inputs)"
+                         })
       eval(src, version = V4) shouldBe Left("Invalid inputs size 33 bytes, must be a multiple of 32 bytes")
     }
   }
@@ -1905,7 +1904,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("Union with multiple List") {
-    eval("""match (if false then 2 else if true then [3] else ["qqq"]) { case n: Int => n case a => a[0] }""", version = V4) shouldBe Right(CONST_LONG(3))
+    eval("""match (if false then 2 else if true then [3] else ["qqq"]) { case n: Int => n case a => a[0] }""", version = V4) shouldBe Right(
+      CONST_LONG(3)
+    )
   }
 
   property("Any type") {
@@ -1963,7 +1964,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("default type") {
-    eval("""func f(x: Int| String) = {
+    eval(
+      """func f(x: Int| String) = {
       match x {
         case i: Int => 1
         case v =>
@@ -1973,7 +1975,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           }
       }
     }
-    f("q")""", version = V4) shouldBe Symbol("Left")
+    f("q")""",
+      version = V4
+    ) shouldBe Symbol("Left")
   }
 
   property("different Lease action constructors") {
@@ -1984,8 +1988,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("calculateLeaseId") {
     val txId = ByteStr.decodeBase58("aaaa").get
-    val id1 = Lease.calculateId(Lease(Address(ByteStr.decodeBase58("bbbb").get), 1234567, 123), txId)
-    val id2 = Lease.calculateId(Lease(Alias("alias"), 9876, 100), txId)
+    val id1  = Lease.calculateId(Lease(Address(ByteStr.decodeBase58("bbbb").get), 1234567, 123), txId)
+    val id2  = Lease.calculateId(Lease(Alias("alias"), 9876, 100), txId)
     val script =
       s"""
          | calculateLeaseId(Lease(Address(base58'bbbb'), 1234567, 123)) == base58'$id1' &&
@@ -1997,8 +2001,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("calculateLeaseId restrictions") {
-    val script1 = s" calculateLeaseId(Lease(Address(base58'${"a"* 36}'), 1234567, 123)) "
-    val script2 = s""" calculateLeaseId(Lease(Alias("${"a"* 31}"), 1234567, 123)) """
+    val script1 = s" calculateLeaseId(Lease(Address(base58'${"a" * 36}'), 1234567, 123)) "
+    val script2 = s""" calculateLeaseId(Lease(Alias("${"a" * 31}"), 1234567, 123)) """
 
     genericEval[Environment, EVALUATED](script1, ctxt = v5Ctx, version = V5, env = utils.environment) should
       produce("Address bytes length=27 exceeds limit=26")
@@ -2006,7 +2010,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       produce("Alias name length=31 exceeds limit=30")
   }
 
-    property("integer case") {
+  property("integer case") {
     val sampleScript =
       """match 2 {
         |  case 1 => 7
@@ -2044,7 +2048,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |}
          |
       """.stripMargin
-    eval[EVALUATED](sampleScript, version=V4) shouldBe evaluated(5)
+    eval[EVALUATED](sampleScript, version = V4) shouldBe evaluated(5)
   }
 
   property("typed tuple destruct") {
@@ -2057,7 +2061,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |}
          |
       """.stripMargin
-    eval[EVALUATED](sampleScript, version=V4) shouldBe evaluated("qqq")
+    eval[EVALUATED](sampleScript, version = V4) shouldBe evaluated("qqq")
   }
 
   property("caseType destruct") {
@@ -2118,11 +2122,15 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
        """.stripMargin
     eval(script2) should produce("value() called on unit value on function 'a' call")
 
-    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx     = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
     val script3 = "SponsorFee(base58'', unit).minSponsoredAssetFee.value()"
-    genericEval(script3, ctxt = ctx, version = V4, env = utils.environment) should produce("value() called on unit value while accessing field 'minSponsoredAssetFee'")
+    genericEval(script3, ctxt = ctx, version = V4, env = utils.environment) should produce(
+      "value() called on unit value while accessing field 'minSponsoredAssetFee'"
+    )
     val script4 = """ getIntegerValue(Address(base58''), "") """
-    genericEval(script4, ctxt = ctx, version = V4, env = utils.environment) should produce("value() called on unit value on function 'getInteger' call")
+    genericEval(script4, ctxt = ctx, version = V4, env = utils.environment) should produce(
+      "value() called on unit value on function 'getInteger' call"
+    )
 
     eval("(if (true) then unit else 7).value()") should produce("value() called on unit value after condition evaluation")
     eval("(let a = 1; if (true) then unit else 7).value()") should produce("value() called on unit value after let block evaluation")

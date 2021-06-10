@@ -1,11 +1,10 @@
 package com.wavesplatform.account
 
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.{NoShrink, crypto}
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.crypto
+import com.wavesplatform.test.PropSpec
 
-class AccountSpecification extends PropSpec with PropertyChecks with Matchers with NoShrink {
+class AccountSpecification extends PropSpec {
 
   property("Account.isValidAddress should return false for another address version") {
     forAll { (data: Array[Byte], AddressVersion2: Byte) =>
