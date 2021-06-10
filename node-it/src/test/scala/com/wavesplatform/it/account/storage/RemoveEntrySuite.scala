@@ -45,9 +45,9 @@ class RemoveEntrySuite extends BaseFreeSpec {
                  |
                  |func deleteEntry(acc: List[DeleteEntry], e: String) = DeleteEntry(e) :: acc
                  |
-                 |@Callable(i) func delete100Entries() = { ${Common.fold(100, "a100", "[]", "deleteEntry")} }
+                 |@Callable(i) func delete100Entries() = { ${Common.fold(100, "a100", "[]", "deleteEntry")()} }
                  |
-                 |@Callable(i) func delete101Entries() = { ${Common.fold(101, "a101", "[]", "deleteEntry")} }
+                 |@Callable(i) func delete101Entries() = { ${Common.fold(101, "a101", "[]", "deleteEntry")()} }
                  |
                  |@Callable(i) func write(k: String, v: String) = [StringEntry(k, v)]
                  |
