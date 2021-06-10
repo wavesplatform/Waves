@@ -7,6 +7,8 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
+import com.wavesplatform.it.util._
+import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG, CONST_STRING}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
@@ -24,7 +26,7 @@ class RemoveEntrySuite extends BaseFreeSpec {
 
   def writeEntry(we: WriteEntry): String = s"@Callable(i) func write${we.ct}(k: String, v: ${we.t}) = [${we.ct}Entry(k, v)]"
 
-  private val script = """
+  private val script = s"""
                  |{-# STDLIB_VERSION 4 #-}
                  |{-# SCRIPT_TYPE ACCOUNT #-}
                  |{-# CONTENT_TYPE DAPP #-}
@@ -43,9 +45,9 @@ class RemoveEntrySuite extends BaseFreeSpec {
                  |
                  |func deleteEntry(acc: List[DeleteEntry], e: String) = DeleteEntry(e) :: acc
                  |
-                 |@Callable(i) func delete100Entries() = { FOLD<100>(a100, [], deleteEntry) }
+                 |@Callable(i) func delete100Entries() = { ${Common.fold(100, "a100", "[]", "deleteEntry")} }
                  |
-                 |@Callable(i) func delete101Entries() = { FOLD<101>(a101, [], deleteEntry) }
+                 |@Callable(i) func delete101Entries() = { ${Common.fold(101, "a101", "[]", "deleteEntry")} }
                  |
                  |@Callable(i) func write(k: String, v: String) = [StringEntry(k, v)]
                  |
