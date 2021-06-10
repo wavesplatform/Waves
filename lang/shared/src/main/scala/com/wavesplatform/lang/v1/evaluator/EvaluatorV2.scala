@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
+import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, Simple}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.{EvaluationException, incomplete}
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.traits.Environment
@@ -26,7 +27,7 @@ class EvaluatorV2(
   def apply(expr: EXPR, limit: Int): (EXPR, Int) =
     applyCoeval(expr, limit).value()
 
-  def applyCoeval(expr: EXPR, limit: Int, parentBlocks: List[BLOCK_DEF] = Nil): Coeval[(EXPR, Int)] = {
+  private def applyCoeval(expr: EXPR, limit: Int, parentBlocks: List[BLOCK_DEF] = Nil): Coeval[(EXPR, Int)] = {
     var ref = expr.deepCopy.value
     root(ref, v => Coeval.delay { ref = v }, limit, parentBlocks)
       .map((ref, _))
@@ -65,8 +66,20 @@ class EvaluatorV2(
       if (limit < cost)
         Coeval.now(limit)
       else {
-        function.ev
-          .evaluateExtended[Id](ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]], limit - cost, evaluateHighOrder)
+        val args = fc.args.asInstanceOf[List[EVALUATED]]
+        (function.ev match {
+          case f: Extended[Environment] => f.evaluate[Id](ctx.ec.environment, args, limit - cost, evaluateHighOrder)
+          case f: Simple[Environment]   => Coeval((f.evaluate(ctx.ec.environment, args), 0))
+        }).onErrorHandleWith {
+            case _: SecurityException =>
+              Coeval((s"""An access to ${function.ev} is denied""".asLeft[EVALUATED], 0))
+            case e: Throwable =>
+              val error = e.getMessage match {
+                case null => e.toString
+                case msg  => msg
+              }
+              Coeval((s"""An error during run ${function.ev}: ${e.getClass} $error""".asLeft[EVALUATED], 0))
+          }
           .flatMap {
             case (result, additionalComplexity) =>
               val totalCost        = cost + additionalComplexity

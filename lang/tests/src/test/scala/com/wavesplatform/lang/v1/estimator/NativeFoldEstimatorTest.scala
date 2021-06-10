@@ -18,7 +18,7 @@ class NativeFoldEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV3)
           estimate(
             s"""
              | func sum(a:Int, b:Int) = a + b
-             | fold_$limit([], 0, "sum")
+             | fold_$limit([], 0, sum)
            """.stripMargin,
             V5
           ) shouldBe Right(3 * (limit + 1) + expectingCostByLimit(limit))
@@ -35,10 +35,11 @@ class NativeFoldEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV3)
   property("unexisting function") {
     PureContext.folds
       .foreach {
-        case (limit, _) =>
-          estimate(s""" fold_$limit([], 0, "sum") """, V5) shouldBe Left(
-            s"Unexpected call of high-order function fold_$limit: 'sum' is not found in the scope"
-          )
+        case (limit, f) =>
+          estimate(
+            functionCosts(V5),
+            FUNCTION_CALL(f.header, List(REF("nil"), CONST_LONG(0), CONST_STRING("sum").explicitGet()))
+          ) shouldBe Left(s"Unexpected call of high-order function fold_$limit: 'sum' is not found in the scope")
       }
   }
 

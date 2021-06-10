@@ -11,7 +11,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
-  def await[A](f: Future[A]): A = Await.result(f, 2 seconds)
+  def await[A](f: Future[A]): A = Await.result(f, 2 hour)
 
   property("variable memorization") {
     val repl = Repl()
@@ -156,8 +156,8 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
   property("internal decls") {
     val repl = Repl()
     await(repl.execute("func filterStep(acc: List[Int], v: Int) = if (v % 2 == 0) then v :: acc else acc"))
-    await(repl.execute("FOLD<5>([1,2,3,4,5], nil, filterStep)"))
-    await(repl.execute("FOLD<5>([1,2,3,4,5], nil, filterStep)")) shouldBe Right("res2: List[Int] = [4, 2]")
+    await(repl.execute("fold_20([1,2,3,4,5], nil, filterStep)"))
+    await(repl.execute("fold_20([1,2,3,4,5], nil, filterStep)")) shouldBe Right("res2: List[Int] = [4, 2]")
 
     repl.info("_isInstanceOf") shouldBe "_isInstanceOf not found in context"
   }
@@ -204,7 +204,7 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
 
   property("parse error message") {
     val repl = Repl()
-    await(repl.execute("FOLD<1>()")) shouldBe Left("Can't parse 'FOLD<1>()'")
+    await(repl.execute("fold_1()")) shouldBe Left("Can't parse 'fold_1()'")
     await(repl.execute("getInteger(")) shouldBe Left("Can't parse 'getInteger('")
   }
 

@@ -11,7 +11,7 @@ import cats.{Id, Monad}
 import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.ExecutionError
+import com.wavesplatform.lang.{CoevalF, ExecutionError}
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils.getDecompilerContext
@@ -23,7 +23,7 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction, ContextfulVal}
+import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction, ContextfulVal, InternalCall}
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
@@ -1484,22 +1484,17 @@ object PureContext {
       ("accumulator", TYPEPARAM('B')),
       ("function", STRING)
     ) {
-      new ContextfulNativeFunction[NoContext](
+      new ContextfulNativeFunction.Extended[NoContext](
         s"fold_$limit",
         TYPEPARAM('B'),
         Nil
       ) {
-        override def ev[F[_]: Monad](input: (NoContext[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
-          evaluateExtended(input._1, input._2, 0, (_, _, _) => Coeval.raiseError(throw new RuntimeException("unexpected")))
-            .value()
-            .map(_._1)
-
-        override def evaluateExtended[F[_]: Monad](
+        override def evaluate[F[_]: Monad](
             env: NoContext[F],
             args: List[EVALUATED],
             availableComplexity: Int,
-            evaluateUserFunction: (String, List[EVALUATED], Int) => Coeval[(Either[ExecutionError, EVALUATED], Int)]
-        ): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] =
+            evaluateUserFunction: InternalCall[F]
+        )(implicit m: Monad[CoevalF[F, ?]]): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] =
           args match {
             case ARR(list) :: accumulator :: CONST_STRING(function) :: Nil =>
               if (list.size > limit) {
@@ -1508,15 +1503,14 @@ object PureContext {
               } else
                 list
                   .foldLeft(
-                    Coeval((accumulator.asRight[ExecutionError], availableComplexity))
+                    Coeval((accumulator.asRight[ExecutionError], availableComplexity).pure[F])
                   )(
                     (result, element) =>
-                      result.flatMap {
+                      m.flatMap(result) {
                         case (Right(value), complexity) => evaluateUserFunction(function, List(value, element), complexity)
-                        case (error, complexity)        => Coeval((error, complexity))
+                        case (error, complexity)        => Coeval((error, complexity).pure[F])
                       }
                   )
-                  .map(_.pure[F])
             case xs =>
               val err = notImplemented[F, EVALUATED](s"fold_$limit(list: List[A], accumulator: B, function: String)", xs)
               Coeval.now(err.map((_, 0)))
