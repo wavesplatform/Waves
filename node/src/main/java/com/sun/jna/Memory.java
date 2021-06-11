@@ -54,7 +54,21 @@ import java.util.ArrayList;
 public class Memory extends Pointer {
     private final Closeable destructor;
 
+    @SuppressWarnings("deprecation")
     private static class Java8Destructor implements Runnable, Closeable {
+        private static Method CLEANER_CREATE;
+
+        static {
+            try {
+                final Class<?> sunCleaner = Class.forName("sun.misc.Cleaner");
+                CLEANER_CREATE = sunCleaner.getDeclaredMethod("create", Object.class, Runnable.class);
+                assert CLEANER_CREATE.isAccessible();
+            } catch (Exception e) {
+                System.err.println("Unable to initialize JNA cleaner");
+                e.printStackTrace();
+            }
+        }
+
         private long peer;
         private final LinkedReference reference;
         private Object cleaner;
@@ -62,9 +76,7 @@ public class Memory extends Pointer {
         public static Java8Destructor create(Memory mem) {
             final Java8Destructor destructor = new Java8Destructor(mem);
             try {
-                final Class<?> sunCleaner = Class.forName("sun.misc.Cleaner");
-                final Method create = sunCleaner.getDeclaredMethod("create", Object.class, Runnable.class);
-                destructor.cleaner = create.invoke(null, mem, destructor);
+                destructor.cleaner = CLEANER_CREATE.invoke(null, mem, destructor);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -103,11 +115,13 @@ public class Memory extends Pointer {
 
         static {
             try {
-                Class<?> cleanerClass = Class.forName("java.lang.ref.Cleaner");
+                final Class<?> cleanerClass = Class.forName("java.lang.ref.Cleaner");
                 final Method create = cleanerClass.getDeclaredMethod("create");
                 Java9Destructor.CLEANER = create.invoke(null);
             } catch (Exception e) {
-                // Ignore
+                System.err.println("Unable to initialize JNA cleaner");
+                e.printStackTrace();
+                System.exit(1);
             }
         }
 
