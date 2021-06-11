@@ -60,14 +60,14 @@ object ExtensionPackaging extends AutoPlugin {
         defaultLinuxInstallLocation.value,
         (Universal / mappings).value
       ),
+      maintainer := (LocalProject("node") / maintainer).value,
       Debian / maintainerScripts := maintainerScriptsAppend((Debian / maintainerScripts).value - Postinst)(
         Postinst ->
           s"""#!/bin/sh
              |set -e
              |chown -R ${nodePackageName.value}:${nodePackageName.value} /usr/share/${nodePackageName.value}""".stripMargin
       ),
-      Debian / normalizedName := s"${name.value}${network.value.packageSuffix}",
-      Debian / packageName := s"${name.value}${network.value.packageSuffix}",
+      Linux / packageName := s"${name.value}${network.value.packageSuffix}",
       libraryDependencies ++= Dependencies.logDeps,
       run / javaOptions ++= extensionClasses.value.zipWithIndex.map { case (extension, index) => s"-Dwaves.extensions.$index=$extension" }
     ) ++ maintainerFix

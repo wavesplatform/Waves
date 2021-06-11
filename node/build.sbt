@@ -9,6 +9,7 @@ enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlu
 libraryDependencies ++= Dependencies.node.value
 
 name := "waves"
+maintainer := "wavesplatform.com"
 
 inConfig(Compile)(
   Seq(
@@ -45,8 +46,8 @@ scriptClasspath += "*"
 
 bashScriptExtraDefines ++= Seq(
   s"""addJava "-Dwaves.defaults.blockchain.type=${network.value}"""",
-  s"""addJava "-Dwaves.defaults.directory=/var/lib/${(Universal / normalizedName).value}"""",
-  s"""addJava "-Dwaves.defaults.config.directory=/etc/${(Universal / normalizedName).value}"""",
+  s"""addJava "-Dwaves.defaults.directory=/var/lib/${(Linux / packageName).value}"""",
+  s"""addJava "-Dwaves.defaults.config.directory=/etc/${(Linux / packageName).value}"""",
   // Workaround to ignore the -h option
   """process_args() {
     |  local no_more_snp_opts=0
@@ -107,9 +108,9 @@ inConfig(Universal)(
 
 inConfig(Linux)(
   Seq(
-    maintainer := "wavesplatform.com",
     packageSummary := "Waves node",
-    packageDescription := "Waves node"
+    packageDescription := "Waves node",
+    packageName := s"${name.value}${network.value.packageSuffix}"
   )
 )
 
@@ -138,9 +139,7 @@ inConfig(Debian)(
         |is_upstart() {
         |    /sbin/init --version | grep upstart >/dev/null 2>&1
         |}
-        |""".stripMargin,
-    packageName := s"${name.value}${network.value.packageSuffix}",
-    normalizedName := s"${name.value}${network.value.packageSuffix}"
+        |""".stripMargin
   )
 )
 
