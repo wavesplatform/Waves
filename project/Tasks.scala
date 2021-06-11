@@ -130,7 +130,14 @@ object Tasks {
       buildTypesStr(types, ver)
     }
 
-    val currentRideVersion    = 6
+    val docFolderR = "^v(\\d+)$".r
+    val currentRideVersion =
+      new File(s"$baseLangDir/doc")
+        .listFiles()
+        .map(_.name)
+        .collect { case docFolderR(version) => version.toInt }
+        .max
+
     val (v1V2Vars, v1V2Funcs) = readV1V2Data()
     val fromV3FuncDefs        = (3 to currentRideVersion).map(v => s"lazy val funcsV$v = ${readFuncs(v)}").mkString("\n")
     val fromV3VarDefs         = (3 to currentRideVersion).map(v => s"lazy val varsV$v = ${readVars(v)}").mkString("\n")
