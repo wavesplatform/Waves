@@ -22,8 +22,11 @@
  */
 package com.sun.jna;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
@@ -49,26 +52,37 @@ import java.util.ArrayList;
  * @see Pointer
  */
 public class Memory extends Pointer {
-    private final Destructor destructor;
+    private final Closeable destructor;
 
-    private static class Destructor implements Runnable {
+    private static class Java8Destructor implements Runnable, Closeable {
         private long peer;
         private final LinkedReference reference;
-        private sun.misc.Cleaner cleaner;
+        private Object cleaner;
 
-        public static Destructor create(Memory mem) {
-            final Destructor destructor = new Destructor(mem);
-            destructor.cleaner = sun.misc.Cleaner.create(mem, destructor);
+        public static Java8Destructor create(Memory mem) {
+            final Java8Destructor destructor = new Java8Destructor(mem);
+            try {
+                final Class<?> sunCleaner = Class.forName("sun.misc.Cleaner");
+                final Method create = sunCleaner.getDeclaredMethod("create", Object.class, Runnable.class);
+                destructor.cleaner = create.invoke(null, mem, destructor);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
             return destructor;
         }
 
-        private Destructor(Memory mem) {
+        private Java8Destructor(Memory mem) {
             this.peer = mem.peer;
             this.reference = mem.reference;
         }
 
-        public void cleanManually() {
-            cleaner.clean();
+        public void close() {
+            try {
+                cleaner.getClass().getDeclaredMethod("clean").invoke(cleaner);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
 
         @Override
@@ -81,6 +95,81 @@ public class Memory extends Pointer {
             }
         }
     }
+
+    private static class Java9Destructor implements Runnable, Closeable {
+        private static Object CLEANER;
+        
+        private Object cleanable;
+
+        static {
+            try {
+                Class<?> cleanerClass = Class.forName("java.lang.ref.Cleaner");
+                final Method create = cleanerClass.getDeclaredMethod("create");
+                Java9Destructor.CLEANER = create.invoke(null);
+            } catch (Exception e) {
+                // Ignore
+            }
+        }
+
+        private long peer;
+        private final LinkedReference reference;
+
+        public static Java9Destructor create(Memory mem) {
+            final Java9Destructor destructor = new Java9Destructor(mem);
+            try {
+                final Class<?> sunCleaner = Class.forName("java.lang.ref.Cleaner");
+                final Method create = sunCleaner.getDeclaredMethod("register", Object.class, Runnable.class);
+                destructor.cleanable = create.invoke(CLEANER, mem, destructor);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
+            return destructor;
+        }
+
+        private Java9Destructor(Memory mem) {
+            this.peer = mem.peer;
+            this.reference = mem.reference;
+        }
+
+        public void close() {
+            try {
+                cleanable.getClass().getDeclaredMethod("clean").invoke(cleanable);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Override
+        public void run() {
+            try {
+                free(peer);
+            } finally {
+                peer = 0;
+                if (reference != null) reference.unlink();
+            }
+        }
+    }
+
+    private static int getJavaVersion() {
+        String version = System.getProperty("java.version");
+        if(version.startsWith("1.")) {
+            version = version.substring(2, 3);
+        } else {
+            int dot = version.indexOf(".");
+            if(dot != -1) { version = version.substring(0, dot); }
+        } return Integer.parseInt(version);
+    }
+
+
+    private static Closeable createDestructor(Memory mem) {
+        if (getJavaVersion() > 8) {
+            return Java9Destructor.create(mem);
+        } else {
+            return Java8Destructor.create(mem);
+        }
+    }
+
 
     private static ReferenceQueue<Memory> QUEUE = new ReferenceQueue<Memory>();
     private static LinkedReference HEAD; // the head of the doubly linked list used for instance tracking
@@ -160,42 +249,48 @@ public class Memory extends Pointer {
 
     private static final WeakMemoryHolder buffers = new WeakMemoryHolder();
 
-    /** Force cleanup of memory that has associated NIO Buffers which have
-        been GC'd.
-    */
+    /**
+     * Force cleanup of memory that has associated NIO Buffers which have
+     * been GC'd.
+     */
     public static void purge() {
         buffers.clean();
     }
 
-    /** Dispose of all allocated memory. */
+    /**
+     * Dispose of all allocated memory.
+     */
     public static void disposeAll() {
-        synchronized (LinkedReference.class) {
-            LinkedReference entry;
+        System.err.println("Skipping com.sun.jna.Memory.disposeAll()");
+        return;
 
-            while ((entry = HEAD) != null) {
-                Memory memory = HEAD.get();
-
-                if (memory != null) {
-                    // dispose does the unlink call internal
-                    memory.dispose();
-                } else {
-                    HEAD.unlink();
-                }
-
-                if (HEAD == entry) {
-                    throw new IllegalStateException("the HEAD did not change");
-                }
-            }
-        }
-
-        synchronized (QUEUE) {
-            LinkedReference stale;
-
-            // try to release as mutch memory as possible
-            while ((stale = (LinkedReference) QUEUE.poll()) != null) {
-                stale.unlink();
-            }
-        }
+//        synchronized (LinkedReference.class) {
+//            LinkedReference entry;
+//
+//            while ((entry = HEAD) != null) {
+//                Memory memory = HEAD.get();
+//
+//                if (memory != null) {
+//                    // dispose does the unlink call internal
+//                    memory.dispose();
+//                } else {
+//                    HEAD.unlink();
+//                }
+//
+//                if (HEAD == entry) {
+//                    throw new IllegalStateException("the HEAD did not change");
+//                }
+//            }
+//        }
+//
+//        synchronized (QUEUE) {
+//            LinkedReference stale;
+//
+//            // try to release as mutch memory as possible
+//            while ((stale = (LinkedReference) QUEUE.poll()) != null) {
+//                stale.unlink();
+//            }
+//        }
     }
 
     /**
@@ -236,7 +331,8 @@ public class Memory extends Pointer {
     private final LinkedReference reference; // used to track the instance
     protected long size; // Size of the malloc'ed space
 
-    /** Provide a view into the original memory.  Keeps an implicit reference
+    /**
+     * Provide a view into the original memory.  Keeps an implicit reference
      * to the original to prevent GC.
      */
     private class SharedMemory extends Memory {
@@ -244,16 +340,23 @@ public class Memory extends Pointer {
             this.size = size;
             this.peer = Memory.this.peer + offset;
         }
-        /** No need to free memory. */
+
+        /**
+         * No need to free memory.
+         */
         @Override
         protected synchronized void dispose() {
             this.peer = 0;
         }
-        /** Pass bounds check to parent. */
+
+        /**
+         * Pass bounds check to parent.
+         */
         @Override
         protected void boundsCheck(long off, long sz) {
             Memory.this.boundsCheck(this.peer - Memory.this.peer + off, sz);
         }
+
         @Override
         public String toString() {
             return super.toString() + " (shared from " + Memory.this.toString() + ")";
@@ -274,34 +377,39 @@ public class Memory extends Pointer {
         if (peer == 0)
             throw new OutOfMemoryError("Cannot allocate " + size + " bytes");
 
-        reference = LinkedReference.track(this);
-        destructor = Destructor.create(this);
+        // reference = LinkedReference.track(this); // Removed to optimize syncs
+        reference = null;
+        destructor = Memory.createDestructor(this);
     }
 
     protected Memory() {
         super();
 
         reference = null;
-        destructor = Destructor.create(this);
+        destructor = Memory.createDestructor(this);
     }
 
-    /** Provide a view of this memory using the given offset as the base address.  The
+    /**
+     * Provide a view of this memory using the given offset as the base address.  The
      * returned {@link Pointer} will have a size equal to that of the original
      * minus the offset.
+     *
      * @throws IndexOutOfBoundsException if the requested memory is outside
-     * the allocated bounds.
+     *                                   the allocated bounds.
      */
     @Override
     public Pointer share(long offset) {
         return share(offset, size() - offset);
     }
 
-    /** Provide a view of this memory using the given offset as the base
+    /**
+     * Provide a view of this memory using the given offset as the base
      * address, bounds-limited with the given size.  Maintains a reference to
      * the original {@link Memory} object to avoid GC as long as the shared
      * memory is referenced.
+     *
      * @throws IndexOutOfBoundsException if the requested memory is outside
-     * the allocated bounds.
+     *                                   the allocated bounds.
      */
     @Override
     public Pointer share(long offset, long sz) {
@@ -309,21 +417,23 @@ public class Memory extends Pointer {
         return new SharedMemory(offset, sz);
     }
 
-    /** Provide a view onto this structure with the given alignment.
+    /**
+     * Provide a view onto this structure with the given alignment.
+     *
      * @param byteBoundary Align memory to this number of bytes; should be a
-     * power of two.
+     *                     power of two.
      * @throws IndexOutOfBoundsException if the requested alignment can
-     * not be met.
-     * @throws IllegalArgumentException if the requested alignment is not
-     * a positive power of two.
+     *                                   not be met.
+     * @throws IllegalArgumentException  if the requested alignment is not
+     *                                   a positive power of two.
      */
     public Memory align(int byteBoundary) {
         if (byteBoundary <= 0) {
             throw new IllegalArgumentException("Byte boundary must be positive: " + byteBoundary);
         }
-        for (int i=0;i < 32;i++) {
-            if (byteBoundary == (1<<i)) {
-                long mask = ~((long)byteBoundary - 1);
+        for (int i = 0; i < 32; i++) {
+            if (byteBoundary == (1 << i)) {
+                long mask = ~((long) byteBoundary - 1);
 
                 if ((peer & mask) != peer) {
                     long newPeer = (peer + byteBoundary - 1) & mask;
@@ -331,7 +441,7 @@ public class Memory extends Pointer {
                     if (newSize <= 0) {
                         throw new IllegalArgumentException("Insufficient memory to align to the requested boundary");
                     }
-                    return (Memory)share(newPeer - peer, newSize);
+                    return (Memory) share(newPeer - peer, newSize);
                 }
                 return this;
             }
@@ -345,22 +455,32 @@ public class Memory extends Pointer {
 //        dispose();
 //    }
 
-    /** Free the native memory and set peer to zero */
-    protected synchronized void dispose() {
+    /**
+     * Free the native memory and set peer to zero
+     */
+    protected void dispose() {
         if (peer == 0) {
             // someone called dispose before, the finalizer will call dispose again
             return;
         }
 
-       destructor.cleanManually();
+        try {
+            destructor.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    /** Zero the full extent of this memory region. */
+    /**
+     * Zero the full extent of this memory region.
+     */
     public void clear() {
         clear(size);
     }
 
-    /** Returns false if the memory has been freed. */
+    /**
+     * Returns false if the memory has been freed.
+     */
     public boolean valid() {
         return peer != 0;
     }
@@ -372,7 +492,6 @@ public class Memory extends Pointer {
     /**
      * Check that indirection won't cause us to write outside the
      * malloc'ed space.
-     *
      */
     protected void boundsCheck(long off, long sz) {
         if (off < 0) {
@@ -380,7 +499,7 @@ public class Memory extends Pointer {
         }
         if (off + sz > size) {
             String msg = "Bounds exceeds available space : size="
-                + size + ", offset=" + (off + sz);
+                    + size + ", offset=" + (off + sz);
             throw new IndexOutOfBoundsException(msg);
         }
     }
@@ -395,7 +514,7 @@ public class Memory extends Pointer {
      * checks to ensure that the indirection does not cause memory outside the
      * <code>malloc</code>ed space to be accessed.
      *
-     * @see Pointer#read(long,byte[],int,int)
+     * @see Pointer#read(long, byte[], int, int)
      */
     @Override
     public void read(long bOff, byte[] buf, int index, int length) {
@@ -409,7 +528,7 @@ public class Memory extends Pointer {
      * checks to ensure that the indirection does not cause memory outside the
      * <code>malloc</code>ed space to be accessed.
      *
-     * @see Pointer#read(long,short[],int,int)
+     * @see Pointer#read(long, short[], int, int)
      */
     @Override
     public void read(long bOff, short[] buf, int index, int length) {
@@ -423,7 +542,7 @@ public class Memory extends Pointer {
      * checks to ensure that the indirection does not cause memory outside the
      * <code>malloc</code>ed space to be accessed.
      *
-     * @see Pointer#read(long,char[],int,int)
+     * @see Pointer#read(long, char[], int, int)
      */
     @Override
     public void read(long bOff, char[] buf, int index, int length) {
@@ -437,7 +556,7 @@ public class Memory extends Pointer {
      * checks to ensure that the indirection does not cause memory outside the
      * <code>malloc</code>ed space to be accessed.
      *
-     * @see Pointer#read(long,int[],int,int)
+     * @see Pointer#read(long, int[], int, int)
      */
     @Override
     public void read(long bOff, int[] buf, int index, int length) {
@@ -451,7 +570,7 @@ public class Memory extends Pointer {
      * checks to ensure that the indirection does not cause memory outside the
      * <code>malloc</code>ed space to be accessed.
      *
-     * @see Pointer#read(long,long[],int,int)
+     * @see Pointer#read(long, long[], int, int)
      */
     @Override
     public void read(long bOff, long[] buf, int index, int length) {
@@ -465,7 +584,7 @@ public class Memory extends Pointer {
      * checks to ensure that the indirection does not cause memory outside the
      * <code>malloc</code>ed space to be accessed.
      *
-     * @see Pointer#read(long,float[],int,int)
+     * @see Pointer#read(long, float[], int, int)
      */
     @Override
     public void read(long bOff, float[] buf, int index, int length) {
@@ -479,7 +598,7 @@ public class Memory extends Pointer {
      * ensure that the indirection does not cause memory outside the
      * <code>malloc</code>ed space to be accessed.
      *
-     * @see Pointer#read(long,double[],int,int)
+     * @see Pointer#read(long, double[], int, int)
      */
     @Override
     public void read(long bOff, double[] buf, int index, int length) {
@@ -493,7 +612,7 @@ public class Memory extends Pointer {
      * ensure that the indirection does not cause memory outside the
      * <code>malloc</code>ed space to be accessed.
      *
-     * @see Pointer#read(long,Pointer[],int,int)
+     * @see Pointer#read(long, Pointer[], int, int)
      */
     @Override
     public void read(long bOff, Pointer[] buf, int index, int length) {
@@ -511,7 +630,7 @@ public class Memory extends Pointer {
      * checks to ensure that the indirection does not cause memory outside the
      * <code>malloc</code>ed space to be accessed.
      *
-     * @see Pointer#write(long,byte[],int,int)
+     * @see Pointer#write(long, byte[], int, int)
      */
     @Override
     public void write(long bOff, byte[] buf, int index, int length) {
@@ -525,7 +644,7 @@ public class Memory extends Pointer {
      * checks to ensure that the indirection does not cause memory outside the
      * <code>malloc</code>ed space to be accessed.
      *
-     * @see Pointer#write(long,short[],int,int)
+     * @see Pointer#write(long, short[], int, int)
      */
     @Override
     public void write(long bOff, short[] buf, int index, int length) {
@@ -539,7 +658,7 @@ public class Memory extends Pointer {
      * checks to ensure that the indirection does not cause memory outside the
      * <code>malloc</code>ed space to be accessed.
      *
-     * @see Pointer#write(long,char[],int,int)
+     * @see Pointer#write(long, char[], int, int)
      */
     @Override
     public void write(long bOff, char[] buf, int index, int length) {
@@ -553,7 +672,7 @@ public class Memory extends Pointer {
      * checks to ensure that the indirection does not cause memory outside the
      * <code>malloc</code>ed space to be accessed.
      *
-     * @see Pointer#write(long,int[],int,int)
+     * @see Pointer#write(long, int[], int, int)
      */
     @Override
     public void write(long bOff, int[] buf, int index, int length) {
@@ -567,7 +686,7 @@ public class Memory extends Pointer {
      * checks to ensure that the indirection does not cause memory outside the
      * <code>malloc</code>ed space to be accessed.
      *
-     * @see Pointer#write(long,long[],int,int)
+     * @see Pointer#write(long, long[], int, int)
      */
     @Override
     public void write(long bOff, long[] buf, int index, int length) {
@@ -581,7 +700,7 @@ public class Memory extends Pointer {
      * checks to ensure that the indirection does not cause memory outside the
      * <code>malloc</code>ed space to be accessed.
      *
-     * @see Pointer#write(long,float[],int,int)
+     * @see Pointer#write(long, float[], int, int)
      */
     @Override
     public void write(long bOff, float[] buf, int index, int length) {
@@ -595,7 +714,7 @@ public class Memory extends Pointer {
      * checks to ensure that the indirection does not cause memory outside the
      * <code>malloc</code>ed space to be accessed.
      *
-     * @see Pointer#write(long,double[],int,int)
+     * @see Pointer#write(long, double[], int, int)
      */
     @Override
     public void write(long bOff, double[] buf, int index, int length) {
@@ -609,7 +728,7 @@ public class Memory extends Pointer {
      * checks to ensure that the indirection does not cause memory outside the
      * <code>malloc</code>ed space to be accessed.
      *
-     * @see Pointer#write(long,Pointer[],int,int)
+     * @see Pointer#write(long, Pointer[], int, int)
      */
     @Override
     public void write(long bOff, Pointer[] buf, int index, int length) {
@@ -913,9 +1032,11 @@ public class Memory extends Pointer {
         return Native.malloc(size);
     }
 
-    /** Dumps the contents of this memory object. */
+    /**
+     * Dumps the contents of this memory object.
+     */
     public String dump() {
-        return dump(0, (int)size());
+        return dump(0, (int) size());
     }
 
     /**
@@ -929,7 +1050,7 @@ public class Memory extends Pointer {
      * points to memory backed by this Memory object.
      */
     private Pointer shareReferenceIfInBounds(Pointer target) {
-        if(target == null) {
+        if (target == null) {
             return null;
         }
         long offset = target.peer - this.peer;
