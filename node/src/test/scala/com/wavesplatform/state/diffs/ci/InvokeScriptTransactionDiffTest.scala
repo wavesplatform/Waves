@@ -28,7 +28,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.settings.{TestFunctionalitySettings, TestSettings}
+import com.wavesplatform.settings.TestSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
@@ -46,7 +46,6 @@ import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -66,26 +65,8 @@ class InvokeScriptTransactionDiffTest
     with EitherValues {
   import DomainPresets._
 
-  private val fs = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
-      BlockchainFeatures.SmartAccounts.id  -> 0,
-      BlockchainFeatures.SmartAssets.id    -> 0,
-      BlockchainFeatures.Ride4DApps.id     -> 0,
-      BlockchainFeatures.FeeSponsorship.id -> 0
-    )
-  )
-
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
-      BlockchainFeatures.SmartAccounts.id    -> 0,
-      BlockchainFeatures.SmartAssets.id      -> 0,
-      BlockchainFeatures.Ride4DApps.id       -> 0,
-      BlockchainFeatures.FeeSponsorship.id   -> 0,
-      BlockchainFeatures.DataTransaction.id  -> 0,
-      BlockchainFeatures.BlockV5.id          -> 0,
-      BlockchainFeatures.SynchronousCalls.id -> 0
-    )
-  )
+  private val fs = settingsForRide(V3).blockchainSettings.functionalitySettings
+  private val fsWithV5 = settingsForRide(V5).blockchainSettings.functionalitySettings
 
   val assetAllowed: Script = ExprScript(
     FUNCTION_CALL(FunctionHeader.Native(FunctionIds.GT_LONG), List(GETTER(REF("tx"), "fee"), CONST_LONG(-1)))
