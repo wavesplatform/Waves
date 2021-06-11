@@ -6,7 +6,7 @@ import com.wavesplatform.account._
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.{DBCacheSettings, WithState}
+import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
@@ -60,9 +60,11 @@ class InvokeScriptTransactionDiffTest
     with NoShrink
     with Inside
     with WithState
+    with WithDomain
     with DBCacheSettings
     with MockFactory
     with EitherValues {
+  import DomainPresets._
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -1370,17 +1372,7 @@ class InvokeScriptTransactionDiffTest
       )
     } yield (r._1, r._2, r._3, version)) {
       case (genesis, setScript, ci, version) =>
-        val settings =
-          version match {
-            case V3 => fs
-            case V4 => fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
-            case V5 =>
-              fs.copy(
-                preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0) + (BlockchainFeatures.SynchronousCalls.id -> 0)
-              )
-            case v => throw new TestFailedException(s"Unexpected $v", 0)
-          }
-
+        val settings = settingsForRide(version).blockchainSettings.functionalitySettings
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), settings) {
           if (version == V3)
             _ shouldBe Symbol("right")

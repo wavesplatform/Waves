@@ -229,10 +229,10 @@ object Types {
 
   def callableReturnType(v: StdLibVersion): Either[ExecutionError, FINAL] =
     v match {
-      case V3 => Right(callableV3ReturnType)
-      case V4 => Right(callableV4ReturnType)
-      case V5 => Right(callableV5ReturnType)
-      case v  => Left(s"DApp is not supported for $v")
+      case V1 | V2 => Left(s"DApp is not supported for $v")
+      case V3      => Right(callableV3ReturnType)
+      case V4      => Right(callableV4ReturnType)
+      case _       => Right(callableV5ReturnType)
     }
 
   private def payments(multiPaymentAllowed: Boolean) =
