@@ -3,8 +3,8 @@ package com.wavesplatform.api.http
 import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
 
 import akka.http.scaladsl.model.HttpMethods._
-import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.RouteResult.Complete
 import akka.http.scaladsl.server._

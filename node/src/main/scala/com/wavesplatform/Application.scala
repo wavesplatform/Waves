@@ -9,7 +9,6 @@ import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
@@ -23,11 +22,12 @@ import com.wavesplatform.api.common._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasApiRoute
 import com.wavesplatform.api.http.assets.AssetsApiRoute
+import com.wavesplatform.api.http.eth.EthRpcRoute
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
-import com.wavesplatform.database.{openDB, DBExt, Keys}
+import com.wavesplatform.database.{DBExt, Keys, openDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider._
@@ -303,6 +303,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         )
 
       val apiRoutes = Seq(
+        new EthRpcRoute(blockchainUpdater),
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => shutdown()),
         BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, time),
         TransactionsApiRoute(
