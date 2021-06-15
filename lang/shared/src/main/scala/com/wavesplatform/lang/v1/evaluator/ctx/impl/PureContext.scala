@@ -1756,7 +1756,10 @@ object PureContext {
         pow(UNION(fromV5RoundTypes)),
         log(UNION(fromV5RoundTypes)),
         fraction(fixLimitCheck = true),
-      ) ++ folds.map(_._2)
+      )
+
+  private val v6Functions =
+    v5Functions ++ folds.map(_._2)
 
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =
     CTX[NoContext](
@@ -1794,6 +1797,13 @@ object PureContext {
       v5Functions
     )
 
+  private val v6Ctx =
+    CTX[NoContext](
+      v5Types,
+      v5Vars,
+      v6Functions
+    )
+
   def build(version: StdLibVersion, fixUnicodeFunctions: Boolean): CTX[NoContext] =
     version match {
       case V1 | V2 if fixUnicodeFunctions => v1V2CtxFixed
@@ -1803,6 +1813,6 @@ object PureContext {
       case V3                             => v3CtxUnfixed
       case V4                             => v4CtxUnfixed
       case V5                             => v5Ctx
-      case V6                             => v5Ctx
+      case V6                             => v6Ctx
     }
 }

@@ -98,47 +98,5 @@
       paramsDoc: [ "The list.", "The element." ]
       complexity: 7
     }
-	{
-      name: "fold_20"
-      params: [ "List[A]", "B", "String" ]
-      doc: "Applies a binary operator to a start value and all elements of the list, going left to right. Max list size is 20"
-      paramsDoc: [ "The list.", "The start value.", "Folding function." ]
-      complexity: 3
-    }
-	{
-      name: "fold_50"
-      params: [ "List[A]", "B", "String" ]
-      doc: "Applies a binary operator to a start value and all elements of the list, going left to right. Max list size is 50"
-      paramsDoc: [ "The list.", "The start value.", "Folding function." ]
-      complexity: 7
-    }
-	{
-      name: "fold_100"
-      params: [ "List[A]", "B", "String" ]
-      doc: "Applies a binary operator to a start value and all elements of the list, going left to right. Max list size is 100"
-      paramsDoc: [ "The list.", "The start value.", "Folding function." ]
-      complexity: 9
-    }
-	{
-      name: "fold_200"
-      params: [ "List[A]", "B", "String" ]
-      doc: "Applies a binary operator to a start value and all elements of the list, going left to right. Max list size is 200"
-      paramsDoc: [ "The list.", "The start value.", "Folding function." ]
-      complexity: 20
-    }
-	{
-      name: "fold_500"
-      params: [ "List[A]", "B", "String" ]
-      doc: "Applies a binary operator to a start value and all elements of the list, going left to right. Max list size is 500"
-      paramsDoc: [ "The list.", "The start value.", "Folding function." ]
-      complexity: 56
-    }
-	{
-      name: "fold_1000"
-      params: [ "List[A]", "B", "String" ]
-      doc: "Applies a binary operator to a start value and all elements of the list, going left to right. Max list size is 1000"
-      paramsDoc: [ "The list.", "The start value.", "Folding function." ]
-      complexity: 115
-    }
   ]
 }
