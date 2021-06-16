@@ -43,6 +43,7 @@ object Dependencies {
 
   val enforcedVersions = Def.setting(
     Seq(
+      "net.java.dev.jna" % "jna" % "5.8.0",
       akkaModule("actor"),
       akkaModule("stream"),
       akkaHttp,
