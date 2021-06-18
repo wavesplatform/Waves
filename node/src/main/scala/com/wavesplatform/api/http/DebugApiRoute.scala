@@ -25,12 +25,14 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
-import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, Portfolio, StateHash}
+import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, StateHash}
 import com.wavesplatform.state.diffs.TransactionDiffer
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -241,19 +243,36 @@ case class DebugApiRoute(
         case Left(err)         => Some(err)
       }
 
-      val transactionJson = parsedTransaction match {
-        case Right(tx) => tx.json()
-        case Left(_)   => jsv
-      }
+      val transactionJson = parsedTransaction.fold(_ => jsv, _.json())
+
+      val serializer = tracedDiff.resultE
+        .fold(_ => this.serializer, { case (_, diff) =>
+          val compositeBlockchain = CompositeBlockchain(blockchain, diff)
+          this.serializer.copy(blockchain = compositeBlockchain)
+        })
+
+      val extendedJson = tracedDiff.resultE
+        .fold(_ => jsv, { case (tx, diff) =>
+          val meta = tx match {
+            case ist: InvokeScriptTransaction =>
+              val result = diff.scriptResults.get(ist.id())
+              TransactionMeta.Invoke(Height(blockchain.height), ist, succeeded = true, result)
+            case tx => TransactionMeta.Default(Height(blockchain.height), tx, succeeded = true)
+          }
+          serializer.transactionWithMetaJson(meta)
+        })
 
       val response = Json.obj(
         "valid"          -> error.isEmpty,
         "validationTime" -> (System.nanoTime() - startTime).nanos.toMillis,
-        "trace"          -> tracedDiff.trace.map(_.loggedJson),
-        "height"         -> blockchain.height
+        "trace" -> tracedDiff.trace.map {
+          case ist: InvokeScriptTrace => ist.maybeLoggedJson(logged = true)(serializer.invokeScriptResultWrites)
+          case trace                  => trace.loggedJson
+        },
+        "height" -> blockchain.height
       )
 
-      error.fold(response ++ transactionJson)(
+      error.fold(response ++ extendedJson)(
         err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)) + ("transaction" -> transactionJson)
       )
     })

@@ -83,7 +83,7 @@ case class InvokeScriptTrace(
   override lazy val json: JsObject       = maybeLoggedJson(false)
   override lazy val loggedJson: JsObject = maybeLoggedJson(true)
 
-  private[this] def maybeLoggedJson(logged: Boolean): JsObject = {
+  def maybeLoggedJson(logged: Boolean)(implicit invokeResultWrites: OWrites[InvokeScriptResult] = InvokeScriptResult.jsonFormat): JsObject = {
     Json.obj(
       "type"     -> "dApp",
       "id"       -> dAppAddressOrAlias.stringRepr,
@@ -97,7 +97,7 @@ case class InvokeScriptTrace(
 }
 
 object TraceStep {
-  private[trace] def scriptResultJson(invokeId: ByteStr, v: ScriptResult): JsObject =
+  private[trace] def scriptResultJson(invokeId: ByteStr, v: ScriptResult)(implicit invokeResultWrites: OWrites[InvokeScriptResult]): JsObject =
     Json.toJsObject(InvokeScriptResult.fromLangResult(invokeId, v))
 
   private[trace] def maybeErrorJson(errorOpt: Option[ValidationError]): JsObject =

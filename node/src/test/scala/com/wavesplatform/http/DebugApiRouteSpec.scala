@@ -4,6 +4,7 @@ import scala.util.Random
 
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet, TransactionGen}
+import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
@@ -539,7 +540,8 @@ class DebugApiRouteSpec
     }
 
     "invoke tx returning leases" in {
-      val dAppPk        = accountGen.sample.get.publicKey
+      val dAppPk        = TxHelpers.defaultSigner.publicKey
+      val dAppAddress = dAppPk.toAddress
       val invoke        = TxHelpers.invoke(dAppPk.toAddress, "test")
       val leaseCancelId = ByteStr(bytes32gen.sample.get)
 
@@ -555,6 +557,8 @@ class DebugApiRouteSpec
 
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
+
+        (blockchain.resolveAlias _).when(Alias.create(recipient2.name).explicitGet()).returning(Right(TxHelpers.secondAddress))
 
         val (dAppScript, _) = ScriptCompiler
           .compile(
@@ -576,6 +580,12 @@ class DebugApiRouteSpec
                |      ]
                |    else []
                |}
+               |
+               |@Callable(i)
+               |func test1() = {
+               |  strict result = reentrantInvoke(this, "test", [], [])
+               |  if (result == unit) then [] else []
+               |}
                |""".stripMargin,
             ScriptEstimatorV3
           )
@@ -589,16 +599,21 @@ class DebugApiRouteSpec
                 dAppPk,
                 dAppScript,
                 0L,
-                Map(3 -> Seq("test").map(_ -> 0L).toMap)
+                Map(3 -> Seq("test", "test1").map(_ -> 0L).toMap)
               )
             )
           )
 
         (blockchain.hasAccountScript _).when(*).returns(true)
 
+        (blockchain.transactionMeta _)
+          .when(leaseCancelId)
+          .returns(Some((1, true)))
+          .anyNumberOfTimes()
+
         (blockchain.leaseDetails _)
           .when(leaseCancelId)
-          .returns(Some(LeaseDetails(dAppPk, accountGen.sample.get.toAddress, 100, LeaseDetails.Status.Active, leaseCancelId, 1)))
+          .returns(Some(LeaseDetails(dAppPk, TxHelpers.defaultAddress, 100, LeaseDetails.Status.Active, leaseCancelId, 1)))
           .anyNumberOfTimes()
 
         (blockchain.leaseDetails _)
@@ -621,63 +636,112 @@ class DebugApiRouteSpec
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, invoke.json().toString())) ~> route ~> check {
         val json = Json.parse(responseAs[String])
         (json \ "valid").as[Boolean] shouldBe true
-        (json \ "trace").as[JsArray] shouldBe Json.parse(
+        (json \ "stateChanges").as[JsObject] should matchJson(s"""{
+                                                                |  "data" : [ ],
+                                                                |  "transfers" : [ ],
+                                                                |  "issues" : [ ],
+                                                                |  "reissues" : [ ],
+                                                                |  "burns" : [ ],
+                                                                |  "sponsorFees" : [ ],
+                                                                |  "leases" : [ {
+                                                                |    "id" : "$leaseId1",
+                                                                |    "originTransactionId" : "${invoke.id()}",
+                                                                |    "sender" : "$dAppAddress",
+                                                                |    "recipient" : "${recipient1.bytes}",
+                                                                |    "amount" : 100,
+                                                                |    "height" : 1,
+                                                                |    "status" : "active",
+                                                                |    "cancelHeight" : null,
+                                                                |    "cancelTransactionId" : null
+                                                                |  }, {
+                                                                |    "id" : "$leaseId2",
+                                                                |    "originTransactionId" : "${invoke.id()}",
+                                                                |    "sender" : "$dAppAddress",
+                                                                |    "recipient" : "${TxHelpers.secondAddress}",
+                                                                |    "amount" : 20,
+                                                                |    "height" : 1,
+                                                                |    "status" : "active",
+                                                                |    "cancelHeight" : null,
+                                                                |    "cancelTransactionId" : null
+                                                                |  } ],
+                                                                |  "leaseCancels" : [ {
+                                                                |    "id" : "$leaseCancelId",
+                                                                |    "originTransactionId" : "$leaseCancelId",
+                                                                |    "sender" : "$dAppAddress",
+                                                                |    "recipient" : "${TxHelpers.defaultAddress}",
+                                                                |    "amount" : 100,
+                                                                |    "height" : 1,
+                                                                |    "status" : "canceled",
+                                                                |    "cancelHeight" : 1,
+                                                                |    "cancelTransactionId" : "${invoke.id()}"
+                                                                |  } ],
+                                                                |  "invokes" : [ ]
+                                                                |}""".stripMargin)
+        (json \ "trace").as[JsArray] should matchJson(
           s"""
-            | [
-            |  {
-            |    "type": "verifier",
-            |    "id": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-            |    "result": "success",
-            |    "error": null
-            |  },
-            |  {
-            |    "type": "dApp",
-            |    "id": "${dAppPk.toAddress}",
-            |    "function": "test",
-            |    "args": [],
-            |    "result": {
-            |      "data": [],
-            |      "transfers": [],
-            |      "issues": [],
-            |      "reissues": [],
-            |      "burns": [],
-            |      "sponsorFees": [],
-            |      "leases": [
-            |        {
-            |          "recipient": "${recipient1.bytes}",
-            |          "amount": $amount1,
-            |          "nonce": $nonce1,
-            |          "id": "$leaseId1"
-            |        },
-            |        {
-            |          "recipient": "alias:T:${recipient2.name}",
-            |          "amount": $amount2,
-            |          "nonce": $nonce2,
-            |          "id": "$leaseId2"
-            |        }
-            |      ],
-            |      "leaseCancels": [
-            |        {
-            |          "id": "$leaseCancelId"
-            |        }
-            |      ],
-            |      "invokes": []
-            |    },
-            |    "error": null,
-            |    "vars": [
-            |      {
-            |        "name":"a",
-            |        "type":"BigInt",
-            |        "value":6.703903964971298549787012499102923E+153
-            |      },
-            |      {
-            |        "name": "test",
-            |        "type": "Int",
-            |        "value": 1
-            |      }
-            |    ]
-            |  }
-            | ]
+             |[ {
+             |  "type" : "verifier",
+             |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+             |  "result" : "success",
+             |  "error" : null
+             |}, {
+             |  "type" : "dApp",
+             |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+             |  "function" : "test",
+             |  "args" : [ ],
+             |  "result" : {
+             |    "data" : [ ],
+             |    "transfers" : [ ],
+             |    "issues" : [ ],
+             |    "reissues" : [ ],
+             |    "burns" : [ ],
+             |    "sponsorFees" : [ ],
+             |    "leases" : [ {
+             |      "id" : "$leaseId1",
+             |      "originTransactionId" : "${invoke.id()}",
+             |      "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+             |      "recipient" : "3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd",
+             |      "amount" : 100,
+             |      "height" : 1,
+             |      "status" : "active",
+             |      "cancelHeight" : null,
+             |      "cancelTransactionId" : null
+             |    }, {
+             |      "id" : "$leaseId2",
+             |      "originTransactionId" : "${invoke.id()}",
+             |      "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+             |      "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+             |      "amount" : 20,
+             |      "height" : 1,
+             |      "status" : "active",
+             |      "cancelHeight" : null,
+             |      "cancelTransactionId" : null
+             |    } ],
+             |    "leaseCancels" : [ {
+             |      "id" : "$leaseCancelId",
+             |      "originTransactionId" : "$leaseCancelId",
+             |      "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+             |      "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+             |      "amount" : 100,
+             |      "height" : 1,
+             |      "status" : "canceled",
+             |      "cancelHeight" : 1,
+             |      "cancelTransactionId" : "${invoke.id()}"
+             |    } ],
+             |    "invokes" : [ ]
+             |  },
+             |  "error" : null,
+             |  "vars" : [ {
+             |    "name" : "a",
+             |    "type" : "BigInt",
+             |    "value" : 6.703903964971298549787012499102923E+153
+             |  }, {
+             |    "name" : "test",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  } ]
+             |} ]
+             |
           """.stripMargin
         )
         (json \ "height").as[Int] shouldBe 1
