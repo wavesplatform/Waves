@@ -335,7 +335,7 @@ object TransactionsApiRoute {
     private[http] implicit lazy val invocationWrites: OWrites[InvokeScriptResult.Invocation] = (i: InvokeScriptResult.Invocation) => Json.obj(
       "dApp" -> i.dApp,
       "call" -> i.call,
-      "payments" -> i.payments,
+      "payment" -> i.payments,
       "stateChanges" -> invokeScriptResultWrites.writes(i.stateChanges)
     )
 
