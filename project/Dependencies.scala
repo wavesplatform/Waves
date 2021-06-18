@@ -1,6 +1,6 @@
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
-import sbt._
 import sbt.Keys._
+import sbt._
 
 //noinspection TypeAnnotation
 object Dependencies {
@@ -110,7 +110,9 @@ object Dependencies {
       "com.softwaremill.sttp" %%% "core"       % "1.6.4",
       "com.wavesplatform"     % "zwaves"       % "0.1.0-SNAPSHOT",
       "com.wavesplatform"     % "zwaves-bn256" % "0.1.5-SNAPSHOT",
-      "org.web3j"             % "crypto"       % "4.5.18"
+      "org.web3j"             % "crypto"       % "4.5.18",
+      "org.web3j"             % "abi"          % "4.5.18",
+      "org.web3j"             % "rlp"          % "4.5.18"
     ) ++ scalapbRuntime.value ++ circe.value ++ protobuf.value
   )
 

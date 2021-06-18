@@ -276,6 +276,24 @@ object Explorer extends ScorexLogging {
             counter += 1
           }
           log.info(s"Found $counter orders")
+
+        case "CSAI" =>
+          val PrefixLength = argument(1, "prefix").toInt
+          var prevAssetId = Array.emptyByteArray
+          var assetCounter = 0
+          db.iterateOver(KeyTags.AssetStaticInfo) { e =>
+            assetCounter += 1
+            val thisAssetId = e.getKey.drop(2)
+            if (prevAssetId.nonEmpty) {
+              var counter = 0
+              while (counter < PrefixLength && prevAssetId(counter) == thisAssetId(counter)) counter += 1
+              if (counter == PrefixLength) {
+                log.info(s"${Base58.encode(prevAssetId)} ~ ${Base58.encode(thisAssetId)}")
+              }
+            }
+            prevAssetId = thisAssetId
+          }
+          log.info(s"Checked $assetCounter asset(s)")
       }
     } finally db.close()
   }
