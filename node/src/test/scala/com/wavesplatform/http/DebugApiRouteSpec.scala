@@ -580,12 +580,6 @@ class DebugApiRouteSpec
                |      ]
                |    else []
                |}
-               |
-               |@Callable(i)
-               |func test1() = {
-               |  strict result = reentrantInvoke(this, "test", [], [])
-               |  if (result == unit) then [] else []
-               |}
                |""".stripMargin,
             ScriptEstimatorV3
           )
@@ -747,6 +741,136 @@ class DebugApiRouteSpec
         (json \ "height").as[Int] shouldBe 1
       }
     }
+
+    "invoke tx with nested call" in {
+      val dAppPk        = TxHelpers.defaultSigner.publicKey
+      val dAppAddress = dAppPk.toAddress
+      val invoke        = TxHelpers.invoke(dAppPk.toAddress, "test1")
+
+      val blockchain = createBlockchainStub { blockchain =>
+        (blockchain.balance _).when(*, *).returns(Long.MaxValue)
+
+        val (dAppScript, _) = ScriptCompiler
+          .compile(
+            s"""
+               |{-# STDLIB_VERSION 5 #-}
+               |{-# SCRIPT_TYPE ACCOUNT #-}
+               |{-# CONTENT_TYPE DAPP #-}
+               |
+               |@Callable(i)
+               |func test() = {
+               |  strict a = parseBigIntValue("${PureContext.BigIntMax}")
+               |  let test = 1
+               |  if (test == 1)
+               |    then [IntegerEntry("key", 1)]
+               |    else []
+               |}
+               |
+               |@Callable(i)
+               |func test1() = {
+               |  strict result = reentrantInvoke(this, "test", [], [])
+               |  if (result == unit) then [] else []
+               |}
+               |""".stripMargin,
+            ScriptEstimatorV3
+          )
+          .explicitGet()
+
+        (blockchain.accountScript _)
+          .when(*)
+          .returns(
+            Some(
+              AccountScriptInfo(
+                dAppPk,
+                dAppScript,
+                0L,
+                Map(3 -> Seq("test", "test1").map(_ -> 0L).toMap)
+              )
+            )
+          )
+
+        (blockchain.hasAccountScript _).when(dAppAddress).returns(true)
+      }
+      val route = debugApiRoute
+        .copy(
+          blockchain = blockchain,
+          priorityPoolBlockchain = () => blockchain
+        )
+        .route
+
+      Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, invoke.json().toString())) ~> route ~> check {
+        val json = Json.parse(responseAs[String])
+        (json \ "valid").as[Boolean] shouldBe true
+        (json \ "stateChanges").as[JsObject] should matchJson(s"""{
+                                                                 |  "data" : [ ],
+                                                                 |  "transfers" : [ ],
+                                                                 |  "issues" : [ ],
+                                                                 |  "reissues" : [ ],
+                                                                 |  "burns" : [ ],
+                                                                 |  "sponsorFees" : [ ],
+                                                                 |  "leases" : [ ],
+                                                                 |  "leaseCancels" : [ ],
+                                                                 |  "invokes" : [ {
+                                                                 |    "dApp" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                                                 |    "call" : {
+                                                                 |      "function" : "test",
+                                                                 |      "args" : [ ]
+                                                                 |    },
+                                                                 |    "payments" : [ ],
+                                                                 |    "stateChanges" : {
+                                                                 |      "data" : [ {
+                                                                 |        "key" : "key",
+                                                                 |        "type" : "integer",
+                                                                 |        "value" : 1
+                                                                 |      } ],
+                                                                 |      "transfers" : [ ],
+                                                                 |      "issues" : [ ],
+                                                                 |      "reissues" : [ ],
+                                                                 |      "burns" : [ ],
+                                                                 |      "sponsorFees" : [ ],
+                                                                 |      "leases" : [ ],
+                                                                 |      "leaseCancels" : [ ],
+                                                                 |      "invokes" : [ ]
+                                                                 |    }
+                                                                 |  } ]
+                                                                 |}
+                                                                 |""".stripMargin)
+        (json \ "trace").as[JsArray] should matchJson(
+          s"""
+             |[ {
+             |  "type" : "verifier",
+             |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+             |  "result" : "success",
+             |  "error" : null
+             |}, {
+             |  "type" : "dApp",
+             |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+             |  "function" : "test1",
+             |  "args" : [ ],
+             |  "result" : {
+             |    "data" : [ ],
+             |    "transfers" : [ ],
+             |    "issues" : [ ],
+             |    "reissues" : [ ],
+             |    "burns" : [ ],
+             |    "sponsorFees" : [ ],
+             |    "leases" : [ ],
+             |    "leaseCancels" : [ ],
+             |    "invokes" : [ ]
+             |  },
+             |  "error" : null,
+             |  "vars" : [ {
+             |    "name" : "result",
+             |    "type" : "Unit",
+             |    "value" : { }
+             |  } ]
+             |} ]
+          """.stripMargin
+        )
+        (json \ "height").as[Int] shouldBe 1
+      }
+    }
+
 
     "transfer transaction with asset fail" in {
       val blockchain = createBlockchainStub { blockchain =>
