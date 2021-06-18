@@ -1,6 +1,9 @@
 package com.wavesplatform.http
 
+import scala.util.Random
+
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet, TransactionGen}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
@@ -19,22 +22,19 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash}
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash}
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{TxHelpers, TxVersion}
-import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet, TransactionGen}
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
-
-import scala.util.Random
+import play.api.libs.json.{JsArray, JsObject, Json, JsValue}
 
 //noinspection ScalaStyle
 class DebugApiRouteSpec
@@ -117,7 +117,7 @@ class DebugApiRouteSpec
       d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
       d.appendBlock(TxHelpers.transfer(to = TxHelpers.secondAddress, amount = 1.waves + TestValues.fee))
 
-      val route = debugApiRoute.copy(priorityPoolBlockchain = () => d.blockchain).route
+      val route = routeWithBlockchain(d.blockchain)
       val tx    = TxHelpers.transfer(TxHelpers.secondSigner, TestValues.address, 1.waves)
       validatePost(tx) ~> route ~> check {
         val json = Json.parse(responseAs[String])
@@ -291,9 +291,9 @@ class DebugApiRouteSpec
           if ((json \ "valid").as[Boolean])
             assert(tx.json().fieldSet subsetOf json.as[JsObject].fieldSet)
           else
-            (json \ "transaction").as[JsObject] shouldBe tx.json()
+            (json \ "transaction").as[JsObject] should matchJson(tx.json())
 
-          (json \ "trace").as[JsArray] shouldBe Json.parse(result(tx))
+          (json \ "trace").as[JsArray] should matchJson(result(tx))
         }
       }
 
@@ -306,9 +306,9 @@ class DebugApiRouteSpec
           if ((json \ "valid").as[Boolean])
             assert(tx.json().fieldSet subsetOf json.as[JsObject].fieldSet)
           else
-            (json \ "transaction").as[JsObject] shouldBe tx.json()
+            (json \ "transaction").as[JsObject] should matchJson(tx.json())
 
-          (json \ "trace").as[JsArray] shouldBe Json.parse(result)
+          (json \ "trace").as[JsArray] should matchJson(Json.parse(result))
         }
       }
 
@@ -680,6 +680,7 @@ class DebugApiRouteSpec
             | ]
           """.stripMargin
         )
+        (json \ "height").as[Int] shouldBe 1
       }
     }
 
@@ -714,7 +715,7 @@ class DebugApiRouteSpec
 
       jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
         val json = responseAs[JsObject]
-        (json \ "trace").as[JsArray] shouldBe Json.parse("""[ {
+        (json \ "trace").as[JsArray] should matchJson("""[ {
                                                            |    "type" : "asset",
                                                            |    "context" : "transfer",
                                                            |    "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
@@ -828,7 +829,9 @@ class DebugApiRouteSpec
                                    |    "recipient" : "$recipientAddress",
                                    |    "amount" : 100,
                                    |    "height" : 1,
-                                   |    "status" : "active"
+                                   |    "status" : "active",
+                                   |    "cancelHeight" : null,
+                                   |    "cancelTransactionId" : null
                                    |  }, {
                                    |    "id" : "$leaseId2",
                                    |    "originTransactionId" : "${invoke.id()}",
@@ -836,7 +839,9 @@ class DebugApiRouteSpec
                                    |    "recipient" : "$recipientAddress",
                                    |    "amount" : 100,
                                    |    "height" : 1,
-                                   |    "status" : "active"
+                                   |    "status" : "active",
+                                   |    "cancelHeight" : null,
+                                   |    "cancelTransactionId" : null
                                    |  } ],
                                    |  "leaseCancels" : [ {
                                    |    "id" : "$leaseCancelId",
@@ -845,7 +850,9 @@ class DebugApiRouteSpec
                                    |    "recipient" : "$recipientAddress",
                                    |    "amount" : 100,
                                    |    "height" : 1,
-                                   |    "status" : "canceled"
+                                   |    "status" : "canceled",
+                                   |    "cancelHeight" : 2,
+                                   |    "cancelTransactionId" : "$leaseCancelId"
                                    |  } ],
                                    |  "invokes" : [ ]
                                    |}""".stripMargin)

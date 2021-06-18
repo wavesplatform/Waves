@@ -249,7 +249,8 @@ case class DebugApiRoute(
       val response = Json.obj(
         "valid"          -> error.isEmpty,
         "validationTime" -> (System.nanoTime() - startTime).nanos.toMillis,
-        "trace"          -> tracedDiff.trace.map(_.loggedJson)
+        "trace"          -> tracedDiff.trace.map(_.loggedJson),
+        "height"         -> blockchain.height
       )
 
       error.fold(response ++ transactionJson)(
