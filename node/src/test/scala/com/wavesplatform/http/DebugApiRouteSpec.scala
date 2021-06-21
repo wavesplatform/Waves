@@ -816,7 +816,7 @@ class DebugApiRouteSpec
                                                                  |      "function" : "test",
                                                                  |      "args" : [ ]
                                                                  |    },
-                                                                 |    "payments" : [ ],
+                                                                 |    "payment" : [ ],
                                                                  |    "stateChanges" : {
                                                                  |      "data" : [ {
                                                                  |        "key" : "key",
