@@ -366,10 +366,8 @@ object TransactionsApiRoute {
       cancelTransactionId: Option[ByteStr] = None
   )
   private[this] object LeaseRef {
-    implicit val jsonWrites: OWrites[LeaseRef] = {
-      import com.wavesplatform.utils.byteStrFormat
-      implicit val config = JsonConfiguration(optionHandlers = OptionHandlers.WritesNull)
-      Json.writes[LeaseRef]
-    }
+    import com.wavesplatform.utils.byteStrFormat
+    implicit val config                        = JsonConfiguration(optionHandlers = OptionHandlers.WritesNull)
+    implicit val jsonWrites: OWrites[LeaseRef] = Json.writes[LeaseRef]
   }
 }
