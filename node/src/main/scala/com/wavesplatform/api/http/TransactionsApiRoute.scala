@@ -344,7 +344,7 @@ object TransactionsApiRoute {
       Json.obj(
         "dApp"         -> i.dApp,
         "call"         -> i.call,
-        "payments"     -> i.payments,
+        "payment"      -> i.payments,
         "stateChanges" -> invokeScriptResultWrites.writes(i.stateChanges)
       )
 
