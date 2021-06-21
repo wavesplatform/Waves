@@ -35,15 +35,15 @@ final case class InvokeScriptResult(
 //noinspection TypeAnnotation
 object InvokeScriptResult {
   type LeaseCancel = com.wavesplatform.lang.v1.traits.domain.LeaseCancel
-  type SponsorFee = com.wavesplatform.lang.v1.traits.domain.SponsorFee
-  type Issue = com.wavesplatform.lang.v1.traits.domain.Issue
-  type Reissue = com.wavesplatform.lang.v1.traits.domain.Reissue
-  type Burn = com.wavesplatform.lang.v1.traits.domain.Burn
-  type DataEntry = com.wavesplatform.state.DataEntry[_]
+  type SponsorFee  = com.wavesplatform.lang.v1.traits.domain.SponsorFee
+  type Issue       = com.wavesplatform.lang.v1.traits.domain.Issue
+  type Reissue     = com.wavesplatform.lang.v1.traits.domain.Reissue
+  type Burn        = com.wavesplatform.lang.v1.traits.domain.Burn
+  type DataEntry   = com.wavesplatform.state.DataEntry[_]
 
   val empty = InvokeScriptResult()
 
-  final case class AttachedPayment(asset: Asset, amount: Long)
+  final case class AttachedPayment(assetId: Asset, amount: Long)
   object AttachedPayment {
     implicit val attachedPaymentWrites = Json.writes[AttachedPayment]
 
@@ -105,14 +105,13 @@ object InvokeScriptResult {
   implicit val sponsorFeeFormat   = Json.writes[SponsorFee]
   implicit val leaseCancelFormat  = Json.writes[LeaseCancel]
   implicit val errorMessageFormat = Json.writes[ErrorMessage]
-  implicit val invocationFormat: Writes[Invocation] = new Writes[Invocation] {
-    override def writes(i: Invocation) = Json.obj(
+  implicit val invocationFormat: Writes[Invocation] = (i: Invocation) =>
+    Json.obj(
       "dApp"         -> i.dApp,
       "call"         -> i.call,
-      "payments"     -> i.payments,
+      "payment"      -> i.payments,
       "stateChanges" -> jsonFormat.writes(i.stateChanges)
     )
-  }
   implicit val jsonFormat = Json.writes[InvokeScriptResult]
 
   implicit val monoid = new Monoid[InvokeScriptResult] {
@@ -221,7 +220,7 @@ object InvokeScriptResult {
     PBInvokeScriptResult.Invocation(
       ByteString.copyFrom(i.dApp.bytes),
       Some(toPbCall(i.call)),
-      i.payments.map(p => Amount(PBAmounts.toPBAssetId(p.asset), p.amount)),
+      i.payments.map(p => Amount(PBAmounts.toPBAssetId(p.assetId), p.amount)),
       Some(toPB(i.stateChanges))
     )
   }

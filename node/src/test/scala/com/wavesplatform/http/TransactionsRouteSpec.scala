@@ -752,7 +752,7 @@ class TransactionsRouteSpec
                                    |      "function" : "nested",
                                    |      "args" : [ ]
                                    |    },
-                                   |    "payments" : [ ],
+                                   |    "payment" : [ ],
                                    |    "stateChanges" : {
                                    |      "data" : [ ],
                                    |      "transfers" : [ ],
