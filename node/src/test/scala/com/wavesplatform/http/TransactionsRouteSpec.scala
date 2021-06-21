@@ -1,6 +1,10 @@
 package com.wavesplatform.http
 
+import scala.concurrent.Future
+import scala.util.Random
+
 import akka.http.scaladsl.model._
+import com.wavesplatform.{BlockchainStubHelpers, BlockGen, NoShrink, TestTime, TestValues, TestWallet, TransactionGen}
 import com.wavesplatform.account.{AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
@@ -19,10 +23,11 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.{Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
-import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
+import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
+import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -30,19 +35,14 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxHelpers, TxVersion}
-import com.wavesplatform.{BlockGen, BlockchainStubHelpers, NoShrink, TestTime, TestValues, TestWallet, TransactionGen}
 import monix.reactive.Observable
-import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, OptionValues}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
-
-import scala.concurrent.Future
-import scala.util.Random
+import play.api.libs.json.Json.JsValueWrapper
 
 class TransactionsRouteSpec
     extends RouteSpec("/transactions")
@@ -310,7 +310,9 @@ class TransactionsRouteSpec
       (blockchain.transactionMeta _).when(lease.id()).returns(Some((1, true)))
       (blockchain.leaseDetails _)
         .when(lease.id())
-        .returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Cancelled(2, Some(leaseCancel.id())), lease.id(), 1)))
+        .returns(
+          Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Cancelled(2, Some(leaseCancel.id())), lease.id(), 1))
+        )
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
       Get(routePath(s"/address/${TxHelpers.secondAddress}/limit/10")) ~> route ~> check {
@@ -336,7 +338,9 @@ class TransactionsRouteSpec
                                    |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                                    |    "amount" : 1000000000,
                                    |    "height" : 1,
-                                   |    "status" : "canceled"
+                                   |    "status" : "canceled",
+                                   |    "cancelHeight" : 2,
+                                   |    "cancelTransactionId" : "${leaseCancel.id()}"
                                    |  }
                                    |}""".stripMargin)
       }
@@ -433,7 +437,16 @@ class TransactionsRouteSpec
       (blockchain.leaseDetails _)
         .expects(leaseCancelId)
         .returning(
-          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, Some(leaseCancelId)), leaseCancelId, 1))
+          Some(
+            LeaseDetails(
+              TestValues.keyPair.publicKey,
+              TestValues.address,
+              123,
+              LeaseDetails.Status.Cancelled(2, Some(leaseCancelId)),
+              leaseCancelId,
+              1
+            )
+          )
         )
         .anyNumberOfTimes()
       (blockchain.transactionMeta _).expects(leaseId1).returning(Some((1, true))).anyNumberOfTimes()
@@ -450,7 +463,7 @@ class TransactionsRouteSpec
       Get(routePath(s"/address/${invokeAddress}/limit/1")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
         val json = (responseAs[JsArray] \ 0 \ 0 \ "stateChanges").as[JsObject]
-        json shouldBe Json.parse(s"""{
+        json should matchJson(s"""{
                                     |  "data": [],
                                     |  "transfers": [],
                                     |  "issues": [],
@@ -465,7 +478,9 @@ class TransactionsRouteSpec
                                     |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                     |      "amount": 123,
                                     |      "height": 1,
-                                    |      "status":"active"
+                                    |      "status":"active",
+                                    |      "cancelHeight" : null,
+                                    |      "cancelTransactionId" : null
                                     |    },
                                     |    {
                                     |      "id": "$leaseId2",
@@ -474,7 +489,9 @@ class TransactionsRouteSpec
                                     |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                     |      "amount": 123,
                                     |      "height": 1,
-                                    |      "status":"active"
+                                    |      "status":"active",
+                                    |      "cancelHeight" : null,
+                                    |      "cancelTransactionId" : null
                                     |    }
                                     |  ],
                                     |  "leaseCancels": [
@@ -485,7 +502,9 @@ class TransactionsRouteSpec
                                     |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                     |      "amount": 123,
                                     |      "height": 1,
-                                    |      "status":"canceled"
+                                    |      "status":"canceled",
+                                    |      "cancelHeight" : 2,
+                                    |      "cancelTransactionId" : "$leaseCancelId"
                                     |    }
                                     |  ],
                                     |  "invokes": []
@@ -510,7 +529,9 @@ class TransactionsRouteSpec
       (blockchain.transactionMeta _).when(lease.id()).returns(Some((1, true)))
       (blockchain.leaseDetails _)
         .when(lease.id())
-        .returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Cancelled(2, Some(leaseCancel.id())), lease.id(), 1)))
+        .returns(
+          Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Cancelled(2, Some(leaseCancel.id())), lease.id(), 1))
+        )
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
       Get(routePath(s"/info/${leaseCancel.id()}")) ~> route ~> check {
@@ -536,7 +557,9 @@ class TransactionsRouteSpec
                                    |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                                    |    "amount" : 1000000000,
                                    |    "height" : 1,
-                                   |    "status" : "canceled"
+                                   |    "status" : "canceled",
+                                   |    "cancelHeight" : 2,
+                                   |    "cancelTransactionId" : "${leaseCancel.id()}"
                                    |  }
                                    |}""".stripMargin)
       }
@@ -637,7 +660,16 @@ class TransactionsRouteSpec
       (blockchain.leaseDetails _)
         .expects(leaseCancelId)
         .returning(
-          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, Some(leaseCancelId)), leaseCancelId, 1))
+          Some(
+            LeaseDetails(
+              TestValues.keyPair.publicKey,
+              TestValues.address,
+              123,
+              LeaseDetails.Status.Cancelled(2, Some(leaseCancelId)),
+              leaseCancelId,
+              1
+            )
+          )
         )
         .anyNumberOfTimes()
       (blockchain.leaseDetails _)
@@ -647,7 +679,16 @@ class TransactionsRouteSpec
       (blockchain.leaseDetails _)
         .expects(nestedLeaseCancelId)
         .returning(
-          Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Cancelled(2, Some(nestedLeaseCancelId)), nestedLeaseCancelId, 1))
+          Some(
+            LeaseDetails(
+              TestValues.keyPair.publicKey,
+              TestValues.address,
+              123,
+              LeaseDetails.Status.Cancelled(2, Some(nestedLeaseCancelId)),
+              nestedLeaseCancelId,
+              1
+            )
+          )
         )
         .anyNumberOfTimes()
 
@@ -680,7 +721,9 @@ class TransactionsRouteSpec
                                    |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                    |    "amount" : 123,
                                    |    "height" : 1,
-                                   |    "status" : "active"
+                                   |    "status":"active",
+                                   |    "cancelHeight" : null,
+                                   |    "cancelTransactionId" : null
                                    |  }, {
                                    |    "id" : "$leaseId2",
                                    |    "originTransactionId" : "$leaseId2",
@@ -688,7 +731,9 @@ class TransactionsRouteSpec
                                    |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                    |    "amount" : 123,
                                    |    "height" : 1,
-                                   |    "status" : "active"
+                                   |    "status":"active",
+                                   |    "cancelHeight" : null,
+                                   |    "cancelTransactionId" : null
                                    |  } ],
                                    |  "leaseCancels" : [ {
                                    |    "id" : "$leaseCancelId",
@@ -697,7 +742,9 @@ class TransactionsRouteSpec
                                    |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                    |    "amount" : 123,
                                    |    "height" : 1,
-                                   |    "status" : "canceled"
+                                   |    "status" : "canceled",
+                                   |    "cancelHeight" : 2,
+                                   |    "cancelTransactionId" : "$leaseCancelId"
                                    |  } ],
                                    |  "invokes" : [ {
                                    |    "dApp" : "$nestedInvokeAddress",
@@ -705,7 +752,7 @@ class TransactionsRouteSpec
                                    |      "function" : "nested",
                                    |      "args" : [ ]
                                    |    },
-                                   |    "payments" : [ ],
+                                   |    "payment" : [ ],
                                    |    "stateChanges" : {
                                    |      "data" : [ ],
                                    |      "transfers" : [ ],
@@ -720,7 +767,9 @@ class TransactionsRouteSpec
                                    |        "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                    |        "amount" : 123,
                                    |        "height" : 1,
-                                   |        "status" : "active"
+                                   |        "status":"active",
+                                   |        "cancelHeight" : null,
+                                   |        "cancelTransactionId" : null
                                    |      } ],
                                    |      "leaseCancels" : [ {
                                    |        "id" : "$nestedLeaseCancelId",
@@ -729,7 +778,9 @@ class TransactionsRouteSpec
                                    |        "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                    |        "amount" : 123,
                                    |        "height" : 1,
-                                   |        "status" : "canceled"
+                                   |        "status" : "canceled",
+                                   |        "cancelHeight" : 2,
+                                   |        "cancelTransactionId" : "$nestedLeaseCancelId"
                                    |      } ],
                                    |      "invokes" : [ ]
                                    |    }
@@ -830,7 +881,9 @@ class TransactionsRouteSpec
         (blockchain.transactionInfo _).when(lease.id()).returns(Some((1, lease, true)))
         (blockchain.transactionInfo _).when(leaseCancel.id()).returns(Some((1, leaseCancel, true)))
         (blockchain.transactionMeta _).when(lease.id()).returns(Some((1, true)))
-        (blockchain.leaseDetails _).when(lease.id()).returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Active, lease.id(), 1)))
+        (blockchain.leaseDetails _)
+          .when(lease.id())
+          .returns(Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Active, lease.id(), 1)))
       }
 
       val transactionsApi = stub[CommonTransactionsApi]
@@ -843,13 +896,15 @@ class TransactionsRouteSpec
       val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
 
       val leaseDetailsJson = Json.obj(
-        "id" -> lease.id(),
+        "id"                  -> lease.id(),
         "originTransactionId" -> lease.id(),
-        "sender" -> lease.sender.toAddress,
-        "recipient" -> lease.recipient,
-        "amount" -> lease.amount,
-        "height" -> 1,
-        "status" -> LeaseDetails.Status.Active.toString.toLowerCase
+        "sender"              -> lease.sender.toAddress,
+        "recipient"           -> lease.recipient,
+        "amount"              -> lease.amount,
+        "height"              -> 1,
+        "status"              -> LeaseDetails.Status.Active.toString.toLowerCase,
+        "cancelHeight"        -> null,
+        "cancelTransactionId" -> null
       )
 
       Get(routePath(s"/unconfirmed")) ~> route ~> check {
@@ -859,7 +914,7 @@ class TransactionsRouteSpec
 
       Get(routePath(s"/unconfirmed/info/${leaseCancel.id()}")) ~> route ~> check {
         val json = responseAs[JsObject]
-        json shouldBe leaseCancel.json() ++ Json.obj("lease" -> leaseDetailsJson)
+        json should matchJson(leaseCancel.json() ++ Json.obj("lease" -> leaseDetailsJson))
       }
     }
 

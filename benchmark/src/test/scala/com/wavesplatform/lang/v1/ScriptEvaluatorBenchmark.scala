@@ -26,7 +26,7 @@ import scala.util.Random
 
 object ScriptEvaluatorBenchmark {
   val version                                           = V1
-  val pureEvalContext: EvaluationContext[NoContext, Id] = PureContext.build(V1).evaluationContext
+  val pureEvalContext: EvaluationContext[NoContext, Id] = PureContext.build(V1, fixUnicodeFunctions = true).evaluationContext
   val evaluatorV1: EvaluatorV1[Id, NoContext]           = new EvaluatorV1[Id, NoContext]()
 }
 
