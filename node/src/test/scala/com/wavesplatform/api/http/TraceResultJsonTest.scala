@@ -7,12 +7,12 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.ScriptResultV3
-import com.wavesplatform.lang.v1.traits.domain.DataItem.Lng
 import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, Recipient}
+import com.wavesplatform.lang.v1.traits.domain.DataItem.Lng
+import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
-import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json.Json
 
@@ -54,7 +54,8 @@ class TraceResultJsonTest extends PropSpec with Matchers {
             0
           )
         ),
-        vars
+        vars,
+        Nil
       )
     )
 
@@ -225,7 +226,8 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         tx.dAppAddressOrAlias,
         tx.funcCall,
         Left(TxValidationError.ScriptExecutionError(reason, vars, None)),
-        vars
+        vars,
+        Nil
       )
     )
     val scriptExecutionError = ScriptExecutionError(tx, reason, isTokenScript = false)
