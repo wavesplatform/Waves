@@ -24,7 +24,7 @@ import com.wavesplatform.lang.v1.traits.domain.{Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, TransactionDiffer}
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxHelpers, TxVersion}
@@ -284,6 +284,55 @@ class TransactionsRouteSpec
           (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 100000
         }
       }
+    }
+
+    "invoke with issued assets" in {
+      val dAppSigner  = TxHelpers.signer(1)
+      val dAppAddress = TxHelpers.signer(1).toAddress
+      val setScript = TxHelpers.setScript(
+        dAppSigner,
+        TxHelpers.script("""
+          |{-# STDLIB_VERSION 5 #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |
+          |@Callable(i)
+          |func issue() = {
+          |  [
+          |    Issue("name", "description", 1000, 4, true, unit, 0),
+          |    Issue("name", "description", 1000, 4, true, unit, 1)
+          |  ]
+          |}
+          |""".stripMargin)
+      )
+
+      val invokeScript = TxHelpers.invoke(dAppAddress, "issue")
+
+      val blockchain = createBlockchainStub { blockchain =>
+        (blockchain.transactionInfo _).when(setScript.id()).returns(Some((1, setScript, true)))
+        (blockchain.hasAccountScript _).when(dAppAddress).returns(true)
+        (blockchain.accountScript _)
+          .when(dAppAddress)
+          .returns(Some(AccountScriptInfo(dAppSigner.publicKey, setScript.script.get, 1000, Map(3 -> Map("issue" -> 1000)))))
+        (blockchain.balance _).when(TxHelpers.defaultAddress, *).returns(Long.MaxValue)
+      }
+      val transactionsApi = CommonTransactionsApi(None, null, blockchain, null, null, _ => null, _ => null)
+      val route           = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
+
+      Post(routePath("/calculateFee"), invokeScript.json()) ~> route ~> check {
+        responseAs[JsObject] should matchJson(
+          Json.obj(
+            "feeAssetId" -> JsNull,
+            "feeAmount"  -> 200500000
+          )
+        )
+      }
+
+      // Debug test that 1waves is enough
+      val invokeScript1 = TxHelpers.invoke(dAppAddress, "issue", fee = 100000000)
+      val differ        = TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
+      val diff          = differ(invokeScript1)
+      println(diff.resultE)
     }
   }
 
@@ -1135,7 +1184,7 @@ class TransactionsRouteSpec
       val route     = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = publisher).route
 
       Post(routePath("/broadcast?trace=true"), invoke.json()) ~> route ~> check {
-        responseAs[JsObject] shouldBe Json.parse(
+        responseAs[JsObject] should matchJson(
           s"""{
             |  "type" : 16,
             |  "id" : "${invoke.id()}",

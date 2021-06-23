@@ -1,5 +1,8 @@
 package com.wavesplatform.transaction.smart
 
+import scala.annotation.tailrec
+import scala.util.{Failure, Success, Try}
+
 import cats.Id
 import cats.implicits._
 import com.google.common.base.Throwables
@@ -16,20 +19,17 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
+import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TracedResult, TraceStep}
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
-import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TraceStep, TracedResult}
 import com.wavesplatform.utils.ScorexLogging
 import org.msgpack.core.annotations.VisibleForTesting
 import shapeless.Coproduct
-
-import scala.annotation.tailrec
-import scala.util.{Failure, Success, Try}
 
 object Verifier extends ScorexLogging {
 
@@ -71,7 +71,8 @@ object Verifier extends ScorexLogging {
     def loop(
         assets: List[AssetForCheck],
         fullComplexity: Long,
-        fullTrace: List[TraceStep]
+        fullTrace: List[TraceStep],
+        attributes: TracedResult.Attributes
     ): (Long, TracedResult[ValidationError, Int]) = {
       assets match {
         case AssetForCheck(asset, AssetScriptInfo(script, estimatedComplexity), context) :: remaining =>
@@ -82,8 +83,8 @@ object Verifier extends ScorexLogging {
           def verify = verifyTx(blockchain, script, estimatedComplexity.toInt, tx, Some(asset.id), complexityLimit, context)
 
           stats.assetScriptExecution.measureForType(tx.typeId)(verify) match {
-            case TracedResult(e @ Left(_), trace)       => (fullComplexity + estimatedComplexity, TracedResult(e, fullTrace ::: trace))
-            case TracedResult(Right(complexity), trace) => loop(remaining, fullComplexity + complexity, fullTrace ::: trace)
+            case TracedResult(e @ Left(_), trace, attributes)       => (fullComplexity + estimatedComplexity, TracedResult(e, fullTrace ::: trace, attributes))
+            case TracedResult(Right(complexity), trace, attributes) => loop(remaining, fullComplexity + complexity, fullTrace ::: trace, attributes)
           }
         case Nil => (fullComplexity, TracedResult(Right(0), fullTrace))
       }
@@ -108,8 +109,8 @@ object Verifier extends ScorexLogging {
       case _ => Nil
     }
 
-    val (complexity, result)  = loop(assets, 0L, Nil)
-    val (_, additionalResult) = loop(additionalAssets, 0L, Nil)
+    val (complexity, result)  = loop(assets, 0L, Nil, Map.empty)
+    val (_, additionalResult) = loop(additionalAssets, 0L, Nil, Map.empty)
 
     result
       .flatMap(_ => additionalResult)
