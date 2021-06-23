@@ -24,7 +24,7 @@ import com.wavesplatform.lang.v1.traits.domain.{Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, TransactionDiffer}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxHelpers, TxVersion}
@@ -327,12 +327,6 @@ class TransactionsRouteSpec
           )
         )
       }
-
-      // Debug test that 1waves is enough
-      val invokeScript1 = TxHelpers.invoke(dAppAddress, "issue", fee = 100000000)
-      val differ        = TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
-      val diff          = differ(invokeScript1)
-      println(diff.resultE)
     }
   }
 
