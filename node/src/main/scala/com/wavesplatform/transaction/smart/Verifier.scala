@@ -72,7 +72,7 @@ object Verifier extends ScorexLogging {
         assets: List[AssetForCheck],
         fullComplexity: Long,
         fullTrace: List[TraceStep],
-        attributes: TracedResult.Attributes
+        fullAttributes: TracedResult.Attributes
     ): (Long, TracedResult[ValidationError, Int]) = {
       assets match {
         case AssetForCheck(asset, AssetScriptInfo(script, estimatedComplexity), context) :: remaining =>
@@ -83,8 +83,10 @@ object Verifier extends ScorexLogging {
           def verify = verifyTx(blockchain, script, estimatedComplexity.toInt, tx, Some(asset.id), complexityLimit, context)
 
           stats.assetScriptExecution.measureForType(tx.typeId)(verify) match {
-            case TracedResult(e @ Left(_), trace, attributes)       => (fullComplexity + estimatedComplexity, TracedResult(e, fullTrace ::: trace, attributes))
-            case TracedResult(Right(complexity), trace, attributes) => loop(remaining, fullComplexity + complexity, fullTrace ::: trace, attributes)
+            case TracedResult(e @ Left(_), trace, attributes) =>
+              (fullComplexity + estimatedComplexity, TracedResult(e, fullTrace ::: trace, fullAttributes ++ attributes))
+            case TracedResult(Right(complexity), trace, attributes) =>
+              loop(remaining, fullComplexity + complexity, fullTrace ::: trace, fullAttributes ++ attributes)
           }
         case Nil => (fullComplexity, TracedResult(Right(0), fullTrace))
       }
