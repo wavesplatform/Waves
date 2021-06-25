@@ -3,16 +3,16 @@ package com.wavesplatform.transaction.smart
 import com.wavesplatform.account._
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+import com.wavesplatform.lang.v1.FunctionHeader.User
+import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
+import com.wavesplatform.state.diffs.invoke.InvokeScriptLike
 import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.{Payment, defaultCall}
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
-import com.wavesplatform.state.diffs.invoke.InvokeScriptLike
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -22,7 +22,7 @@ case class InvokeScriptTransaction(
     version: TxVersion,
     sender: PublicKey,
     dAppAddressOrAlias: AddressOrAlias,
-    funcCallOpt: Option[FUNCTION_CALL],
+    exprOpt: Option[EXPR],
     payments: Seq[Payment],
     fee: TxAmount,
     feeAssetId: Asset,
@@ -36,7 +36,8 @@ case class InvokeScriptTransaction(
     with LegacyPBSwitch.V2
     with InvokeScriptLike {
 
-  val funcCall = funcCallOpt.getOrElse(FUNCTION_CALL(FunctionHeader.User(ContractEvaluator.DEFAULT_FUNC_NAME), List.empty))
+  val funcCallOpt: Option[FUNCTION_CALL] = exprOpt.collect { case f: FUNCTION_CALL => f }
+  val funcCall: FUNCTION_CALL            = funcCallOpt.getOrElse(defaultCall)
 
   override val builder = InvokeScriptTransaction
 
@@ -71,41 +72,43 @@ object InvokeScriptTransaction extends TransactionParser {
     implicit val jsonFormat: Format[Payment] = Json.format
   }
 
+  val defaultCall: FUNCTION_CALL = FUNCTION_CALL(User(ContractEvaluator.DEFAULT_FUNC_NAME), Nil)
+
   def create(
       version: TxVersion,
       sender: PublicKey,
       dappAddress: AddressOrAlias,
-      fc: Option[FUNCTION_CALL],
+      expr: Option[EXPR],
       p: Seq[Payment],
       fee: TxAmount,
       feeAssetId: Asset,
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, InvokeScriptTransaction] =
-    InvokeScriptTransaction(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs, dappAddress.chainId).validatedEither
+    InvokeScriptTransaction(version, sender, dappAddress, expr, p, fee, feeAssetId, timestamp, proofs, dappAddress.chainId).validatedEither
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
       dappAddress: AddressOrAlias,
-      fc: Option[FUNCTION_CALL],
+      expr: Option[EXPR],
       p: Seq[Payment],
       fee: TxAmount,
       feeAssetId: Asset,
       timestamp: TxTimestamp,
       signer: PrivateKey
   ): Either[ValidationError, InvokeScriptTransaction] =
-    create(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, dappAddress, expr, p, fee, feeAssetId, timestamp, Proofs.empty).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
       sender: KeyPair,
       dappAddress: AddressOrAlias,
-      fc: Option[FUNCTION_CALL],
+      expr: Option[EXPR],
       p: Seq[Payment],
       fee: TxAmount,
       feeAssetId: Asset,
       timestamp: TxTimestamp
   ): Either[ValidationError, InvokeScriptTransaction] =
-    signed(version, sender.publicKey, dappAddress, fc, p, fee, feeAssetId, timestamp, sender.privateKey)
+    signed(version, sender.publicKey, dappAddress, expr, p, fee, feeAssetId, timestamp, sender.privateKey)
 }

@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.serialization.Deser
@@ -613,12 +613,12 @@ object PBTransactions {
     }
   }
 
-  def toPBInvokeScriptData(dappAddress: AddressOrAlias, fcOpt: Option[FUNCTION_CALL], payment: Seq[Payment]): InvokeScriptTransactionData = {
+  def toPBInvokeScriptData(dAppAddress: AddressOrAlias, exprOpt: Option[EXPR], payment: Seq[Payment]): InvokeScriptTransactionData = {
     import com.wavesplatform.lang.v1.Serde
 
     InvokeScriptTransactionData(
-      Some(PBRecipients.create(dappAddress)),
-      ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
+      Some(PBRecipients.create(dAppAddress)),
+      ByteString.copyFrom(Deser.serializeOption(exprOpt)(Serde.serialize(_))),
       payment.map(p => (p.assetId, p.amount): Amount)
     )
   }

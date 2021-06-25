@@ -14,6 +14,7 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, WrongArgumentType}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.{VariableInfo, vars}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, LONG, STRING}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
@@ -403,4 +404,20 @@ object ContractCompiler {
       case Left(error) => Left(error.toString)
     }
   }
+
+  def compileFreeCall(
+      input: String,
+      ctx: CompilerContext,
+      version: StdLibVersion
+  ): Either[String, EXPR] =
+    Parser.parseExpr(input) match {
+      case fastparse.Parsed.Success(expr, _) =>
+        val p          = AnyPos
+        val annotation = List(Expressions.ANNOTATION(p, PART.VALID(p, "Callable"), List(PART.VALID(p, "i"))))
+        val function   = Expressions.FUNC(p, expr, PART.VALID(p, "default"), Nil)
+        val dApp       = Expressions.DAPP(p, Nil, List(Expressions.ANNOTATEDFUNC(p, annotation, function)))
+        ContractCompiler(ctx, dApp, version).map(_.callableFuncs.head.u.body)
+      case f @ fastparse.Parsed.Failure(_, _, _) =>
+        Left(f.toString)
+    }
 }

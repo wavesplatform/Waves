@@ -28,13 +28,13 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
     def checkLength =
       if (tx.isProtobufVersion)
         PBTransactions
-          .toPBInvokeScriptData(tx.dAppAddressOrAlias, tx.funcCallOpt, tx.payments)
+          .toPBInvokeScriptData(tx.dAppAddressOrAlias, tx.exprOpt, tx.payments)
           .toByteArray
           .length <= ContractLimits.MaxInvokeScriptSizeInBytes
       else tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes
 
     val callableNameSize =
-      funcCallOpt match {
+      exprOpt match {
         case Some(FUNCTION_CALL(FunctionHeader.User(internalName, _), _)) => internalName.utf8Bytes.length
         case _ => 0
       }
