@@ -36,7 +36,7 @@ case class InvokeScriptTransaction(
     with LegacyPBSwitch.V2
     with InvokeScriptLike {
 
-  val funcCallOpt: Option[FUNCTION_CALL] = exprOpt.collect { case f: FUNCTION_CALL => f }
+  val funcCallOpt: Option[FUNCTION_CALL] = exprOpt.collect { case f @ FUNCTION_CALL(User(_, _), _) => f }
   val funcCall: FUNCTION_CALL            = funcCallOpt.getOrElse(defaultCall)
 
   override val builder = InvokeScriptTransaction
