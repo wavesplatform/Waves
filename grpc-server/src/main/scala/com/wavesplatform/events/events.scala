@@ -3,7 +3,7 @@ package com.wavesplatform.events
 import cats.Monoid
 import cats.syntax.monoid._
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
@@ -360,6 +360,9 @@ object StateUpdate {
     }
   }
 
+  private val WavesAlias   = Alias.fromString("alias:W:waves").explicitGet()
+  private val WavesAddress = Address.fromString("3PGd1eQR8EhLkSogpmu9Ne7hSH1rQ5ALihd").explicitGet()
+
   def atomic(blockchainBeforeWithMinerReward: Blockchain, diff: Diff): StateUpdate = {
     val blockchain      = blockchainBeforeWithMinerReward
     val blockchainAfter = CompositeBlockchain(blockchain, diff)
@@ -398,7 +401,10 @@ object StateUpdate {
           if (newState.isActive) LeaseStatus.Active else LeaseStatus.Inactive,
           newState.amount,
           newState.sender,
-          blockchainAfter.resolveAlias(newState.recipient).explicitGet(),
+          newState.recipient match {
+            case `WavesAlias` => WavesAddress
+            case other        => blockchainAfter.resolveAlias(other).explicitGet()
+          },
           newState.sourceId
         )
     }.toVector
