@@ -285,7 +285,7 @@ object InvokeScriptTransactionDiff {
       blockchain: Blockchain,
       tx: InvokeScriptTransaction
   ): Either[GenericError, (PublicKey, StdLibVersion, FUNCTION_CALL, DApp, Map[Int, Map[String, Long]])] =
-    if (!blockchain.isFeatureActivated(BlockchainFeatures.BlockV5))
+    if (!blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
       Left(GenericError("Free call is not activated yet"))
     else if (tx.dAppAddressOrAlias != tx.senderAddress)
       Left(GenericError("Free call could be performed only on the invoker account"))
