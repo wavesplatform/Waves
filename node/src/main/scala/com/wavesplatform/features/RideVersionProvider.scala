@@ -1,13 +1,14 @@
 package com.wavesplatform.features
 
-import com.wavesplatform.features.BlockchainFeatures.{BlockV5, Ride4DApps, SynchronousCalls}
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, Ride4DApps, RideV6, SynchronousCalls}
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.state.Blockchain
 
 object RideVersionProvider {
-  private val actualVersionByFeature =
+  val actualVersionByFeature =
     List(
+      RideV6           -> V6,
       SynchronousCalls -> V5,
       BlockV5          -> V4,
       Ride4DApps       -> V3
@@ -17,7 +18,7 @@ object RideVersionProvider {
     .filter(_ >= V3)
     .foreach { v =>
       if (!actualVersionByFeature.map(_._2).contains(v))
-        throw new RuntimeException(s"Blockchain feature related to RIDE V$v is not found")
+        throw new RuntimeException(s"Blockchain feature related to RIDE $v is not found")
     }
 
   implicit class RideVersionBlockchainExt(b: Blockchain) {
