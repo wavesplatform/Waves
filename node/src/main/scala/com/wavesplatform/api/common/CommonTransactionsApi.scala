@@ -10,6 +10,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult}
+import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
@@ -38,7 +39,7 @@ trait CommonTransactionsApi {
   def transactionsByAddress(
       subject: AddressOrAlias,
       sender: Option[Address],
-      transactionTypes: Set[Byte],
+      transactionTypes: Set[TransactionType],
       fromId: Option[ByteStr] = None
   ): Observable[TransactionMeta]
 
@@ -89,7 +90,7 @@ object CommonTransactionsApi {
     override def transactionsByAddress(
         subject: AddressOrAlias,
         sender: Option[Address],
-        transactionTypes: Set[Byte],
+        transactionTypes: Set[TransactionType],
         fromId: Option[ByteStr] = None
     ): Observable[TransactionMeta] = resolve(subject).fold(Observable.empty[TransactionMeta]) { subjectAddress =>
       common.addressTransactions(db, maybeDiff, subjectAddress, sender, transactionTypes, fromId)

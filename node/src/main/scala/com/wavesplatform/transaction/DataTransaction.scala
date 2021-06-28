@@ -21,18 +21,16 @@ case class DataTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends ProvenTransaction
+) extends Transaction(TransactionType.Data)
+    with ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
     with FastHashId
     with LegacyPBSwitch.V2 {
 
-  //noinspection TypeAnnotation
-  override val builder = DataTransaction
-
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
-  override val json: Coeval[JsObject]         = Coeval.eval(builder.serializer.toJson(this))
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(DataTxSerializer.bodyBytes(this))
+  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(DataTxSerializer.toBytes(this))
+  override val json: Coeval[JsObject]         = Coeval.evalOnce(DataTxSerializer.toJson(this))
 
   private[wavesplatform] lazy val protoDataPayload = PBTransactions.protobuf(this).getTransaction.getDataTransaction.toByteArray
 }
@@ -41,7 +39,7 @@ object DataTransaction extends TransactionParser {
   type TransactionT = DataTransaction
 
   val MaxBytes: Int      = 150 * 1024 // uses for RIDE CONST_STRING and CONST_BYTESTR
-  val MaxProtoBytes: Int = 165890     // uses for RIDE CONST_BYTESTR
+  val MaxProtoBytes: Int = 165890 // uses for RIDE CONST_BYTESTR
   val MaxEntryCount: Int = 100
 
   override val typeId: TxType                    = 12: Byte
@@ -52,10 +50,8 @@ object DataTransaction extends TransactionParser {
   implicit def sign(tx: DataTransaction, privateKey: PrivateKey): DataTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-  val serializer = DataTxSerializer
-
   override def parseBytes(bytes: Array[TxVersion]): Try[DataTransaction] =
-    serializer.parseBytes(bytes)
+    DataTxSerializer.parseBytes(bytes)
 
   def create(
       version: TxVersion,

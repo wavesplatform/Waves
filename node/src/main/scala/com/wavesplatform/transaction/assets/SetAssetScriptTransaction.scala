@@ -23,18 +23,16 @@ case class SetAssetScriptTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends VersionedTransaction
+) extends Transaction(TransactionType.SetAssetScript)
+    with VersionedTransaction
     with ProvenTransaction
     with TxWithFee.InWaves
     with FastHashId
     with LegacyPBSwitch.V2 {
 
-  //noinspection TypeAnnotation
-  override val builder = SetAssetScriptTransaction
-
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
-  override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(SetAssetScriptTxSerializer.bodyBytes(this))
+  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(SetAssetScriptTxSerializer.toBytes(this))
+  override val json: Coeval[JsObject]         = Coeval.evalOnce(SetAssetScriptTxSerializer.toJson(this))
 
   override val checkedAssets: Seq[IssuedAsset] = Seq(asset)
 }

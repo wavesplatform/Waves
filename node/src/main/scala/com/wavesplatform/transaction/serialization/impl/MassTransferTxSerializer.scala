@@ -37,7 +37,7 @@ object MassTransferTxSerializer {
         val transferBytes = transfers.map { case ParsedTransfer(recipient, amount) => Bytes.concat(recipient.bytes, Longs.toByteArray(amount)) }
 
         Bytes.concat(
-          Array(builder.typeId, version),
+          Array(tpe.id.toByte, version),
           sender.arr,
           assetId.byteRepr,
           Shorts.toByteArray(transfers.size.toShort),

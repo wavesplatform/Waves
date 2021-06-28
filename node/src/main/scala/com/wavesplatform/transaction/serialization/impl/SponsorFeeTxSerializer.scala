@@ -25,7 +25,7 @@ object SponsorFeeTxSerializer {
     version match {
       case TxVersion.V1 =>
         Bytes.concat(
-          Array(builder.typeId, version),
+          Array(tpe.id.toByte, version),
           sender.arr,
           asset.id.arr,
           Longs.toByteArray(minSponsoredAssetFee.getOrElse(0)),
@@ -40,7 +40,7 @@ object SponsorFeeTxSerializer {
 
   def toBytes(tx: SponsorFeeTransaction): Array[Byte] = {
     if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
-    else Bytes.concat(Array(0: Byte, tx.typeId, tx.version), this.bodyBytes(tx), tx.proofs.bytes()) // [typeId, version] appears twice
+    else Bytes.concat(Array(0: Byte, tx.tpe.id.toByte, tx.version), this.bodyBytes(tx), tx.proofs.bytes()) // [typeId, version] appears twice
   }
 
   def parseBytes(bytes: Array[Byte]): Try[SponsorFeeTransaction] = Try {

@@ -234,8 +234,8 @@ case class UtilsApiRoute(
   }
 
   def transactionSerialize: Route =
-    path("transactionSerialize")(jsonPost[JsObject] { jsv =>
-      parseOrCreateTransaction(jsv)(tx => Json.obj("bytes" -> tx.bodyBytes().map(_.toInt & 0xff)))
+    path("transactionSerialize")(jsonPost[JsObject] { jsv => ???
+//      parseOrCreateTransaction(jsv)(tx => Json.obj("bytes" -> tx.bodyBytes().map(_.toInt & 0xff)))
     })
 
   def evaluate: Route =

@@ -39,14 +39,14 @@ object TransferTxSerializer {
       )
 
     version match {
-      case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
-      case TxVersion.V2 => Bytes.concat(Array(typeId, version), baseBytes)
+      case TxVersion.V1 => Bytes.concat(Array(tpe.id.toByte), baseBytes)
+      case TxVersion.V2 => Bytes.concat(Array(tpe.id.toByte, version), baseBytes)
       case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
   def toBytes(tx: TransferTransaction): Array[Byte] = tx.version match {
-    case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature.arr, this.bodyBytes(tx))
+    case TxVersion.V1 => Bytes.concat(Array(tx.tpe.id.toByte), tx.proofs.toSignature.arr, this.bodyBytes(tx))
     case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
     case _            => PBTransactionSerializer.bytes(tx)
   }

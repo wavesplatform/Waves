@@ -31,8 +31,8 @@ object BurnTxSerializer {
     )
 
     version match {
-      case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
-      case TxVersion.V2 => Bytes.concat(Array(builder.typeId, version, chainId), baseBytes)
+      case TxVersion.V1 => Bytes.concat(Array(tpe.id.toByte), baseBytes)
+      case TxVersion.V2 => Bytes.concat(Array(tpe.id.toByte, version, chainId), baseBytes)
       case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }

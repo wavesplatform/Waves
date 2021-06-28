@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs.invoke
 
 import scala.util.Right
-
 import cats.Id
 import cats.implicits._
 import com.wavesplatform.account._
@@ -26,7 +25,7 @@ import com.wavesplatform.metrics.{TxProcessingStats => Stats}
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{Transaction, TransactionType}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
@@ -71,7 +70,7 @@ object InvokeScriptTransactionDiff {
       )
 
       def executeMainScript(): TracedResult[ValidationError, MainScriptResult] = {
-        val scriptResultE = Stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId) {
+        val scriptResultE = Stats.invokedScriptExecution.measureForType(TransactionType.InvokeScript) {
           val fullLimit =
             if (blockchain.estimator == ScriptEstimatorV2)
               Int.MaxValue //to avoid continuations when evaluating underestimated by EstimatorV2 scripts

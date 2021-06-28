@@ -20,15 +20,21 @@ case class PaymentTransaction private (
     timestamp: TxTimestamp,
     signature: ByteStr,
     chainId: Byte
-) extends SignedTransaction
+) extends Transaction(TransactionType.Payment)
+    with Signed
+    with ProvenTransaction
     with TxWithFee.InWaves {
 
-  override val builder             = PaymentTransaction
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PaymentTxSerializer.bodyBytes(this))
+
+  def proofs: Proofs = Proofs(signature)
+
+  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), sender))
+
   override val id: Coeval[ByteStr] = Coeval.evalOnce(signature)
 
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
-  override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(PaymentTxSerializer.toBytes(this))
+  override val json: Coeval[JsObject]     = Coeval.evalOnce(PaymentTxSerializer.toJson(this))
 }
 
 object PaymentTransaction extends TransactionParser {
@@ -37,10 +43,8 @@ object PaymentTransaction extends TransactionParser {
   override val typeId: TxType                    = 2: Byte
   override val supportedVersions: Set[TxVersion] = Set(1)
 
-  val serializer = PaymentTxSerializer
-
   override def parseBytes(bytes: Array[TxVersion]): Try[PaymentTransaction] =
-    serializer.parseBytes(bytes)
+    PaymentTxSerializer.parseBytes(bytes)
 
   implicit val validator: TxValidator[PaymentTransaction] = PaymentTxValidator
 

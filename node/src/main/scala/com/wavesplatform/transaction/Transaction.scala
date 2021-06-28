@@ -6,11 +6,9 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-trait Transaction {
+abstract class Transaction(val tpe: TransactionType.TransactionType) {
   val id: Coeval[ByteStr]
 
-  def typeId: Byte = builder.typeId
-  def builder: TransactionParser
   def assetFee: (Asset, Long)
   def timestamp: Long
   def chainId: Byte
@@ -29,12 +27,11 @@ trait Transaction {
 
   override def hashCode(): Int = id().hashCode()
 
-  val bodyBytes: Coeval[Array[Byte]]
   def checkedAssets: Seq[IssuedAsset] = Nil
 }
 
 object Transaction {
-  type Type = Byte
+  type Type = TransactionType.TransactionType
 
   val V1: TxVersion = TxVersion.V1
   val V2: TxVersion = TxVersion.V2

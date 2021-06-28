@@ -499,7 +499,7 @@ abstract class LevelDBWriter private[database] (
         val nextSeqNr = rw.get(kk) + 1
         val txTypeNumSeq = txIds.map { txId =>
           val (tx, num, _) = transactions(txId)
-          (tx.typeId, num)
+          (tx.tpe.id.toByte, num)
         }
         rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
         rw.put(kk, nextSeqNr)
@@ -511,7 +511,7 @@ abstract class LevelDBWriter private[database] (
 
       for ((id, (tx, num, succeeded)) <- transactions) {
         rw.put(Keys.transactionAt(Height(height), num), Some((tx, succeeded)))
-        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.typeId, !succeeded)))
+        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.tpe.id, !succeeded)))
       }
 
       val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
@@ -724,7 +724,7 @@ abstract class LevelDBWriter private[database] (
                 ordersToInvalidate += rollbackOrderFill(rw, tx.sellOrder.id(), currentHeight)
             }
 
-            if (tx.typeId != GenesisTransaction.typeId) {
+            if (tx.tpe != TransactionType.Genesis) {
               rw.delete(Keys.transactionAt(h, num))
               rw.delete(Keys.transactionMetaById(TransactionId(tx.id())))
             }

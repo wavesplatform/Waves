@@ -4,14 +4,12 @@ import cats.data.Chain
 import cats.implicits._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.transfer._
 
@@ -24,24 +22,24 @@ object FeeValidation {
   val NFTMultiplier     = 0.001
   val BlockV5Multiplier = 0.001
 
-  val FeeConstants: Map[Byte, Long] = Map(
-    GenesisTransaction.typeId         -> 0,
-    PaymentTransaction.typeId         -> 1,
-    IssueTransaction.typeId           -> 1000,
-    ReissueTransaction.typeId         -> 1000,
-    BurnTransaction.typeId            -> 1,
-    TransferTransaction.typeId        -> 1,
-    MassTransferTransaction.typeId    -> 1,
-    LeaseTransaction.typeId           -> 1,
-    LeaseCancelTransaction.typeId     -> 1,
-    ExchangeTransaction.typeId        -> 3,
-    CreateAliasTransaction.typeId     -> 1,
-    DataTransaction.typeId            -> 1,
-    SetScriptTransaction.typeId       -> 10,
-    SponsorFeeTransaction.typeId      -> 1000,
-    SetAssetScriptTransaction.typeId  -> (1000 - 4),
-    InvokeScriptTransaction.typeId    -> 5,
-    UpdateAssetInfoTransaction.typeId -> 1
+  val FeeConstants: Map[TransactionType.TransactionType, Long] = Map(
+    TransactionType.Genesis         -> 0,
+    TransactionType.Payment         -> 1,
+    TransactionType.Issue           -> 1000,
+    TransactionType.Reissue         -> 1000,
+    TransactionType.Burn            -> 1,
+    TransactionType.Transfer        -> 1,
+    TransactionType.MassTransfer    -> 1,
+    TransactionType.Lease           -> 1,
+    TransactionType.LeaseCancel     -> 1,
+    TransactionType.Exchange        -> 3,
+    TransactionType.CreateAlias     -> 1,
+    TransactionType.Data            -> 1,
+    TransactionType.SetScript       -> 10,
+    TransactionType.SponsorFee      -> 1000,
+    TransactionType.SetAssetScript  -> (1000 - 4),
+    TransactionType.InvokeScript    -> 5,
+    TransactionType.UpdateAssetInfo -> 1
   )
 
   def apply(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] = {
@@ -51,7 +49,7 @@ object FeeValidation {
         _ <- Either.cond(
           feeDetails.minFeeInAsset <= tx.assetFee._2,
           (),
-          notEnoughFeeError(tx.typeId, feeDetails, tx.assetFee._2)
+          notEnoughFeeError(tx.tpe, feeDetails, tx.assetFee._2)
         )
       } yield ()
     } else {
@@ -59,12 +57,11 @@ object FeeValidation {
     }
   }
 
-  private def notEnoughFeeError(txType: Byte, feeDetails: FeeDetails, feeAmount: Long): ValidationError = {
-    val txName      = Constants.TransactionNames(txType)
+  private def notEnoughFeeError(txType: TransactionType.TransactionType, feeDetails: FeeDetails, feeAmount: Long): ValidationError = {
     val actualFee   = s"$feeAmount in ${feeDetails.asset.fold("WAVES")(_.id.toString)}"
     val requiredFee = s"${feeDetails.minFeeInWaves} WAVES${feeDetails.asset.fold("")(id => s" or ${feeDetails.minFeeInAsset} ${id.id.toString}")}"
 
-    val errorMessage = s"Fee for $txName ($actualFee) does not exceed minimal value of $requiredFee."
+    val errorMessage = s"Fee for ${txType.transactionName} ($actualFee) does not exceed minimal value of $requiredFee."
 
     GenericError((feeDetails.requirements mkString_ " ") ++ ". " ++ errorMessage)
   }
@@ -73,7 +70,7 @@ object FeeValidation {
 
   private def feeInUnits(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Long] = {
     FeeConstants
-      .get(tx.typeId)
+      .get(tx.tpe)
       .map { baseFee =>
         tx match {
           case tx: MassTransferTransaction =>
@@ -137,8 +134,9 @@ object FeeValidation {
 
     val assetsCount = tx match {
       case _: InvokeScriptTransaction if blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) => 0
-      case tx: ExchangeTransaction                                                                          => tx.checkedAssets.count(blockchain.hasAssetScript) /* *3 if we decide to check orders and transaction */
-      case _                                                                                                => tx.checkedAssets.count(blockchain.hasAssetScript)
+      case tx: ExchangeTransaction =>
+        tx.checkedAssets.count(blockchain.hasAssetScript) /* *3 if we decide to check orders and transaction */
+      case _ => tx.checkedAssets.count(blockchain.hasAssetScript)
     }
 
     val finalAssetsCount =

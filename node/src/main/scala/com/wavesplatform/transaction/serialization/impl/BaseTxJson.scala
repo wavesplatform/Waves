@@ -1,13 +1,13 @@
 package com.wavesplatform.transaction.serialization.impl
 
-import com.wavesplatform.transaction.{LegacyPBSwitch, ProvenTransaction, SigProofsSwitch, VersionedTransaction}
+import com.wavesplatform.transaction.{LegacyPBSwitch, ProvenTransaction, SigProofsSwitch, Transaction, VersionedTransaction}
 import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
 object BaseTxJson {
-  def toJson(tx: ProvenTransaction): JsObject = {
+  def toJson(tx: Transaction with ProvenTransaction): JsObject = {
     import tx._
     Json.obj(
-      "type"            -> typeId,
+      "type"            -> tpe.id,
       "id"              -> id().toString,
       "sender"          -> sender.toAddress,
       "senderPublicKey" -> sender,

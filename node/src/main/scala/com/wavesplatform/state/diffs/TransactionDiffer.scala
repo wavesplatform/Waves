@@ -74,7 +74,7 @@ object TransactionDiffer {
       verifierDiff    <- if (verify) verifierDiff(blockchain, tx) else Right(Diff.empty).traced
       transactionDiff <- transactionDiff(blockchain, tx, verifierDiff, currentBlockTimestamp, limitedExecution)
       remainingComplexity = if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - transactionDiff.scriptsComplexity.toInt else Int.MaxValue
-      _ <- validateBalance(blockchain, tx.typeId, transactionDiff).traced.leftMap { err =>
+      _ <- validateBalance(blockchain, tx.tpe, transactionDiff).traced.leftMap { err =>
         def acceptFailedByBalance() =
           acceptFailed(blockchain) && blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
 
@@ -98,7 +98,7 @@ object TransactionDiffer {
   ): Either[ValidationError, Unit] =
     if (verify)
       stats.commonValidation
-        .measureForType(tx.typeId) {
+        .measureForType(tx.tpe) {
           for {
             _ <- CommonValidation.disallowFromAnotherNetwork(tx, AddressScheme.current.chainId)
             _ <- CommonValidation.disallowTxFromFuture(blockchain.settings.functionalitySettings, currentBlockTs, tx)
@@ -152,12 +152,12 @@ object TransactionDiffer {
     }
   }
 
-  private def validateBalance(blockchain: Blockchain, txType: TxType, diff: Diff): Either[ValidationError, Unit] =
+  private def validateBalance(blockchain: Blockchain, txType: Transaction.Type, diff: Diff): Either[ValidationError, Unit] =
     stats.balanceValidation.measureForType(txType)(BalanceDiffValidation(blockchain)(diff).as(()))
 
   private def transactionDiff(blockchain: Blockchain, tx: Transaction, initDiff: Diff, currentBlockTs: TxTimestamp, limitedExecution: Boolean) =
     stats.transactionDiffValidation
-      .measureForType(tx.typeId) {
+      .measureForType(tx.tpe) {
         tx match {
           case gtx: GenesisTransaction           => GenesisTransactionDiff(blockchain.height)(gtx).traced
           case ptx: PaymentTransaction           => PaymentTransactionDiff(blockchain)(ptx).traced
@@ -196,7 +196,7 @@ object TransactionDiffer {
   private def validateFee(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] =
     for {
       fee <- feePortfolios(blockchain, tx)
-      _   <- validateBalance(blockchain, tx.typeId, Diff(portfolios = fee))
+      _   <- validateBalance(blockchain, tx.tpe, Diff(portfolios = fee))
     } yield ()
 
   private def validateOrder(blockchain: Blockchain, order: Order, matcherFee: Long): Either[ValidationError, Unit] =
@@ -209,7 +209,7 @@ object TransactionDiffer {
             .toRight(GenericError(s"Asset $asset should be issued before it can be traded"))
       }
       orderDiff = Diff.empty.copy(portfolios = Map(order.sender.toAddress -> Portfolio.build(order.matcherFeeAssetId, -matcherFee)))
-      _ <- validateBalance(blockchain, ExchangeTransaction.typeId, orderDiff)
+      _ <- validateBalance(blockchain, TransactionType.Exchange, orderDiff)
     } yield ()
 
   private def validatePayments(blockchain: Blockchain, tx: InvokeScriptTransaction): Either[ValidationError, Unit] =
@@ -244,7 +244,7 @@ object TransactionDiffer {
     } yield ()
 
   // failed transactions related
-  private def transactionMayFail(tx: Transaction): Boolean = tx.typeId == InvokeScriptTransaction.typeId || tx.typeId == ExchangeTransaction.typeId
+  private def transactionMayFail(tx: Transaction): Boolean = tx.tpe == TransactionType.InvokeScript || tx.tpe == TransactionType.Exchange
 
   private def acceptFailed(blockchain: Blockchain): Boolean = blockchain.isFeatureActivated(BlockV5)
 

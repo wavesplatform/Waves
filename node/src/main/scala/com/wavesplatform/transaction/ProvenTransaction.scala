@@ -2,14 +2,14 @@ package com.wavesplatform.transaction
 
 import play.api.libs.json._
 
-trait ProvenTransaction extends Transaction with Proven {
+trait ProvenTransaction extends Proven { this: Transaction =>
 
   // TODO: Delete (use ProvenTXJson)
   protected def proofField: Seq[(String, JsValue)] = Seq("proofs" -> JsArray(this.proofs.proofs.map(p => JsString(p.toString))))
 
   protected def jsonBase(): JsObject =
     Json.obj(
-      "type"            -> typeId,
+      "type"            -> tpe.id,
       "id"              -> id().toString,
       "sender"          -> sender.toAddress,
       "senderPublicKey" -> sender,

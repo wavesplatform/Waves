@@ -27,18 +27,16 @@ case class MassTransferTransaction(
     attachment: ByteStr,
     proofs: Proofs,
     chainId: Byte
-) extends ProvenTransaction
+) extends Transaction(TransactionType.MassTransfer)
+    with ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
     with FastHashId
     with LegacyPBSwitch.V2 {
 
-  //noinspection TypeAnnotation
-  override val builder = MassTransferTransaction
-
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
-  override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(MassTransferTxSerializer.bodyBytes(this))
+  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(MassTransferTxSerializer.toBytes(this))
+  override val json: Coeval[JsObject]         = Coeval.evalOnce(MassTransferTxSerializer.toJson(this))
 
   def compactJson(recipients: Set[AddressOrAlias]): JsObject =
     json() ++ Json.obj("transfers" -> MassTransferTxSerializer.transfersJson(transfers.filter(t => recipients.contains(t.address))))
@@ -62,11 +60,8 @@ object MassTransferTransaction extends TransactionParser {
   implicit def sign(tx: MassTransferTransaction, privateKey: PrivateKey): MassTransferTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-  //noinspection TypeAnnotation
-  val serializer = MassTransferTxSerializer
-
   override def parseBytes(bytes: Array[Byte]): Try[MassTransferTransaction] =
-    serializer.parseBytes(bytes)
+    MassTransferTxSerializer.parseBytes(bytes)
 
   case class Transfer(
       recipient: String,

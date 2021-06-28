@@ -3,20 +3,18 @@ package com.wavesplatform.api.http.eth
 import java.math.BigInteger
 
 import akka.http.scaladsl.server._
-import com.google.common.io.BaseEncoding
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http._
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.crypto
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.Blockchain
-import org.web3j.abi.datatypes.Address
+import com.wavesplatform.transaction.{EthereumTransaction, Transaction}
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.abi.{TypeDecoder, TypeEncoder}
-import org.web3j.crypto.{RawTransaction, SignedRawTransaction, TransactionDecoder, TransactionEncoder}
+import org.web3j.crypto.{RawTransaction, SignedRawTransaction, TransactionDecoder}
 import org.web3j.utils.Numeric._
 import play.api.libs.json.Json.JsValueWrapper
-import play.api.libs.json.{JsObject, JsValue, Json}
+import play.api.libs.json._
 
 import scala.reflect.ClassTag
 
@@ -59,30 +57,12 @@ class EthRpcRoute(blockchain: Blockchain) extends ApiRoute {
 
         resp(id, s"0x$balance")
       case "eth_sendRawTransaction" =>
-        val rawTransaction = TransactionDecoder.decode(params.get.head.as[String]) match {
-          case srt: SignedRawTransaction =>
-            val hexData = cleanHexPrefix(srt.getData)
-            hexData.take(8) match {
-              case "a9059cbb" =>
-                val amount    = decode[Uint256](hexData, 72)
-                val recipient = decode[Address](hexData, 8)
-                log.info(s"TRANSFER ${amount.getValue} of token ${srt.getTo} from ${srt.getFrom} to $recipient")
-              case _ =>
-                log.info(s"""Signed raw transaction:
-                            |from = ${srt.getFrom}
-                            |to = ${srt.getTo}
-                            |data = ${srt.getData}""".stripMargin)
-            }
-
-            srt
-
-          case rt: RawTransaction =>
-            rt
+        val et: Transaction = TransactionDecoder.decode(params.get.head.as[String]) match {
+          case srt: SignedRawTransaction => EthereumTransaction(srt)
+          case _: RawTransaction         => throw new UnsupportedOperationException("Cannot process unsigned transactions")
         }
-        resp(
-          id,
-          s"0x${BaseEncoding.base16().lowerCase().encode(crypto.secureHash(TransactionEncoder.encode(rawTransaction, AddressScheme.current.chainId.toLong)))}"
-        )
+
+        resp(id, toHexString(et.id().arr))
       case "eth_getTransactionReceipt" =>
         resp(
           id,
@@ -95,7 +75,7 @@ class EthRpcRoute(blockchain: Blockchain) extends ApiRoute {
             "to"                -> toHexString(new Array[Byte](20)),
             "cumulativeGasUsed" -> toHexStringWithPrefixSafe(BigInteger.valueOf(blockchain.height)),
             "gasUsed"           -> toHexStringWithPrefixSafe(BigInteger.valueOf(blockchain.height)),
-            "contractAddress"   -> toHexString(new Array[Byte](20)),
+            "contractAddress"   -> JsNull,
             "logs"              -> Json.arr(),
             "logsBloom"         -> toHexString(new Array[Byte](32))
           )

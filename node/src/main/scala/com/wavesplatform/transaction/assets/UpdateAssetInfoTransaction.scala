@@ -12,8 +12,6 @@ import com.wavesplatform.transaction.validation.impl.UpdateAssetInfoTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
-import scala.util.{Failure, Success, Try}
-
 case class UpdateAssetInfoTransaction(
     version: TxVersion,
     sender: PublicKey,
@@ -25,14 +23,13 @@ case class UpdateAssetInfoTransaction(
     feeAsset: Asset,
     proofs: Proofs,
     chainId: Byte
-) extends VersionedTransaction
+) extends Transaction(TransactionType.UpdateAssetInfo)
+    with VersionedTransaction
     with FastHashId
     with ProvenTransaction
     with ProtobufOnly { self =>
 
   override def assetFee: (Asset, TxAmount) = (feeAsset, feeAmount)
-
-  override def builder: UpdateAssetInfoTransaction.type = UpdateAssetInfoTransaction
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBTransactionSerializer.bodyBytes(self))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(PBTransactionSerializer.bytes(self))
@@ -50,24 +47,13 @@ case class UpdateAssetInfoTransaction(
   override def checkedAssets: Seq[IssuedAsset] = Seq(assetId)
 }
 
-object UpdateAssetInfoTransaction extends TransactionParser {
-  type TransactionT = UpdateAssetInfoTransaction
-
-  override val typeId: TxType                    = 17: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1)
+object UpdateAssetInfoTransaction {
+  val supportedVersions: Set[TxVersion] = Set(1)
 
   implicit def sign(tx: UpdateAssetInfoTransaction, privateKey: PrivateKey): UpdateAssetInfoTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   implicit val validator: TxValidator[UpdateAssetInfoTransaction] = UpdateAssetInfoTxValidator
-
-  override def parseBytes(bytes: Array[TxType]): Try[UpdateAssetInfoTransaction] =
-    PBTransactionSerializer
-      .parseBytes(bytes)
-      .flatMap {
-        case tx: UpdateAssetInfoTransaction => Success(tx)
-        case tx: Transaction                => Failure(UnexpectedTransaction(typeId, tx.typeId))
-      }
 
   def create(
       version: Byte,

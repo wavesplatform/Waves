@@ -167,7 +167,7 @@ object CommonValidation {
       case p: LegacyPBSwitch if p.isProtobufVersion =>
         activationBarrier(BlockchainFeatures.BlockV5)
 
-      case v: VersionedTransaction if !v.builder.supportedVersions.contains(v.version) =>
+      case v: VersionedTransaction =>
         Left(GenericError(s"Invalid tx version: $v"))
 
       case _ =>

@@ -23,19 +23,17 @@ case class ReissueTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends VersionedTransaction
+) extends Transaction(TransactionType.Reissue)
+    with VersionedTransaction
     with ProvenTransaction
     with SigProofsSwitch
     with TxWithFee.InWaves
     with FastHashId
     with LegacyPBSwitch.V3 {
 
-  //noinspection TypeAnnotation
-  override val builder = ReissueTransaction
-
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
-  override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(ReissueTxSerializer.bodyBytes(this))
+  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(ReissueTxSerializer.toBytes(this))
+  override val json: Coeval[JsObject]         = Coeval.evalOnce(ReissueTxSerializer.toJson(this))
 
   override def checkedAssets: Seq[IssuedAsset] = Seq(asset)
 }
@@ -50,10 +48,8 @@ object ReissueTransaction extends TransactionParser {
   implicit def sign(tx: ReissueTransaction, privateKey: PrivateKey): ReissueTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-  val serializer = ReissueTxSerializer
-
   override def parseBytes(bytes: Array[TxVersion]): Try[ReissueTransaction] =
-    serializer.parseBytes(bytes)
+    ReissueTxSerializer.parseBytes(bytes)
 
   def create(
       version: TxVersion,

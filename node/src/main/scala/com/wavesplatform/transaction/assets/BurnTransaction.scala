@@ -22,14 +22,12 @@ final case class BurnTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends ProvenTransaction
+) extends Transaction(TransactionType.Burn) with ProvenTransaction
     with VersionedTransaction
     with SigProofsSwitch
     with TxWithFee.InWaves
     with FastHashId
     with LegacyPBSwitch.V3 {
-
-  override def builder: TransactionParser = BurnTransaction
 
   override val bodyBytes: Coeval[Array[Byte]] = BurnTxSerializer.bodyBytes(this)
   override val bytes: Coeval[Array[Byte]]     = BurnTxSerializer.toBytes(this)

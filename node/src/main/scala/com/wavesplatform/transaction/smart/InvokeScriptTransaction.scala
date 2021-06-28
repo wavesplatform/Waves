@@ -6,13 +6,13 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
+import com.wavesplatform.state.diffs.invoke.InvokeScriptLike
 import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
-import com.wavesplatform.state.diffs.invoke.InvokeScriptLike
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -29,7 +29,8 @@ case class InvokeScriptTransaction(
     override val timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends ProvenTransaction
+) extends Transaction(TransactionType.InvokeScript)
+    with ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InCustomAsset
     with FastHashId
@@ -38,15 +39,13 @@ case class InvokeScriptTransaction(
 
   val funcCall = funcCallOpt.getOrElse(FUNCTION_CALL(FunctionHeader.User(ContractEvaluator.DEFAULT_FUNC_NAME), List.empty))
 
-  override val builder = InvokeScriptTransaction
-
-  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
-  val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
-  val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(InvokeScriptTxSerializer.bodyBytes(this))
+  val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(InvokeScriptTxSerializer.toBytes(this))
+  val json: Coeval[JsObject]         = Coeval.evalOnce(InvokeScriptTxSerializer.toJson(this))
 
   override def root: Option[InvokeScriptTransaction] = Some(this)
-  def senderAddress: Address = sender.toAddress
-  override def checkedAssets: Seq[IssuedAsset] = super[InvokeScriptLike].checkedAssets
+  def senderAddress: Address                         = sender.toAddress
+  override def checkedAssets: Seq[IssuedAsset]       = super[InvokeScriptLike].checkedAssets
 }
 
 object InvokeScriptTransaction extends TransactionParser {

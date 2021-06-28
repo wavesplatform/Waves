@@ -43,22 +43,22 @@ object Verifier extends ScorexLogging {
     case _: GenesisTransaction => Right(0)
     case pt: ProvenTransaction =>
       (pt, blockchain.accountScript(pt.sender.toAddress)) match {
-        case (stx: SignedTransaction, None) =>
+        case (stx: PaymentTransaction, None) =>
           stats.signatureVerification
-            .measureForType(stx.typeId)(stx.signaturesValid())
+            .measureForType(stx.tpe)(stx.signaturesValid())
             .as(0)
         case (et: ExchangeTransaction, scriptOpt) =>
           verifyExchange(et, blockchain, scriptOpt, if (limitedExecution) ContractLimits.FailFreeInvokeComplexity else Int.MaxValue)
         case (tx: SigProofsSwitch, Some(_)) if tx.usesLegacySignature =>
           Left(GenericError("Can't process transaction with signature from scripted account"))
-        case (_: SignedTransaction, Some(_)) =>
+        case (_: PaymentTransaction, Some(_)) =>
           Left(GenericError("Can't process transaction with signature from scripted account"))
         case (_, Some(script)) =>
           stats.accountScriptExecution
-            .measureForType(pt.typeId)(verifyTx(blockchain, script.script, script.verifierComplexity.toInt, pt, None))
+            .measureForType(pt.tpe)(verifyTx(blockchain, script.script, script.verifierComplexity.toInt, pt, None))
         case _ =>
           stats.signatureVerification
-            .measureForType(tx.typeId)(verifyAsEllipticCurveSignature(pt))
+            .measureForType(tx.tpe)(verifyAsEllipticCurveSignature(pt))
             .as(0)
       }
   }
@@ -81,7 +81,7 @@ object Verifier extends ScorexLogging {
 
           def verify = verifyTx(blockchain, script, estimatedComplexity.toInt, tx, Some(asset.id), complexityLimit, context)
 
-          stats.assetScriptExecution.measureForType(tx.typeId)(verify) match {
+          stats.assetScriptExecution.measureForType(tx.tpe)(verify) match {
             case TracedResult(e @ Left(_), trace)       => (fullComplexity + estimatedComplexity, TracedResult(e, fullTrace ::: trace))
             case TracedResult(Right(complexity), trace) => loop(remaining, fullComplexity + complexity, fullTrace ::: trace)
           }
@@ -211,7 +211,7 @@ object Verifier extends ScorexLogging {
       complexityLimit: Int
   ): TracedResult[ValidationError, Int] = {
 
-    val typeId    = et.typeId
+    val typeId    = et.tpe
     val sellOrder = et.sellOrder
     val buyOrder  = et.buyOrder
 

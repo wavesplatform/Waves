@@ -21,12 +21,12 @@ final case class LeaseCancelTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends SigProofsSwitch
+) extends Transaction(TransactionType.LeaseCancel)
+    with SigProofsSwitch
     with VersionedTransaction
     with TxWithFee.InWaves
     with FastHashId
     with LegacyPBSwitch.V3 {
-  override def builder: TransactionParser          = LeaseCancelTransaction
   override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(LeaseCancelTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(LeaseCancelTxSerializer.toBytes(this))
   override val json: Coeval[JsObject]              = Coeval.evalOnce(LeaseCancelTxSerializer.toJson(this))

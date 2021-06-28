@@ -25,7 +25,7 @@ object RealTransactionWrapper {
     }
     Header(txIdOpt.getOrElse(ByteStr(tx.id().arr)), tx.assetFee._2, tx.timestamp, v)
   }
-  private def proven(tx: ProvenTransaction, txIdOpt: Option[ByteStr] = None): Proven =
+  private def proven(tx: Transaction with ProvenTransaction, txIdOpt: Option[ByteStr] = None): Proven =
     Proven(
       header(tx, txIdOpt),
       Recipient.Address(ByteStr(tx.sender.toAddress.bytes)),

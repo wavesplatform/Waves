@@ -38,8 +38,7 @@ object TransactionParsers {
     SponsorFeeTransaction,
     SetAssetScriptTransaction,
     InvokeScriptTransaction,
-    TransferTransaction,
-    UpdateAssetInfoTransaction,
+    TransferTransaction
   ).flatMap { x =>
     x.supportedVersions.map { version =>
       ((x.typeId, version), x)

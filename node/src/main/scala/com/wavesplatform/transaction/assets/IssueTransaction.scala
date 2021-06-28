@@ -29,19 +29,17 @@ case class IssueTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends VersionedTransaction
+) extends Transaction(TransactionType.Issue)
+    with VersionedTransaction
     with ProvenTransaction
     with FastHashId
     with SigProofsSwitch
     with TxWithFee.InWaves
     with LegacyPBSwitch.V3 {
 
-  //noinspection TypeAnnotation,ScalaStyle
-  override def builder = IssueTransaction
-
-  override val bodyBytes: Coeval[Array[TxType]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[TxType]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
-  override val json: Coeval[JsObject]           = Coeval.evalOnce(builder.serializer.toJson(this))
+  override val bodyBytes: Coeval[Array[TxType]] = Coeval.evalOnce(IssueTxSerializer.bodyBytes(this))
+  override val bytes: Coeval[Array[TxType]]     = Coeval.evalOnce(IssueTxSerializer.toBytes(this))
+  override val json: Coeval[JsObject]           = Coeval.evalOnce(IssueTxSerializer.toJson(this))
 }
 
 object IssueTransaction extends TransactionParser {
@@ -54,8 +52,6 @@ object IssueTransaction extends TransactionParser {
 
   override val typeId: TxType                    = 3: Byte
   override val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
-
-  val serializer = IssueTxSerializer
 
   implicit val validator: TxValidator[IssueTransaction] = IssueTxValidator
   implicit def sign(tx: IssueTransaction, privateKey: PrivateKey): IssueTransaction =
@@ -150,10 +146,10 @@ object IssueTransaction extends TransactionParser {
   ): Either[ValidationError, IssueTransaction] =
     signed(version, sender.publicKey, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender.privateKey)
 
-  override def parseBytes(bytes: Array[TxType]): Try[IssueTransaction] = serializer.parseBytes(bytes)
+  override def parseBytes(bytes: Array[TxType]): Try[IssueTransaction] = IssueTxSerializer.parseBytes(bytes)
 
   implicit class IssueTransactionExt(private val tx: IssueTransaction) extends AnyVal {
     def asset: IssuedAsset = IssuedAsset(assetId)
-    def assetId: ByteStr = tx.id()
+    def assetId: ByteStr   = tx.id()
   }
 }

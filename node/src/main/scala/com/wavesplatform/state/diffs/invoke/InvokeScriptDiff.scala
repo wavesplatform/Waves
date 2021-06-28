@@ -27,7 +27,7 @@ import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, CoevalR, TracedResult}
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
-import com.wavesplatform.transaction.{Transaction, TxValidationError}
+import com.wavesplatform.transaction.{Transaction, TransactionType, TxValidationError}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -145,7 +145,7 @@ object InvokeScriptDiff {
 
           result <- for {
             (diff, (scriptResult, log), availableActions, availableData) <- {
-              stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
+              stats.invokedScriptExecution.measureForType(TransactionType.InvokeScript)({
                 val height = blockchain.height
                 val invocation = ContractEvaluator.Invocation(
                   tx.funcCall,

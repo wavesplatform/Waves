@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, DBResource, Keys, protobuf => pb}
 import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, NewTransactionInfo, TransactionId, TxNum}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import com.wavesplatform.transaction.{Authorized, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{Authorized, GenesisTransaction, Transaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
@@ -89,7 +89,7 @@ object AddressTransactions {
           (txType, txNum)          <- transactionIds.view
         } yield (height, txNum, txType))
           .dropWhile { case (h, txNum, _) => h > maxHeight || h == maxHeight && txNum >= maxTxNum }
-          .collect { case (h, txNum, txType) if types.isEmpty || types(txType) => h -> txNum }
+          .collect { case (h, txNum, txType) if types.isEmpty || types(TransactionType(txType)) => h -> txNum }
           .flatMap { case (h, txNum) => loadTransaction(db, h, txNum, sender) }
       }
       .iterator
@@ -108,7 +108,7 @@ object AddressTransactions {
     } yield (height, tx, succeeded))
       .dropWhile { case (_, tx, _) => fromId.isDefined && !fromId.contains(tx.id()) }
       .dropWhile { case (_, tx, _) => fromId.contains(tx.id()) }
-      .filter { case (_, tx, _) => types.isEmpty || types.contains(tx.typeId) }
+      .filter { case (_, tx, _) => types.isEmpty || types.contains(tx.tpe) }
       .collect { case v @ (_, tx: Authorized, _) if sender.forall(_ == tx.sender.toAddress) => v }
       .iterator
 }

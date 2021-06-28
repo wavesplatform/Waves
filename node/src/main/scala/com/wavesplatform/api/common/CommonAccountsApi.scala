@@ -13,6 +13,7 @@ import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
 import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TransactionType
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -127,7 +128,7 @@ object CommonAccountsApi extends ScorexLogging {
         Some(Height(blockchain.height) -> diff),
         address,
         None,
-        Set(LeaseTransaction.typeId, InvokeScriptTransaction.typeId),
+        Set(TransactionType.Lease, TransactionType.InvokeScript),
         None
       ).flatMapIterable {
         case TransactionMeta(leaseHeight, lt: LeaseTransaction, true) if leaseIsActive(lt.id()) =>

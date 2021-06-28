@@ -56,7 +56,7 @@ object InvokeScriptTxSerializer {
     version match {
       case TxVersion.V1 =>
         Bytes.concat(
-          Array(builder.typeId, version, chainId),
+          Array(tpe.id.toByte, version, chainId),
           sender.arr,
           dAppAddressOrAlias.bytes,
           Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
