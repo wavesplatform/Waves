@@ -135,7 +135,7 @@ object Dependencies {
   )
 
   private[this] val levelDBJNA = {
-    val levelDbVersion = "1.22.3"
+    val levelDbVersion = "1.23.0"
     Seq(
       "com.wavesplatform.leveldb-jna" % "leveldb-jna-core"   % levelDbVersion,
       "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion
