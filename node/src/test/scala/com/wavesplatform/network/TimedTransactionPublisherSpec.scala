@@ -48,7 +48,7 @@ class TimedTransactionPublisherSpec extends FreeSpec with Matchers with BeforeAn
   }
 
   private def withUPS(putIfNew: Transaction => TracedResult[ValidationError, Boolean])(f: TransactionPublisher => Unit): Unit =
-    f(TransactionPublisher.timeBounded((tx, _) => putIfNew(tx), (_, _) => (), scheduler, false))
+    f(TransactionPublisher.timeBounded((tx, _) => putIfNew(tx), (_, _) => (), scheduler, allowRebroadcast = false, () => Right()))
 
   override protected def afterAll(): Unit = {
     super.afterAll()

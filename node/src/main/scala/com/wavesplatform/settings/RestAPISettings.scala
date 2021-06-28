@@ -10,5 +10,6 @@ case class RestAPISettings(
     transactionsByAddressLimit: Int,
     distributionAddressLimit: Int,
     evaluateScriptComplexityLimit: Int,
-    limitedPoolThreads: Int
+    limitedPoolThreads: Int,
+    minimumPeers: Int
 )

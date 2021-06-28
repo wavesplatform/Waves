@@ -42,6 +42,7 @@ import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils._
 import com.wavesplatform.utils.Schedulers._
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
@@ -102,7 +103,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     StorageFactory(settings, db, time, spendableBalanceChanged, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
 
   private var maybeUtx: Option[UtxPool] = None
-  private var maybeNetwork: Option[NS]  = None
+  private var maybeNetworkServer: Option[NS]  = None
 
   def run(): Unit = {
     // initialization
@@ -133,7 +134,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         utxStorage.putIfNew,
         allChannels.broadcast,
         timedTxValidator,
-        settings.synchronizationSettings.utxSynchronizer.allowTxRebroadcasting
+        settings.synchronizationSettings.utxSynchronizer.allowTxRebroadcasting,
+        { () =>
+          val currentPeers = maybeNetworkServer.fold(0)(_.peerConnections.size)
+          if (currentPeers >= settings.restAPISettings.minimumPeers) Right()
+          else Left(GenericError(s"There are not enough connections with peers ($currentPeers) to accept transaction"))
+        }
       )
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
@@ -224,10 +230,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     // After this point, node actually starts doing something
     appenderScheduler.execute(() => checkGenesis(settings, blockchainUpdater, miner))
 
-    val network =
+    val networkServer =
       NetworkServer(settings, lastBlockInfo, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
-    maybeNetwork = Some(network)
-    val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = network.messages
+    this.maybeNetworkServer = Some(networkServer)
+    val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = networkServer.messages
 
     val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]
 
@@ -237,7 +243,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       blockchainUpdater.score,
       lastScore,
       blockchainScores,
-      network.closedChannels,
+      networkServer.closedChannels,
       timeoutSubject,
       scoreObserverScheduler
     )
@@ -317,7 +323,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
         UtilsApiRoute(time, settings.restAPISettings, () => blockchainUpdater.estimator, limitedScheduler, blockchainUpdater),
-        PeersApiRoute(settings.restAPISettings, address => maybeNetwork.foreach(_.connect(address)), peerDatabase, establishedConnections),
+        PeersApiRoute(settings.restAPISettings, address => maybeNetworkServer.foreach(_.connect(address)), peerDatabase, establishedConnections),
         AddressApiRoute(
           settings.restAPISettings,
           wallet,
@@ -405,7 +411,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       blockchainUpdater.shutdown()
 
-      maybeNetwork.foreach { network =>
+      maybeNetworkServer.foreach { network =>
         log.info("Stopping network services")
         network.shutdown()
       }
