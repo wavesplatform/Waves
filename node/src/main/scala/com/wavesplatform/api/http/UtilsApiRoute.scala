@@ -13,11 +13,14 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.{RideV6, SynchronousCalls}
+import com.wavesplatform.features.RideVersionProvider.RideVersionBlockchainExt
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
@@ -58,6 +61,12 @@ case class UtilsApiRoute(
     new SecureRandom().nextBytes(seed) //seed mutated here!
     Json.obj("seed" -> Base58.encode(seed))
   }
+
+  private def extraFee(verifierComplexity: Long): Long =
+    if (verifierComplexity <= ContractLimits.FreeVerifierComplexity && blockchain.isFeatureActivated(SynchronousCalls))
+      0
+    else
+      FeeValidation.ScriptExtraFee
 
   override val route: Route = pathPrefix("utils") {
     decompile ~ compile ~ compileCode ~ compileWithImports ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize ~ evaluate
@@ -113,33 +122,25 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      val v5Activated = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
-      def stdLib: StdLibVersion = {
-        if (v5Activated) {
-          V5
-        } else if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps)) {
-          V4
-        } else {
-          StdLibVersion.VersionDic.default
-        }
-      }
-      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), defaultStdLib = stdLib)) { result =>
+      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), defaultStdLib = blockchain.actualRideVersion)) { result =>
         complete(
           result
+            .filterOrElse(
+              {
+                case (e: ExprScript, _) => !e.isFreeCall || blockchain.isFeatureActivated(RideV6)
+                case _                  => true
+              },
+              "Free call is not activated yet"
+            )
             .fold(
               e => ScriptCompilerError(e), {
                 case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
-                  val extraFee =
-                    if (verifierComplexity <= ContractLimits.FreeVerifierComplexity && v5Activated)
-                      0
-                    else
-                      FeeValidation.ScriptExtraFee
                   Json.obj(
                     "script"               -> script.bytes().base64,
                     "complexity"           -> maxComplexity,
                     "verifierComplexity"   -> verifierComplexity,
                     "callableComplexities" -> callableComplexities,
-                    "extraFee"             -> extraFee
+                    "extraFee"             -> extraFee(verifierComplexity)
                   )
               }
             )
@@ -170,7 +171,7 @@ case class UtilsApiRoute(
                   Json.obj(
                     "script"     -> script.bytes().base64,
                     "complexity" -> complexity,
-                    "extraFee"   -> FeeValidation.ScriptExtraFee
+                    "extraFee"   -> extraFee(complexity)
                   )
               }
             )
@@ -191,19 +192,27 @@ case class UtilsApiRoute(
           }
       ) { result =>
         complete(
-          result.fold(
-            e => ScriptCompilerError(e), {
-              case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
-                Json.obj(
-                  "script"               -> code,
-                  "scriptText"           -> script.expr.toString, // [WAIT] Script.decompile(script),
-                  "complexity"           -> maxComplexity,
-                  "verifierComplexity"   -> verifierComplexity,
-                  "callableComplexities" -> callableComplexities,
-                  "extraFee"             -> FeeValidation.ScriptExtraFee
-                )
-            }
-          )
+          result
+            .filterOrElse(
+              {
+                case (e: ExprScript, _) => !e.isFreeCall || blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
+                case _                  => true
+              },
+              "Free call is not activated yet"
+            )
+            .fold(
+              e => ScriptCompilerError(e), {
+                case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
+                  Json.obj(
+                    "script"               -> code,
+                    "scriptText"           -> script.expr.toString, // [WAIT] Script.decompile(script),
+                    "complexity"           -> maxComplexity,
+                    "verifierComplexity"   -> verifierComplexity,
+                    "callableComplexities" -> callableComplexities,
+                    "extraFee"             -> extraFee(verifierComplexity)
+                  )
+              }
+            )
         )
       }
     }

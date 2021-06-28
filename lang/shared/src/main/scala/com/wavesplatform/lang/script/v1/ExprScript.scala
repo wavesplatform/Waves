@@ -10,6 +10,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.ContractLimits._
+import com.wavesplatform.lang.v1.compiler.ContractCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import monix.eval.Coeval
@@ -30,26 +31,30 @@ object ExprScript {
   @VisibleForTesting
   def apply(x: EXPR): Either[String, Script] = apply(V1, x)
 
-  def apply(version: StdLibVersion, x: EXPR, checkSize: Boolean = true): Either[String, Script] =
-    ExprScriptImpl(version, x)
+  def apply(version: StdLibVersion, x: EXPR, isFreeCall: Boolean = false, checkSize: Boolean = true): Either[String, Script] =
+    ExprScriptImpl(version, isFreeCall, x)
       .asRight[String]
       .flatTap(s => if (checkSize) validateBytes(s.bytes().arr) else Right(()))
 
   def estimateExact(
       expr: EXPR,
       version: StdLibVersion,
+      isFreeCall: Boolean,
       estimator: ScriptEstimator
-  ): Either[String, Long] =
-    estimator(varNames(version, Expression), functionCosts(version, Expression), expr)
+  ): Either[String, Long] = {
+    val modifiedExpr = if (isFreeCall) BLOCK(LET(ContractCompiler.FreeCallInvocationArg, TRUE), expr) else expr
+    estimator(varNames(version, Expression), functionCosts(version, Expression), modifiedExpr)
+  }
 
   def estimate(
       expr: EXPR,
       version: StdLibVersion,
+      isFreeCall: Boolean,
       estimator: ScriptEstimator,
       useContractVerifierLimit: Boolean
   ): Either[String, Long] =
     for {
-      complexity <- estimateExact(expr, version, estimator)
+      complexity <- estimateExact(expr, version, isFreeCall, estimator)
       _          <- checkComplexity(version, complexity, useContractVerifierLimit)
     } yield complexity
 
@@ -71,9 +76,9 @@ object ExprScript {
     )
   }
 
-  private case class ExprScriptImpl(stdLibVersion: StdLibVersion, expr: EXPR) extends ExprScript {
+  private case class ExprScriptImpl(stdLibVersion: StdLibVersion, isFreeCall: Boolean, expr: EXPR) extends ExprScript {
     override type Expr = EXPR
-    override val bytes: Coeval[ByteStr]           = Coeval.evalOnce(ByteStr(Global.serializeExpression(expr, stdLibVersion)))
+    override val bytes: Coeval[ByteStr]           = Coeval.evalOnce(ByteStr(Global.serializeExpression(expr, stdLibVersion, isFreeCall)))
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(com.wavesplatform.lang.v1.compiler.containsBlockV2(expr))
     override val containsArray: Boolean           = com.wavesplatform.lang.v1.compiler.containsArray(expr)
   }
@@ -82,5 +87,6 @@ object ExprScript {
 trait ExprScript extends Script {
   override type Expr = EXPR
   val stdLibVersion: StdLibVersion
+  val isFreeCall: Boolean
   val expr: EXPR
 }

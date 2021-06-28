@@ -4,8 +4,9 @@ import cats.syntax.either._
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.meta.{FunctionSignatures, MetaMapper, ParsedMeta}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
-import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, V1, V2, DApp => DAppType}
+import com.wavesplatform.lang.directives.values.{Asset, Call, Expression, ScriptType, StdLibVersion, V1, V2, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.script.ScriptReader.FreeCallHeader
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
@@ -75,8 +76,9 @@ trait BaseGlobal {
 
   def checksum(arr: Array[Byte]): Array[Byte] = secureHash(arr).take(4)
 
-  def serializeExpression(expr: EXPR, stdLibVersion: StdLibVersion): Array[Byte] = {
-    val s = Array(stdLibVersion.id.toByte) ++ Serde.serialize(expr)
+  def serializeExpression(expr: EXPR, stdLibVersion: StdLibVersion, isFreeCall: Boolean): Array[Byte] = {
+    val header = if (isFreeCall) Array(FreeCallHeader) else Array()
+    val s = header ++ Array(stdLibVersion.id.toByte) ++ Serde.serialize(expr)
     s ++ checksum(s)
   }
 
@@ -91,6 +93,7 @@ trait BaseGlobal {
       context: CompilerContext,
       letBlockOnly: Boolean,
       stdLibVersion: StdLibVersion,
+      isFreeCall: Boolean,
       estimator: ScriptEstimator
   ): Either[String, (Array[Byte], Long, Expressions.SCRIPT, Iterable[CompilationError])] = {
     (for {
@@ -98,7 +101,7 @@ trait BaseGlobal {
       (compExpr, exprScript, compErrorList) = compRes
       illegalBlockVersionUsage              = letBlockOnly && com.wavesplatform.lang.v1.compiler.containsBlockV2(compExpr)
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
-      bytes = if (compErrorList.isEmpty) serializeExpression(compExpr, stdLibVersion) else Array.empty[Byte]
+      bytes = if (compErrorList.isEmpty) serializeExpression(compExpr, stdLibVersion, isFreeCall) else Array.empty[Byte]
 
       vars  = utils.varNames(stdLibVersion, Expression)
       costs = utils.functionCosts(stdLibVersion, DAppType)
@@ -131,38 +134,39 @@ trait BaseGlobal {
   }
 
   val compileExpression =
-    compile(_, _, _, _, ExpressionCompiler.compileBoolean)
+    compile(_, _, _, _, _, ExpressionCompiler.compileBoolean)
 
   val compileDecls =
-    compile(_, _, _, _, ExpressionCompiler.compileDecls)
+    compile(_, _, _, _, _, ExpressionCompiler.compileDecls)
 
   private def compile(
       input: String,
       context: CompilerContext,
       version: StdLibVersion,
+      scriptType: ScriptType,
       estimator: ScriptEstimator,
       compiler: (String, CompilerContext) => Either[String, EXPR]
   ): Either[String, (Array[Byte], EXPR, Long)] =
     for {
       expr <- compiler(input, context)
-      bytes = serializeExpression(expr, version)
+      bytes = serializeExpression(expr, version, scriptType == Call)
       _ <- ExprScript.validateBytes(bytes)
-      complexity <- ExprScript.estimateExact(expr, version, estimator)
+      complexity <- ExprScript.estimateExact(expr, version, scriptType == Call, estimator)
     } yield (bytes, expr, complexity)
 
   def checkExpr(
       expr: EXPR,
       complexity: Long,
       version: StdLibVersion,
-      isAsset: Boolean,
+      scriptType: ScriptType,
       estimator: ScriptEstimator
   ): Either[String, Unit] =
     for {
       _ <- if (estimator == ScriptEstimatorV2)
-        ExprScript.estimate(expr, version, ScriptEstimatorV1, !isAsset)
+        ExprScript.estimate(expr, version, scriptType == Call, ScriptEstimatorV1, scriptType != Asset)
       else
         Right(())
-      _ <- ExprScript.checkComplexity(version, complexity, !isAsset)
+      _ <- ExprScript.checkComplexity(version, complexity, scriptType != Asset)
       illegalBlockVersionUsage = LetBlockVersions.contains(version) &&
         com.wavesplatform.lang.v1.compiler.containsBlockV2(expr)
       _ <- Either.cond(

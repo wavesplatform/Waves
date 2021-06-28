@@ -290,9 +290,10 @@ object InvokeScriptTransactionDiff {
     else if (tx.dAppAddressOrAlias != tx.senderAddress)
       Left(GenericError("Free call could be performed only on the invoker account"))
     else {
-      val callable = CallableFunction(CallableAnnotation("i"), FUNC(defaultCall.function.funcName, Nil, tx.exprOpt.get))
-      val dApp     = DApp(DAppMeta(), Nil, List(callable), None)
-      val version  = blockchain.actualRideVersion
+      val annotation = CallableAnnotation(ContractCompiler.FreeCallInvocationArg)
+      val callable   = CallableFunction(annotation, FUNC(defaultCall.function.funcName, Nil, tx.exprOpt.get))
+      val dApp       = DApp(DAppMeta(), Nil, List(callable), None)
+      val version    = blockchain.actualRideVersion
       Right((tx.sender, version, defaultCall, dApp, Map[Int, Map[String, Long]]()))
     }
 
