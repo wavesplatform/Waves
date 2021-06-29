@@ -61,7 +61,9 @@ object InvokeScriptDiff {
             Either.cond(
               version >= V5,
               (),
-              GenericError(s"DApp $invoker invoked DApp $dAppAddress that uses RIDE $version, but dApp-to-dApp invocation requires version 5 or higher")
+              GenericError(
+                s"DApp $invoker invoked DApp $dAppAddress that uses RIDE $version, but dApp-to-dApp invocation requires version 5 or higher"
+              )
             )
           )
           _ <- traced(
@@ -193,6 +195,7 @@ object InvokeScriptDiff {
                 ).map(result => (environment.currentDiff |+| paymentsPartToResolve, result, environment.availableActions, environment.availableData))
               })
             }
+            _ = invocationRoot.setLog(log)
 
             doProcessActions = (actions: List[CallableAction], unusedComplexity: Int) => {
               val storingComplexity = if (blockchain.storeEvaluatedComplexity) complexityAfterPayments - unusedComplexity else invocationComplexity
@@ -247,12 +250,17 @@ object InvokeScriptDiff {
                 traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
             }
             resultDiff = diff.copy(scriptsComplexity = 0) |+| actionsDiff |+| Diff.empty.copy(scriptsComplexity = paymentsComplexity)
+            _          = invocationRoot.setResult(scriptResult)
           } yield (resultDiff, evaluated, remainingActions1, remainingData1)
         } yield result
 
       case _ => traced(Left(GenericError(s"No contract at address ${tx.dAppAddress}")))
     }
-    result
+
+    result.leftMap { err =>
+      invocationRoot.setError(err)
+      err
+    }
   }
 
   private def evaluateV2(

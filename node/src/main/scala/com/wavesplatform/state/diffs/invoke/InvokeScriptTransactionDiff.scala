@@ -121,7 +121,8 @@ object InvokeScriptTransactionDiff {
               tx.dAppAddressOrAlias,
               functionCall,
               scriptResultE.map(_.scriptResult),
-              scriptResultE.fold(_.log, _.log)
+              scriptResultE.fold(_.log, _.log),
+              environment.invocationRoot.toTraceList(tx.id())
             )
           )
         )
