@@ -19,6 +19,7 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
                                                |    distribution-address-limit = 10000
                                                |    evaluate-script-complexity-limit = 4000
                                                |    limited-pool-threads = 2
+                                               |    minimum-peers = 2
                                                |  }
                                                |}
       """.stripMargin)
@@ -34,5 +35,6 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
     settings.distributionAddressLimit shouldBe 10000
     settings.evaluateScriptComplexityLimit shouldBe 4000
     settings.limitedPoolThreads shouldBe 2
+    settings.minimumPeers shouldBe 2
   }
 }
