@@ -61,6 +61,7 @@ object SyncHttpApi extends Assertions {
 
   implicit class ApiErrorOps(error: ApiError) {
     def assertive(matchMessage: Boolean = false): AssertiveApiError = AssertiveApiError(error.id, error.message, error.code, matchMessage)
+    def assertiveRegex: AssertiveApiError = assertive(matchMessage = true)
   }
 
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
