@@ -8,7 +8,7 @@ import java.time.format.DateTimeFormatter
 import java.util.{Properties, List => JList, Map => JMap}
 import java.util.Collections._
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
 import scala.concurrent.{blocking, Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -243,7 +243,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
         config
       }
 
-      val debuggerPort = 11000 + nodes.size()
+      val debuggerPort = Docker.freeDebuggerPort()
 
       val hostConfig = HostConfig
         .builder()
@@ -610,4 +610,7 @@ object Docker {
     def getConfig: Config = config
   }
 
+
+  private[this] val debuggerPort = new AtomicInteger(11000)
+  private def freeDebuggerPort(): Int = debuggerPort.getAndIncrement()
 }
