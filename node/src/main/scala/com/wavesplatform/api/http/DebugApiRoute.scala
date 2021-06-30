@@ -175,7 +175,7 @@ case class DebugApiRoute(
         .collect {
           case (address, Right(offset)) =>
             AccountMiningInfo(
-              address.stringRepr,
+              address.toString,
               blockchain.effectiveBalance(
                 address,
                 ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(blockchain.height),
@@ -347,7 +347,7 @@ object DebugApiRoute {
 
   implicit val accountMiningBalanceFormat: Format[AccountMiningInfo] = Json.format
 
-  implicit val addressWrites: Writes[Address] = Writes((a: Address) => JsString(a.stringRepr))
+  implicit val addressWrites: Writes[Address] = Writes((a: Address) => JsString(a.toString))
 
   implicit val hrCacheSizesFormat: Format[HistoryReplier.CacheSizes]          = Json.format
   implicit val mbsCacheSizesFormat: Format[MicroBlockSynchronizer.CacheSizes] = Json.format

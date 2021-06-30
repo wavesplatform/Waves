@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
-import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient, _}
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
@@ -102,9 +102,9 @@ object InvokeScriptDiff {
               val usedComplexity = totalComplexityLimit - nextRemainingComplexity
               val pseudoTx = ScriptTransfer(
                 Some(assetId),
-                Recipient.Address(ByteStr(tx.senderDApp.bytes)),
+                RideRecipient.Address(ByteStr(tx.senderDApp.bytes)),
                 tx.sender,
-                Recipient.Address(ByteStr(tx.dAppAddress.bytes)),
+                RideRecipient.Address(ByteStr(tx.dAppAddress.bytes)),
                 amount,
                 tx.timestamp,
                 tx.txId
@@ -136,7 +136,7 @@ object InvokeScriptDiff {
           complexityAfterPayments <- CoevalR(Coeval.now(complexityAfterPaymentsTraced))
           paymentsComplexity = checkedPayments.map(_._1.complexity).sum.toInt
 
-          tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
+          tthis = Coproduct[Environment.Tthis](RideRecipient.Address(ByteStr(dAppAddress.bytes)))
           input <- traced(
             tx.root
               .map(t => buildThisValue(Coproduct[TxOrd](t: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply))
@@ -149,9 +149,9 @@ object InvokeScriptDiff {
                 val height = blockchain.height
                 val invocation = ContractEvaluator.Invocation(
                   tx.funcCall,
-                  Recipient.Address(ByteStr(invoker.bytes)),
+                  RideRecipient.Address(ByteStr(invoker.bytes)),
                   ByteStr(tx.sender.arr),
-                  Recipient.Address(ByteStr(tx.root.fold(invoker)(_.senderAddress).bytes)),
+                  RideRecipient.Address(ByteStr(tx.root.fold(invoker)(_.senderAddress).bytes)),
                   ByteStr(tx.root.getOrElse(tx).sender.arr),
                   payments,
                   tx.txId,

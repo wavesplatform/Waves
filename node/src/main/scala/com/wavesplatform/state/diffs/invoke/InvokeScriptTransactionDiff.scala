@@ -20,7 +20,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient, _}
 import com.wavesplatform.metrics.{TxProcessingStats => Stats}
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state._
@@ -210,11 +210,11 @@ object InvokeScriptTransactionDiff {
           (directives, payments, tthis, input) <- TracedResult(for {
             directives <- DirectiveSet(version, Account, DAppType)
             payments   <- AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget)
-            tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
+            tthis = Coproduct[Environment.Tthis](RideRecipient.Address(ByteStr(dAppAddress.bytes)))
             input <- buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, tthis)
           } yield (directives, payments, tthis, input)).leftMap(GenericError(_))
 
-          invoker = Recipient.Address(ByteStr(tx.sender.toAddress.bytes))
+          invoker = RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes))
           invocation = ContractEvaluator.Invocation(
             functionCall,
             invoker,

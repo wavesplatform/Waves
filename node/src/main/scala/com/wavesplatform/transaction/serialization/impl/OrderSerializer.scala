@@ -18,7 +18,7 @@ object OrderSerializer {
     Json.obj(
       "version"          -> version,
       "id"               -> idStr(),
-      "sender"           -> senderPublicKey.toAddress,
+      "sender"           -> senderPublicKey.toAddress.toString,
       "senderPublicKey"  -> senderPublicKey,
       "matcherPublicKey" -> matcherPublicKey,
       "assetPair"        -> assetPair.json,

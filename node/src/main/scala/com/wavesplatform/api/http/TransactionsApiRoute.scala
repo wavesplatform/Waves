@@ -2,7 +2,6 @@ package com.wavesplatform.api.http
 
 import scala.concurrent.Future
 import scala.util.Success
-
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import cats.instances.either._
@@ -11,7 +10,7 @@ import cats.instances.try_._
 import cats.syntax.alternative._
 import cats.syntax.either._
 import cats.syntax.traverse._
-import com.wavesplatform.account.{Address, AddressOrAlias}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.http.ApiError._
@@ -169,7 +168,7 @@ case class TransactionsApiRoute(
   }
 
   def signWithSigner: Route = path(AddrSegment) { address =>
-    jsonPost[JsObject](TransactionFactory.parseRequestAndSign(wallet, address.stringRepr, time, _))
+    jsonPost[JsObject](TransactionFactory.parseRequestAndSign(wallet, address.toString, time, _))
   }
 
   def signedBroadcast: Route = path("broadcast")(broadcast[JsValue](TransactionFactory.fromSignedRequest))
@@ -196,12 +195,12 @@ case class TransactionsApiRoute(
     }
 
   def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Future[List[JsObject]] = {
-    val aliasesOfAddress: Task[Set[AddressOrAlias]] =
+    val aliasesOfAddress: Task[Set[Alias]] =
       commonApi
         .aliasesOfAddress(address)
         .collect { case (_, cat) => cat.alias }
         .toListL
-        .map(aliases => (address :: aliases).toSet)
+        .map(aliases => aliases.toSet)
         .memoize
 
     /**
@@ -212,7 +211,7 @@ case class TransactionsApiRoute(
       import com.wavesplatform.transaction.transfer._
       meta.transaction match {
         case mtt: MassTransferTransaction if mtt.sender.toAddress != address =>
-          aliasesOfAddress.map(mtt.compactJson(_) ++ serializer.transactionMetaJson(meta))
+          aliasesOfAddress.map(aliases => mtt.compactJson(address, aliases) ++ serializer.transactionMetaJson(meta))
         case _ => Task.now(serializer.transactionWithMetaJson(meta))
       }
     }

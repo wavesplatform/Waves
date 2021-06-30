@@ -5,7 +5,7 @@ import java.nio.file.Files
 import java.time.Instant
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
+import com.wavesplatform.account.{AddressScheme, KeyPair, WavesAddress}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -66,7 +66,7 @@ object GenesisBlockGenerator extends App {
       accountSeed: ByteStr,
       accountPrivateKey: ByteStr,
       accountPublicKey: ByteStr,
-      accountAddress: Address,
+      accountAddress: WavesAddress,
       account: KeyPair,
       miner: Boolean
   )
@@ -96,7 +96,6 @@ object GenesisBlockGenerator extends App {
     .map(new File(_).getAbsoluteFile.ensuring(f => !f.isDirectory && f.getParentFile.isDirectory || f.getParentFile.mkdirs()))
 
   val settings: Settings = {
-    import net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
     ConfigFactory.parseFile(inputConfFile).as[Settings]("genesis-generator")
   }
 
@@ -204,7 +203,7 @@ object GenesisBlockGenerator extends App {
       settings.initialBalance,
       Some(genesis.signature),
       genesisTxs.map { tx =>
-        GenesisTransactionSettings(tx.recipient.stringRepr, tx.amount)
+        GenesisTransactionSettings(tx.recipient.toString, tx.amount)
       },
       genesis.header.baseTarget,
       settings.averageBlockDelay

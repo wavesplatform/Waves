@@ -19,7 +19,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
     }
 
   def generatingBalance: Route = (path("generatingbalance" / AddrSegment) & get) { address =>
-    complete(Json.obj("address" -> address.stringRepr, "balance" -> blockchain.generatingBalance(address)))
+    complete(Json.obj("address" -> address.toString, "balance" -> blockchain.generatingBalance(address)))
   }
 
   private def headerForId(blockId: ByteStr, f: BlockHeader => JsObject) =

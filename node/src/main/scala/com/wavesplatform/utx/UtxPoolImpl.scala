@@ -126,7 +126,7 @@ class UtxPoolImpl(
                 }
                 val allowed =
                   recipients.nonEmpty &&
-                    recipients.forall(r => utxSettings.allowBlacklistedTransferTo.contains(r.stringRepr))
+                    recipients.forall(r => utxSettings.allowBlacklistedTransferTo.contains(r.toString))
                 Either.cond(allowed, (), SenderIsBlacklisted(addr))
               case _ => Right(())
             }
@@ -274,10 +274,10 @@ class UtxPoolImpl(
   private def scriptedAddresses(tx: Transaction): Set[Address] = tx match {
     case t if inUTXPoolOrdering.isWhitelisted(t) => Set.empty
     case i: InvokeScriptTransaction =>
-      Set(i.sender.toAddress)
+      Set[Address](i.sender.toAddress)
         .filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
     case e: ExchangeTransaction =>
-      Set(e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasAccountScript)
+      Set[Address](e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasAccountScript)
     case a: Authorized if blockchain.hasAccountScript(a.sender.toAddress) => Set(a.sender.toAddress)
     case _                                                                => Set.empty
   }

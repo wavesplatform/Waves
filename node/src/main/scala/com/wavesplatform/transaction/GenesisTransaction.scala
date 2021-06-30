@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import cats.data.Validated
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, WavesAddress}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -14,7 +14,7 @@ import play.api.libs.json.JsObject
 
 import scala.util.Try
 
-case class GenesisTransaction private (recipient: Address, amount: TxAmount, timestamp: TxTimestamp, signature: ByteStr, chainId: Byte)
+case class GenesisTransaction private (recipient: WavesAddress, amount: TxAmount, timestamp: TxTimestamp, signature: ByteStr, chainId: Byte)
     extends Transaction(TransactionType.Genesis) {
   override val assetFee: (Asset, Long) = (Waves, 0)
   override val id: Coeval[ByteStr]     = Coeval.evalOnce(signature)
@@ -46,7 +46,7 @@ object GenesisTransaction extends TransactionParser {
     Bytes.concat(hash, hash)
   }
 
-  def create(recipient: Address, amount: Long, timestamp: Long): Either[ValidationError, GenesisTransaction] = {
+  def create(recipient: WavesAddress, amount: Long, timestamp: Long): Either[ValidationError, GenesisTransaction] = {
     val signature = ByteStr(GenesisTransaction.generateSignature(recipient, amount, timestamp))
     GenesisTransaction(recipient, amount, timestamp, signature, recipient.chainId).validatedEither
   }

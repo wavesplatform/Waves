@@ -136,7 +136,10 @@ inScope(Global)(
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
     network := Network(sys.props.get("network")),
-    resolvers += Resolver.sonatypeRepo("snapshots"),
+    resolvers ++= Seq(
+      Resolver.sonatypeRepo("snapshots"),
+      Resolver.mavenLocal
+    ),
     sources in (Compile, doc) := Seq.empty,
     publishArtifact in (Compile, packageDoc) := false
   )

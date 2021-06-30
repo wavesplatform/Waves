@@ -31,7 +31,7 @@ case class AccountVerifierTrace(
   override lazy val json: JsObject = Json
     .obj(
       "type" -> "verifier",
-      "id"   -> address.stringRepr
+      "id"   -> address.toString
     ) ++ TraceStep.maybeErrorJson(errorOpt)
 }
 
@@ -86,7 +86,7 @@ case class InvokeScriptTrace(
   def maybeLoggedJson(logged: Boolean)(implicit invokeResultWrites: OWrites[InvokeScriptResult] = InvokeScriptResult.jsonFormat): JsObject = {
     Json.obj(
       "type"     -> "dApp",
-      "id"       -> dAppAddressOrAlias.stringRepr,
+      "id"       -> dAppAddressOrAlias.toString,
       "function" -> functionCall.function.funcName,
       "args"     -> functionCall.args.map(_.toString)
     ) ++ (resultE match {

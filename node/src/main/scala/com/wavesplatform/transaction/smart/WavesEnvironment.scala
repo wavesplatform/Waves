@@ -127,8 +127,8 @@ class WavesEnvironment(
   override def accountBalanceOf(addressOrAlias: Recipient, maybeAssetId: Option[Array[Byte]]): Either[String, Long] = {
     (for {
       aoa <- addressOrAlias match {
-        case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr, position = 0).map(_._1)
-        case Alias(name)    => com.wavesplatform.account.Alias.create(name)
+        case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr)
+        case Alias(name)    => com.wavesplatform.account.Alias.create(name).map(Right(_))
       }
       address <- blockchain.resolveAlias(aoa)
       balance = currentBlockchain().balance(address, Asset.fromCompatId(maybeAssetId.map(ByteStr(_))))
@@ -138,8 +138,8 @@ class WavesEnvironment(
   override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails] = {
     (for {
       aoa <- addressOrAlias match {
-        case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr, position = 0).map(_._1)
-        case Alias(name)    => com.wavesplatform.account.Alias.create(name)
+        case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr)
+        case Alias(name)    => com.wavesplatform.account.Alias.create(name).map(Right(_))
       }
       address <- blockchain.resolveAlias(aoa)
       portfolio = currentBlockchain().wavesPortfolio(address)

@@ -1,7 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import scala.collection.mutable
-
 import cats.instances.either._
 import cats.instances.map._
 import cats.kernel.Monoid
@@ -16,19 +14,21 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.transaction._
+import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
-import com.wavesplatform.transaction.smart.script.trace.{TracedResult, TraceStep}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json
+
+import scala.collection.mutable
 
 object TransactionDiffer {
   def apply(prevBlockTs: Option[Long], currentBlockTs: Long, verify: Boolean = true)(
@@ -167,16 +167,19 @@ object TransactionDiffer {
           case rtx: ReissueTransaction           => AssetTransactionsDiff.reissue(blockchain, currentBlockTs)(rtx).traced
           case btx: BurnTransaction              => AssetTransactionsDiff.burn(blockchain)(btx).traced
           case uaitx: UpdateAssetInfoTransaction => AssetTransactionsDiff.updateInfo(blockchain)(uaitx).traced
-          case ttx: TransferTransaction          => TransferTransactionDiff(blockchain, currentBlockTs)(ttx).traced
-          case mtx: MassTransferTransaction      => MassTransferTransactionDiff(blockchain, currentBlockTs)(mtx).traced
-          case ltx: LeaseTransaction             => LeaseTransactionsDiff.lease(blockchain)(ltx).traced
-          case ltx: LeaseCancelTransaction       => LeaseTransactionsDiff.leaseCancel(blockchain, currentBlockTs)(ltx).traced
-          case atx: CreateAliasTransaction       => CreateAliasTransactionDiff(blockchain)(atx).traced
-          case dtx: DataTransaction              => DataTransactionDiff(blockchain)(dtx).traced
-          case sstx: SetScriptTransaction        => SetScriptTransactionDiff(blockchain)(sstx).traced
-          case sstx: SetAssetScriptTransaction   => AssetTransactionsDiff.setAssetScript(blockchain)(sstx).traced
-          case stx: SponsorFeeTransaction        => AssetTransactionsDiff.sponsor(blockchain)(stx).traced
-          case _                                 => UnsupportedTransactionType.asLeft.traced
+          case ttx: TransferTransaction =>
+            TransferDiff(blockchain)(ttx.sender.toAddress, ttx.recipient, ttx.amount, ttx.assetId, ttx.fee, ttx.feeAssetId).traced
+          case mtx: MassTransferTransaction    => MassTransferTransactionDiff(blockchain, currentBlockTs)(mtx).traced
+          case ltx: LeaseTransaction           => LeaseTransactionsDiff.lease(blockchain)(ltx).traced
+          case ltx: LeaseCancelTransaction     => LeaseTransactionsDiff.leaseCancel(blockchain, currentBlockTs)(ltx).traced
+          case atx: CreateAliasTransaction     => CreateAliasTransactionDiff(blockchain)(atx).traced
+          case dtx: DataTransaction            => DataTransactionDiff(blockchain)(dtx).traced
+          case sstx: SetScriptTransaction      => SetScriptTransactionDiff(blockchain)(sstx).traced
+          case sstx: SetAssetScriptTransaction => AssetTransactionsDiff.setAssetScript(blockchain)(sstx).traced
+          case stx: SponsorFeeTransaction      => AssetTransactionsDiff.sponsor(blockchain)(stx).traced
+          case et: EthereumTransaction.Transfer =>
+            TransferDiff(blockchain)(et.sender, et.recipient, et.amount, et.asset, et.assetFee._2, et.assetFee._1).traced
+          case _ => UnsupportedTransactionType.asLeft.traced
         }
       }
       .map(d => initDiff |+| d.bindTransaction(tx))
@@ -225,15 +228,15 @@ object TransactionDiffer {
                   .toRight(GenericError(s"Referenced $asset not found"))
                   .as(
                     Monoid.combine(
-                      Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))),
-                      Map(dAppAddress         -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
+                      Map[Address, Portfolio](tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))),
+                      Map[Address, Portfolio](dAppAddress         -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
                     )
                   )
               case Waves =>
                 Monoid
                   .combine(
-                    Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty)),
-                    Map(dAppAddress         -> Portfolio(amt, LeaseBalance.empty, Map.empty))
+                    Map[Address, Portfolio](tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty)),
+                    Map[Address, Portfolio](dAppAddress         -> Portfolio(amt, LeaseBalance.empty, Map.empty))
                   )
                   .asRight
             }
@@ -289,10 +292,10 @@ object TransactionDiffer {
   private def feePortfolios(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Map[Address, Portfolio]] =
     tx match {
       case _: GenesisTransaction   => Map.empty[Address, Portfolio].asRight
-      case ptx: PaymentTransaction => Map(ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
+      case ptx: PaymentTransaction => Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
       case ptx: ProvenTransaction =>
         ptx.assetFee match {
-          case (Waves, fee) => Map(ptx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty)).asRight
+          case (Waves, fee) => Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty)).asRight
           case (asset @ IssuedAsset(_), fee) =>
             for {
               assetInfo <- blockchain

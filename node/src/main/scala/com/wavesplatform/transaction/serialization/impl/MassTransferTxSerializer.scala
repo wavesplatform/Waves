@@ -17,7 +17,7 @@ import scala.util.Try
 
 object MassTransferTxSerializer {
   def transfersJson(transfers: Seq[ParsedTransfer]): JsValue =
-    Json.toJson(transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) })
+    Json.toJson(transfers.map { case ParsedTransfer(address, amount) => Transfer(address.toString, amount) })
 
   def toJson(tx: MassTransferTransaction): JsObject = {
     import tx._
@@ -61,7 +61,7 @@ object MassTransferTxSerializer {
       def readTransfer(buf: ByteBuffer): ParsedTransfer = {
         val addressOrAlias = AddressOrAlias.fromBytes(buf).explicitGet()
         val amount         = buf.getLong
-        ParsedTransfer(addressOrAlias, amount)
+        ParsedTransfer(addressOrAlias.recipient, amount)
       }
 
       val entryCount = buf.getShort

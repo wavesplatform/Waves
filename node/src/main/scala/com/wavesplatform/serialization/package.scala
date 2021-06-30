@@ -3,7 +3,7 @@ package com.wavesplatform
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.Shorts
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
+import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto.{KeyLength, SignatureLength}
@@ -33,15 +33,15 @@ package object serialization {
       val prefix = buf.get(buf.position())
       prefix match {
         case Address.AddressVersion =>
-          getAddress
+          Left(getAddress)
         case Alias.AddressVersion =>
           val length = buf.getShort(buf.position() + 2)
-          Alias.fromBytes(getByteArray(length + 4)).explicitGet()
+          Right(Alias.fromBytes(getByteArray(length + 4)).explicitGet())
         case _ => throw new IllegalArgumentException(s"Invalid address or alias prefix: $prefix")
       }
     }
 
-    def getAddress: Address = {
+    def getAddress: WavesAddress = {
       Address.fromBytes(getByteArray(Address.AddressLength)).explicitGet()
     }
 

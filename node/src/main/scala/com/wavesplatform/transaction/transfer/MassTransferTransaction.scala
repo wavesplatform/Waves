@@ -38,8 +38,15 @@ case class MassTransferTransaction(
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(MassTransferTxSerializer.toBytes(this))
   override val json: Coeval[JsObject]         = Coeval.evalOnce(MassTransferTxSerializer.toJson(this))
 
-  def compactJson(recipients: Set[AddressOrAlias]): JsObject =
-    json() ++ Json.obj("transfers" -> MassTransferTxSerializer.transfersJson(transfers.filter(t => recipients.contains(t.address))))
+  def compactJson(recipient: Address, aliases: Set[Alias]): JsObject =
+    json() ++ Json.obj(
+      "transfers" -> MassTransferTxSerializer.transfersJson(transfers.filter { t =>
+        t.address match {
+          case a: Address => a == recipient
+          case a: Alias => aliases(a)
+        }
+      })
+    )
 
   override def checkedAssets: Seq[IssuedAsset] = assetId match {
     case Waves          => Seq()
@@ -72,7 +79,7 @@ object MassTransferTransaction extends TransactionParser {
     implicit val jsonFormat = Json.format[Transfer]
   }
 
-  case class ParsedTransfer(address: AddressOrAlias, amount: Long)
+  case class ParsedTransfer(address: Recipient, amount: Long)
 
   def create(
       version: TxVersion,
@@ -113,7 +120,7 @@ object MassTransferTransaction extends TransactionParser {
   def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] = {
     transfers.traverse {
       case Transfer(recipient, amount) =>
-        AddressOrAlias.fromString(recipient).map(ParsedTransfer(_, amount))
+        Recipient.fromString(recipient).map(ParsedTransfer(_, amount))
     }
   }
 

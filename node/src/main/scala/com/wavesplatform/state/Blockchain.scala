@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
-import com.wavesplatform.block.Block.{BlockId, GenesisBlockVersion, NgBlockVersion, PlainBlockVersion, ProtoBlockVersion, RewardBlockVersion}
+import com.wavesplatform.account._
+import com.wavesplatform.block.Block._
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
@@ -93,10 +93,16 @@ object Blockchain {
     def lastBlockTimestamp: Option[Long]           = lastBlockHeader.map(_.header.timestamp)
     def lastBlockIds(howMany: Int): Seq[ByteStr]   = (blockchain.height to blockchain.height - howMany by -1).flatMap(blockId)
 
-    def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
+    def resolveAlias(aoa: Recipient): Either[ValidationError, Address] =
       aoa match {
         case a: Address => Right(a)
         case a: Alias   => blockchain.resolveAlias(a)
+      }
+
+    def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
+      aoa match {
+        case Left(wa) => Right(wa)
+        case Right(alias) => blockchain.resolveAlias(alias)
       }
 
     def canCreateAlias(alias: Alias): Boolean = blockchain.resolveAlias(alias) match {

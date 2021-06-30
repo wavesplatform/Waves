@@ -6,7 +6,7 @@ import sbt._
 object Dependencies {
   // Node protobuf schemas
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.3.1" classifier "proto" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.4.0-SNAPSHOT" classifier "proto" intransitive ()
 
   def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.4"
 

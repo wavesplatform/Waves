@@ -36,7 +36,7 @@ package object state {
   implicit val dstWrites: Writes[AssetDistribution] = Writes { dst =>
     Json
       .toJson(dst.map {
-        case (addr, balance) => addr.stringRepr -> balance
+        case (addr, balance) => addr.toString -> balance
       })
   }
 
@@ -46,7 +46,7 @@ package object state {
   implicit val dstPageWrites: Writes[AssetDistributionPage] = Writes { page =>
     Json.obj(
       "hasNext"  -> JsBoolean(page.hasNext),
-      "lastItem" -> Json.toJson(page.lastItem.map(_.stringRepr)),
+      "lastItem" -> Json.toJson(page.lastItem.map(_.toString)),
       "items"    -> Json.toJson(page.items)
     )
   }

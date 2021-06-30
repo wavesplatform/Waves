@@ -32,8 +32,8 @@ object KeyPair {
   }
 
   implicit class KeyPairImplicitOps(private val kp: KeyPair) extends AnyVal {
-    def toAddress: Address                = kp.publicKey.toAddress
-    def toAddress(chainId: Byte): Address = kp.publicKey.toAddress(chainId)
+    def toAddress: WavesAddress                = kp.publicKey.toAddress
+    def toAddress(chainId: Byte): WavesAddress = kp.publicKey.toAddress(chainId)
   }
 
   implicit val jsonFormat: Format[KeyPair] = Format(

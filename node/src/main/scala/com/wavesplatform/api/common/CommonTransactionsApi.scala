@@ -37,7 +37,7 @@ trait CommonTransactionsApi {
   def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]]
 
   def transactionsByAddress(
-      subject: AddressOrAlias,
+      subject: Address,
       sender: Option[Address],
       transactionTypes: Set[TransactionType],
       fromId: Option[ByteStr] = None
@@ -88,13 +88,12 @@ object CommonTransactionsApi {
     override def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)] = common.aliasesOfAddress(db, maybeDiff, address)
 
     override def transactionsByAddress(
-        subject: AddressOrAlias,
+        subject: Address,
         sender: Option[Address],
         transactionTypes: Set[TransactionType],
         fromId: Option[ByteStr] = None
-    ): Observable[TransactionMeta] = resolve(subject).fold(Observable.empty[TransactionMeta]) { subjectAddress =>
-      common.addressTransactions(db, maybeDiff, subjectAddress, sender, transactionTypes, fromId)
-    }
+    ): Observable[TransactionMeta] =
+      common.addressTransactions(db, maybeDiff, subject, sender, transactionTypes, fromId)
 
     override def transactionById(transactionId: ByteStr): Option[TransactionMeta] =
       blockchain.transactionInfo(transactionId).map {

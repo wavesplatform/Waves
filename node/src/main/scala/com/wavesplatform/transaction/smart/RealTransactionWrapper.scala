@@ -1,13 +1,13 @@
 package com.wavesplatform.transaction.smart
 
 import cats.implicits._
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
+import com.wavesplatform.account.{AddressOrAlias, Recipient}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
-import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient, _}
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state._
 import com.wavesplatform.transaction._
@@ -28,7 +28,7 @@ object RealTransactionWrapper {
   private def proven(tx: Transaction with ProvenTransaction, txIdOpt: Option[ByteStr] = None): Proven =
     Proven(
       header(tx, txIdOpt),
-      Recipient.Address(ByteStr(tx.sender.toAddress.bytes)),
+      RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes)),
       ByteStr(tx.bodyBytes()),
       tx.sender,
       tx.proofs.proofs.map(_.arr).map(ByteStr(_)).toIndexedSeq
@@ -38,7 +38,7 @@ object RealTransactionWrapper {
   implicit def ord(o: Order): Ord =
     Ord(
       id = o.id(),
-      sender = Recipient.Address(ByteStr(o.sender.toAddress.bytes)),
+      sender = RideRecipient.Address(ByteStr(o.sender.toAddress.bytes)),
       senderPublicKey = o.senderPublicKey,
       matcherPublicKey = o.matcherPublicKey,
       assetPair = o.assetPair,
@@ -56,11 +56,6 @@ object RealTransactionWrapper {
       matcherFeeAssetId = o.matcherFeeAssetId.compatId
     )
 
-  implicit def aoaToRecipient(aoa: AddressOrAlias): Recipient = aoa match {
-    case a: Address => Recipient.Address(ByteStr(a.bytes))
-    case a: Alias   => Recipient.Alias(a.name)
-  }
-
   def apply(
       tx: Transaction,
       blockchain: Blockchain,
@@ -68,7 +63,7 @@ object RealTransactionWrapper {
       target: AttachedPaymentTarget
   ): Either[ExecutionError, Tx] =
     tx match {
-      case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient).asRight
+      case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, toRide(g.recipient)).asRight
       case t: TransferTransaction => mapTransferTx(t).asRight
       case i: IssueTransaction =>
         Tx.Issue(
@@ -83,7 +78,7 @@ object RealTransactionWrapper {
           .asRight
       case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.asset.id, r.reissuable).asRight
       case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity, b.asset.id).asRight
-      case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount, b.recipient).asRight
+      case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount, toRide(b.recipient)).asRight
       case b: LeaseCancelTransaction => Tx.LeaseCancel(proven(b), b.leaseId).asRight
       case b: CreateAliasTransaction => Tx.CreateAlias(proven(b), b.alias.name).asRight
       case ms: MassTransferTransaction =>
@@ -92,13 +87,13 @@ object RealTransactionWrapper {
             assetId = ms.assetId.compatId,
             transferCount = ms.transfers.length,
             totalAmount = ms.transfers.map(_.amount).sum,
-            transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(r.address, r.amount)).toIndexedSeq,
+            transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(toRide(r.address), r.amount)).toIndexedSeq,
             attachment = ms.attachment
           )
           .asRight
       case ss: SetScriptTransaction      => Tx.SetScript(proven(ss), ss.script.map(_.bytes())).asRight
       case ss: SetAssetScriptTransaction => Tx.SetAssetScript(proven(ss), ss.asset.id, ss.script.map(_.bytes())).asRight
-      case p: PaymentTransaction         => Tx.Payment(proven(p), p.amount, p.recipient).asRight
+      case p: PaymentTransaction         => Tx.Payment(proven(p), p.amount, toRide(p.recipient)).asRight
       case e: ExchangeTransaction        => Tx.Exchange(proven(e), e.amount, e.price, e.buyMatcherFee, e.sellMatcherFee, e.buyOrder, e.sellOrder).asRight
       case s: SponsorFeeTransaction      => Tx.Sponsorship(proven(s), s.asset.id, s.minSponsoredAssetFee).asRight
       case d: DataTransaction =>
@@ -119,7 +114,7 @@ object RealTransactionWrapper {
           .map { payments =>
             Tx.CI(
               proven(ci),
-              ci.dAppAddressOrAlias,
+              toRide(ci.dAppAddressOrAlias),
               payments,
               ci.feeAssetId.compatId,
               ci.funcCallOpt.map(_.function.funcName),
@@ -137,8 +132,10 @@ object RealTransactionWrapper {
       feeAssetId = t.feeAssetId.compatId,
       assetId = t.assetId.compatId,
       amount = t.amount,
-      recipient = t.recipient,
+      recipient = toRide(t.recipient),
       attachment = t.attachment
     )
 
+  def toRide(recipient: Recipient): RideRecipient = ???
+  def toRide(aoa: AddressOrAlias): RideRecipient  = ???
 }

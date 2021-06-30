@@ -3,6 +3,7 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.account.Recipient
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -16,7 +17,7 @@ object TransferTxSerializer {
   def toJson(tx: TransferTransaction): JsObject = {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
-      "recipient"  -> recipient.stringRepr,
+      "recipient"  -> recipient.toString,
       "assetId"    -> assetId.maybeBase58Repr,
       "feeAsset"   -> feeAssetId.maybeBase58Repr, // legacy v0.11.1 compat
       "amount"     -> amount,
@@ -62,7 +63,19 @@ object TransferTxSerializer {
       val recipient  = buf.getAddressOrAlias
       val attachment = buf.getByteArrayWithLength
 
-      TransferTransaction(version, sender, recipient, assetId, amount, feeAssetId, fee, ByteStr(attachment), ts, Proofs.empty, recipient.chainId)
+      TransferTransaction(
+        version,
+        sender,
+        recipient.fold[Recipient](identity, identity),
+        assetId,
+        amount,
+        feeAssetId,
+        fee,
+        ByteStr(attachment),
+        ts,
+        Proofs.empty,
+        recipient.chainId
+      )
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction
 
-object TransactionType extends Enumeration {
+object TransactionType extends Enumeration(1) {
   type TransactionType = Value
   val Genesis,
   Payment,

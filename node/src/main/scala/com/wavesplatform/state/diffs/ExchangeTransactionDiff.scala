@@ -108,9 +108,9 @@ object ExchangeTransactionDiff {
 
       val feeDiff = Monoid.combineAll(
         Seq(
-          Map(matcher -> matcherPortfolio),
-          Map(buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee)),
-          Map(seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee))
+          Map[Address, Portfolio](matcher -> matcherPortfolio),
+          Map[Address, Portfolio](buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee)),
+          Map[Address, Portfolio](seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee))
         )
       )
 

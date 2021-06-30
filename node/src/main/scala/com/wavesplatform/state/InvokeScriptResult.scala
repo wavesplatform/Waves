@@ -2,16 +2,16 @@ package com.wavesplatform.state
 
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
+import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.domain._
-import com.wavesplatform.protobuf.{Amount, _}
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBUtils
+import com.wavesplatform.protobuf.{Amount, _}
 import com.wavesplatform.state.{InvokeScriptResult => R}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -75,9 +75,9 @@ object InvokeScriptResult {
   case class Lease(recipient: AddressOrAlias, amount: Long, nonce: Long, id: ByteStr)
   object Lease {
     implicit val recipientWrites = Writes[AddressOrAlias] {
-      case address: Address => implicitly[Writes[Address]].writes(address)
-      case alias: Alias     => JsString(alias.stringRepr)
-      case _                => JsNull
+      case Left(address) => implicitly[Writes[Address]].writes(address)
+      case Right(alias)  => JsString(alias.toString)
+      case _             => JsNull
     }
     implicit val jsonWrites = Json.writes[Lease]
   }

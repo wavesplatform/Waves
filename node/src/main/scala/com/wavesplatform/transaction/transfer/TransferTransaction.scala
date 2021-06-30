@@ -18,7 +18,7 @@ import scala.util.Try
 case class TransferTransaction(
     version: TxVersion,
     sender: PublicKey,
-    recipient: AddressOrAlias,
+    recipient: Recipient,
     assetId: Asset,
     amount: TxAmount,
     feeAssetId: Asset,
@@ -27,7 +27,8 @@ case class TransferTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.Transfer) with VersionedTransaction
+) extends Transaction(TransactionType.Transfer)
+    with VersionedTransaction
     with SigProofsSwitch
     with FastHashId
     with TxWithFee.InCustomAsset
@@ -62,7 +63,7 @@ object TransferTransaction extends TransactionParser {
   def create(
       version: TxVersion,
       sender: PublicKey,
-      recipient: AddressOrAlias,
+      recipient: Recipient,
       asset: Asset,
       amount: TxAmount,
       feeAsset: Asset,
@@ -71,12 +72,12 @@ object TransferTransaction extends TransactionParser {
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, TransferTransaction] =
-    TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs, recipient.chainId).validatedEither
+    TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs, AddressScheme.current.chainId).validatedEither
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
-      recipient: AddressOrAlias,
+      recipient: Recipient,
       asset: Asset,
       amount: TxAmount,
       feeAsset: Asset,
@@ -90,7 +91,7 @@ object TransferTransaction extends TransactionParser {
   def selfSigned(
       version: TxVersion,
       sender: KeyPair,
-      recipient: AddressOrAlias,
+      recipient: Recipient,
       asset: Asset,
       amount: TxAmount,
       feeAsset: Asset,

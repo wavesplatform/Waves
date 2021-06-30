@@ -189,7 +189,7 @@ object ResponsivenessLogs {
   def isNeutrino(tx: Transaction): Boolean = {
     val txAddrs = tx match {
       case is: InvokeScriptTransaction =>
-        Seq(is.sender.toAddress) ++ (is.dAppAddressOrAlias match {
+        Seq(is.sender.toAddress) ++ (is.dAppAddressOrAlias.recipient match {
           case a: Address => Seq(a)
           case _          => Nil
         })
@@ -205,7 +205,7 @@ object ResponsivenessLogs {
       "3PNikM6yp4NqcSU8guxQtmR5onr2D4e8yTJ"
     )
 
-    txAddrs.map(_.stringRepr).exists(neutrinoAddrs)
+    txAddrs.map(_.toString).exists(neutrinoAddrs)
   }
 
   def writeEvent(height: Int, tx: Transaction, eventType: TxEvent, reason: Option[ValidationError] = None): Unit =

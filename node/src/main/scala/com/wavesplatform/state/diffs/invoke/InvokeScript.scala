@@ -25,11 +25,11 @@ trait InvokeScriptLike {
 case class InvokeScript(
     senderDApp: Address,
     sender: PublicKey,
-    dAppAddress: Address,
+    dAppAddress: WavesAddress,
     funcCall: FUNCTION_CALL,
     payments: Seq[Payment],
     root: Option[InvokeScriptTransaction]
 ) extends InvokeScriptLike {
-  def dAppAddressOrAlias: AddressOrAlias = dAppAddress
+  def dAppAddressOrAlias: AddressOrAlias = Left(dAppAddress)
   def senderAddress: Address             = senderDApp
 }

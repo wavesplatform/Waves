@@ -1,13 +1,13 @@
 package com.wavesplatform.api.http
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.transaction.{Transaction, _}
-import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.{Transaction, _}
 import play.api.libs.json._
 
 case class ApiErrorResponse(error: Int, message: String)
@@ -43,7 +43,7 @@ object ApiError {
       case TxValidationError.GenericError(ge)                => CustomValidationError(ge)
       case TxValidationError.AlreadyInTheState(tx, txHeight) => AlreadyInState(tx, txHeight)
       case TxValidationError.AccountBalanceError(errs)       => AccountBalanceErrors(errs)
-      case TxValidationError.AliasDoesNotExist(tx)           => AliasDoesNotExist(tx)
+      case TxValidationError.AliasDoesNotExist(alias)        => AliasDoesNotExist(alias)
       case TxValidationError.OrderValidationError(o, m)      => OrderInvalid(o, m)
       case TxValidationError.UnsupportedTransactionType      => UnsupportedTransactionType
       case TxValidationError.Mistiming(err)                  => Mistiming(err)
@@ -58,7 +58,7 @@ object ApiError {
           case TxValidationError.Mistiming(errorMessage)                         => Mistiming(errorMessage)
           case e: TxValidationError.ScriptExecutionError                         => ScriptExecutionError(tx, e.error, isTokenScript = e.isAssetScript)
           case e: TxValidationError.FailedTransactionError if e.isExecutionError => ScriptExecutionError(tx, e.message, e.isAssetScript)
-          case e: TxValidationError.FailedTransactionError                       => TransactionNotAllowedByAssetScript(tx)
+          case _: TxValidationError.FailedTransactionError                       => TransactionNotAllowedByAssetScript(tx)
           case err                                                               => StateCheckFailed(tx, fromValidationError(err))
         }
       case error => CustomValidationError(error.toString)
@@ -204,15 +204,11 @@ object ApiError {
     override val message: String = "block does not exist"
   }
 
-  final case class AliasDoesNotExist(aoa: AddressOrAlias) extends ApiError {
+  final case class AliasDoesNotExist(alias: Alias) extends ApiError {
     override val id: Int = AliasDoesNotExist.Id
     override val code    = StatusCodes.NotFound
 
-    private[this] lazy val msgReason = aoa match {
-      case a: Address => s"for address '${a.stringRepr}'"
-      case a: Alias   => s"'${a.stringRepr}'"
-    }
-    override lazy val message: String = s"alias $msgReason doesn't exist"
+    override lazy val message: String = s"alias '$alias' doesn't exist"
   }
 
   case object AliasDoesNotExist {
@@ -295,8 +291,8 @@ object ApiError {
   }
 
   case class AssetDoesNotExist(assetId: IssuedAsset) extends ApiError {
-    val id: Int = 313
-    val message: String = s"Asset does not exist: $assetId"
+    val id: Int          = 313
+    val message: String  = s"Asset does not exist: $assetId"
     val code: StatusCode = StatusCodes.NotFound
   }
 
@@ -357,7 +353,7 @@ object ApiError {
           .toJson(
             errs
               .map {
-                case (addr, err) => addr.stringRepr -> err
+                case (addr, err) => addr.toString -> err
               }
           )
       )

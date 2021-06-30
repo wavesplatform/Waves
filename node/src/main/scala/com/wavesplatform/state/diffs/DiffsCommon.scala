@@ -191,7 +191,7 @@ object DiffsCommon {
             s"time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=$allowedTs"
         )
       )
-      senderPortfolio    = Map(sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
+      senderPortfolio    = Map[Address, Portfolio](sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
       recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
       actionInfo         = lease.copy(status = LeaseDetails.Status.Cancelled(blockchain.height, Some(cancelTxId)))
     } yield Diff(

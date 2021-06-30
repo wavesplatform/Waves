@@ -32,8 +32,8 @@ object PublicKey extends TaggedType[ByteStr] {
     Some(apply(arg))
 
   implicit class PublicKeyImplicitOps(private val pk: PublicKey) extends AnyVal {
-    def toAddress: Address                = Address.fromPublicKey(pk)
-    def toAddress(chainId: Byte): Address = Address.fromPublicKey(pk, chainId)
+    def toAddress: WavesAddress                = Address.fromPublicKey(pk)
+    def toAddress(chainId: Byte): WavesAddress = Address.fromPublicKey(pk, chainId)
   }
 
   implicit lazy val jsonFormat: Format[PublicKey] = Format[PublicKey](

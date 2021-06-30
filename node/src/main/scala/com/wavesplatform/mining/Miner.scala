@@ -3,7 +3,6 @@ package com.wavesplatform.mining
 import java.time.LocalTime
 
 import scala.concurrent.duration._
-
 import cats.implicits._
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
@@ -28,6 +27,7 @@ import kamon.Kamon
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
+import monix.reactive.Observable
 
 trait Miner {
   def scheduleMining(blockchain: Option[Blockchain] = None): Unit
@@ -55,7 +55,8 @@ class MinerImpl(
     wallet: Wallet,
     pos: PoSSelector,
     val minerScheduler: SchedulerService,
-    val appenderScheduler: SchedulerService
+    val appenderScheduler: SchedulerService,
+    transactionAdded: Observable[Unit]
 ) extends Miner
     with MinerDebugInfo
     with ScorexLogging {
@@ -78,6 +79,7 @@ class MinerImpl(
     settings.minerSettings,
     minerScheduler,
     appenderScheduler,
+    transactionAdded,
     utx.priorityPool.nextMicroBlockSize
   )
 

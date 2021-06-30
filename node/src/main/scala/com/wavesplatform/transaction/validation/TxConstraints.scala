@@ -4,7 +4,7 @@ import cats.data.Validated
 import cats.data.Validated.{Invalid, Valid}
 import cats.syntax.validated._
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.account.{AddressOrAlias, Alias, EthereumAddress, Recipient, WavesAddress}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -84,6 +84,18 @@ object TxConstraints {
       .condNel(
         addr.chainId == chainId,
         addr,
+        GenericError("Address or alias from other network")
+      )
+
+  def addressChainId(r: Recipient, chainId: Byte): ValidatedV[Recipient] =
+    Validated
+      .condNel(
+        r match {
+          case wa: WavesAddress => wa.chainId == chainId
+          case wl: Alias => wl.chainId == chainId
+          case _: EthereumAddress => true
+        },
+        r,
         GenericError("Address or alias from other network")
       )
 

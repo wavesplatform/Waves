@@ -29,7 +29,7 @@ import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
-import com.wavesplatform.utils.{ScorexLogging, _}
+import com.wavesplatform.utils._
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb._

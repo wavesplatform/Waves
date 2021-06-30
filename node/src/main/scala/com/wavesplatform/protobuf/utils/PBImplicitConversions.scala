@@ -8,15 +8,17 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 
 object PBImplicitConversions {
   import com.google.protobuf.{ByteString => PBByteString}
-  import com.wavesplatform.account.{AddressOrAlias, Address => VAddress, Alias => VAlias}
+  import com.wavesplatform.account.{AddressOrAlias, Address => VAddress, Alias => VAlias, Recipient => VRecipient}
 
-  implicit def fromAddressOrAlias(addressOrAlias: AddressOrAlias): Recipient = PBRecipients.create(addressOrAlias)
-  implicit def fromAddress(address: VAddress): PBByteString                  = PBByteString.copyFrom(address.bytes)
+  implicit class RecipientExt(val r: VRecipient) extends AnyVal {
+    def toPb: Recipient = ???
+  }
 
   implicit class PBRecipientImplicitConversionOps(val recipient: Recipient) extends AnyVal {
     def toAddress(chainId: Byte): Either[ValidationError, VAddress]              = PBRecipients.toAddress(recipient, chainId)
     def toAlias(chainId: Byte): Either[ValidationError, VAlias]                  = PBRecipients.toAlias(recipient, chainId)
     def toAddressOrAlias(chainId: Byte): Either[ValidationError, AddressOrAlias] = PBRecipients.toAddressOrAlias(recipient, chainId)
+    def toRecipient(chainId: Byte): Either[ValidationError, VRecipient] = ???
   }
 
   implicit def fromAssetIdAndAmount(v: (VanillaAssetId, Long)): Amount = v match {

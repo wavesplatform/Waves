@@ -22,7 +22,7 @@ object GenesisTxSerializer {
       "fee"       -> 0,
       "timestamp" -> timestamp,
       "signature" -> signature.toString,
-      "recipient" -> recipient.stringRepr,
+      "recipient" -> recipient.toString,
       "amount"    -> amount
     )
   }

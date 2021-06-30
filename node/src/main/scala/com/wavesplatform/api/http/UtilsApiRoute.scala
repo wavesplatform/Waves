@@ -262,7 +262,7 @@ case class UtilsApiRoute(
           (result, complexity) <- ScriptCallEvaluator.executeExpression(blockchain, script, address, settings.evaluateScriptComplexityLimit)(expr)
         } yield Json.obj("result" -> ScriptValuesJson.serializeValue(result), "complexity" -> complexity)
 
-      val requestData = obj ++ Json.obj("address" -> address.stringRepr)
+      val requestData = obj ++ Json.obj("address" -> address.toString)
       val responseJson = result
         .recover {
           case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)

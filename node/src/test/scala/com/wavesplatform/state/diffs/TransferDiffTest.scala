@@ -18,7 +18,7 @@ import org.scalacheck.Gen
 import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class TransferTransactionDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class TransferDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
 
   val preconditionsAndTransfer: Gen[(GenesisTransaction, IssueTransaction, IssueTransaction, TransferTransaction)] = for {
     master    <- accountGen
@@ -111,7 +111,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with With
       case (genesis, issue, fee, transfer) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(issue, fee)), smartEnabledFS) {
           case (_, state) => {
-            val diffOrError = TransferTransactionDiff(state, System.currentTimeMillis())(transfer)
+            val diffOrError = TransferDiff(state, System.currentTimeMillis())(transfer)
             diffOrError shouldBe Left(GenericError("Smart assets can't participate in TransferTransactions as a fee"))
           }
         }

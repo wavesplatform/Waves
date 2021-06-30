@@ -17,14 +17,16 @@ import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Proofs, TxValidationError}
+import com.wavesplatform.transaction.{EthereumTransaction, Proofs, TxValidationError}
 import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{transaction => vt}
+import org.web3j.crypto.{SignedRawTransaction, TransactionDecoder}
+import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 
 import scala.util.Try
 
 object PBTransactions {
-  import com.wavesplatform.protobuf.utils.PBImplicitConversions._
+
 
   def createGenesis(chainId: Byte, timestamp: Long, signature: ByteStr, data: GenesisTransactionData): SignedTransaction =
     new SignedTransaction(
@@ -56,43 +58,47 @@ object PBTransactions {
     vanilla(signedTx).left.map(err => new Exception(err.toString)).toTry
 
   def vanilla(signedTx: PBSignedTransaction, unsafe: Boolean = false): Either[ValidationError, VanillaTransaction] = {
-    for {
-      parsedTx <- signedTx.transaction.toRight(GenericError("Transaction must be specified"))
-      fee = parsedTx.fee.getOrElse(Amount.defaultInstance)
-      _ <- Either.cond(parsedTx.data.isDefined, (), GenericError("Transaction data must be specified"))
-      feeAmount = PBAmounts.toAssetAndAmount(fee)
-      sender = Option(parsedTx.senderPublicKey)
-        .filterNot(_.isEmpty)
-        .map(pk => PublicKey(pk.toByteArray))
-        .orNull
-      tx <- if (unsafe)
-        Right(
-          createVanillaUnsafe(
-            parsedTx.version,
-            parsedTx.chainId.toByte,
-            sender,
-            feeAmount._2,
-            feeAmount._1,
-            parsedTx.timestamp,
-            Proofs(signedTx.proofs.map(_.toByteStr)),
-            parsedTx.data
-          )
-        )
-      else
+    import org.web3j.utils.Numeric.toHexString
+    signedTx.transaction match {
+      case None => Right(EthereumTransaction(TransactionDecoder.decode(toHexString(signedTx.ethereumTransaction.toByteArray)).asInstanceOf[SignedRawTransaction]))
+      case Some(parsedTx) =>
         for {
-          proofs <- Proofs.create(signedTx.proofs.map(_.toByteStr))
-          tx <- createVanilla(
-            parsedTx.version,
-            parsedTx.chainId.toByte,
-            sender,
-            feeAmount._2,
-            feeAmount._1,
-            parsedTx.timestamp,
-            proofs,
-            parsedTx.data
-          )
+          _ <- Either.cond(parsedTx.data.isDefined, (), GenericError("Transaction data must be specified"))
+          fee = parsedTx.fee.getOrElse(Amount.defaultInstance)
+          (feeAsset, feeAmount) = PBAmounts.toAssetAndAmount(fee)
+          sender = Option(parsedTx.senderPublicKey)
+            .filterNot(_.isEmpty)
+            .map(pk => PublicKey(pk.toByteArray))
+            .orNull
+          tx <- if (unsafe)
+            Right(
+              createVanillaUnsafe(
+                parsedTx.version,
+                parsedTx.chainId.toByte,
+                sender,
+                feeAmount,
+                feeAsset,
+                parsedTx.timestamp,
+                Proofs(signedTx.proofs.map(_.toByteStr)),
+                parsedTx.data
+              )
+            )
+          else
+            for {
+              proofs <- Proofs.create(signedTx.proofs.map(_.toByteStr))
+              tx <- createVanilla(
+                parsedTx.version,
+                parsedTx.chainId.toByte,
+                sender,
+                feeAmount,
+                feeAsset,
+                parsedTx.timestamp,
+                proofs,
+                parsedTx.data
+              )
+            } yield tx
         } yield tx
-    } yield tx
+    }
   }
 
   private[this] def createVanilla(
@@ -122,7 +128,7 @@ object PBTransactions {
 
       case Data.Transfer(TransferTransactionData(Some(recipient), Some(amount), attachment)) =>
         for {
-          address <- recipient.toAddressOrAlias(chainId)
+          address <- recipient.toRecipient(chainId)
           tx <- vt.transfer.TransferTransaction.create(
             version.toByte,
             sender,
@@ -229,7 +235,7 @@ object PBTransactions {
           version.toByte,
           sender,
           PBAmounts.toVanillaAssetId(mt.assetId),
-          mt.transfers.flatMap(t => t.getRecipient.toAddressOrAlias(chainId).toOption.map(ParsedTransfer(_, t.amount))).toList,
+          mt.transfers.flatMap(t => t.getRecipient.toRecipient(chainId).toOption.map(ParsedTransfer(_, t.amount))).toList,
           feeAmount,
           timestamp,
           mt.attachment.toByteStr,
@@ -336,7 +342,7 @@ object PBTransactions {
         vt.transfer.TransferTransaction(
           version.toByte,
           sender,
-          recipient.toAddressOrAlias(chainId).explicitGet(),
+          recipient.toRecipient(chainId).explicitGet(),
           amount.vanillaAssetId,
           amount.longAmount,
           feeAssetId,
@@ -451,7 +457,7 @@ object PBTransactions {
           version.toByte,
           sender,
           PBAmounts.toVanillaAssetId(mt.assetId),
-          mt.transfers.flatMap(t => t.getRecipient.toAddressOrAlias(chainId).toOption.map(ParsedTransfer(_, t.amount))).toList,
+          mt.transfers.flatMap(t => t.getRecipient.toRecipient(chainId).toOption.map(ParsedTransfer(_, t.amount))).toList,
           feeAmount,
           timestamp,
           mt.attachment.toByteStr,
@@ -525,7 +531,7 @@ object PBTransactions {
 
       case tx: vt.transfer.TransferTransaction =>
         import tx._
-        val data = TransferTransactionData(Some(recipient), Some((assetId, amount)), attachment.toByteString)
+        val data = TransferTransactionData(Some(recipient.toPb), Some((assetId, amount)), attachment.toByteString)
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, version, proofs, Data.Transfer(data))
 
       case tx: vt.CreateAliasTransaction =>
@@ -569,7 +575,7 @@ object PBTransactions {
 
       case tx: vt.lease.LeaseTransaction =>
         import tx._
-        val data = LeaseTransactionData(Some(recipient), amount)
+        val data = LeaseTransactionData(Some(recipient.recipient.toPb), amount)
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Lease(data))
 
       case tx: vt.lease.LeaseCancelTransaction =>
@@ -580,7 +586,7 @@ object PBTransactions {
       case tx @ MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, attachment, proofs, chainId) =>
         val data = MassTransferTransactionData(
           PBAmounts.toPBAssetId(assetId),
-          transfers.map(pt => MassTransferTransactionData.Transfer(Some(pt.address), pt.amount)),
+          transfers.map(pt => MassTransferTransactionData.Transfer(Some(pt.address.toPb), pt.amount)),
           attachment.toByteString
         )
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.MassTransfer(data))
@@ -607,6 +613,8 @@ object PBTransactions {
 
         PBTransactions.create(sender, chainId, feeAmount, feeAsset, timestamp, version, proofs, Data.UpdateAssetInfo(data))
 
+      case et: vt.EthereumTransaction =>
+        new PBSignedTransaction(ethereumTransaction = ByteString.copyFrom(et.bytes()))
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
     }

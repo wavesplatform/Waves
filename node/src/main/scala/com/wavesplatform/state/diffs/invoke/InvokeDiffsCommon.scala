@@ -55,8 +55,8 @@ object InvokeDiffsCommon {
           )
         } yield {
           val portfolioDiff =
-            Map(tx.sender.toAddress          -> Portfolio(assets = Map(asset              -> -attachedFee))) |+|
-              Map(assetInfo.issuer.toAddress -> Portfolio(-feeInWaves, assets = Map(asset -> attachedFee)))
+            Map[Address, Portfolio](tx.sender.toAddress          -> Portfolio(assets = Map(asset              -> -attachedFee))) |+|
+              Map[Address, Portfolio](assetInfo.issuer.toAddress -> Portfolio(-feeInWaves, assets = Map(asset -> attachedFee)))
           (feeInWaves, portfolioDiff)
         }
     }
@@ -399,10 +399,14 @@ object InvokeDiffsCommon {
             val address                                              = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
             Asset.fromCompatId(asset) match {
               case Waves =>
-                TracedResult.wrapValue(Diff(portfolios = Map(address -> Portfolio(amount)) |+| Map(dAppAddress -> Portfolio(-amount))))
+                TracedResult.wrapValue(
+                  Diff(portfolios = Map[Address, Portfolio](address -> Portfolio(amount)) |+| Map(dAppAddress -> Portfolio(-amount)))
+                )
               case a @ IssuedAsset(id) =>
                 val nextDiff = Diff(
-                  portfolios = Map(address -> Portfolio(assets = Map(a -> amount))) |+| Map(dAppAddress -> Portfolio(assets = Map(a -> -amount)))
+                  portfolios = Map[Address, Portfolio](address -> Portfolio(assets = Map(a -> amount))) |+| Map(
+                    dAppAddress                                -> Portfolio(assets = Map(a -> -amount))
+                  )
                 )
                 blockchain
                   .assetScript(a)
