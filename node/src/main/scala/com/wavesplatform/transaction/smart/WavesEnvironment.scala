@@ -269,8 +269,13 @@ object DAppEnvironment {
         InvokeScriptTrace(invocationId, inv.root.dAppAddress, inv.root.call, inv.result, inv.log, inv.toTraceList(invocationId))
       }
 
-    def getErrorMessage: Option[InvokeScriptResult.ErrorMessage] =
-      this.result.left.toOption.map(errorMessage)
+    def getErrorMessage: Option[InvokeScriptResult.ErrorMessage] = {
+      def isNestedError(ve: ValidationError) = invocations.exists(_.result == Left(ve))
+
+      this.result.left.toOption.collect {
+        case ve if !isNestedError(ve) => errorMessage(ve)
+      }
+    }
 
     private[this] def errorMessage(ve: ValidationError): InvokeScriptResult.ErrorMessage = {
       val fte = FailedTransactionError.asFailedScriptError(ve)
