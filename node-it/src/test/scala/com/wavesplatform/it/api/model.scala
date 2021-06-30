@@ -434,7 +434,7 @@ object Invocation {
         Invocation(
           (json \ "dApp").as[String],
           (json \ "call").as[Call],
-          (json \ "payments").as[Seq[AttachedPayment]],
+          (json \ "payment").as[Seq[AttachedPayment]],
           (json \ "stateChanges").as[StateChangesDetails]
         )
       )

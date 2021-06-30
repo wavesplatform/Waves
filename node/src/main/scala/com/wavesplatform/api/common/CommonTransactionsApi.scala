@@ -1,24 +1,25 @@
 package com.wavesplatform.api.common
 
+import scala.concurrent.Future
+
 import com.wavesplatform.account.{Address, AddressOrAlias}
-import com.wavesplatform.api.{BlockMeta, common}
+import com.wavesplatform.api.{common, BlockMeta}
 import com.wavesplatform.block
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult}
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
-import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult}
+import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
-
-import scala.concurrent.Future
 
 trait CommonTransactionsApi {
   import CommonTransactionsApi._
@@ -110,13 +111,20 @@ object CommonTransactionsApi {
     override def unconfirmedTransactionById(transactionId: ByteStr): Option[Transaction] =
       utx.transactionById(transactionId)
 
-    override def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)] =
-      FeeValidation
-        .getMinFee(blockchain, tx)
-        .map {
-          case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
-            (asset, feeInAsset, feeInWaves)
-        }
+    override def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
+      val defaultFee = FeeValidation.getMinFee(blockchain, tx)
+      (tx match {
+        case ist: InvokeScriptTransaction =>
+          InvokeScriptTransactionDiff.calculateFee(blockchain, ist) match {
+            case Some(wavesFee) => Right(FeeValidation.calculateAssetFee(blockchain, ist.feeAssetId, wavesFee))
+            case None           => defaultFee
+          }
+        case _ => defaultFee
+      }).map {
+        case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
+          (asset, feeInAsset, feeInWaves)
+      }
+    }
 
     override def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]] = publishTransaction(tx)
 
