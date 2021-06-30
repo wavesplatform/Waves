@@ -40,7 +40,7 @@ object TransactionPublisher extends ScorexLogging {
               TracedResult(Left(GenericError(err)))
           }
           .andThen {
-            case Success(TracedResult(Right(isNew), _)) if isNew || (allowRebroadcast && source.isEmpty) => broadcast(tx, source)
+            case Success(TracedResult(Right(isNew), _, _)) if isNew || (allowRebroadcast && source.isEmpty) => broadcast(tx, source)
           }
 
       case Left(err) =>

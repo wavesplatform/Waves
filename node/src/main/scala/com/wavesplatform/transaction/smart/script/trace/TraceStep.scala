@@ -78,17 +78,19 @@ case class InvokeScriptTrace(
     dAppAddressOrAlias: AddressOrAlias,
     functionCall: FUNCTION_CALL,
     resultE: Either[ValidationError, ScriptResult],
-    log: Log[Id]
+    log: Log[Id],
+    invocations: Seq[InvokeScriptTrace]
 ) extends TraceStep {
   override lazy val json: JsObject       = maybeLoggedJson(false)
   override lazy val loggedJson: JsObject = maybeLoggedJson(true)
 
   def maybeLoggedJson(logged: Boolean)(implicit invokeResultWrites: OWrites[InvokeScriptResult] = InvokeScriptResult.jsonFormat): JsObject = {
     Json.obj(
-      "type"     -> "dApp",
-      "id"       -> dAppAddressOrAlias.stringRepr,
-      "function" -> functionCall.function.funcName,
-      "args"     -> functionCall.args.map(_.toString)
+      "type"        -> "dApp",
+      "id"          -> dAppAddressOrAlias.stringRepr,
+      "function"    -> functionCall.function.funcName,
+      "args"        -> functionCall.args.map(_.toString),
+      "invocations" -> invocations.map(_.maybeLoggedJson(logged)(invokeResultWrites))
     ) ++ (resultE match {
       case Right(value) => TraceStep.maybeErrorJson(None) ++ Json.obj("result" -> TraceStep.scriptResultJson(invokeId, value))
       case Left(e)      => TraceStep.maybeErrorJson(Some(e))
