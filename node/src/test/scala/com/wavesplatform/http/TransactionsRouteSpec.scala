@@ -1205,6 +1205,7 @@ class TransactionsRouteSpec
             |    "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
             |    "function" : "test",
             |    "args" : [ ],
+            |    "invocations" : [ ],
             |    "result" : {
             |      "data" : [ ],
             |      "transfers" : [ ],
