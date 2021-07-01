@@ -83,7 +83,7 @@ class InvokeAssetChecksTest
     val (activated, func, invoke, genesisTxs) = transferBase58WavesDAppScenario.sample.get
     tempDb { _ =>
       val miner       = TestBlock.defaultSigner.toAddress
-      val dAppAddress = invoke.dAppAddressOrAlias.asInstanceOf[Address]
+      val dAppAddress = invoke.dApp.asInstanceOf[Address]
       def invokeInfo(succeeded: Boolean) =
         Map(invoke.id.value() -> NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded))
 

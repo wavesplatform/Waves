@@ -43,7 +43,7 @@ object InvokeScriptTxSerializer {
   def toJson(tx: InvokeScriptTransaction): JsObject = {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
-      "dApp"    -> dAppAddressOrAlias.toString,
+      "dApp"    -> dApp.toString,
       "payment" -> payments
     ) ++ (funcCallOpt match {
       case Some(fc) => Json.obj("call" -> this.functionCallToJson(fc))
@@ -58,7 +58,7 @@ object InvokeScriptTxSerializer {
         Bytes.concat(
           Array(tpe.id.toByte, version, chainId),
           sender.arr,
-          dAppAddressOrAlias.bytes,
+          dApp.bytes,
           Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
           Deser.serializeArrays(payments.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
           Longs.toByteArray(fee),
@@ -95,6 +95,6 @@ object InvokeScriptTxSerializer {
     val fee          = buf.getLong
     val feeAssetId   = buf.getAsset
     val timestamp    = buf.getLong
-    InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId, timestamp, buf.getProofs, chainId)
+    InvokeScriptTransaction(TxVersion.V1, sender, dApp.recipient, functionCall, payments, fee, feeAssetId, timestamp, buf.getProofs, chainId)
   }
 }

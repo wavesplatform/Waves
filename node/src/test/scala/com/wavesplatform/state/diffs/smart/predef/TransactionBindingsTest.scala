@@ -318,7 +318,7 @@ class TransactionBindingsTest
            |     case ad : Address => ad.bytes
            |     case _ : Alias => base58''
            |   }
-           |   let dappAddress = dAppAddressBytes == base58'${Base58.encode(t.dAppAddressOrAlias.bytes)}'
+           |   let dappAddress = dAppAddressBytes == base58'${Base58.encode(t.dApp.bytes)}'
            |
            |   let paymentAmount = if(${t.payments.nonEmpty})
            |     then extract(t.payment).amount == ${t.payments.headOption.map(_.amount).getOrElse(-1)}

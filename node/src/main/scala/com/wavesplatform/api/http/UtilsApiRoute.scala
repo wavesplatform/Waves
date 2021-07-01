@@ -2,7 +2,7 @@ package com.wavesplatform.api.http
 
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.implicits._
-import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
+import com.wavesplatform.account.{Address, AddressScheme, PublicKey, WavesAddress}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, ScriptCompilerError, TooBigArrayAllocation}
 import com.wavesplatform.api.http.requests.{ScriptWithImportsRequest, byteStrFormat}
 import com.wavesplatform.common.state.ByteStr
@@ -37,7 +37,6 @@ import monix.eval.Coeval
 import monix.execution.Scheduler
 import play.api.libs.json._
 import shapeless.Coproduct
-
 import java.security.SecureRandom
 
 case class UtilsApiRoute(
@@ -239,7 +238,7 @@ case class UtilsApiRoute(
     })
 
   def evaluate: Route =
-    (path("script" / "evaluate" / ScriptedAddress) & jsonPostD[JsObject]) { (address: Address, obj: JsObject) =>
+    (path("script" / "evaluate" / ScriptedAddress) & jsonPostD[JsObject]) { (address, obj) =>
       val script = blockchain.accountScript(address).get.script
 
       def parseCall(js: JsReadable) = {
@@ -273,9 +272,10 @@ case class UtilsApiRoute(
       complete(responseJson)
     }
 
-  private[this] val ScriptedAddress: PathMatcher1[Address] = AddrSegment.map { address =>
-    if (blockchain.hasAccountScript(address)) address
-    else throw ApiException(CustomValidationError(s"Address $address is not dApp"))
+  private[this] val ScriptedAddress: PathMatcher1[WavesAddress] = AddrSegment.map {
+    case address: WavesAddress if blockchain.hasAccountScript(address) => address
+    case other =>
+      throw ApiException(CustomValidationError(s"Address $other is not dApp"))
   }
 }
 
@@ -303,7 +303,7 @@ object UtilsApiRoute {
         .map(_._1)
     }
 
-    def executeExpression(blockchain: Blockchain, script: Script, address: Address, limit: Int)(
+    def executeExpression(blockchain: Blockchain, script: Script, address: WavesAddress, limit: Int)(
         expr: EXPR
     ): Either[ValidationError, (EVALUATED, Int)] = {
       for {

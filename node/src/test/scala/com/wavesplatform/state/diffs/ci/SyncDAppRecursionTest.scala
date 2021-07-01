@@ -177,7 +177,7 @@ class SyncDAppRecursionTest
         features
       )(
         _ should produce(
-          s"The invocation stack contains multiple invocations of the dApp at address ${invoke.dAppAddressOrAlias} with invocations of another dApp between them"
+          s"The invocation stack contains multiple invocations of the dApp at address ${invoke.dApp} with invocations of another dApp between them"
         )
       )
     }
@@ -221,7 +221,7 @@ class SyncDAppRecursionTest
       features
     )(
       _ should produce(
-        s"The invocation stack contains multiple invocations of the dApp at address ${invoke.dAppAddressOrAlias} with invocations of another dApp between them"
+        s"The invocation stack contains multiple invocations of the dApp at address ${invoke.dApp} with invocations of another dApp between them"
       )
     )
   }

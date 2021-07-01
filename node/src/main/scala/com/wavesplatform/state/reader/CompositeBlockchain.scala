@@ -3,7 +3,7 @@ package com.wavesplatform.state.reader
 import cats.data.Ior
 import cats.implicits._
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, WavesAddress}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
@@ -69,7 +69,7 @@ final class CompositeBlockchain private (
 
   override def height: Int = inner.height + blockMeta.fold(0)(_ => 1)
 
-  override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
+  override def resolveAlias(alias: Alias): Either[ValidationError, WavesAddress] = inner.resolveAlias(alias) match {
     case l @ Left(AliasIsDisabled(_)) => l
     case Right(addr)                  => Right(diff.aliases.getOrElse(alias, addr))
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))

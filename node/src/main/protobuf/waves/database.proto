@@ -37,7 +37,8 @@ message TransactionMeta {
 message TransactionData {
     oneof transaction {
         bytes legacy_bytes = 1;
-        SignedTransaction new_transaction = 2;
+        SignedTransaction waves_transaction = 2;
+        bytes ethereum_transaction = 4;
     }
     bool failed = 3;
 }

@@ -16,7 +16,6 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TransactionType
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.reactive.Observable
@@ -160,7 +159,7 @@ object CommonAccountsApi extends ScorexLogging {
               result.invokes.flatMap(i => extractLeases(i.dApp, i.stateChanges))
             }
 
-          extractLeases(blockchain.resolveAlias(originTransaction.dAppAddressOrAlias).explicitGet(), scriptResult)
+          extractLeases(blockchain.resolveAlias(originTransaction.dApp).explicitGet(), scriptResult)
         case _ => Seq()
       }
 

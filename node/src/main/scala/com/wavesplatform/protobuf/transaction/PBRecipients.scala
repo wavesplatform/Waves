@@ -48,6 +48,8 @@ object PBRecipients {
     else Left(GenericError(s"Not an address or alias: $r"))
   }
 
+  def toRecipient(r: PBRecipient, chainId: Byte): Either[ValidationError, Recipient] = ???
+
   @inline
   final def publicKeyHash(address: Address): Array[Byte] =
     address.bytes.slice(2, address.bytes.length - Address.ChecksumLength)

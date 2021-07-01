@@ -1,12 +1,11 @@
 package com.wavesplatform.state
 
 import scala.collection.immutable.VectorMap
-
 import cats.data.Ior
 import cats.implicits._
 import cats.kernel.{Monoid, Semigroup}
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey, WavesAddress}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.Script
@@ -147,7 +146,7 @@ case class Diff(
     portfolios: Map[Address, Portfolio] = Map.empty,
     issuedAssets: Map[IssuedAsset, NewAssetInfo] = Map.empty,
     updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
-    aliases: Map[Alias, Address] = Map.empty,
+    aliases: Map[Alias, WavesAddress] = Map.empty,
     orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
     leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
     scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,

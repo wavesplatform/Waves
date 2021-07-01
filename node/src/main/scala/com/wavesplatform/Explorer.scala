@@ -4,25 +4,21 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util
 
-import com.google.common.primitives.{Longs, Shorts}
+import com.google.common.primitives.Longs
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressPortfolio
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.database.{DBExt, KeyTags, Keys, LevelDBWriter, openDB, readTransactionBytes}
-import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
+import com.wavesplatform.database.{DBExt, KeyTags, Keys, LevelDBWriter, loadTransactions, openDB}
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio, TxNum}
+import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 import scala.jdk.CollectionConverters._
-import scala.util.Try
 
 //noinspection ScalaStyle
 object Explorer extends ScorexLogging {
@@ -222,35 +218,8 @@ object Explorer extends ScorexLogging {
           }
 
         case "TXBH" =>
-          val txs = new ListBuffer[(TxNum, Transaction)]
-
           val h = Height(argument(1, "height").toInt)
-
-          val prefix = ByteBuffer
-            .allocate(6)
-            .put(KeyTags.NthTransactionInfoAtHeight.prefixBytes)
-            .putInt(h)
-            .array()
-
-          val iterator = db.iterator
-
-          try {
-            iterator.seek(prefix)
-            while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) {
-              val entry = iterator.next()
-
-              val k = entry.getKey
-              println(k.toList.map(_.toInt & 0xff))
-
-              for {
-                idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-                tx = readTransactionBytes(entry.getValue) match {
-                  case (_, Left(legacyBytes)) => TransactionParsers.parseBytes(legacyBytes).get
-                  case (_, Right(newBytes))   => PBTransactions.vanilla(PBSignedTransaction.parseFrom(newBytes)).explicitGet()
-                }
-              } txs.append((TxNum(idx), tx))
-            }
-          } finally iterator.close()
+          val txs = db.readOnly(loadTransactions(h, _)).get
 
           println(txs.length)
           txs.foreach(println)
@@ -279,7 +248,7 @@ object Explorer extends ScorexLogging {
 
         case "CSAI" =>
           val PrefixLength = argument(1, "prefix").toInt
-          var prevAssetId = Array.emptyByteArray
+          var prevAssetId  = Array.emptyByteArray
           var assetCounter = 0
           db.iterateOver(KeyTags.AssetStaticInfo) { e =>
             assetCounter += 1

@@ -24,14 +24,14 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
         // By recipient
         case Some(subject) =>
           val recipientAddrOrAlias = subject
-            .toAddressOrAlias(AddressScheme.current.chainId)
+            .toRecipient(AddressScheme.current.chainId)
             .fold(e => throw new IllegalArgumentException(e.toString), identity)
 
           val maybeSender = Option(request.sender)
             .collect { case s if !s.isEmpty => s.toAddress }
 
           commonApi.transactionsByAddress(
-            recipientAddrOrAlias,
+            ???,
             maybeSender,
             Set.empty,
             None

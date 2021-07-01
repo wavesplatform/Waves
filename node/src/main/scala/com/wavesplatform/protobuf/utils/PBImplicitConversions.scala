@@ -1,24 +1,29 @@
 package com.wavesplatform.protobuf.utils
 
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.{Amount, _}
 import com.wavesplatform.protobuf.transaction._
+import com.wavesplatform.protobuf.{Amount, _}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 
 object PBImplicitConversions {
   import com.google.protobuf.{ByteString => PBByteString}
-  import com.wavesplatform.account.{AddressOrAlias, Address => VAddress, Alias => VAlias, Recipient => VRecipient}
+  import com.wavesplatform.{account => va}
 
-  implicit class RecipientExt(val r: VRecipient) extends AnyVal {
-    def toPb: Recipient = ???
+  implicit class RecipientExt(val r: va.Recipient) extends AnyVal {
+    def toPb: Recipient = r match {
+      case va.Alias(_, name)     => Recipient.of(Recipient.Recipient.Alias(name))
+      case w: va.WavesAddress    => Recipient.of(Recipient.Recipient.PublicKeyHash(PBByteString.copyFrom(w.publicKeyHash)))
+      case e: va.EthereumAddress => Recipient.of(Recipient.Recipient.EthereumAddress(PBByteString.copyFrom(e.publicKeyHash)))
+
+    }
   }
 
   implicit class PBRecipientImplicitConversionOps(val recipient: Recipient) extends AnyVal {
-    def toAddress(chainId: Byte): Either[ValidationError, VAddress]              = PBRecipients.toAddress(recipient, chainId)
-    def toAlias(chainId: Byte): Either[ValidationError, VAlias]                  = PBRecipients.toAlias(recipient, chainId)
-    def toAddressOrAlias(chainId: Byte): Either[ValidationError, AddressOrAlias] = PBRecipients.toAddressOrAlias(recipient, chainId)
-    def toRecipient(chainId: Byte): Either[ValidationError, VRecipient] = ???
+    def toAddress(chainId: Byte): Either[ValidationError, va.Address]               = PBRecipients.toAddress(recipient, chainId)
+    def toAlias(chainId: Byte): Either[ValidationError, va.Alias]                   = PBRecipients.toAlias(recipient, chainId)
+    def toAddressOrAlias(chainId: Byte): Either[ValidationError, va.AddressOrAlias] = PBRecipients.toAddressOrAlias(recipient, chainId)
+    def toRecipient(chainId: Byte): Either[ValidationError, va.Recipient]           = ???
   }
 
   implicit def fromAssetIdAndAmount(v: (VanillaAssetId, Long)): Amount = v match {

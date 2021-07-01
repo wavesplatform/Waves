@@ -263,7 +263,7 @@ object DAppEnvironment {
     }
   }
 
-  final case class DAppInvocation(dAppAddress: com.wavesplatform.account.Address, call: FUNCTION_CALL, payments: Seq[InvokeScriptTransaction.Payment])
+  final case class DAppInvocation(dAppAddress: com.wavesplatform.account.WavesAddress, call: FUNCTION_CALL, payments: Seq[InvokeScriptTransaction.Payment])
 }
 
 // Not thread safe
@@ -275,7 +275,7 @@ class DAppEnvironment(
     tthis: Environment.Tthis,
     ds: DirectiveSet,
     tx: Option[InvokeScriptTransaction],
-    currentDApp: com.wavesplatform.account.Address,
+    currentDApp: com.wavesplatform.account.WavesAddress,
     currentDAppPk: com.wavesplatform.account.PublicKey,
     calledAddresses: Set[com.wavesplatform.account.Address],
     limitedExecution: Boolean,

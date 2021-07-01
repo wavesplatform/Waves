@@ -54,5 +54,5 @@ package object block {
 
   def mkTransactionsRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
     if (version < Block.ProtoBlockVersion) ByteStr.empty
-    else mkLevels(transactionData.map(PBTransactions.protobuf(_).toByteArray)).transactionsRoot
+    else mkLevels(transactionData.map(_.bytes())).transactionsRoot
 }

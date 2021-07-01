@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.requests
 
 import cats.implicits._
-import com.wavesplatform.account.{AddressOrAlias, PublicKey}
+import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -73,6 +73,7 @@ object InvokeScriptRequest {
 }
 
 case class InvokeScriptRequest(
+    chainId: Option[Byte],
     version: Option[Byte],
     sender: String,
     fee: Long,
@@ -84,6 +85,7 @@ case class InvokeScriptRequest(
 )
 
 case class SignedInvokeScriptRequest(
+    chainId: Option[Byte],
     version: Option[Byte],
     senderPublicKey: String,
     fee: Long,
@@ -97,8 +99,8 @@ case class SignedInvokeScriptRequest(
   def toTx: Either[ValidationError, InvokeScriptTransaction] =
     for {
       _sender      <- PublicKey.fromBase58String(senderPublicKey)
-      _dappAddress <- AddressOrAlias.fromString(dApp)
-      _feeAssetId  <- parseBase58ToAsset(feeAssetId.filter(_.length > 0), "invalid.feeAssetId")
+      _dappAddress <- Recipient.fromString(dApp)
+      _feeAssetId  <- parseBase58ToAsset(feeAssetId.filter(_.nonEmpty), "invalid.feeAssetId")
       t <- InvokeScriptTransaction.create(
         version.getOrElse(2.toByte),
         _sender,
@@ -108,7 +110,8 @@ case class SignedInvokeScriptRequest(
         fee,
         _feeAssetId,
         timestamp,
-        proofs
+        proofs,
+        chainId.getOrElse(AddressScheme.current.chainId)
       )
     } yield t
 }

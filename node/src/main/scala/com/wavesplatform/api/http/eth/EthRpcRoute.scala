@@ -3,10 +3,9 @@ package com.wavesplatform.api.http.eth
 import java.math.BigInteger
 
 import akka.http.scaladsl.server._
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.account.{AddressScheme, EthereumAddress}
 import com.wavesplatform.api.http._
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.protobuf.transaction.PBRecipients
+import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.{EthereumTransaction, Transaction}
 import org.web3j.abi.datatypes.generated.Uint256
@@ -16,9 +15,11 @@ import org.web3j.utils.Numeric._
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.reflect.ClassTag
 
-class EthRpcRoute(blockchain: Blockchain) extends ApiRoute {
+class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPublisher) extends ApiRoute {
   private def quantity(v: Long) = s"0x${java.lang.Long.toString(v, 16)}"
 
   private val decodeMethod = {
@@ -31,6 +32,9 @@ class EthRpcRoute(blockchain: Blockchain) extends ApiRoute {
     decodeMethod.invoke(null, source, offset, ct.runtimeClass.asInstanceOf[Class[A]]).asInstanceOf[A]
 
   private def resp(id: JsValue, resp: JsValueWrapper) = complete(Json.obj("id" -> id, "jsonrpc" -> "2.0", "result" -> resp))
+
+  private def resp(id: JsValue, resp: Future[JsValueWrapper]) = complete(resp.map(r => Json.obj("id" -> id, "jsonrpc" -> "2.0", "result" -> r)))
+
   val route: Route = (post & path("eth") & entity(as[JsObject])) { jso =>
     val id     = (jso \ "id").get
     val params = (jso \ "params").asOpt[IndexedSeq[JsValue]]
@@ -40,7 +44,7 @@ class EthRpcRoute(blockchain: Blockchain) extends ApiRoute {
       case "eth_blockNumber" =>
         resp(id, quantity(blockchain.height))
       case "eth_getTransactionCount" =>
-        resp(id, quantity(2))
+        resp(id, quantity(System.currentTimeMillis()))
       case "eth_getBlockByNumber" =>
         val height    = Integer.parseInt(params.get.head.as[String].drop(2), 16)
         val blockMeta = blockchain.blockHeader(height).get
@@ -51,18 +55,17 @@ class EthRpcRoute(blockchain: Blockchain) extends ApiRoute {
           )
         )
       case "eth_getBalance" =>
-        val address = PBRecipients.toAddress(hexStringToByteArray(params.get.head.as[String]), AddressScheme.current.chainId).explicitGet()
-        val balance = (BigInt(System.currentTimeMillis()) * 1_000_000_000_000L).bigInteger.toString(16)
-        log.info(s"\n\t$balance\n")
-
-        resp(id, s"0x$balance")
+        resp(id, toHexStringWithPrefixSafe((BigInt(blockchain.balance(EthereumAddress(params.get.head.as[String]))) * EthereumTransaction.AmountMultiplier).bigInteger))
       case "eth_sendRawTransaction" =>
         val et: Transaction = TransactionDecoder.decode(params.get.head.as[String]) match {
           case srt: SignedRawTransaction => EthereumTransaction(srt)
           case _: RawTransaction         => throw new UnsupportedOperationException("Cannot process unsigned transactions")
         }
 
-        resp(id, toHexString(et.id().arr))
+        resp(id, transactionPublisher.validateAndBroadcast(et, None).map[JsValueWrapper] { result =>
+          log.info(s"Published transaction $et")
+          toHexString(et.id().arr)
+        })
       case "eth_getTransactionReceipt" =>
         resp(
           id,

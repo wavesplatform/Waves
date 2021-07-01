@@ -49,7 +49,7 @@ trait Blockchain {
 
   def assetDescription(id: IssuedAsset): Option[AssetDescription]
 
-  def resolveAlias(a: Alias): Either[ValidationError, Address]
+  def resolveAlias(a: Alias): Either[ValidationError, WavesAddress]
 
   def leaseDetails(leaseId: ByteStr): Option[LeaseDetails]
 
@@ -93,9 +93,10 @@ object Blockchain {
     def lastBlockTimestamp: Option[Long]           = lastBlockHeader.map(_.header.timestamp)
     def lastBlockIds(howMany: Int): Seq[ByteStr]   = (blockchain.height to blockchain.height - howMany by -1).flatMap(blockId)
 
-    def resolveAlias(aoa: Recipient): Either[ValidationError, Address] =
+    def resolveAlias(aoa: Recipient): Either[ValidationError, WavesAddress] =
       aoa match {
-        case a: Address => Right(a)
+        case a: WavesAddress => Right(a)
+        case e: EthereumAddress => Right(e.toWaves)
         case a: Alias   => blockchain.resolveAlias(a)
       }
 
@@ -182,14 +183,16 @@ object Blockchain {
     def featureActivationHeight(feature: Short): Option[Int] = blockchain.activatedFeatures.get(feature)
     def featureApprovalHeight(feature: Short): Option[Int]   = blockchain.approvedFeatures.get(feature)
 
-    def blockVersionAt(height: Int): Byte =
-      if (isFeatureActivated(BlockchainFeatures.BlockV5, height)) ProtoBlockVersion
+    def blockVersionAt(height: Int): Byte = {
+      if (isFeatureActivated(BlockchainFeatures.SynchronousCalls)) HybridBlockVersion
+      else if (isFeatureActivated(BlockchainFeatures.BlockV5, height)) ProtoBlockVersion
       else if (isFeatureActivated(BlockchainFeatures.BlockReward, height)) {
         if (blockchain.activatedFeatures(BlockchainFeatures.BlockReward.id) == height) NgBlockVersion else RewardBlockVersion
       }
       else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight + 1 < height) NgBlockVersion
       else if (height > 1) PlainBlockVersion
       else GenesisBlockVersion
+    }
 
     def binaryData(address: Address, key: String): Option[ByteStr] = blockchain.accountData(address, key).collect {
       case BinaryDataEntry(_, value) => value

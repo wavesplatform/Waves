@@ -217,7 +217,7 @@ object TransactionDiffer {
 
   private def validatePayments(blockchain: Blockchain, tx: InvokeScriptTransaction): Either[ValidationError, Unit] =
     for {
-      dAppAddress <- blockchain.resolveAlias(tx.dAppAddressOrAlias)
+      dAppAddress <- blockchain.resolveAlias(tx.dApp)
       portfolios <- tx.payments
         .map {
           case InvokeScriptTransaction.Payment(amt, assetId) =>
@@ -258,7 +258,7 @@ object TransactionDiffer {
       scriptResult: Option[InvokeScriptResult]
   ): Either[ValidationError, Diff] = {
     val extractDAppAddress = tx match {
-      case ist: InvokeScriptTransaction => blockchain.resolveAlias(ist.dAppAddressOrAlias).map(Some(_))
+      case ist: InvokeScriptTransaction => blockchain.resolveAlias(ist.dApp).map(Some(_))
       case _                            => Right(None)
     }
 
@@ -293,6 +293,7 @@ object TransactionDiffer {
     tx match {
       case _: GenesisTransaction   => Map.empty[Address, Portfolio].asRight
       case ptx: PaymentTransaction => Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
+      case et: EthereumTransaction.Transfer => Map[Address, Portfolio](et.sender -> Portfolio(-et.assetFee._2)).asRight
       case ptx: ProvenTransaction =>
         ptx.assetFee match {
           case (Waves, fee) => Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty)).asRight

@@ -5,6 +5,7 @@ import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.block.serialization.MicroBlockSerializer
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -259,8 +260,10 @@ object LegacyMicroBlockResponseSpec extends MessageSpec[MicroBlockResponse] {
   override def deserializeData(bytes: Array[Byte]): Try[MicroBlockResponse] =
     MicroBlock.parseBytes(bytes).map(MicroBlockResponse(_))
 
-  override def serializeData(resp: MicroBlockResponse): Array[Byte] =
-    resp.microblock.bytes()
+  override def serializeData(resp: MicroBlockResponse): Array[Byte] = {
+    require(resp.microblock.version < Block.ProtoBlockVersion)
+    MicroBlockSerializer.toBytes(resp.microblock)
+  }
 
   override val maxLength: Int = 271 + TransactionSpec.maxLength * MaxTransactionsPerMicroblock
 }
@@ -295,7 +298,7 @@ object PBTransactionSpec extends MessageSpec[Transaction] {
   override val maxLength: Int = 624 + DataTransaction.MaxProtoBytes + 5 + 100
 
   override def deserializeData(bytes: Array[MessageCode]): Try[Transaction] =
-    PBTransactions.vanilla(PBSignedTransaction.parseFrom(bytes)).left.map(ve => new IllegalArgumentException(ve.toString)).toTry
+    PBTransactions.tryToVanilla(PBSignedTransaction.parseFrom(bytes))
 
   override def serializeData(data: Transaction): Array[MessageCode] =
     PBTransactions.protobuf(data).toByteArray

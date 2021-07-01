@@ -151,7 +151,7 @@ object InvokeScriptDiff {
                   tx.funcCall,
                   RideRecipient.Address(ByteStr(invoker.bytes)),
                   ByteStr(tx.sender.arr),
-                  RideRecipient.Address(ByteStr(tx.root.fold(invoker)(_.senderAddress).bytes)),
+                  RideRecipient.Address(ByteStr(tx.root.fold[Address](invoker)(_.senderAddress).bytes)),
                   ByteStr(tx.root.getOrElse(tx).sender.arr),
                   payments,
                   tx.txId,

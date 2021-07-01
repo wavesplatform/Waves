@@ -4,7 +4,7 @@ import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 import cats.implicits._
 import cats.kernel.Monoid
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, WavesAddress}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
@@ -656,7 +656,7 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.assetDescription(id)
   }
 
-  override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readLock {
+  override def resolveAlias(alias: Alias): Either[ValidationError, WavesAddress] = readLock {
     compositeBlockchain.resolveAlias(alias)
   }
 

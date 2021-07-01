@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 
 trait InvokeScriptLike {
-  def dAppAddressOrAlias: AddressOrAlias
+  def dApp: Recipient
   def funcCall: FUNCTION_CALL
   def payments: Seq[Payment]
   def root: Option[InvokeScriptTransaction]
@@ -23,13 +23,13 @@ trait InvokeScriptLike {
 }
 
 case class InvokeScript(
-    senderDApp: Address,
+    senderDApp: WavesAddress,
     sender: PublicKey,
     dAppAddress: WavesAddress,
     funcCall: FUNCTION_CALL,
     payments: Seq[Payment],
     root: Option[InvokeScriptTransaction]
 ) extends InvokeScriptLike {
-  def dAppAddressOrAlias: AddressOrAlias = Left(dAppAddress)
-  def senderAddress: Address             = senderDApp
+  def dApp: Recipient        = dAppAddress
+  def senderAddress: Address = senderDApp
 }

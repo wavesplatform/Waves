@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.smart.script.trace
 
 import cats.Id
-import com.wavesplatform.account.{Address, AddressOrAlias}
+import com.wavesplatform.account.{Address, Recipient}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -15,8 +15,8 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import play.api.libs.json._
 import play.api.libs.json.Json.JsValueWrapper
+import play.api.libs.json._
 
 sealed abstract class TraceStep {
   def json: JsObject // TODO: Is this format necessary?
@@ -75,7 +75,7 @@ case class AssetVerifierTrace(
 
 case class InvokeScriptTrace(
     invokeId: ByteStr,
-    dAppAddressOrAlias: AddressOrAlias,
+    dAppAddressOrAlias: Recipient,
     functionCall: FUNCTION_CALL,
     resultE: Either[ValidationError, ScriptResult],
     log: Log[Id]

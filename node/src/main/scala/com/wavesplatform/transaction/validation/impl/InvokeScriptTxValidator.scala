@@ -28,7 +28,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
     def checkLength =
       if (tx.isProtobufVersion)
         PBTransactions
-          .toPBInvokeScriptData(tx.dAppAddressOrAlias, tx.funcCallOpt, tx.payments)
+          .toPBInvokeScriptData(tx.dApp, tx.funcCallOpt, tx.payments)
           .toByteArray
           .length <= ContractLimits.MaxInvokeScriptSizeInBytes
       else tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes
@@ -40,7 +40,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       }
 
     V.seq(tx)(
-      V.addressChainId(dAppAddressOrAlias, chainId),
+      V.addressChainId(dApp, chainId),
       V.cond(
         funcCallOpt.isEmpty || funcCallOpt.get.args.size <= ContractLimits.MaxInvokeScriptArgs,
         GenericError(s"InvokeScript can't have more than ${ContractLimits.MaxInvokeScriptArgs} arguments")

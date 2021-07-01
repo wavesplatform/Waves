@@ -415,10 +415,10 @@ object StateUpdate {
 
         tx.transaction match {
           case tt: TransferTransaction =>
-            TransactionMetadata.Metadata.Transfer(TransactionMetadata.TransferMetadata(tt.recipient.resolve.toByteString))
+            TransactionMetadata.Metadata.Transfer(TransactionMetadata.TransferMetadata(???))
 
           case mtt: MassTransferTransaction =>
-            TransactionMetadata.Metadata.MassTransfer(TransactionMetadata.MassTransferMetadata(mtt.transfers.map(_.address.resolve.toByteString)))
+            TransactionMetadata.Metadata.MassTransfer(TransactionMetadata.MassTransferMetadata(mtt.transfers.map(_ => ???)))
 
           case lt: LeaseTransaction =>
             TransactionMetadata.Metadata.LeaseMeta(TransactionMetadata.LeaseMetadata(lt.recipient.resolve.toByteString))
@@ -438,7 +438,7 @@ object StateUpdate {
 
             TransactionMetadata.Metadata.InvokeScript(
               TransactionMetadata.InvokeScriptMetadata(
-                ist.dAppAddressOrAlias.resolve.toByteString,
+                ???,
                 ist.funcCall.function.funcName,
                 ist.funcCall.args.map(x => Argument(argumentToPB(x))),
                 ist.payments.map(p => Amount(PBAmounts.toPBAssetId(p.assetId), p.amount)),

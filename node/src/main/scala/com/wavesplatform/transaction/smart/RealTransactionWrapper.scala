@@ -114,7 +114,7 @@ object RealTransactionWrapper {
           .map { payments =>
             Tx.CI(
               proven(ci),
-              toRide(ci.dAppAddressOrAlias),
+              toRide(ci.dApp),
               payments,
               ci.feeAssetId.compatId,
               ci.funcCallOpt.map(_.function.funcName),

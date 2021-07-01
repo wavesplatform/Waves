@@ -1,22 +1,14 @@
 package com.wavesplatform.database
 
-import java.nio.ByteBuffer
-
-import scala.annotation.tailrec
-import scala.collection.mutable.{ArrayBuffer, ListBuffer}
-import scala.jdk.CollectionConverters._
-import scala.util.Try
-import scala.util.control.NonFatal
-
 import cats.data.Ior
 import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
-import com.google.common.primitives.{Ints, Shorts}
-import com.wavesplatform.account.{Address, Alias}
+import com.google.common.primitives.Ints
+import com.wavesplatform.account.{Address, Alias, WavesAddress}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.database
@@ -24,13 +16,12 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.database.protobuf.TransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, WavesSettings}
-import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction._
+import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -40,6 +31,11 @@ import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
+
+import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
+import scala.jdk.CollectionConverters._
+import scala.util.control.NonFatal
 
 object LevelDBWriter extends ScorexLogging {
 
@@ -822,11 +818,11 @@ abstract class LevelDBWriter private[database] (
     db.get(Keys.transactionMetaById(TransactionId(id))).map { case TransactionMeta(height, _, _, failed) => (height, !failed) }
   }
 
-  override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>
+  override def resolveAlias(alias: Alias): Either[ValidationError, WavesAddress] = readOnly { db =>
     if (disabledAliases.contains(alias)) Left(AliasIsDisabled(alias))
     else
       db.get(Keys.addressIdOfAlias(alias))
-        .map(addressId => db.get(Keys.idToAddress(addressId)))
+        .map(addressId => WavesAddress(db.get(Keys.idToAddress(addressId)).publicKeyHash))
         .toRight(AliasDoesNotExist(alias))
   }
 
@@ -838,8 +834,15 @@ abstract class LevelDBWriter private[database] (
         isActive =>
           transactionInfo(leaseId, db).collect {
             case (leaseHeight, lt: LeaseTransaction, _) =>
-              LeaseDetails(lt.sender, lt.recipient, lt.amount, if (isActive) LeaseDetails.Status.Active
-                else LeaseDetails.Status.Cancelled(h, None), leaseId, leaseHeight)
+              LeaseDetails(
+                lt.sender,
+                lt.recipient,
+                lt.amount,
+                if (isActive) LeaseDetails.Status.Active
+                else LeaseDetails.Status.Cancelled(h, None),
+                leaseId,
+                leaseHeight
+              )
           },
         Some(_)
       )
@@ -945,28 +948,8 @@ abstract class LevelDBWriter private[database] (
   }
 
   private def transactionsAtHeight(h: Height): List[(TxNum, Transaction)] = readOnly { db =>
-    import com.wavesplatform.protobuf.transaction.PBSignedTransaction
-
-    val txs = new ListBuffer[(TxNum, Transaction)]()
-
-    val prefix = ByteBuffer
-      .allocate(6)
-      .put(KeyTags.NthTransactionInfoAtHeight.prefixBytes)
-      .putInt(h)
-      .array()
-
-    db.iterateOver(prefix) { entry =>
-      val k = entry.getKey
-
-      for {
-        idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-        tx = readTransactionBytes(entry.getValue) match {
-          case (_, Left(legacyBytes)) => TransactionParsers.parseBytes(legacyBytes).get
-          case (_, Right(newBytes))   => PBTransactions.vanilla(PBSignedTransaction.parseFrom(newBytes)).explicitGet()
-        }
-      } txs.append((TxNum(idx), tx))
+    loadTransactions(h, db).fold[List[(TxNum, Transaction)]](Nil) { transactions =>
+      transactions.zipWithIndex.collect { case ((tx, _), txNum) => TxNum(txNum.toShort) -> tx }.toList
     }
-
-    txs.toList
   }
 }

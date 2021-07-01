@@ -21,7 +21,7 @@ import scala.util.Try
 case class InvokeScriptTransaction(
     version: TxVersion,
     sender: PublicKey,
-    dAppAddressOrAlias: AddressOrAlias,
+    dApp: Recipient,
     funcCallOpt: Option[FUNCTION_CALL],
     payments: Seq[Payment],
     fee: TxAmount,
@@ -73,38 +73,41 @@ object InvokeScriptTransaction extends TransactionParser {
   def create(
       version: TxVersion,
       sender: PublicKey,
-      dappAddress: AddressOrAlias,
+      dappAddress: Recipient,
       fc: Option[FUNCTION_CALL],
       p: Seq[Payment],
       fee: TxAmount,
       feeAssetId: Asset,
       timestamp: TxTimestamp,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: Byte
   ): Either[ValidationError, InvokeScriptTransaction] =
-    InvokeScriptTransaction(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs, dappAddress.chainId).validatedEither
+    InvokeScriptTransaction(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs, chainId).validatedEither
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
-      dappAddress: AddressOrAlias,
+      dappAddress: Recipient,
       fc: Option[FUNCTION_CALL],
       p: Seq[Payment],
       fee: TxAmount,
       feeAssetId: Asset,
       timestamp: TxTimestamp,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte
   ): Either[ValidationError, InvokeScriptTransaction] =
-    create(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
       sender: KeyPair,
-      dappAddress: AddressOrAlias,
+      dappAddress: Recipient,
       fc: Option[FUNCTION_CALL],
       p: Seq[Payment],
       fee: TxAmount,
       feeAssetId: Asset,
-      timestamp: TxTimestamp
+      timestamp: TxTimestamp,
+      chainId: Byte
   ): Either[ValidationError, InvokeScriptTransaction] =
-    signed(version, sender.publicKey, dappAddress, fc, p, fee, feeAssetId, timestamp, sender.privateKey)
+    signed(version, sender.publicKey, dappAddress, fc, p, fee, feeAssetId, timestamp, sender.privateKey, chainId)
 }

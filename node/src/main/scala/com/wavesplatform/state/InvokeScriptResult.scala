@@ -2,7 +2,7 @@ package com.wavesplatform.state
 
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme}
+import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, WavesAddress}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.Serde
@@ -58,7 +58,7 @@ object InvokeScriptResult {
     def fromFunctionCall(fc: FUNCTION_CALL): Call = Call(fc.function.funcName, fc.args.collect { case e: EVALUATED => e })
   }
 
-  final case class Invocation(dApp: Address, call: Call, payments: Seq[AttachedPayment], stateChanges: InvokeScriptResult)
+  final case class Invocation(dApp: WavesAddress, call: Call, payments: Seq[AttachedPayment], stateChanges: InvokeScriptResult)
   object Invocation {
     def calledAddresses(inv: InvokeScriptResult.Invocation): LazyList[Address] =
       LazyList(inv.dApp) #::: inv.stateChanges.invokes.to(LazyList).flatMap(calledAddresses)
@@ -107,7 +107,7 @@ object InvokeScriptResult {
   implicit val errorMessageFormat = Json.writes[ErrorMessage]
   implicit val invocationFormat: Writes[Invocation] = (i: Invocation) =>
     Json.obj(
-      "dApp"         -> i.dApp,
+      "dApp"         -> i.dApp.toString,
       "call"         -> i.call,
       "payment"      -> i.payments,
       "stateChanges" -> jsonFormat.writes(i.stateChanges)
@@ -168,7 +168,7 @@ object InvokeScriptResult {
   def fromLangResult(invokeId: ByteStr, result: ScriptResult): InvokeScriptResult = {
     import com.wavesplatform.lang.v1.traits.{domain => lang}
 
-    def langAddressToAddress(a: lang.Recipient.Address): Address =
+    def langAddressToAddress(a: lang.Recipient.Address): WavesAddress =
       Address.fromBytes(a.bytes.arr).explicitGet()
 
     def langTransferToPayment(t: lang.AssetTransfer): Payment =

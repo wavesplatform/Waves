@@ -32,7 +32,7 @@ object TransactionsOrdering {
       t match {
         case _ if whitelistAddresses.isEmpty                                                            => false
         case a: Authorized if whitelistAddresses.contains(a.sender.toAddress.toString)                => true
-        case i: InvokeScriptTransaction if whitelistAddresses.contains(i.dAppAddressOrAlias.toString) => true
+        case i: InvokeScriptTransaction if whitelistAddresses.contains(i.dApp.toString) => true
         case _                                                                                          => false
       }
     override def txTimestampOrder(ts: Long): Long = ts

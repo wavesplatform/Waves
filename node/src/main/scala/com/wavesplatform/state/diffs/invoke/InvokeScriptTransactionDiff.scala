@@ -43,10 +43,10 @@ object InvokeScriptTransactionDiff {
       tx: InvokeScriptTransaction
   ): TracedResult[ValidationError, Diff] = {
 
-    val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
+    val dAppAddressEi = blockchain.resolveAlias(tx.dApp)
     val accScriptEi =
       for (address <- dAppAddressEi;
-           script  <- blockchain.accountScript(address).toRight(GenericError(s"No contract at address ${tx.dAppAddressOrAlias}")))
+           script  <- blockchain.accountScript(address).toRight(GenericError(s"No contract at address ${tx.dApp}")))
         yield (address, script)
     val functionCall = tx.funcCall
 
@@ -54,7 +54,7 @@ object InvokeScriptTransactionDiff {
         pk: PublicKey,
         version: StdLibVersion,
         contract: DApp,
-        dAppAddress: Address,
+        dAppAddress: WavesAddress,
         invocationComplexity: Int,
         fixedInvocationComplexity: Int,
         environment: DAppEnvironment,
@@ -114,7 +114,7 @@ object InvokeScriptTransactionDiff {
           List(
             InvokeScriptTrace(
               tx.id(),
-              tx.dAppAddressOrAlias,
+              tx.dApp,
               functionCall,
               scriptResultE.map(_.scriptResult),
               scriptResultE.fold(_.log, _.log)

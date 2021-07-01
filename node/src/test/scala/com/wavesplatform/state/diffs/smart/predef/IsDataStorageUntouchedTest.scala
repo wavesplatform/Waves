@@ -132,8 +132,8 @@ class IsDataStorageUntouchedTest
     withDomain(RideV5) { d =>
       d.appendBlock(genesisTxs: _*).id()
       d.appendBlock(invokeTx)
-      d.blockchain.accountData(invokeTx.dAppAddressOrAlias.asInstanceOf[Address], "start") shouldBe Some(BooleanDataEntry("start", true))
-      d.blockchain.accountData(invokeTx.dAppAddressOrAlias.asInstanceOf[Address], "end") shouldBe Some(BooleanDataEntry("end", false))
+      d.blockchain.accountData(invokeTx.dApp.asInstanceOf[Address], "start") shouldBe Some(BooleanDataEntry("start", true))
+      d.blockchain.accountData(invokeTx.dApp.asInstanceOf[Address], "end") shouldBe Some(BooleanDataEntry("end", false))
     }
   }
 }

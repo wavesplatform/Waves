@@ -91,7 +91,7 @@ object CommonValidation {
               identity
 
           for {
-            address <- blockchain.resolveAlias(citx.dAppAddressOrAlias)
+            address <- blockchain.resolveAlias(citx.dApp)
             allowFeeOverdraft = blockchain.accountScript(address) match {
               case Some(AccountScriptInfo(_, ContractScriptImpl(version, _), _, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
               case _                                                                                                                      => false
@@ -221,6 +221,8 @@ object CommonValidation {
       case _: InvokeScriptTransaction => activationBarrier(BlockchainFeatures.Ride4DApps)
 
       case _: UpdateAssetInfoTransaction => activationBarrier(BlockchainFeatures.BlockV5)
+
+      case _: EthereumTransaction => activationBarrier(BlockchainFeatures.SynchronousCalls)
 
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }

@@ -12,41 +12,63 @@ import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidAddress}
 import com.wavesplatform.utils.{StringBytes, base58Length}
-import org.web3j.utils.Numeric.toHexString
+import org.web3j.utils.Numeric._
 import play.api.libs.json._
 
 sealed trait Recipient {
   def bytes: Array[Byte]
-  override def equals(obj: Any): Boolean = obj match {
-    case r: Recipient => java.util.Arrays.equals(bytes, r.bytes)
-    case _            => false
-  }
-
-  override def hashCode(): Int = java.util.Arrays.hashCode(bytes)
 }
 
 object Recipient {
-  def fromString(s: String): Either[ValidationError, Recipient] = ???
+  def fromString(s: String): Either[ValidationError, Recipient] =
+    if (s.startsWith(Alias.Prefix)) {
+      Alias.fromString(s)
+    } else if (s.startsWith("0x")) {
+      Right(EthereumAddress(s))
+    } else {
+      Address.fromString(s)
+    }
 }
 
-abstract class Address(override val bytes: Array[Byte]) extends Recipient {
+sealed trait Address extends Recipient {
   def publicKeyHash: Array[Byte]
+  override def equals(obj: Any): Boolean = obj match {
+    case a: Address => java.util.Arrays.equals(publicKeyHash, a.publicKeyHash)
+    case _          => false
+  }
+
+  override def hashCode(): Int = java.util.Arrays.hashCode(publicKeyHash)
 }
 
-class WavesAddress(val chainId: Byte, val publicKeyHash: Array[Byte], checksum: Array[Byte])
-    extends Address(Array(1.toByte, chainId) ++ publicKeyHash ++ checksum) {
-  override lazy val toString: String = ByteStr(bytes).toString
+final class WavesAddress(val chainId: Byte, val publicKeyHash: Array[Byte], checksum: Array[Byte]) extends Address {
+  override lazy val bytes: Array[Byte] = Array(1.toByte, chainId) ++ publicKeyHash ++ checksum
+  override lazy val toString: String   = ByteStr(bytes).toString
 }
 
-class EthereumAddress(val publicKeyHash: Array[Byte]) extends Address(publicKeyHash) {
-  override lazy val toString: String = toHexString(bytes)
+object WavesAddress {
+  def apply(publicKeyHash: Array[Byte]): WavesAddress = new WavesAddress(
+    AddressScheme.current.chainId,
+    publicKeyHash,
+    crypto.secureHash(Array(1.toByte, AddressScheme.current.chainId) ++ publicKeyHash).take(4)
+  )
 }
 
-class Alias(val chainId: Byte, val name: String) extends Recipient {
+final class EthereumAddress(val publicKeyHash: Array[Byte]) extends Address {
+  override def bytes: Array[Byte]    = publicKeyHash
+  override lazy val toString: String = toHexString(publicKeyHash)
+}
 
+object EthereumAddress {
+  implicit class EAExt(val e: EthereumAddress) extends AnyVal {
+    def toWaves: WavesAddress = WavesAddress(e.publicKeyHash)
+  }
+
+  def apply(hexString: String): EthereumAddress = new EthereumAddress(hexStringToByteArray(hexString))
+}
+
+final case class Alias(chainId: Byte, name: String) extends Recipient {
   override lazy val bytes: Array[Byte] = Bytes.concat(Array(Alias.AddressVersion, chainId), Deser.serializeArrayWithLength(name.utf8Bytes))
-
-  override lazy val toString: String = s"alias:${chainId.toChar}:$name"
+  override lazy val toString: String   = s"alias:${chainId.toChar}:$name"
 }
 
 object AddressOrAlias {

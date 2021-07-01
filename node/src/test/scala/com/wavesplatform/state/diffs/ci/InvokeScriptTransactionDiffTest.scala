@@ -1038,7 +1038,7 @@ class InvokeScriptTransactionDiffTest
                 AssetVerifierTrace(allowedAssetId, None, _),
                 AssetVerifierTrace(bannedAssetId, Some(_: FailedTransactionError), _)
                 ) =>
-              dAppAddress shouldBe ci.dAppAddressOrAlias
+              dAppAddress shouldBe ci.dApp
               functionCall shouldBe ci.funcCall
 
               allowedAssetId shouldBe asset1.id()
@@ -1904,7 +1904,7 @@ class InvokeScriptTransactionDiffTest
       case (genesis, setScript, issue, sponsorFee, invoke) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(issue, sponsorFee, setScript))), TestBlock.create(Seq(invoke)), fsWithV5) { diff =>
           invoke.feeAssetId shouldBe sponsorFee.asset
-          invoke.dAppAddressOrAlias shouldBe invoke.sender.toAddress
+          invoke.dApp shouldBe invoke.sender.toAddress
 
           val dv           = diff.explicitGet()
           val senderChange = dv.portfolios(invoke.sender.toAddress).balanceOf(sponsorFee.asset)

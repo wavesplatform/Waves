@@ -9,7 +9,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxValidationError.{GenericError, UnsupportedTypeAndVersion, WrongChain}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, WrongChain}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -18,8 +18,6 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.{JsObject, JsValue}
-
-import scala.util.Try
 
 object TransactionFactory {
   def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
@@ -285,7 +283,7 @@ object TransactionFactory {
     for {
       sender   <- wallet.findPrivateKey(request.sender)
       signer   <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      contract <- AddressOrAlias.fromString(request.dApp)
+      contract <- Recipient.fromString(request.dApp)
 
       tx <- InvokeScriptTransaction.signed(
         request.version.getOrElse(1.toByte),
@@ -296,13 +294,14 @@ object TransactionFactory {
         request.fee,
         Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
         request.timestamp.getOrElse(time.getTimestamp()),
-        signer.privateKey
+        signer.privateKey,
+        request.chainId.getOrElse(AddressScheme.current.chainId)
       )
     } yield tx
 
   def invokeScript(request: InvokeScriptRequest, sender: PublicKey): Either[ValidationError, InvokeScriptTransaction] =
     for {
-      addressOrAlias <- AddressOrAlias.fromString(request.dApp)
+      addressOrAlias <- Recipient.fromString(request.dApp)
       fcOpt = request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart))
       tx <- InvokeScriptTransaction.create(
         request.version.getOrElse(1.toByte),
@@ -313,7 +312,8 @@ object TransactionFactory {
         request.fee,
         Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
         request.timestamp.getOrElse(0),
-        Proofs.empty
+        Proofs.empty,
+        request.chainId.getOrElse(AddressScheme.current.chainId)
       )
 
     } yield tx
@@ -387,7 +387,9 @@ object TransactionFactory {
 
     if (chainId.exists(_ != AddressScheme.current.chainId)) {
       Left(WrongChain(AddressScheme.current.chainId, chainId.get))
-    } else Try(pf(TransactionType(typeId))).getOrElse(Left(UnsupportedTypeAndVersion(typeId, version)))
+    } else {
+      pf(TransactionType(typeId))
+    }
   }
 
   def parseRequestAndSign(wallet: Wallet, signerAddress: String, time: Time, jsv: JsObject): Either[ValidationError, Transaction] = {

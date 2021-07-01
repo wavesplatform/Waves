@@ -224,7 +224,7 @@ class SyncDAppComplexityCountTest
         else
           diff.errorMessage(invokeTx.id.value()) shouldBe None
 
-        val dAppAddress = invokeTx.dAppAddressOrAlias.asInstanceOf[Address]
+        val dAppAddress = invokeTx.dApp.asInstanceOf[Address]
         val basePortfolios = Map(
           TestBlock.defaultSigner.toAddress -> Portfolio(invokeTx.fee),
           invokeTx.senderAddress            -> Portfolio(-invokeTx.fee)

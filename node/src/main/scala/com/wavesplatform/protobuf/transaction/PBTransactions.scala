@@ -1,14 +1,16 @@
 package com.wavesplatform.protobuf.transaction
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{AddressOrAlias, PublicKey}
+import com.wavesplatform.account.{PublicKey, Recipient => VRecipient}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction.Transaction.Data
+import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -21,12 +23,11 @@ import com.wavesplatform.transaction.{EthereumTransaction, Proofs, TxValidationE
 import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{transaction => vt}
 import org.web3j.crypto.{SignedRawTransaction, TransactionDecoder}
-import com.wavesplatform.protobuf.utils.PBImplicitConversions._
+import org.web3j.utils.Numeric.toHexString
 
 import scala.util.Try
 
 object PBTransactions {
-
 
   def createGenesis(chainId: Byte, timestamp: Long, signature: ByteStr, data: GenesisTransactionData): SignedTransaction =
     new SignedTransaction(
@@ -55,50 +56,53 @@ object PBTransactions {
   }
 
   def tryToVanilla(signedTx: PBSignedTransaction): Try[VanillaTransaction] =
-    vanilla(signedTx).left.map(err => new Exception(err.toString)).toTry
+    Try(vanilla(signedTx, unsafe = false).explicitGet())
 
-  def vanilla(signedTx: PBSignedTransaction, unsafe: Boolean = false): Either[ValidationError, VanillaTransaction] = {
-    import org.web3j.utils.Numeric.toHexString
-    signedTx.transaction match {
-      case None => Right(EthereumTransaction(TransactionDecoder.decode(toHexString(signedTx.ethereumTransaction.toByteArray)).asInstanceOf[SignedRawTransaction]))
-      case Some(parsedTx) =>
-        for {
-          _ <- Either.cond(parsedTx.data.isDefined, (), GenericError("Transaction data must be specified"))
-          fee = parsedTx.fee.getOrElse(Amount.defaultInstance)
-          (feeAsset, feeAmount) = PBAmounts.toAssetAndAmount(fee)
-          sender = Option(parsedTx.senderPublicKey)
-            .filterNot(_.isEmpty)
-            .map(pk => PublicKey(pk.toByteArray))
-            .orNull
-          tx <- if (unsafe)
-            Right(
-              createVanillaUnsafe(
-                parsedTx.version,
-                parsedTx.chainId.toByte,
-                sender,
-                feeAmount,
-                feeAsset,
-                parsedTx.timestamp,
-                Proofs(signedTx.proofs.map(_.toByteStr)),
-                parsedTx.data
-              )
-            )
-          else
-            for {
-              proofs <- Proofs.create(signedTx.proofs.map(_.toByteStr))
-              tx <- createVanilla(
-                parsedTx.version,
-                parsedTx.chainId.toByte,
-                sender,
-                feeAmount,
-                feeAsset,
-                parsedTx.timestamp,
-                proofs,
-                parsedTx.data
-              )
-            } yield tx
-        } yield tx
+  def vanilla(txWrapper: PBTransactionWrapper, unsafe: Boolean): Either[ValidationError, VanillaTransaction] = {
+    txWrapper.transaction match {
+      case PBTransactionWrapper.Transaction.Empty                   => ???
+      case PBTransactionWrapper.Transaction.WavesTransaction(value) => vanilla(value, unsafe)
+      case PBTransactionWrapper.Transaction.EthereumTransaction(bytes) =>
+        Right(EthereumTransaction(TransactionDecoder.decode(toHexString(bytes.toByteArray)).asInstanceOf[SignedRawTransaction]))
     }
+  }
+
+  def vanilla(signedTx: PBSignedTransaction, unsafe: Boolean): Either[ValidationError, VanillaTransaction] = {
+    for {
+      parsedTx <- signedTx.transaction.toRight(GenericError("Transaction must be specified"))
+      (feeAsset, feeAmount) = PBAmounts.toAssetAndAmount(parsedTx.fee.getOrElse(Amount.defaultInstance))
+      sender = Option(parsedTx.senderPublicKey)
+        .filterNot(_.isEmpty)
+        .map(pk => PublicKey(pk.toByteArray))
+        .orNull
+      tx <- if (unsafe)
+        Right(
+          createVanillaUnsafe(
+            parsedTx.version,
+            parsedTx.chainId.toByte,
+            sender,
+            feeAmount,
+            feeAsset,
+            parsedTx.timestamp,
+            Proofs(signedTx.proofs.map(_.toByteStr)),
+            parsedTx.data
+          )
+        )
+      else
+        for {
+          proofs <- Proofs.create(signedTx.proofs.map(_.toByteStr))
+          tx <- createVanilla(
+            parsedTx.version,
+            parsedTx.chainId.toByte,
+            sender,
+            feeAmount,
+            feeAsset,
+            parsedTx.timestamp,
+            proofs,
+            parsedTx.data
+          )
+        } yield tx
+    } yield tx
   }
 
   private[this] def createVanilla(
@@ -263,7 +267,7 @@ object PBTransactions {
         import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
         for {
-          dApp <- PBRecipients.toAddressOrAlias(dappAddress, chainId)
+          dApp <- PBRecipients.toRecipient(dappAddress, chainId)
 
           fcOpt <- Deser
             .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
@@ -285,7 +289,8 @@ object PBTransactions {
             feeAmount,
             feeAssetId,
             timestamp,
-            proofs
+            proofs,
+            chainId
           )
         } yield tx
 
@@ -484,7 +489,7 @@ object PBTransactions {
         vt.smart.InvokeScriptTransaction(
           version.toByte,
           sender,
-          PBRecipients.toAddressOrAlias(dappAddress, chainId).explicitGet(),
+          PBRecipients.toRecipient(dappAddress, chainId).explicitGet(),
           Deser
             .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
             .map(_.explicitGet().asInstanceOf[FUNCTION_CALL]),
@@ -513,6 +518,12 @@ object PBTransactions {
       case other =>
         throw new IllegalArgumentException(s"Unsupported transaction data: $other")
     }
+  }
+
+  def wrapped(tx: VanillaTransaction): PBTransactionWrapper = tx match {
+    case et: EthereumTransaction => PBTransactionWrapper(PBTransactionWrapper.Transaction.EthereumTransaction(ByteString.copyFrom(et.bytes())))
+    case wt => PBTransactionWrapper(PBTransactionWrapper.Transaction.WavesTransaction(protobuf(wt)))
+
   }
 
   def protobuf(tx: VanillaTransaction): PBSignedTransaction = {
@@ -613,14 +624,12 @@ object PBTransactions {
 
         PBTransactions.create(sender, chainId, feeAmount, feeAsset, timestamp, version, proofs, Data.UpdateAssetInfo(data))
 
-      case et: vt.EthereumTransaction =>
-        new PBSignedTransaction(ethereumTransaction = ByteString.copyFrom(et.bytes()))
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
     }
   }
 
-  def toPBInvokeScriptData(dappAddress: AddressOrAlias, fcOpt: Option[FUNCTION_CALL], payment: Seq[Payment]): InvokeScriptTransactionData = {
+  def toPBInvokeScriptData(dappAddress: VRecipient, fcOpt: Option[FUNCTION_CALL], payment: Seq[Payment]): InvokeScriptTransactionData = {
     import com.wavesplatform.lang.v1.Serde
 
     InvokeScriptTransactionData(

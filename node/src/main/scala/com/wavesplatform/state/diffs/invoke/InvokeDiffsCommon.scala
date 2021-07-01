@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs.invoke
 import cats.implicits._
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
+import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey, WavesAddress}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
@@ -139,7 +139,7 @@ object InvokeDiffsCommon {
   def processActions(
       actions: List[CallableAction],
       version: StdLibVersion,
-      dAppAddress: Address,
+      dAppAddress: WavesAddress,
       dAppPublicKey: PublicKey,
       storingComplexity: Int,
       tx: InvokeScriptLike,
@@ -289,7 +289,7 @@ object InvokeDiffsCommon {
     }
 
   private def checkSelfPayments(
-      dAppAddress: Address,
+      dAppAddress: WavesAddress,
       blockchain: Blockchain,
       tx: InvokeScriptLike,
       version: StdLibVersion,
@@ -392,7 +392,7 @@ object InvokeDiffsCommon {
             else remainingLimit
 
           val blockchain   = CompositeBlockchain(sblockchain, curDiff)
-          val actionSender = Recipient.Address(ByteStr(tx.dAppAddressOrAlias.bytes)) // XXX Is it correct for aliases&
+          val actionSender = Recipient.Address(ByteStr(tx.dApp.bytes)) // XXX Is it correct for aliases&
 
           def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
             val AssetTransfer(addressRepr, recipient, amount, asset) = transfer
@@ -593,7 +593,7 @@ object InvokeDiffsCommon {
         isAssetScript = true,
         scriptContainerAddress =
           if (blockchain.passCorrectAssetId) Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr))
-          else Coproduct[Environment.Tthis](Environment.AssetId(tx.dAppAddressOrAlias.bytes)),
+          else Coproduct[Environment.Tthis](Environment.AssetId(tx.dApp.bytes)),
         complexityLimit
       )
       val complexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else estimatedComplexity

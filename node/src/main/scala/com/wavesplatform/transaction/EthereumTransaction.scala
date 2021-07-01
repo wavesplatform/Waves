@@ -3,12 +3,12 @@ package com.wavesplatform.transaction
 import com.wavesplatform.account.{Address, EthereumAddress}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.protobuf.transaction.PBRecipients
+import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import monix.eval.Coeval
 import org.web3j.abi.TypeDecoder
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.abi.datatypes.{Address => EthAddress}
-import org.web3j.crypto.{SignedRawTransaction, TransactionEncoder}
+import org.web3j.crypto.{SignedRawTransaction, TransactionDecoder, TransactionEncoder}
 import org.web3j.rlp.{RlpEncoder, RlpList}
 import org.web3j.utils.Numeric._
 import play.api.libs.json._
@@ -26,12 +26,21 @@ abstract class EthereumTransaction(underlying: SignedRawTransaction) extends Tra
 
   override val timestamp: TxTimestamp = underlying.getNonce.longValueExact()
 
+  override val protoSize: Coeval[Int] = bytes.map(_.length)
+
   override val chainId: Byte = underlying.getChainId.byteValue()
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(Json.obj())
+  override val json: Coeval[JsObject] = Coeval.evalOnce(Json.obj("type" -> tpe.id))
+
+  val signerPublicKey: Coeval[String] = Coeval.evalOnce(
+//    Keys.getAddress(Sign.signedMessageToKey(underlying.getEncodedTransaction(chainId.toLong), underlying.getSignatureData))
+    "OK"
+  )
 }
 
 object EthereumTransaction {
+  val AmountMultiplier = 10000000000L
+
   private val decodeMethod = {
     val m = classOf[TypeDecoder].getDeclaredMethod("decode", classOf[String], classOf[Int], classOf[Class[_]])
     m.setAccessible(true)
@@ -44,6 +53,9 @@ object EthereumTransaction {
   class Transfer(val sender: Address, val asset: Asset, val amount: TxAmount, val recipient: EthereumAddress, underlying: SignedRawTransaction)
       extends EthereumTransaction(underlying) {}
 
+  def apply(bytes: Array[Byte]): EthereumTransaction =
+    apply(TransactionDecoder.decode(toHexString(bytes)).asInstanceOf[SignedRawTransaction])
+
   def apply(underlying: SignedRawTransaction): EthereumTransaction = {
     val hexData       = cleanHexPrefix(underlying.getData)
     val senderAddress = PBRecipients.toAddress(hexStringToByteArray(underlying.getFrom), underlying.getChainId.toByte).explicitGet()
@@ -51,7 +63,7 @@ object EthereumTransaction {
       new Transfer(
         senderAddress,
         Asset.Waves,
-        underlying.getValue.longValueExact(),
+        underlying.getValue.divide(BigInt(AmountMultiplier).bigInteger).longValueExact(),
         new EthereumAddress(hexStringToByteArray(underlying.getTo)),
         underlying
       )
