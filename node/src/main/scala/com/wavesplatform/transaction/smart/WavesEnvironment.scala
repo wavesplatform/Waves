@@ -270,10 +270,11 @@ object DAppEnvironment {
       }
 
     def getErrorMessage: Option[InvokeScriptResult.ErrorMessage] = {
-      def isNestedError(ve: ValidationError) = invocations.exists(_.result == Left(ve))
+      def isNestedError(ve: ValidationError) = invocations.exists(_.result.left.map(_.toString) == Left(ve.toString))
 
       this.result.left.toOption.collect {
-        case ve if !isNestedError(ve) => errorMessage(ve)
+        case ve if !isNestedError(ve) =>
+          errorMessage(ve)
       }
     }
 

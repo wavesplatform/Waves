@@ -154,11 +154,7 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain w
         |            "text" : "boom"
         |          }
         |        }
-        |      } ],
-        |      "error" : {
-        |        "code" : 1,
-        |        "text" : "FailedTransactionError(code = 1, error = boom, log =\n\t@p = false\n)"
-        |      }
+        |      } ]
         |    }
         |  } ],
         |  "error" : {
