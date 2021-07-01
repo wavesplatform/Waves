@@ -62,11 +62,12 @@ object ContractScript {
   private def estimateAnnotatedFunctions(
       version: StdLibVersion,
       dApp: DApp,
-      estimator: ScriptEstimator
+      estimator: ScriptEstimator,
+      fixEstimateOfVerifier: Boolean
   ): Either[String, Iterable[(String, Long)]] =
     for {
       callables <- estimateDeclarations(version, dApp, estimator, callables(dApp))
-      verifier  <- dApp.verifierFuncOpt.traverse(estimateVerifier(version, dApp, estimator, _))
+      verifier  <- dApp.verifierFuncOpt.traverse(estimateVerifier(version, dApp, estimator, fixEstimateOfVerifier, _))
     } yield verifier ++ callables
 
   def estimateUserFunctions(
@@ -106,13 +107,18 @@ object ContractScript {
       version: StdLibVersion,
       dApp: DApp,
       estimator: ScriptEstimator,
+      fixEstimateOfVerifier: Boolean,
       verifier: VerifierFunction
-  ): Either[String, (String, Long)] =
-    estimator(
-      varNames(version, DAppType),
-      functionCosts(version, DAppType, isDAppVerifier = true),
-      constructExprFromDeclAndContext(dApp.decs, Some(verifier.annotation.invocationArgName), verifier.u)
-    ).map((verifier.u.name, _))
+  ): Either[String, (String, Long)] = {
+    if (dApp.containsSyncCall)
+      Left("DApp-to-dApp invocations are not allowed from verifier")
+    else
+      estimator(
+        varNames(version, DAppType),
+        functionCosts(version, DAppType, isDAppVerifier = !fixEstimateOfVerifier),
+        constructExprFromDeclAndContext(dApp.decs, Some(verifier.annotation.invocationArgName), verifier.u)
+      ).map((verifier.u.name, _))
+  }
 
   private[script] def constructExprFromDeclAndContext(
       dec: List[DECLARATION],
@@ -142,10 +148,11 @@ object ContractScript {
       version: StdLibVersion,
       dApp: DApp,
       estimator: ScriptEstimator,
+      fixEstimateOfVerifier: Boolean,
       useReducedVerifierLimit: Boolean = true
   ): Either[String, (Long, Map[String, Long])] =
     for {
-      (maxComplexity, complexities) <- estimateComplexityExact(version, dApp, estimator)
+      (maxComplexity, complexities) <- estimateComplexityExact(version, dApp, estimator, fixEstimateOfVerifier)
       _                             <- checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit)
     } yield (maxComplexity._2, complexities)
 
@@ -184,10 +191,11 @@ object ContractScript {
   def estimateComplexityExact(
       version: StdLibVersion,
       dApp: DApp,
-      estimator: ScriptEstimator
+      estimator: ScriptEstimator,
+      fixEstimateOfVerifier: Boolean
   ): Either[String, ((String, Long), Map[String, Long])] =
     for {
-      annotatedFunctionComplexities <- estimateAnnotatedFunctions(version, dApp, estimator)
+      annotatedFunctionComplexities <- estimateAnnotatedFunctions(version, dApp, estimator, fixEstimateOfVerifier)
       max = annotatedFunctionComplexities.toList.maximumOption(_._2 compareTo _._2).getOrElse(("", 0L))
     } yield (max, annotatedFunctionComplexities.toMap)
 }

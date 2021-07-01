@@ -13,6 +13,7 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
@@ -123,7 +124,8 @@ case class UtilsApiRoute(
           StdLibVersion.VersionDic.default
         }
       }
-      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), defaultStdLib = stdLib)) { result =>
+      val fixEstimateOfVerifier = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
+      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), stdLib, fixEstimateOfVerifier)) { result =>
         complete(
           result
             .fold(
@@ -161,7 +163,8 @@ case class UtilsApiRoute(
         } else {
           StdLibVersion.VersionDic.default
         }
-      executeLimited(ScriptCompiler.compile(req.script, estimator(), req.imports, stdLib)) { result =>
+      val fixEstimateOfVerifier = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
+      executeLimited(ScriptCompiler.compile(req.script, estimator(), req.imports, stdLib, fixEstimateOfVerifier)) { result =>
         complete(
           result
             .fold(
@@ -187,7 +190,12 @@ case class UtilsApiRoute(
           .left
           .map(_.m)
           .flatMap { script =>
-            Script.complexityInfo(script, estimator(), useContractVerifierLimit = false).map((script, _))
+            Script.complexityInfo(
+              script,
+              estimator(),
+              fixEstimateOfVerifier = blockchain.isFeatureActivated(RideV6),
+              useContractVerifierLimit = false
+            ).map((script, _))
           }
       ) { result =>
         complete(

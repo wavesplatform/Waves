@@ -61,7 +61,7 @@ class ContractScriptComplexityTest(estimator: ScriptEstimator) extends PropSpec 
       )
     )
 
-    ContractScript.estimateComplexity(V3, contract, estimator) shouldBe Right((41, Map("first" -> 32, "default" -> 20, "third" -> 41)))
+    ContractScript.estimateComplexity(V3, contract, estimator, true) shouldBe Right((41, Map("first" -> 32, "default" -> 20, "third" -> 41)))
   }
 
   property("estimate contract script with context correctly") {
@@ -113,7 +113,7 @@ class ContractScriptComplexityTest(estimator: ScriptEstimator) extends PropSpec 
       )
     )
 
-    ContractScript.estimateComplexity(V3, contract, estimator) shouldBe Right((68, Map("first" -> 68, "default" -> 30, "third" -> 51)))
+    ContractScript.estimateComplexity(V3, contract, estimator, true) shouldBe Right((68, Map("first" -> 68, "default" -> 30, "third" -> 51)))
   }
 
   property("estimate contract script with context correctly 2") {
@@ -165,7 +165,7 @@ class ContractScriptComplexityTest(estimator: ScriptEstimator) extends PropSpec 
       )
     )
 
-    ContractScript.estimateComplexity(V3, contract, estimator) shouldBe Right((68, Map("first" -> 68, "default" -> 30, "second" -> 51)))
+    ContractScript.estimateComplexity(V3, contract, estimator, true) shouldBe Right((68, Map("first" -> 68, "default" -> 30, "second" -> 51)))
   }
 
   property("estimate contract script with user functions") {

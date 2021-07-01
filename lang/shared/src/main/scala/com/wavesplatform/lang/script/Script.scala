@@ -68,6 +68,7 @@ object Script {
   def complexityInfo(
       script: Script,
       estimator: ScriptEstimator,
+      fixEstimateOfVerifier: Boolean,
       useContractVerifierLimit: Boolean
   ): Either[String, ComplexityInfo] =
     (script: @unchecked) match {
@@ -81,6 +82,7 @@ object Script {
             version,
             contract,
             estimator,
+            fixEstimateOfVerifier,
             useContractVerifierLimit
           )
           complexityInfo = verifierFuncOpt.fold(
@@ -91,15 +93,16 @@ object Script {
         } yield complexityInfo
     }
 
-  def estimate(script: Script, estimator: ScriptEstimator, useContractVerifierLimit: Boolean): Either[String, Long] =
-    complexityInfo(script, estimator, useContractVerifierLimit)
+  def estimate(script: Script, estimator: ScriptEstimator, fixEstimateOfVerifier: Boolean, useContractVerifierLimit: Boolean): Either[String, Long] =
+    complexityInfo(script, estimator, fixEstimateOfVerifier, useContractVerifierLimit)
       .map(_.maxComplexity)
 
   def verifierComplexity(
       script: Script,
       estimator: ScriptEstimator,
+      fixEstimateOfVerifier: Boolean,
       useContractVerifierLimit: Boolean
   ): Either[String, Long] =
-    complexityInfo(script, estimator, useContractVerifierLimit)
+    complexityInfo(script, estimator, fixEstimateOfVerifier, useContractVerifierLimit)
       .map(_.verifierComplexity)
 }

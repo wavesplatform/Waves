@@ -41,8 +41,14 @@ object SetScriptTransactionDiff {
     val callables = dApp.copy(verifierFuncOpt = None)
     val actualComplexities =
       for {
-        currentComplexity <- ContractScript.estimateComplexity(version, callables, blockchain.estimator, blockchain.useReducedVerifierComplexityLimit)
-        nextComplexities  <- estimateNext(blockchain, version, callables)
+        currentComplexity <- ContractScript.estimateComplexity(
+          version,
+          callables,
+          blockchain.estimator,
+          fixEstimateOfVerifier = blockchain.isFeatureActivated(RideV6),
+          useReducedVerifierLimit = blockchain.useReducedVerifierComplexityLimit
+        )
+        nextComplexities <- estimateNext(blockchain, version, callables)
         complexitiesByEstimator = (currentComplexity :: nextComplexities).mapWithIndex {
           case ((_, complexitiesByCallable), i) => (i + blockchain.estimator.version, complexitiesByCallable)
         }.toMap
@@ -58,7 +64,10 @@ object SetScriptTransactionDiff {
   ): Either[String, List[(Long, Map[String, Long])]] =
     ScriptEstimator.all
       .drop(blockchain.estimator.version)
-      .traverse(se => ContractScript.estimateComplexityExact(version, dApp, se)
-        .map { case ((_, maxComplexity), complexities) => (maxComplexity, complexities) }
+      .traverse(
+        se =>
+          ContractScript
+            .estimateComplexityExact(version, dApp, se, fixEstimateOfVerifier = blockchain.isFeatureActivated(RideV6))
+            .map { case ((_, maxComplexity), complexities) => (maxComplexity, complexities) }
       )
 }
