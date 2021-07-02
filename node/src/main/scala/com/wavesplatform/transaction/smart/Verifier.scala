@@ -43,7 +43,7 @@ object Verifier extends ScorexLogging {
     case _: GenesisTransaction => Right(0)
     case et: EthereumTransaction =>
       stats.signatureVerification.measureForType(et.tpe)(Either.cond(
-        et.signerPublicKey().nonEmpty,
+        et.signatureValid(),
         0,
         GenericError("Invalid signature")
       ))

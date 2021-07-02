@@ -5,12 +5,13 @@ import java.math.BigInteger
 import akka.http.scaladsl.server._
 import com.wavesplatform.account.{AddressScheme, EthereumAddress}
 import com.wavesplatform.api.http._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.{EthereumTransaction, Transaction}
+import com.wavesplatform.transaction.EthereumTransaction
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.abi.{TypeDecoder, TypeEncoder}
-import org.web3j.crypto.{RawTransaction, SignedRawTransaction, TransactionDecoder}
+import org.web3j.crypto._
 import org.web3j.utils.Numeric._
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
@@ -55,33 +56,45 @@ class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPubli
           )
         )
       case "eth_getBalance" =>
-        resp(id, toHexStringWithPrefixSafe((BigInt(blockchain.balance(EthereumAddress(params.get.head.as[String]))) * EthereumTransaction.AmountMultiplier).bigInteger))
+        resp(
+          id,
+          toHexStringWithPrefixSafe(
+            (BigInt(blockchain.balance(EthereumAddress(params.get.head.as[String]))) * EthereumTransaction.AmountMultiplier).bigInteger
+          )
+        )
       case "eth_sendRawTransaction" =>
-        val et: Transaction = TransactionDecoder.decode(params.get.head.as[String]) match {
+        val transactionHex = params.get.head.as[String]
+        val et: EthereumTransaction = TransactionDecoder.decode(transactionHex) match {
           case srt: SignedRawTransaction => EthereumTransaction(srt)
           case _: RawTransaction         => throw new UnsupportedOperationException("Cannot process unsigned transactions")
         }
 
-        resp(id, transactionPublisher.validateAndBroadcast(et, None).map[JsValueWrapper] { result =>
+        resp(id, transactionPublisher.validateAndBroadcast(et, None).map[JsValueWrapper] { _ =>
           log.info(s"Published transaction $et")
           toHexString(et.id().arr)
         })
       case "eth_getTransactionReceipt" =>
+        val transactionHex = params.get.head.as[String]
+        val txId           = ByteStr(hexStringToByteArray(transactionHex))
+        log.info(s"Get receipt for $transactionHex/$txId")
+
         resp(
           id,
-          Json.obj(
-            "transactionHash"   -> toHexString(new Array[Byte](32)),
-            "transactionIndex"  -> "0x01",
-            "blockHash"         -> toHexString(blockchain.lastBlockId.get.arr),
-            "blockNumber"       -> toHexStringWithPrefixSafe(BigInteger.valueOf(blockchain.height)),
-            "from"              -> toHexString(new Array[Byte](20)),
-            "to"                -> toHexString(new Array[Byte](20)),
-            "cumulativeGasUsed" -> toHexStringWithPrefixSafe(BigInteger.valueOf(blockchain.height)),
-            "gasUsed"           -> toHexStringWithPrefixSafe(BigInteger.valueOf(blockchain.height)),
-            "contractAddress"   -> JsNull,
-            "logs"              -> Json.arr(),
-            "logsBloom"         -> toHexString(new Array[Byte](32))
-          )
+          blockchain.transactionInfo(txId).fold[JsValue](JsNull) { case (height, tx, _) =>
+            Json.obj(
+              "transactionHash"   -> toHexString(tx.id().arr),
+              "transactionIndex"  -> "0x01",
+              "blockHash"         -> toHexString(blockchain.lastBlockId.get.arr),
+              "blockNumber"       -> toHexStringWithPrefixSafe(BigInteger.valueOf(height)),
+              "from"              -> toHexString(new Array[Byte](20)),
+              "to"                -> toHexString(new Array[Byte](20)),
+              "cumulativeGasUsed" -> toHexStringWithPrefixSafe(BigInteger.valueOf(blockchain.height)),
+              "gasUsed"           -> toHexStringWithPrefixSafe(BigInteger.valueOf(blockchain.height)),
+              "contractAddress"   -> JsNull,
+              "logs"              -> Json.arr(),
+              "logsBloom"         -> toHexString(new Array[Byte](32))
+            )
+          }
         )
       case "eth_call" =>
         val call              = params.get.head.as[JsObject]

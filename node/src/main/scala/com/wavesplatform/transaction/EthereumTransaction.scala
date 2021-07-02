@@ -1,26 +1,34 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.account.{Address, EthereumAddress}
+import java.math.BigInteger
+
+import com.wavesplatform.account.{Address, AddressScheme, EthereumAddress}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
+import com.wavesplatform.protobuf.transaction.PBRecipients
+import com.wavesplatform.state.{Height, TxNum}
 import monix.eval.Coeval
 import org.web3j.abi.TypeDecoder
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.abi.datatypes.{Address => EthAddress}
-import org.web3j.crypto.{SignedRawTransaction, TransactionDecoder, TransactionEncoder}
+import org.web3j.crypto._
 import org.web3j.rlp.{RlpEncoder, RlpList}
 import org.web3j.utils.Numeric._
 import play.api.libs.json._
-import scorex.crypto.hash.Keccak256
 
 import scala.reflect.ClassTag
 
-abstract class EthereumTransaction(underlying: SignedRawTransaction) extends Transaction(TransactionType.Ethereum) {
-
+abstract class EthereumTransaction(final val underlying: SignedRawTransaction) extends Transaction(TransactionType.Ethereum) {
+  private final val signatureData: Sign.SignatureData = underlying.getSignatureData
   override val bytes: Coeval[Array[Byte]] =
-    Coeval.evalOnce(RlpEncoder.encode(new RlpList(TransactionEncoder.asRlpValues(underlying, underlying.getSignatureData))))
-  override val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(Keccak256.hash(bytes())))
+    Coeval.evalOnce(RlpEncoder.encode(new RlpList(TransactionEncoder.asRlpValues(underlying, signatureData))))
+
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
+    underlying.getEncodedTransaction(AddressScheme.current.chainId.toLong)
+  }
+
+  override val id: Coeval[ByteStr] = bytes.map(bs => ByteStr(Hash.sha3(bs)))
 
   override def assetFee: (Asset, Long) = Asset.Waves -> underlying.getGasLimit.longValueExact()
 
@@ -30,11 +38,45 @@ abstract class EthereumTransaction(underlying: SignedRawTransaction) extends Tra
 
   override val chainId: Byte = underlying.getChainId.byteValue()
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(Json.obj("type" -> tpe.id))
+  val signerPublicKey: Coeval[Array[Byte]] = bodyBytes.map { bs =>
+    Sign
+      .recoverFromSignature(
+        1,
+        new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS)),
+        Hash.sha3(bs)
+      )
+      .toByteArray
+  }
 
-  val signerPublicKey: Coeval[String] = Coeval.evalOnce(
-//    Keys.getAddress(Sign.signedMessageToKey(underlying.getEncodedTransaction(chainId.toLong), underlying.getSignatureData))
-    "OK"
+  val senderAddress: Coeval[EthereumAddress] = signerPublicKey.map { pk =>
+    new EthereumAddress(Keys.getAddress(pk))
+  }
+
+  val signatureValid: Coeval[Boolean] = senderAddress.map { _ => true }
+
+  val baseJson: Coeval[JsObject] = for {
+    idValue <- id
+  } yield Json.obj(
+    "id"                  -> idValue.toString,
+    "type"                -> tpe.id,
+    "ethereumTransaction" -> ethereumJson(None, None, None)
+  )
+
+  def ethereumJson(blockId: Option[BlockId], height: Option[Height], num: Option[TxNum]): JsObject = Json.obj(
+    "blockHash"        -> blockId.map(id => toHexString(id.arr)),
+    "blockNumber"      -> height.map(h => toHexStringWithPrefix(BigInteger.valueOf(h))),
+    "from"             -> senderAddress().toString,
+    "gas"              -> toHexStringWithPrefix(underlying.getGasLimit),
+    "gasPrice"         -> toHexStringWithPrefix(underlying.getGasPrice),
+    "hash"             -> toHexString(id().arr),
+    "input"            -> underlying.getData,
+    "nonce"            -> toHexStringWithPrefix(underlying.getNonce),
+    "to"               -> underlying.getTo,
+    "transactionIndex" -> num.map(n => toHexStringWithPrefix(BigInteger.valueOf(n))),
+    "value"            -> toHexStringWithPrefix(underlying.getValue),
+    "v"                -> toHexString(underlying.getSignatureData.getV),
+    "r"                -> toHexString(underlying.getSignatureData.getR),
+    "s"                -> toHexString(underlying.getSignatureData.getS)
   )
 }
 
@@ -51,7 +93,18 @@ object EthereumTransaction {
     decodeMethod.invoke(null, source, offset, ct.runtimeClass.asInstanceOf[Class[A]]).asInstanceOf[A]
 
   class Transfer(val sender: Address, val asset: Asset, val amount: TxAmount, val recipient: EthereumAddress, underlying: SignedRawTransaction)
-      extends EthereumTransaction(underlying) {}
+      extends EthereumTransaction(underlying) {
+    override val json: Coeval[JsObject] = baseJson.map(
+      _ ++ Json.obj(
+        "transfer" -> Json.obj(
+          "sender"    -> sender.asWaves.toString,
+          "recipient" -> recipient.toString,
+          "amount"    -> amount,
+          "asset"     -> asset
+        )
+      )
+    )
+  }
 
   def apply(bytes: Array[Byte]): EthereumTransaction =
     apply(TransactionDecoder.decode(toHexString(bytes)).asInstanceOf[SignedRawTransaction])

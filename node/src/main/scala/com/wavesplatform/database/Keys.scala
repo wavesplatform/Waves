@@ -71,8 +71,8 @@ object Keys {
 
   val lastAddressId: Key[Option[Long]] = Key.opt(LastAddressId, Array.emptyByteArray, Longs.fromByteArray, _.toByteArray)
 
-  def addressId(address: Address): Key[Option[AddressId]] = Key.opt(AddressIdTag, address.publicKeyHash, AddressId.fromByteArray, _.toByteArray)
-  def idToAddress(addressId: AddressId): Key[Address]     = Key(IdToAddress, addressId.toByteArray, Address.fromBytes(_).explicitGet(), _.publicKeyHash)
+  def addressId(address: Address): Key[Option[AddressId]] = Key.opt(AddressIdTag, address.asWaves.bytes, AddressId.fromByteArray, _.toByteArray)
+  def idToAddress(addressId: AddressId): Key[Address]     = Key(IdToAddress, addressId.toByteArray, Address.fromBytes(_).explicitGet(), _.bytes)
 
   def addressScriptHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(AddressScriptHistory, addressId.toByteArray)
   def addressScript(addressId: AddressId)(height: Int): Key[Option[AccountScriptInfo]] =
