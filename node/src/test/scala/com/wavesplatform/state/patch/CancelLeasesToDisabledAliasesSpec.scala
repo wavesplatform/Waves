@@ -1,6 +1,6 @@
 package com.wavesplatform.state.patch
 
-import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
@@ -58,5 +58,6 @@ class CancelLeasesToDisabledAliasesSpec extends FlatSpec with Matchers with Path
     AddressScheme.current = new AddressScheme {
       val chainId: Byte = 'T'
     }
+    super.afterAll()
   }
 }
