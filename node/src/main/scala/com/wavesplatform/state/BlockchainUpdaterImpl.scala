@@ -718,6 +718,10 @@ class BlockchainUpdaterImpl(
     }
   }
 
+  override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = readLock {
+    compositeBlockchain.resolveERC20Address(address)
+  }
+
   private[this] def compositeBlockchain =
     ngState.fold(leveldb: Blockchain)(CompositeBlockchain(leveldb, _))
 

@@ -10,7 +10,7 @@ import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{ERC20Address, Transaction}
 import com.wavesplatform.utils._
 
 object Keys {
@@ -48,7 +48,6 @@ object Keys {
     Key(UpdatedAssets, h(height), d => readAssetIds(d).map(IssuedAsset), ias => writeAssetIds(ias.map(_.id)))
   def sponsorshipAssets(height: Int): Key[Seq[IssuedAsset]] =
     Key(SponsoredAssets, h(height), d => readAssetIds(d).map(IssuedAsset), ias => writeAssetIds(ias.map(_.id)))
-
 
   def leaseBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(LeaseBalanceHistory, addressId.toByteArray)
   def leaseBalance(addressId: AddressId)(height: Int): Key[LeaseBalance] =
@@ -180,4 +179,7 @@ object Keys {
 
   def stateHash(height: Int): Key[Option[StateHash]] =
     Key.opt(StateHash, h(height), readStateHash, writeStateHash)
+
+  def erc20toWavesAssetId(erc20Address: ERC20Address): Key[Option[IssuedAsset]] =
+    Key.opt(ERC20ToWavesAssetId, erc20Address.arr, prefix => IssuedAsset(ByteStr(prefix ++ erc20Address.arr)), _.id.arr.take(12))
 }

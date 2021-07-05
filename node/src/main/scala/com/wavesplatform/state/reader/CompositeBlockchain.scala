@@ -4,17 +4,17 @@ import cats.data.Ior
 import cats.implicits._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias, WavesAddress}
-import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 final class CompositeBlockchain private (
     inner: Blockchain,
@@ -42,7 +42,8 @@ final class CompositeBlockchain private (
     CompositeBlockchain.assetDescription(asset, maybeDiff.orEmpty, inner.assetDescription(asset), inner.assetScript(asset), height)
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
-    inner.leaseDetails(leaseId)
+    inner
+      .leaseDetails(leaseId)
       .map(ld => ld.copy(status = diff.leaseState.get(leaseId).map(_.status).getOrElse(ld.status)))
       .orElse(diff.leaseState.get(leaseId))
   }
@@ -150,6 +151,17 @@ final class CompositeBlockchain private (
     blockMeta
       .collect { case (_, hitSource) if this.height == height => hitSource }
       .orElse(inner.hitSource(height))
+
+  override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
+    inner
+      .resolveERC20Address(address)
+      .orElse(
+        diff.issuedAssets.keys.find(
+          _.id.arr.view
+            .drop(12)
+            .sameElements(address.arr)
+        )
+      )
 }
 
 object CompositeBlockchain {

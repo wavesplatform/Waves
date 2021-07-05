@@ -177,9 +177,8 @@ object TransactionDiffer {
           case sstx: SetScriptTransaction      => SetScriptTransactionDiff(blockchain)(sstx).traced
           case sstx: SetAssetScriptTransaction => AssetTransactionsDiff.setAssetScript(blockchain)(sstx).traced
           case stx: SponsorFeeTransaction      => AssetTransactionsDiff.sponsor(blockchain)(stx).traced
-          case et: EthereumTransaction.Transfer =>
-            TransferDiff(blockchain)(et.sender, et.recipient, et.amount, et.asset, et.assetFee._2, et.assetFee._1).traced
-          case _ => UnsupportedTransactionType.asLeft.traced
+          case et: EthereumTransaction         => EthereumTransactionDiff(blockchain, et).traced
+          case _                               => UnsupportedTransactionType.asLeft.traced
         }
       }
       .map(d => initDiff |+| d.bindTransaction(tx))
@@ -291,8 +290,9 @@ object TransactionDiffer {
   // helpers
   private def feePortfolios(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Map[Address, Portfolio]] =
     tx match {
-      case _: GenesisTransaction   => Map.empty[Address, Portfolio].asRight
-      case ptx: PaymentTransaction => Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
+      case _: GenesisTransaction => Map.empty[Address, Portfolio].asRight
+      case ptx: PaymentTransaction =>
+        Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
       case et: EthereumTransaction.Transfer => Map[Address, Portfolio](et.sender -> Portfolio(-et.assetFee._2)).asRight
       case ptx: ProvenTransaction =>
         ptx.assetFee match {

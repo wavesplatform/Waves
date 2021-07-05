@@ -952,4 +952,10 @@ abstract class LevelDBWriter private[database] (
       transactions.zipWithIndex.collect { case ((tx, _), txNum) => TxNum(txNum.toShort) -> tx }.toList
     }
   }
+
+  override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = writableDB.withResource { r =>
+    r.iterator.seek(KeyTags.AssetStaticInfo.prefixBytes ++ address.arr)
+    val nextAssetId = r.iterator.next().getKey.drop(2)
+    if (nextAssetId.view.take(20).sameElements(address.arr)) Some(IssuedAsset(ByteStr(nextAssetId))) else None
+  }
 }

@@ -52,7 +52,9 @@ abstract class EthereumTransaction(final val underlying: SignedRawTransaction) e
     new EthereumAddress(Keys.getAddress(pk))
   }
 
-  val signatureValid: Coeval[Boolean] = senderAddress.map { _ => true }
+  val signatureValid: Coeval[Boolean] = senderAddress.map { _ =>
+    true
+  }
 
   val baseJson: Coeval[JsObject] = for {
     idValue <- id
@@ -92,15 +94,23 @@ object EthereumTransaction {
   private def decode[A](source: String, offset: Int)(implicit ct: ClassTag[A]): A =
     decodeMethod.invoke(null, source, offset, ct.runtimeClass.asInstanceOf[Class[A]]).asInstanceOf[A]
 
-  class Transfer(val sender: Address, val asset: Asset, val amount: TxAmount, val recipient: EthereumAddress, underlying: SignedRawTransaction)
-      extends EthereumTransaction(underlying) {
+  class Transfer(
+      val sender: Address,
+      val asset: Either[Asset.Waves.type, ERC20Address],
+      val amount: TxAmount,
+      val recipient: EthereumAddress,
+      underlying: SignedRawTransaction
+  ) extends EthereumTransaction(underlying) {
     override val json: Coeval[JsObject] = baseJson.map(
       _ ++ Json.obj(
         "transfer" -> Json.obj(
           "sender"    -> sender.asWaves.toString,
           "recipient" -> recipient.toString,
           "amount"    -> amount,
-          "asset"     -> asset
+          "asset" -> (asset match {
+            case Left(_)      => JsNull
+            case Right(erc20) => toHexString(erc20.arr)
+          })
         )
       )
     )
@@ -109,23 +119,25 @@ object EthereumTransaction {
   def apply(bytes: Array[Byte]): EthereumTransaction =
     apply(TransactionDecoder.decode(toHexString(bytes)).asInstanceOf[SignedRawTransaction])
 
+  val ERC20TransferPrefix: String = "a9059cbb"
+
   def apply(underlying: SignedRawTransaction): EthereumTransaction = {
     val hexData       = cleanHexPrefix(underlying.getData)
     val senderAddress = PBRecipients.toAddress(hexStringToByteArray(underlying.getFrom), underlying.getChainId.toByte).explicitGet()
     if (hexData.isEmpty) {
       new Transfer(
         senderAddress,
-        Asset.Waves,
+        Left(Asset.Waves),
         underlying.getValue.divide(BigInt(AmountMultiplier).bigInteger).longValueExact(),
         new EthereumAddress(hexStringToByteArray(underlying.getTo)),
         underlying
       )
-    } else if (hexData.startsWith("a9059cbb")) {
+    } else if (hexData.startsWith(ERC20TransferPrefix)) {
       val amount    = decode[Uint256](hexData, 72)
       val recipient = decode[EthAddress](hexData, 8)
       new Transfer(
         senderAddress,
-        Asset.IssuedAsset(ByteStr(hexStringToByteArray(underlying.getTo))),
+        Right(ERC20Address(ByteStr(hexStringToByteArray(underlying.getTo)))),
         amount.getValue.longValueExact(),
         new EthereumAddress(hexStringToByteArray(recipient.toString)),
         underlying

@@ -8,6 +8,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Diff
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.utils.base58Length
+import supertagged._
 
 package object transaction {
   val AssetIdLength: Int       = com.wavesplatform.crypto.DigestLength
@@ -37,4 +38,12 @@ package object transaction {
   implicit class TransactionSignOps[T](val tx: T) extends AnyVal {
     def signWith(privateKey: PrivateKey)(implicit sign: (T, PrivateKey) => T): T = sign(tx, privateKey)
   }
+
+  object ERC20Address extends TaggedType[ByteStr] {
+    def apply(bs: ByteStr): Type = {
+      require(bs.arr.length == 20, "ERC20 token address length must be 20 bytes")
+      bs @@ this
+    }
+  }
+  type ERC20Address = ERC20Address.Type
 }
