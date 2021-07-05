@@ -123,8 +123,9 @@ case class FairPoSCalculator(minBlockTime: Int, delayDelta: Int) extends PoSCalc
         prevBaseTarget
       case Some(ts) =>
         val avg = (timestamp - ts) / 3 / 1000
-        if (avg > maxDelay) prevBaseTarget + math.max(1, prevBaseTarget / 100)
-        else if (avg < minDelay) prevBaseTarget - math.max(1, prevBaseTarget / 100)
+        val prevBaseTarget1pct = (prevBaseTarget / 100) max 1
+        if (avg > maxDelay) prevBaseTarget + prevBaseTarget1pct
+        else if (avg < minDelay) (prevBaseTarget - prevBaseTarget1pct) max 1
         else prevBaseTarget
     }
   }
