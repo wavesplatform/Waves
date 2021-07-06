@@ -4,14 +4,12 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.util._
-import com.wavesplatform.it.{ReportingTestName, WaitForHeight2}
+import com.wavesplatform.it.{BaseFreeSpec, WaitForHeight2}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
-class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with CancelAfterFailure with ReportingTestName with NodesFromDocker {
+class UTXAllowance extends BaseFreeSpec with WaitForHeight2 {
   import UTXAllowance._
 
   override protected def nodeConfigs: Seq[Config] = Configs

@@ -1,7 +1,6 @@
 package com.wavesplatform.api.grpc
 
 import com.google.protobuf.empty.Empty
-import com.google.protobuf.wrappers.UInt32Value
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.grpc.BlockRangeRequest.Filter
@@ -18,8 +17,8 @@ import scala.concurrent.Future
 class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) extends BlocksApiGrpc.BlocksApi {
   import BlocksApiGrpcImpl._
 
-  override def getCurrentHeight(request: Empty): Future[UInt32Value] = {
-    Future.successful(UInt32Value(commonApi.currentHeight))
+  override def getCurrentHeight(request: Empty): Future[Int] = {
+    Future.successful(commonApi.currentHeight)
   }
 
   override def getBlockRange(request: BlockRangeRequest, responseObserver: StreamObserver[BlockWithHeight]): Unit = responseObserver.interceptErrors {

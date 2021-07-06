@@ -8,19 +8,14 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{GrpcIntegrationSuiteWithThreeAddress, NodeConfigs, ReportingTestName}
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
+import com.wavesplatform.it.{GrpcIntegrationSuiteWithThreeAddress, NodeConfigs}
+import org.scalatest._
 
 import scala.concurrent.duration._
 
 class BlockV5GrpcSuite
-    extends FreeSpec
-    with Matchers
-    with CancelAfterFailure
-    with NodesFromDocker
+    extends freespec.AnyFreeSpec
     with ActivationStatusRequest
-    with ReportingTestName
     with OptionValues
     with GrpcIntegrationSuiteWithThreeAddress {
 

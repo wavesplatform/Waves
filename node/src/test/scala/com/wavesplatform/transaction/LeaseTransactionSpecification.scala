@@ -1,15 +1,13 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
-class LeaseTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class LeaseTransactionSpecification extends PropSpec {
 
   property("Lease transaction serialization roundtrip") {
     forAll(leaseGen) { tx: LeaseTransaction =>

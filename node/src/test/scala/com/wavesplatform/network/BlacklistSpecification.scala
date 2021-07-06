@@ -4,8 +4,9 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.NetworkSettings
+import com.wavesplatform.test.FeatureSpec
 import net.ceedubs.ficus.Ficus._
-import org.scalatest.{FeatureSpec, GivenWhenThen}
+import org.scalatest.GivenWhenThen
 
 class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
   private val config = ConfigFactory.parseString("""waves.network {
@@ -20,8 +21,8 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
   info("I want to blacklist other peers for certain time")
   info("So I can give them another chance after")
 
-  feature("Blacklist") {
-    scenario("Peer blacklist another peer") {
+  Feature("Blacklist") {
+    Scenario("Peer blacklist another peer") {
 
       Given("Peer database is empty")
       val peerDatabase = new PeerDatabaseImpl(networkSettings)

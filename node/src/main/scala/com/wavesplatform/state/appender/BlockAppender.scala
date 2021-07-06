@@ -21,7 +21,6 @@ import monix.eval.Task
 import monix.execution.Scheduler
 
 import scala.util.Right
-import scala.util.control.NonFatal
 
 object BlockAppender extends ScorexLogging {
   def apply(
@@ -88,9 +87,7 @@ object BlockAppender extends ScorexLogging {
     }
 
     handle
-      .onErrorHandle {
-        case NonFatal(e) => log.warn("Error happened after block appending", e)
-      }
+      .onErrorHandle(e => log.warn("Error happened after block appending", e))
   }
 
   //noinspection TypeAnnotation,ScalaStyle

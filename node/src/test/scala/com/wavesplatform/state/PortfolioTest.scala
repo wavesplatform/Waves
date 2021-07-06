@@ -2,15 +2,17 @@ package com.wavesplatform.state
 
 import java.nio.charset.StandardCharsets
 
-import cats._
+import cats.Monoid
 import com.wavesplatform.TestValues
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.test.FunSuite
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import org.scalatest.{FunSuite, Matchers}
 
-class PortfolioTest extends FunSuite with Matchers {
+class PortfolioTest extends FunSuite {
   test("pessimistic - should return only withdraws") {
-    val Seq(fooKey, barKey, bazKey) = Seq("foo", "bar", "baz").map(x => IssuedAsset(ByteStr(x.getBytes(StandardCharsets.UTF_8))))
+    val fooKey = IssuedAsset(ByteStr("foo".getBytes(StandardCharsets.UTF_8)))
+    val barKey = IssuedAsset(ByteStr("bar".getBytes(StandardCharsets.UTF_8)))
+    val bazKey = IssuedAsset(ByteStr("baz".getBytes(StandardCharsets.UTF_8)))
 
     val orig = Portfolio(
       balance = -10,

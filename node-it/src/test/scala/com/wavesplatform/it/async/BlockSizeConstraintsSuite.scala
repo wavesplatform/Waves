@@ -1,27 +1,23 @@
 package com.wavesplatform.it.async
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{LoadTest, NodeConfigs, TransferSending}
-import org.scalatest._
 
 import scala.concurrent.Await.result
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
 @LoadTest
-class BlockSizeConstraintsSuite extends FreeSpec with Matchers with TransferSending with NodesFromDocker {
+class BlockSizeConstraintsSuite extends BaseFreeSpec with TransferSending {
   import BlockSizeConstraintsSuite._
 
   override protected val nodeConfigs: Seq[Config] =
     Seq(ConfigOverrides.withFallback(NodeConfigs.randomMiner))
 
-  private val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet
-  private def miner         = nodes.head
+  private lazy val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet
 
-  val transfers = generateTransfersToRandomAddresses(maxTxsGroup, nodeAddresses)
+  private lazy val transfers = generateTransfersToRandomAddresses(maxTxsGroup, nodeAddresses)
   s"Block is limited by size after activation" in result(
     for {
       _                 <- Future.sequence((0 to maxGroups).map(_ => processRequests(transfers, includeAttachment = true)))

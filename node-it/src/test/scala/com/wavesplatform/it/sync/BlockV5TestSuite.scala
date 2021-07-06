@@ -5,23 +5,15 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
-import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
+import com.wavesplatform.crypto.Blake2b256
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
-import com.wavesplatform.it.transactions.NodesFromDocker
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
-import scorex.crypto.hash.Blake2b256
+import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
+import org.scalatest._
 
 import scala.concurrent.duration._
 
-class BlockV5TestSuite
-    extends FreeSpec
-    with Matchers
-    with CancelAfterFailure
-    with NodesFromDocker
-    with ActivationStatusRequest
-    with ReportingTestName
-    with OptionValues {
+class BlockV5TestSuite extends BaseFreeSpec with ActivationStatusRequest with OptionValues {
 
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
@@ -37,11 +29,11 @@ class BlockV5TestSuite
       nodes.head.waitForHeight(nodes.head.height + 2, 2.minute)
       currentHeight = nodes.head.height
 
-      val lastBlockCurrentHeight = nodes.head.lastBlock()
-      val lastBlockHeadersCurrentHeight = nodes.head.lastBlockHeader()
-      val blockAtCurrentHeight = nodes.head.blockAt(currentHeight)
-      val blockHeadersCurrentHeight = nodes.head.blockHeadersAt(currentHeight)
-      val blockBySignatureCurrentHeight = nodes.head.blockById(blockAtCurrentHeight.id)
+      val lastBlockCurrentHeight         = nodes.head.lastBlock()
+      val lastBlockHeadersCurrentHeight  = nodes.head.lastBlockHeader()
+      val blockAtCurrentHeight           = nodes.head.blockAt(currentHeight)
+      val blockHeadersCurrentHeight      = nodes.head.blockHeadersAt(currentHeight)
+      val blockBySignatureCurrentHeight  = nodes.head.blockById(blockAtCurrentHeight.id)
       val generationSignatureInBlockJson = ByteStr.decodeBase58(blockAtCurrentHeight.generationSignature.get).get
 
       blockAtCurrentHeight.version.value shouldBe Block.ProtoBlockVersion

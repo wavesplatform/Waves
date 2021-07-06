@@ -1,8 +1,10 @@
 package com.wavesplatform.state.diffs
 
-import cats.implicits._
-import com.wavesplatform.features.EstimatorProvider._
+import cats.instances.list._
+import cats.syntax.either._
+import cats.syntax.traverse._
 import com.wavesplatform.features.ComplexityCheckPolicyProvider._
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.StdLibVersion

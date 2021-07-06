@@ -1,9 +1,6 @@
 package com.wavesplatform.http
 
-import scala.util.Random
-
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
-import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet, TransactionGen}
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
@@ -14,7 +11,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.util._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
@@ -23,19 +19,23 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash}
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash}
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet}
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json.{JsArray, JsObject, Json, JsValue}
+import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
+
+import scala.util.Random
 
 //noinspection ScalaStyle
 class DebugApiRouteSpec
@@ -45,7 +45,6 @@ class DebugApiRouteSpec
     with NTPTime
     with PathMockFactory
     with BlockchainStubHelpers
-    with TransactionGen
     with WithDomain {
 
   val wavesSettings = WavesSettings.default()
@@ -323,6 +322,7 @@ class DebugApiRouteSpec
                     |  "id" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                     |  "function" : "test",
                     |  "args" : [ ],
+                    |  "invocations" : [ ],
                     |  "result" : {
                     |    "data" : [ ],
                     |    "transfers" : [ ],
@@ -361,6 +361,7 @@ class DebugApiRouteSpec
                |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                |  "function" : "dataAndTransfer",
                |  "args" : [ ],
+               |  "invocations" : [ ],
                |  "result" : {
                |    "data" : [ {
                |      "key" : "key",
@@ -423,6 +424,7 @@ class DebugApiRouteSpec
           |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
           |  "function" : "issue",
           |  "args" : [ ],
+          |  "invocations" : [ ],
           |  "result" : {
           |    "data" : [ ],
           |    "transfers" : [ ],
@@ -464,6 +466,7 @@ class DebugApiRouteSpec
                |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                |  "function" : "reissue",
                |  "args" : [ ],
+               |  "invocations" : [ ],
                |  "result" : {
                |    "data" : [ ],
                |    "transfers" : [ ],
@@ -507,6 +510,7 @@ class DebugApiRouteSpec
                |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                |  "function" : "burn",
                |  "args" : [ ],
+               |  "invocations" : [ ],
                |  "result" : {
                |    "data" : [ ],
                |    "transfers" : [ ],
@@ -548,12 +552,12 @@ class DebugApiRouteSpec
       val amount1    = 100
       val recipient1 = Recipient.Address(ByteStr.decodeBase58("3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd").get)
       val nonce1     = 0
-      val leaseId1   = Lease.calculateId(Lease(recipient1, amount1, nonce1), invoke.id.value())
+      val leaseId1   = Lease.calculateId(Lease(recipient1, amount1, nonce1), invoke.id())
 
       val amount2    = 20
       val recipient2 = Recipient.Alias("some_alias")
       val nonce2     = 2
-      val leaseId2   = Lease.calculateId(Lease(recipient2, amount2, nonce2), invoke.id.value())
+      val leaseId2   = Lease.calculateId(Lease(recipient2, amount2, nonce2), invoke.id())
 
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
@@ -683,6 +687,7 @@ class DebugApiRouteSpec
              |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
              |  "function" : "test",
              |  "args" : [ ],
+             |  "invocations" : [ ],
              |  "result" : {
              |    "data" : [ ],
              |    "transfers" : [ ],
@@ -847,6 +852,38 @@ class DebugApiRouteSpec
              |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
              |  "function" : "test1",
              |  "args" : [ ],
+             |  "invocations" : [ {
+             |    "type" : "dApp",
+             |    "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+             |    "function" : "test",
+             |    "args" : [ ],
+             |    "invocations" : [ ],
+             |    "result" : {
+             |      "data" : [ {
+             |        "key" : "key",
+             |        "type" : "integer",
+             |        "value" : 1
+             |      } ],
+             |      "transfers" : [ ],
+             |      "issues" : [ ],
+             |      "reissues" : [ ],
+             |      "burns" : [ ],
+             |      "sponsorFees" : [ ],
+             |      "leases" : [ ],
+             |      "leaseCancels" : [ ],
+             |      "invokes" : [ ]
+             |    },
+             |    "error" : null,
+             |    "vars" : [ {
+             |      "name" : "a",
+             |      "type" : "BigInt",
+             |      "value" : 6.703903964971298549787012499102923E+153
+             |    }, {
+             |      "name" : "test",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    } ]
+             |  } ],
              |  "result" : {
              |    "data" : [ ],
              |    "transfers" : [ ],

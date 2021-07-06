@@ -2,11 +2,6 @@ package com.wavesplatform.events.repo
 
 import java.nio.{ByteBuffer, ByteOrder}
 
-import scala.annotation.tailrec
-import scala.collection.concurrent.TrieMap
-import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success, Try}
-
 import cats.effect.ExitCase
 import cats.kernel.Monoid
 import com.wavesplatform.Shutdownable
@@ -15,14 +10,19 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events._
-import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
 import com.wavesplatform.events.protobuf.serde._
+import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import monix.eval.Task
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.{Observable, Observer, OverflowStrategy}
 import monix.reactive.subjects.ConcurrentSubject
+
+import scala.annotation.tailrec
+import scala.collection.concurrent.TrieMap
+import scala.jdk.CollectionConverters._
+import scala.util.{Failure, Success, Try}
 
 class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val scheduler: Scheduler)
     extends UpdatesRepo.Read
@@ -223,10 +223,10 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
                 microBlocks: Seq[MicroBlockAppended],
                 id: ByteStr,
                 dropped: Seq[MicroBlockAppended] = Nil
-            ): (Seq[MicroBlockAppended], Seq[MicroBlockAppended]) = microBlocks match {
-              case Nil                                   => (Nil, dropped)
-              case rest @ (_ :+ block) if block.id == id => (rest, dropped)
-              case rest :+ block                         => dropUntilId(rest, id, block +: dropped)
+            ): (Seq[MicroBlockAppended], Seq[MicroBlockAppended]) = (microBlocks: @unchecked) match {
+              case Nil                                 => (Nil, dropped)
+              case rest @ _ :+ block if block.id == id => (rest, dropped)
+              case rest :+ block                       => dropUntilId(rest, id, block +: dropped)
             }
             val (keep, drop) = dropUntilId(ls.microBlocks, toId)
             if (keep.isEmpty) {

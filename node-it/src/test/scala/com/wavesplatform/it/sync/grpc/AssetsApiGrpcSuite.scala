@@ -1,18 +1,13 @@
 package com.wavesplatform.it.sync.grpc
 
 import com.typesafe.config.Config
+import com.wavesplatform.it._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{GrpcIntegrationSuiteWithThreeAddress, NodeConfigs, ReportingTestName}
-import org.scalatest.{FreeSpec, Matchers}
 
 class AssetsApiGrpcSuite
-    extends FreeSpec
-    with Matchers
-    with NodesFromDocker
+    extends BaseFreeSpec
     with ActivationStatusRequest
-    with ReportingTestName
     with GrpcIntegrationSuiteWithThreeAddress {
 
   "nftList returns all NFT" in {

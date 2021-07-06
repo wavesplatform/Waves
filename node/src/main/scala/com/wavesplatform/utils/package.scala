@@ -83,7 +83,7 @@ package object utils extends ScorexLogging {
 
   implicit val evaluatedWrites: Writes[EVALUATED] = new Writes[EVALUATED] {
     import com.wavesplatform.api.http.ApiError
-    override def writes(o: EVALUATED): JsValue = o match {
+    override def writes(o: EVALUATED): JsValue = (o: @unchecked) match {
         case CONST_LONG(num)   => Json.obj("type" -> "Int", "value"        -> num)
         case CONST_BYTESTR(bs) => Json.obj("type" -> "ByteVector", "value" -> bs.toString)
         case CONST_STRING(str) => Json.obj("type" -> "String", "value"     -> str)

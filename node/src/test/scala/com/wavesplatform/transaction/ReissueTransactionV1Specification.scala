@@ -5,12 +5,11 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.ReissueTransaction
-import com.wavesplatform.{TransactionGen, crypto}
-import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.crypto
+import com.wavesplatform.test.PropSpec
 import play.api.libs.json.Json
 
-class ReissueTransactionV1Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class ReissueTransactionV1Specification extends PropSpec {
 
   property("Reissue serialization roundtrip") {
     forAll(reissueGen) { tx: ReissueTransaction =>

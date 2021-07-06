@@ -1,5 +1,8 @@
 package com.wavesplatform.network
 
+import scala.concurrent.{ExecutionException, Future}
+import scala.util.Success
+
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -8,9 +11,6 @@ import com.wavesplatform.utils.Schedulers.ExecutorExt
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.Channel
 import monix.execution.Scheduler
-
-import scala.concurrent.{ExecutionException, Future}
-import scala.util.Success
 
 trait TransactionPublisher {
   def validateAndBroadcast(tx: Transaction, source: Option[Channel]): Future[TracedResult[ValidationError, Boolean]]
@@ -37,7 +37,7 @@ object TransactionPublisher extends ScorexLogging {
           TracedResult(Left(GenericError(err)))
       }
       .andThen {
-        case Success(TracedResult(Right(isNew), _)) if isNew || (allowRebroadcast && source.isEmpty) => broadcast(tx, source)
+        case Success(TracedResult(Right(isNew), _, _)) if isNew || (allowRebroadcast && source.isEmpty) => broadcast(tx, source)
       }
   }
 }

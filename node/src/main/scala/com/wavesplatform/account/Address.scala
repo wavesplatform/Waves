@@ -68,7 +68,8 @@ object Address extends ScorexLogging {
           )
           .flatMap {
             _ =>
-              val Array(version, network, _*) = addressBytes
+              val version = addressBytes(0)
+              val network = addressBytes(1)
 
               (for {
                 _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")

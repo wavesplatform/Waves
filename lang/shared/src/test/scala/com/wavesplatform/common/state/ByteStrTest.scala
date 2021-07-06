@@ -1,9 +1,9 @@
 package com.wavesplatform.common.state
 
 import com.wavesplatform.common.utils.{Base58, Base64}
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest._
 
-class ByteStrTest extends Matchers with WordSpecLike {
+class ByteStrTest extends wordspec.AnyWordSpec with matchers.should.Matchers {
 
   private def getSeqBytesArr(size: Int, from: Int = 1): Array[Byte] = (from until (from + size) map (_.toByte)).toArray
 

@@ -10,19 +10,15 @@ import com.wavesplatform.lang.v1.BaseGlobal.DAppInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.repl.Repl
-import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import com.wavesplatform.lang.{Global, Version}
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.scalajs.js
 import scala.scalajs.js.Dynamic.{literal => jObj}
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.annotation.JSExportTopLevel
-import scala.scalajs.js.{Any, Dictionary, Promise, UndefOr}
+import scala.scalajs.js.{Any, Dictionary}
 
 object JsAPI {
 
@@ -165,7 +161,7 @@ object JsAPI {
             case (bytes, complexity, exprScript, compErrorList) =>
               js.Dynamic.literal(
                 "result"     -> Global.toBuffer(bytes),
-                "complexity" -> complexity,
+                "complexity" -> complexity.toDouble,
                 "exprAst"    -> expressionScriptToJs(exprScript),
                 "errorList"  -> compErrorList.map(compilationErrToJs).toJSArray
               )
@@ -179,7 +175,7 @@ object JsAPI {
               js.Dynamic.literal(
                 "result"     -> Global.toBuffer(bytes),
                 "ast"        -> toJs(ast),
-                "complexity" -> complexity
+                "complexity" -> complexity.toDouble
               )
           }
       case DAppType =>
@@ -189,8 +185,8 @@ object JsAPI {
             case (bytes, complexityWithMap, exprDApp, compErrorList) =>
               js.Dynamic.literal(
                 "result"           -> Global.toBuffer(bytes),
-                "complexity"       -> complexityWithMap._1,
-                "complexityByFunc" -> complexityWithMap._2.view.mapValues(c => c: Any).toMap.toJSDictionary,
+                "complexity"       -> complexityWithMap._1.toDouble,
+                "complexityByFunc" -> complexityWithMap._2.view.mapValues(_.toDouble).toMap.toJSDictionary,
                 "dAppAst"          -> dAppToJs(exprDApp),
                 "errorList"        -> compErrorList.map(compilationErrToJs).toJSArray
               )
@@ -242,7 +238,7 @@ object JsAPI {
               val resultFields: Seq[(String, Any)] = Seq(
                 "result"     -> Global.toBuffer(bytes),
                 "ast"        -> toJs(expr),
-                "complexity" -> complexity
+                "complexity" -> complexity.toDouble
               )
               val errorFieldOpt: Seq[(String, Any)] =
                 Global
@@ -262,7 +258,7 @@ object JsAPI {
               js.Dynamic.literal(
                 "result"     -> Global.toBuffer(bytes),
                 "ast"        -> toJs(expr),
-                "complexity" -> complexity
+                "complexity" -> complexity.toDouble
               )
           }
       case DAppType =>
@@ -283,11 +279,11 @@ object JsAPI {
               val resultFields: Seq[(String, Any)] = Seq(
                 "result"                     -> Global.toBuffer(bytes),
                 "ast"                        -> toJs(dApp),
-                "complexity"                 -> maxComplexity,
-                "verifierComplexity"         -> verifierComplexity,
-                "callableComplexities"       -> callableComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary,
-                "userFunctionComplexities"   -> userFunctionComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary,
-                "globalVariableComplexities" -> globalVariableComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary
+                "complexity"                 -> maxComplexity.toDouble,
+                "verifierComplexity"         -> verifierComplexity.toDouble,
+                "callableComplexities"       -> callableComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary,
+                "userFunctionComplexities"   -> userFunctionComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary,
+                "globalVariableComplexities" -> globalVariableComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary
               )
               val errorFieldOpt: Seq[(String, Any)] = {
                 Global
@@ -313,30 +309,4 @@ object JsAPI {
 
   @JSExportTopLevel("nodeVersion")
   def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
-
-  @JSExportTopLevel("repl")
-  def repl(
-    settings: UndefOr[NodeConnectionSettings],
-    libraries: js.Array[String] = js.Array()
-  ): js.Dynamic = asJs(Repl(settings.toOption, libraries.toList))
-
-  private def asJs(repl: Repl): js.Dynamic =
-    jObj(
-      "evaluate"    -> (repl.execute _ andThen mapResult),
-      "info"        -> repl.info _,
-      "totalInfo"   -> (() => repl.totalInfo),
-      "clear"       -> repl.clear _,
-      "reconfigure" -> (repl.reconfigure _ andThen asJs)
-    )
-
-  private def mapResult(eval: Future[Either[String, String]]): Promise[js.Object with js.Dynamic] =
-    eval
-      .map(
-        _.fold(
-          e => jObj("error"  -> e),
-          r => jObj("result" -> r)
-        )
-      )
-      .toJSPromise
-
 }

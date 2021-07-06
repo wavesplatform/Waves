@@ -1,7 +1,12 @@
 package com.wavesplatform.state.diffs.invoke
 
+import scala.util.Right
+
 import cats.Id
-import cats.implicits._
+import cats.instances.list._
+import cats.syntax.either._
+import cats.syntax.semigroup._
+import cats.syntax.traverseFilter._
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
@@ -12,26 +17,24 @@ import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.transaction.{Transaction, TxValidationError}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, CoevalR, TracedResult}
-import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
-import com.wavesplatform.transaction.{Transaction, TxValidationError}
+import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import monix.eval.Coeval
 import shapeless.Coproduct
-
-import scala.util.Right
 
 object InvokeScriptDiff {
   private val stats = TxProcessingStats
@@ -61,7 +64,9 @@ object InvokeScriptDiff {
             Either.cond(
               version >= V5,
               (),
-              GenericError(s"DApp $invoker invoked DApp $dAppAddress that uses RIDE $version, but dApp-to-dApp invocation requires version 5 or higher")
+              GenericError(
+                s"DApp $invoker invoked DApp $dAppAddress that uses RIDE $version, but dApp-to-dApp invocation requires version 5 or higher"
+              )
             )
           )
           _ <- traced(
@@ -97,8 +102,8 @@ object InvokeScriptDiff {
               .leftMap(GenericError(_))
           }
           complexityAfterPaymentsTraced = checkedPayments.foldLeft(TracedResult(Right(remainingComplexity): TxValidationError.Validation[Int])) {
-            case (error @ TracedResult(Left(_), _), _) => error
-            case (TracedResult(Right(nextRemainingComplexity), _), (script, amount, assetId)) =>
+            case (error @ TracedResult(Left(_), _, _), _) => error
+            case (TracedResult(Right(nextRemainingComplexity), _, _), (script, amount, assetId)) =>
               val usedComplexity = totalComplexityLimit - nextRemainingComplexity
               val pseudoTx = ScriptTransfer(
                 Some(assetId),
@@ -193,6 +198,7 @@ object InvokeScriptDiff {
                 ).map(result => (environment.currentDiff |+| paymentsPartToResolve, result, environment.availableActions, environment.availableData))
               })
             }
+            _ = invocationRoot.setLog(log)
 
             doProcessActions = (actions: List[CallableAction], unusedComplexity: Int) => {
               val storingComplexity = if (blockchain.storeEvaluatedComplexity) complexityAfterPayments - unusedComplexity else invocationComplexity
@@ -247,12 +253,17 @@ object InvokeScriptDiff {
                 traced(error.asLeft[(Diff, EVALUATED, Int, Int)])
             }
             resultDiff = diff.copy(scriptsComplexity = 0) |+| actionsDiff |+| Diff.empty.copy(scriptsComplexity = paymentsComplexity)
+            _          = invocationRoot.setResult(scriptResult)
           } yield (resultDiff, evaluated, remainingActions1, remainingData1)
         } yield result
 
       case _ => traced(Left(GenericError(s"No contract at address ${tx.dAppAddress}")))
     }
-    result
+
+    result.leftMap { err =>
+      invocationRoot.setError(err)
+      err
+    }
   }
 
   private def evaluateV2(

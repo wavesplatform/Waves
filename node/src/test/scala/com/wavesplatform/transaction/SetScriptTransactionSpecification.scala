@@ -15,15 +15,14 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
     tx.copy(1.toByte, proofs = p)
   }
 
-  def assertTxs(f: Transaction, second: SetScriptTransaction): Unit = f match {
-    case first: SetScriptTransaction =>
-      first.sender shouldEqual second.sender
-      first.timestamp shouldEqual second.timestamp
-      first.fee shouldEqual second.fee
-      first.version shouldEqual second.version
-      first.proofs shouldEqual second.proofs
-      first.bytes() shouldEqual second.bytes()
-      first.script shouldEqual second.script
+  def assertTxs(first: SetScriptTransaction, second: SetScriptTransaction): Unit = {
+    first.sender shouldEqual second.sender
+    first.timestamp shouldEqual second.timestamp
+    first.fee shouldEqual second.fee
+    first.version shouldEqual second.version
+    first.proofs shouldEqual second.proofs
+    first.bytes() shouldEqual second.bytes()
+    first.script shouldEqual second.script
   }
 
   def generator: Gen[((Seq[com.wavesplatform.transaction.Transaction], SetScriptTransaction))] = setScriptTransactionGen.map(t => (Seq(), t))

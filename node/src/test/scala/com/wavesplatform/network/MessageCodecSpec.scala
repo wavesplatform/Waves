@@ -2,16 +2,13 @@ package com.wavesplatform.network
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.embedded.EmbeddedChannel
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.{FreeSpec, Matchers}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class MessageCodecSpec extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen {
+class MessageCodecSpec extends FreeSpec {
 
   "should block a sender of invalid messages" in {
     val codec = new SpiedMessageCodec

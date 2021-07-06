@@ -1,17 +1,15 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.Verifier
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
-class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class OrderJsonSpecification extends PropSpec {
 
   property("Read Order from json") {
     val keyPair   = KeyPair("123".getBytes("UTF-8"))

@@ -6,29 +6,30 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.test.FunSuite
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.words.ShouldVerb
-import org.scalatest.{FunSuite, Matchers}
 
 import scala.util.Random
 
-class MicroBlockSpecification extends FunSuite with Matchers with MockFactory with ShouldVerb {
+class MicroBlockSpecification extends FunSuite with MockFactory {
 
-  val prevResBlockSig  = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))
-  val totalResBlockSig = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))
-  val reference        = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
-  val sender           = KeyPair(reference.dropRight(2))
-  val gen              = KeyPair(reference)
+  private val prevResBlockSig  = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))
+  private val totalResBlockSig = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))
+  private val reference        = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
+  private val sender           = KeyPair(reference.dropRight(2))
+  private val gen              = KeyPair(reference)
 
   test("MicroBlock with txs bytes/parse roundtrip") {
 
-    val ts                       = System.currentTimeMillis() - 5000
-    val tr: TransferTransaction  = TransferTransaction.selfSigned(1.toByte, sender, gen.toAddress, Waves, 5, Waves, 2, ByteStr.empty,  ts + 1).explicitGet()
-    val assetId                  = IssuedAsset(ByteStr(Array.fill(AssetIdLength)(Random.nextInt(100).toByte)))
-    val tr2: TransferTransaction = TransferTransaction.selfSigned(1.toByte, sender, gen.toAddress, assetId, 5, Waves, 2, ByteStr.empty,  ts + 2).explicitGet()
+    val ts = System.currentTimeMillis() - 5000
+    val tr: TransferTransaction =
+      TransferTransaction.selfSigned(1.toByte, sender, gen.toAddress, Waves, 5, Waves, 2, ByteStr.empty, ts + 1).explicitGet()
+    val assetId = IssuedAsset(ByteStr(Array.fill(AssetIdLength)(Random.nextInt(100).toByte)))
+    val tr2: TransferTransaction =
+      TransferTransaction.selfSigned(1.toByte, sender, gen.toAddress, assetId, 5, Waves, 2, ByteStr.empty, ts + 2).explicitGet()
 
     val transactions = Seq(tr, tr2)
 
@@ -57,7 +58,7 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
   test("MicroBlock cannot contain more than Miner.MaxTransactionsPerMicroblock") {
 
     val transaction =
-      TransferTransaction.selfSigned(1.toByte, sender, gen.toAddress, Waves, 5, Waves, 1000, ByteStr.empty,  System.currentTimeMillis()).explicitGet()
+      TransferTransaction.selfSigned(1.toByte, sender, gen.toAddress, Waves, 5, Waves, 1000, ByteStr.empty, System.currentTimeMillis()).explicitGet()
     val transactions = Seq.fill(Miner.MaxTransactionsPerMicroblock + 1)(transaction)
 
     val eitherBlockOrError = MicroBlock.buildAndSign(3.toByte, sender, transactions, prevResBlockSig, totalResBlockSig)

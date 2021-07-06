@@ -1,10 +1,10 @@
 package com.wavesplatform.lang.evaluator
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common.produce
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONST_STRING}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
+import com.wavesplatform.test.produce
 
 class StringFunctionsTest extends EvaluatorSpec {
   property("take") {

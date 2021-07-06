@@ -3,12 +3,12 @@ package com.wavesplatform.settings
 import java.net.InetSocketAddress
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.test.FlatSpec
 import net.ceedubs.ficus.Ficus._
-import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._
 
-class NetworkSettingsSpecification extends FlatSpec with Matchers {
+class NetworkSettingsSpecification extends FlatSpec {
 
   "NetworkSpecification" should "read values from config" in {
     val config          = loadConfig(ConfigFactory.parseString("""waves.network {
@@ -87,8 +87,11 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
   }
 
   it should "fail with IllegalArgumentException on too long node name" in {
-    val config = loadConfig(ConfigFactory.parseString(
-      "waves.network.node-name = очень-длинное-название-в-многобайтной-кодировке-отличной-от-однобайтной-кодировки-американского-института-стандартов"))
+    val config = loadConfig(
+      ConfigFactory.parseString(
+        "waves.network.node-name = очень-длинное-название-в-многобайтной-кодировке-отличной-от-однобайтной-кодировки-американского-института-стандартов"
+      )
+    )
     intercept[IllegalArgumentException] {
       config.as[NetworkSettings]("waves.network")
     }
