@@ -51,7 +51,8 @@ object Importer extends ScorexLogging {
       blockchainFile: String = "blockchain",
       importHeight: Int = Int.MaxValue,
       format: String = Formats.Binary,
-      verify: Boolean = true
+      verify: Boolean = true,
+      dryRun: Boolean = false
   )
 
   def parseOptions(args: Array[String]): ImportOptions = {
@@ -84,6 +85,7 @@ object Importer extends ScorexLogging {
             case f if Formats.isSupportedInImporter(f) => success
             case f                                     => failure(s"Unsupported format: $f")
           },
+        opt[Unit]("dry-run").action((_, c) => c.copy(dryRun = true)),
         opt[Unit]('n', "no-verify")
           .text("Disable signatures verification")
           .action((_, c) => c.copy(verify = false)),
@@ -142,9 +144,9 @@ object Importer extends ScorexLogging {
           override def blocksApi: CommonBlocksApi =
             CommonBlocksApi(blockchainUpdater, Application.loadBlockMetaAt(db, blockchainUpdater), Application.loadBlockInfoAt(db, blockchainUpdater))
           override def accountsApi: CommonAccountsApi =
-            CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
+            CommonAccountsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
           override def assetsApi: CommonAssetsApi =
-            CommonAssetsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
+            CommonAssetsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
         }
       }
 
@@ -285,7 +287,7 @@ object Importer extends ScorexLogging {
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, db, actorSystem)
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)
 
-    val importFileOffset = importOptions.format match {
+    val importFileOffset = if (importOptions.dryRun) 0 else importOptions.format match {
       case Formats.Binary =>
         var result = 0L
         db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
@@ -301,6 +303,16 @@ object Importer extends ScorexLogging {
       case _ => 0L
     }
     val inputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, importFileOffset), 2 * 1024 * 1024)
+
+    if (importOptions.dryRun) {
+      def readNextBlock(): Future[Option[Block]] = Future.successful(None)
+      readNextBlock().flatMap {
+        case None => Future.successful(())
+        case Some(block) =>
+
+          readNextBlock()
+      }
+    }
 
     sys.addShutdownHook {
       quit = true

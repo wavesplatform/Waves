@@ -11,15 +11,13 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.PropSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class TransferByIdTest extends PropSpec with ScalaCheckPropertyChecks with WithState with TransactionGen with NoShrink {
+class TransferByIdTest extends PropSpec with WithState {
 
   val scriptSrc =
     s"""

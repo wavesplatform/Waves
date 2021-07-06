@@ -17,13 +17,13 @@ import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.repo.UpdatesRepoImpl
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
-import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.{AssetDescription, Blockchain, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
+import com.wavesplatform.test.{FreeSpec, _}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
@@ -35,14 +35,13 @@ import monix.execution.Scheduler.Implicits.global
 import org.scalactic.source.Position
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Promise}
 import scala.reflect.ClassTag
 import scala.util.Random
 
-class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with ScalaFutures with PathMockFactory {
+class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures with PathMockFactory {
   var currentSettings: WavesSettings = domainSettingsWithFS(
     TestFunctionalitySettings.withFeatures(
       BlockchainFeatures.BlockReward,

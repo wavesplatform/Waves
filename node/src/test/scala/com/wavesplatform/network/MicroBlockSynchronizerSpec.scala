@@ -2,16 +2,16 @@ package com.wavesplatform.network
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
-import com.wavesplatform.{BlockGen, RxScheduler, TransactionGen}
+import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.{BlockGen, RxScheduler}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
 import monix.reactive.Observable
 import monix.reactive.subjects.{PublishSubject => PS}
-import org.scalatest._
 
 import scala.concurrent.duration._
 
-class MicroBlockSynchronizerSpec extends FreeSpec with Matchers with TransactionGen with RxScheduler with BlockGen {
+class MicroBlockSynchronizerSpec extends FreeSpec with RxScheduler with BlockGen {
   override def testSchedulerName: String = "test-microblock-synchronizer"
 
   val defaultSettings = MicroblockSynchronizerSettings(1.second, 1.minute, 1.minute)

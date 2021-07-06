@@ -1,25 +1,18 @@
 package com.wavesplatform.state.diffs.smart.predef
 
+import com.wavesplatform.TestTime
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
-import org.scalatest.{EitherValues, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.scalatest.EitherValues
 
-class DAppVerifierRestrictionsTest
-    extends PropSpec
-    with ScalaCheckPropertyChecks
-    with Matchers
-    with TransactionGen
-    with NoShrink
-    with WithDomain
-    with EitherValues {
+class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherValues {
 
   import DomainPresets._
 
@@ -56,7 +49,9 @@ class DAppVerifierRestrictionsTest
     withDomain(RideV5) { d =>
       d.appendBlock(genesis: _*)
       (the[RuntimeException] thrownBy d.appendBlock(setInvoke)).getMessage should include(s"DApp-to-dApp invocations are not allowed from verifier")
-      (the[RuntimeException] thrownBy d.appendBlock(setReentrantInvoke)).getMessage should include(s"DApp-to-dApp invocations are not allowed from verifier")
+      (the[RuntimeException] thrownBy d.appendBlock(setReentrantInvoke)).getMessage should include(
+        s"DApp-to-dApp invocations are not allowed from verifier"
+      )
     }
   }
 }

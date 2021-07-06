@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs
 
-import cats.implicits._
+import cats.instances.map._
+import cats.syntax.semigroup._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError

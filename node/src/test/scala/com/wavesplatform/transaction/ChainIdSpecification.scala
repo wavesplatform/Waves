@@ -14,12 +14,11 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.{TransactionGen, crypto}
+import com.wavesplatform.crypto
+import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
-import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class ChainIdSpecification extends PropSpec {
 
   private val otherChainId     = 'W'.toByte
   private val aliasFromOther   = Alias.createWithChainId("sasha", otherChainId).explicitGet()

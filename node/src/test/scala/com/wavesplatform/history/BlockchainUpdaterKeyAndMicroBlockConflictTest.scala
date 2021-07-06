@@ -6,19 +6,15 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.GenesisTransaction
 import org.scalacheck.Gen
 import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class BlockchainUpdaterKeyAndMicroBlockConflictTest
     extends PropSpec
-    with PropertyChecks
     with DomainScenarioDrivenPropertyCheck
     with OptionValues
-    with Matchers
-    with EitherMatchers
-    with TransactionGen
     with BlocksTransactionsHelpers {
 
   property("new key block should be validated to previous") {
@@ -62,9 +58,9 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
 
   property("data keys should not be duplicated") {
     forAll(Preconditions.duplicateDataKeys()) {
-      case (genesisBlock, Seq(block1, block2), microBlocks, address) =>
+      case (genesisBlock, blocks, microBlocks, address) =>
         withDomain(DataAndMicroblocksActivatedAt0WavesSettings) { d =>
-          Seq(genesisBlock, block1, block2).foreach(d.blockchainUpdater.processBlock(_) should beRight)
+          Seq(genesisBlock, blocks(0), blocks(1)).foreach(d.blockchainUpdater.processBlock(_) should beRight)
           d.blockchainUpdater.accountData(address, "test") shouldBe defined
           microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) should beRight)
           d.blockchainUpdater.accountData(address, "test") shouldBe defined

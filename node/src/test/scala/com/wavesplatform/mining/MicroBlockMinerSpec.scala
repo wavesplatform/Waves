@@ -1,9 +1,6 @@
 package com.wavesplatform.mining
 
-import scala.concurrent.duration._
-import scala.util.Random
-
-import com.wavesplatform.{TestValues, TransactionGen}
+import com.wavesplatform.TestValues
 import com.wavesplatform.account.Alias
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils._
@@ -12,14 +9,17 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
 import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, TxVersion}
 import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.utx.UtxPoolImpl
 import monix.execution.Scheduler
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{FlatSpec, Matchers}
 
-class MicroBlockMinerSpec extends FlatSpec with Matchers with PathMockFactory with WithDomain with TransactionGen {
+import scala.concurrent.duration._
+import scala.util.Random
+
+class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain {
   "Micro block miner" should "generate microblocks in flat interval" in {
     val scheduler = Schedulers.singleThread("test")
     val acc       = TestValues.keyPair

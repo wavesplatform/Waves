@@ -9,13 +9,12 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state._
-import com.wavesplatform.{EitherMatchers, history}
-import org.scalatest.words.ShouldVerb
-import org.scalatest.{FreeSpec, Matchers}
+import com.wavesplatform.history
+import com.wavesplatform.test.FreeSpec
 
 import scala.util.Try
 
-class BlockchainUpdaterTest extends FreeSpec with Matchers with EitherMatchers with HistoryTest with ShouldVerb with WithDomain {
+class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
 
   private val ApprovalPeriod = 100
 

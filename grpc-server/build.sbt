@@ -11,8 +11,8 @@ extensionClasses ++= Seq(
 
 inConfig(Compile)(
   Seq(
-    PB.protoSources in Compile := Seq(PB.externalIncludePath.value),
-    includeFilter in PB.generate := new SimpleFileFilter(
+    Compile / PB.protoSources := Seq(PB.externalIncludePath.value),
+    PB.generate / includeFilter := new SimpleFileFilter(
       (f: File) =>
         ((** / "waves" / "node" / "grpc" / ** / "*.proto") || (** / "waves" / "events" / ** / "*.proto"))
           .accept(f.toPath, FileAttributes(f.toPath).getOrElse(FileAttributes.NonExistent))

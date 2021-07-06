@@ -5,7 +5,7 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync.{dataTxSupportedVersions, minFee}
-import com.wavesplatform.it.util._
+import com.wavesplatform.test._
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
 import com.wavesplatform.protobuf.transaction.{DataTransactionData, PBRecipients, PBTransactions, Recipient}

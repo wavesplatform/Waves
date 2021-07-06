@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import play.api.libs.json.{JsObject, Json}
 
 object ScriptValuesJson {
-  def serializeValue(e: EVALUATED): JsObject = e match {
+  def serializeValue(e: EVALUATED): JsObject = (e: @unchecked) match {
     case CONST_LONG(num)           => Json.obj("type" -> "Int", "value"         -> num)
     case CONST_BYTESTR(bs)         => Json.obj("type" -> "ByteVector", "value"  -> bs.toString)
     case CONST_STRING(str)         => Json.obj("type" -> "String", "value"      -> str)

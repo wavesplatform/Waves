@@ -45,7 +45,7 @@ object AsyncGrpcApi {
 
     def blockAt(height: Int): Future[Block] = {
       blocks
-        .getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.Height(height)))
+        .getBlock(BlockRequest.of(BlockRequest.Request.Height(height), includeTransactions = true))
         .map(r => PBBlocks.vanilla(r.getBlock).get.json().as[Block])
     }
 
@@ -307,7 +307,7 @@ object AsyncGrpcApi {
       condition
     }
 
-    def height: Future[Int] = blocks.getCurrentHeight(Empty.of()).map(h => h.value)
+    def height: Future[Int] = blocks.getCurrentHeight(Empty.of())
 
     def waitForHeight(expectedHeight: Int): Future[Int] = {
       waitFor[Int](s"height >= $expectedHeight")(_.height, h => h >= expectedHeight, 5.seconds)

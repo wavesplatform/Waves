@@ -4,10 +4,10 @@ import com.typesafe.config.Config
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.smartcontract.RideV4ActivationSuite._
 import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.smartcontract.RideV4ActivationSuite._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.util._
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.scalatest.CancelAfterFailure

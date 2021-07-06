@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
+import com.wavesplatform.RequestGen
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
@@ -8,7 +9,7 @@ import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.requests.{SignedTransferV1Request, SignedTransferV2Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.it.util.DoubleExt
+import com.wavesplatform.test._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -17,19 +18,15 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
 import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{NoShrink, RequestGen}
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
 class AssetsBroadcastRouteSpec
     extends RouteSpec("/assets/broadcast/")
     with RequestGen
     with PathMockFactory
-    with PropertyChecks
-    with RestAPISettingsHelper
-    with NoShrink {
+    with RestAPISettingsHelper {
 
   private[this] val route = AssetsApiRoute(
     restAPISettings,

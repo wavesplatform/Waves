@@ -11,10 +11,9 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.state.diffs._
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test.PropSpec
 
-class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
+class ScriptV1Test extends PropSpec with TypedScriptGen {
 
   property("ScriptV1.apply should permit BOOLEAN scripts") {
     forAll(BOOLEANgen(10)) { expr =>

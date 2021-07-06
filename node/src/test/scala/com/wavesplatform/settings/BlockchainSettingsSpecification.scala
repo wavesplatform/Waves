@@ -2,11 +2,11 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.common.state.ByteStr
-import org.scalatest.{FlatSpec, Matchers}
+import com.wavesplatform.test.FlatSpec
 
 import scala.concurrent.duration._
 
-class BlockchainSettingsSpecification extends FlatSpec with Matchers {
+class BlockchainSettingsSpecification extends FlatSpec {
   "BlockchainSettings" should "read custom values" in {
     val config   = loadConfig(ConfigFactory.parseString("""waves {
         |  directory = "/waves"

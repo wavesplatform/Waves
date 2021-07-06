@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1
 
-import cats.implicits._
+import cats.syntax.either._
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.meta.{FunctionSignatures, MetaMapper, ParsedMeta}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
@@ -20,10 +20,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
-import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
 import scala.annotation.tailrec
-import scala.concurrent.Future
 import scala.util.Random
 
 /**
@@ -257,8 +255,6 @@ trait BaseGlobal {
   def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt]
   def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt]
 
-  def requestNode(url: String): Future[NodeResponse]
-
   def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
 
   def bn256Groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
@@ -270,11 +266,11 @@ trait BaseGlobal {
     @tailrec
     def findKMedianInPlace(arr: ArrayView[T], k: Int)(implicit choosePivot: ArrayView[T] => T): T = {
       val a = choosePivot(arr)
-      val (s, b) = arr partitionInPlace (a >)
+      val (s, b) = arr partitionInPlace (a > _)
       if (s.size == k) a
       // The following test is used to avoid infinite repetition
       else if (s.isEmpty) {
-        val (s, b) = arr partitionInPlace (a ==)
+        val (s, b) = arr partitionInPlace (a == _)
         if (s.size > k) a
         else findKMedianInPlace(b, k - s.size)
       } else if (s.size < k) findKMedianInPlace(b, k - s.size)

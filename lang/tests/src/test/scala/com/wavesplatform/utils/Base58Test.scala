@@ -1,12 +1,10 @@
 package com.wavesplatform.utils
 
 import com.wavesplatform.common.utils.{Base58, FastBase58, StdBase58}
+import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import scorex.util.encode.{Base58 => ScorexBase58}
 
-class Base58Test extends PropSpec with PropertyChecks with Matchers {
+class Base58Test extends PropSpec {
   import org.scalacheck.Shrink
   implicit val noShrink: Shrink[String] = Shrink.shrinkAny
 
@@ -26,18 +24,6 @@ class Base58Test extends PropSpec with PropertyChecks with Matchers {
         .listOfN(length, Gen.oneOf(Base58Chars ++ IllegalChars))
         .filter(_.toSet.intersect(IllegalChars.toSet).nonEmpty)
     } yield chars.mkString
-
-  property("works the same as scorex implementation") {
-    forAll(base58Gen) { s =>
-      val bytes       = StdBase58.decode(s)
-      val scorexBytes = ScorexBase58.decode(s).get
-      bytes.sameElements(scorexBytes) shouldBe true
-
-      val str       = StdBase58.encode(bytes)
-      val scorexStr = ScorexBase58.encode(bytes)
-      str shouldBe scorexStr
-    }
-  }
 
   property("decodes the same as fast implementation") {
     forAll(base58Gen) { s =>
@@ -62,7 +48,7 @@ class Base58Test extends PropSpec with PropertyChecks with Matchers {
 
   property("handles zeroes at start") {
     val encodedString = "11WH5tQgZH6Djm7RS2guC"
-    val bytes         = ScorexBase58.decode(encodedString).get
+    val bytes         = Base58.decode(encodedString)
 
     val stdStr  = StdBase58.encode(bytes)
     val fastStr = FastBase58.encode(bytes)

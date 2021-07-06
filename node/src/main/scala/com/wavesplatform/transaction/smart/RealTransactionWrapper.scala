@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.smart
 
-import cats.implicits._
+import cats.syntax.either._
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
@@ -56,7 +56,7 @@ object RealTransactionWrapper {
       matcherFeeAssetId = o.matcherFeeAssetId.compatId
     )
 
-  implicit def aoaToRecipient(aoa: AddressOrAlias): Recipient = aoa match {
+  implicit def aoaToRecipient(aoa: AddressOrAlias): Recipient = (aoa: @unchecked) match {
     case a: Address => Recipient.Address(ByteStr(a.bytes))
     case a: Alias   => Recipient.Alias(a.name)
   }
@@ -67,7 +67,7 @@ object RealTransactionWrapper {
       stdLibVersion: StdLibVersion,
       target: AttachedPaymentTarget
   ): Either[ExecutionError, Tx] =
-    tx match {
+    (tx: @unchecked) match {
       case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient).asRight
       case t: TransferTransaction => mapTransferTx(t).asRight
       case i: IssueTransaction =>
