@@ -54,7 +54,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
       subj =>
         subj.onNext(upd) match {
           case Ack.Continue =>
-          // log.trace(s"$subj returned Ack.Continue on ${upd.ref}")
+            // Ignore
           case Ack.Stop =>
             log.error(s"$subj returned Ack.Stop on ${upd.ref}")
           case ack =>

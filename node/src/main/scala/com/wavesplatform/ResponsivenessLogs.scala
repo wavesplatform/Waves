@@ -163,7 +163,6 @@ private class ResponsivenessLogs(csvPrefix: String, metricName: String) extends 
         val timestamp = System.currentTimeMillis()
         val txJson    = if (eventType == TxEvent.Expired || eventType == TxEvent.Invalidated) tx.json().toString() else ""
         val logLine   = s"${tx.id()};$eventType;$height;$txType;$timestamp;$reasonClass;$reasonEscaped;$txJson"
-        // log.info(logLine)
         try pw.println(logLine)
         finally pw.close()
       }
