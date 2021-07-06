@@ -136,9 +136,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         timedTxValidator,
         settings.synchronizationSettings.utxSynchronizer.allowTxRebroadcasting,
         { () =>
-          val currentPeers = maybeNetworkServer.fold(0)(_.peerConnections.size)
-          if (currentPeers >= settings.restAPISettings.minimumPeers) Right(())
-          else Left(GenericError(s"There are not enough connections with peers ($currentPeers) to accept transaction"))
+          maybeNetworkServer
+            .collect { case ns if ns.peerConnections.size >= settings.restAPISettings.minimumPeers => () }
+            .toRight(GenericError(s"There are not enough connections with peers ($currentPeers) to accept transaction"))
         }
       )
 
