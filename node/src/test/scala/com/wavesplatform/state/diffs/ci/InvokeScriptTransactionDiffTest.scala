@@ -873,7 +873,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
           blockDiffEi.resultE.explicitGet().scriptsRun shouldBe 3
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, _)), _),
+                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, _)), _, _),
                 AssetVerifierTrace(transferringAssetId, None, _),
                 AssetVerifierTrace(attachedAssetId, None, _)
                 ) =>
@@ -1023,7 +1023,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
           blockDiffEi.resultE should produce("Transaction is not allowed by script")
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, dAppAddress, functionCall, Right(ScriptResultV3(_, transfers, _)), _),
+                InvokeScriptTrace(_, dAppAddress, functionCall, Right(ScriptResultV3(_, transfers, _)), _, _),
                 AssetVerifierTrace(allowedAssetId, None, _),
                 AssetVerifierTrace(bannedAssetId, Some(_: FailedTransactionError), _)
                 ) =>
@@ -1088,7 +1088,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
           blockDiffEi.resultE should produce("TransactionValidationError")
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, _)), _),
+                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, _)), _, _),
                 AssetVerifierTrace(transferringAssetId, Some(_), _)
                 ) =>
               transferringAssetId shouldBe transferringAsset.id()
@@ -2571,7 +2571,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
             diff.scriptResults(invokeTx.id()).error shouldBe None
             val l  = diff.scriptResults(invokeTx.id()).leases(0)
             val l1 = diff.scriptResults(invokeTx.id()).leases(1)
-            val l2 = diff.scriptResults(invokeTx.id()).leaseCancels(0)
+            val l2                                                        = diff.scriptResults(invokeTx.id()).leaseCancels(0)
             l.amount shouldBe 13
             l.recipient shouldBe service
             l1.amount shouldBe 23

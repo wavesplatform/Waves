@@ -322,6 +322,7 @@ class DebugApiRouteSpec
                     |  "id" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
                     |  "function" : "test",
                     |  "args" : [ ],
+                    |  "invocations" : [ ],
                     |  "result" : {
                     |    "data" : [ ],
                     |    "transfers" : [ ],
@@ -360,6 +361,7 @@ class DebugApiRouteSpec
                |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                |  "function" : "dataAndTransfer",
                |  "args" : [ ],
+               |  "invocations" : [ ],
                |  "result" : {
                |    "data" : [ {
                |      "key" : "key",
@@ -422,6 +424,7 @@ class DebugApiRouteSpec
           |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
           |  "function" : "issue",
           |  "args" : [ ],
+          |  "invocations" : [ ],
           |  "result" : {
           |    "data" : [ ],
           |    "transfers" : [ ],
@@ -463,6 +466,7 @@ class DebugApiRouteSpec
                |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                |  "function" : "reissue",
                |  "args" : [ ],
+               |  "invocations" : [ ],
                |  "result" : {
                |    "data" : [ ],
                |    "transfers" : [ ],
@@ -506,6 +510,7 @@ class DebugApiRouteSpec
                |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                |  "function" : "burn",
                |  "args" : [ ],
+               |  "invocations" : [ ],
                |  "result" : {
                |    "data" : [ ],
                |    "transfers" : [ ],
@@ -682,6 +687,7 @@ class DebugApiRouteSpec
              |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
              |  "function" : "test",
              |  "args" : [ ],
+             |  "invocations" : [ ],
              |  "result" : {
              |    "data" : [ ],
              |    "transfers" : [ ],
@@ -846,6 +852,38 @@ class DebugApiRouteSpec
              |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
              |  "function" : "test1",
              |  "args" : [ ],
+             |  "invocations" : [ {
+             |    "type" : "dApp",
+             |    "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+             |    "function" : "test",
+             |    "args" : [ ],
+             |    "invocations" : [ ],
+             |    "result" : {
+             |      "data" : [ {
+             |        "key" : "key",
+             |        "type" : "integer",
+             |        "value" : 1
+             |      } ],
+             |      "transfers" : [ ],
+             |      "issues" : [ ],
+             |      "reissues" : [ ],
+             |      "burns" : [ ],
+             |      "sponsorFees" : [ ],
+             |      "leases" : [ ],
+             |      "leaseCancels" : [ ],
+             |      "invokes" : [ ]
+             |    },
+             |    "error" : null,
+             |    "vars" : [ {
+             |      "name" : "a",
+             |      "type" : "BigInt",
+             |      "value" : 6.703903964971298549787012499102923E+153
+             |    }, {
+             |      "name" : "test",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    } ]
+             |  } ],
              |  "result" : {
              |    "data" : [ ],
              |    "transfers" : [ ],

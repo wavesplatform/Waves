@@ -24,11 +24,13 @@ import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.metrics.{TxProcessingStats => Stats}
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{Proofs, Transaction}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import monix.eval.Coeval
 import shapeless.Coproduct
@@ -119,7 +121,8 @@ object InvokeScriptTransactionDiff {
               tx.dAppAddressOrAlias,
               functionCall,
               scriptResultE.map(_.scriptResult),
-              scriptResultE.fold(_.log, _.log)
+              scriptResultE.fold(_.log, _.log),
+              environment.invocationRoot.toTraceList(tx.id())
             )
           )
         )
@@ -257,6 +260,12 @@ object InvokeScriptTransactionDiff {
 
       case Left(error) => TracedResult(Left(error))
     }
+  }
+
+  def calculateFee(blockchain: Blockchain, tx: InvokeScriptTransaction): Option[Long] = {
+    val differ = TransactionDiffer(blockchain.lastBlockTimestamp, tx.timestamp, verify = false)(blockchain, _)
+    val result = differ(tx.copy(proofs = Proofs(ByteStr.empty)))
+    result.attributeOpt[Long](Attribute.MinFee)
   }
 
   private def evaluateV2(

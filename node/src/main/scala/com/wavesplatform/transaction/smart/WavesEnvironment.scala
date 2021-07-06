@@ -14,6 +14,7 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain._
@@ -26,6 +27,7 @@ import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
+import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
@@ -235,8 +237,9 @@ class WavesEnvironment(
 object DAppEnvironment {
   // Not thread safe
   final case class InvocationTreeTracker(root: DAppInvocation) {
-    private[this] var error       = Option.empty[ValidationError]
-    private[this] var invocations = Vector.empty[InvocationTreeTracker]
+    private var result: Either[ValidationError, ScriptResult] = Left(GenericError("No result"))
+    private var log: Log[Id]                                  = Nil
+    private[this] var invocations                             = Vector.empty[InvocationTreeTracker]
 
     def record(invocation: DAppInvocation): InvocationTreeTracker = {
       val tracker = InvocationTreeTracker(invocation)
@@ -244,19 +247,31 @@ object DAppEnvironment {
       tracker
     }
 
+    def setResult(result: ScriptResult): Unit =
+      this.result = Right(result)
+
     def setError(error: ValidationError): Unit =
-      this.error = Some(error)
+      this.result = Left(error)
+
+    def setLog(log: Log[Id]): Unit =
+      this.log = log
 
     def toInvocationList: Seq[InvokeScriptResult.Invocation] = {
       this.invocations.to(LazyList).map { inv =>
-        val call       = InvokeScriptResult.Call.fromFunctionCall(inv.root.call)
-        val payments   = InvokeScriptResult.AttachedPayment.fromInvokePaymentList(inv.root.payments)
-        InvokeScriptResult.Invocation(inv.root.dAppAddress, call, payments, InvokeScriptResult(invokes = inv.toInvocationList, error = inv.getErrorMessage))
+        val call     = InvokeScriptResult.Call.fromFunctionCall(inv.root.call)
+        val payments = InvokeScriptResult.AttachedPayment.fromInvokePaymentList(inv.root.payments)
+        InvokeScriptResult
+          .Invocation(inv.root.dAppAddress, call, payments, InvokeScriptResult(invokes = inv.toInvocationList, error = inv.getErrorMessage))
       }
     }
 
+    def toTraceList(invocationId: ByteStr): Seq[InvokeScriptTrace] =
+      this.invocations.to(LazyList).map { inv =>
+        InvokeScriptTrace(invocationId, inv.root.dAppAddress, inv.root.call, inv.result, inv.log, inv.toTraceList(invocationId))
+      }
+
     def getErrorMessage: Option[InvokeScriptResult.ErrorMessage] =
-      this.error.map(errorMessage)
+      this.result.left.toOption.map(errorMessage)
 
     private[this] def errorMessage(ve: ValidationError): InvokeScriptResult.ErrorMessage = {
       val fte = FailedTransactionError.asFailedScriptError(ve)
@@ -285,7 +300,7 @@ class DAppEnvironment(
     var availableActions: Int,
     var availableData: Int,
     var currentDiff: Diff,
-    invocationRoot: DAppEnvironment.InvocationTreeTracker
+    val invocationRoot: DAppEnvironment.InvocationTreeTracker
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.map(_.id()).getOrElse(ByteStr.empty)) {
 
   private[this] var mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
@@ -312,7 +327,10 @@ class DAppEnvironment(
         account.Address
           .fromBytes(dApp.bytes.arr)
           .ensureOr(
-            address => GenericError(s"The invocation stack contains multiple invocations of the dApp at address $address with invocations of another dApp between them")
+            address =>
+              GenericError(
+                s"The invocation stack contains multiple invocations of the dApp at address $address with invocations of another dApp between them"
+              )
           )(
             address => currentDApp == address || !calledAddresses.contains(address)
           )
@@ -343,10 +361,7 @@ class DAppEnvironment(
         availableData,
         if (reentrant) calledAddresses else calledAddresses + invoke.senderAddress,
         invocationTracker
-      )(invoke).leftMap { err =>
-        invocationTracker.setError(err)
-        err
-      }
+      )(invoke)
     } yield {
       val fixedDiff = diff.copy(
         scriptResults = Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))),
