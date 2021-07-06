@@ -1,34 +1,23 @@
 package com.wavesplatform.state.diffs.ci
 
+import com.wavesplatform.TestTime
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
+import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.scalatest.{EitherValues, Inside}
 
-class InvokePaymentsAvailabilityTest
-    extends PropSpec
-    with ScalaCheckPropertyChecks
-    with Matchers
-    with TransactionGen
-    with NoShrink
-    with Inside
-    with WithState
-    with DBCacheSettings
-    with MockFactory
-    with WithDomain
-    with EitherValues {
+class InvokePaymentsAvailabilityTest extends PropSpec with Inside with DBCacheSettings with MockFactory with WithDomain with EitherValues {
   import DomainPresets._
 
   private val time = new TestTime

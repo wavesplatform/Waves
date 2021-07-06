@@ -23,18 +23,14 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
+import com.wavesplatform.TestTime
+import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.scalatest.{EitherValues, Inside}
 
 class BigIntInvokeTest
     extends PropSpec
-    with ScalaCheckPropertyChecks
-    with Matchers
-    with TransactionGen
-    with NoShrink
     with Inside
     with WithState
     with DBCacheSettings
@@ -204,7 +200,7 @@ class BigIntInvokeTest
       fsWithV5
     ) {
       case (diff, _) =>
-        diff.errorMessage(invoke.id.value()) shouldBe None
+        diff.errorMessage(invoke.id()) shouldBe None
         diff.scriptsRun shouldBe 2
         diff.accountData.head._2.data("key").value shouldBe 1
     }

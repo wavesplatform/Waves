@@ -3,7 +3,10 @@ package com.wavesplatform.state.diffs.invoke
 import scala.util.Right
 
 import cats.Id
-import cats.implicits._
+import cats.instances.list._
+import cats.syntax.either._
+import cats.syntax.semigroup._
+import cats.syntax.traverseFilter._
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt

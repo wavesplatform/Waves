@@ -20,18 +20,13 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.{BlocksTransactionsHelpers, NoShrink, TransactionGen}
+import com.wavesplatform.BlocksTransactionsHelpers
+import com.wavesplatform.test.PropSpec
 import fastparse.Parsed
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class AssetTransactionsDiffTest
     extends PropSpec
-    with PropertyChecks
-    with Matchers
-    with TransactionGen
-    with NoShrink
     with BlocksTransactionsHelpers
     with WithDomain {
 
@@ -404,13 +399,13 @@ class AssetTransactionsDiffTest
 
   property(s"Can update with CompositeBlockchain") {
     forAll(genesisIssueUpdateWithSecondAsset) {
-      case (gen, Seq(issue, issue1), signer, update1) =>
+      case (gen, issues, signer, update1) =>
         withDomain(domainSettingsWithFS(assetInfoUpdateEnabled.copy(minAssetInfoUpdateInterval = 0))) { d =>
           val blockchain   = d.blockchainUpdater
-          val genesisBlock = TestBlock.create(gen :+ issue :+ issue1)
+          val genesisBlock = TestBlock.create(gen ++ issues)
           d.appendBlock(genesisBlock)
 
-          val (keyBlock, Seq(microBlock)) =
+          val (keyBlock, mbs) =
             UnsafeBlocks.unsafeChainBaseAndMicro(
               genesisBlock.id(),
               Nil,
@@ -420,7 +415,10 @@ class AssetTransactionsDiffTest
               genesisBlock.header.timestamp + 100
             )
           d.appendBlock(keyBlock)
-          val microBlockId = d.appendMicroBlock(microBlock)
+          val microBlockId = d.appendMicroBlock(mbs.head)
+
+          val issue = issues(0)
+          val issue1 = issues(1)
 
           { // Check liquid block
             val desc = blockchain.assetDescription(issue.asset).get

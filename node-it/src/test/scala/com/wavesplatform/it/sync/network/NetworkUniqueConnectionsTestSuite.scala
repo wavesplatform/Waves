@@ -4,13 +4,13 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.{DockerBased, Node, NodeConfigs, Nodes}
 import com.wavesplatform.utils.ScorexLogging
-import org.scalatest.{FreeSpec, Matchers}
+import org.scalatest._
 
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with DockerBased with ScorexLogging with Nodes {
+class NetworkUniqueConnectionsTestSuite extends freespec.AnyFreeSpec with matchers.should.Matchers with DockerBased with ScorexLogging with Nodes {
   import NetworkUniqueConnectionsTestSuite._
 
   "nodes should up and connect with each other" in {
@@ -40,8 +40,8 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Dock
     withClue("Should fail with TimeoutException, because the connectionAttempt should fail") {
       Try(firstNode.waitForPeers(2, 30.seconds)) match {
         case Failure(ApiCallException(_: TimeoutException)) => // Pass
-        case Failure(exception) => fail(exception)
-        case Success(v) => fail(s"Expected TimeoutException, got $v")
+        case Failure(exception)                             => fail(exception)
+        case Success(v)                                     => fail(s"Expected TimeoutException, got $v")
       }
     }
   }

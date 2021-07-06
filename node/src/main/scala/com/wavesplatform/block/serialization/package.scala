@@ -22,7 +22,7 @@ package object serialization {
   }
 
   private[block] def readTransactionData(version: Byte, buf: ByteBuffer): Seq[Transaction] = {
-    val txCount = version match {
+    val txCount = (version: @unchecked) match {
       case GenesisBlockVersion | PlainBlockVersion                 => buf.getByte
       case NgBlockVersion | RewardBlockVersion | ProtoBlockVersion => buf.getInt
     }
@@ -46,7 +46,7 @@ package object serialization {
       generationSignature.arr
     )
 
-  def mkTxsCountBytes(version: Byte, txsCount: Int): Array[Byte] = version match {
+  def mkTxsCountBytes(version: Byte, txsCount: Int): Array[Byte] = (version: @unchecked) match {
     case GenesisBlockVersion | PlainBlockVersion                 => Array(txsCount.toByte)
     case NgBlockVersion | RewardBlockVersion | ProtoBlockVersion => Ints.toByteArray(txsCount)
   }

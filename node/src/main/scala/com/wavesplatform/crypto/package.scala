@@ -8,8 +8,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils._
 import org.whispersystems.curve25519.OpportunisticCurve25519Provider
-import scorex.crypto.hash.{Blake2b256, Keccak256}
-import scorex.crypto.signatures.{Curve25519, Signature, PrivateKey => SPrivateKey, PublicKey => SPublicKey}
 
 import scala.util.Try
 
@@ -37,19 +35,17 @@ package object crypto extends ScorexLogging {
 
   // Signatures
   def sign(account: PrivateKey, message: Array[Byte]): ByteStr =
-    ByteStr(Curve25519.sign(SPrivateKey(account.arr), message))
+    ByteStr(Curve25519.sign(account.arr, message))
 
   def signVRF(account: PrivateKey, message: Array[Byte]): ByteStr =
     ByteStr(provider.calculateVrfSignature(provider.getRandom(DigestLength), account.arr, message))
 
   def verify(signature: ByteStr, message: Array[Byte], publicKey: PublicKey): Boolean =
-    Curve25519.verify(Signature(signature.arr), message, SPublicKey(publicKey.arr))
+    Curve25519.verify(signature.arr, message, publicKey.arr)
 
   def verifyVRF(signature: ByteStr, message: Array[Byte], publicKey: PublicKey): Either[ValidationError, ByteStr] =
     Try(ByteStr(provider.verifyVrfSignature(publicKey.arr, message, signature.arr))).toEither.left
       .map(_ => GenericError("Could not verify VRF proof"))
-
-  def createKeyPair(seed: Array[Byte]): (Array[Byte], Array[Byte]) = Curve25519.createKeyPair(seed)
 
   // see
   // https://github.com/jedisct1/libsodium/blob/ab4ab23d5744a8e060864a7cec1a7f9b059f9ddd/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c#L17

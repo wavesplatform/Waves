@@ -3,16 +3,14 @@ package com.wavesplatform.network
 import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.{Ints, Longs}
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.test.FreeSpec
 import io.netty.buffer.Unpooled
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{FreeSpec, Matchers}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class HandshakeDecoderSpec extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen with NoShrink {
+class HandshakeDecoderSpec extends FreeSpec with MockFactory {
 
   "should read a handshake and remove itself from the pipeline" in {
     var mayBeDecodedHandshake: Option[Handshake] = None
@@ -64,16 +62,15 @@ class HandshakeDecoderSpec extends FreeSpec with Matchers with MockFactory with 
         false
     }
 
-    invalidBytesGen.map {
-      case List(appNameLen, nodeNameLen, declaredAddressLen) =>
-        Array(appNameLen) ++
-          appNameBytes ++
-          versionBytes ++
-          Array(nodeNameLen) ++
-          nodeNameBytes ++
-          nonceBytes ++
-          Array(declaredAddressLen) ++
-          timestampBytes
+    invalidBytesGen.map { l =>
+      Array(l(0)) ++
+        appNameBytes ++
+        versionBytes ++
+        Array(l(1)) ++
+        nodeNameBytes ++
+        nonceBytes ++
+        Array(l(2)) ++
+        timestampBytes
     }
   }
 

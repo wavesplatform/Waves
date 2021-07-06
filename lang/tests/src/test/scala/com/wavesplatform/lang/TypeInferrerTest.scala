@@ -1,11 +1,10 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.v1.compiler.Types._
-import org.scalatest.{FreeSpec, Matchers}
-import Common._
 import com.wavesplatform.lang.v1.compiler.TypeInferrer
+import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.test._
 
-class TypeInferrerTest extends FreeSpec with Matchers {
+class TypeInferrerTest extends FreeSpec {
 
   val typeparamT = TYPEPARAM('T')
   val typeparamG = TYPEPARAM('G')

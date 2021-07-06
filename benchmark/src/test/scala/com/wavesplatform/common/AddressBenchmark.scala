@@ -4,6 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.AddressBenchmark.{CachedAddress, PublicKeySt, UncachedAddress}
+import com.wavesplatform.crypto.Curve25519
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
@@ -37,7 +38,7 @@ class AddressBenchmark {
 object AddressBenchmark {
   @State(Scope.Benchmark)
   class PublicKeySt {
-    val publicKey = new Array[Byte](scorex.crypto.signatures.Curve25519.KeyLength25519)
+    val publicKey = new Array[Byte](Curve25519.KeyLength)
     Random.nextBytes(publicKey)
   }
 

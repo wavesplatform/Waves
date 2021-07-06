@@ -9,7 +9,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressPortfolio
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.database.{DBExt, KeyTags, Keys, LevelDBWriter, openDB, readTransactionBytes}
+import com.wavesplatform.database.{AddressId, DBExt, KeyTags, Keys, LevelDBWriter, openDB, readTransactionBytes, readTransactionHNSeqAndType}
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio, TxNum}
@@ -43,7 +43,7 @@ object Explorer extends ScorexLogging {
 
     @tailrec
     def parseArgs(buffer: Seq[String], args: Seq[String] = Nil, flags: Map[String, String] = Map.empty): (Seq[String], Map[String, String]) =
-      buffer match {
+      (buffer: @unchecked) match {
         case flag +: value +: rest if flag.startsWith("-") =>
           parseArgs(rest, args, flags + (flag -> value))
 
@@ -276,6 +276,20 @@ object Explorer extends ScorexLogging {
             counter += 1
           }
           log.info(s"Found $counter orders")
+
+        case "CAT" =>
+          log.info(s"Counting address transactions")
+          val addressCount = db.get(Keys.lastAddressId).get.toInt
+          log.info(s"Processing $addressCount addresses")
+          val txCounts = new Array[Int](addressCount + 1)
+          db.iterateOver(KeyTags.AddressTransactionHeightTypeAndNums) { e =>
+            txCounts(Longs.fromByteArray(e.getKey.slice(2, 10)).toInt) += readTransactionHNSeqAndType(e.getValue)._2.size
+          }
+          log.info("Sorting result")
+          txCounts.zipWithIndex.sorted.takeRight(100).foreach { case (count, id) =>
+            log.info(s"${db.get(Keys.idToAddress(AddressId(id.toLong)))}: $count")
+          }
+
       }
     } finally db.close()
   }

@@ -1,10 +1,7 @@
 package com.wavesplatform.http
 
-import scala.concurrent.Future
-
 import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity}
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.{NoShrink, NTPTime, TestWallet, TransactionGen}
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
 import com.wavesplatform.api.http.ApiMarshallers._
@@ -14,31 +11,31 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
-import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Diff}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
+import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Diff}
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
 import com.wavesplatform.utils.SystemTime
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{NTPTime, TestWallet, TransactionGen}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.libs.json.{JsArray, JsObject, Json}
+
+import scala.concurrent.Future
 
 class LeaseRouteSpec
     extends RouteSpec("/leasing")
-    with ScalaCheckPropertyChecks
     with TransactionGen
     with RestAPISettingsHelper
-    with NoShrink
     with NTPTime
     with WithDomain
     with TestWallet
@@ -50,7 +47,7 @@ class LeaseRouteSpec
       domain.blockchain,
       (_, _) => Future.successful(TracedResult(Right(true))),
       ntpTime,
-      CommonAccountsApi(domain.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), domain.db, domain.blockchain)
+      CommonAccountsApi(() => domain.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), domain.db, domain.blockchain)
     )
 
   private def withRoute(f: (Domain, Route) => Unit): Unit =

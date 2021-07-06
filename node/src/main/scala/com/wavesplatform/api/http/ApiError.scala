@@ -208,7 +208,7 @@ object ApiError {
     override val id: Int = AliasDoesNotExist.Id
     override val code    = StatusCodes.NotFound
 
-    private[this] lazy val msgReason = aoa match {
+    private[this] lazy val msgReason = (aoa: @unchecked) match {
       case a: Address => s"for address '${a.stringRepr}'"
       case a: Alias   => s"'${a.stringRepr}'"
     }

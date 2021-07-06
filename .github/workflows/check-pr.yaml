@@ -1,0 +1,21 @@
+name: Check PR
+on: [push]
+jobs:
+  check-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Cache SBT
+        uses: actions/cache@v1
+        with:
+          path: ~/.sbt
+          key: sbt-cache-${{ hashFiles('project/build.properties') }}
+      - name: Cache Coursier
+        uses: actions/cache@v1
+        with:
+          path: ~/.cache/coursier
+          key: coursier-cache
+      - name: Check PR
+        run: |
+          sbt --mem 6144 --batch checkPR
+          find ~/.cache/coursier -type d -name '*SNAPSHOT' | xargs rm -vrf {} \;

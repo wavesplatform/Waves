@@ -1,26 +1,24 @@
 package com.wavesplatform.transaction
 
+import com.wavesplatform.NTPTime
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.utx.UtxPoolImpl
-import com.wavesplatform.{NTPTime, NoShrink, TransactionGen}
 import monix.reactive.Observer
-import org.scalatest.FreeSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with ScalaCheckPropertyChecks with TransactionGen with NTPTime with NoShrink {
+class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
   private[this] val dApp1 = TestCompiler(V5).compileContract("""
       |{-# STDLIB_VERSION 5 #-}
       |{-# CONTENT_TYPE DAPP #-}

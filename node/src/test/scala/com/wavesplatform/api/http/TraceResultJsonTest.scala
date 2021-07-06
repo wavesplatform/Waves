@@ -7,9 +7,9 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.ScriptResultV3
-import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, Recipient}
 import com.wavesplatform.lang.v1.traits.domain.DataItem.Lng
-import com.wavesplatform.transaction.{Proofs, TxValidationError}
+import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, Recipient}
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
@@ -44,7 +44,7 @@ class TraceResultJsonTest extends PropSpec with Matchers with JsonMatchers {
     val recipient = Recipient.Address(ByteStr(tx.dAppAddressOrAlias.bytes))
     val trace = List(
       InvokeScriptTrace(
-        tx.id.value(),
+        tx.id(),
         tx.dAppAddressOrAlias,
         tx.funcCall,
         Right(
@@ -224,7 +224,7 @@ class TraceResultJsonTest extends PropSpec with Matchers with JsonMatchers {
 
     val trace = List(
       InvokeScriptTrace(
-        tx.id.value(),
+        tx.id(),
         tx.dAppAddressOrAlias,
         tx.funcCall,
         Left(TxValidationError.ScriptExecutionError(reason, vars, None)),

@@ -1,13 +1,13 @@
 package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.test.FlatSpec
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
-import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._
 
-class MinerSettingsSpecification extends FlatSpec with Matchers {
+class MinerSettingsSpecification extends FlatSpec {
   "MinerSettings" should "read values" in {
     val config = ConfigFactory.parseString("""
         |waves {

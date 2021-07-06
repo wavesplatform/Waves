@@ -1,6 +1,11 @@
 package com.wavesplatform.lang.v1.compiler
 
-import cats.implicits._
+import cats.instances.list._
+import cats.instances.option._
+import cats.instances.vector._
+import cats.syntax.applicative._
+import cats.syntax.either._
+import cats.syntax.traverse._
 import cats.{Id, Show}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
@@ -95,7 +100,11 @@ object ContractCompiler {
     } yield (resultAnnFunc, typedParams, parseNodeExpr, errorList)
   }
 
-  private def compileDeclaration(dec: Expressions.Declaration, saveExprContext: Boolean, allowIllFormedStrings: Boolean): CompileM[CompilationStepResultDec] = {
+  private def compileDeclaration(
+      dec: Expressions.Declaration,
+      saveExprContext: Boolean,
+      allowIllFormedStrings: Boolean
+  ): CompileM[CompilationStepResultDec] = {
     dec match {
       case l: Expressions.LET =>
         for {
@@ -122,7 +131,9 @@ object ContractCompiler {
       allowIllFormedStrings: Boolean = false
   ): CompileM[(Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
     for {
-      decsCompileResult <- parsedDapp.decs.traverse[CompileM, CompilationStepResultDec](dec => compileDeclaration(dec, saveExprContext, allowIllFormedStrings))
+      decsCompileResult <- parsedDapp.decs.traverse[CompileM, CompilationStepResultDec](
+        dec => compileDeclaration(dec, saveExprContext, allowIllFormedStrings)
+      )
       decs           = decsCompileResult.map(_.dec)
       parsedNodeDecs = decsCompileResult.map(_.parseNodeExpr)
       duplicateVarsErr   <- validateDuplicateVarsInContract(parsedDapp).handleError()
@@ -353,7 +364,7 @@ object ContractCompiler {
           case Left(err) => Left(err)
           case Right(c)  => Right(c)
         }
-      case f @ fastparse.Parsed.Failure(_, _, _) => Left(f.toString)
+      case f: fastparse.Parsed.Failure => Left(f.toString)
     }
   }
 

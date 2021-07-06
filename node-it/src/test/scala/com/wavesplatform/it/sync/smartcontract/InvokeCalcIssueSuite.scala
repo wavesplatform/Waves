@@ -12,9 +12,9 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.{CancelAfterFailure, Matchers, OptionValues}
+import org.scalatest._
 
-class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with CancelAfterFailure with OptionValues {
+class InvokeCalcIssueSuite extends BaseTransactionSuite with CancelAfterFailure with OptionValues {
   import InvokeCalcIssueSuite._
 
   override protected def nodeConfigs: Seq[Config] =
