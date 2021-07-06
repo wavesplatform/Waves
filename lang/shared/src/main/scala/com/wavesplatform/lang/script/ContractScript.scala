@@ -1,6 +1,12 @@
 package com.wavesplatform.lang.script
 
-import cats.implicits._
+import cats.instances.either._
+import cats.instances.list._
+import cats.instances.option._
+import cats.syntax.either._
+import cats.syntax.flatMap._
+import cats.syntax.foldable._
+import cats.syntax.traverse._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.VerifierFunction

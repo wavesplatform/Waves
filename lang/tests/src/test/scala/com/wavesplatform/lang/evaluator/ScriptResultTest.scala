@@ -2,9 +2,7 @@ package com.wavesplatform.lang.evaluator
 
 import cats.Id
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -16,10 +14,9 @@ import com.wavesplatform.lang.v1.evaluator.{ScriptResult, ScriptResultV3}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, DataItem}
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test._
 
-class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
+class ScriptResultTest extends PropSpec {
 
   val pureEvalContext: EvaluationContext[Environment, Id] =
     PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment].evaluationContext(utils.environment)

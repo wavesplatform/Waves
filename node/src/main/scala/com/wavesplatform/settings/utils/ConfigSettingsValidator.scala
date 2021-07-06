@@ -1,7 +1,9 @@
 package com.wavesplatform.settings.utils
 
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
-import cats.implicits._
+import cats.instances.list._
+import cats.syntax.foldable._
+import cats.syntax.traverse._
 import com.typesafe.config.{Config, ConfigException}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import net.ceedubs.ficus.Ficus._

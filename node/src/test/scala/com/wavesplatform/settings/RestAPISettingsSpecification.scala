@@ -1,11 +1,11 @@
 package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.test.FlatSpec
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
-import org.scalatest.{FlatSpec, Matchers}
 
-class RestAPISettingsSpecification extends FlatSpec with Matchers {
+class RestAPISettingsSpecification extends FlatSpec {
   "RestAPISettings" should "read values" in {
     val config   = ConfigFactory.parseString("""waves {
                                                |  rest-api {

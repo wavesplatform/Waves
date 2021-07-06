@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.serialization.impl
 
-import cats.implicits._
+import cats.syntax.applicativeError._
 import com.wavesplatform.protobuf.transaction.{PBTransactions, SignedTransaction => PBSignedTransaction}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.transaction.{PBParsingError, Transaction}

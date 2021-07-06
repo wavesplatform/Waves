@@ -1,26 +1,19 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.{EitherMatchers, TransactionGen}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
-import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class BlockchainUpdaterMicroblockBadSignaturesTest
-    extends PropSpec
-    with PropertyChecks
-    with DomainScenarioDrivenPropertyCheck
-    with Matchers
-    with EitherMatchers
-    with TransactionGen {
+class BlockchainUpdaterMicroblockBadSignaturesTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck {
 
   val preconditionsAndPayments: Gen[(GenesisTransaction, TransferTransaction, TransferTransaction)] = for {
     master    <- accountGen

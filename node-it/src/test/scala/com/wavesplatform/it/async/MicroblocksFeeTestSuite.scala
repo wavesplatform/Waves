@@ -1,22 +1,17 @@
 package com.wavesplatform.it.async
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.util._
-import com.wavesplatform.utils.ScorexLogging
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
+import com.wavesplatform.test._
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class MicroblocksFeeTestSuite extends FreeSpec with Matchers with CancelAfterFailure with NodesFromDocker with ScorexLogging {
-
-  private def notMiner = nodes.head
+class MicroblocksFeeTestSuite extends BaseFreeSpec {
 
   private def firstAddress = nodes(1).address
 
@@ -100,10 +95,10 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with CancelAfterFai
       """.stripMargin
   )
 
-  override protected def nodeConfigs: Seq[Config] = Seq(
-    notMinerConfig.withFallback(Default.head),
+  override protected val nodeConfigs: Seq[Config] = Seq(
+    minerConfig.withFallback(Default(0)),
     notMinerConfig.withFallback(Default(1)),
     notMinerConfig.withFallback(Default(2)),
-    minerConfig.withFallback(Default(3))
+    notMinerConfig.withFallback(Default(3))
   )
 }

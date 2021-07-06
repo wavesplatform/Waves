@@ -2,26 +2,23 @@ package com.wavesplatform.lang
 
 import java.math.{MathContext, BigDecimal => BD}
 import java.security.spec.InvalidKeySpecException
-import cats.implicits._
+import cats.syntax.either._
 import ch.obermuhlner.math.big.BigDecimalMath
 import com.google.common.base.Utf8
 import com.google.common.io.BaseEncoding
+import com.wavesplatform.common.merkle.Merkle
 import com.wavesplatform.common.utils.{Base58, Base64}
+import com.wavesplatform.crypto.{Blake2b256, Curve25519, Keccak256, Sha256}
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
-import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
-import com.wavesplatform.utils.Merkle
 import com.wavesplatform.zwaves.bls12.{Groth16 => Bls12Groth16}
 import com.wavesplatform.zwaves.bn256.{Groth16 => Bn256Groth16}
 import org.web3j.crypto.Sign
 import org.web3j.crypto.Sign.SignatureData
-import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
-import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 import scala.annotation.tailrec
-import scala.concurrent.Future
 import scala.util.Try
 
 object Global extends BaseGlobal {
@@ -63,11 +60,11 @@ object Global extends BaseGlobal {
     if (th.getCause == null) th
     else findThrowableCause(th.getCause)
 
-  def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean = Curve25519.verify(Signature(sig), message, PublicKey(pub))
+  def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean =
+    Curve25519.verify(sig, message, pub)
 
   override def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Either[String, Boolean] =
-    Try(RSA.verify(alg, message, sig, pub))
-      .toEither
+    Try(RSA.verify(alg, message, sig, pub)).toEither
       .leftMap {
         case err: InvalidKeySpecException => s"Invalid key base58'${Base58.encode(pub)}': ${findThrowableCause(err).getMessage}"
         case err                          => findThrowableCause(err).getMessage
@@ -117,10 +114,6 @@ object Global extends BaseGlobal {
       BigInt(res.setScale(rp.toInt, round.mode).unscaledValue)
     }
 
-  private val client = new SttpClient()
-  override def requestNode(url: String): Future[NodeResponse] =
-    client.requestNode(url)
-
   override def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
     Bls12Groth16.verify(verifyingKey, proof, inputs)
 
@@ -131,9 +124,9 @@ object Global extends BaseGlobal {
     // https://github.com/web3j/web3j/blob/master/crypto/src/test/java/org/web3j/crypto/ECRecoverTest.java#L43
     val signatureData = {
       val vTemp = signature(64)
-      val v = if (vTemp < 27) (vTemp + 27).toByte else vTemp
-      val r = signature.slice(0, 32)
-      val s = signature.slice(32, 64)
+      val v     = if (vTemp < 27) (vTemp + 27).toByte else vTemp
+      val r     = signature.slice(0, 32)
+      val s     = signature.slice(32, 64)
       new SignatureData(v, r, s)
     }
     val pk = Sign.signedMessageHashToKey(messageHash, signatureData)

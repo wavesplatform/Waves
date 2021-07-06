@@ -8,13 +8,13 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.state.DataEntry._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.{TransactionGen, crypto}
+import com.wavesplatform.crypto
+import com.wavesplatform.test.PropSpec
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
-class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class DataTransactionSpecification extends PropSpec {
 
   private def checkSerialization(tx: DataTransaction): Assertion = {
     val parsed = DataTransaction.parseBytes(tx.bytes()).get

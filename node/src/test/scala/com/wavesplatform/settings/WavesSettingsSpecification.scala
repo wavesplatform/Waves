@@ -3,9 +3,9 @@ package com.wavesplatform.settings
 import java.io.File
 
 import com.typesafe.config.ConfigFactory
-import org.scalatest.{FlatSpec, Matchers}
+import com.wavesplatform.test.FlatSpec
 
-class WavesSettingsSpecification extends FlatSpec with Matchers {
+class WavesSettingsSpecification extends FlatSpec {
 
   private def config(configName: String) = {
     WavesSettings.fromRootConfig(
@@ -19,7 +19,8 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
     "WavesSettings" should s"read values from default config with $configName overrides" in {
       val settings = config(configName)
 
-      val expected = ConfigFactory.parseString(s"waves.directory = ${com.wavesplatform.settings.defaultDirectory(settings.config)}")
+      val expected = ConfigFactory
+        .parseString(s"waves.directory = ${com.wavesplatform.settings.defaultDirectory(settings.config)}")
         .withFallback(ConfigFactory.load())
         .resolve()
         .getString("waves.directory")

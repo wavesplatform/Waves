@@ -9,17 +9,15 @@ import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.utils._
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.PropSpec
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class SmartAssetEvalTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class SmartAssetEvalTest extends PropSpec with WithState {
   val preconditions: Gen[(GenesisTransaction, IssueTransaction, SetAssetScriptTransaction, TransferTransaction)] =
     for {
       firstAcc  <- accountGen
@@ -42,17 +40,17 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with WithState wit
         .explicitGet()
 
       issueTransaction = IssueTransaction(
-          TxVersion.V2,
-          firstAcc.publicKey,
-          "name".utf8Bytes,
-          "description".utf8Bytes,
-          100,
-          0,
-          false,
-          Some(emptyExprScript),
-          1000000,
-          ts
-        ).signWith(firstAcc.privateKey)
+        TxVersion.V2,
+        firstAcc.publicKey,
+        "name".utf8Bytes,
+        "description".utf8Bytes,
+        100,
+        0,
+        false,
+        Some(emptyExprScript),
+        1000000,
+        ts
+      ).signWith(firstAcc.privateKey)
 
       asset = IssuedAsset(issueTransaction.id())
 
@@ -79,7 +77,8 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with WithState wit
         .signed(1.toByte, firstAcc.publicKey, asset, Some(typedScript), 1000, ts + 10, firstAcc.privateKey)
         .explicitGet()
 
-      assetTransferTransaction = TransferTransaction.selfSigned(1.toByte, firstAcc, secondAcc.toAddress, asset, 1, Waves, 1000, ByteStr.empty,  ts + 20)
+      assetTransferTransaction = TransferTransaction
+        .selfSigned(1.toByte, firstAcc, secondAcc.toAddress, asset, 1, Waves, 1000, ByteStr.empty, ts + 20)
         .explicitGet()
 
     } yield (genesis, issueTransaction, setAssetScriptTransaction, assetTransferTransaction)

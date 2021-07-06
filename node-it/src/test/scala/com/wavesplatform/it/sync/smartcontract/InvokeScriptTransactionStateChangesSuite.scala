@@ -5,9 +5,9 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.scalactic.source.Position

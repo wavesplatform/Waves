@@ -3,14 +3,12 @@ package com.wavesplatform.state
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.history._
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class NgStateTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class NgStateTest extends PropSpec {
 
   def preconditionsAndPayments(amt: Int): Gen[(GenesisTransaction, Seq[TransferTransaction])] =
     for {

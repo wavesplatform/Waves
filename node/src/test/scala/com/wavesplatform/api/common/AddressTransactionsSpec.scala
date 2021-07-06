@@ -1,9 +1,8 @@
 package com.wavesplatform.api.common
 
-import com.wavesplatform.WithDB
-import org.scalatest.FreeSpec
+import com.wavesplatform.test.FreeSpec
 
-class AddressTransactionsSpec extends FreeSpec with WithDB {
+class AddressTransactionsSpec extends FreeSpec {
   "addressTransactions" - {
     "without pagination" in pending
 

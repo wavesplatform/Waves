@@ -131,7 +131,7 @@ package object database extends ScorexLogging {
     val ids = List.newBuilder[ByteStr]
 
     while (b.remaining() > 0) {
-      val buffer = b.get() match {
+      val buffer = (b.get(): @unchecked) match {
         case crypto.DigestLength    => new Array[Byte](crypto.DigestLength)
         case crypto.SignatureLength => new Array[Byte](crypto.SignatureLength)
       }
@@ -146,7 +146,7 @@ package object database extends ScorexLogging {
     ids
       .foldLeft(ByteBuffer.allocate(ids.map(_.arr.length + 1).sum)) {
         case (b, id) =>
-          b.put(id.arr.length match {
+          b.put((id.arr.length: @unchecked) match {
               case crypto.DigestLength    => crypto.DigestLength.toByte
               case crypto.SignatureLength => crypto.SignatureLength.toByte
             })
@@ -219,8 +219,8 @@ package object database extends ScorexLogging {
           d.amount,
           d.status match {
             case pb.LeaseDetails.Status.Active(_)                                => LeaseDetails.Status.Active
-            case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height)) => LeaseDetails.Status.Expired(height)
-            case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId)) =>
+            case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height, _)) => LeaseDetails.Status.Expired(height)
+            case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId, _)) =>
               LeaseDetails.Status.Cancelled(height, Some(transactionId.toByteStr).filter(!_.isEmpty))
             case pb.LeaseDetails.Status.Empty => ???
           },
@@ -561,7 +561,7 @@ package object database extends ScorexLogging {
       case _: PaymentTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _                                             => NewTransaction(PBTransactions.protobuf(tx))
     }
-    pb.TransactionData(!succeeded, ptx).toByteArray
+    pb.TransactionData(ptx, !succeeded).toByteArray
   }
 
   /** Returns status (succeed - true, failed -false) and bytes (left - legacy format bytes, right - new format bytes) */
@@ -645,8 +645,8 @@ package object database extends ScorexLogging {
       id      <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
       details <- fromHistory(r, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id))
       if details.exists(_.fold(identity, _.isActive))
-      pb.TransactionMeta(h, n, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
-      tx                             <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
+      tm <- r.get(Keys.transactionMetaById(TransactionId(id)))
+      tx <- r.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)))
     } yield tx).collect {
       case (lt: LeaseTransaction, true) => lt
     }.toSeq

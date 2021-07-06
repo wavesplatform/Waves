@@ -20,7 +20,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, FunctionIds}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
-import scorex.crypto.signatures.Curve25519
+import com.wavesplatform.crypto.Curve25519
 
 import scala.util.Random
 

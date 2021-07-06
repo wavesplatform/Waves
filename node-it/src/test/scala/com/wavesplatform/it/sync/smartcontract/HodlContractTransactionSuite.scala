@@ -5,10 +5,10 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{PutDataResponse, TransactionInfo}
 import com.wavesplatform.it.sync.{minFee, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state._
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler

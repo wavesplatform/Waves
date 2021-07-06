@@ -9,11 +9,9 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
-import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalatest.PropSpec
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test.PropSpec
 
-class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class OnlyTransferIsAllowedTest extends PropSpec with WithState {
 
   property("transfer is allowed but lease is not due to predicate") {
 
@@ -33,8 +31,9 @@ class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with WithSt
     forAll(preconditionsTransferAndLease(transferAllowed)) {
       case (genesis, script, lease, transfer) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(totalDiffEi =>
-          totalDiffEi should produce("TransactionNotAllowedByScript"))
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(
+          totalDiffEi => totalDiffEi should produce("TransactionNotAllowedByScript")
+        )
     }
   }
 

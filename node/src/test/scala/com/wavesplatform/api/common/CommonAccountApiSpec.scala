@@ -1,6 +1,5 @@
 package com.wavesplatform.api.common
 
-import com.wavesplatform.{history, BlocksTransactionsHelpers, TransactionGen}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
@@ -9,19 +8,16 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.{diffs, DataEntry, Diff, EmptyDataEntry, StringDataEntry}
+import com.wavesplatform.state.{DataEntry, Diff, EmptyDataEntry, StringDataEntry, diffs}
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxHelpers}
+import com.wavesplatform.{BlocksTransactionsHelpers, history}
 import monix.execution.Scheduler.Implicits.global
-import org.scalatest.{FreeSpec, Matchers}
-import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 class CommonAccountApiSpec
     extends FreeSpec
-    with Matchers
     with WithDomain
-    with TransactionGen
-    with BlocksTransactionsHelpers
-    with ScalaCheckDrivenPropertyChecks {
+    with BlocksTransactionsHelpers {
 
   "Data stream" - {
     "handles non-existent address" in {
@@ -55,7 +51,7 @@ class CommonAccountApiSpec
               )
             )
           ) { d =>
-            val commonAccountsApi             = CommonAccountsApi(d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
+            val commonAccountsApi             = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
             def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, None).toListL.runSyncUnsafe().toSet
 
             d.appendBlock(block1)
@@ -93,7 +89,7 @@ class CommonAccountApiSpec
       forAll(preconditions) {
         case (acc, block1, mb1, block2, mb2) =>
           withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG, BlockchainFeatures.DataTransaction))) { d =>
-            val commonAccountsApi             = CommonAccountsApi(d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
+            val commonAccountsApi             = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
             def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, Some("test_.*")).toListL.runSyncUnsafe().toSet
 
             d.appendBlock(block1)
@@ -168,7 +164,7 @@ class CommonAccountApiSpec
         invoke
       )
 
-      val api = CommonAccountsApi(Diff.empty, d.db, d.blockchain)
+      val api = CommonAccountsApi(() => Diff.empty, d.db, d.blockchain)
       val leaseId = Lease.calculateId(
         Lease(
           Recipient.Address(ByteStr(TxHelpers.defaultAddress.bytes)),

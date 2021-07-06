@@ -4,15 +4,13 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.PropSpec
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class BalanceDiffValidationTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class BalanceDiffValidationTest extends PropSpec with WithState {
 
   val ownLessThatLeaseOut: Gen[(GenesisTransaction, TransferTransaction, LeaseTransaction, LeaseTransaction, TransferTransaction)] = for {
     master <- accountGen

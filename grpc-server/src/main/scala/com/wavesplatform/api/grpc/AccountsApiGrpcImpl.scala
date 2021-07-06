@@ -1,9 +1,6 @@
 package com.wavesplatform.api.grpc
 
-import scala.concurrent.Future
-
 import com.google.protobuf.ByteString
-import com.google.protobuf.wrappers.{BytesValue, StringValue}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
 import com.wavesplatform.protobuf._
@@ -13,6 +10,8 @@ import com.wavesplatform.transaction.Asset
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
 import monix.reactive.Observable
+
+import scala.concurrent.Future
 
 class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) extends AccountsApiGrpc.AccountsApi {
 
@@ -94,12 +93,12 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
     responseObserver.completeWith(stream.map(de => DataEntryResponse(request.address, Some(PBTransactions.toPBDataEntry(de)))))
   }
 
-  override def resolveAlias(request: StringValue): Future[BytesValue] =
+  override def resolveAlias(request: String): Future[ByteString] =
     Future {
       val result = for {
-        alias   <- Alias.create(request.value)
+        alias   <- Alias.create(request)
         address <- commonApi.resolveAlias(alias)
-      } yield BytesValue(ByteString.copyFrom(address.bytes))
+      } yield ByteString.copyFrom(address.bytes)
 
       result.explicitGetErr()
     }

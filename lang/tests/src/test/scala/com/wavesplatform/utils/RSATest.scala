@@ -6,7 +6,6 @@ import cats.Id
 import cats.syntax.monoid._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
-import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.CTX
@@ -21,14 +20,14 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContextfulVal, EvaluatorV1}
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.test._
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.util.Random
 
-class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndAfterAll with NoShrink {
+class RSATest extends PropSpec with BeforeAndAfterAll {
 
   lazy val provider = new BouncyCastleProvider
 

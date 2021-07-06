@@ -5,12 +5,12 @@ import java.net.InetSocketAddress
 import java.nio.file.Files
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.network.PeerDatabaseImpl
+import com.wavesplatform.network.{PeerDatabase, PeerDatabaseImpl}
 import com.wavesplatform.settings.NetworkSettings
+import com.wavesplatform.test.FreeSpec
 import net.ceedubs.ficus.Ficus._
-import org.scalatest.{Matchers, path}
 
-class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
+class PeerDatabaseImplSpecification extends FreeSpec {
 
   val host1     = "1.1.1.1"
   val host2     = "2.2.2.2"
@@ -27,31 +27,33 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
   private val config2   = ConfigFactory.parseString("""waves.network {
       |  file = null
       |  known-peers = []
-      |  peers-data-residence-time: 10s
+      |  peers-data-residence-time = 10s
       |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
   private val settings2 = config2.as[NetworkSettings]("waves.network")
 
   private val config3   = ConfigFactory.parseString(s"""waves.network {
                                                       |  file = null
                                                       |  known-peers = ["$host1:1"]
-                                                      |  peers-data-residence-time: 2s
-                                                      |  enable-peers-exchange: no
+                                                      |  peers-data-residence-time = 2s
+                                                      |  enable-peers-exchange = no
                                                       |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
   private val settings3 = config3.as[NetworkSettings]("waves.network")
 
-  val database  = new PeerDatabaseImpl(settings1)
-  val database2 = new PeerDatabaseImpl(settings2)
-  val database3 = new PeerDatabaseImpl(settings3)
+  private def withDatabase(settings: NetworkSettings)(f: PeerDatabase => Unit): Unit = {
+    val pdb = new PeerDatabaseImpl(settings)
+    f(pdb)
+    pdb.close()
+  }
 
   "Peer database" - {
-    "new peer should not appear in internal buffer but does not appear in database" in {
+    "new peer should not appear in internal buffer but does not appear in database" in withDatabase(settings1) { database =>
       database.knownPeers shouldBe empty
       database.addCandidate(address1)
       database.randomPeer(Set()) should contain(address1)
       database.knownPeers shouldBe empty
     }
 
-    "new peer should move from internal buffer to database" in {
+    "new peer should move from internal buffer to database" in withDatabase(settings1) { database =>
       database.knownPeers shouldBe empty
       database.addCandidate(address1)
       database.knownPeers shouldBe empty
@@ -59,7 +61,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       database.knownPeers.keys should contain(address1)
     }
 
-    "peer should should became obsolete after time" in {
+    "peer should should became obsolete after time" in withDatabase(settings1) { database =>
       database.touch(address1)
       database.knownPeers.keys should contain(address1)
       sleepLong()
@@ -67,7 +69,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       database.randomPeer(Set()) shouldBe empty
     }
 
-    "known-peers should be always in database" in {
+    "known-peers should be always in database" in withDatabase(settings3) { database3 =>
       database3.knownPeers.keys should contain(address1)
       sleepLong()
       database3.knownPeers.keys should contain(address1)
@@ -75,7 +77,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       database3.knownPeers.keys should contain(address1)
     }
 
-    "touching peer prevent it from obsoleting" in {
+    "touching peer prevent it from obsoleting" in withDatabase(settings1) { database =>
       database.addCandidate(address1)
       database.touch(address1)
       sleepLong()
@@ -84,7 +86,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       database.knownPeers.keys should contain(address1)
     }
 
-    "blacklisted peer should disappear from internal buffer and database" in {
+    "blacklisted peer should disappear from internal buffer and database" in withDatabase(settings1) { database =>
       database.touch(address1)
       database.addCandidate(address2)
       database.knownPeers.keys should contain(address1)
@@ -100,7 +102,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       database.randomPeer(Set()) should be(empty)
     }
 
-    "random peer should return peers from both from database and buffer" in {
+    "random peer should return peers from both from database and buffer" in withDatabase(settings2) { database2 =>
       database2.touch(address1)
       database2.addCandidate(address2)
       val keys = database2.knownPeers.keys
@@ -113,7 +115,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       set should contain(address2)
     }
 
-    "filters out excluded candidates" in {
+    "filters out excluded candidates" in withDatabase(settings1) { database =>
       database.addCandidate(address1)
       database.addCandidate(address1)
       database.addCandidate(address2)
@@ -121,7 +123,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       database.randomPeer(Set(address1)) should contain(address2)
     }
 
-    "filters out wildcard addresses" in {
+    "filters out wildcard addresses" in withDatabase(settings1) { database =>
       database.addCandidate(new InetSocketAddress("0.0.0.0", 6863))
       database.randomPeer(Set(address1, address2)) shouldBe None
     }
@@ -133,7 +135,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
         val prevConfig   = ConfigFactory.parseString(s"""waves.network {
              |  file = "$path"
              |  known-peers = []
-             |  peers-data-residence-time: 100s
+             |  peers-data-residence-time = 100s
              |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
         val prevSettings = prevConfig.as[NetworkSettings]("waves.network")
         val prevDatabase = new PeerDatabaseImpl(prevSettings)
@@ -143,7 +145,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
         val config   = ConfigFactory.parseString(s"""waves.network {
              |  file = "$path"
              |  known-peers = []
-             |  peers-data-residence-time: 100s
+             |  peers-data-residence-time = 100s
              |  enable-blacklisting = no
              |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
         val settings = config.as[NetworkSettings]("waves.network")
@@ -156,7 +158,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
         val config   = ConfigFactory.parseString(s"""waves.network {
              |  file = null
              |  known-peers = []
-             |  peers-data-residence-time: 100s
+             |  peers-data-residence-time = 100s
              |  enable-blacklisting = no
              |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
         val settings = config.as[NetworkSettings]("waves.network")

@@ -202,7 +202,7 @@ object HandshakeHandler extends ScorexLogging {
         super.channelRead(ctx, msg)
     }
 
-    override protected def channelActive(ctx: ChannelHandlerContext): Unit = {
+    override def channelActive(ctx: ChannelHandlerContext): Unit = {
       sendLocalHandshake(ctx)
       ctx.channel().attr(ConnectionStartAttributeKey).set(System.currentTimeMillis())
       super.channelActive(ctx)

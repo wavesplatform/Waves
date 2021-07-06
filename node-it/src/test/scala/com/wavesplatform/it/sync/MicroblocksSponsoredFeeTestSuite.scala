@@ -1,17 +1,13 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
 import com.wavesplatform.state.Sponsorship
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.utils.ScorexLogging
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
-class MicroblocksSponsoredFeeTestSuite extends FreeSpec with Matchers with CancelAfterFailure with NodesFromDocker with ScorexLogging {
-
-  private def notMiner = nodes.head
+class MicroblocksSponsoredFeeTestSuite extends BaseFreeSpec with ScorexLogging {
 
   private lazy val sponsor      = nodes(1)
   private val Token             = 100L
