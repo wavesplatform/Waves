@@ -70,18 +70,8 @@ object Types {
         (A1, ..., Z1) | ... | (A1, ..., Zk) | ... | (An, ..., Zk)
     */
     override def unfold: FINAL = {
-      def combine(accTypes: List[TUPLE], nextTypes: List[REAL]): List[TUPLE] =
-        if (accTypes.isEmpty)
-          nextTypes.map(t => TUPLE(List(t)))
-        else
-          for {
-            a <- accTypes
-            b <- nextTypes
-          } yield TUPLE(a.types :+ b)
-
-      UNION.reduce(UNION.create(
-        types.map(_.typeList).foldLeft(List.empty[TUPLE])(combine)
-      ))
+      val regrouped = regroup(types.map(_.typeList)).map(t => TUPLE(t.toList))
+      UNION.reduce(UNION.create(regrouped))
     }
   }
 

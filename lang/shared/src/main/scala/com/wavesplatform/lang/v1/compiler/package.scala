@@ -59,4 +59,17 @@ package object compiler {
     }
     horTraversal(Queue(e))
   }
+
+  def regroup[A](listOfList: Seq[Seq[A]]): Seq[Seq[A]] = {
+    def combine(acc: Seq[Seq[A]], next: Seq[A]): Seq[Seq[A]] =
+      if (acc.isEmpty)
+        next.map(Seq(_))
+      else
+        for {
+          a <- acc
+          b <- next
+        } yield a :+ b
+
+    listOfList.foldLeft(Seq.empty[Seq[A]])(combine)
+  }
 }

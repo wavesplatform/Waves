@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 class NestedPatternsTest extends EvaluatorSpec {
   implicit val v: StdLibVersion = V5
 
-  property("nested typed tuples") {
+  property("typed tuples") {
     eval(
       s"""
          | func sum(arg: Any) = {
@@ -27,26 +27,87 @@ class NestedPatternsTest extends EvaluatorSpec {
     ) shouldBe Right(CONST_BOOLEAN(true))
   }
 
-  property("nested typed tuples with constants") {
+  property("typed tuples with constants") {
     eval(
       s"""
          | func f(arg: Any) =
          |   match arg {
-         |     case (x: Int, "a")       => x
-         |     case (x: Int, "b" | "c") => x * 2
-         |     case (x: Int, _)         => x * 3
-         |     case _                   => throw("unexpected")
+         |     case (x: Int, "a")     => x
+         |     case (x: Int, "b" | 7) => x * 2
+         |     case (x: Int, _)       => x * 3
+         |     case _                 => throw("unexpected")
          |   }
          |
          | f((1, "a")) == 1 &&
          | f((1, "b")) == 2 &&
-         | f((1, "c")) == 2 &&
-         | f((1, "d")) == 3
+         | f((1, 7)) == 2   &&
+         | f((1, "c")) == 3
        """.stripMargin
     ) shouldBe Right(CONST_BOOLEAN(true))
   }
 
-  ignore("deep nested typed tuples") {
+  property("multi-sized tuples") {
+    eval(
+      s"""
+         | func f(arg: Any) =
+         |   match arg {
+         |     case "a"             => 1
+         |     case ("a", "b")      => 2
+         |     case ("a", "b", "c") => 3
+         |     case _               => throw("unexpected")
+         |   }
+         |
+         | f(("a")) == 1           &&
+         | f(("a", "b")) == 2      &&
+         | f(("a", "b", "c")) == 3
+       """.stripMargin
+    ) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("typed tuples with case types") {
+    eval(
+      s"""
+         | func f(arg: Any) =
+         |   match arg {
+         |     case (_: Lease, Lease(recipient = Address(base58'aaa'), amount = 1, nonce = 1)) => 1
+         |     case (_: Lease, Lease(recipient = Address(base58'bbb')))                        => 2
+         |     case (_: Lease, Lease(recipient = r: Alias, amount = 1, nonce = 1))             => 3
+         |     case (_: Lease, Lease(recipient = r: Alias, amount = 1, nonce = 1), _: Burn)    => 4
+         |     case (_: Lease | Issue, Lease(recipient = r, amount = 1, nonce = 2))            => r
+         |     case _                                                                          => throw("unexpected")
+         |   }
+         |
+         | let l = Lease(Address(base58''), 1, 1)
+         |
+         | f((l, Lease(Address(base58'aaa'), 1, 1)))           == 1 &&
+         | f((l, Lease(Address(base58'bbb'), 1, 1)))           == 2 &&
+         | f((l, Lease(Alias("x"), 1, 1)))                     == 3 &&
+         | f((l, Lease(Alias("x"), 1, 1), Burn(base58'', 1)))  == 4
+         | # f((l, Lease(Alias("x"), 1, 2)))                     == Alias("x")
+       """.stripMargin
+    ) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("deep typed tuples") {
+    eval(
+      s"""
+         | func f(arg: Any) =
+         |   match arg {
+         |     case (_: Int, (x: Int, "a"))                       => x
+         |     case ((x: Int, "b" | "c"), y: Int)                 => x + y
+         |     case ((x: Int, "c" | 1), (y: Int, (7, z: String))) => x + y + z.size()
+         |     case _                                             => throw("unexpected")
+         |   }
+         |
+         | f((8, (1, "a")))               == 1 &&
+         | f((8, (1, "a")))               == 1 &&
+         | f(((1, "b"), 2))               == 3 &&
+         | f(((1, "c"), (2, (7, "xxx")))) == 6
+       """.stripMargin
+    ) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  ignore("deep typed tuples with untyped gaps") {
     eval(
       s"""
          | func f(arg: Any) =
@@ -54,10 +115,10 @@ class NestedPatternsTest extends EvaluatorSpec {
          |     case (_, (x: Int, "a"))            => x
          |     case ((x: Int, "b" | "c"), y: Int) => x + y
          |     case ((x: Int, "b" | "c"), _)      => x * 2
-         |     case _                   => throw("unexpected")
+         |     case _                             => throw("unexpected")
          |   }
          |
-         | f((1, (1, "a")))   == 1 &&
+         | f((8, (1, "a")))   == 1 &&
          | f(("r", (1, "a"))) == 1 &&
          | f(((1, "b"), 2))   == 3 &&
          | f(((1, "c"), "r")) == 2
