@@ -7,10 +7,11 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.TxHelpers
+import org.scalactic.source.Position
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.BeforeAndAfter
 
-class CancelLeasesToDisabledAliasesSpec extends FlatSpec with PathMockFactory with WithDomain with BeforeAndAfterAll {
+class CancelLeasesToDisabledAliasesSpec extends FlatSpec with PathMockFactory with WithDomain with BeforeAndAfter {
   val MainnetSettings = {
     import SettingsFromDefaultConfig.blockchainSettings.{functionalitySettings => fs}
     SettingsFromDefaultConfig.copy(
@@ -48,17 +49,18 @@ class CancelLeasesToDisabledAliasesSpec extends FlatSpec with PathMockFactory wi
     leaseBalance.out shouldBe -2562590821L
   }
 
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
+  override protected def before(fun: => Any)(implicit pos: Position): Unit = {
     AddressScheme.current = new AddressScheme {
       val chainId: Byte = 'W'
     }
+    super.before(fun)
   }
 
-  override protected def afterAll(): Unit = {
+  override protected def after(fun: => Any)(implicit pos: Position): Unit = {
     AddressScheme.current = new AddressScheme {
       val chainId: Byte = 'T'
     }
-    super.afterAll()
+    super.after(fun)
   }
+
 }
