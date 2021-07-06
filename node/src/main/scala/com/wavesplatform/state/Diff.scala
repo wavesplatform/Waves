@@ -1,10 +1,9 @@
 package com.wavesplatform.state
 
-import scala.collection.immutable.VectorMap
-
 import cats.data.Ior
-import cats.implicits._
+import cats.instances.map._
 import cats.kernel.{Monoid, Semigroup}
+import cats.syntax.semigroup._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -12,8 +11,10 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.{Asset, Transaction}
+
+import scala.collection.immutable.VectorMap
 
 case class LeaseBalance(in: Long, out: Long)
 
@@ -178,7 +179,7 @@ object Diff {
         assetScripts = older.assetScripts ++ newer.assetScripts,
         accountData = older.accountData.combine(newer.accountData),
         sponsorship = older.sponsorship.combine(newer.sponsorship),
-        scriptsRun = older.scriptsRun.combine(newer.scriptsRun),
+        scriptsRun = older.scriptsRun + newer.scriptsRun,
         scriptResults = older.scriptResults.combine(newer.scriptResults),
         scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity
       )

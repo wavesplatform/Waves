@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import cats.implicits._
+import cats.syntax.semigroup._
 import cats.{Id, Monad}
 import com.wavesplatform.common.merkle.Merkle.createRoot
 import com.wavesplatform.common.state.ByteStr
@@ -136,8 +136,9 @@ object CryptoContext {
         case 128 => 172
       }),
       (n => {
-        case CONST_BYTESTR(msg: ByteStr) :: _ => Either.cond(msg.size <= n * 1024, (), s"Invalid message size = ${msg.size} bytes, must be not greater than $n KB")
-        case xs                               => notImplemented[Id, Unit](s"sigVerify_${n}Kb(message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
+        case CONST_BYTESTR(msg: ByteStr) :: _ =>
+          Either.cond(msg.size <= n * 1024, (), s"Invalid message size = ${msg.size} bytes, must be not greater than $n KB")
+        case xs => notImplemented[Id, Unit](s"sigVerify_${n}Kb(message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }),
       BOOLEAN,
       ("message", BYTESTR),
@@ -166,10 +167,10 @@ object CryptoContext {
     }
 
     def rsaVerify(
-      digestAlg: CaseObj,
-      msg: ByteStr,
-      sig: ByteStr,
-      pub: ByteStr
+        digestAlg: CaseObj,
+        msg: ByteStr,
+        sig: ByteStr,
+        pub: ByteStr
     ) =
       for {
         alg    <- algFromCO(digestAlg)
@@ -211,7 +212,8 @@ object CryptoContext {
         case 128 => 750
       }),
       (n => {
-        case _ :: CONST_BYTESTR(msg: ByteStr) :: _ => Either.cond(msg.size <= n * 1024, (), s"Invalid message size = ${msg.size} bytes, must be not greater than $n KB")
+        case _ :: CONST_BYTESTR(msg: ByteStr) :: _ =>
+          Either.cond(msg.size <= n * 1024, (), s"Invalid message size = ${msg.size} bytes, must be not greater than $n KB")
         case xs =>
           notImplemented[Id, Unit](s"rsaVerify_${n}Kb(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }),
@@ -234,9 +236,9 @@ object CryptoContext {
         STRING,
         ("bytes", BYTESTR)
       ) {
-      case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base58Encode(bytes.arr).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
-      case xs                                   => notImplemented[Id, EVALUATED]("toBase58String(bytes: ByteVector)", xs)
-    }
+        case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base58Encode(bytes.arr).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
+        case xs                                   => notImplemented[Id, EVALUATED]("toBase58String(bytes: ByteVector)", xs)
+      }
 
     def fromBase58StringF: BaseFunction[NoContext] =
       NativeFunction(
@@ -258,9 +260,9 @@ object CryptoContext {
         STRING,
         ("bytes", BYTESTR)
       ) {
-      case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base64Encode(bytes.arr).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
-      case xs                                   => notImplemented[Id, EVALUATED]("toBase64String(bytes: ByteVector)", xs)
-    }
+        case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base64Encode(bytes.arr).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
+        case xs                                   => notImplemented[Id, EVALUATED]("toBase64String(bytes: ByteVector)", xs)
+      }
 
     def fromBase64StringF: BaseFunction[NoContext] =
       NativeFunction(
@@ -504,9 +506,9 @@ object CryptoContext {
     val fromV4Ctx = fromV1Ctx |+| CTX[NoContext](v4Types, v4Vars, v4Functions)
 
     version match {
-      case V1 | V2      => fromV1Ctx
-      case V3           => fromV3Ctx
-      case v if v >= V4 => fromV4Ctx
+      case V1 | V2 => fromV1Ctx
+      case V3      => fromV3Ctx
+      case V4 | V5 => fromV4Ctx
     }
   }
 

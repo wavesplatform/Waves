@@ -1,14 +1,12 @@
 package com.wavesplatform.http
 
-import scala.util.Random
-
-import com.wavesplatform.{NoShrink, TestWallet}
+import com.wavesplatform.TestWallet
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.BlocksApiRoute
-import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -17,16 +15,15 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.SystemTime
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
+
+import scala.util.Random
 
 class BlocksApiRouteSpec
     extends RouteSpec("/blocks")
     with PathMockFactory
-    with PropertyChecks
     with RestAPISettingsHelper
     with TestWallet
-    with NoShrink
     with WithDomain {
   private val blocksApi                      = mock[CommonBlocksApi]
   private val blocksApiRoute: BlocksApiRoute = BlocksApiRoute(restAPISettings, blocksApi, SystemTime)

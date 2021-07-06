@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.BlockGen
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -12,11 +11,11 @@ import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySetti
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.BlockGen
+import com.wavesplatform.test.FreeSpec
 import org.scalacheck.Gen
-import org.scalatest.{FreeSpec, Matchers}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class BlockDifferDetailedDiffTest extends FreeSpec with Matchers with PropertyChecks with BlockGen with WithState {
+class BlockDifferDetailedDiffTest extends FreeSpec with BlockGen with WithState {
 
   private def assertDetailedDiff(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
       assertion: (Diff, DetailedDiff) => Unit

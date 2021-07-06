@@ -9,13 +9,12 @@ import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.{NoShrink, TransactionGen, crypto}
+import com.wavesplatform.crypto
+import com.wavesplatform.test.PropSpec
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
-import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class BlockSpecification extends PropSpec with PropertyChecks with TransactionGen with Matchers with NoShrink {
+class BlockSpecification extends PropSpec {
 
   val time = System.currentTimeMillis() - 5000
 
@@ -167,7 +166,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             Seq.empty,
             -1L,
             transactionData
-          ).copy(signature = ByteStr(Array.fill(64)(0: Byte)))
+          )
+          .copy(signature = ByteStr(Array.fill(64)(0: Byte)))
         block.signatureValid() shouldBe false
     }
   }

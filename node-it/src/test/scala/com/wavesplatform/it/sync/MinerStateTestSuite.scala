@@ -1,21 +1,20 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it.BaseFunSuite
 import com.wavesplatform.it.api.State
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.util._
-import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
+import com.wavesplatform.test._
+
 import scala.concurrent.duration._
 
-class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFromDocker with Matchers {
+class MinerStateTestSuite extends BaseFunSuite {
   import MinerStateTestSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
   private val transferAmount = 1000.waves
 
-  private def miner = nodes.head
   private def last  = nodes.last
 
   test("node w/o balance can forge blocks after effective balance increase") {

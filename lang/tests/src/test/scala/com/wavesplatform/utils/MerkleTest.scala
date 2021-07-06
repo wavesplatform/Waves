@@ -4,6 +4,7 @@ import cats.Id
 import cats.syntax.monoid._
 import com.google.common.primitives.Ints
 import com.wavesplatform.common.merkle.Merkle._
+import com.wavesplatform.common.merkle._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.Global
@@ -15,107 +16,104 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.Common.{NoShrink, produce}
+import com.wavesplatform.test._
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import scorex.crypto.authds.merkle.{Leaf, MerkleProof, MerkleTree}
-import scorex.crypto.authds.{LeafData, Side}
-import scorex.crypto.hash.{Blake2b256, CryptographicHash32, Digest, Digest32}
 
+import scala.annotation.tailrec
 import scala.util.Random
 
-class MerkleTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
+class MerkleTest extends PropSpec {
+  private val EmptyNodeHash = hash(Array[Byte](0))
 
-  val AMT: Long = 1000000 * 100000000L
-
-  implicit val fastHash = new CryptographicHash32 {
-    override def hash(input: Message): Digest32 = Blake2b256.hash(input)
+  private def mkScryptoLevels(data: Seq[Message]): Seq[Level] = {
+    if (data.isEmpty) Seq(Seq.empty)
+    else {
+      @tailrec
+      def loop(prevLevel: Seq[Digest], acc: Seq[Level]): Seq[Level] = {
+        val level = prevLevel
+          .grouped(2)
+          .collect {
+            case Seq(l, r) => hash(ScryptoMerkleProof.InternalNodePrefix +: (l ++ r))
+            case Seq(l) =>
+              hash(ScryptoMerkleProof.InternalNodePrefix +: (l ++ EmptyNodeHash))
+          }
+          .toSeq
+        if (level.size == 1) level +: acc else loop(level, level +: acc)
+      }
+      val bottom = data.map(ld => hash(ScryptoMerkleProof.LeafPrefix +: ld))
+      loop(bottom, Seq(bottom))
+    }
   }
 
-  def testData(): (MerkleTree[Digest32], List[LeafData]) = {
-    val data: List[LeafData] =
-      List
-        .fill(100)(Random.nextInt(10000))
-        .distinct
-        .map(Ints.toByteArray)
-        .map(LeafData @@ _)
-
-    val tree = MerkleTree[Digest32](data)(fastHash)
-
-    (tree, data)
-  }
+  private def testData() =
+    List
+      .fill(10)(Random.nextInt(10000))
+      .distinct
+      .map(Ints.toByteArray)
 
   property("TRUE on correct proof") {
-    val (tree, leafs) = testData()
+    val leaves = testData()
+    val tree   = mkScryptoLevels(leaves)
 
-    forAll(Gen.oneOf(leafs)) { leaf =>
-      val proof = tree
-        .proofByElement(Leaf[Digest32](leaf)(fastHash))
-        .get
-
-      eval(scriptSrc(tree.rootHash, proofBytes(proof), leaf)) shouldBe Right(CONST_BOOLEAN(true))
+    forAll(Gen.oneOf(leaves.zipWithIndex)) {
+      case (leaf, index) =>
+        val proofs = Merkle.mkProofs(index, tree)
+        val bytes  = proofBytes(index, proofs)
+        eval(scriptSrc(tree.head.head, bytes, leaf)) shouldBe Right(CONST_BOOLEAN(true))
     }
   }
 
   property("FALSE on incorrect proof") {
-    val (tree, leafs) = testData()
+    val leaves = testData()
+    val tree   = mkScryptoLevels(leaves)
 
-    val twoLeafsGen: Gen[(LeafData, LeafData)] =
-      for {
-        l1 <- Gen.oneOf(leafs)
-        l2 <- Gen.oneOf(leafs).suchThat(_ != l1)
-      } yield (l1, l2)
+    val twoLeavesGen = Gen.pick(2, leaves.zipWithIndex)
 
-    forAll(twoLeafsGen) {
-      case (l1, l2) =>
-        val proof = tree
-          .proofByElement(Leaf[Digest32](l1)(fastHash))
-          .get
+    forAll(twoLeavesGen) { tl =>
+      val (_, i1)  = tl(0)
+      val (l2, i2) = tl(1)
 
-        eval(scriptSrc(tree.rootHash, proofBytes(proof), l2)) shouldBe Right(CONST_BOOLEAN(false))
+      eval(scriptSrc(tree.head.head, proofBytes(i2, Merkle.mkProofs(i1, tree)), l2)) shouldBe Right(CONST_BOOLEAN(false))
     }
   }
 
   property("FALSE on incorrect root") {
-    val (tree1, leafs) = testData()
-    val (tree2, _)     = testData()
+    val leaves = testData()
+    val tree1  = mkScryptoLevels(leaves)
 
-    forAll(Gen.oneOf(leafs)) { leaf =>
-      val proof = tree1
-        .proofByElement(Leaf[Digest32](leaf)(fastHash))
-        .get
+    val tree2 = mkScryptoLevels(testData())
 
-      eval(scriptSrc(tree2.rootHash, proofBytes(proof), leaf)) shouldBe Right(CONST_BOOLEAN(false))
+    forAll(Gen.oneOf(leaves.zipWithIndex)) {
+      case (leaf, index) =>
+        eval(scriptSrc(tree2.head.head, proofBytes(index, Merkle.mkProofs(index, tree1)), leaf)) shouldBe Right(CONST_BOOLEAN(false))
     }
   }
 
-  property("FALSE on incorrect proof bytes") {
-    val (tree, leafs) = testData()
+  property("FALSE on arbitrary proof bytes") {
+    val leaves = testData()
+    val tree   = mkScryptoLevels(leaves)
 
-    forAll(Gen.oneOf(leafs), Gen.containerOf[Array, Byte](Arbitrary.arbitrary[Byte])) { (leaf, bytes) =>
-      eval(scriptSrc(tree.rootHash, bytes, leaf)) shouldBe Right(CONST_BOOLEAN(false))
+    forAll(Gen.oneOf(leaves), Gen.containerOf[Array, Byte](Arbitrary.arbitrary[Byte])) { (leaf, bytes) =>
+      eval(scriptSrc(tree.head.head, bytes, leaf)) shouldBe Right(CONST_BOOLEAN(false))
     }
   }
 
-  property("FALSE on incorrect root bytes") {
-    val (tree, leafs) = testData()
+  property("FALSE on arbitrary root bytes") {
+    val leaves = testData()
+    val tree   = mkScryptoLevels(leaves)
 
-    forAll(Gen.oneOf(leafs), Gen.containerOf[Array, Byte](Arbitrary.arbitrary[Byte])) { (leaf, bytes) =>
-      val proof = tree
-        .proofByElement(Leaf[Digest32](leaf)(fastHash))
-        .get
-
-      eval(scriptSrc(bytes, proofBytes(proof), leaf)) shouldBe Right(CONST_BOOLEAN(false))
+    forAll(Gen.oneOf(leaves.zipWithIndex), Gen.containerOf[Array, Byte](Arbitrary.arbitrary[Byte])) {
+      case ((leaf, index), bytes) =>
+        eval(scriptSrc(bytes, proofBytes(index, Merkle.mkProofs(index, tree)), leaf)) shouldBe Right(CONST_BOOLEAN(false))
     }
   }
 
   private val evaluator = new EvaluatorV1[Id, NoContext]()
 
   private def eval[T <: EVALUATED](code: String, version: StdLibVersion = V3): Either[String, T] = {
-    val untyped  = Parser.parseExpr(code).get.value
-    val ctx = PureContext.build(version, fixUnicodeFunctions = true) |+| CryptoContext.build(Global, version)
-    val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
+    val untyped = Parser.parseExpr(code).get.value
+    val ctx     = PureContext.build(version, fixUnicodeFunctions = true) |+| CryptoContext.build(Global, version)
+    val typed   = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => evaluator.apply[T](ctx.evaluationContext, v._1))
   }
 
@@ -139,25 +137,22 @@ class MerkleTest extends PropSpec with PropertyChecks with Matchers with NoShrin
   }
 
   property("Create root from proof") {
-    val (_, leafs) = testData()
-    val levels = mkLevels(leafs)
+    val leaves = testData()
+    val levels = Merkle.mkLevels(leaves)
 
-    forAll(Gen.oneOf(leafs.zipWithIndex)) { case (leaf, index) =>
-      val proofs = mkProofs(index, levels).reverse
+    forAll(Gen.oneOf(leaves.zipWithIndex)) {
+      case (leaf, index) =>
+        val proofs = mkProofs(index, levels).reverse
 
-      eval(scriptCreateRootSrc(proofs, hash(leaf), index), V4) shouldBe CONST_BYTESTR(ByteStr(levels.head.head))
-      eval(scriptCreateRootSrc(proofs, hash(leaf), index + (1<<proofs.length)), V4) should produce("out of range allowed by proof list length")
+        eval(scriptCreateRootSrc(proofs, hash(leaf), index), V4) shouldBe CONST_BYTESTR(ByteStr(levels.head.head))
+        eval(scriptCreateRootSrc(proofs, hash(leaf), index + (1 << proofs.length)), V4) should produce("out of range allowed by proof list length")
     }
   }
 
-  private def proofBytes(mp: MerkleProof[Digest32]): Array[Byte] = {
-    def loop(lvls: List[(Digest, Side)], acc: Array[Byte]): Array[Byte] = {
-      lvls match {
-        case (d, s) :: xs => loop(xs, Array.concat(acc, s +: d.length.toByte +: d))
-        case Nil          => acc
+  private def proofBytes(index: Int, proofs: Seq[Array[Byte]]): Array[Byte] =
+    proofs.reverse
+      .foldLeft(index -> Array.emptyByteArray) {
+        case ((index, buf), proof) => (index / 2, buf ++ Array(((index + 0) % 2).toByte, proof.length.toByte) ++ proof)
       }
-    }
-
-    loop(mp.levels.toList, Array.emptyByteArray)
-  }
+      ._2
 }

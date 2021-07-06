@@ -7,43 +7,28 @@
  */
 
 import sbt.Keys._
-import sbt.{File, IO, Project, _}
+import sbt.{**, Compile, CrossVersion, File, IO, Project, compilerPlugin, inConfig, _}
 import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
-
-val langPublishSettings = Seq(
-  coverageExcludedPackages := "",
-  publishMavenStyle := true,
-  publishTo := Some("Sonatype Nexus" at "https://oss.sonatype.org/service/local/staging/deploy/maven2"),
-  homepage := Some(url("https://docs.wavesplatform.com/en/technical-details/waves-contracts-language-description/maven-compiler-package.html")),
-  developers := List(
-    Developer("petermz", "Peter Zhelezniakov", "peterz@rambler.ru", url("https://wavesplatform.com"))
-  )
-)
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
     .crossType(CrossType.Full)
     .settings(
-      coverageExcludedPackages := ".*",
-      test in assembly := {},
+      assembly / test := {},
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       inConfig(Compile)(
         Seq(
-          sourceGenerators += Tasks.docSource,
-          PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
-          PB.protoSources := Seq(PB.externalIncludePath.value, baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"),
-          includeFilter in PB.generate := { (f: File) =>
-            (** / "DAppMeta.proto").matches(f.toPath) ||
-            (** / "waves" / "*.proto").matches(f.toPath)
-          },
+          PB.protoSources := Seq(baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"),
+          PB.targets := Seq(
+            scalapb.gen(flatPackage = true) -> sourceManaged.value
+          ),
           PB.deleteTargetDirectory := false
         )
       )
     )
 
 lazy val `lang-jvm` = lang.jvm
-  .settings(langPublishSettings)
   .settings(
     name := "RIDE Compiler",
     normalizedName := "lang",
@@ -54,32 +39,64 @@ lazy val `lang-jvm` = lang.jvm
 lazy val `lang-js` = lang.js
   .enablePlugins(VersionObject)
   .settings(
-    libraryDependencies += Dependencies.circeJsInterop.value
+    Compile / sourceGenerators += Tasks.docSource
   )
 
 lazy val `lang-testkit` = project
   .dependsOn(`lang-jvm`)
   .in(file("lang/testkit"))
-  .settings(langPublishSettings)
   .settings(
     libraryDependencies ++= Dependencies.test.map(_.withConfigurations(Some("compile")))
   )
 
-lazy val `lang-tests` = project.in(file("lang/tests")).dependsOn(`lang-testkit`)
+lazy val `lang-tests` = project
+  .in(file("lang/tests"))
+  .dependsOn(`lang-testkit`)
+  .settings(
+    Compile / sourceGenerators += Tasks.docSource
+  )
 
 lazy val `lang-doc` = project
   .in(file("lang/doc"))
   .dependsOn(`lang-jvm`)
   .settings(
+    Compile / sourceGenerators += Tasks.docSource,
     libraryDependencies ++= Seq("com.github.spullara.mustache.java" % "compiler" % "0.9.5") ++ Dependencies.test
   )
 
 lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test")
 
 lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
-lazy val `node-it`        = project.dependsOn(node, `grpc-server`)
-lazy val `node-generator` = project.dependsOn(node, `node` % "compile")
+lazy val `node-it`        = project.dependsOn(node, `lang-testkit`, `repl-jvm`, `grpc-server`)
+lazy val `node-generator` = project.dependsOn(node)
 lazy val benchmark        = project.dependsOn(node % "compile;test->test")
+
+lazy val repl = crossProject(JSPlatform, JVMPlatform)
+  .withoutSuffixFor(JVMPlatform)
+  .crossType(CrossType.Full)
+  .settings(
+    libraryDependencies ++= Dependencies.protobuf.value ++ Dependencies.langCompilerPlugins.value,
+    inConfig(Compile)(
+      Seq(
+        PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
+        PB.protoSources += PB.externalIncludePath.value,
+        PB.generate / includeFilter := { (f: File) =>
+          (** / "waves" / "*.proto").matches(f.toPath)
+        }
+      )
+    )
+  )
+
+lazy val `repl-jvm` = repl.jvm
+  .dependsOn(`lang-jvm`)
+  .settings(
+    libraryDependencies ++= Dependencies.circe.value ++ Seq(
+      "org.scala-js" %% "scalajs-stubs" % "1.0.0" % Provided,
+      Dependencies.sttp3
+    )
+  )
+
+lazy val `repl-js` = repl.js.dependsOn(`lang-js`)
 
 lazy val `curve25519-test` = project.dependsOn(node)
 
@@ -97,12 +114,11 @@ lazy val root = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion := "2.13.3",
+    scalaVersion := "2.13.6",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
     V.fallback := (1, 3, 6),
     organizationHomepage := Some(url("https://wavesplatform.com")),
-    scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     scalacOptions ++= Seq(
       "-feature",
@@ -121,8 +137,6 @@ inScope(Global)(
     scalafmtOnCompile := false,
     dependencyOverrides ++= Dependencies.enforcedVersions.value,
     cancelable := true,
-    logBuffered := false,
-    coverageExcludedPackages := ".*",
     parallelExecution := false,
     testListeners := Seq.empty, // Fix for doubled test reports
     /* http://www.scalatest.org/user_guide/using_the_runner
@@ -137,8 +151,8 @@ inScope(Global)(
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
     network := Network(sys.props.get("network")),
     resolvers += Resolver.sonatypeRepo("snapshots"),
-    sources in (Compile, doc) := Seq.empty,
-    publishArtifact in (Compile, packageDoc) := false
+    Compile / doc / sources := Seq.empty,
+    Compile / packageDoc / publishArtifact := false
   )
 )
 
@@ -165,6 +179,7 @@ checkPRRaw := Def
       (`lang-js` / Compile / fastOptJS).value
       (`grpc-server` / Test / test).value
       (node / Test / test).value
+      (`repl-js` / Compile / fastOptJS).value
     }
   )
   .value

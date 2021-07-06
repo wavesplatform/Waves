@@ -1,24 +1,26 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
+import cats.syntax.applicative._
+import cats.syntax.either._
+import cats.syntax.functor._
 import cats.{Id, Monad}
-import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
-import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, notImplemented, unit}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{scriptTransfer => _, _}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.{addressOrAliasType, addressType, commonDataEntryType, optionAddress, _}
-import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, notImplemented, unit}
+import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
+import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
+import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
 import monix.eval.Coeval
 import shapeless.Coproduct.unsafeGet
 
@@ -45,7 +47,7 @@ object Functions {
           .map(_.flatMap {
             case None => Right(unit)
             case Some(a) =>
-              a match {
+              (a: @unchecked) match {
                 case b: ByteStr => CONST_BYTESTR(b)
                 case b: Long    => Right(CONST_LONG(b))
                 case b: String  => CONST_STRING(b)
@@ -526,7 +528,7 @@ object Functions {
       }
     }
 
-  def callDAppF(version: StdLibVersion, reentrant: Boolean): BaseFunction[Environment] = {
+  def callDAppF(reentrant: Boolean): BaseFunction[Environment] = {
     val (id, name) =  if (reentrant) (CALLDAPPREENTRANT, "reentrantInvoke") else (CALLDAPP, "invoke")
     NativeFunction.withEnvironment[Environment](
       name,
@@ -558,7 +560,7 @@ object Functions {
                 case a                => throw new IllegalArgumentException(s"Unexpected address bytes $a")
               }
             case (dApp: CaseObj) :: _ if dApp.caseType == aliasType =>
-              dApp.fields("alias") match {
+              (dApp.fields("alias"): @unchecked) match {
                 case CONST_STRING(a) => env.resolveAlias(a).map(_.explicitGet().bytes)
               }
             case args => throw new IllegalArgumentException(s"Unexpected recipient args $args")
@@ -577,9 +579,9 @@ object Functions {
                   args.toList,
                   payments.map {
                     case p: CaseObj if p.caseType == paymentType =>
-                      List("assetId", "amount").map(p.fields) match {
-                        case List(CONST_BYTESTR(a), CONST_LONG(v)) => (Some(a.arr), v)
-                        case List(CaseObj(UNIT, _), CONST_LONG(v)) => (None, v)
+                      (List("assetId", "amount").map(p.fields): @unchecked) match {
+                        case CONST_BYTESTR(a) :: CONST_LONG(v) :: Nil => (Some(a.arr), v)
+                        case CaseObj(UNIT, _) :: CONST_LONG(v) :: Nil => (None, v)
                       }
                     case arg => throw new IllegalArgumentException(s"Unexpected payment arg $arg")
                   },

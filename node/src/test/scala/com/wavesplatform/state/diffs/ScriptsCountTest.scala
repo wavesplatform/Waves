@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -21,9 +22,7 @@ import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalatest.{Inside, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import org.scalatest.Inside
 
 object ScriptsCountTest {
   def calculateLegacy(blockchain: Blockchain, tx: Transaction): Int = {
@@ -64,7 +63,7 @@ object ScriptsCountTest {
 }
 
 //noinspection NameBooleanParameters
-class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink with Inside {
+class ScriptsCountTest extends PropSpec with WithState with Inside {
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -141,7 +140,8 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
         .create(1.toByte, master.publicKey, IssuedAsset(issueScr.id()), Some(allAllowed), fee, timestamp, Proofs.empty)
         .explicitGet()
       data = DataTransaction.selfSigned(1.toByte, master, List(BooleanDataEntry("q", true)), 15000000, timestamp).explicitGet()
-      tr1 = TransferTransaction.selfSigned(2.toByte, master, acc.toAddress, Waves, 10000000000L, Waves, fee, ByteStr.empty, timestamp)
+      tr1 = TransferTransaction
+        .selfSigned(2.toByte, master, acc.toAddress, Waves, 10000000000L, Waves, fee, ByteStr.empty, timestamp)
         .explicitGet()
       tr2 = TransferTransaction
         .selfSigned(2.toByte, master, acc.toAddress, IssuedAsset(issueScr.id()), 1000000000L, Waves, fee, ByteStr.empty, timestamp)
@@ -170,17 +170,17 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
 
       setContractB = SetScriptTransaction.selfSigned(1.toByte, acc, Some(allAllowed), fee, ts).explicitGet()
       issueScrB = IssueTransaction(
-          TxVersion.V2,
-          acc.publicKey,
-          assetName,
-          description,
-          quantity + 1000000000L,
-          decimals,
-          true,
-          Some(allAllowed),
-          iFee,
-          timestamp
-        ).signWith(acc.privateKey)
+        TxVersion.V2,
+        acc.publicKey,
+        assetName,
+        description,
+        quantity + 1000000000L,
+        decimals,
+        true,
+        Some(allAllowed),
+        iFee,
+        timestamp
+      ).signWith(acc.privateKey)
       assetPairB = AssetPair(IssuedAsset(issueScrB.id()), IssuedAsset(issueScr.id()))
       o1b        = Order.buy(2: Byte, master, master.publicKey, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
       o2b        = Order.sell(2: Byte, acc, master.publicKey, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
@@ -244,35 +244,34 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
       resetContract               = SetScriptTransaction.selfSigned(1.toByte, master, Some(allAllowed), fee, ts + 1).explicitGet()
       (_, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
       issueSp = IssueTransaction(
-          TxVersion.V2,
-          master.publicKey,
-          assetName,
-          description,
-          quantity + 1000000000L,
-          decimals,
-          true,
-          None,
-          iFee,
-          timestamp
-        )
-        .signWith(master.privateKey)
+        TxVersion.V2,
+        master.publicKey,
+        assetName,
+        description,
+        quantity + 1000000000L,
+        decimals,
+        true,
+        None,
+        iFee,
+        timestamp
+      ).signWith(master.privateKey)
       sponsorTx = SponsorFeeTransaction.selfSigned(1.toByte, master, IssuedAsset(issueSp.id()), Some(1), fee, timestamp).explicitGet()
       burnSp    = BurnTransaction.selfSigned(2.toByte, master, IssuedAsset(issueSp.id()), 1, fee, timestamp).explicitGet()
       reissueSp = ReissueTransaction
         .selfSigned(2.toByte, master, IssuedAsset(issueSp.id()), 1, true, fee, timestamp)
         .explicitGet()
       issueScr = IssueTransaction(
-          TxVersion.V2,
-          master.publicKey,
-          assetName,
-          description,
-          quantity + 1000000000L,
-          decimals,
-          true,
-          Some(allAllowed),
-          iFee,
-          timestamp
-        ).signWith(master.privateKey)
+        TxVersion.V2,
+        master.publicKey,
+        assetName,
+        description,
+        quantity + 1000000000L,
+        decimals,
+        true,
+        Some(allAllowed),
+        iFee,
+        timestamp
+      ).signWith(master.privateKey)
 
       burnScr = BurnTransaction.selfSigned(2.toByte, master, IssuedAsset(issueScr.id()), 1, fee, timestamp).explicitGet()
       reissueScr = ReissueTransaction

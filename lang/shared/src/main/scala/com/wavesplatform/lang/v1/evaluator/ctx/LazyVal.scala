@@ -1,6 +1,8 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
-import cats.implicits._
+import cats.instances.either._
+import cats.syntax.applicative._
+import cats.syntax.flatMap._
 import cats.{Eval, Monad, ~>}
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.LogCallback
@@ -34,7 +36,7 @@ object LazyVal {
     LazyValImpl(v, _ => Monad[F].unit)
 
   def fromEvaluated[F[_] : Monad](v: EVALUATED, lc: LogCallback[F]): LazyVal[F] =
-    LazyValImpl(v.pure[Either[ExecutionError, ?]].pure[F].pure[Eval], lc)
+    LazyValImpl(v.pure[Either[ExecutionError, *]].pure[F].pure[Eval], lc)
 
   def fromEvaluated[F[_] : Monad](v: EVALUATED): LazyVal[F] =
     fromEvaluated(v, _ => Monad[F].unit)

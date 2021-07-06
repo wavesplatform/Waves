@@ -1,21 +1,16 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.{TransactionGen, crypto}
+import com.wavesplatform.crypto
+import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
-import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
-abstract class GenericTransactionSpecification[T <: com.wavesplatform.transaction.Transaction]
-    extends PropSpec
-    with PropertyChecks
-    with Matchers
-    with TransactionGen {
+abstract class GenericTransactionSpecification[T <: Transaction] extends PropSpec {
 
   def transactionParser: com.wavesplatform.transaction.TransactionParser
   def updateProofs(tx: T, p: Proofs): T
   def generator: Gen[(Seq[com.wavesplatform.transaction.Transaction], T)]
-  def assertTxs(first: Transaction, second: T): Unit
+  def assertTxs(first: T, second: T): Unit
   def jsonRepr: Seq[(JsValue, T)]
   def transactionName: String
   def preserBytesJson: Option[(Array[Byte], JsValue)] = None
@@ -23,7 +18,7 @@ abstract class GenericTransactionSpecification[T <: com.wavesplatform.transactio
   property(s"$transactionName serialization roundtrip") {
     forAll(generator) {
       case (_, tx) =>
-        assertTxs(transactionParser.parseBytes(tx.bytes()).get, tx)
+        assertTxs(transactionParser.parseBytes(tx.bytes()).get.asInstanceOf[T], tx)
     }
   }
 

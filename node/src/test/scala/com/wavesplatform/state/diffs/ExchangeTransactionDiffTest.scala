@@ -19,6 +19,7 @@ import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctio
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ExchangeTransactionDiff.getOrderFeePortfolio
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
 import com.wavesplatform.transaction._
@@ -29,19 +30,15 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.utils._
-import com.wavesplatform.{NoShrink, TestValues, TransactionGen, crypto}
+import com.wavesplatform.{TestValues, crypto}
 import org.scalacheck.Gen
-import org.scalatest.{EitherValues, Inside, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import org.scalatest.{EitherValues, Inside}
 
 import scala.util.Random
 
 class ExchangeTransactionDiffTest
     extends PropSpec
-    with PropertyChecks
-    with TransactionGen
     with Inside
-    with NoShrink
     with WithDomain
     with EitherValues {
 

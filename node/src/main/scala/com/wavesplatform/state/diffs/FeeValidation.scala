@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.data.Chain
-import cats.implicits._
+import cats.syntax.foldable._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.Constants

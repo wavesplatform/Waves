@@ -1,11 +1,10 @@
 package com.wavesplatform.code
 
-import com.wavesplatform.common.state.diffs.ProduceError.produce
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
-import org.scalatest.{Matchers, PropSpec}
+import com.wavesplatform.test._
 
-class DirectiveSetConstructingTest extends PropSpec with Matchers {
+class DirectiveSetConstructingTest extends PropSpec {
   property("DirectiveSet should be successfully constructed with (V3, Account, Contract) params") {
     DirectiveSet(V3, Account, DApp) shouldBe DirectiveSet(V3, Account, DApp)
   }

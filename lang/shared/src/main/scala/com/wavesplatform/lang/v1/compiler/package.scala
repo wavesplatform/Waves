@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1
 
 import cats.Id
-import cats.implicits._
+import cats.syntax.applicative._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.task.TaskM
 import com.wavesplatform.lang.v1.task.imports._

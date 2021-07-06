@@ -1,7 +1,9 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.Id
-import cats.implicits._
+import cats.instances.either._
+import cats.instances.list._
+import cats.syntax.traverse._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}

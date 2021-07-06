@@ -15,18 +15,10 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, Transaction, TxWithFee}
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
-import org.scalatest.{EitherValues, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import com.wavesplatform.TestTime
+import com.wavesplatform.test.PropSpec
 
-class SmartAccountFeeTest
-    extends PropSpec
-    with ScalaCheckPropertyChecks
-    with Matchers
-    with TransactionGen
-    with NoShrink
-    with WithDomain
-    with EitherValues {
+class SmartAccountFeeTest extends PropSpec with WithDomain {
 
   private val time = new TestTime
   private def ts   = time.getTimestamp()
@@ -236,7 +228,7 @@ class SmartAccountFeeTest
   }
 
   private def assertNoError(tx: Transaction, d: Domain) =
-    d.blockchain.bestLiquidDiff.get.errorMessage(tx.id.value()) shouldBe None
+    d.blockchain.bestLiquidDiff.get.errorMessage(tx.id()) shouldBe None
 
   property(s"small verifier is free after ${BlockchainFeatures.SynchronousCalls} activation") {
     forAll(preconditions) {

@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
@@ -9,6 +8,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.settings.Constants
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -19,9 +19,8 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTran
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.utils.StringBytes
 import org.scalacheck.Gen
-import org.scalatest.{FreeSpec, Matchers}
 
-class ProtoVersionTransactionsSpec extends FreeSpec with TransactionGen with Matchers {
+class ProtoVersionTransactionsSpec extends FreeSpec {
 
   val MinFee: Long            = (0.001 * Constants.UnitsInWave).toLong
   val DataTxFee: Long         = 15000000

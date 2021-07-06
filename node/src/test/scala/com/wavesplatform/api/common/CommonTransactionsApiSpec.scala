@@ -1,6 +1,7 @@
 package com.wavesplatform.api.common
 
-import org.scalatest.FreeSpec
+import com.wavesplatform.test.FreeSpec
+
 
 class CommonTransactionsApiSpec extends FreeSpec {
   "Merkle Tree" - {

@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.compiler
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.directives.values.Imports
 import com.wavesplatform.lang.directives.{Directive, DirectiveParser}
 import com.wavesplatform.lang.utils.lazyContexts
@@ -10,10 +9,9 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test.PropSpec
 
-class ExpressionCompilerWithParserV2Test extends PropSpec with PropertyChecks with Matchers with NoShrink {
+class ExpressionCompilerWithParserV2Test extends PropSpec {
 
   def compile(script: String, saveExprContext: Boolean = false): Either[String, Expressions.EXPR] = {
 

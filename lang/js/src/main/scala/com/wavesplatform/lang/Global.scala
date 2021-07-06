@@ -1,16 +1,13 @@
 package com.wavesplatform.lang
 
-import cats.implicits._
+import java.math.{BigInteger, BigDecimal => BD}
+
+import cats.syntax.either._
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
-import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
-import java.math.{BigInteger, BigDecimal => BD}
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.scalajs.js
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.typedarray.{ArrayBuffer, Int8Array}
 import scala.util.Try
@@ -145,12 +142,6 @@ object Global extends BaseGlobal {
         "BigInteger out of long range"
       )
   }
-
-  override def requestNode(url: String): Future[NodeResponse] =
-    impl.Global
-      .httpGet(js.Dynamic.literal(url = url))
-      .toFuture
-      .map(r => NodeResponse(r.status.asInstanceOf[Int], r.body.asInstanceOf[String]))
 
   override def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
     ???

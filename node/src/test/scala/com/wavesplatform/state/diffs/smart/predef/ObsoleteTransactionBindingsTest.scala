@@ -11,13 +11,11 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, PaymentTransaction}
-import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalatest.PropSpec
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class ObsoleteTransactionBindingsTest extends PropSpec with WithState {
 
   def script(g: GenesisTransaction, p: PaymentTransaction): String =
     s"""let genTx = extract(transactionById(base58'${g.id().toString}'))
