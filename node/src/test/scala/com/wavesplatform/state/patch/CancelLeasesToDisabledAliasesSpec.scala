@@ -5,11 +5,12 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.TxHelpers
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
+import org.scalatest.BeforeAndAfterAll
 
-class CancelLeasesToDisabledAliasesSpec extends FlatSpec with Matchers with PathMockFactory with WithDomain with BeforeAndAfterAll {
+class CancelLeasesToDisabledAliasesSpec extends FlatSpec with PathMockFactory with WithDomain with BeforeAndAfterAll {
   val MainnetSettings = {
     import SettingsFromDefaultConfig.blockchainSettings.{functionalitySettings => fs}
     SettingsFromDefaultConfig.copy(
