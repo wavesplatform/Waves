@@ -20,9 +20,11 @@ case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatu
       height: Int
   )
 
-  lazy val patchData: Map[ByteStr, (LeaseDetails, Address)] = {
+  private[this] lazy val mainnetPatchData = {
+    require(AddressScheme.current.chainId == 'W')
     implicit val cancelDetailsReads: Reads[CancelDetails] = Json.reads
-    if (AddressScheme.current.chainId == 'W') readPatchData[Seq[CancelDetails]]().map { cancelDetails =>
+
+    readPatchData[Seq[CancelDetails]]().map { cancelDetails =>
       val leaseId          = ByteStr(Base58.decode(cancelDetails.id))
       val sender           = PublicKey(Base58.decode(cancelDetails.senderPublicKey))
       val recipientAlias   = Alias.fromString(cancelDetails.recipientAlias).explicitGet()
@@ -35,8 +37,11 @@ case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatu
         leaseId,
         cancelDetails.height
       ) -> recipientAddress)
-    }.toMap else Map.empty
+    }.toMap
   }
+
+  def patchData: Map[ByteStr, (LeaseDetails, Address)] =
+    if (AddressScheme.current.chainId == 'W') mainnetPatchData else Map.empty
 
   override def apply(blockchain: Blockchain): Diff =
     patchData
@@ -51,5 +56,5 @@ case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatu
                 Map(recipientAddress  -> Portfolio(lease = LeaseBalance(-ld.amount, 0)))
           )
       }
-      .reduceLeft(_ |+| _)
+      .foldLeft(Diff.empty)(_ |+| _)
 }
