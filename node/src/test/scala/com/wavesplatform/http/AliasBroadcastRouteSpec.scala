@@ -10,9 +10,8 @@ import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{NoShrink, RequestGen}
+import com.wavesplatform.RequestGen
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json._
 import play.api.libs.json._
 
@@ -20,9 +19,7 @@ class AliasBroadcastRouteSpec
     extends RouteSpec("/alias/broadcast/")
     with RequestGen
     with PathMockFactory
-    with PropertyChecks
-    with RestAPISettingsHelper
-    with NoShrink {
+    with RestAPISettingsHelper {
   private[this] val utxPoolSynchronizer = DummyTransactionPublisher.rejecting(tx => TransactionValidationError(GenericError("foo"), tx))
 
   val route = AliasApiRoute(restAPISettings, stub[CommonTransactionsApi], stub[Wallet], utxPoolSynchronizer, stub[Time], stub[Blockchain]).route

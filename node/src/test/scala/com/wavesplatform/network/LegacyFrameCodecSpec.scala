@@ -4,20 +4,19 @@ import java.net.InetSocketAddress
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.network.message.{MessageSpec, Message => ScorexMessage}
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
-import com.wavesplatform.{TestValues, TransactionGen, crypto}
+import com.wavesplatform.{TestValues, crypto}
 import io.netty.buffer.Unpooled.wrappedBuffer
 import io.netty.buffer.{ByteBuf, Unpooled}
 import io.netty.channel.embedded.EmbeddedChannel
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{FreeSpec, Matchers}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.concurrent.duration.DurationInt
 
-class LegacyFrameCodecSpec extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen {
+class LegacyFrameCodecSpec extends FreeSpec with MockFactory {
 
   "should handle one message" in forAll(issueGen) { origTx =>
     val codec = new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes)

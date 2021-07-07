@@ -1,7 +1,8 @@
 package com.wavesplatform.database
 
 import cats.data.Ior
-import cats.implicits._
+import cats.syntax.option._
+import cats.syntax.semigroup._
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.Ints
@@ -555,8 +556,8 @@ abstract class LevelDBWriter private[database] (
           val (txHeight, txNum) = transactions
             .get(TransactionId(txId))
             .map { case (_, txNum, _) => (height, txNum) }
-            .orElse(rw.get(Keys.transactionMetaById(TransactionId(txId))).map {
-              case TransactionMeta(height, txNum, _, _) => (height, TxNum(txNum.toShort))
+            .orElse(rw.get(Keys.transactionMetaById(TransactionId(txId))).map { tm =>
+              (tm.height, TxNum(tm.num.toShort))
             })
             .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
 
@@ -683,7 +684,7 @@ abstract class LevelDBWriter private[database] (
         transactions.foreach {
           case (num, tx) =>
             forgetTransaction(tx.id())
-            tx match {
+            (tx: @unchecked) match {
               case _: GenesisTransaction                                                       => // genesis transaction can not be rolled back
               case _: PaymentTransaction | _: TransferTransaction | _: MassTransferTransaction =>
               // balances already restored
@@ -799,23 +800,24 @@ abstract class LevelDBWriter private[database] (
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
-      TransactionMeta(height, num, TransferTransaction.typeId, _) <- db.get(Keys.transactionMetaById(TransactionId @@ id))
-      tx                                                          <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort))).collect { case (t: TransferTransaction, true) => t }
+      tm <- db.get(Keys.transactionMetaById(TransactionId @@ id))
+      if tm.`type` == TransferTransaction.typeId
+      tx <- db.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort))).collect { case (t: TransferTransaction, true) => t }
     } yield (height, tx)
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] = readOnly(transactionInfo(id, _))
 
-  protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction, Boolean)] = {
-    val txId = TransactionId(id)
+  protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction, Boolean)] =
     for {
-      TransactionMeta(height, num, _, failed) <- db.get(Keys.transactionMetaById(txId))
-      (tx, _)                                 <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort)))
-    } yield (height, tx, !failed)
-  }
+      tm      <- db.get(Keys.transactionMetaById(TransactionId(id)))
+      (tx, _) <- db.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)))
+    } yield (tm.height, tx, !tm.failed)
 
   override def transactionMeta(id: ByteStr): Option[(Int, Boolean)] = readOnly { db =>
-    db.get(Keys.transactionMetaById(TransactionId(id))).map { case TransactionMeta(height, _, _, failed) => (height, !failed) }
+    db.get(Keys.transactionMetaById(TransactionId(id))).map { tm =>
+      (tm.height, !tm.failed)
+    }
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, WavesAddress] = readOnly { db =>

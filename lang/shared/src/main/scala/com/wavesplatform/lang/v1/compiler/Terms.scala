@@ -3,7 +3,8 @@ package com.wavesplatform.lang.v1.compiler
 import java.nio.charset.StandardCharsets
 
 import cats.Eval
-import cats.implicits._
+import cats.instances.list._
+import cats.syntax.traverse._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.ExecutionError

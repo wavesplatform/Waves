@@ -14,21 +14,17 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state.HistoryTest
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.utils._
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB, crypto}
-import org.scalatest.{EitherValues, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.{WithDB, crypto}
+import org.scalatest.EitherValues
 import play.api.libs.json.Json
 
 class IssueTransactionV2Specification
     extends PropSpec
-    with PropertyChecks
-    with Matchers
-    with TransactionGen
     with WithDB
     with HistoryTest
-    with NoShrink
     with EitherValues {
 
   property("IssueV2 serialization roundtrip") {

@@ -9,6 +9,7 @@ import com.wavesplatform.state.Diff
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.utils.base58Length
 import supertagged._
+import supertagged.postfix._
 
 package object transaction {
   val AssetIdLength: Int       = com.wavesplatform.crypto.DigestLength

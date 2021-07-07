@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.smart
 
-import cats.implicits._
+import cats.syntax.either._
 import com.wavesplatform.account.{AddressOrAlias, Recipient}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
@@ -62,7 +62,7 @@ object RealTransactionWrapper {
       stdLibVersion: StdLibVersion,
       target: AttachedPaymentTarget
   ): Either[ExecutionError, Tx] =
-    tx match {
+    (tx: @unchecked) match {
       case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, toRide(g.recipient)).asRight
       case t: TransferTransaction => mapTransferTx(t).asRight
       case i: IssueTransaction =>

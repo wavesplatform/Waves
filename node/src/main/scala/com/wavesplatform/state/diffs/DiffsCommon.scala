@@ -1,6 +1,12 @@
 package com.wavesplatform.state.diffs
 
-import cats.implicits._
+import cats.instances.map._
+import cats.instances.option._
+import cats.syntax.apply._
+import cats.syntax.either._
+import cats.syntax.ior._
+import cats.syntax.semigroup._
+import cats.syntax.traverse._
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures

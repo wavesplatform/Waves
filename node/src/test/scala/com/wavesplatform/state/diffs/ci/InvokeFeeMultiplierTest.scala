@@ -13,26 +13,15 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, Transaction}
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
+import com.wavesplatform.TestTime
+import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.scalatest.EitherValues
 
 import scala.util.Try
 
-class InvokeFeeMultiplierTest
-    extends PropSpec
-    with ScalaCheckPropertyChecks
-    with Matchers
-    with TransactionGen
-    with NoShrink
-    with Inside
-    with WithState
-    with DBCacheSettings
-    with MockFactory
-    with WithDomain
-    with EitherValues {
+class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettings with MockFactory with WithDomain with EitherValues {
 
   private val time = new TestTime
   private def ts   = time.getTimestamp()
@@ -89,7 +78,7 @@ class InvokeFeeMultiplierTest
             FunctionHeader.User("init"),
             List(
               CONST_STRING("").explicitGet(),
-              CONST_STRING(issue.id.value().toString).explicitGet(),
+              CONST_STRING(issue.id().toString).explicitGet(),
               CONST_STRING("").explicitGet(),
               CONST_LONG(1),
               CONST_LONG(1),
@@ -102,7 +91,7 @@ class InvokeFeeMultiplierTest
           )
         )
         call    = Some(FUNCTION_CALL(FunctionHeader.User("buyBack"), Nil))
-        payment = Seq(Payment(1, IssuedAsset(issue.id.value())))
+        payment = Seq(Payment(1, IssuedAsset(issue.id())))
         initInvoke <- InvokeScriptTransaction.selfSigned(1.toByte, master, master.toAddress, initCall, Nil, initFee, Waves, ts)
         invoke1    <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, call, payment, fee, Waves, ts)
         invoke2    <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, call, payment, fee, Waves, ts)

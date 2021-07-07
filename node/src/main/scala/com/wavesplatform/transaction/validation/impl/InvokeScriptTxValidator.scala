@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.validation.impl
 
 import cats.data.NonEmptyList
 import cats.data.Validated.{Invalid, Valid}
-import cats.implicits._
+import cats.syntax.either._
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.protobuf.transaction.PBTransactions

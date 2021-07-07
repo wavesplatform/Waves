@@ -3,31 +3,29 @@ package com.wavesplatform.db
 import java.nio.file.Files
 
 import cats.Monoid
-import com.wavesplatform.{NTPTime, TestHelpers}
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{loadActiveLeases, LevelDBFactory, LevelDBWriter, TestStorageFactory}
+import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{
-  loadConfig, BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings,
-  TestFunctionalitySettings => TFS
-}
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
-import com.wavesplatform.state.diffs.{produce, BlockDiffer}
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
+import com.wavesplatform.state.diffs.{BlockDiffer, produce}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.{NTPTime, TestHelpers}
 import monix.reactive.Observer
 import monix.reactive.subjects.{PublishSubject, Subject}
 import org.iq80.leveldb.{DB, Options}
-import org.scalatest.{Matchers, Suite}
+import org.scalatest.Suite
+import org.scalatest.matchers.should.Matchers
 
 trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
   protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = PublishSubject()

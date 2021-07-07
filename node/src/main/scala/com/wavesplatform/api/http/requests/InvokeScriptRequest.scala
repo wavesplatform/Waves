@@ -1,6 +1,8 @@
 package com.wavesplatform.api.http.requests
 
-import cats.implicits._
+import cats.instances.list._
+import cats.syntax.either._
+import cats.syntax.traverse._
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError

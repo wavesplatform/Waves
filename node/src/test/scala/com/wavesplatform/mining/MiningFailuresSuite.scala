@@ -1,6 +1,7 @@
 package com.wavesplatform.mining
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.WithDB
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -9,20 +10,19 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{BalanceSnapshot, BlockMinerInfo, Blockchain, NG}
+import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{TransactionGen, WithDB}
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{FlatSpec, Matchers}
 
-class MiningFailuresSuite extends FlatSpec with Matchers with PathMockFactory with WithDB with TransactionGen {
+class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithDB {
   trait BlockchainUpdaterNG extends Blockchain with BlockchainUpdater with NG
 
   behavior of "Miner"

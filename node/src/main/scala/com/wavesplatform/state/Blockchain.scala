@@ -103,7 +103,7 @@ object Blockchain {
       }
 
     def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
-      aoa match {
+      (aoa: @unchecked) match {
         case Left(wa) => Right(wa)
         case Right(alias) => blockchain.resolveAlias(alias)
       }

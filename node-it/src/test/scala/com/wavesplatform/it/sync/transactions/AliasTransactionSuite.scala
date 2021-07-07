@@ -5,7 +5,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.util._
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.CreateAliasTransaction
 import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.Json

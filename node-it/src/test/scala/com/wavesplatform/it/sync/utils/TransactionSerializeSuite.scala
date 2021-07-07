@@ -2,15 +2,16 @@ package com.wavesplatform.it.sync.utils
 
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry}
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
@@ -20,9 +21,8 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion}
 import com.wavesplatform.utils._
-import org.scalatest.prop.TableDrivenPropertyChecks
-import com.wavesplatform.common.utils.EitherExt2
 import org.scalatest.Informing
+import org.scalatest.prop.TableDrivenPropertyChecks
 
 class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPropertyChecks with Informing {
   private val publicKey         = PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet()
@@ -30,7 +30,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   private val tsOrderFrom: Long = 1526992336241L
   private val tsOrderTo: Long   = 1529584336241L
 
-  private val buyV2 = Order(
+  private lazy val buyV2 = Order(
     TxVersion.V2,
     PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(),
     PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
@@ -44,7 +44,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     proofs = Proofs(Seq(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get))
   )
 
-  val buyV1 = Order(
+  private lazy val buyV1 = Order(
     TxVersion.V1,
     PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(),
     PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
@@ -58,7 +58,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     proofs = Proofs(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
   )
 
-  private val sell = Order(
+  private lazy val sell = Order(
     TxVersion.V1,
     PublicKey.fromBase58String("7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV").explicitGet(),
     PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
@@ -72,7 +72,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     proofs = Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
   )
 
-  private val exV1 = ExchangeTransaction
+  private lazy val exV1 = ExchangeTransaction
     .create(
       TxVersion.V1,
       buyV1,
@@ -87,7 +87,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val exV2 = ExchangeTransaction
+  private lazy val exV2 = ExchangeTransaction
     .create(
       TxVersion.V2,
       buyV2,
@@ -102,7 +102,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val burnV1 = BurnTransaction
+  private lazy val burnV1 = BurnTransaction
     .create(
       1.toByte,
       publicKey,
@@ -114,7 +114,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val burnV2 = BurnTransaction
+  private lazy val burnV2 = BurnTransaction
     .create(
       2.toByte,
       publicKey,
@@ -126,7 +126,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val aliasV1 = CreateAliasTransaction
+  private lazy val aliasV1 = CreateAliasTransaction
     .create(
       Transaction.V1,
       publicKey,
@@ -137,7 +137,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val aliasV2 = CreateAliasTransaction
+  private lazy val aliasV2 = CreateAliasTransaction
     .create(
       Transaction.V2,
       publicKey,
@@ -148,7 +148,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val data = DataTransaction
+  private lazy val data = DataTransaction
     .create(
       1.toByte,
       publicKey,
@@ -159,7 +159,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val issueV1 = IssueTransaction(
+  private lazy val issueV1 = IssueTransaction(
     TxVersion.V1,
     publicKey,
     "Gigacoin".utf8Bytes,
@@ -173,7 +173,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get)
   )
 
-  private val issueV2 = IssueTransaction(
+  private lazy val issueV2 = IssueTransaction(
     TxVersion.V2,
     publicKey,
     "Gigacoin".utf8Bytes,
@@ -187,7 +187,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get))
   )
 
-  private val leasecancelV1 = LeaseCancelTransaction
+  private lazy val leasecancelV1 = LeaseCancelTransaction
     .create(
       1.toByte,
       publicKey,
@@ -198,7 +198,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val leasecancelV2 = LeaseCancelTransaction
+  private lazy val leasecancelV2 = LeaseCancelTransaction
     .create(
       2.toByte,
       publicKey,
@@ -233,7 +233,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  lazy val mass = MassTransferTransaction
+  private lazy val mass = MassTransferTransaction
     .create(
       1.toByte,
       publicKey,
@@ -248,7 +248,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val reissueV1 = ReissueTransaction
+  private lazy val reissueV1 = ReissueTransaction
     .create(
       1.toByte,
       publicKey,
@@ -261,7 +261,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val reissueV2 = ReissueTransaction
+  private lazy val reissueV2 = ReissueTransaction
     .create(
       2.toByte,
       publicKey,
@@ -274,7 +274,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val setasset = SetAssetScriptTransaction
+  private lazy val setasset = SetAssetScriptTransaction
     .create(
       1.toByte,
       publicKey,
@@ -295,7 +295,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val setscript = SetScriptTransaction
+  private lazy val setscript = SetScriptTransaction
     .create(
       1.toByte,
       publicKey,
@@ -306,7 +306,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val sponsor = SponsorFeeTransaction
+  private lazy val sponsor = SponsorFeeTransaction
     .create(
       1.toByte,
       publicKey,
@@ -347,7 +347,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     recipient.chainId
   )
 
-  private val invokeScript = InvokeScriptTransaction
+  private lazy val invokeScript = InvokeScriptTransaction
     .create(
       1.toByte,
       PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(),

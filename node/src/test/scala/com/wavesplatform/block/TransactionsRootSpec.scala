@@ -3,24 +3,17 @@ package com.wavesplatform.block
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.merkle.Merkle._
+import com.wavesplatform.crypto.Blake2b256
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.{BlockGen, NoShrink, TransactionGen}
+import com.wavesplatform.BlockGen
+import com.wavesplatform.test.FreeSpec
 import org.scalacheck.Gen
-import org.scalatest.{FreeSpec, Matchers, OptionValues}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import scorex.crypto.hash.Blake2b256
+import org.scalatest.OptionValues
 
-class TransactionsRootSpec
-    extends FreeSpec
-    with OptionValues
-    with ScalaCheckPropertyChecks
-    with BlockGen
-    with TransactionGen
-    with NoShrink
-    with Matchers {
+class TransactionsRootSpec extends FreeSpec with OptionValues with BlockGen {
 
   val commonGen: Gen[(KeyPair, List[TransferTransaction])] =
     for {
@@ -144,4 +137,3 @@ class TransactionsRootSpec
       block.verifyTransactionProof(proof) shouldBe false
   }
 }
-

@@ -28,7 +28,6 @@ object ExtensionPackaging extends AutoPlugin {
     Seq(
       packageDoc / publishArtifact := false,
       packageSrc / publishArtifact := false,
-      Universal / javaOptions := Nil,
       // Here we record the classpath as it's added to the mappings separately, so
       // we can use its order to generate the bash/bat scripts.
       classpathOrdering := Nil,
@@ -70,8 +69,7 @@ object ExtensionPackaging extends AutoPlugin {
       Debian / normalizedName := s"${name.value}${network.value.packageSuffix}",
       Debian / packageName := s"${name.value}${network.value.packageSuffix}",
       libraryDependencies ++= Dependencies.logDeps,
-      javaOptions in run ++= extensionClasses.value.zipWithIndex.map { case (extension, index) => s"-Dwaves.extensions.$index=$extension" },
-      maintainer := "wavesplatform.com"
+      run / javaOptions ++= extensionClasses.value.zipWithIndex.map { case (extension, index) => s"-Dwaves.extensions.$index=$extension" }
     ) ++ maintainerFix
 
   private def maintainerFix =
@@ -145,7 +143,7 @@ object ExtensionPackaging extends AutoPlugin {
         val providedClasspath = refs.map { ref =>
           stateTask.flatMap { state =>
             val extracted = Project.extract(state)
-            extracted.get(Runtime / dependencyClasspath in ref)
+            extracted.get(ref / Runtime / dependencyClasspath)
           }
         }
 

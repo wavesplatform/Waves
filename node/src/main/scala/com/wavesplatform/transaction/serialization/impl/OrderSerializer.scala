@@ -86,7 +86,7 @@ object OrderSerializer {
 
   def toBytes(ord: Order): Array[Byte] = {
     import ord._
-    version match {
+    (version: @unchecked) match {
       case Order.V1            => Bytes.concat(this.bodyBytes(ord), proofs.toSignature.arr)
       case Order.V2 | Order.V3 => Bytes.concat(this.bodyBytes(ord), proofs.bytes())
     }

@@ -1,6 +1,8 @@
 package com.wavesplatform.state.diffs.invoke
 
-import cats.implicits._
+import cats.instances.map._
+import cats.syntax.either._
+import cats.syntax.semigroup._
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey, WavesAddress}
@@ -30,6 +32,7 @@ import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
+import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.validation.impl.{LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
 import com.wavesplatform.transaction.{Asset, AssetIdLength, TransactionType}
@@ -62,6 +65,13 @@ object InvokeDiffsCommon {
     }
   }
 
+  def calculateMinFee(blockchain: Blockchain, issueList: List[Issue], additionalScriptsInvoked: Int, stepsNumber: Long): Long = {
+    val dAppFee    = FeeConstants(TransactionType.InvokeScript) * FeeUnit * stepsNumber
+    val issuesFee  = issueList.count(!blockchain.isNFT(_)) * FeeConstants(TransactionType.Issue) * FeeUnit
+    val actionsFee = additionalScriptsInvoked * ScriptExtraFee
+    dAppFee + issuesFee + actionsFee
+  }
+
   def calcAndCheckFee[E <: ValidationError](
       makeError: (String, Long) => E,
       tx: InvokeScriptTransaction,
@@ -70,55 +80,52 @@ object InvokeDiffsCommon {
       invocationComplexity: Long,
       issueList: List[Issue],
       additionalScriptsInvoked: Int
-  ): TracedResult[ValidationError, (Long, Map[Address, Portfolio])] =
-    TracedResult {
-      val stepsNumber =
-        if (invocationComplexity % stepLimit == 0)
-          invocationComplexity / stepLimit
-        else
-          invocationComplexity / stepLimit + 1
+  ): TracedResult[ValidationError, (Long, Map[Address, Portfolio])] = {
+    val stepsNumber =
+      if (invocationComplexity % stepLimit == 0)
+        invocationComplexity / stepLimit
+      else
+        invocationComplexity / stepLimit + 1
 
-      for {
-        (attachedFeeInWaves, portfolioDiff) <- txFeeDiff(blockchain, tx)
-        _ <- {
-          val dAppFee    = FeeConstants(TransactionType.InvokeScript) * FeeUnit * stepsNumber
-          val issuesFee  = issueList.count(!blockchain.isNFT(_)) * FeeConstants(TransactionType.Issue) * FeeUnit
-          val actionsFee = additionalScriptsInvoked * ScriptExtraFee
-          val minFee     = dAppFee + issuesFee + actionsFee
+    val minFee = calculateMinFee(blockchain, issueList, additionalScriptsInvoked, stepsNumber)
 
-          lazy val errorMessage = {
-            val stepsInfo =
-              if (stepsNumber > 1)
-                s" with $stepsNumber invocation steps"
-              else
-                ""
+    val resultE = for {
+      (attachedFeeInWaves, portfolioDiff) <- txFeeDiff(blockchain, tx)
+      _ <- {
+        lazy val errorMessage = {
+          val stepsInfo =
+            if (stepsNumber > 1)
+              s" with $stepsNumber invocation steps"
+            else
+              ""
 
-            val totalScriptsInvokedInfo =
-              if (additionalScriptsInvoked > 0)
-                s" with $additionalScriptsInvoked total scripts invoked"
-              else
-                ""
+          val totalScriptsInvokedInfo =
+            if (additionalScriptsInvoked > 0)
+              s" with $additionalScriptsInvoked total scripts invoked"
+            else
+              ""
 
-            val issuesInfo =
-              if (issueList.nonEmpty)
-                s" with ${issueList.length} assets issued"
-              else
-                ""
+          val issuesInfo =
+            if (issueList.nonEmpty)
+              s" with ${issueList.length} assets issued"
+            else
+              ""
 
             val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
             s"Fee in $assetName for ${TransactionType.InvokeScript.transactionName} (${tx.assetFee._2} in $assetName)" +
-              s"$stepsInfo$totalScriptsInvokedInfo$issuesInfo " +
-              s"does not exceed minimal value of $minFee WAVES."
-          }
-
-          Either.cond(
-            attachedFeeInWaves >= minFee,
-            (),
-            makeError(errorMessage, invocationComplexity)
-          )
+            s"$stepsInfo$totalScriptsInvokedInfo$issuesInfo " +
+            s"does not exceed minimal value of $minFee WAVES."
         }
-      } yield (attachedFeeInWaves, portfolioDiff)
-    }
+
+        Either.cond(
+          attachedFeeInWaves >= minFee,
+          (),
+          makeError(errorMessage, invocationComplexity)
+        )
+      }
+    } yield (attachedFeeInWaves, portfolioDiff)
+    TracedResult(resultE).withAttributes(Attribute.MinFee -> minFee)
+  }
 
   def getInvocationComplexity(
       blockchain: Blockchain,
@@ -386,7 +393,7 @@ object InvokeDiffsCommon {
   ): TracedResult[FailedTransactionError, Diff] =
     actions.foldLeft(TracedResult(paymentsDiff.asRight[FailedTransactionError])) { (diffAcc, action) =>
       diffAcc match {
-        case TracedResult(Right(curDiff), _) =>
+        case TracedResult(Right(curDiff), _, _) =>
           val complexityLimit =
             if (remainingLimit < Int.MaxValue) remainingLimit - curDiff.scriptsComplexity.toInt
             else remainingLimit

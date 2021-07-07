@@ -365,8 +365,6 @@ object TransactionFactory {
     import InvokeScriptRequest._
     val chainId = (jsv \ "chainId").asOpt[Byte]
     val typeId  = (jsv \ "type").as[Byte]
-    val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
-
     val pf: PartialFunction[TransactionType.TransactionType, Either[ValidationError, Transaction]] = {
       case TransactionType.Transfer        => jsv.as[TransferRequest].toTx
       case TransactionType.CreateAlias     => jsv.as[CreateAliasRequest].toTx

@@ -1,7 +1,8 @@
 package com.wavesplatform.state.reader
 
 import cats.data.Ior
-import cats.implicits._
+import cats.syntax.option._
+import cats.syntax.semigroup._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias, WavesAddress}
 import com.wavesplatform.block.Block.BlockId

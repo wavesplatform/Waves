@@ -4,8 +4,9 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.{NetworkSettings, loadConfig}
+import com.wavesplatform.test.FeatureSpec
 import net.ceedubs.ficus.Ficus._
-import org.scalatest.{FeatureSpec, GivenWhenThen, ParallelTestExecution}
+import org.scalatest.{GivenWhenThen, ParallelTestExecution}
 
 class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with ParallelTestExecution {
 
@@ -21,7 +22,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
   info("I want to blacklist other peers for certain time")
   info("So I can give them another chance after")
 
-  feature("Blacklist") {
+  Feature("Blacklist") {
 
     val peerDatabase = new PeerDatabaseImpl(networkSettings)
 
@@ -35,7 +36,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
     def isBlacklisted(address: InetSocketAddress): Boolean =
       peerDatabase.blacklistedHosts.contains(address.getAddress)
 
-    scenario("Peer blacklist another peer") {
+    Scenario("Peer blacklist another peer") {
 
       Given("Peer database is empty")
       assert(peerDatabase.knownPeers.isEmpty)
@@ -65,7 +66,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       assert(peerDatabase.knownPeers.contains(address1))
     }
 
-    scenario("Peer blacklist few peers") {
+    Scenario("Peer blacklist few peers") {
 
       Given("Peer database is empty")
       assert(peerDatabase.knownPeers.isEmpty)

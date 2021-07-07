@@ -16,24 +16,13 @@ import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Po
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
+import com.wavesplatform.TestTime
+import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.scalatest.{EitherValues, Inside}
 
-class InvokeAssetChecksTest
-    extends PropSpec
-    with ScalaCheckPropertyChecks
-    with Matchers
-    with TransactionGen
-    with NoShrink
-    with Inside
-    with WithState
-    with DBCacheSettings
-    with MockFactory
-    with WithDomain
-    with EitherValues {
+class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBCacheSettings with MockFactory with WithDomain with EitherValues {
 
   private val time = new TestTime
   private def ts   = time.getTimestamp()
@@ -85,7 +74,7 @@ class InvokeAssetChecksTest
       val miner       = TestBlock.defaultSigner.toAddress
       val dAppAddress = invoke.dApp.asInstanceOf[Address]
       def invokeInfo(succeeded: Boolean) =
-        Map(invoke.id.value() -> NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded))
+        Map(invoke.id() -> NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded))
 
       val expectedResult =
         if (activated) {
@@ -101,7 +90,7 @@ class InvokeAssetChecksTest
               miner                -> Portfolio.waves(invoke.fee)
             ),
             scriptsComplexity = 8,
-            scriptResults = Map(invoke.id.value() -> InvokeScriptResult(error = Some(ErrorMessage(1, expectingMessage))))
+            scriptResults = Map(invoke.id() -> InvokeScriptResult(error = Some(ErrorMessage(1, expectingMessage))))
           )
         } else {
           val asset = if (func == "invalidLength") invalidLengthAsset else unexistingAsset
@@ -115,7 +104,7 @@ class InvokeAssetChecksTest
             scriptsRun = 1,
             scriptsComplexity = 18,
             scriptResults = Map(
-              invoke.id.value() -> InvokeScriptResult(
+              invoke.id() -> InvokeScriptResult(
                 transfers = Seq(
                   InvokeScriptResult.Payment(invoke.senderAddress, Waves, 0),
                   InvokeScriptResult.Payment(invoke.senderAddress, asset, 0)

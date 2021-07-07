@@ -1,7 +1,10 @@
 package com.wavesplatform.api.http
 
+import java.security.SecureRandom
+
 import akka.http.scaladsl.server.{PathMatcher1, Route}
-import cats.implicits._
+import cats.syntax.either._
+import cats.syntax.semigroup._
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey, WavesAddress}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, ScriptCompilerError, TooBigArrayAllocation}
 import com.wavesplatform.api.http.requests.{ScriptWithImportsRequest, byteStrFormat}
@@ -37,8 +40,6 @@ import monix.eval.Coeval
 import monix.execution.Scheduler
 import play.api.libs.json._
 import shapeless.Coproduct
-import java.security.SecureRandom
-
 case class UtilsApiRoute(
     timeService: Time,
     settings: RestAPISettings,

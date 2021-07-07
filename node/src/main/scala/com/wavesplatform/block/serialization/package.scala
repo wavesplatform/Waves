@@ -32,7 +32,7 @@ package object serialization {
       generationSignature.arr
     )
 
-  def mkTxsCountBytes(version: Byte, txsCount: Int): Array[Byte] = version match {
+  def mkTxsCountBytes(version: Byte, txsCount: Int): Array[Byte] = (version: @unchecked) match {
     case GenesisBlockVersion | PlainBlockVersion                 => Array(txsCount.toByte)
     case NgBlockVersion | RewardBlockVersion | ProtoBlockVersion => Ints.toByteArray(txsCount)
   }

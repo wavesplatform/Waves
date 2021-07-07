@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.smart.script
 
-import cats.implicits._
+import cats.syntax.option._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -10,10 +10,10 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.state.diffs._
-import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test.PropSpec
+import org.scalatest.{EitherValues, Inside}
 
-class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers with Inside with EitherValues {
+class ScriptCompilerV1Test extends PropSpec with EitherValues with Inside {
   private val estimator = ScriptEstimatorV2
 
   property("compile script with specified version") {
@@ -87,7 +87,8 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
            |  case _ => false
            |}""".stripMargin,
         estimator
-      ).explicitGet()
+      )
+      .explicitGet()
   }
 
   property("account script with 'this' address link") {
@@ -104,7 +105,8 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
            |  case _ => false
            |}""".stripMargin,
         estimator
-      ).explicitGet()
+      )
+      .explicitGet()
   }
 
   property("asset script with 'this' address link") {
@@ -122,7 +124,8 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
            |  case _ => false
            |}""".stripMargin,
         estimator
-      ).explicitGet()
+      )
+      .explicitGet()
   }
 
   property("binary operations priority && ||") {
@@ -351,7 +354,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
 
     ScriptCompiler.compile(script, estimator) should produce(
       "Compilation failed: Match case variables should not be named as RIDE types, " +
-      "but `InvokeScriptTransaction`, `DataTransaction` found in 91-239"
+        "but `InvokeScriptTransaction`, `DataTransaction` found in 91-239"
     )
   }
 

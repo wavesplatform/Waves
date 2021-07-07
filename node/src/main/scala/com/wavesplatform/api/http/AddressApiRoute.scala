@@ -1,6 +1,8 @@
 package com.wavesplatform.api.http
 
 import akka.NotUsed
+import cats.syntax.traverse._
+import cats.instances.option._
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.server.{Directive0, Route}
 import akka.stream.scaladsl.Source
@@ -113,7 +115,7 @@ case class AddressApiRoute(
     complete(balanceJson(address))
   }
 
-  def balances: Route = (path("balance") & get & parameters(("height".as[Int].?, "address".as[String].*, "asset".?))) {
+  def balances: Route = (path("balance") & get & parameters("height".as[Int].?, "address".as[String].*, "asset".?)) {
     (maybeHeight, addresses, assetId) =>
       val height = maybeHeight.getOrElse(blockchain.height)
       validateBalanceDepth(height)(
@@ -247,7 +249,6 @@ case class AddressApiRoute(
   private def balanceJson(acc: Address) = Balance(acc.toString, 0, commonAccountsApi.balance(acc))
 
   private def scriptMetaJson(account: Address): Either[ValidationError.ScriptParseError, AccountScriptMeta] = {
-    import cats.implicits._
     val accountScript = blockchain.accountScript(account)
 
     accountScript

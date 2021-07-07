@@ -11,10 +11,9 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test.PropSpec
 
-class ContractScriptComplexityTest(estimator: ScriptEstimator) extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
+class ContractScriptComplexityTest(estimator: ScriptEstimator) extends PropSpec with TypedScriptGen {
 
   property("estimate contract script correctly") {
     val contract = DApp(

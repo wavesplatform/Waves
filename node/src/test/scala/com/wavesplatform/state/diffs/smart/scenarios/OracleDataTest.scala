@@ -13,16 +13,14 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.TxValidationError.ScriptExecutionError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Proofs}
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class OracleDataTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink with Matchers {
+class OracleDataTest extends PropSpec with WithState {
   val preconditions
       : Gen[(GenesisTransaction, GenesisTransaction, CreateAliasTransaction, SetScriptTransaction, DataTransaction, TransferTransaction)] =
     for {

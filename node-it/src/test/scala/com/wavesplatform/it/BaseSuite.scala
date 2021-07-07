@@ -3,21 +3,21 @@ package com.wavesplatform.it
 import java.io.File
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.it.transactions.NodesFromDocker
 import monix.eval.Coeval
 import org.scalatest._
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext
+import scala.jdk.CollectionConverters._
 
-class BaseSuite
-    extends FreeSpec
-    with ReportingTestName
+trait BaseSuite
+    extends ReportingTestName
     with NodesFromDocker
-    with Matchers
+    with matchers.should.Matchers
     with CancelAfterFailure
     with BeforeAndAfterAll
-    with BeforeAndAfterEach {
+    with BeforeAndAfterEach { this: TestSuite with Nodes =>
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
   protected def nodeConfigs: Seq[Config] =
@@ -31,10 +31,17 @@ class BaseSuite
   def notMiner: Node         = nodes.last
   protected def sender: Node = miner
 
+  private var isRunning = false
+
   // protected because https://github.com/sbt/zinc/issues/292
   protected val theNodes: Coeval[Seq[Node]] = Coeval.evalOnce {
+    require(isRunning, "Do not attempt to access node instances from suite constructors")
     Option(System.getProperty("waves.it.config.file")) match {
-      case None => dockerNodes()
+      case None =>
+        AddressScheme.current = new AddressScheme {
+          override val chainId: Byte = 'I'
+        }
+        dockerNodes()
       case Some(filePath) =>
         val defaultConfig = ConfigFactory.load()
         ConfigFactory
@@ -49,7 +56,12 @@ class BaseSuite
   override protected def nodes: Seq[Node] = theNodes()
 
   protected override def beforeAll(): Unit = {
+    isRunning = true
     theNodes.run()
     super.beforeAll()
   }
 }
+
+abstract class BaseFreeSpec extends freespec.AnyFreeSpec with BaseSuite
+
+abstract class BaseFunSuite extends funsuite.AnyFunSuite with BaseSuite

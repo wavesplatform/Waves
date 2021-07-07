@@ -2,8 +2,10 @@ package com.wavesplatform.state
 
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
-import cats.implicits._
+import cats.instances.map._
 import cats.kernel.Monoid
+import cats.syntax.either._
+import cats.syntax.option._
 import com.wavesplatform.account.{Address, Alias, WavesAddress}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
@@ -580,7 +582,7 @@ class BlockchainUpdaterImpl(
               innerVotes :+ ng.base.header.rewardVote
             else innerVotes
         }
-      case None => Seq()
+      case _ => Seq()
     }
   }
 

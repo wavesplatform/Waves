@@ -3,10 +3,9 @@ package com.wavesplatform.lang
 import com.wavesplatform.lang.directives.DirectiveKey._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{Directive, DirectiveParser}
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test._
 
-class DirectiveParserTest extends PropSpec with PropertyChecks with Matchers {
+class DirectiveParserTest extends PropSpec {
 
   def parse(s: String): Either[ExecutionError, List[Directive]] = DirectiveParser(s)
 

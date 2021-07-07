@@ -7,11 +7,16 @@ import sbtassembly.MergeStrategy
 enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning, VersionObject)
 
 libraryDependencies ++= Dependencies.node.value
-coverageExcludedPackages := ""
+
+name := "waves"
 
 inConfig(Compile)(
   Seq(
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
+    PB.protoSources += PB.externalIncludePath.value,
+    PB.generate / includeFilter := { (f: File) =>
+      (** / "waves" / "*.proto").matches(f.toPath)
+    },
     PB.deleteTargetDirectory := false,
     packageDoc / publishArtifact := false,
     packageSrc / publishArtifact := false
@@ -23,9 +28,13 @@ inTask(assembly)(
     test := {},
     assemblyJarName := s"waves-all-${version.value}.jar",
     assemblyMergeStrategy := {
-      case "module-info.class"                                  => MergeStrategy.discard
-      case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.concat
-      case other                                                => (assemblyMergeStrategy in assembly).value(other)
+      case p
+          if p.endsWith(".proto") ||
+            p.endsWith("module-info.class") ||
+            p.endsWith("io.netty.versions.properties") =>
+        MergeStrategy.discard
+      case "scala-collection-compat.properties" => MergeStrategy.discard
+      case other                                => (assembly / assemblyMergeStrategy).value(other)
     }
   )
 )
@@ -104,23 +113,16 @@ inConfig(Linux)(
   )
 )
 
-// Variable options are used in different tasks and configs, so we will specify all of them
-val nameFix = Seq(
-  name := "waves",
-  packageName := s"${name.value}${network.value.packageSuffix}",
-  normalizedName := s"${name.value}${network.value.packageSuffix}"
-)
-
 inConfig(Debian)(
   Seq(
+    packageSource := sourceDirectory.value / "package",
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
     debianPackageDependencies += "java8-runtime-headless",
-    serviceAutostart := false,
     maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm")),
     linuxPackageMappings ++= {
       val upstartScript = {
         val src    = packageSource.value / "upstart.conf"
-        val dest   = (target in Debian).value / "upstart" / s"${packageName.value}.conf"
+        val dest   = (Debian / target).value / "upstart" / s"${packageName.value}.conf"
         val result = TemplateWriter.generateScript(src.toURI.toURL, linuxScriptReplacements.value)
         IO.write(dest, result)
         dest
@@ -136,8 +138,10 @@ inConfig(Debian)(
         |is_upstart() {
         |    /sbin/init --version | grep upstart >/dev/null 2>&1
         |}
-        |""".stripMargin
-  ) ++ nameFix
+        |""".stripMargin,
+    packageName := s"${name.value}${network.value.packageSuffix}",
+    normalizedName := s"${name.value}${network.value.packageSuffix}"
+  )
 )
 
 V.scalaPackage := "com.wavesplatform"
@@ -146,6 +150,3 @@ V.scalaPackage := "com.wavesplatform"
 
 moduleName := s"waves${network.value.packageSuffix}" // waves-*.jar instead of node-*.jar
 executableScriptName := moduleName.value             // bin/waves instead of bin/node
-
-nameFix
-inScope(Global)(nameFix)

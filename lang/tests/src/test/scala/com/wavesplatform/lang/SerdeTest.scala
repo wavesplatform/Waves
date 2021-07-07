@@ -4,23 +4,21 @@ import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.Expressions
-import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
+import com.wavesplatform.test._
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{Assertion, FreeSpec, Matchers}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import org.scalatest.Assertion
 
 import scala.util.Try
 
-class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+class SerdeTest extends FreeSpec {
 
   private val caseObj = CaseObj(
     CASETYPEREF("Object type", Nil),

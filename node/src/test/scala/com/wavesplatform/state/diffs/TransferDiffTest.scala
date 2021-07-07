@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import cats.implicits._
+import cats.syntax.option._
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -8,17 +8,15 @@ import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxValidationError}
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.PropSpec
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class TransferDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class TransferDiffTest extends PropSpec with WithState {
 
   val preconditionsAndTransfer: Gen[(GenesisTransaction, IssueTransaction, IssueTransaction, TransferTransaction)] = for {
     master    <- accountGen
@@ -37,7 +35,7 @@ class TransferDiffTest extends PropSpec with PropertyChecks with WithState with 
 
   property("transfers assets to recipient preserving waves invariant") {
     forAll(preconditionsAndTransfer) {
-      case ((genesis, issue1, issue2, transfer)) =>
+      case (genesis, issue1, issue2, transfer) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, issue1, issue2))), TestBlock.create(Seq(transfer))) {
           case (totalDiff, newState) =>
             assertBalanceInvariant(totalDiff)
@@ -62,11 +60,11 @@ class TransferDiffTest extends PropSpec with PropertyChecks with WithState with 
       recepient <- otherAccountGen(master)
       ts        <- positiveIntGen
       genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue: IssueTransaction      <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
+      issue: IssueTransaction    <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
       feeIssue: IssueTransaction <- issueV2TransactionGen(master, scriptGen.map(_.some))
-      transferV1                   <- transferGeneratorP(master, recepient.toAddress, IssuedAsset(issue.id()), IssuedAsset(feeIssue.id()))
-      transferV2                   <- transferGeneratorP(master, recepient.toAddress, IssuedAsset(issue.id()), IssuedAsset(feeIssue.id()))
-      transfer                     <- Gen.oneOf(transferV1, transferV2)
+      transferV1                 <- transferGeneratorP(master, recepient.toAddress, IssuedAsset(issue.id()), IssuedAsset(feeIssue.id()))
+      transferV2                 <- transferGeneratorP(master, recepient.toAddress, IssuedAsset(issue.id()), IssuedAsset(feeIssue.id()))
+      transfer                   <- Gen.oneOf(transferV1, transferV2)
     } yield (genesis, issue, feeIssue, transfer)
   }
 
@@ -78,7 +76,8 @@ class TransferDiffTest extends PropSpec with PropertyChecks with WithState with 
       genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       issue: IssueTransaction <- issueReissueBurnGeneratorP(Long.MaxValue, master).map(_._1)
       asset = IssuedAsset(issue.id())
-      transfer = TransferTransaction.selfSigned(1.toByte, master, recepient.toAddress, asset, Long.MaxValue, Waves, 100000, ByteStr.empty,  ts)
+      transfer = TransferTransaction
+        .selfSigned(1.toByte, master, recepient.toAddress, asset, Long.MaxValue, Waves, 100000, ByteStr.empty, ts)
         .explicitGet()
     } yield (genesis, issue, transfer)
 
@@ -110,10 +109,9 @@ class TransferDiffTest extends PropSpec with PropertyChecks with WithState with 
     forAll(transferWithSmartAssetFee) {
       case (genesis, issue, fee, transfer) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(issue, fee)), smartEnabledFS) {
-          case (_, state) => {
+          case (_, state) =>
             val diffOrError = TransferDiff(state, System.currentTimeMillis())(transfer)
             diffOrError shouldBe Left(GenericError("Smart assets can't participate in TransferTransactions as a fee"))
-          }
         }
     }
   }

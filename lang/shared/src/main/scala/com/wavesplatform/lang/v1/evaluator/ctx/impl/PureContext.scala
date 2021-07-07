@@ -1,6 +1,12 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import cats.implicits._
+import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.charset.{MalformedInputException, StandardCharsets}
+import java.nio.{BufferUnderflowException, ByteBuffer}
+
+import cats.instances.list._
+import cats.syntax.either._
+import cats.syntax.traverse._
 import cats.{Id, Monad}
 import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
@@ -21,9 +27,6 @@ import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
 
-import java.nio.charset.StandardCharsets.UTF_8
-import java.nio.charset.{MalformedInputException, StandardCharsets}
-import java.nio.{BufferUnderflowException, ByteBuffer}
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.util.{Success, Try}
@@ -39,12 +42,21 @@ object PureContext {
   val BigIntMin: BigInt = -BigIntMax - 1
   val MaxListLengthV4   = 1000
 
+  // As an optimization, JVM might throw an ArithmeticException with empty stack trace and null message.
+  // The workaround below retrows an exception with the message explicitly set.
+  lazy val divLong: BaseFunction[NoContext] =
+    createTryOp(DIV_OP, LONG, LONG, DIV_LONG) { (a, b) =>
+      try Math.floorDiv(a, b)
+      catch { case _: ArithmeticException => throw new ArithmeticException("/ by zero") }
+    }
+  lazy val modLong: BaseFunction[NoContext] =
+    createTryOp(MOD_OP, LONG, LONG, MOD_LONG) { (a, b) =>
+      try Math.floorMod(a, b)
+      catch { case _: ArithmeticException => throw new ArithmeticException("/ by zero") }
+    }
+
   lazy val mulLong: BaseFunction[NoContext] =
     createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => Math.multiplyExact(a, b))
-  lazy val divLong: BaseFunction[NoContext] =
-    createTryOp(DIV_OP, LONG, LONG, DIV_LONG)((a, b) => Math.floorDiv(a, b))
-  lazy val modLong: BaseFunction[NoContext] =
-    createTryOp(MOD_OP, LONG, LONG, MOD_LONG)((a, b) => Math.floorMod(a, b))
   lazy val sumLong: BaseFunction[NoContext] =
     createTryOp(SUM_OP, LONG, LONG, SUM_LONG)((a, b) => Math.addExact(a, b))
   lazy val subLong: BaseFunction[NoContext] =

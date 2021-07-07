@@ -4,14 +4,16 @@ import java.util
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.crypto.Curve25519
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.{crypto, utils}
+import com.wavesplatform.utils
 import play.api.libs.json.{Format, Json, Writes}
 
 import scala.util.{Failure, Success}
 
 final class KeyPair(val seed: Array[Byte]) {
-  lazy val (PrivateKey(privateKey), PublicKey(publicKey)) = crypto.createKeyPair(seed)
+  lazy val privateKey: PrivateKey = PrivateKey(Curve25519.privateKeyFromSeed(seed))
+  lazy val publicKey: PublicKey   = PublicKey(Curve25519.publicKeyFromPrivateKey(privateKey.arr))
 
   override def equals(obj: Any): Boolean = obj match {
     case kp: KeyPair => util.Arrays.equals(kp.seed, seed)

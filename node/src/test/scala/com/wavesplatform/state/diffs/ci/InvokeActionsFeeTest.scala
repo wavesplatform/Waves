@@ -18,18 +18,14 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
+import com.wavesplatform.TestTime
+import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.scalatest.{EitherValues, Inside}
 
 class InvokeActionsFeeTest
     extends PropSpec
-    with ScalaCheckPropertyChecks
-    with Matchers
-    with TransactionGen
-    with NoShrink
     with Inside
     with WithState
     with DBCacheSettings
@@ -98,7 +94,7 @@ class InvokeActionsFeeTest
         genesis2 <- GenesisTransaction.create(scriptedInvoker.toAddress, ENOUGH_AMT, ts)
         genesis3 <- GenesisTransaction.create(nonScriptedInvoker.toAddress, ENOUGH_AMT, ts)
         issue    <- IssueTransaction.selfSigned(2.toByte, dAppAcc, "Asset", "Description", ENOUGH_AMT, 8, true, Some(verifier), fee, ts)
-        asset = IssuedAsset(issue.id.value())
+        asset = IssuedAsset(issue.id())
         transfer1 <- TransferTransaction.selfSigned(2.toByte, dAppAcc, scriptedInvoker.toAddress, asset, Int.MaxValue, Waves, fee, ByteStr.empty, ts)
         transfer2 <- TransferTransaction.selfSigned(
           2.toByte,
@@ -129,12 +125,12 @@ class InvokeActionsFeeTest
       val invokeFromScripted1    = invokeFromScripted()
       val invokeFromNonScripted1 = invokeFromNonScripted()
       d.appendBlock(invokeFromScripted1, invokeFromNonScripted1)
-      d.blockchain.bestLiquidDiff.get.errorMessage(invokeFromScripted1.id.value()).get.text should include(
+      d.blockchain.bestLiquidDiff.get.errorMessage(invokeFromScripted1.id()).get.text should include(
         s"Fee in WAVES for InvokeScriptTransaction (${invokeFromScripted1.fee} in WAVES) " +
           s"with 6 total scripts invoked " +
           s"does not exceed minimal value of ${FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + 6 * ScriptExtraFee} WAVES"
       )
-      d.blockchain.bestLiquidDiff.get.errorMessage(invokeFromNonScripted1.id.value()).get.text should include(
+      d.blockchain.bestLiquidDiff.get.errorMessage(invokeFromNonScripted1.id()).get.text should include(
         s"Fee in WAVES for InvokeScriptTransaction (${invokeFromNonScripted1.fee} in WAVES) " +
           s"with 5 total scripts invoked " +
           s"does not exceed minimal value of ${FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + 5 * ScriptExtraFee} WAVES"
@@ -146,12 +142,12 @@ class InvokeActionsFeeTest
       val invokeFromScripted2    = invokeFromScripted()
       val invokeFromNonScripted2 = invokeFromNonScripted()
       d.appendBlock(invokeFromScripted2, invokeFromNonScripted2)
-      d.blockchain.bestLiquidDiff.get.errorMessage(invokeFromScripted2.id.value()).get.text should include(
+      d.blockchain.bestLiquidDiff.get.errorMessage(invokeFromScripted2.id()).get.text should include(
         s"Fee in WAVES for InvokeScriptTransaction (${invokeFromScripted2.fee} in WAVES) " +
           s"with 1 total scripts invoked " +
           s"does not exceed minimal value of ${FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee} WAVES"
       )
-      d.blockchain.bestLiquidDiff.get.errorMessage(invokeFromNonScripted2.id.value()) shouldBe None
+      d.blockchain.bestLiquidDiff.get.errorMessage(invokeFromNonScripted2.id()) shouldBe None
     }
   }
 }

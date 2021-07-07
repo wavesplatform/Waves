@@ -2,6 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.TestWallet
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.TransactionsApiRoute
@@ -22,20 +23,12 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTran
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion, VersionedTransaction}
 import com.wavesplatform.utx.UtxPool
-import com.wavesplatform.{TestWallet, TransactionGen}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{Matchers, OptionValues}
+import org.scalatest.OptionValues
 import play.api.libs.json._
 
-class ProtoVersionTransactionsSpec
-    extends RouteSpec("/transactions")
-    with RestAPISettingsHelper
-    with MockFactory
-    with TransactionGen
-    with Matchers
-    with OptionValues
-    with TestWallet {
+class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestAPISettingsHelper with MockFactory with OptionValues with TestWallet {
   import com.wavesplatform.api.http.ApiMarshallers._
 
   private val MinFee: Long            = (0.001 * Constants.UnitsInWave).toLong

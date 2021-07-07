@@ -1,11 +1,14 @@
 package com.wavesplatform.state.diffs.ci
 
-import cats.implicits._
+import cats.instances.list._
+import cats.instances.map._
+import cats.syntax.semigroup._
+import cats.syntax.traverse._
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.{DBCacheSettings, WithState}
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V5
@@ -15,6 +18,7 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -22,23 +26,9 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class SyncDAppComplexityCountTest
-    extends PropSpec
-    with ScalaCheckPropertyChecks
-    with Matchers
-    with TransactionGen
-    with NoShrink
-    with Inside
-    with WithState
-    with DBCacheSettings
-    with MockFactory
-    with EitherValues {
+class SyncDAppComplexityCountTest extends PropSpec with WithState {
 
   private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -142,7 +132,7 @@ class SyncDAppComplexityCountTest
           ts + 1
         )
         .explicitGet()
-      asset   = IssuedAsset(assetIssue.id.value())
+      asset   = IssuedAsset(assetIssue.id())
       payment = List(Payment(1, asset))
 
       dAppGenesisTxs = dAppAccs.flatMap(
@@ -218,11 +208,11 @@ class SyncDAppComplexityCountTest
         val diff = diffE.explicitGet()
         diff.scriptsComplexity shouldBe complexity
         if (exceeding)
-          diff.errorMessage(invokeTx.id.value()).get.text should include("Invoke complexity limit = 26000 is exceeded")
+          diff.errorMessage(invokeTx.id()).get.text should include("Invoke complexity limit = 26000 is exceeded")
         else if (raiseError)
-          diff.errorMessage(invokeTx.id.value()).get.text should include("Error raised")
+          diff.errorMessage(invokeTx.id()).get.text should include("Error raised")
         else
-          diff.errorMessage(invokeTx.id.value()) shouldBe None
+          diff.errorMessage(invokeTx.id()) shouldBe None
 
         val dAppAddress = invokeTx.dApp.asInstanceOf[Address]
         val basePortfolios = Map(
