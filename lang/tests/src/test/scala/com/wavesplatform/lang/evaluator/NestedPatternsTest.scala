@@ -96,15 +96,15 @@ class NestedPatternsTest extends EvaluatorSpec {
       s"""
          | func f(arg: Any) =
          |   match arg {
-         |     case (_: Int, (x: Int, "a"))                       => x
-         |     case ((x: Int, "b" | "c"), y: Int)                 => x + y
-         |     case ((x: Int, "c" | 1), (y: Int, (7, z: String))) => x + y + z.size()
-         |     case _                                             => throw("unexpected")
+         |     case (_: Int, (x: Int, "a"))                            => x
+         |     case ((x: Int, "b" | "c"), y: Int)                      => x + y
+         |     case (((x: Int, "c" | 1), (y: Int, (7, z: String))), _) => x + y + z.size()
+         |     case _                                                  => throw("unexpected")
          |   }
          |
-         | f((8, (1, "a")))               == 1 &&
-         | f(((1, "b"), 2))               == 3 &&
-         | f(((1, "c"), (2, (7, "xxx")))) == 6
+         | f((8, (1, "a")))                       == 1 &&
+         | f(((1, "b"), 2))                       == 3 &&
+         | f((((1, "c"), (2, (7, "xxx"))), unit)) == 6
        """.stripMargin
     ) shouldBe Right(CONST_BOOLEAN(true))
   }
