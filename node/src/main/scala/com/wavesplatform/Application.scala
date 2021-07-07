@@ -105,8 +105,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     StorageFactory(settings, db, time, spendableBalanceChanged, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
 
   @volatile
-  private[this] var maybeUtx: Option[UtxPool]      = None
-  
+  private[this] var maybeUtx: Option[UtxPool] = None
+
   @volatile
   private[this] var maybeNetworkServer: Option[NS] = None
 
@@ -169,10 +169,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val historyReplier = new HistoryReplier(blockchainUpdater.score, history, settings.synchronizationSettings)(historyRepliesScheduler)
 
-    val networkServer =
-      NetworkServer(settings, lastBlockInfo, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
-    maybeNetworkServer = Some(networkServer)
-
     val transactionPublisher =
       TransactionPublisher.timeBounded(
         utxStorage.putIfNew,
@@ -180,8 +176,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         timedTxValidator,
         settings.synchronizationSettings.utxSynchronizer.allowTxRebroadcasting,
         () =>
-          if (networkServer.peerConnections.size >= settings.restAPISettings.minimumPeers) Right(())
-          else Left(GenericError(s"There are not enough connections with peers (${networkServer.peerConnections.size}) to accept transaction"))
+          if (allChannels.size >= settings.restAPISettings.minimumPeers) Right(())
+          else Left(GenericError(s"There are not enough connections with peers (${allChannels.size}) to accept transaction"))
       )
 
     def rollbackTask(blockId: ByteStr, returnTxsToUtx: Boolean) =
@@ -241,6 +237,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     // After this point, node actually starts doing something
     appenderScheduler.execute(() => checkGenesis(settings, blockchainUpdater, miner))
 
+    // Network server should be started only after all extensions initialized
+    val networkServer =
+      NetworkServer(settings, lastBlockInfo, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
+    maybeNetworkServer = Some(networkServer)
     val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = networkServer.messages
 
     val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]

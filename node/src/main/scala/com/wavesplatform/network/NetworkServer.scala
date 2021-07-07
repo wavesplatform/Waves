@@ -30,7 +30,6 @@ trait NS {
   def shutdown(): Unit
   def messages: Messages
   def closedChannels: Observable[Channel]
-  def peerConnections: Map[PeerKey, Channel]
 }
 
 object NetworkServer extends ScorexLogging {
@@ -260,7 +259,6 @@ object NetworkServer extends ScorexLogging {
 
       override val messages: Messages                     = networkMessages
       override val closedChannels: Observable[Channel]    = closedChannelsSubject
-      override def peerConnections: Map[PeerKey, Channel] = peerConnectionsMap.asScala.toMap
     }
   }
 }
