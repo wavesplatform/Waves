@@ -100,7 +100,6 @@ class NestedPatternsTest extends EvaluatorSpec {
          |   }
          |
          | f((8, (1, "a")))               == 1 &&
-         | f((8, (1, "a")))               == 1 &&
          | f(((1, "b"), 2))               == 3 &&
          | f(((1, "c"), (2, (7, "xxx")))) == 6
        """.stripMargin
