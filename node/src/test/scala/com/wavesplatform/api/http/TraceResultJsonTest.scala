@@ -7,16 +7,16 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.ScriptResultV3
-import com.wavesplatform.lang.v1.traits.domain.DataItem.Lng
 import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, Recipient}
+import com.wavesplatform.lang.v1.traits.domain.DataItem.Lng
 import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.utils.JsonMatchers
-import org.scalatest.{Matchers, PropSpec}
 
-class TraceResultJsonTest extends PropSpec with Matchers with JsonMatchers {
+class TraceResultJsonTest extends PropSpec with JsonMatchers {
   private val tx = (
     for {
       publicKey <- PublicKey.fromBase58String("9utotH1484Hb1WdAHuAKLjuGAmocPZg7jZDtnc35MuqT")
