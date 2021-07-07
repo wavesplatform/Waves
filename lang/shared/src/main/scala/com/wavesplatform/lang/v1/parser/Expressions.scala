@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1.parser
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.Types._
+import shapeless.syntax.std.tuple.productTupleOps
 
 object Expressions {
 
@@ -145,24 +146,24 @@ object Expressions {
 
   sealed trait Pattern {
     def isRest: Boolean = false
-    def subpatterns: Seq[(SimplePattern, Seq[PART[String]])]
+    def subpatterns: Seq[(SimplePattern, Seq[(PART[String], Option[Single])])]
     def position: Pos
   }
 
   sealed trait SimplePattern extends Pattern {
-    def subpatterns: Seq[(SimplePattern, Seq[PART[String]])] = Seq((this, Seq()))
+    def subpatterns: Seq[(SimplePattern, Seq[(PART[String], Option[Single])])] = Seq((this, Seq()))
   }
 
   sealed trait CompositePattern extends Pattern {
     def caseType: Option[Single]
     val patternsWithFields: Seq[(String, Pattern)]
 
-    def subpatterns: Seq[(SimplePattern, Seq[PART[String]])] =
+    def subpatterns: Seq[(SimplePattern, Seq[(PART[String], Option[Single])])] =
       for {
         (field, p) <- patternsWithFields
         (sp, path) <- p.subpatterns
         nextPath = Expressions.PART.VALID(p.position, field)
-      } yield (sp, path :+ nextPath)
+      } yield (sp, path :+ (nextPath, caseType))
   }
 
   case class TypedVar(newVarName: Option[PART[String]], caseType: Type) extends SimplePattern {

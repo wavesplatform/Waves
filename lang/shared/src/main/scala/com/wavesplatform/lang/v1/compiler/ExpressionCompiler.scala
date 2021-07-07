@@ -11,7 +11,18 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, CompositePattern, ConstsPat, MATCH_CASE, ObjPat, PART, Pos, TuplePat, TypedVar}
+import com.wavesplatform.lang.v1.parser.Expressions.{
+  BINARY_OP,
+  CompositePattern,
+  ConstsPat,
+  MATCH_CASE,
+  ObjPat,
+  PART,
+  Pos,
+  Single,
+  TuplePat,
+  TypedVar
+}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{BaseGlobal, ContractLimits, FunctionHeader}
@@ -714,6 +725,13 @@ object ExpressionCompiler {
       ctx: CompilerContext
   ): Either[CompilationError, Expressions.EXPR] = {
 
+    def resolveFieldType(p: Pos, field: String, t: Single): Either[CompilationError, Option[FINAL]] =
+      handleCompositeType(p, t, None, allowShadowVarName)
+        .run(ctx)
+        .value
+        ._2
+        .map(_.asInstanceOf[CASETYPEREF].fields.find(_._1 == field).map(_._2))
+
     def f(mc: MATCH_CASE, caseType: FINAL, further: Expressions.EXPR): Either[CompilationError, Expressions.EXPR] = {
       val blockWithNewVarE = mc.pattern match {
         case TypedVar(None, _) | ConstsPat(_, _) => mc.expr.asRight[CompilationError]
@@ -736,8 +754,14 @@ object ExpressionCompiler {
           val exprE = p.subpatterns.foldRight(mc.expr.asRight[CompilationError]) { (pa, nextExprE) =>
             (nextExprE, pa) match {
               case (Right(nextExpr), (TypedVar(Some(nv), t), path)) =>
-                handleCompositeType(nv.position, t, None, allowShadowVarName).run(ctx).value._2.map { resolvedType =>
-                  val accs = mkGet(path, newRef, nv.position)
+                val (field, objType) = path.head
+                for {
+                  resolvedField     <- handlePart(field).run(ctx).value._2
+                  resolvedFieldType <- objType.flatTraverse(resolveFieldType(nv.position, resolvedField, _))
+                  typeFromContext   <- handleCompositeType(nv.position, t, None, allowShadowVarName).run(ctx).value._2
+                } yield {
+                  val resolvedType = resolvedFieldType.fold(typeFromContext)(t => UNION.reduce(UNION(t, typeFromContext)))
+                  val accs         = mkGet(path, newRef, nv.position)
                   val allowShadowing = nv match {
                     case PART.VALID(_, x) => allowShadowVarName.contains(x)
                     case _                => false
@@ -849,8 +873,8 @@ object ExpressionCompiler {
     }
   }
 
-  private def mkGet(path: Seq[PART[String]], ref: Expressions.EXPR, pos: Pos): Expressions.EXPR =
-    path.foldRight(ref) { (field, exp) =>
+  private def mkGet(path: Seq[(PART[String], Option[Single])], ref: Expressions.EXPR, pos: Pos): Expressions.EXPR =
+    path.map(_._1).foldRight(ref) { (field, exp) =>
       Expressions.GETTER(pos, exp, field)
     }
 

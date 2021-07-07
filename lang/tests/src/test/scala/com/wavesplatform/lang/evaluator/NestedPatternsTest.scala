@@ -71,19 +71,22 @@ class NestedPatternsTest extends EvaluatorSpec {
          |   match arg {
          |     case (_: Lease, Lease(recipient = Address(base58'aaa'), amount = 1, nonce = 1)) => 1
          |     case (_: Lease, Lease(recipient = Address(base58'bbb')))                        => 2
-         |     case (_: Lease, Lease(recipient = r: Alias, amount = 1, nonce = 1))             => 3
+         |     case (_: Lease, Lease(recipient = r: Alias, amount = 1, nonce = 1 | 2))         => 3
          |     case (_: Lease, Lease(recipient = r: Alias, amount = 1, nonce = 1), _: Burn)    => 4
-         |     case (_: Lease | Issue, Lease(recipient = r, amount = 1, nonce = 2))            => r
+         |     case (_: Lease | Burn, Lease(recipient = r, amount = a, nonce = n))             => if (n > a) then r else unit
          |     case _                                                                          => throw("unexpected")
          |   }
          |
          | let l = Lease(Address(base58''), 1, 1)
+         | let b = Burn(base58'', 1)
          |
-         | f((l, Lease(Address(base58'aaa'), 1, 1)))           == 1 &&
-         | f((l, Lease(Address(base58'bbb'), 1, 1)))           == 2 &&
-         | f((l, Lease(Alias("x"), 1, 1)))                     == 3 &&
-         | f((l, Lease(Alias("x"), 1, 1), Burn(base58'', 1)))  == 4
-         | # f((l, Lease(Alias("x"), 1, 2)))                     == Alias("x")
+         | f((l, Lease(Address(base58'aaa'), 1, 1))) == 1          &&
+         | f((l, Lease(Address(base58'bbb'), 1, 1))) == 2          &&
+         | f((l, Lease(Alias("x"), 1, 1)))           == 3          &&
+         | f((l, Lease(Alias("x"), 1, 2)))           == 3          &&
+         | f((l, Lease(Alias("x"), 1, 1), b))        == 4          &&
+         | f((b, Lease(Alias("x"), 1, 3)))           == Alias("x") &&
+         | f((b, Lease(Alias("x"), 3, 1)))           == unit
        """.stripMargin
     ) shouldBe Right(CONST_BOOLEAN(true))
   }
