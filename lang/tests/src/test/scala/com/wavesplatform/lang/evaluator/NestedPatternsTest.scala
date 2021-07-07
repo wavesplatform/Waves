@@ -107,21 +107,20 @@ class NestedPatternsTest extends EvaluatorSpec {
     ) shouldBe Right(CONST_BOOLEAN(true))
   }
 
-  ignore("deep typed tuples with untyped gaps") {
+  ignore("multi-sized tuples with untyped gaps") {
     eval(
       s"""
          | func f(arg: Any) =
          |   match arg {
-         |     case (_, (x: Int, "a"))            => x
-         |     case ((x: Int, "b" | "c"), y: Int) => x + y
-         |     case ((x: Int, "b" | "c"), _)      => x * 2
-         |     case _                             => throw("unexpected")
+         |     case "a"         => 1
+         |     case ("a", _)    => 2
+         |     case ("a", _, _) => 3
+         |     case _           => throw("unexpected")
          |   }
          |
-         | f((8, (1, "a")))   == 1 &&
-         | f(("r", (1, "a"))) == 1 &&
-         | f(((1, "b"), 2))   == 3 &&
-         | f(((1, "c"), "r")) == 2
+         | f(("a")) == 1           &&
+         | f(("a", "b")) == 2      &&
+         | f(("a", "b", "c")) == 3
        """.stripMargin
     ) shouldBe Right(CONST_BOOLEAN(true))
   }
