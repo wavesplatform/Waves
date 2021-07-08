@@ -41,7 +41,7 @@ case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatu
   }
 
   def patchData: Map[ByteStr, (LeaseDetails, Address)] =
-    if (AddressScheme.current.chainId == 'W') mainnetPatchData else Map.empty
+    if (AddressScheme.current.chainId == 'W'.toByte) mainnetPatchData else Map.empty
 
   override def apply(blockchain: Blockchain): Diff =
     patchData
