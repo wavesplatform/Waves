@@ -6,7 +6,7 @@ import com.wavesplatform.account._
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
+import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
@@ -50,7 +50,7 @@ import org.scalatest.{EitherValues, Inside}
 
 import scala.collection.immutable
 
-class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCacheSettings with EitherValues with Inside with MockFactory {
+class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCacheSettings with EitherValues with Inside with MockFactory {
   import DomainPresets._
 
   private val fs = settingsForRide(V3).blockchainSettings.functionalitySettings

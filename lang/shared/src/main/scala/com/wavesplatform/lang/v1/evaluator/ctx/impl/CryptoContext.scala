@@ -506,9 +506,9 @@ object CryptoContext {
     val fromV4Ctx = fromV1Ctx |+| CTX[NoContext](v4Types, v4Vars, v4Functions)
 
     version match {
-      case V1 | V2 => fromV1Ctx
-      case V3      => fromV3Ctx
-      case V4 | V5 => fromV4Ctx
+      case V1 | V2      => fromV1Ctx
+      case V3           => fromV3Ctx
+      case v if v >= V4 => fromV4Ctx
     }
   }
 

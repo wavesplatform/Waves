@@ -5,7 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.db.{WithDomain, WithState}
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Global
@@ -37,7 +37,7 @@ import com.wavesplatform.utils._
 import org.scalacheck.Gen
 import shapeless.Coproduct
 
-class ContextFunctionsTest extends PropSpec with WithState {
+class ContextFunctionsTest extends PropSpec with WithDomain {
   import DomainPresets._
 
   def compactDataTransactionGen(sender: KeyPair): Gen[DataTransaction] =

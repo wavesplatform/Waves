@@ -7,19 +7,16 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
-import org.scalatest.{EitherValues, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import com.wavesplatform.{TestTime, TransactionGen}
+import org.scalatest.EitherValues
 
 class GenericRideActivationTest
     extends PropSpec
-    with ScalaCheckPropertyChecks
-    with Matchers
     with TransactionGen
-    with NoShrink
     with WithDomain
     with EitherValues {
 

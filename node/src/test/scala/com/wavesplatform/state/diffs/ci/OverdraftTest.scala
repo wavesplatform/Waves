@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.{WithDomain, WithState}
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.DirectiveDictionary
@@ -21,7 +21,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import org.scalacheck.Gen
 
-class OverdraftTest extends PropSpec with WithState {
+class OverdraftTest extends PropSpec with WithDomain {
   import DomainPresets._
 
   private val InvokeFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeValidation.FeeUnit
