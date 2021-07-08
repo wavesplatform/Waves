@@ -2,7 +2,6 @@ package com.wavesplatform.lang.v1.parser
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.Types._
-import shapeless.syntax.std.tuple.productTupleOps
 
 object Expressions {
 
@@ -163,7 +162,7 @@ object Expressions {
         (field, p) <- patternsWithFields
         (sp, path) <- p.subpatterns
         nextPath = Expressions.PART.VALID(p.position, field)
-      } yield (sp, path :+ (nextPath, caseType))
+      } yield (sp, path :+ ((nextPath, caseType)))
   }
 
   case class TypedVar(newVarName: Option[PART[String]], caseType: Type) extends SimplePattern {
