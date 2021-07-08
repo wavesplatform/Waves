@@ -3,8 +3,8 @@ package com.wavesplatform.lang
 import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -13,13 +13,10 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
+import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
-import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
 import monix.eval.Coeval
-import org.scalacheck.ShrinkLowPriority
 
 import scala.util.{Left, Right, Try}
 
@@ -35,10 +32,6 @@ object Common {
       expr: EXPR
   ): Either[ExecutionError, T] =
     new EvaluatorV1[Id, NoContext]().apply[T](context, expr)
-
-  trait NoShrink extends ShrinkLowPriority
-
-  def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
   val multiplierFunction: NativeFunction[NoContext] =
     NativeFunction("MULTIPLY", 1L, 10005.toShort, LONG, ("x1", LONG), ("x2", LONG)) {

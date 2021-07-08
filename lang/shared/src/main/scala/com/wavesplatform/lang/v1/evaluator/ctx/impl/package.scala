@@ -1,7 +1,8 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats.Monad
-import cats.implicits._
+import cats.syntax.applicative._
+import cats.syntax.either._
 import com.wavesplatform.lang.v1.compiler.Terms.CaseObj
 import com.wavesplatform.lang.v1.compiler.Types.UNIT
 

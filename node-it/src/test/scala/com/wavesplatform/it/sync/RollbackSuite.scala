@@ -1,32 +1,26 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.test._
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Proofs, TxVersion}
 import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Random
 
 @LoadTest
-class RollbackSuite
-    extends FunSuite
-    with CancelAfterFailure
-    with TransferSending
-    with NodesFromDocker
-    with ReportingTestName
-    with Matchers
-    with TableDrivenPropertyChecks {
+class RollbackSuite extends BaseFunSuite with TransferSending with TableDrivenPropertyChecks {
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
@@ -35,10 +29,9 @@ class RollbackSuite
       .withSpecial(1, _.nonMiner)
       .buildNonConflicting()
 
-  private val nodeAddresses        = nodeConfigs.map(_.getString("address")).toSet
-  private def sender: Node         = nodes.last
-  private def miner: Node          = nodes.head
-  private def firstAddress: String = sender.address
+  private lazy val nodeAddresses        = nodeConfigs.map(_.getString("address")).toSet
+
+  private def notMinerAddress: String = notMiner.address
 
   test("Apply the same transfer transactions twice with return to UTX") {
 
@@ -91,19 +84,19 @@ class RollbackSuite
   test("Alias transaction rollback should work fine") {
     val alias = "test_alias4"
 
-    val aliasTxId = sender.createAlias(sender.keyPair, alias, transferAmount).id
+    val aliasTxId = sender.createAlias(notMiner.keyPair, alias, transferAmount).id
     nodes.waitForHeightAriseAndTxPresent(aliasTxId)
 
-    val txsBefore = sender.transactionsByAddress(firstAddress, 10)
+    val txsBefore = sender.transactionsByAddress(notMinerAddress, 10)
 
     val txHeight = sender.waitForTransaction(aliasTxId).height
 
     nodes.rollback(txHeight - 1, returnToUTX = false)
     nodes.waitForHeight(txHeight + 1)
 
-    val secondAliasTxId = sender.createAlias(sender.keyPair, alias, transferAmount).id
+    val secondAliasTxId = sender.createAlias(notMiner.keyPair, alias, transferAmount).id
     nodes.waitForHeightAriseAndTxPresent(secondAliasTxId)
-    sender.transactionsByAddress(firstAddress, 10) shouldNot contain theSameElementsAs txsBefore
+    sender.transactionsByAddress(notMinerAddress, 10) shouldNot contain theSameElementsAs txsBefore
 
   }
 
@@ -112,33 +105,33 @@ class RollbackSuite
     val entry1     = IntegerDataEntry("1", 0)
     val entry2     = BooleanDataEntry("2", value = true)
     val entry3     = IntegerDataEntry("1", 1)
-    val txsBefore0 = sender.transactionsByAddress(firstAddress, 10)
+    val txsBefore0 = sender.transactionsByAddress(notMinerAddress, 10)
 
-    val tx1 = sender.putData(sender.keyPair, List(entry1), calcDataFee(List(entry1), TxVersion.V1)).id
+    val tx1 = sender.putData(notMiner.keyPair, List(entry1), calcDataFee(List(entry1), TxVersion.V1)).id
     nodes.waitForHeightAriseAndTxPresent(tx1)
-    val txsBefore1 = sender.transactionsByAddress(firstAddress, 10)
+    val txsBefore1 = sender.transactionsByAddress(notMinerAddress, 10)
 
     val tx1height = sender.waitForTransaction(tx1).height
 
-    val tx2 = sender.putData(sender.keyPair, List(entry2, entry3), calcDataFee(List(entry2, entry3), TxVersion.V1)).id
+    val tx2 = sender.putData(notMiner.keyPair, List(entry2, entry3), calcDataFee(List(entry2, entry3), TxVersion.V1)).id
     nodes.waitForHeightAriseAndTxPresent(tx2)
 
-    val data2 = sender.getData(firstAddress)
+    val data2 = sender.getData(notMinerAddress)
     assert(data2 == List(entry3, entry2))
 
     nodes.rollback(tx1height, returnToUTX = false)
     nodes.waitForSameBlockHeadersAt(tx1height)
 
-    val data1 = node.getData(firstAddress)
+    val data1 = node.getData(notMinerAddress)
     assert(data1 == List(entry1))
-    sender.transactionsByAddress(firstAddress, 10) should contain theSameElementsAs txsBefore1
+    sender.transactionsByAddress(notMinerAddress, 10) should contain theSameElementsAs txsBefore1
 
     nodes.rollback(tx1height - 1, returnToUTX = false)
     nodes.waitForSameBlockHeadersAt(tx1height - 1)
 
-    val data0 = node.getData(firstAddress)
+    val data0 = node.getData(notMinerAddress)
     assert(data0 == List.empty)
-    sender.transactionsByAddress(firstAddress, 10) should contain theSameElementsAs txsBefore0
+    sender.transactionsByAddress(notMinerAddress, 10) should contain theSameElementsAs txsBefore0
   }
 
   test("Sponsorship transaction rollback") {
@@ -146,20 +139,20 @@ class RollbackSuite
 
     val sponsorAssetId =
       sender
-        .issue(sender.keyPair, "SponsoredAsset", "For test usage", sponsorAssetTotal, reissuable = false, fee = issueFee)
+        .issue(notMiner.keyPair, "SponsoredAsset", "For test usage", sponsorAssetTotal, reissuable = false, fee = issueFee)
         .id
     nodes.waitForHeightAriseAndTxPresent(sponsorAssetId)
 
-    val sponsorId = sender.sponsorAsset(sender.keyPair, sponsorAssetId, baseFee = 100L, fee = issueFee).id
+    val sponsorId = sender.sponsorAsset(notMiner.keyPair, sponsorAssetId, baseFee = 100L, fee = issueFee).id
     nodes.waitForHeightAriseAndTxPresent(sponsorId)
 
     val height     = sender.waitForTransaction(sponsorId).height
-    val txsBefore1 = sender.transactionsByAddress(firstAddress, 10)
+    val txsBefore1 = sender.transactionsByAddress(notMinerAddress, 10)
 
     val assetDetailsBefore = sender.assetsDetails(sponsorAssetId)
 
     nodes.waitForHeightArise()
-    val sponsorSecondId = sender.sponsorAsset(sender.keyPair, sponsorAssetId, baseFee = 2 * 100L, fee = issueFee).id
+    val sponsorSecondId = sender.sponsorAsset(notMiner.keyPair, sponsorAssetId, baseFee = 2 * 100L, fee = issueFee).id
     nodes.waitForHeightAriseAndTxPresent(sponsorSecondId)
 
     nodes.rollback(height, returnToUTX = false)
@@ -169,7 +162,7 @@ class RollbackSuite
     val assetDetailsAfter = sender.assetsDetails(sponsorAssetId)
 
     assert(assetDetailsAfter.minSponsoredAssetFee == assetDetailsBefore.minSponsoredAssetFee)
-    sender.transactionsByAddress(sender.address, 10) should contain theSameElementsAs txsBefore1
+    sender.transactionsByAddress(notMinerAddress, 10) should contain theSameElementsAs txsBefore1
   }
 
   test("transfer depends from data tx") {
@@ -182,7 +175,7 @@ class RollbackSuite
       case _ => false
     }""".stripMargin
 
-    val pkSwapBC1 = KeyPair.fromSeed(sender.seed(firstAddress)).explicitGet()
+    val pkSwapBC1 = notMiner.keyPair
     val script    = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
     val sc1SetTx = SetScriptTransaction
       .selfSigned(1.toByte, sender = pkSwapBC1, script = Some(script), fee = setScriptFee, timestamp = System.currentTimeMillis())
@@ -195,11 +188,14 @@ class RollbackSuite
 
     nodes.waitForHeightArise()
     val entry1 = StringDataEntry("oracle", "yes")
-    val dtx    = sender.putData(sender.keyPair, List(entry1), calcDataFee(List(entry1), TxVersion.V1) + smartFee).id
+    val dtx    = sender.putData(sender.keyPair, List(entry1), 0.1.waves).id
     nodes.waitForHeightAriseAndTxPresent(dtx)
 
-    val tx = sender.transfer(sender.keyPair, firstAddress, transferAmount, smartMinFee, waitForTx = true).id
-    nodes.waitForHeightAriseAndTxPresent(tx)
+    val transfer = TransferTransaction
+      .create(2.toByte, pkSwapBC1.publicKey, sender.publicKey.toAddress, Waves, transferAmount, Waves, smartMinFee, ByteStr.empty, System.currentTimeMillis(), Proofs.empty)
+      .explicitGet()
+
+    nodes.waitForHeightAriseAndTxPresent(sender.signedBroadcast(transfer.json(), waitForTx = true).id)
 
     //as rollback is too fast, we should blacklist nodes from each other before rollback
     sender.blacklist(miner.networkAddress)
@@ -213,7 +209,7 @@ class RollbackSuite
     nodes.waitForHeightArise()
 
     assert(sender.findTransactionInfo(dtx).isDefined)
-    assert(sender.findTransactionInfo(tx).isDefined)
+    assert(sender.findTransactionInfo(transfer.id().toString).isDefined)
 
   }
 
@@ -221,7 +217,7 @@ class RollbackSuite
     Table(
       ("num", "name"),
       (1, "1 of N"),
-      (nodes.size, "N of N")
+      (nodeConfigs.size, "N of N")
     )
   ) { (num, name) =>
     test(s"generate more blocks and resynchronise after rollback $name") {

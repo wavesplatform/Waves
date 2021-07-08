@@ -13,8 +13,9 @@ import scala.util.{Failure, Success, Try}
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import cats.instances.all._
 import cats.syntax.option._
+import cats.instances.bigInt._
+import cats.instances.int._
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
@@ -207,8 +208,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       )
       override val blocksApi: CommonBlocksApi =
         CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
-      override val accountsApi: CommonAccountsApi = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
-      override val assetsApi: CommonAssetsApi     = CommonAssetsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
+      override val accountsApi: CommonAccountsApi = CommonAccountsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
+      override val assetsApi: CommonAssetsApi     = CommonAssetsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
     }
 
     extensions = settings.extensions.map { extensionClassName =>
@@ -367,7 +368,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       )
 
       val httpService = CompositeHttpService(apiRoutes, settings.restAPISettings)
-      val httpFuture  = Http().bindAndHandle(httpService.loggingCompositeRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
+      val httpFuture  = Http().newServerAt(settings.restAPISettings.bindAddress, settings.restAPISettings.port).bindFlow(httpService.loggingCompositeRoute)
       serverBinding = Await.result(httpFuture, 20.seconds)
       serverBinding.whenTerminated.foreach(_ => httpService.scheduler.shutdown())
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")

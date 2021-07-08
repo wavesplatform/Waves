@@ -1,12 +1,12 @@
 package com.wavesplatform.transaction.smart.script.trace
 
-import cats.{Applicative, Apply, Functor}
 import cats.instances.either._
 import cats.instances.list._
 import cats.kernel.Semigroup
 import cats.syntax.either._
 import cats.syntax.semigroup._
 import cats.syntax.semigroupal._
+import cats.{Applicative, Apply, Functor}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.transaction.Transaction
 import play.api.libs.json.{JsObject, Json}

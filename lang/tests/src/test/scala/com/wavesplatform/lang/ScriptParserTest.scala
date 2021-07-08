@@ -1,24 +1,22 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.Common._
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
+import com.wavesplatform.test._
 import fastparse.Parsed.{Failure, Success}
 import org.scalacheck.Gen
 import org.scalatest.exceptions.TestFailedException
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import scorex.util.encode.{Base58 => ScorexBase58}
 
-class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
+class ScriptParserTest extends PropSpec with ScriptGenParser {
 
   private def parse(x: String): EXPR = Parser.parseExpr(x) match {
     case Success(r, _)      => r
-    case f@Failure(_, _, _) => throw new TestFailedException(f.msg, 0)
+    case f: Failure => throw new TestFailedException(f.msg, 0)
   }
 
   private def cleanOffsets(l: LET): LET =
@@ -110,9 +108,9 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
         AnyPos,
         PART.VALID(AnyPos, "sigVerify"),
         List(
-          CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(ScorexBase58.decode("333").get))),
-          CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(ScorexBase58.decode("222").get))),
-          CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(ScorexBase58.decode("111").get)))
+          CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(Base58.decode("333")))),
+          CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(Base58.decode("222")))),
+          CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(Base58.decode("111"))))
         )
       )
     )
@@ -573,7 +571,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
 
   property("crypto functions: sha256") {
     val text        = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD=test message"
-    val encodedText = ScorexBase58.encode(text.getBytes("UTF-8"))
+    val encodedText = Base58.encode(text.getBytes("UTF-8"))
 
     parse(s"sha256(base58'$encodedText')".stripMargin) shouldBe
       FUNCTION_CALL(
@@ -585,7 +583,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
 
   property("crypto functions: blake2b256") {
     val text        = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD=test message"
-    val encodedText = ScorexBase58.encode(text.getBytes("UTF-8"))
+    val encodedText = Base58.encode(text.getBytes("UTF-8"))
 
     parse(s"blake2b256(base58'$encodedText')".stripMargin) shouldBe
       FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "blake2b256"), List(CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(text.getBytes("UTF-8"))))))
@@ -593,7 +591,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
 
   property("crypto functions: keccak256") {
     val text        = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD=test message"
-    val encodedText = ScorexBase58.encode(text.getBytes("UTF-8"))
+    val encodedText = Base58.encode(text.getBytes("UTF-8"))
 
     parse(s"keccak256(base58'$encodedText')".stripMargin) shouldBe
       FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "keccak256"), List(CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(text.getBytes("UTF-8"))))))

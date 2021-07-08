@@ -3,18 +3,10 @@ package com.wavesplatform.it.sync.activation
 import com.typesafe.config.Config
 import com.wavesplatform.features.api.NodeFeatureStatus
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs, ReportingTestName}
 
-class FeatureActivationTestSuite
-    extends FreeSpec
-    with Matchers
-    with CancelAfterFailure
-    with NodesFromDocker
-    with ActivationStatusRequest
-    with ReportingTestName {
+class FeatureActivationTestSuite extends BaseFreeSpec with ActivationStatusRequest with ReportingTestName {
 
   private val votingInterval      = 12
   private val blocksForActivation = 12 // should be even

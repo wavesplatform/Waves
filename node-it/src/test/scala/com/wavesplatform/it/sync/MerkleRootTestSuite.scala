@@ -4,23 +4,18 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidSignature}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.crypto.Blake2b256
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.ReportingTestName
-import com.wavesplatform.it.sync.activation.ActivationStatusRequest
+import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
-import scorex.crypto.hash.Blake2b256
+import com.wavesplatform.it.sync.activation.ActivationStatusRequest
+import org.scalatest._
 
 import scala.concurrent.duration._
 
 class MerkleRootTestSuite
-    extends FreeSpec
-    with Matchers
-    with CancelAfterFailure
-    with NodesFromDocker
+    extends BaseFreeSpec
     with ActivationStatusRequest
-    with ReportingTestName
     with OptionValues {
   import MerkleRootTestSuite._
 

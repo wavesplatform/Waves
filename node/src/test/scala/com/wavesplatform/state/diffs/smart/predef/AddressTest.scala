@@ -10,13 +10,11 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CaseObj}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart.predef
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.TxValidationError.InvalidAddress
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class AddressTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class AddressTest extends PropSpec {
   property("should calculate address from public key") {
     forAll(accountGen) { acc =>
       val script =

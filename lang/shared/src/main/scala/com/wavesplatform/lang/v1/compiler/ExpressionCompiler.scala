@@ -11,18 +11,7 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.{
-  BINARY_OP,
-  CompositePattern,
-  ConstsPat,
-  MATCH_CASE,
-  ObjPat,
-  PART,
-  Pos,
-  Single,
-  TuplePat,
-  TypedVar
-}
+import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{BaseGlobal, ContractLimits, FunctionHeader}
@@ -51,15 +40,15 @@ object ExpressionCompiler {
 
   def compile(input: String, ctx: CompilerContext, allowIllFormedStrings: Boolean = false): Either[String, (EXPR, FINAL)] = {
     Parser.parseExpr(input) match {
-      case fastparse.Parsed.Success(xs, _)       => ExpressionCompiler(ctx, xs, allowIllFormedStrings)
-      case f @ fastparse.Parsed.Failure(_, _, _) => Left(f.toString)
+      case fastparse.Parsed.Success(xs, _) => ExpressionCompiler(ctx, xs, allowIllFormedStrings)
+      case f: fastparse.Parsed.Failure     => Left(f.toString)
     }
   }
 
   def compileBoolean(input: String, ctx: CompilerContext): Either[String, EXPR] = {
     compile(input, ctx).flatMap {
       case (expr, BOOLEAN) => Right(expr)
-      case (_, _)          => Left("Script should return boolean")
+      case _               => Left("Script should return boolean")
     }
   }
 
@@ -294,7 +283,7 @@ object ExpressionCompiler {
         ifCasesWithErr._1.getOrElse(
           Expressions.INVALID(
             p,
-            ifCasesWithErr._2.map(e => Show[CompilationError].show(e)).mkString_("\n"),
+            ifCasesWithErr._2.map(e => Show[CompilationError].show(e)).mkString("\n"),
             ctxOpt = saveExprContext.toOption(ctx.getSimpleContext())
           )
         ),

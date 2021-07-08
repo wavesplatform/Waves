@@ -4,9 +4,9 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.transactions.NodesFromDocker
-import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
+import org.scalatest._
 
-class ForgeReturnedToUTXSuite extends FunSuite with CancelAfterFailure with NodesFromDocker with Matchers {
+class ForgeReturnedToUTXSuite extends funsuite.AnyFunSuite with CancelAfterFailure with NodesFromDocker with matchers.should.Matchers {
 
   import ForgeReturnedToUTXSuite._
   override protected def nodeConfigs: Seq[Config] = Configs

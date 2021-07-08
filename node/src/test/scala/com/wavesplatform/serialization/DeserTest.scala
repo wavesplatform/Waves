@@ -1,12 +1,12 @@
 package com.wavesplatform.serialization
 
-import org.scalatest.{Matchers, PropSpec}
+import com.wavesplatform.test.PropSpec
 
-class DeserTest extends PropSpec with Matchers {
+class DeserTest extends PropSpec {
   property("correctly serialized arrays") {
     val arrays: Seq[Array[Byte]] = Seq(Array(1, 2, 3), Array(), Array(1, 2))
-    val bytes = Deser.serializeArrays(arrays)
-    Deser.parseArrays(bytes).toArray should be (arrays.toArray)
+    val bytes                    = Deser.serializeArrays(arrays)
+    Deser.parseArrays(bytes).toArray should be(arrays.toArray)
   }
 
   property("too big arrays count") {

@@ -5,8 +5,8 @@ import com.wavesplatform.api.grpc.LeaseResponse
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.util._
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions, Recipient}
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import io.grpc.Status.Code
@@ -183,7 +183,7 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
 
   private def toResponse(tx: Transaction, height: Long): LeaseResponse = {
     val leaseTx   = tx.asInstanceOf[LeaseTransaction]
-    val leaseTxId = ByteString.copyFrom(leaseTx.id.value().arr)
+    val leaseTxId = ByteString.copyFrom(leaseTx.id().arr)
     LeaseResponse(
       leaseId = leaseTxId,
       originTransactionId = leaseTxId,

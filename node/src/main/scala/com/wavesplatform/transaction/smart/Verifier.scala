@@ -4,7 +4,8 @@ import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
 
 import cats.Id
-import cats.implicits._
+import cats.syntax.either._
+import cats.syntax.functor._
 import com.google.common.base.Throwables
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -39,7 +40,7 @@ object Verifier extends ScorexLogging {
 
   type ValidationResult[T] = Either[ValidationError, T]
 
-  def apply(blockchain: Blockchain, limitedExecution: Boolean = false)(tx: Transaction): TracedResult[ValidationError, Int] = tx match {
+  def apply(blockchain: Blockchain, limitedExecution: Boolean = false)(tx: Transaction): TracedResult[ValidationError, Int] = (tx: @unchecked) match {
     case _: GenesisTransaction => Right(0)
     case pt: ProvenTransaction =>
       (pt, blockchain.accountScript(pt.sender.toAddress)) match {

@@ -1,9 +1,7 @@
 package com.wavesplatform.lang.evaluator
 
-import cats.implicits._
+import cats.syntax.semigroup._
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.{Common, Global}
-import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -15,16 +13,16 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, FunctionIds}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.{Common, Global}
+import com.wavesplatform.test._
 import org.scalacheck.Gen
-import org.scalatest.{Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import org.scalatest.Inside
 
 import scala.annotation.tailrec
 import scala.util.Random
 
-class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
+class EvaluatorV2Test extends PropSpec with Inside {
   private val version = V4
   private val ctx =
     PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[Environment] |+|

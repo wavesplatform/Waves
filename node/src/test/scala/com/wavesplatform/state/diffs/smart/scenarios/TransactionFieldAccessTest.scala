@@ -9,19 +9,16 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.diffs.smart._
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.PropSpec
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class TransactionFieldAccessTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class TransactionFieldAccessTest extends PropSpec with WithState {
 
-  private def preconditionsTransferAndLease(
-      code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = {
+  private def preconditionsTransferAndLease(code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = {
     val untyped = Parser.parseExpr(code).get.value
     val typed   = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untyped).explicitGet()._1
     preconditionsTransferAndLease(typed)
@@ -42,8 +39,9 @@ class TransactionFieldAccessTest extends PropSpec with PropertyChecks with WithS
     forAll(preconditionsTransferAndLease(script)) {
       case ((genesis, script, lease, transfer)) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(totalDiffEi =>
-          totalDiffEi should produce("TransactionNotAllowedByScript"))
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(
+          totalDiffEi => totalDiffEi should produce("TransactionNotAllowedByScript")
+        )
     }
   }
 }

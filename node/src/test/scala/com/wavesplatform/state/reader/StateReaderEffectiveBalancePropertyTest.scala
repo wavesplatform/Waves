@@ -7,14 +7,12 @@ import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.TestFunctionalitySettings.Enabled
 import com.wavesplatform.state.LeaseBalance
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.PropSpec
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithState {
   property("No-interactions genesis account's effectiveBalance doesn't depend on depths") {
     val setup: Gen[(GenesisTransaction, Int, Int, Int)] = for {
       master <- accountGen

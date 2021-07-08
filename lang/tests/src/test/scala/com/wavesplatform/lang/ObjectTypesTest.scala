@@ -2,16 +2,14 @@ package com.wavesplatform.lang
 
 import com.wavesplatform.DocSource
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
+import com.wavesplatform.test._
 import org.scalatest.exceptions.TestFailedException
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ObjectTypesTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
+class ObjectTypesTest extends PropSpec {
   private val directives: Iterable[DirectiveSet] =
     DirectiveDictionary[StdLibVersion].all
       .map(version => DirectiveSet(version, Account, Expression).explicitGet())

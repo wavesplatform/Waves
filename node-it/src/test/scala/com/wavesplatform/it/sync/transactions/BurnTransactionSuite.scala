@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.transactions
 
-import cats.implicits._
+import cats.syntax.option._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._

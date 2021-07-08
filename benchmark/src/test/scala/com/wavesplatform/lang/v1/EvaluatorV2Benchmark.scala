@@ -57,7 +57,7 @@ class Funcs {
       """.stripMargin
 
   val parsed = Parser.parseExpr(script).get.value
-  val expr = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
+  val expr   = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
 }
 
 @State(Scope.Benchmark)

@@ -13,6 +13,13 @@ trait InvalidBlockStorage {
   def find(blockId: ByteStr): Option[ValidationError]
 }
 
+object InvalidBlockStorage {
+  object NoOp extends InvalidBlockStorage {
+    override def add(blockId: ByteStr, validationError: ValidationError): Unit = {}
+    override def find(blockId: ByteStr): Option[ValidationError]               = None
+  }
+}
+
 class InvalidBlockStorageImpl(settings: InvalidBlockStorageSettings) extends InvalidBlockStorage {
   private val cache = CacheBuilder
     .newBuilder()
