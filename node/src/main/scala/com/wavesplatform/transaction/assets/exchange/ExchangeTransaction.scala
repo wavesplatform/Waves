@@ -3,7 +3,6 @@ package com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.account.{AddressScheme, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.ExchangeTxSerializer
 import com.wavesplatform.transaction.validation.impl.ExchangeTxValidator
@@ -24,7 +23,7 @@ case class ExchangeTransaction(
     timestamp: Long,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.Exchange)
+) extends Transaction(TransactionType.Exchange, order1.assetPair.checkedAssets)
     with VersionedTransaction
     with ProvenTransaction
     with TxWithFee.InWaves
@@ -39,11 +38,6 @@ case class ExchangeTransaction(
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(ExchangeTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(ExchangeTxSerializer.toBytes(this))
   override val json: Coeval[JsObject]         = Coeval.evalOnce(ExchangeTxSerializer.toJson(this))
-
-  override def checkedAssets: Seq[IssuedAsset] = {
-    val pair = buyOrder.assetPair
-    Seq(pair.priceAsset, pair.amountAsset) collect { case a: IssuedAsset => a }
-  }
 }
 
 object ExchangeTransaction extends TransactionParser {

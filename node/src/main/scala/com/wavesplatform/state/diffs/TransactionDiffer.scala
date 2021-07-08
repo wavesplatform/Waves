@@ -227,14 +227,14 @@ object TransactionDiffer {
                   .toRight(GenericError(s"Referenced $asset not found"))
                   .as(
                     Monoid.combine(
-                      Map[Address, Portfolio](tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))),
+                      Map[Address, Portfolio](tx.senderAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))),
                       Map[Address, Portfolio](dAppAddress         -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
                     )
                   )
               case Waves =>
                 Monoid
                   .combine(
-                    Map[Address, Portfolio](tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty)),
+                    Map[Address, Portfolio](tx.senderAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty)),
                     Map[Address, Portfolio](dAppAddress         -> Portfolio(amt, LeaseBalance.empty, Map.empty))
                   )
                   .asRight

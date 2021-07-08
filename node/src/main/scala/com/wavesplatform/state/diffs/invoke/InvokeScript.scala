@@ -13,13 +13,19 @@ trait InvokeScriptLike {
   def funcCall: FUNCTION_CALL
   def payments: Seq[Payment]
   def root: Option[InvokeScriptTransaction]
-  def checkedAssets: Seq[IssuedAsset] = payments collect { case Payment(_, assetId: IssuedAsset) => assetId }
   def senderAddress: Address
   def sender: PublicKey
+}
 
-  def txId: ByteStr            = root.map(_.id()).getOrElse(ByteStr.empty)
-  val enableEmptyKeys: Boolean = root.forall(_.isProtobufVersion)
-  val timestamp: TxTimestamp   = root.map(_.timestamp).getOrElse(0L)
+object InvokeScriptLike {
+  implicit class ISLExt(val isl: InvokeScriptLike) extends AnyVal {
+    def enableEmptyKeys: Boolean        = isl.root.forall(_.isProtobufVersion)
+    def timestamp: TxTimestamp          = isl.root.fold(0L)(_.timestamp)
+    def txId: ByteStr                   = isl.root.fold(ByteStr.empty)(_.id())
+    def paymentAssets: Seq[IssuedAsset] = isl.payments.collect(IssuedAssets)
+  }
+
+  val IssuedAssets: PartialFunction[Payment, IssuedAsset] = { case Payment(_, assetId: IssuedAsset) => assetId }
 }
 
 case class InvokeScript(
@@ -30,6 +36,6 @@ case class InvokeScript(
     payments: Seq[Payment],
     root: Option[InvokeScriptTransaction]
 ) extends InvokeScriptLike {
-  def dApp: Recipient        = dAppAddress
-  def senderAddress: Address = senderDApp
+  val dApp: Recipient        = dAppAddress
+  val senderAddress: Address = senderDApp
 }

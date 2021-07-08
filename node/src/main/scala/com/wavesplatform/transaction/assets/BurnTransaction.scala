@@ -22,7 +22,7 @@ final case class BurnTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.Burn) with ProvenTransaction
+) extends Transaction(TransactionType.Burn, Seq(asset)) with ProvenTransaction
     with VersionedTransaction
     with SigProofsSwitch
     with TxWithFee.InWaves
@@ -32,8 +32,6 @@ final case class BurnTransaction(
   override val bodyBytes: Coeval[Array[Byte]] = BurnTxSerializer.bodyBytes(this)
   override val bytes: Coeval[Array[Byte]]     = BurnTxSerializer.toBytes(this)
   override val json: Coeval[JsObject]         = BurnTxSerializer.toJson(this)
-
-  override def checkedAssets: Seq[IssuedAsset] = Seq(asset)
 }
 
 object BurnTransaction extends TransactionParser {

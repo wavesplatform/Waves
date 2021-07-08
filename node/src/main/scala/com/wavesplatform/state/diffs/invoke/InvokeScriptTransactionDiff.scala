@@ -218,7 +218,7 @@ object InvokeScriptTransactionDiff {
             input <- buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, tthis)
           } yield (directives, payments, tthis, input)).leftMap(GenericError(_))
 
-          invoker = RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes))
+          invoker = RideRecipient.Address(ByteStr(tx.senderAddress.bytes))
           invocation = ContractEvaluator.Invocation(
             functionCall,
             invoker,

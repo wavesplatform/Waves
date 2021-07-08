@@ -27,7 +27,10 @@ case class TransferTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.Transfer)
+) extends Transaction(TransactionType.Transfer, assetId match {
+      case Waves          => Seq()
+      case a: IssuedAsset => Seq(a)
+    })
     with VersionedTransaction
     with SigProofsSwitch
     with FastHashId
@@ -37,11 +40,6 @@ case class TransferTransaction(
   val bodyBytes: Coeval[TxByteArray] = Coeval.evalOnce(TransferTxSerializer.bodyBytes(this))
   val bytes: Coeval[TxByteArray]     = Coeval.evalOnce(TransferTxSerializer.toBytes(this))
   final val json: Coeval[JsObject]   = Coeval.evalOnce(TransferTxSerializer.toJson(this))
-
-  override def checkedAssets: Seq[IssuedAsset] = assetId match {
-    case a: IssuedAsset => Seq(a)
-    case Waves          => Nil
-  }
 }
 
 object TransferTransaction extends TransactionParser {

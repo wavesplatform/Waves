@@ -97,7 +97,7 @@ object CommonValidation {
               case _                                                                                                                      => false
             }
             check <- foldPayments(citx.payments)
-              .map(p => checkTransfer(citx.sender.toAddress, p.assetId, p.amount, citx.feeAssetId, citx.fee, allowFeeOverdraft))
+              .map(p => checkTransfer(citx.senderAddress, p.assetId, p.amount, citx.feeAssetId, citx.fee, allowFeeOverdraft))
               .find(_.isLeft)
               .getOrElse(Right(tx))
           } yield check

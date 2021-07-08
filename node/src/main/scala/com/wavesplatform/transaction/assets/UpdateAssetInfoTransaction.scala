@@ -23,7 +23,7 @@ case class UpdateAssetInfoTransaction(
     feeAsset: Asset,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.UpdateAssetInfo)
+) extends Transaction(TransactionType.UpdateAssetInfo, Seq(assetId))
     with VersionedTransaction
     with FastHashId
     with ProvenTransaction
@@ -43,8 +43,6 @@ case class UpdateAssetInfoTransaction(
         "description" -> self.description
       )
     )
-
-  override def checkedAssets: Seq[IssuedAsset] = Seq(assetId)
 }
 
 object UpdateAssetInfoTransaction {

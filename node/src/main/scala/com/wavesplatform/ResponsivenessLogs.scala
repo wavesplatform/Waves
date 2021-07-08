@@ -189,7 +189,7 @@ object ResponsivenessLogs {
   def isNeutrino(tx: Transaction): Boolean = {
     val txAddrs = tx match {
       case is: InvokeScriptTransaction =>
-        Seq(is.sender.toAddress) ++ (is.dApp match {
+        Seq(is.senderAddress) ++ (is.dApp match {
           case a: Address => Seq(a)
           case _          => Nil
         })

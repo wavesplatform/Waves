@@ -29,7 +29,7 @@ case class InvokeScriptTransaction(
     override val timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.InvokeScript)
+) extends Transaction(TransactionType.InvokeScript, payments.collect(InvokeScriptLike.IssuedAssets))
     with ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InCustomAsset
@@ -45,7 +45,6 @@ case class InvokeScriptTransaction(
 
   override def root: Option[InvokeScriptTransaction] = Some(this)
   def senderAddress: Address                         = sender.toAddress
-  override def checkedAssets: Seq[IssuedAsset]       = super[InvokeScriptLike].checkedAssets
 }
 
 object InvokeScriptTransaction extends TransactionParser {

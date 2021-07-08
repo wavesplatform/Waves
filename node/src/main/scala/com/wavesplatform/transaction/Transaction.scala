@@ -6,7 +6,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-abstract class Transaction(val tpe: TransactionType.TransactionType) {
+abstract class Transaction(val tpe: TransactionType.TransactionType, val checkedAssets: Seq[IssuedAsset] = Nil) {
   val id: Coeval[ByteStr]
 
   def assetFee: (Asset, Long)
@@ -26,8 +26,6 @@ abstract class Transaction(val tpe: TransactionType.TransactionType) {
   }
 
   override def hashCode(): Int = id().hashCode()
-
-  def checkedAssets: Seq[IssuedAsset] = Nil
 }
 
 object Transaction {

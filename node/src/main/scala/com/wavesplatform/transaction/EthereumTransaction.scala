@@ -2,14 +2,17 @@ package com.wavesplatform.transaction
 
 import java.math.BigInteger
 
-import com.wavesplatform.account.{Address, AddressScheme, EthereumAddress}
+import com.wavesplatform.account.{Address, AddressScheme, EthereumAddress, PublicKey, Recipient}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.protobuf.transaction.PBRecipients
+import com.wavesplatform.state.diffs.invoke.InvokeScriptLike
 import com.wavesplatform.state.{Height, TxNum}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import monix.eval.Coeval
-import org.web3j.abi.{FunctionReturnDecoder, TypeDecoder, TypeReference}
+import org.web3j.abi.TypeDecoder
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.abi.datatypes.{Address => EthAddress}
 import org.web3j.crypto._
@@ -17,7 +20,6 @@ import org.web3j.rlp.{RlpEncoder, RlpList}
 import org.web3j.utils.Numeric._
 import play.api.libs.json._
 
-import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
 
 sealed abstract class EthereumTransaction(final val underlying: SignedRawTransaction) extends Transaction(TransactionType.Ethereum) {
@@ -49,13 +51,7 @@ sealed abstract class EthereumTransaction(final val underlying: SignedRawTransac
       .toByteArray
   }
 
-  val senderAddress: Coeval[EthereumAddress] = signerPublicKey.map { pk =>
-    new EthereumAddress(Keys.getAddress(pk))
-  }
-
-  val signatureValid: Coeval[Boolean] = senderAddress.map { _ =>
-    true
-  }
+  val signatureValid: Coeval[Boolean] = signerPublicKey.map(_ => true)
 
   val baseJson: Coeval[JsObject] = for {
     idValue <- id
@@ -68,7 +64,7 @@ sealed abstract class EthereumTransaction(final val underlying: SignedRawTransac
   def ethereumJson(blockId: Option[BlockId], height: Option[Height], num: Option[TxNum]): JsObject = Json.obj(
     "blockHash"        -> blockId.map(id => toHexString(id.arr)),
     "blockNumber"      -> height.map(h => toHexStringWithPrefix(BigInteger.valueOf(h))),
-    "from"             -> senderAddress().toString,
+    "from"             -> new EthereumAddress(Keys.getAddress(signerPublicKey())).toString,
     "gas"              -> toHexStringWithPrefix(underlying.getGasLimit),
     "gasPrice"         -> toHexStringWithPrefix(underlying.getGasPrice),
     "hash"             -> toHexString(id().arr),
@@ -115,6 +111,20 @@ object EthereumTransaction {
         )
       )
     )
+  }
+
+  class InvokeScript(
+      val senderAddress: EthereumAddress,
+      val dApp: Recipient,
+      val funcCall: Terms.FUNCTION_CALL,
+      val payments: Seq[InvokeScriptTransaction.Payment],
+      underlying: SignedRawTransaction
+  ) extends EthereumTransaction(underlying)
+      with InvokeScriptLike {
+    override val json: Coeval[JsObject]                = baseJson.map(_ ++ Json.obj("invokeScript" -> Json.obj()))
+    override val root: Option[InvokeScriptTransaction] = None
+
+    override def sender: PublicKey = PublicKey(signerPublicKey())
   }
 
   def apply(bytes: Array[Byte]): EthereumTransaction =

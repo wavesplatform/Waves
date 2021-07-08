@@ -22,7 +22,7 @@ case class SponsorFeeTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.SponsorFee) with ProvenTransaction
+) extends Transaction(TransactionType.SponsorFee, Seq(asset)) with ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
     with FastHashId
@@ -31,8 +31,6 @@ case class SponsorFeeTransaction(
   val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(SponsorFeeTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(SponsorFeeTxSerializer.toBytes(this))
   override val json: Coeval[JsObject]     = Coeval.evalOnce(SponsorFeeTxSerializer.toJson(this))
-
-  override val checkedAssets: Seq[IssuedAsset] = Seq(asset)
 }
 
 object SponsorFeeTransaction extends TransactionParser {

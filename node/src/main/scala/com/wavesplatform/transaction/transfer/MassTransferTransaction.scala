@@ -28,7 +28,10 @@ case class MassTransferTransaction(
     attachment: ByteStr,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.MassTransfer)
+) extends Transaction(TransactionType.MassTransfer, assetId match {
+      case Waves          => Seq()
+      case a: IssuedAsset => Seq(a)
+    })
     with ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
@@ -44,15 +47,10 @@ case class MassTransferTransaction(
       "transfers" -> MassTransferTxSerializer.transfersJson(transfers.filter { t =>
         t.address match {
           case a: Address => a == recipient
-          case a: Alias => aliases(a)
+          case a: Alias   => aliases(a)
         }
       })
     )
-
-  override def checkedAssets: Seq[IssuedAsset] = assetId match {
-    case Waves          => Seq()
-    case a: IssuedAsset => Seq(a)
-  }
 }
 
 object MassTransferTransaction extends TransactionParser {

@@ -23,7 +23,7 @@ case class ReissueTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.Reissue)
+) extends Transaction(TransactionType.Reissue, Seq(asset))
     with VersionedTransaction
     with ProvenTransaction
     with SigProofsSwitch
@@ -34,8 +34,6 @@ case class ReissueTransaction(
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(ReissueTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(ReissueTxSerializer.toBytes(this))
   override val json: Coeval[JsObject]         = Coeval.evalOnce(ReissueTxSerializer.toJson(this))
-
-  override def checkedAssets: Seq[IssuedAsset] = Seq(asset)
 }
 
 object ReissueTransaction extends TransactionParser {

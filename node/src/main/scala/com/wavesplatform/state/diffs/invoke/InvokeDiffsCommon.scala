@@ -45,7 +45,7 @@ object InvokeDiffsCommon {
   def txFeeDiff(blockchain: Blockchain, tx: InvokeScriptTransaction): Either[GenericError, (Long, Map[Address, Portfolio])] = {
     val attachedFee = tx.fee
     tx.assetFee._1 match {
-      case Waves => Right((attachedFee, Map(tx.sender.toAddress -> Portfolio(-attachedFee))))
+      case Waves => Right((attachedFee, Map(tx.senderAddress -> Portfolio(-attachedFee))))
       case asset @ IssuedAsset(_) =>
         for {
           assetInfo <- blockchain
@@ -58,7 +58,7 @@ object InvokeDiffsCommon {
           )
         } yield {
           val portfolioDiff =
-            Map[Address, Portfolio](tx.sender.toAddress          -> Portfolio(assets = Map(asset              -> -attachedFee))) |+|
+            Map[Address, Portfolio](tx.senderAddress          -> Portfolio(assets = Map(asset              -> -attachedFee))) |+|
               Map[Address, Portfolio](assetInfo.issuer.toAddress -> Portfolio(-feeInWaves, assets = Map(asset -> attachedFee)))
           (feeInWaves, portfolioDiff)
         }
@@ -199,7 +199,7 @@ object InvokeDiffsCommon {
 
       actionComplexities     = actionAssets.flatMap(blockchain.assetScript(_).map(_.complexity))
       verifierCount          = if (blockchain.hasPaidVerifier(tx.senderAddress)) 1 else 0
-      additionalScriptsCount = actionComplexities.size + verifierCount + tx.checkedAssets.count(blockchain.hasAssetScript)
+      additionalScriptsCount = actionComplexities.size + verifierCount + tx.paymentAssets.count(blockchain.hasAssetScript)
 
       feeDiff <- if (isSyncCall)
         TracedResult.wrapValue(Map[Address, Portfolio]())

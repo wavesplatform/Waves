@@ -274,7 +274,7 @@ class UtxPoolImpl(
   private def scriptedAddresses(tx: Transaction): Set[Address] = tx match {
     case t if inUTXPoolOrdering.isWhitelisted(t) => Set.empty
     case i: InvokeScriptTransaction =>
-      Set[Address](i.sender.toAddress)
+      Set[Address](i.senderAddress)
         .filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dApp).fold[Set[Address]](_ => Set.empty, Set(_))
     case e: ExchangeTransaction =>
       Set[Address](e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasAccountScript)
