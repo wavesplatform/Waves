@@ -200,10 +200,12 @@ trait WithDomain extends WithState { _: Suite =>
 
     def settingsForRide(v: StdLibVersion): WavesSettings =
       v match {
-        case v if v <= V3 => RideV3
-        case V4           => RideV4
-        case V5           => RideV5
-        case V6           => RideV6
+        case V1 => RideV3
+        case V2 => RideV3
+        case V3 => RideV3
+        case V4 => RideV4
+        case V5 => RideV5
+        case V6 => RideV6
       }
   }
 
