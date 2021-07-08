@@ -4,14 +4,14 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer._
-import org.scalatest.{Assertions, Matchers, PropSpec}
 
 import scala.util.Random
 
-class TransactionsOrderingSpecification extends PropSpec with Assertions with Matchers {
+class TransactionsOrderingSpecification extends PropSpec {
 
   private val kp: KeyPair = KeyPair(ByteStr(new Array[Byte](32)))
   property("TransactionsOrdering.InBlock should sort correctly") {

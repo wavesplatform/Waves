@@ -4,7 +4,7 @@ import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync.{matcherFee, minFee, someAssetAmount}
-import com.wavesplatform.it.util._
+import com.wavesplatform.test._
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion

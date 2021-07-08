@@ -1,9 +1,8 @@
 package com.wavesplatform.lang.compiler
 
-import cats.implicits._
+import cats.syntax.semigroup._
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
@@ -17,14 +16,12 @@ import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, Terms}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.{CallableFuncSignature, CompactNameAndOriginalNamePair}
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test._
 
-class ContractCompilerCompactorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+class ContractCompilerCompactorTest extends PropSpec {
   property("contract script compaction - V4, V5") {
     val script =
       """

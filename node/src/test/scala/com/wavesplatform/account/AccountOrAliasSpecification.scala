@@ -1,11 +1,9 @@
 package com.wavesplatform.account
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.common.utils.EitherExt2
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test.PropSpec
 
-class AccountOrAliasSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class AccountOrAliasSpecification extends PropSpec {
 
   property("Account serialization round trip") {
     forAll(accountGen) { account =>

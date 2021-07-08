@@ -3,7 +3,7 @@ package com.wavesplatform.lang.compiler
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common.NoShrink
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.meta.{MetaMapper, ParsedMeta}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, V3, V4, DApp => DAppType}
@@ -11,14 +11,12 @@ import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import org.scalatest.{Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test._
+import org.scalatest.Inside
 
-class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink with Inside {
+class MetaTest extends PropSpec with Inside {
   property("meta v1 with union type parameters") {
     val ctx = Monoid.combine(
       compilerContext,

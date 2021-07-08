@@ -6,21 +6,12 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.{EitherMatchers, NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
-    extends PropSpec
-    with PropertyChecks
-    with DomainScenarioDrivenPropertyCheck
-    with Matchers
-    with EitherMatchers
-    with TransactionGen
-    with NoShrink {
+class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends PropSpec with DomainScenarioDrivenPropertyCheck {
 
   import BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest._
 
@@ -164,7 +155,7 @@ object BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest {
       t <- if (h < total) genSizes(total - h) else Gen.const(Seq.empty)
     } yield h +: t
 
-  def genSplitSizes(total: Int): Gen[(Int, Seq[Int])] = genSizes(total).map { case h :: tail => (h, tail) }
+  def genSplitSizes(total: Int): Gen[(Int, Seq[Int])] = genSizes(total).map(s => s.head -> s.tail)
 
   type BlockAndMicroblockSize     = (Int, Seq[Int])
   type BlockAndMicroblockSizes    = Seq[BlockAndMicroblockSize]

@@ -1,13 +1,14 @@
 package com.wavesplatform.lang.v1.compiler
 
-import cats.implicits._
+import cats.instances.vector._
+import cats.syntax.traverse._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableFunction, VerifierFunction}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{ExtractedFuncPrefix, ExtractedFuncPostfix}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{ExtractedFuncPostfix, ExtractedFuncPrefix}
 import monix.eval.Coeval
 
 import scala.util.Try
@@ -123,7 +124,7 @@ object Decompiler {
 
     val i = if (firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident
 
-    e flatMap {
+    e.flatMap(v => (v: @unchecked) match {
       case Terms.BLOCK(Terms.LET(MatchRef(name), e), body) => matchBlock(name, pure(body), ctx.incrementIdent()) flatMap { b =>
         expr(pure(e), ctx.incrementIdent(), NoBraces, DontIndentFirstLine) map { ex =>
           out("match " ++ ex ++ " {" ++ NEWLINE, ctx.ident) ++
@@ -203,7 +204,7 @@ object Decompiler {
         }
       case _: Terms.ARR       => ??? // never happens
       case obj: Terms.CaseObj => pureOut(obj.toString, i) // never happens
-    }
+    })
   }
 
   private val extractedFuncR = s"$ExtractedFuncPrefix(\\w+)\\((.+)\\)".r

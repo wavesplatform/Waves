@@ -17,12 +17,11 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.{NoShrink, TransactionGen, crypto}
+import com.wavesplatform.crypto
+import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
-import org.scalatest.PropSpec
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class MultiSig2of3Test extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class MultiSig2of3Test extends PropSpec with WithState {
 
   def multisigTypedExpr(pk0: PublicKey, pk1: PublicKey, pk2: PublicKey): EXPR = {
     val script =
@@ -65,7 +64,8 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with WithState with 
         Waves,
         amount,
         Waves,
-        fee, ByteStr.empty,
+        fee,
+        ByteStr.empty,
         timestamp,
         proofs = Proofs.empty,
         recipient.toAddress.chainId

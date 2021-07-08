@@ -8,14 +8,12 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, Proofs}
-import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalatest.PropSpec
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class OneProofForNonScriptedAccountTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class OneProofForNonScriptedAccountTest extends PropSpec with WithState {
 
   property("exactly 1 proof required for non-scripted accounts") {
     val s = for {
@@ -26,7 +24,7 @@ class OneProofForNonScriptedAccountTest extends PropSpec with PropertyChecks wit
       ts        <- positiveIntGen
       genesis = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       setScript <- selfSignedSetScriptTransactionGenP(master, ExprScript(TRUE).explicitGet())
-      transfer = TransferTransaction.selfSigned(2.toByte, master, recepient.toAddress, Waves, amt, Waves, fee, ByteStr.empty,  ts).explicitGet()
+      transfer = TransferTransaction.selfSigned(2.toByte, master, recepient.toAddress, Waves, amt, Waves, fee, ByteStr.empty, ts).explicitGet()
     } yield (genesis, setScript, transfer)
 
     forAll(s) {

@@ -1,6 +1,6 @@
 package com.wavesplatform.protobuf.utils
 
-import cats.implicits._
+import cats.syntax.applicativeError._
 import com.google.protobuf.CodedOutputStream
 import com.wavesplatform.common.state.ByteStr
 import scalapb.{GeneratedMessage, GeneratedMessageCompanion}
@@ -24,7 +24,7 @@ object PBUtils {
     outArray
   }
 
-  def decode[A <: GeneratedMessage with scalapb.Message[A]](msg: Array[Byte], cmp: GeneratedMessageCompanion[A]): Either[Throwable, A] =
+  def decode[A <: GeneratedMessage](msg: Array[Byte], cmp: GeneratedMessageCompanion[A]): Either[Throwable, A] =
     cmp
       .validate(msg)
       .toEither

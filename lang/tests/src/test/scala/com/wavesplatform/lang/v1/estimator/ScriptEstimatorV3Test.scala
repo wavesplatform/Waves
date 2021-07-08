@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.estimator
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common.produce
+import com.wavesplatform.test._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.FunctionHeader.Native

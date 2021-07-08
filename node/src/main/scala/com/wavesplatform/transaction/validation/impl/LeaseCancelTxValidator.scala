@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.validation.impl
 
 import cats.data.ValidatedNel
-import cats.implicits._
+import cats.syntax.either._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError

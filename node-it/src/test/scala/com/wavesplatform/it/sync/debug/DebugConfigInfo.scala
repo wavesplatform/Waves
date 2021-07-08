@@ -1,12 +1,10 @@
 package com.wavesplatform.it.sync.debug
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
-import org.scalatest.FunSuite
+import com.wavesplatform.it.{BaseFunSuite, NodeConfigs}
 
-class DebugConfigInfo extends FunSuite with NodesFromDocker {
+class DebugConfigInfo extends BaseFunSuite {
 
   override protected val nodeConfigs: Seq[Config] = NodeConfigs.newBuilder.withDefault(1).build()
 

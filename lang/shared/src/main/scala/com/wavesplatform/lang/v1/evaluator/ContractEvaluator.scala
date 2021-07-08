@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.Id
-import cats.implicits._
+import cats.syntax.either._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ExecutionError

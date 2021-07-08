@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import cats.implicits._
+import cats.syntax.semigroup._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.evaluator.ctx.BaseFunction
@@ -83,7 +83,7 @@ object WavesContext {
 
     val dAppFuncs =
       if (contentType == DApp)
-        Array(callDAppF(version, reentrant = false), callDAppF(version, reentrant = true))
+        Array(callDAppF(reentrant = false), callDAppF(reentrant = true))
       else
         Array[BaseFunction[Environment]]()
 

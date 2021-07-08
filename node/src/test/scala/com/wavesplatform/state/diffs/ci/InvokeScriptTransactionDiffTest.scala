@@ -33,6 +33,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets._
@@ -43,26 +44,13 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, _}
 import com.wavesplatform.utils._
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import org.scalatest.{EitherValues, Inside}
 
 import scala.collection.immutable
 
-class InvokeScriptTransactionDiffTest
-    extends PropSpec
-    with PropertyChecks
-    with Matchers
-    with TransactionGen
-    with NoShrink
-    with Inside
-    with WithState
-    with WithDomain
-    with DBCacheSettings
-    with MockFactory
-    with EitherValues {
+class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCacheSettings with EitherValues with Inside with MockFactory {
   import DomainPresets._
 
   private val fs = settingsForRide(V3).blockchainSettings.functionalitySettings
@@ -197,7 +185,7 @@ class InvokeScriptTransactionDiffTest
         FUNCTION_CALL(
           User(FieldNames.ScriptTransfer),
           List(
-            recipientAddress match {
+            (recipientAddress: @unchecked) match {
               case recipientAddress: Address => FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(ByteStr(recipientAddress.bytes)).explicitGet()))
               case recipientAddress: Alias   => FUNCTION_CALL(User("Alias"), List(CONST_STRING(recipientAddress.name).explicitGet()))
             },
@@ -867,7 +855,7 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE.explicitGet().scriptsRun shouldBe 3
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, _)), _),
+                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, _)), _, _),
                 AssetVerifierTrace(transferringAssetId, None, _),
                 AssetVerifierTrace(attachedAssetId, None, _)
                 ) =>
@@ -1017,7 +1005,7 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE should produce("Transaction is not allowed by script")
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, dAppAddress, functionCall, Right(ScriptResultV3(_, transfers, _)), _),
+                InvokeScriptTrace(_, dAppAddress, functionCall, Right(ScriptResultV3(_, transfers, _)), _, _),
                 AssetVerifierTrace(allowedAssetId, None, _),
                 AssetVerifierTrace(bannedAssetId, Some(_: FailedTransactionError), _)
                 ) =>
@@ -1082,7 +1070,7 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE should produce("TransactionValidationError")
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, _)), _),
+                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, _)), _, _),
                 AssetVerifierTrace(transferringAssetId, Some(_), _)
                 ) =>
               transferringAssetId shouldBe transferringAsset.id()
@@ -1998,7 +1986,9 @@ class InvokeScriptTransactionDiffTest
              | if (i == "throw" && check) then
              |   throw("Some error")
              | else if (i == "insufficient fee" && check) then
-             |   [ ${(1 to ContractLimits.MaxCallableActionsAmount(V4)).map(i => s"""Issue("Asset $i", "", 100, 8, true, unit, $i)""").mkString(",")} ]
+             |   [ ${(1 to ContractLimits.MaxCallableActionsAmount(V4))
+               .map(i => s"""Issue("Asset $i", "", 100, 8, true, unit, $i)""")
+               .mkString(",")} ]
              | else if (i == "negative amount" && check) then
              |   [ ScriptTransfer(inv.caller, -1, a) ]
              | else if (i == "overflow amount" && check) then
@@ -2008,7 +1998,9 @@ class InvokeScriptTransactionDiffTest
              | else if (i == "max actions" && check) then
              |   [ ${(0 to ContractLimits.MaxCallableActionsAmount(V4)).map(_ => "ScriptTransfer(inv.caller, 10, a)").mkString(",")} ]
              | else if (i == "invalid data entries" && check) then
-             |   [ ${(0 to ContractLimits.MaxWriteSetSize(V4)).map(x => s"""IntegerEntry("val", $x)""").mkString(",")},ScriptTransfer(inv.caller, 10, a)]
+             |   [ ${(0 to ContractLimits.MaxWriteSetSize(V4))
+               .map(x => s"""IntegerEntry("val", $x)""")
+               .mkString(",")},ScriptTransfer(inv.caller, 10, a)]
              | else []
              |}
              |
@@ -2045,14 +2037,15 @@ class InvokeScriptTransactionDiffTest
 
     forAll(scenario) {
       case (genesisTxs, _, txs) =>
-        txs.foreach { case (name, invokeTx) =>
-          assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
-            case (diff, _) =>
-              if (name == "ok")
-                diff.errorMessage(invokeTx.id.value()) shouldBe empty
-              else
-                diff.errorMessage(invokeTx.id.value()) shouldBe defined
-          }
+        txs.foreach {
+          case (name, invokeTx) =>
+            assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+              case (diff, _) =>
+                if (name == "ok")
+                  diff.errorMessage(invokeTx.id()) shouldBe empty
+                else
+                  diff.errorMessage(invokeTx.id()) shouldBe defined
+            }
         }
     }
   }
@@ -2139,7 +2132,7 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, dApp, assetsComplexity) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
-            diff.errorMessage(invokeTx.id.value()) shouldBe defined
+            diff.errorMessage(invokeTx.id()) shouldBe defined
             diff.scriptsComplexity should be > 0L
         }
     }
@@ -2194,7 +2187,7 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, dApp, script) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
-            diff.errorMessage(invokeTx.id.value()) shouldBe None
+            diff.errorMessage(invokeTx.id()) shouldBe None
             val hash = ByteStr(com.wavesplatform.lang.Global.blake2b256(script.bytes().arr))
             bc.accountData(dApp, "hash1").get.value shouldBe hash
             bc.accountData(dApp, "hash2").get.value shouldBe hash
@@ -2260,7 +2253,7 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, dApp) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
-            diff.errorMessage(invokeTx.id.value()) shouldBe None
+            diff.errorMessage(invokeTx.id()) shouldBe None
             bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
             bc.accountData(dApp, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
         }
@@ -2325,7 +2318,7 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, _) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, _) =>
-            diff.errorMessage(invokeTx.id.value()) shouldBe None
+            diff.errorMessage(invokeTx.id()) shouldBe None
             diff.scriptsComplexity shouldBe 108
             diff.scriptsRun shouldBe 2
         }
@@ -2433,8 +2426,9 @@ class InvokeScriptTransactionDiffTest
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
             diff.scriptResults(invokeTx.id()).error shouldBe None
-            val List(l: InvokeScriptResult.Lease, l1: InvokeScriptResult.Lease) = diff.scriptResults(invokeTx.id()).leases
-            val List(l2)                                                        = diff.scriptResults(invokeTx.id()).leaseCancels
+            val l  = diff.scriptResults(invokeTx.id()).leases(0)
+            val l1 = diff.scriptResults(invokeTx.id()).leases(1)
+            val l2 = diff.scriptResults(invokeTx.id()).leaseCancels(0)
             l.amount shouldBe 13
             l.recipient shouldBe service
             l1.amount shouldBe 23
@@ -2547,8 +2541,9 @@ class InvokeScriptTransactionDiffTest
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
             diff.scriptResults(invokeTx.id()).error shouldBe None
-            val List(l:InvokeScriptResult.Lease, l1:InvokeScriptResult.Lease) = diff.scriptResults(invokeTx.id()).leases
-            val List(l2) = diff.scriptResults(invokeTx.id()).leaseCancels
+            val l  = diff.scriptResults(invokeTx.id()).leases(0)
+            val l1 = diff.scriptResults(invokeTx.id()).leases(1)
+            val l2                                                        = diff.scriptResults(invokeTx.id()).leaseCancels(0)
             l.amount shouldBe 13
             l.recipient shouldBe service
             l1.amount shouldBe 23
@@ -2663,7 +2658,6 @@ class InvokeScriptTransactionDiffTest
         }
     }
   }
-
 
   property("non-NFT issue work") {
     def contract(): DApp = {
@@ -3718,7 +3712,7 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, clientDApp, serviceDApp, transferAsset) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
-            diff.errorMessage(invokeTx.id.value()) shouldBe None
+            diff.errorMessage(invokeTx.id()) shouldBe None
 
             bc.accountData(clientDApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
             bc.accountData(serviceDApp, "bar") shouldBe Some(IntegerDataEntry("bar", 1))

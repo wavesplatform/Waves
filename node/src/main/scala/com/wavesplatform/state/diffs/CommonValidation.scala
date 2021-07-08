@@ -147,7 +147,7 @@ object CommonValidation {
         case V6                               => v6Activation
       }
 
-      def scriptTypeActivation(sc: Script): Either[ActivationError, T] = sc match {
+      def scriptTypeActivation(sc: Script): Either[ActivationError, T] = (sc: @unchecked) match {
         case _: ExprScript                        => Right(tx)
         case _: ContractScript.ContractScriptImpl => v3Activation
       }

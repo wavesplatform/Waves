@@ -1,8 +1,8 @@
 package com.wavesplatform.state.diffs.invoke
 
-import scala.util.{Failure, Right, Success, Try}
-
-import cats.implicits._
+import cats.instances.map._
+import cats.syntax.either._
+import cats.syntax.semigroup._
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
@@ -19,25 +19,28 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, _}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, _}
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
+import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, _}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.DiffsCommon
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
+import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
+import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.validation.impl.{LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
+import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import com.wavesplatform.utils._
 import shapeless.Coproduct
+
+import scala.util.{Failure, Right, Success, Try}
 
 object InvokeDiffsCommon {
   def txFeeDiff(blockchain: Blockchain, tx: InvokeScriptTransaction): Either[GenericError, (Long, Map[Address, Portfolio])] = {
@@ -63,6 +66,13 @@ object InvokeDiffsCommon {
     }
   }
 
+  def calculateMinFee(blockchain: Blockchain, issueList: List[Issue], additionalScriptsInvoked: Int, stepsNumber: Long): Long = {
+    val dAppFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
+    val issuesFee  = issueList.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
+    val actionsFee = additionalScriptsInvoked * ScriptExtraFee
+    dAppFee + issuesFee + actionsFee
+  }
+
   def calcAndCheckFee[E <: ValidationError](
       makeError: (String, Long) => E,
       tx: InvokeScriptTransaction,
@@ -71,57 +81,54 @@ object InvokeDiffsCommon {
       invocationComplexity: Long,
       issueList: List[Issue],
       additionalScriptsInvoked: Int
-  ): TracedResult[ValidationError, (Long, Map[Address, Portfolio])] =
-    TracedResult {
-      val stepsNumber =
-        if (invocationComplexity % stepLimit == 0)
-          invocationComplexity / stepLimit
-        else
-          invocationComplexity / stepLimit + 1
+  ): TracedResult[ValidationError, (Long, Map[Address, Portfolio])] = {
+    val stepsNumber =
+      if (invocationComplexity % stepLimit == 0)
+        invocationComplexity / stepLimit
+      else
+        invocationComplexity / stepLimit + 1
 
-      for {
-        (attachedFeeInWaves, portfolioDiff) <- txFeeDiff(blockchain, tx)
-        _ <- {
-          val dAppFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
-          val issuesFee  = issueList.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
-          val actionsFee = additionalScriptsInvoked * ScriptExtraFee
-          val minFee     = dAppFee + issuesFee + actionsFee
+    val minFee = calculateMinFee(blockchain, issueList, additionalScriptsInvoked, stepsNumber)
 
-          lazy val errorMessage = {
-            val stepsInfo =
-              if (stepsNumber > 1)
-                s" with $stepsNumber invocation steps"
-              else
-                ""
+    val resultE = for {
+      (attachedFeeInWaves, portfolioDiff) <- txFeeDiff(blockchain, tx)
+      _ <- {
+        lazy val errorMessage = {
+          val stepsInfo =
+            if (stepsNumber > 1)
+              s" with $stepsNumber invocation steps"
+            else
+              ""
 
-            val totalScriptsInvokedInfo =
-              if (additionalScriptsInvoked > 0)
-                s" with $additionalScriptsInvoked total scripts invoked"
-              else
-                ""
+          val totalScriptsInvokedInfo =
+            if (additionalScriptsInvoked > 0)
+              s" with $additionalScriptsInvoked total scripts invoked"
+            else
+              ""
 
-            val issuesInfo =
-              if (issueList.nonEmpty)
-                s" with ${issueList.length} assets issued"
-              else
-                ""
+          val issuesInfo =
+            if (issueList.nonEmpty)
+              s" with ${issueList.length} assets issued"
+            else
+              ""
 
-            val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
-            val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+          val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
+          val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
 
-            s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
-              s"$stepsInfo$totalScriptsInvokedInfo$issuesInfo " +
-              s"does not exceed minimal value of $minFee WAVES."
-          }
-
-          Either.cond(
-            attachedFeeInWaves >= minFee,
-            (),
-            makeError(errorMessage, invocationComplexity)
-          )
+          s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
+            s"$stepsInfo$totalScriptsInvokedInfo$issuesInfo " +
+            s"does not exceed minimal value of $minFee WAVES."
         }
-      } yield (attachedFeeInWaves, portfolioDiff)
-    }
+
+        Either.cond(
+          attachedFeeInWaves >= minFee,
+          (),
+          makeError(errorMessage, invocationComplexity)
+        )
+      }
+    } yield (attachedFeeInWaves, portfolioDiff)
+    TracedResult(resultE).withAttributes(Attribute.MinFee -> minFee)
+  }
 
   def getInvocationComplexity(
       blockchain: Blockchain,
@@ -389,7 +396,7 @@ object InvokeDiffsCommon {
   ): TracedResult[FailedTransactionError, Diff] =
     actions.foldLeft(TracedResult(paymentsDiff.asRight[FailedTransactionError])) { (diffAcc, action) =>
       diffAcc match {
-        case TracedResult(Right(curDiff), _) =>
+        case TracedResult(Right(curDiff), _, _) =>
           val complexityLimit =
             if (remainingLimit < Int.MaxValue) remainingLimit - curDiff.scriptsComplexity.toInt
             else remainingLimit
@@ -483,8 +490,9 @@ object InvokeDiffsCommon {
           }
 
           def applyReissue(reissue: Reissue, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
-            val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue).leftMap(FailedTransactionError.asFailedScriptError)
-            val pseudoTx    = ReissuePseudoTx(reissue, actionSender, pk, tx.txId, tx.timestamp)
+            val reissueDiff =
+              DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue).leftMap(FailedTransactionError.asFailedScriptError)
+            val pseudoTx = ReissuePseudoTx(reissue, actionSender, pk, tx.txId, tx.timestamp)
             callAssetVerifierWithPseudoTx(reissueDiff, reissue.assetId, pseudoTx, AssetContext.Reissue)
           }
 
@@ -503,9 +511,13 @@ object InvokeDiffsCommon {
                   FailedTransactionError.dAppExecution(s"SponsorFee assetId=${sponsorFee.assetId} was not issued from address of current dApp", 0L)
                 )
               )
-              _ <- TracedResult(SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee).leftMap(FailedTransactionError.asFailedScriptError))
-              sponsorDiff = DiffsCommon.processSponsor(blockchain, dAppAddress, fee = 0, sponsorFee).leftMap(FailedTransactionError.asFailedScriptError)
-              pseudoTx    = SponsorFeePseudoTx(sponsorFee, actionSender, pk, tx.txId, tx.timestamp)
+              _ <- TracedResult(
+                SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee).leftMap(FailedTransactionError.asFailedScriptError)
+              )
+              sponsorDiff = DiffsCommon
+                .processSponsor(blockchain, dAppAddress, fee = 0, sponsorFee)
+                .leftMap(FailedTransactionError.asFailedScriptError)
+              pseudoTx = SponsorFeePseudoTx(sponsorFee, actionSender, pk, tx.txId, tx.timestamp)
               r <- callAssetVerifierWithPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx, AssetContext.Sponsor)
             } yield r
 

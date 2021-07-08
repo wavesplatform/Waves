@@ -11,7 +11,7 @@ package object evaluator {
 
   implicit class EvalMOps[F[_], C[_[_]], A](ev: EvalM[F, C, A]) {
     def ter(ctx: LoggedEvaluationContext[C, F]): TrampolinedExecResult[F, A] =
-      EitherT[EvalF[F, ?], ExecutionError, A](ev.run(ctx).map(_._2))
+      EitherT[EvalF[F, *], ExecutionError, A](ev.run(ctx).map(_._2))
   }
 
   def liftTER[F[_], C[_[_]], A](ter: Eval[F[Either[ExecutionError, A]]]): EvalM[F, C, A] =

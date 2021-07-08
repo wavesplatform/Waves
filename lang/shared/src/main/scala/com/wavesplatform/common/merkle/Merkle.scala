@@ -1,21 +1,15 @@
 package com.wavesplatform.common.merkle
 
-import com.wavesplatform.lang.Global
-
 import scala.annotation.tailrec
 
 object Merkle {
-  private type Message = Array[Byte]
-  private type Digest  = Array[Byte]
-  private type Level   = Seq[Digest]
-
   private val empty: Digest           = hash(Array[Byte](0))
   private val emptyLevels: Seq[Level] = Seq(Seq(empty))
 
   @inline private def isLeft(i: Int): Boolean = i % 2 == 0
 
   /** Hash function */
-  def hash(input: Message): Digest = Global.blake2b256(input)
+  def hash(input: Message): Digest = com.wavesplatform.lang.Global.blake2b256(input)
 
   /** Makes levels of merkle tree (from top to bottom) */
   def mkLevels(data: Seq[Message]): Seq[Level] = {
@@ -25,7 +19,7 @@ object Merkle {
       def loop(prevLevel: Seq[Digest], acc: Seq[Level]): Seq[Level] = {
         val level = prevLevel
           .grouped(2)
-          .map {
+          .collect {
             case Seq(l, r) => hash(l ++ r)
             case Seq(l)    => hash(l ++ empty)
           }
@@ -60,7 +54,7 @@ object Merkle {
       case ((left, idx), right) if isLeft(idx) => (hash(left ++ right), idx / 2)
       case ((right, idx), left)                => (hash(left ++ right), idx / 2)
     }
-    if(rest != 0) {
+    if (rest != 0) {
       throw new Exception(s"Index $index out of range allowed by proof list length ${proofs.length}")
     }
     calculated
@@ -76,4 +70,13 @@ object Merkle {
   def verify(digest: Digest, index: Int, proofs: Seq[Digest], root: Digest): Boolean = {
     (1 << proofs.length) > index && index >= 0 && (createRoot(digest, index, proofs) sameElements root)
   }
+
+  def verify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean = {
+    (for {
+      rootDigest  <- parseRoot(rootBytes)
+      merkleProof <- ScryptoMerkleProof.parse(proofBytes, valueBytes)
+    } yield merkleProof.valid(rootDigest)).getOrElse(false)
+  }
+
+  def parseRoot(bytes: Array[Byte]): Option[Digest] = if (bytes.length == 32) Some(bytes) else None
 }

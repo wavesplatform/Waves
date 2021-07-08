@@ -2,7 +2,6 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values._
@@ -12,6 +11,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import org.scalacheck.Gen
 import play.api.libs.json._
+import com.wavesplatform.test._
 
 class SetAssetScriptTransactionSpecification extends GenericTransactionSpecification[SetAssetScriptTransaction] {
   property("issuer can`t make SetAssetScript tx when Script is Contract") {
@@ -46,8 +46,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
   override def updateProofs(tx: SetAssetScriptTransaction, p: Proofs): SetAssetScriptTransaction = tx.copy(1.toByte, proofs = p)
 
   override def generator: Gen[(Seq[Transaction], SetAssetScriptTransaction)] = setAssetScriptTransactionGen
-  override def assertTxs(f: Transaction, second: SetAssetScriptTransaction): Unit = f match {
-    case first: SetAssetScriptTransaction =>
+  override def assertTxs(first: SetAssetScriptTransaction, second: SetAssetScriptTransaction): Unit = {
       first.sender shouldEqual second.sender
       first.timestamp shouldEqual second.timestamp
       first.fee shouldEqual second.fee

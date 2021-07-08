@@ -1,16 +1,14 @@
 package com.wavesplatform.lang.compiler
 
-import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.Imports
 import com.wavesplatform.lang.directives.{Directive, DirectiveParser}
 import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.compiler.{CompilationError, ContractCompiler}
 import com.wavesplatform.lang.v1.parser.Expressions
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test.PropSpec
 
-class ContractCompilerWithParserV2Test extends PropSpec with PropertyChecks with Matchers with NoShrink {
+class ContractCompilerWithParserV2Test extends PropSpec {
 
   def compile(script: String, saveExprContext: Boolean = false): Either[String, (Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
 

@@ -4,7 +4,11 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
-import cats.implicits._
+import cats.syntax.either._
+import cats.syntax.traverse._
+import cats.instances.either._
+import cats.syntax.option._
+import cats.instances.list._
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.utils.Serialize._
 import com.wavesplatform.lang.v1.Serde.desAux
@@ -118,7 +122,7 @@ object ContractSerDe {
     val len = bb.getInt
     if (len <= (bb.limit() - bb.position()) && len >= 0) {
       (1 to len).toList
-        .traverse[Either[String, ?], A](_ => df(bb))
+        .traverse[Either[String, *], A](_ => df(bb))
     } else {
       Left(s"At position ${bb.position()} array of arguments too big.")
     }

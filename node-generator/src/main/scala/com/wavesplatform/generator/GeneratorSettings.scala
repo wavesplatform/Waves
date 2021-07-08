@@ -32,14 +32,14 @@ object GeneratorSettings {
   implicit val toPrintable: Show[GeneratorSettings] = { x =>
     import x._
 
-    val modeSettings: String = (mode match {
+    val modeSettings: String = (mode: @unchecked) match {
       case Mode.NARROW   => show"$narrow"
       case Mode.WIDE     => show"$wide"
       case Mode.DYN_WIDE => show"$dynWide"
       case Mode.MULTISIG => show"$multisig"
       case Mode.ORACLE   => show"$oracle"
       case Mode.SWARM    => show"$swarm"
-    }).toString
+    }
 
     s"""network byte: $chainId
        |rich accounts:

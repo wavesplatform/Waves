@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import cats.implicits._
+import cats.syntax.either._
+import cats.syntax.functor._
 import cats.{Eval, Monad}
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion

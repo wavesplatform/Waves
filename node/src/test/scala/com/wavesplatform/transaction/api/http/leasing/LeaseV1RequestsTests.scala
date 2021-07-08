@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction.api.http.leasing
 
 import com.wavesplatform.api.http.requests.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
-import org.scalatest.{FunSuite, Matchers}
+import com.wavesplatform.test.FunSuite
 import play.api.libs.json.Json
 
-class LeaseV1RequestsTests extends FunSuite with Matchers {
+class LeaseV1RequestsTests extends FunSuite {
 
   test("LeaseRequest") {
     val json =

@@ -23,7 +23,8 @@ import com.wavesplatform.{NTPTime, TestHelpers}
 import monix.reactive.Observer
 import monix.reactive.subjects.{PublishSubject, Subject}
 import org.iq80.leveldb.{DB, Options}
-import org.scalatest.{Matchers, Suite}
+import org.scalatest.Suite
+import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.Files
 
