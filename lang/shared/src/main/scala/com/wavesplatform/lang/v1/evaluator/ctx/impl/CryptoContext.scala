@@ -508,9 +508,7 @@ object CryptoContext {
     version match {
       case V1 | V2  => fromV1Ctx
       case V3       => fromV3Ctx
-      case V4       => fromV4Ctx
-      case V5       => fromV4Ctx
-      case V6       => fromV4Ctx
+      case _        => fromV4Ctx
     }
   }
 
