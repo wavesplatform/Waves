@@ -9,7 +9,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.{Height, TxNum}
 import monix.eval.Coeval
-import org.web3j.abi.TypeDecoder
+import org.web3j.abi.{FunctionReturnDecoder, TypeDecoder, TypeReference}
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.abi.datatypes.{Address => EthAddress}
 import org.web3j.crypto._
@@ -17,9 +17,10 @@ import org.web3j.rlp.{RlpEncoder, RlpList}
 import org.web3j.utils.Numeric._
 import play.api.libs.json._
 
+import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
 
-abstract class EthereumTransaction(final val underlying: SignedRawTransaction) extends Transaction(TransactionType.Ethereum) {
+sealed abstract class EthereumTransaction(final val underlying: SignedRawTransaction) extends Transaction(TransactionType.Ethereum) {
   private final val signatureData: Sign.SignatureData = underlying.getSignatureData
   override val bytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(RlpEncoder.encode(new RlpList(TransactionEncoder.asRlpValues(underlying, signatureData))))

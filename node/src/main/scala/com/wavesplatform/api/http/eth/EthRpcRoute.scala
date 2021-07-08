@@ -10,8 +10,8 @@ import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction}
+import org.web3j.abi._
 import org.web3j.abi.datatypes.generated.{Uint256, Uint8}
-import org.web3j.abi.{FunctionEncoder, TypeDecoder}
 import org.web3j.crypto._
 import org.web3j.utils.Numeric._
 import play.api.libs.json.Json.JsValueWrapper
@@ -20,19 +20,9 @@ import play.api.libs.json._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters._
-import scala.reflect.ClassTag
 
 class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPublisher) extends ApiRoute {
   private def quantity(v: Long) = s"0x${java.lang.Long.toString(v, 16)}"
-
-  private val decodeMethod = {
-    val m = classOf[TypeDecoder].getDeclaredMethod("decode", classOf[String], classOf[Int], classOf[Class[_]])
-    m.setAccessible(true)
-    m
-  }
-
-  private def decode[A](source: String, offset: Int)(implicit ct: ClassTag[A]): A =
-    decodeMethod.invoke(null, source, offset, ct.runtimeClass.asInstanceOf[Class[A]]).asInstanceOf[A]
 
   private def resp(id: JsValue, resp: JsValueWrapper) = complete(Json.obj("id" -> id, "jsonrpc" -> "2.0", "result" -> resp))
 
@@ -57,12 +47,10 @@ class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPubli
       case "eth_getTransactionCount" =>
         resp(id, quantity(System.currentTimeMillis()))
       case "eth_getBlockByNumber" =>
-        val height    = Integer.parseInt(params.get.head.as[String].drop(2), 16)
-        val blockMeta = blockchain.blockHeader(height).get
         resp(
           id,
           Json.obj(
-            "number" -> quantity(height)
+            "number" -> quantity(Integer.parseInt(params.get.head.as[String].drop(2), 16))
           )
         )
       case "eth_getBalance" =>
@@ -122,7 +110,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPubli
               id,
               encodeResponse(
                 new Uint256(
-                  blockchain.balance(EthereumAddress(decode[org.web3j.abi.datatypes.Address](dataString, 10).toString), assetId(contractAddress).get)
+                  blockchain.balance(EthereumAddress(dataString.takeRight(40)), assetId(contractAddress).get)
                 )
               )
             )
