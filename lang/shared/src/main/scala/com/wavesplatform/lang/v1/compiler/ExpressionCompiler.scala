@@ -556,7 +556,7 @@ object ExpressionCompiler {
       ctx           <- get[Id, CompilerContext, CompilationError]
       fieldWithErr  <- handlePart(fieldPart).handleError()
       compiledRef   <- compileExprWithCtx(refExpr, saveExprContext, allowIllFormedStrings)
-      getterWithErr <- mkGetter(p, ctx, compiledRef.t.typeList, fieldWithErr._1.getOrElse("NO_NAME"), compiledRef.expr).toCompileM.handleError()
+      getterWithErr <- mkGetter(p, ctx, compiledRef.t, fieldWithErr._1.getOrElse("NO_NAME"), compiledRef.expr).toCompileM.handleError()
 
       errorList     = fieldWithErr._2 ++ getterWithErr._2
       parseNodeExpr = Expressions.GETTER(p, compiledRef.parseNodeExpr, fieldPart, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
@@ -869,25 +869,19 @@ object ExpressionCompiler {
   private def mkGetter(
       p: Pos,
       ctx: CompilerContext,
-      types: List[FINAL],
+      objectType: FINAL,
       fieldName: String,
       expr: EXPR
   ): Either[CompilationError, (CompilerContext, GETTER, FINAL)] = {
-
-    lazy val errMsg =
-      if (types.length == 1) types.head.toString
-      else s"""Union(${types.mkString("|")})"""
-
     lazy val err =
-      FieldNotFound(p.start, p.end, fieldName, errMsg)
+      FieldNotFound(p.start, p.end, fieldName, objectType.name)
         .asLeft[(CompilerContext, GETTER, FINAL)]
 
     val getter = GETTER(expr, fieldName)
-
-    types
+    objectType.typeList
       .traverse(_.fields.find(_._1 == fieldName).map(_._2))
       .map(TypeInferrer.findCommonType)
-      .fold(err)(t => Right((ctx, getter, t)))
+      .fold(err)(t => if (t == NOTHING) err else Right((ctx, getter, t)))
   }
 
   private def handleCompositeType(

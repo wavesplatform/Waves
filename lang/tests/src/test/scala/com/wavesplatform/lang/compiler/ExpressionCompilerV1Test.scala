@@ -556,6 +556,20 @@ class ExpressionCompilerV1Test extends PropSpec {
       TestCompiler(V4).compileExpression(s""" "d" == "d" """)
   }
 
+  property("accessing to Any as to tuple") {
+    val script =
+      """
+        | func f(a: Any) = a._1 == a._2
+        | true
+      """.stripMargin
+    ExpressionCompiler.compile(script, compilerContext) should produce(
+      "Compilation failed: [" +
+        "Undefined field `_1` of variable of type `Any` in 19-23; " +
+        "Undefined field `_2` of variable of type `Any` in 27-31" +
+        "]"
+    )
+  }
+
   treeTypeTest("GETTER")(
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
