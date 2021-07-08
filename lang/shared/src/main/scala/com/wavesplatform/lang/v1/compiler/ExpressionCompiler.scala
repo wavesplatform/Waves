@@ -11,8 +11,18 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions._
-import com.wavesplatform.lang.v1.parser.Expressions.{EXPR => _}
+import com.wavesplatform.lang.v1.parser.Expressions.{
+  BINARY_OP,
+  CompositePattern,
+  ConstsPat,
+  MATCH_CASE,
+  ObjPat,
+  PART,
+  Pos,
+  Single,
+  TuplePat,
+  TypedVar
+}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{BaseGlobal, ContractLimits, FunctionHeader}
