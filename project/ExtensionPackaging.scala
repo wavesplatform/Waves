@@ -66,18 +66,13 @@ object ExtensionPackaging extends AutoPlugin {
              |set -e
              |chown -R ${nodePackageName.value}:${nodePackageName.value} /usr/share/${nodePackageName.value}""".stripMargin
       ),
+      Linux / maintainer := "wavesplatform.com",
+      Linux / packageSummary := s"Waves node ${name.value}${network.value.packageSuffix} extension",
+      Linux / packageDescription := s"Waves node ${name.value}${network.value.packageSuffix} extension",
       Debian / normalizedName := s"${name.value}${network.value.packageSuffix}",
       Debian / packageName := s"${name.value}${network.value.packageSuffix}",
       libraryDependencies ++= Dependencies.logDeps,
       run / javaOptions ++= extensionClasses.value.zipWithIndex.map { case (extension, index) => s"-Dwaves.extensions.$index=$extension" }
-    ) ++ maintainerFix
-
-  private def maintainerFix =
-    inConfig(Linux)(
-      Seq(
-        packageSummary := s"Waves node ${name.value}${network.value.packageSuffix} extension",
-        packageDescription := s"Waves node ${name.value}${network.value.packageSuffix} extension"
-      )
     )
 
   // A copy of com.typesafe.sbt.packager.linux.LinuxPlugin.getUniversalFolderMappings
