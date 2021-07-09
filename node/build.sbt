@@ -1,14 +1,14 @@
 import CommonSettings.autoImport.network
 import com.typesafe.sbt.SbtNativePackager.Universal
-import com.typesafe.sbt.packager.Keys.executableScriptName
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbtassembly.MergeStrategy
+
+name := "waves"
+maintainer := "com.wavesplatform"
 
 enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning, VersionObject)
 
 libraryDependencies ++= Dependencies.node.value
-
-name := "waves"
 
 inConfig(Compile)(
   Seq(
@@ -39,16 +39,12 @@ inTask(assembly)(
   )
 )
 
-// Adds "$lib_dir/*" to app_classpath in the executable file
-// Logback creates a "waves.directory_UNDEFINED" without this option.
+// Adds "$lib_dir/*" to app_classpath in the executable file, this is needed for extensions
 scriptClasspath += "*"
 
-bashScriptExtraDefines ++= Seq(
-  s"""addJava "-Dwaves.defaults.blockchain.type=${network.value}"""",
-  s"""addJava "-Dwaves.defaults.directory=/var/lib/${(Universal / normalizedName).value}"""",
-  s"""addJava "-Dwaves.defaults.config.directory=/etc/${(Universal / normalizedName).value}"""",
-  // Workaround to ignore the -h option
-  """process_args() {
+bashScriptExtraDefines +=
+  """# Workaround to ignore the -h option
+    |process_args() {
     |  local no_more_snp_opts=0
     |  while [[ $# -gt 0 ]]; do
     |    case "$1" in
@@ -74,23 +70,10 @@ bashScriptExtraDefines ++= Seq(
     |  }
     |}
     |""".stripMargin
-)
 
 inConfig(Universal)(
   Seq(
     mappings += (baseDirectory.value / s"waves-sample.conf" -> "doc/waves.conf.sample"),
-    mappings := {
-      val linuxScriptPattern = "bin/(.+)".r
-      val batScriptPattern   = "bin/([^.]+)\\.bat".r
-      val scriptSuffix       = network.value.packageSuffix
-      mappings.value.map {
-        case m @ (file, batScriptPattern(script)) =>
-          if (script.endsWith(scriptSuffix)) m else (file, s"bin/$script$scriptSuffix.bat")
-        case m @ (file, linuxScriptPattern(script)) =>
-          if (script.endsWith(scriptSuffix)) m else (file, s"bin/$script$scriptSuffix")
-        case other => other
-      }
-    },
     javaOptions ++= Seq(
       // -J prefix is required by the bash script
       "-J-server",
@@ -107,11 +90,32 @@ inConfig(Universal)(
 
 inConfig(Linux)(
   Seq(
-    maintainer := "wavesplatform.com",
     packageSummary := "Waves node",
-    packageDescription := "Waves node"
+    packageDescription := "Waves node",
+    normalizedName := s"${name.value}${network.value.packageSuffix}",
+    packageName := normalizedName.value
   )
 )
+
+def fixScriptName(path: String, name: String, packageName: String): String =
+  path.replace(s"/bin/$name", s"/bin/$packageName")
+
+linuxPackageMappings := linuxPackageMappings.value.map { lpm =>
+  val altered = lpm.mappings.map {
+    case (file, path) if path.endsWith(s"/bin/${name.value}") => file -> fixScriptName(path, name.value, (Linux / packageName).value)
+    case other                                                => other
+  }
+  lpm.copy(mappings = altered)
+}
+
+linuxPackageSymlinks := linuxPackageSymlinks.value.map { lsl =>
+  if (lsl.link.endsWith(s"/bin/${name.value}"))
+    lsl.copy(
+      fixScriptName(lsl.link, name.value, (Linux / packageName).value),
+      fixScriptName(lsl.destination, name.value, (Linux / packageName).value)
+    )
+  else lsl
+}
 
 inConfig(Debian)(
   Seq(
@@ -138,15 +142,8 @@ inConfig(Debian)(
         |is_upstart() {
         |    /sbin/init --version | grep upstart >/dev/null 2>&1
         |}
-        |""".stripMargin,
-    packageName := s"${name.value}${network.value.packageSuffix}",
-    normalizedName := s"${name.value}${network.value.packageSuffix}"
+        |""".stripMargin
   )
 )
 
 V.scalaPackage := "com.wavesplatform"
-
-// Hack for https://youtrack.jetbrains.com/issue/SCL-15210
-
-moduleName := s"waves${network.value.packageSuffix}" // waves-*.jar instead of node-*.jar
-executableScriptName := moduleName.value             // bin/waves instead of bin/node
