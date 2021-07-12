@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 
 import scala.util.{Left, Right}
@@ -132,9 +132,7 @@ object CommonValidation {
 
     def scriptActivation(sc: Script): Either[ActivationError, T] = {
       val barrierByVersion =
-        RideVersionProvider.actualVersionByFeature
-          .map { case (feature, version) => (version, activationBarrier(feature)) }
-          .toMap
+        RideVersionProvider.actualVersionByFeature.map { case (feature, version) => (version, activationBarrier(feature)) }.toMap
 
       def scriptVersionActivation(sc: Script): Either[ActivationError, T] = sc.stdLibVersion match {
         case V1 | V2 | V3 if sc.containsArray => barrierByVersion(V4)
@@ -218,7 +216,8 @@ object CommonValidation {
       case _: SponsorFeeTransaction   => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _: InvokeScriptTransaction => activationBarrier(BlockchainFeatures.Ride4DApps)
 
-      case _: UpdateAssetInfoTransaction => activationBarrier(BlockchainFeatures.BlockV5)
+      case _: UpdateAssetInfoTransaction  => activationBarrier(BlockchainFeatures.BlockV5)
+      case _: InvokeExpressionTransaction => activationBarrier(BlockchainFeatures.RideV6)
 
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
