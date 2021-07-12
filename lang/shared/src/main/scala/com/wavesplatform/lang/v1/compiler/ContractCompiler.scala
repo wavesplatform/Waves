@@ -418,7 +418,7 @@ object ContractCompiler {
         val function   = Expressions.FUNC(p, expr, PART.VALID(p, "default"), Nil)
         val dApp       = Expressions.DAPP(p, Nil, List(Expressions.ANNOTATEDFUNC(p, annotation, function)))
         ContractCompiler(ctx, dApp, version).map(_.callableFuncs.head.u.body)
-      case f @ fastparse.Parsed.Failure(_, _, _) =>
+      case f =>
         Left(f.toString)
     }
 }
