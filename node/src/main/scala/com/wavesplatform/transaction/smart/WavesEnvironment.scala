@@ -296,7 +296,7 @@ class DAppEnvironment(
     blockchain: Blockchain,
     tthis: Environment.Tthis,
     ds: DirectiveSet,
-    tx: Option[InvokeScriptTransaction],
+    tx: Option[InvokeTransaction],
     currentDApp: com.wavesplatform.account.Address,
     currentDAppPk: com.wavesplatform.account.PublicKey,
     calledAddresses: Set[com.wavesplatform.account.Address],

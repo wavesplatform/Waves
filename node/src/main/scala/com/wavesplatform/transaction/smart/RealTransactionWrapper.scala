@@ -126,6 +126,8 @@ object RealTransactionWrapper {
               ci.funcCallOpt.map(_.args.map(arg => arg.asInstanceOf[EVALUATED])).getOrElse(List.empty)
             )
           }
+      case ie: InvokeExpressionTransaction =>
+        Tx.InvokeExpression(proven(ie), ByteStr(ie.expressionBytes), ie.feeAssetId.compatId).asRight
 
       case u: UpdateAssetInfoTransaction =>
         Tx.UpdateAssetInfo(proven(u), u.assetId.id, u.name, u.description).asRight

@@ -17,7 +17,6 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.ContractCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
@@ -30,13 +29,13 @@ import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.{Proofs, Transaction}
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.defaultCall
+import com.wavesplatform.transaction.smart.InvokeTransaction.defaultCall
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
+import com.wavesplatform.transaction.{Proofs, Transaction}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -49,17 +48,17 @@ object InvokeScriptTransactionDiff {
   }
 
   def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean)(
-      tx: InvokeScriptTransaction
+      tx: InvokeTransaction
   ): TracedResult[ValidationError, Diff] = {
 
     val accScriptEi =
       for {
         address <- blockchain.resolveAlias(tx.dAppAddressOrAlias)
         scriptOpt = blockchain.accountScript(address)
-        script <- if (isLikeFreeCall(tx.exprOpt, scriptOpt))
-          extractFreeCall(blockchain, tx)
-        else
-          extractInvoke(tx, scriptOpt)
+        script <- tx match {
+          case ie: InvokeExpressionTransaction => extractFreeCall(blockchain, ie)
+          case _                               => extractInvoke(tx, scriptOpt)
+        }
       } yield (address, script)
 
     def executeInvoke(
@@ -271,7 +270,7 @@ object InvokeScriptTransactionDiff {
   }
 
   private def extractInvoke(
-      tx: InvokeScriptTransaction,
+      tx: InvokeTransaction,
       scriptOpt: Option[AccountScriptInfo]
   ): Either[GenericError, (PublicKey, StdLibVersion, FUNCTION_CALL, DApp, Map[Int, Map[String, Long]])] =
     scriptOpt
@@ -283,26 +282,13 @@ object InvokeScriptTransactionDiff {
 
   private def extractFreeCall(
       blockchain: Blockchain,
-      tx: InvokeScriptTransaction
-  ): Either[GenericError, (PublicKey, StdLibVersion, FUNCTION_CALL, DApp, Map[Int, Map[String, Long]])] =
-    if (!blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
-      Left(GenericError("Free call is not activated yet"))
-    else if (tx.dAppAddressOrAlias != tx.senderAddress)
-      Left(GenericError("Free call could be performed only on the invoker account"))
-    else {
+      tx: InvokeExpressionTransaction
+  ): Either[GenericError, (PublicKey, StdLibVersion, FUNCTION_CALL, DApp, Map[Int, Map[String, Long]])] = {
       val annotation = CallableAnnotation(ContractCompiler.FreeCallInvocationArg)
-      val callable   = CallableFunction(annotation, FUNC(defaultCall.function.funcName, Nil, tx.exprOpt.get))
+      val callable   = CallableFunction(annotation, FUNC(defaultCall.function.funcName, Nil, tx.expression))
       val dApp       = DApp(DAppMeta(), Nil, List(callable), None)
       val version    = blockchain.actualRideVersion
       Right((tx.sender, version, defaultCall, dApp, Map[Int, Map[String, Long]]()))
-    }
-
-  private def isLikeFreeCall(expr: Option[EXPR], scriptOpt: Option[AccountScriptInfo]): Boolean =
-    expr.fold(false) {
-      case FUNCTION_CALL(User(_, name), _) if scriptOpt.exists(_.complexitiesByEstimator.head._2.contains(name)) =>
-        false
-      case _ =>
-        true
     }
 
   def calculateFee(blockchain: Blockchain, tx: InvokeScriptTransaction): Option[Long] = {

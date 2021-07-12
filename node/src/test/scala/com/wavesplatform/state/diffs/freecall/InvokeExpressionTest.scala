@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.freecall
 
+import com.wavesplatform.{TestTime, TransactionGen}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -11,13 +12,13 @@ import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.InvokeExpressionTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.{TestTime, TransactionGen}
 import org.scalatest.EitherValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import com.wavesplatform.{TestTime, TransactionGen}
 
-class FreeCallTest extends PropSpec with ScalaCheckPropertyChecks with TransactionGen with WithDomain with EitherValues {
+class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with TransactionGen with WithDomain with EitherValues {
 
   import DomainPresets._
 
@@ -45,23 +46,19 @@ class FreeCallTest extends PropSpec with ScalaCheckPropertyChecks with Transacti
        """.stripMargin
     )
 
-  private val functionCallExpr =
-    TestCompiler(V6).compileFreeCall(""" [BooleanEntry("check", true)] """.stripMargin)
-
-  private def scenario(external: Boolean = false, functionCall: Boolean = false) =
+  private val scenario =
     for {
       invoker  <- accountGen
       address2 <- accountGen
       fee      <- ciFee()
-      gTx1    = GenesisTransaction.create(address2.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2    = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      call    = Some(if (functionCall) functionCallExpr else expr(invoker, fee))
-      address = (if (external) address2 else invoker).toAddress
-      invoke  = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, address, call, Nil, fee, Waves, ts).explicitGet()
+      gTx1   = GenesisTransaction.create(address2.toAddress, ENOUGH_AMT, ts).explicitGet()
+      gTx2   = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+      call   = expr(invoker, fee)
+      invoke = InvokeExpressionTransaction.selfSigned(TxVersion.V1, invoker, call, fee, Waves, ts).explicitGet()
     } yield (Seq(gTx1, gTx2), invoke)
 
-  property("global variable fields of free call") {
-    val (genesisTxs, invoke) = scenario().sample.get
+  property("global variable fields of invoke expression") {
+    val (genesisTxs, invoke) = scenario.sample.get
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invoke)
@@ -71,28 +68,10 @@ class FreeCallTest extends PropSpec with ScalaCheckPropertyChecks with Transacti
   }
 
   property("activation") {
-    val (genesisTxs, invoke) = scenario().sample.get
+    val (genesisTxs, invoke) = scenario.sample.get
     withDomain(RideV5) { d =>
       d.appendBlock(genesisTxs: _*)
-      (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include("Free call is not activated yet")
-    }
-  }
-
-  property("free call on external account") {
-    val (genesisTxs, invoke) = scenario(external = true).sample.get
-    withDomain(RideV6) { d =>
-      d.appendBlock(genesisTxs: _*)
-      (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include("Free call could be performed only on the invoker account")
-    }
-  }
-
-  property("free call using function call expression") {
-    val (genesisTxs, invoke) = scenario(functionCall = true).sample.get
-    invoke.exprOpt.get shouldBe a[FUNCTION_CALL]
-    withDomain(RideV6) { d =>
-      d.appendBlock(genesisTxs: _*)
-      d.appendBlock(invoke)
-      d.blockchain.accountData(invoke.senderAddress, "check").get shouldBe BooleanDataEntry("check", true)
+      (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include("Ride V6 feature has not been activated yet")
     }
   }
 }

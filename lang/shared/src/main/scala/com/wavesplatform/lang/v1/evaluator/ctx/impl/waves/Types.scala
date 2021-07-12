@@ -317,6 +317,19 @@ object Types {
     )
   }
 
+  def buildInvokeExpressionTransactionType(proofsEnabled: Boolean) = {
+    CASETYPEREF(
+      "InvokeExpressionTransaction",
+      addProofsIfNeeded(
+        List(
+          "expression" -> BYTESTR,
+          "feeAssetId" -> optionByteVector
+        ) ++ header ++ proven,
+        proofsEnabled
+      )
+    )
+  }
+
   def buildReissueTransactionType(proofsEnabled: Boolean) = CASETYPEREF(
     "ReissueTransaction",
     addProofsIfNeeded(
@@ -433,6 +446,7 @@ object Types {
       )
     )
   }
+
   def buildExchangeTransactionType(proofsEnabled: Boolean) = CASETYPEREF(
     "ExchangeTransaction",
     addProofsIfNeeded(

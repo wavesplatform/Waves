@@ -36,14 +36,14 @@ import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.Asset
 import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.validation.impl.{LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
-import com.wavesplatform.transaction.{Asset, AssetIdLength}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, LegacyPBSwitch}
 import com.wavesplatform.utils._
 import shapeless.Coproduct
 
 import scala.util.{Failure, Right, Success, Try}
 
 object InvokeDiffsCommon {
-  def txFeeDiff(blockchain: Blockchain, tx: InvokeScriptTransaction): Either[GenericError, (Long, Map[Address, Portfolio])] = {
+  def txFeeDiff(blockchain: Blockchain, tx: InvokeTransaction): Either[GenericError, (Long, Map[Address, Portfolio])] = {
     val attachedFee = tx.fee
     tx.assetFee._1 match {
       case Waves => Right((attachedFee, Map(tx.sender.toAddress -> Portfolio(-attachedFee))))
@@ -75,7 +75,7 @@ object InvokeDiffsCommon {
 
   def calcAndCheckFee[E <: ValidationError](
       makeError: (String, Long) => E,
-      tx: InvokeScriptTransaction,
+      tx: InvokeTransaction,
       blockchain: Blockchain,
       stepLimit: Long,
       invocationComplexity: Long,
@@ -348,7 +348,13 @@ object InvokeDiffsCommon {
       _ <- Either.cond(
         !tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
         (),
-        s"Empty keys aren't allowed in tx version >= ${tx.root.get.protobufVersion}"
+        {
+          val versionInfo = tx.root.get match {
+            case s: LegacyPBSwitch => s" in tx version >= ${s.protobufVersion}"
+            case _                 => ""
+          }
+          s"Empty keys aren't allowed$versionInfo"
+        }
       )
 
       maxKeySize = ContractLimits.MaxKeySizeInBytesByVersion(stdLibVersion)

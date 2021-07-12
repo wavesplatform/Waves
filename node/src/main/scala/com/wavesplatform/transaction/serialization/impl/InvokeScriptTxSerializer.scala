@@ -1,12 +1,14 @@
 package com.wavesplatform.transaction.serialization.impl
 
+import java.nio.ByteBuffer
+
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.{ARR, EXPR, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
 import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -14,24 +16,20 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
-import java.nio.ByteBuffer
 import scala.util.Try
 
 object InvokeScriptTxSerializer {
-  def functionCallToJson(expr: EXPR): JsObject =
-    expr match {
-      case FUNCTION_CALL(function, args) =>
-        Json.obj(
-          "function" -> JsString(function.asInstanceOf[com.wavesplatform.lang.v1.FunctionHeader.User].internalName),
-          "args" -> JsArray(
-            args.map {
-              case ARR(elements) => Json.obj("type" -> "list", "value" -> elements.map(mapSingleArg))
-              case other         => mapSingleArg(other)
-            }
-          )
-        )
-      case _ => Json.obj()
-    }
+  def functionCallToJson(fc: Terms.FUNCTION_CALL): JsObject = {
+    Json.obj(
+      "function" -> JsString(fc.function.asInstanceOf[com.wavesplatform.lang.v1.FunctionHeader.User].internalName),
+      "args" -> JsArray(
+        fc.args.map {
+          case Terms.ARR(elements) => Json.obj("type" -> "list", "value" -> elements.map(mapSingleArg))
+          case other               => mapSingleArg(other)
+        }
+      )
+    )
+  }
 
   private def mapSingleArg(arg: EXPR) =
     arg match {
@@ -47,7 +45,7 @@ object InvokeScriptTxSerializer {
     BaseTxJson.toJson(tx) ++ Json.obj(
       "dApp"    -> dAppAddressOrAlias.stringRepr,
       "payment" -> payments
-    ) ++ (exprOpt match {
+    ) ++ (funcCallOpt match {
       case Some(fc) => Json.obj("call" -> this.functionCallToJson(fc))
       case None     => JsObject.empty
     })
@@ -61,7 +59,7 @@ object InvokeScriptTxSerializer {
           Array(builder.typeId, version, chainId),
           sender.arr,
           dAppAddressOrAlias.bytes,
-          Deser.serializeOption(exprOpt)(Serde.serialize(_)),
+          Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
           Deser.serializeArrays(payments.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
           Longs.toByteArray(fee),
           feeAssetId.byteRepr,

@@ -5,6 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.{BaseTxJson, PBTransactionSerializer}
@@ -24,11 +25,16 @@ case class InvokeExpressionTransaction(
     override val timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends ProvenTransaction
-    with VersionedTransaction
-    with TxWithFee.InCustomAsset
-    with FastHashId
-    with LegacyPBSwitch.V2 {
+) extends InvokeTransaction
+    with ProtobufOnly {
+
+  override def root: Option[InvokeTransaction]                = Some(this)
+  override def senderAddress: Address                         = sender.toAddress
+  override val dAppAddressOrAlias: AddressOrAlias             = sender.toAddress
+  override val funcCall: Terms.FUNCTION_CALL                  = InvokeTransaction.defaultCall
+  override def payments: Seq[InvokeScriptTransaction.Payment] = Nil
+  override def checkedAssets: Seq[Asset.IssuedAsset]          = Nil
+  override val enableEmptyKeys: Boolean                       = false
 
   lazy val expressionBytes  = Serde.serialize(expression, allowObjects = true)
   lazy val expressionBase64 = ByteStr(expressionBytes).base64
@@ -91,9 +97,9 @@ object InvokeExpressionTransaction extends TransactionParser {
       version: Byte,
       sender: KeyPair,
       expression: EXPR,
-      timestamp: TxTimestamp,
       feeAmount: TxAmount,
-      feeAsset: Asset
+      feeAsset: Asset,
+      timestamp: TxTimestamp
   ): Either[ValidationError, InvokeExpressionTransaction] =
     create(version, sender.publicKey, expression, feeAmount, feeAsset, timestamp, Proofs.empty)
       .map(_.signWith(sender.privateKey))

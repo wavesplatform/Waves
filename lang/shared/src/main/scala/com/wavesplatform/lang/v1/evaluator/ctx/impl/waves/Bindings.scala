@@ -345,6 +345,17 @@ object Bindings {
             provenTxPart(p, proofsEnabled, version)
           )
         )
+      case InvokeExpression(p, expression, feeAssetId) =>
+        CaseObj(
+          buildInvokeExpressionTransactionType(proofsEnabled),
+          combine(
+            Map(
+              "expression" -> expression,
+              "feeAssetId" -> feeAssetId
+            ),
+            provenTxPart(p, proofsEnabled, version)
+          )
+        )
     }
 
   private def reissueTransactionObject(
