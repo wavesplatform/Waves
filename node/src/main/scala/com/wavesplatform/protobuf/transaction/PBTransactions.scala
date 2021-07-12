@@ -5,6 +5,7 @@ import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
+import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.protobuf._
@@ -14,6 +15,7 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, EmptyDataEntr
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
+import com.wavesplatform.transaction.smart.InvokeExpressionTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -298,6 +300,24 @@ object PBTransactions {
           chainId
         )
 
+      case Data.InvokeExpression(InvokeExpressionTransactionData(expressionBytes, `empty`)) =>
+        for {
+          expression <- Serde
+            .deserialize(expressionBytes.toByteArray, allowObjects = true)
+            .left
+            .map(e => GenericError(s"Invalid InvokeScript function call: $e"))
+          tx <- InvokeExpressionTransaction.create(
+            version.toByte,
+            sender,
+            expression._1,
+            feeAmount,
+            feeAssetId,
+            timestamp,
+            proofs,
+            chainId
+          )
+        } yield tx
+
       case _ =>
         Left(TxValidationError.UnsupportedTransactionType)
     }
@@ -505,6 +525,18 @@ object PBTransactions {
           chainId
         )
 
+      case Data.InvokeExpression(InvokeExpressionTransactionData(expressionBytes, `empty`)) =>
+        InvokeExpressionTransaction(
+          version.toByte,
+          sender,
+          Serde.deserialize(expressionBytes.toByteArray, allowObjects = true).explicitGet()._1,
+          feeAmount,
+          feeAssetId,
+          timestamp,
+          proofs,
+          chainId
+        )
+
       case other =>
         throw new IllegalArgumentException(s"Unsupported transaction data: $other")
     }
@@ -607,6 +639,10 @@ object PBTransactions {
           .withDescription(description)
 
         PBTransactions.create(sender, chainId, feeAmount, feeAsset, timestamp, version, proofs, Data.UpdateAssetInfo(data))
+
+      case tx @ InvokeExpressionTransaction(version, sender, _, fee, feeAssetId, timestamp, proofs, chainId) =>
+        val data = Data.InvokeExpression(InvokeExpressionTransactionData(ByteString.copyFrom(tx.expressionBytes)))
+        PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, version, proofs, data)
 
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
