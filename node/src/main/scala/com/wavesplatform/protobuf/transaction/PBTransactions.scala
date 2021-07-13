@@ -5,7 +5,7 @@ import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
-import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.protobuf._
@@ -302,14 +302,15 @@ object PBTransactions {
 
       case Data.InvokeExpression(InvokeExpressionTransactionData(expressionBytes, `empty`)) =>
         for {
-          expression <- Serde
-            .deserialize(expressionBytes.toByteArray, allowObjects = true)
-            .left
-            .map(e => GenericError(s"Invalid InvokeScript function call: $e"))
+          expression <- toVanillaScript(expressionBytes) match {
+            case Some(e: ExprScript) => Right(e)
+            case Some(_)             => Left(GenericError("Unexpected expression type for InvokeExpression"))
+            case None                => Left(GenericError(s"Unexpected empty expression bytes for InvokeExpression"))
+          }
           tx <- InvokeExpressionTransaction.create(
             version.toByte,
             sender,
-            expression._1,
+            expression,
             feeAmount,
             feeAssetId,
             timestamp,
@@ -529,7 +530,7 @@ object PBTransactions {
         InvokeExpressionTransaction(
           version.toByte,
           sender,
-          Serde.deserialize(expressionBytes.toByteArray, allowObjects = true).explicitGet()._1,
+          toVanillaScript(expressionBytes).get.asInstanceOf,
           feeAmount,
           feeAssetId,
           timestamp,
@@ -641,7 +642,7 @@ object PBTransactions {
         PBTransactions.create(sender, chainId, feeAmount, feeAsset, timestamp, version, proofs, Data.UpdateAssetInfo(data))
 
       case tx @ InvokeExpressionTransaction(version, sender, _, fee, feeAssetId, timestamp, proofs, chainId) =>
-        val data = Data.InvokeExpression(InvokeExpressionTransactionData(ByteString.copyFrom(tx.expressionBytes)))
+        val data = Data.InvokeExpression(InvokeExpressionTransactionData(tx.expressionBytes.toByteString))
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, version, proofs, data)
 
       case _ =>

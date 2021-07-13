@@ -127,7 +127,7 @@ object RealTransactionWrapper {
             )
           }
       case ie: InvokeExpressionTransaction =>
-        Tx.InvokeExpression(proven(ie), ByteStr(ie.expressionBytes), ie.feeAssetId.compatId).asRight
+        Tx.InvokeExpression(proven(ie), ie.expressionBytes, ie.feeAssetId.compatId).asRight
 
       case u: UpdateAssetInfoTransaction =>
         Tx.UpdateAssetInfo(proven(u), u.assetId.id, u.name, u.description).asRight

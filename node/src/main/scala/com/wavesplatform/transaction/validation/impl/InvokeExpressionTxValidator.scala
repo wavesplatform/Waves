@@ -8,6 +8,6 @@ object InvokeExpressionTxValidator extends TxValidator[InvokeExpressionTransacti
   override def validate(tx: InvokeExpressionTransaction): ValidatedV[InvokeExpressionTransaction] =
     V.seq(tx)(
       V.fee(tx.fee),
-      V.invokeLength(tx.expressionBytes.length <= ContractLimits.MaxContractSizeInBytes)
+      V.invokeLength(tx.expressionBytes.size <= ContractLimits.MaxContractSizeInBytes)
     )
 }

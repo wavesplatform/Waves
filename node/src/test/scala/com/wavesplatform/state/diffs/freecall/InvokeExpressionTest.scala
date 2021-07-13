@@ -5,6 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V6
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
@@ -24,7 +25,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   private val time = new TestTime
   private def ts   = time.getTimestamp()
 
-  private def expr(invoker: KeyPair, fee: Long) =
+  private def expr(invoker: KeyPair, fee: Long): ExprScript =
     TestCompiler(V6).compileFreeCall(
       s"""
          | let address   = Address(base58'${invoker.toAddress}')

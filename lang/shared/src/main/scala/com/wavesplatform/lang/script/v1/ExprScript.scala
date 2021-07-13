@@ -31,7 +31,7 @@ object ExprScript {
   @VisibleForTesting
   def apply(x: EXPR): Either[String, Script] = apply(V1, x)
 
-  def apply(version: StdLibVersion, x: EXPR, isFreeCall: Boolean = false, checkSize: Boolean = true): Either[String, Script] =
+  def apply(version: StdLibVersion, x: EXPR, isFreeCall: Boolean = false, checkSize: Boolean = true): Either[String, ExprScript] =
     ExprScriptImpl(version, isFreeCall, x)
       .asRight[String]
       .flatTap(s => if (checkSize) validateBytes(s.bytes().arr) else Right(()))

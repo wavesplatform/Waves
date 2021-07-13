@@ -8,7 +8,6 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Asset, Expression, StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
@@ -44,8 +43,10 @@ class TestCompiler(version: StdLibVersion) {
   def compileAsset(script: String): Script =
     ExprScript(version, ExpressionCompiler.compile(script, assetCompilerContext).explicitGet()._1).explicitGet()
 
-  def compileFreeCall(script: String): EXPR =
-    ContractCompiler.compileFreeCall(script, compilerContext, version).explicitGet()
+  def compileFreeCall(script: String): ExprScript = {
+    val expr = ContractCompiler.compileFreeCall(script, compilerContext, version).explicitGet()
+    ExprScript(version, expr, isFreeCall = true).explicitGet()
+  }
 }
 
 object TestCompiler {

@@ -4,9 +4,8 @@ import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.{BaseTxJson, PBTransactionSerializer}
 import com.wavesplatform.transaction.validation.TxValidator
@@ -19,7 +18,7 @@ import scala.util.{Failure, Success, Try}
 case class InvokeExpressionTransaction(
     version: TxVersion,
     sender: PublicKey,
-    expression: EXPR,
+    expression: ExprScript,
     fee: TxAmount,
     feeAssetId: Asset,
     override val timestamp: TxTimestamp,
@@ -27,6 +26,8 @@ case class InvokeExpressionTransaction(
     chainId: Byte
 ) extends InvokeTransaction
     with ProtobufOnly {
+
+  lazy val expressionBytes: ByteStr = expression.bytes.value()
 
   override def root: Option[InvokeTransaction]                = Some(this)
   override def senderAddress: Address                         = sender.toAddress
@@ -36,19 +37,15 @@ case class InvokeExpressionTransaction(
   override def checkedAssets: Seq[Asset.IssuedAsset]          = Nil
   override val enableEmptyKeys: Boolean                       = false
 
-  lazy val expressionBytes: Array[Byte] = Serde.serialize(expression, allowObjects = true)
-  lazy val expressionBase64: String     = ByteStr(expressionBytes).base64
-
   override val builder = InvokeExpressionTransaction
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBTransactionSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(PBTransactionSerializer.bytes(this))
-
   override val json: Coeval[JsObject] =
     Coeval.evalOnce(
       BaseTxJson.toJson(this) ++ Json.obj(
         "chainId"    -> this.chainId,
-        "expression" -> expressionBase64
+        "expression" -> expressionBytes.base64
       )
     )
 }
@@ -75,7 +72,7 @@ object InvokeExpressionTransaction extends TransactionParser {
   def create(
       version: Byte,
       sender: PublicKey,
-      expression: EXPR,
+      expression: ExprScript,
       feeAmount: TxAmount,
       feeAsset: Asset,
       timestamp: TxTimestamp,
@@ -96,7 +93,7 @@ object InvokeExpressionTransaction extends TransactionParser {
   def selfSigned(
       version: Byte,
       sender: KeyPair,
-      expression: EXPR,
+      expression: ExprScript,
       feeAmount: TxAmount,
       feeAsset: Asset,
       timestamp: TxTimestamp

@@ -280,7 +280,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
      """.stripMargin.trim + "\n"
 
   val freeCallExpr =
-    ByteStr(Global.serializeExpression(TestCompiler(V6).compileFreeCall(freeCall), V6, isFreeCall = true)).base64
+    ByteStr(Global.serializeExpression(TestCompiler(V6).compileFreeCall(freeCall).expr, V6, isFreeCall = true)).base64
 
   routePath("/script/decompile") in {
     val base64 = ExprScript(script).explicitGet().bytes().base64

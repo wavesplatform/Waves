@@ -9,7 +9,6 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.FunctionCallPolicyProvider._
-import com.wavesplatform.features.RideVersionProvider.RideVersionBlockchainExt
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
@@ -56,7 +55,7 @@ object InvokeScriptTransactionDiff {
         address <- blockchain.resolveAlias(tx.dAppAddressOrAlias)
         scriptOpt = blockchain.accountScript(address)
         script <- tx match {
-          case ie: InvokeExpressionTransaction => extractFreeCall(blockchain, ie)
+          case ie: InvokeExpressionTransaction => extractFreeCall(ie)
           case _                               => extractInvoke(tx, scriptOpt)
         }
       } yield (address, script)
@@ -281,15 +280,14 @@ object InvokeScriptTransactionDiff {
       .toRight(GenericError(s"No contract at address ${tx.dAppAddressOrAlias}"))
 
   private def extractFreeCall(
-      blockchain: Blockchain,
       tx: InvokeExpressionTransaction
   ): Either[GenericError, (PublicKey, StdLibVersion, FUNCTION_CALL, DApp, Map[Int, Map[String, Long]])] = {
-      val annotation = CallableAnnotation(ContractCompiler.FreeCallInvocationArg)
-      val callable   = CallableFunction(annotation, FUNC(defaultCall.function.funcName, Nil, tx.expression))
-      val dApp       = DApp(DAppMeta(), Nil, List(callable), None)
-      val version    = blockchain.actualRideVersion
-      Right((tx.sender, version, defaultCall, dApp, Map[Int, Map[String, Long]]()))
-    }
+    val annotation = CallableAnnotation(ContractCompiler.FreeCallInvocationArg)
+    val callable   = CallableFunction(annotation, FUNC(defaultCall.function.funcName, Nil, tx.expression.expr))
+    val dApp       = DApp(DAppMeta(), Nil, List(callable), None)
+    val version    = tx.expression.stdLibVersion
+    Right((tx.sender, version, defaultCall, dApp, Map[Int, Map[String, Long]]()))
+  }
 
   def calculateFee(blockchain: Blockchain, tx: InvokeScriptTransaction): Option[Long] = {
     val differ = TransactionDiffer(blockchain.lastBlockTimestamp, tx.timestamp, verify = false)(blockchain, _)
