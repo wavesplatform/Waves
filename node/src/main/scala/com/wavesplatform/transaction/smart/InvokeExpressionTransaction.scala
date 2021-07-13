@@ -36,8 +36,8 @@ case class InvokeExpressionTransaction(
   override def checkedAssets: Seq[Asset.IssuedAsset]          = Nil
   override val enableEmptyKeys: Boolean                       = false
 
-  lazy val expressionBytes  = Serde.serialize(expression, allowObjects = true)
-  lazy val expressionBase64 = ByteStr(expressionBytes).base64
+  lazy val expressionBytes: Array[Byte] = Serde.serialize(expression, allowObjects = true)
+  lazy val expressionBase64: String     = ByteStr(expressionBytes).base64
 
   override val builder = InvokeExpressionTransaction
 
