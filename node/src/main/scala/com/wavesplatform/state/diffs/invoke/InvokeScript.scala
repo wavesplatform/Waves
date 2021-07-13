@@ -4,9 +4,10 @@ import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxTimestamp
+import com.wavesplatform.transaction.{Asset, Transaction, TxAmount, TxTimestamp}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import monix.eval.Coeval
 
 trait InvokeScriptLike {
   def dApp: Recipient
@@ -15,6 +16,13 @@ trait InvokeScriptLike {
   def root: Option[InvokeScriptTransaction]
   def senderAddress: Address
   def sender: PublicKey
+}
+
+trait InvokeScriptTransactionLike extends InvokeScriptLike {
+  def id: Coeval[ByteStr]
+  def fee: TxAmount
+  def feeAssetId: Asset
+  def transaction: Transaction
 }
 
 object InvokeScriptLike {

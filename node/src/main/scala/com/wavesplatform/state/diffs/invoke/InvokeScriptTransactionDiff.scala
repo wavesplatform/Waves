@@ -43,7 +43,7 @@ object InvokeScriptTransactionDiff {
   }
 
   def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean)(
-      tx: InvokeScriptTransaction
+      tx: InvokeScriptTransactionLike
   ): TracedResult[ValidationError, Diff] = {
 
     val dAppAddressEi = blockchain.resolveAlias(tx.dApp)

@@ -6,7 +6,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
-import com.wavesplatform.state.diffs.invoke.InvokeScriptLike
+import com.wavesplatform.state.diffs.invoke.{InvokeScriptLike, InvokeScriptTransactionLike}
 import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
@@ -15,7 +15,6 @@ import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
-
 import scala.util.Try
 
 case class InvokeScriptTransaction(
@@ -35,7 +34,9 @@ case class InvokeScriptTransaction(
     with TxWithFee.InCustomAsset
     with FastHashId
     with LegacyPBSwitch.V2
-    with InvokeScriptLike {
+    with InvokeScriptTransactionLike {
+
+  override def transaction: Transaction = this
 
   val funcCall = funcCallOpt.getOrElse(FUNCTION_CALL(FunctionHeader.User(ContractEvaluator.DEFAULT_FUNC_NAME), List.empty))
 
