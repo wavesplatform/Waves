@@ -602,7 +602,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/compileCode"), freeCallDirectives + freeCall) ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "error").as[Int] shouldBe 305
-      (json \ "message").as[String] shouldBe "Free call is not activated yet"
+      (json \ "message").as[String] shouldBe "Invoke Expression Transaction is not activated yet"
     }
   }
 
@@ -728,7 +728,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/estimate"), freeCallExpr) ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "error").as[Int] shouldBe 305
-      (json \ "message").as[String] shouldBe "Free call is not activated yet"
+      (json \ "message").as[String] shouldBe "Invoke Expression Transaction is not activated yet"
     }
   }
 

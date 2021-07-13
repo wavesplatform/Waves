@@ -68,6 +68,16 @@ case class UtilsApiRoute(
     else
       FeeValidation.ScriptExtraFee
 
+  private def checkInvokeExpression[A](result: Either[String, (Script, A)]): Either[String, (Script, A)] =
+    result
+      .filterOrElse(
+        {
+          case (e: ExprScript, _) => !e.isFreeCall || blockchain.isFeatureActivated(RideV6)
+          case _                  => true
+        },
+        "Invoke Expression Transaction is not activated yet"
+      )
+
   override val route: Route = pathPrefix("utils") {
     decompile ~ compile ~ compileCode ~ compileWithImports ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize ~ evaluate
   }
@@ -124,14 +134,7 @@ case class UtilsApiRoute(
     (post & entity(as[String])) { code =>
       executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), defaultStdLib = blockchain.actualRideVersion)) { result =>
         complete(
-          result
-            .filterOrElse(
-              {
-                case (e: ExprScript, _) => !e.isFreeCall || blockchain.isFeatureActivated(RideV6)
-                case _                  => true
-              },
-              "Free call is not activated yet"
-            )
+          checkInvokeExpression(result)
             .fold(
               e => ScriptCompilerError(e), {
                 case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
@@ -145,9 +148,7 @@ case class UtilsApiRoute(
               }
             )
         )
-
       }
-
     }
   }
 
@@ -164,7 +165,7 @@ case class UtilsApiRoute(
         }
       executeLimited(ScriptCompiler.compile(req.script, estimator(), req.imports, stdLib)) { result =>
         complete(
-          result
+          checkInvokeExpression(result)
             .fold(
               e => ScriptCompilerError(e), {
                 case (script, complexity) =>
@@ -192,14 +193,7 @@ case class UtilsApiRoute(
           }
       ) { result =>
         complete(
-          result
-            .filterOrElse(
-              {
-                case (e: ExprScript, _) => !e.isFreeCall || blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
-                case _                  => true
-              },
-              "Free call is not activated yet"
-            )
+          checkInvokeExpression(result)
             .fold(
               e => ScriptCompilerError(e), {
                 case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
