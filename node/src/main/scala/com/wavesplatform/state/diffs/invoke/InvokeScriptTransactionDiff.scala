@@ -19,6 +19,7 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.ContractCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
@@ -215,11 +216,8 @@ object InvokeScriptTransactionDiff {
       case Right((dAppAddress, (pk, version, funcCall, contract, callableComplexities))) =>
         val invocationTracker = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(dAppAddress, funcCall, tx.payments))
         (for {
-          _ <- TracedResult(checkCall(funcCall, blockchain).leftMap(GenericError(_)))
-          (invocationComplexity, fixedInvocationComplexity) <- if (callableComplexities.nonEmpty)
-            calcInvocationComplexity(version, callableComplexities, dAppAddress)
-          else TracedResult(Right((0, 0)))
-
+          _                                                 <- TracedResult(checkCall(funcCall, blockchain).leftMap(GenericError(_)))
+          (invocationComplexity, fixedInvocationComplexity) <- calcInvocationComplexity(version, callableComplexities, dAppAddress)
           (directives, tthis, input) <- TracedResult(for {
             directives <- DirectiveSet(version, Account, DAppType)
             tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
@@ -282,11 +280,12 @@ object InvokeScriptTransactionDiff {
   private def extractFreeCall(
       tx: InvokeExpressionTransaction
   ): Either[GenericError, (PublicKey, StdLibVersion, FUNCTION_CALL, DApp, Map[Int, Map[String, Long]])] = {
-    val annotation = CallableAnnotation(ContractCompiler.FreeCallInvocationArg)
-    val callable   = CallableFunction(annotation, FUNC(defaultCall.function.funcName, Nil, tx.expression.expr))
-    val dApp       = DApp(DAppMeta(), Nil, List(callable), None)
-    val version    = tx.expression.stdLibVersion
-    Right((tx.sender, version, defaultCall, dApp, Map[Int, Map[String, Long]]()))
+    val annotation   = CallableAnnotation(ContractCompiler.FreeCallInvocationArg)
+    val callable     = CallableFunction(annotation, FUNC(defaultCall.function.funcName, Nil, tx.expression.expr))
+    val dApp         = DApp(DAppMeta(), Nil, List(callable), None)
+    val version      = tx.expression.stdLibVersion
+    val complexities = Map(ScriptEstimatorV3.version -> Map(defaultCall.function.funcName -> 1L))
+    Right((tx.sender, version, defaultCall, dApp, complexities))
   }
 
   def calculateFee(blockchain: Blockchain, tx: InvokeScriptTransaction): Option[Long] = {

@@ -66,14 +66,20 @@ object InvokeDiffsCommon {
     }
   }
 
-  def calculateMinFee(blockchain: Blockchain, issueList: List[Issue], additionalScriptsInvoked: Int, stepsNumber: Long): Long = {
-    val dAppFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
+  private def calculateMinFee(
+      tx: InvokeTransaction,
+      blockchain: Blockchain,
+      issueList: List[Issue],
+      additionalScriptsInvoked: Int,
+      stepsNumber: Long
+  ): Long = {
+    val dAppFee    = FeeConstants(tx.typeId) * FeeUnit * stepsNumber
     val issuesFee  = issueList.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
     val actionsFee = additionalScriptsInvoked * ScriptExtraFee
     dAppFee + issuesFee + actionsFee
   }
 
-  def calcAndCheckFee[E <: ValidationError](
+  private[invoke] def calcAndCheckFee[E <: ValidationError](
       makeError: (String, Long) => E,
       tx: InvokeTransaction,
       blockchain: Blockchain,
@@ -88,7 +94,7 @@ object InvokeDiffsCommon {
       else
         invocationComplexity / stepLimit + 1
 
-    val minFee = calculateMinFee(blockchain, issueList, additionalScriptsInvoked, stepsNumber)
+    val minFee = calculateMinFee(tx, blockchain, issueList, additionalScriptsInvoked, stepsNumber)
 
     val resultE = for {
       (attachedFeeInWaves, portfolioDiff) <- txFeeDiff(blockchain, tx)
@@ -113,7 +119,7 @@ object InvokeDiffsCommon {
               ""
 
           val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
-          val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+          val txName    = Constants.TransactionNames(tx.typeId)
 
           s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
             s"$stepsInfo$totalScriptsInvokedInfo$issuesInfo " +
@@ -347,8 +353,7 @@ object InvokeDiffsCommon {
       )
       _ <- Either.cond(
         !tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
-        (),
-        {
+        (), {
           val versionInfo = tx.root.get match {
             case s: LegacyPBSwitch => s" in tx version >= ${s.protobufVersion}"
             case _                 => ""

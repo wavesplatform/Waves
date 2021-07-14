@@ -46,19 +46,22 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
        """.stripMargin
     )
 
-  private val scenario =
+  private def scenario(freeCallFee: Boolean = true) =
     for {
       invoker  <- accountGen
       address2 <- accountGen
-      fee      <- ciFee()
+      fee      <- ciFee(freeCall = freeCallFee)
       gTx1   = GenesisTransaction.create(address2.toAddress, ENOUGH_AMT, ts).explicitGet()
       gTx2   = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
       call   = expr(invoker, fee)
       invoke = InvokeExpressionTransaction.selfSigned(TxVersion.V1, invoker, call, fee, Waves, ts).explicitGet()
     } yield (Seq(gTx1, gTx2), invoke)
 
+  private def feeErrorMessage(invoke: InvokeExpressionTransaction) =
+    s"Fee in WAVES for InvokeExpressionTransaction (${invoke.fee} in WAVES) does not exceed minimal value of 1000000 WAVES."
+
   property("global variable fields of invoke expression") {
-    val (genesisTxs, invoke) = scenario.sample.get
+    val (genesisTxs, invoke) = scenario().sample.get
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invoke)
@@ -67,8 +70,25 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
     }
   }
 
+  property("insufficient fee leading to reject") {
+    val (genesisTxs, invoke) = scenario(freeCallFee = false).sample.get
+    withDomain(RideV6) { d =>
+      d.appendBlock(genesisTxs: _*)
+      intercept[Exception](d.appendBlock(invoke)).getMessage should include (feeErrorMessage(invoke))
+    }
+  }
+
+  property("insufficient fee leading to fail") {
+    val (genesisTxs, invoke) = scenario(freeCallFee = false).sample.get
+    withDomain(RideV6) { d =>
+      d.appendBlock(genesisTxs: _*)
+      d.appendBlock(invoke)
+      d.blockchain.bestLiquidDiff.get.errorMessage(invoke.txId).get.text shouldBe feeErrorMessage(invoke)
+    }
+  }
+
   property("activation") {
-    val (genesisTxs, invoke) = scenario.sample.get
+    val (genesisTxs, invoke) = scenario().sample.get
     withDomain(RideV5) { d =>
       d.appendBlock(genesisTxs: _*)
       (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include("Ride V6 feature has not been activated yet")
