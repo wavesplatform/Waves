@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, NewAssetInfo}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeExpressionTransaction
@@ -18,6 +18,8 @@ import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import org.scalatest.EitherValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.wavesplatform.{TestTime, TransactionGen}
+import org.scalatest.Assertion
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with TransactionGen with WithDomain with EitherValues {
 
@@ -25,6 +27,12 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
 
   private val time = new TestTime
   private def ts   = time.getTimestamp()
+
+  private val assetName         = "name"
+  private val assetDescription  = "description"
+  private val assetVolume       = 1000
+  private val assetDecimals     = 4
+  private val assetIsReissuable = true
 
   private def expr(invoker: KeyPair, fee: Long, issue: Boolean): ExprScript =
     TestCompiler(V6).compileFreeCall(
@@ -43,12 +51,12 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
          | [
          |   BooleanEntry("check", check),
          |   BinaryEntry("transactionId", i.transactionId)
-         |   ${if (issue) """, Issue("name", "description", 1000, 4, true, unit, 0) """ else ""}
+         |   ${if (issue) s""", Issue("$assetName", "$assetDescription", $assetVolume, $assetDecimals, $assetIsReissuable, unit, 0) """ else ""}
          | ]
        """.stripMargin
     )
 
-  private def scenario(enoughFee: Boolean = true, issue: Boolean = false) =
+  private def scenario(enoughFee: Boolean = true, issue: Boolean = true) =
     for {
       invoker  <- accountGen
       address2 <- accountGen
@@ -65,6 +73,19 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
     s"Fee in WAVES for InvokeExpressionTransaction (${invoke.fee} in WAVES)$issueErr does not exceed minimal value of $expectingFee WAVES."
   }
 
+  private def checkAsset(
+      invoke: InvokeExpressionTransaction,
+      asset: NewAssetInfo
+  ): Assertion = {
+    asset.dynamic.name.toStringUtf8 shouldBe assetName
+    asset.dynamic.description.toStringUtf8 shouldBe assetDescription
+    asset.volume.volume shouldBe assetVolume
+    asset.volume.isReissuable shouldBe assetIsReissuable
+    asset.static.decimals shouldBe assetDecimals
+    asset.static.nft shouldBe false
+    asset.static.issuer shouldBe invoke.sender
+  }
+
   property("successful applying to the state") {
     val (genesisTxs, invoke) = scenario().sample.get
     withDomain(RideV6) { d =>
@@ -72,23 +93,25 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
       d.appendBlock(invoke)
       d.blockchain.accountData(invoke.senderAddress, "check").get shouldBe BooleanDataEntry("check", true)
       d.blockchain.accountData(invoke.senderAddress, "transactionId").get shouldBe BinaryDataEntry("transactionId", invoke.txId)
+      d.liquidDiff.issuedAssets.size shouldBe 1
+      checkAsset(invoke, d.liquidDiff.issuedAssets.head._2)
     }
   }
 
   property("insufficient fee leading to reject") {
-    val (genesisTxs, invoke) = scenario(enoughFee = false).sample.get
+    val (genesisTxs, invoke) = scenario(enoughFee = false, issue = false).sample.get
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
-      intercept[Exception](d.appendBlock(invoke)).getMessage should include (feeErrorMessage(invoke))
+      intercept[Exception](d.appendBlock(invoke)).getMessage should include(feeErrorMessage(invoke))
     }
   }
 
   property("insufficient fee leading to fail") {
-    val (genesisTxs, invoke) = scenario(enoughFee = false, issue = true).sample.get
+    val (genesisTxs, invoke) = scenario(enoughFee = false).sample.get
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invoke)
-      d.blockchain.bestLiquidDiff.get.errorMessage(invoke.txId).get.text shouldBe feeErrorMessage(invoke, issue = true)
+      d.liquidDiff.errorMessage(invoke.txId).get.text shouldBe feeErrorMessage(invoke, issue = true)
     }
   }
 
