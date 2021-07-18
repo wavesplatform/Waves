@@ -5,13 +5,13 @@ import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{PutDataResponse, Transaction, TransactionInfo}
+import com.wavesplatform.it.api.{PutDataResponse, StateChangesDetails, Transaction, TransactionInfo}
 import com.wavesplatform.it.sync.invokeExpressionFee
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.directives.values.StdLibVersion.V6
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import org.scalatest.CancelAfterFailure
+import org.scalatest.{Assertion, CancelAfterFailure}
 
 class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure {
   override protected def nodeConfigs: Seq[Config] =
@@ -34,7 +34,7 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     val id = sender.invokeExpression(firstKeyPair, expr)._1.id
 
     val txFromUnconfirmed = sender.utx().find(_.id == id).get
-    check(txFromUnconfirmed, checkStatus = false)
+    checkTx(txFromUnconfirmed, checkStatus = false)
 
     sender.waitForTransaction(id)
     val lastBlock = sender.lastBlock()
@@ -44,19 +44,22 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     val txFromBlockById         = sender.blockById(lastBlock.id).transactions.find(_.id == id).get
     val txFromBlockSeq          = sender.blockSeq(1, 100).flatMap(_.transactions).find(_.id == id).get
     val txFromBlockSeqByAddress = sender.blockSeqByAddress(sender.address, 1, 100).flatMap(_.transactions).find(_.id == id).get
+    List(txFromLastBlock, txFromBlockByHeight, txFromBlockById, txFromBlockSeq, txFromBlockSeqByAddress).foreach(checkTx(_))
 
     val txFromInfoById  = sender.transactionInfo[TransactionInfo](id)
     val txFromByAddress = sender.transactionsByAddress(firstAddress, 100).find(_.id == id).get
+    List(txFromInfoById, txFromByAddress).foreach(checkTxInfo(_, lastBlock.height))
 
-    List(txFromInfoById, txFromByAddress).foreach(checkInfo(_, lastBlock.height))
-    List(txFromLastBlock, txFromBlockByHeight, txFromBlockById, txFromBlockSeq, txFromBlockSeqByAddress).foreach(check(_))
+    val stateChanges          = sender.debugStateChanges(id).stateChanges
+    val stateChangesByAddress = sender.debugStateChangesByAddress(firstAddress, 1).flatMap(_.stateChanges).headOption
+    List(stateChanges, stateChangesByAddress).foreach(checkStateChanges)
 
-    sender.debugStateChanges(id).stateChanges.get.data.head shouldBe PutDataResponse("boolean", true, "check")
-    sender.debugStateChangesByAddress(firstAddress, 1).flatMap(_.stateChanges.get.data).head shouldBe PutDataResponse("boolean", true, "check")
     sender.getDataByKey(firstAddress, "check").value shouldBe true
   }
 
-  private def check(tx: Transaction, checkStatus: Boolean = true) = {
+  private def checkTx(tx: Transaction, checkStatus: Boolean = true): Assertion = {
+    if (checkStatus)
+      tx.applicationStatus.get shouldBe "succeeded"
     tx.fee shouldBe invokeExpressionFee
     tx.feeAssetId shouldBe None
     tx.sender.get shouldBe firstKeyPair.toAddress.toString
@@ -66,11 +69,9 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     tx.timestamp should be > 0L
     tx.proofs.get.size shouldBe 1
     tx.chainId.get shouldBe AddressScheme.current.chainId
-    if (checkStatus)
-      tx.applicationStatus.get shouldBe "succeeded"
   }
 
-  private def checkInfo(tx: TransactionInfo, height: Int) = {
+  private def checkTxInfo(tx: TransactionInfo, height: Int): Assertion = {
     tx.fee shouldBe invokeExpressionFee
     tx.sender.get shouldBe firstKeyPair.toAddress.toString
     tx.expression.get shouldBe expr.bytes.value().base64
@@ -78,5 +79,9 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     tx.timestamp should be > 0L
     tx.chainId.get shouldBe AddressScheme.current.chainId
     tx.height shouldBe height
+    checkStateChanges(tx.stateChanges)
   }
+
+  private def checkStateChanges(s: Option[StateChangesDetails]): Assertion =
+    s.get.data.head shouldBe PutDataResponse("boolean", true, "check")
 }

@@ -333,7 +333,8 @@ case class TransactionInfo(
     data: Option[Seq[DataEntry[_]]],
     transfers: Option[Seq[Transfer]],
     totalAmount: Option[Long],
-    expression: Option[String]
+    expression: Option[String],
+    stateChanges: Option[StateChangesDetails]
 ) extends TxInfo
 object TransactionInfo {
   implicit val transactionReads: Reads[TransactionInfo] =
@@ -363,6 +364,7 @@ object TransactionInfo {
           transfers            <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
           totalAmount          <- (jsv \ "totalAmount").validateOpt[Long]
           expression           <- (jsv \ "expression").validateOpt[String]
+          stateChanges         <- (jsv \ "stateChanges").validateOpt[StateChangesDetails]
         } yield TransactionInfo(
           _type,
           id,
@@ -386,7 +388,8 @@ object TransactionInfo {
           data,
           transfers,
           totalAmount,
-          expression
+          expression,
+          stateChanges
         )
     )
 }
