@@ -5,7 +5,7 @@ import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{Transaction, TransactionInfo}
+import com.wavesplatform.it.api.{PutDataResponse, Transaction, TransactionInfo}
 import com.wavesplatform.it.sync.invokeExpressionFee
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.directives.values.StdLibVersion.V6
@@ -51,8 +51,8 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     List(txFromInfoById, txFromByAddress).foreach(checkInfo(_, lastBlock.height))
     List(txFromLastBlock, txFromBlockByHeight, txFromBlockById, txFromBlockSeq, txFromBlockSeqByAddress).foreach(check(_))
 
-//    sender.debugStateChanges(id).stateChanges.get.data.head shouldBe PutDataResponse("boolean", true, "check")
-//    sender.debugStateChangesByAddress(firstAddress, 1).flatMap(_.stateChanges.get.data).head shouldBe PutDataResponse("boolean", true, "check")
+    sender.debugStateChanges(id).stateChanges.get.data.head shouldBe PutDataResponse("boolean", true, "check")
+    sender.debugStateChangesByAddress(firstAddress, 1).flatMap(_.stateChanges.get.data).head shouldBe PutDataResponse("boolean", true, "check")
     sender.getDataByKey(firstAddress, "check").value shouldBe true
   }
 
