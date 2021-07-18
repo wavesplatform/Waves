@@ -530,7 +530,7 @@ object PBTransactions {
         InvokeExpressionTransaction(
           version.toByte,
           sender,
-          toVanillaScript(expressionBytes).get.asInstanceOf,
+          toVanillaScript(expressionBytes).get.asInstanceOf[ExprScript],
           feeAmount,
           feeAssetId,
           timestamp,
