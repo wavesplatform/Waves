@@ -3,6 +3,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.account._
 import com.wavesplatform.api.http.requests.DataRequest._
 import com.wavesplatform.api.http.requests.SponsorFeeRequest._
+import com.wavesplatform.api.http.requests.InvokeExpressionRequest._
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.api.http.versionReads
 import com.wavesplatform.common.state.ByteStr
@@ -13,13 +14,13 @@ import com.wavesplatform.transaction.TxValidationError.{GenericError, Unsupporte
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.{JsObject, JsValue}
 
-object  TransactionFactory {
+object TransactionFactory {
   def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
     for {
       _  <- Either.cond(request.sender.nonEmpty, (), GenericError("invalid.sender"))
@@ -86,7 +87,14 @@ object  TransactionFactory {
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
-      tx <- SetScriptTransaction.signed(request.version.getOrElse(1.toByte), sender.publicKey, script, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer.privateKey)
+      tx <- SetScriptTransaction.signed(
+        request.version.getOrElse(1.toByte),
+        sender.publicKey,
+        script,
+        request.fee,
+        request.timestamp.getOrElse(time.getTimestamp()),
+        signer.privateKey
+      )
     } yield tx
 
   def setScript(request: SetScriptRequest, sender: PublicKey): Either[ValidationError, SetScriptTransaction] =
@@ -251,7 +259,14 @@ object  TransactionFactory {
     for {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      tx     <- DataTransaction.signed(request.version, sender.publicKey, request.data, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer.privateKey)
+      tx <- DataTransaction.signed(
+        request.version,
+        sender.publicKey,
+        request.data,
+        request.fee,
+        request.timestamp.getOrElse(time.getTimestamp()),
+        signer.privateKey
+      )
     } yield tx
 
   def data(request: DataRequest, sender: PublicKey): Either[ValidationError, DataTransaction] =
@@ -352,21 +367,22 @@ object  TransactionFactory {
     val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
 
     val pf: PartialFunction[TransactionParser, Either[ValidationError, Transaction]] = {
-      case TransferTransaction        => jsv.as[TransferRequest].toTx
-      case CreateAliasTransaction     => jsv.as[CreateAliasRequest].toTx
-      case LeaseTransaction           => jsv.as[LeaseRequest].toTx
-      case LeaseCancelTransaction     => jsv.as[LeaseCancelRequest].toTx
-      case IssueTransaction           => jsv.as[IssueRequest].toTx
-      case ReissueTransaction         => jsv.as[ReissueRequest].toTx
-      case BurnTransaction            => jsv.as[BurnRequest].toTx
-      case MassTransferTransaction    => jsv.as[SignedMassTransferRequest].toTx
-      case DataTransaction            => jsv.as[SignedDataRequest].toTx
-      case InvokeScriptTransaction    => jsv.as[SignedInvokeScriptRequest].toTx
-      case SetScriptTransaction       => jsv.as[SignedSetScriptRequest].toTx
-      case SetAssetScriptTransaction  => jsv.as[SignedSetAssetScriptRequest].toTx
-      case SponsorFeeTransaction      => jsv.as[SignedSponsorFeeRequest].toTx
-      case ExchangeTransaction        => jsv.as[ExchangeRequest].toTx
-      case UpdateAssetInfoTransaction => jsv.as[SignedUpdateAssetInfoRequest].toTx
+      case TransferTransaction         => jsv.as[TransferRequest].toTx
+      case CreateAliasTransaction      => jsv.as[CreateAliasRequest].toTx
+      case LeaseTransaction            => jsv.as[LeaseRequest].toTx
+      case LeaseCancelTransaction      => jsv.as[LeaseCancelRequest].toTx
+      case IssueTransaction            => jsv.as[IssueRequest].toTx
+      case ReissueTransaction          => jsv.as[ReissueRequest].toTx
+      case BurnTransaction             => jsv.as[BurnRequest].toTx
+      case MassTransferTransaction     => jsv.as[SignedMassTransferRequest].toTx
+      case DataTransaction             => jsv.as[SignedDataRequest].toTx
+      case InvokeScriptTransaction     => jsv.as[SignedInvokeScriptRequest].toTx
+      case SetScriptTransaction        => jsv.as[SignedSetScriptRequest].toTx
+      case SetAssetScriptTransaction   => jsv.as[SignedSetAssetScriptRequest].toTx
+      case SponsorFeeTransaction       => jsv.as[SignedSponsorFeeRequest].toTx
+      case ExchangeTransaction         => jsv.as[ExchangeRequest].toTx
+      case UpdateAssetInfoTransaction  => jsv.as[SignedUpdateAssetInfoRequest].toTx
+      case InvokeExpressionTransaction => jsv.as[SignedInvokeExpressionRequest].toTx
     }
 
     TransactionParsers.by(typeId, version) match {

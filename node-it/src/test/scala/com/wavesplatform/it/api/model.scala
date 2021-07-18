@@ -1,7 +1,7 @@
 package com.wavesplatform.it.api
 
-import scala.util.{Failure, Success}
-
+import ai.x.play.json.Encoders.encoder
+import ai.x.play.json.Jsonx
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.DataEntry
@@ -9,6 +9,8 @@ import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import io.grpc.{Metadata, Status => GrpcStatus}
 import play.api.libs.json._
+
+import scala.util.{Failure, Success}
 
 // USCE no longer contains references to non-serializable Request/Response objects
 // to work around https://github.com/scalatest/scalatest/issues/556
@@ -135,7 +137,9 @@ class Transaction(
     val senderPublicKey: Option[String],
     val recipient: Option[String],
     val proofs: Option[Seq[String]],
-    val applicationStatus: Option[String]
+    val applicationStatus: Option[String],
+    val feeAssetId: Option[String],
+    val expression: Option[String]
 ) {
   import Transaction._
   override def toString: String = Json.toJson(this).toString
@@ -172,7 +176,9 @@ object Transaction {
       senderPublicKey: Option[String],
       recipient: Option[String],
       proofs: Option[Seq[String]],
-      applicationStatus: Option[String]
+      applicationStatus: Option[String],
+      feeAssetId: Option[String],
+      expression: Option[String]
   ): Transaction = new Transaction(
     _type,
     id,
@@ -197,7 +203,9 @@ object Transaction {
     senderPublicKey,
     recipient,
     proofs,
-    applicationStatus
+    applicationStatus,
+    feeAssetId,
+    expression
   )
 
   implicit val transactionFormat: Format[Transaction] = Format(
@@ -231,6 +239,8 @@ object Transaction {
           recipient            <- (jsv \ "recipient").validateOpt[String]
           proofs               <- (jsv \ "proofs").validateOpt[Seq[String]]
           applicationStatus    <- (jsv \ "applicationStatus").validateOpt[String]
+          feeAssetId    <- (jsv \ "feeAssetId").validateOpt[String]
+          expression           <- (jsv \ "expression").validateOpt[String]
         } yield new Transaction(
           _type,
           id,
@@ -255,7 +265,9 @@ object Transaction {
           senderPublicKey,
           recipient,
           proofs,
-          applicationStatus
+          applicationStatus,
+          feeAssetId,
+          expression
         )
     ),
     Writes { t =>
@@ -322,7 +334,8 @@ case class TransactionInfo(
     version: Option[Byte],
     data: Option[Seq[DataEntry[_]]],
     transfers: Option[Seq[Transfer]],
-    totalAmount: Option[Long]
+    totalAmount: Option[Long],
+    expression: Option[String]
 ) extends TxInfo
 object TransactionInfo {
   implicit val transactionFormat: Format[TransactionInfo] = Format(
@@ -351,6 +364,7 @@ object TransactionInfo {
           data                 <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
           transfers            <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
           totalAmount          <- (jsv \ "totalAmount").validateOpt[Long]
+          expression           <- (jsv \ "expression").validateOpt[String]
         } yield TransactionInfo(
           _type,
           id,
@@ -373,10 +387,11 @@ object TransactionInfo {
           version,
           data,
           transfers,
-          totalAmount
+          totalAmount,
+          expression
         )
     ),
-    Json.writes[TransactionInfo]
+    Jsonx.formatCaseClass[TransactionInfo]
   )
 }
 
