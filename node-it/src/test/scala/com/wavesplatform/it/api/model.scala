@@ -1,7 +1,5 @@
 package com.wavesplatform.it.api
 
-import ai.x.play.json.Encoders.encoder
-import ai.x.play.json.Jsonx
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.DataEntry
@@ -239,7 +237,7 @@ object Transaction {
           recipient            <- (jsv \ "recipient").validateOpt[String]
           proofs               <- (jsv \ "proofs").validateOpt[Seq[String]]
           applicationStatus    <- (jsv \ "applicationStatus").validateOpt[String]
-          feeAssetId    <- (jsv \ "feeAssetId").validateOpt[String]
+          feeAssetId           <- (jsv \ "feeAssetId").validateOpt[String]
           expression           <- (jsv \ "expression").validateOpt[String]
         } yield new Transaction(
           _type,
@@ -338,7 +336,7 @@ case class TransactionInfo(
     expression: Option[String]
 ) extends TxInfo
 object TransactionInfo {
-  implicit val transactionFormat: Format[TransactionInfo] = Format(
+  implicit val transactionReads: Reads[TransactionInfo] =
     Reads(
       jsv =>
         for {
@@ -390,9 +388,7 @@ object TransactionInfo {
           totalAmount,
           expression
         )
-    ),
-    Jsonx.formatCaseClass[TransactionInfo]
-  )
+    )
 }
 
 case class TransactionStatus(

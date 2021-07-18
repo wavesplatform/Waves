@@ -108,7 +108,6 @@ object Dependencies {
   lazy val it = scalaTest +: Seq(
     logback,
     "com.spotify" % "docker-client" % "8.16.0",
-    "ai.x" %% "play-json-extensions" % "0.42.0",
     jacksonModule("dataformat", "dataformat-properties"),
     asyncHttpClient
   ).map(_ % Test)
