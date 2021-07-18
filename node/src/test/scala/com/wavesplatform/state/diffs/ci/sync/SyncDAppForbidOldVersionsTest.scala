@@ -5,13 +5,15 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
@@ -57,31 +59,39 @@ class SyncDAppForbidOldVersionsTest
     )
   }
 
-  private def scenario(version: StdLibVersion) =
+  private def scenario(version: StdLibVersion, invokeExpression: Boolean) =
     for {
       invoker     <- accountGen
       callingDApp <- accountGen
       proxyDApp   <- accountGen
-      fee         <- ciFee()
-      gTx1     = GenesisTransaction.create(callingDApp.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx3     = GenesisTransaction.create(proxyDApp.toAddress, ENOUGH_AMT, ts).explicitGet()
-      ssTx     = SetScriptTransaction.selfSigned(1.toByte, callingDApp, Some(callingDAppScript(version)), fee, ts).explicitGet()
-      ssTx2    = SetScriptTransaction.selfSigned(1.toByte, proxyDApp, Some(proxyDAppScript(callingDApp.toAddress)), fee, ts).explicitGet()
-      invokeTx = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, proxyDApp.toAddress, None, Nil, fee, Waves, ts).explicitGet()
+      fee         <- ciFee(freeCall = invokeExpression)
+      gTx1              = GenesisTransaction.create(callingDApp.toAddress, ENOUGH_AMT, ts).explicitGet()
+      gTx2              = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+      gTx3              = GenesisTransaction.create(proxyDApp.toAddress, ENOUGH_AMT, ts).explicitGet()
+      ssTx              = SetScriptTransaction.selfSigned(1.toByte, callingDApp, Some(callingDAppScript(version)), fee, ts).explicitGet()
+      ssTx2             = SetScriptTransaction.selfSigned(1.toByte, proxyDApp, Some(proxyDAppScript(callingDApp.toAddress)), fee, ts).explicitGet()
+      invokeScriptTx    = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, proxyDApp.toAddress, None, Nil, fee, Waves, ts).explicitGet()
+      callingExpression = ssTx2.script.get.asInstanceOf[ContractScriptImpl].expr.callableFuncs.head.u.body
+      invokeExpressionTx = InvokeExpressionTransaction
+        .selfSigned(TxVersion.V1, invoker, ExprScript(V5, callingExpression, isFreeCall = true).explicitGet(), fee, Waves, ts)
+        .explicitGet()
+      invokeTx = if (invokeExpression) invokeExpressionTx else invokeScriptTx
     } yield (Seq(gTx1, gTx2, gTx3, ssTx, ssTx2), invokeTx, proxyDApp.toAddress, callingDApp.toAddress)
 
   property("sync call is forbidden for V3 and V4 DApps") {
-    Seq(V3, V4)
-      .foreach { callingDAppVersion =>
-        val (preparingTxs, invoke, proxyDApp, callingDApp) = scenario(callingDAppVersion).sample.get
-        withDomain(RideV5) { d =>
-          d.appendBlock(preparingTxs: _*)
-          (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include(
-            s"DApp $proxyDApp invoked DApp $callingDApp that uses RIDE $callingDAppVersion, " +
-              s"but dApp-to-dApp invocation requires version 5 or higher"
-          )
-        }
+    for {
+      callingDAppVersion <- Seq(V3, V4)
+      invokeExpression   <- Seq(false, true)
+    } {
+      val (preparingTxs, invoke, proxyDApp, callingDApp) = scenario(callingDAppVersion, invokeExpression).sample.get
+      val (settings, source, target)                     = if (invokeExpression) (RideV6, invoke.senderAddress, callingDApp) else (RideV5, proxyDApp, callingDApp)
+      withDomain(settings) { d =>
+        d.appendBlock(preparingTxs: _*)
+        (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include(
+          s"DApp $source invoked DApp $target that uses RIDE $callingDAppVersion, " +
+            s"but dApp-to-dApp invocation requires version 5 or higher"
+        )
       }
+    }
   }
 }
