@@ -8,8 +8,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithState
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
@@ -17,9 +16,8 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.Portfolio
-import com.wavesplatform.state.diffs.ci.ciFee
+import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -31,20 +29,8 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
 import org.scalacheck.Gen
 
-class SyncDAppComplexityCountTest extends PropSpec with WithState {
-
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
-      BlockchainFeatures.SmartAccounts.id    -> 0,
-      BlockchainFeatures.SmartAssets.id      -> 0,
-      BlockchainFeatures.Ride4DApps.id       -> 0,
-      BlockchainFeatures.FeeSponsorship.id   -> 0,
-      BlockchainFeatures.DataTransaction.id  -> 0,
-      BlockchainFeatures.BlockV5.id          -> 0,
-      BlockchainFeatures.SynchronousCalls.id -> 0,
-      BlockchainFeatures.RideV6.id           -> 0
-    )
-  )
+class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
+  import DomainPresets._
 
   private def dApp(otherDApps: List[Address], paymentAsset: Option[IssuedAsset], transferAsset: Option[IssuedAsset], condition: String): Script =
     TestCompiler(V5).compileContract(s"""
@@ -222,7 +208,11 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
   ): Unit = {
     val (preparingTxs, invokeTx, asset, lastCallingDApp) =
       scenario(dAppCount, withPayment, withThroughPayment, withThroughTransfer, withVerifier, raiseError, sequentialCalls, invokeExpression).sample.get
-    assertDiffEi(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { diffE =>
+    assertDiffEi(
+      Seq(TestBlock.create(preparingTxs)),
+      TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion),
+      RideV6.blockchainSettings.functionalitySettings
+    ) { diffE =>
       if (reject) {
         diffE shouldBe Symbol("left")
         diffE should produce("Error raised")
@@ -238,7 +228,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
 
         val dAppAddress = invokeTx.dAppAddressOrAlias.asInstanceOf[Address]
         val basePortfolios = Map(
-          TestBlock.defaultSigner.toAddress -> Portfolio(invokeTx.fee),
+          TestBlock.defaultSigner.toAddress -> Portfolio(CurrentBlockFeePart(invokeTx.fee)),
           invokeTx.senderAddress            -> Portfolio(-invokeTx.fee)
         )
         val paymentsPortfolios = Map(

@@ -130,7 +130,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
     val (genesisTxs, invoke) = scenario(withVerifier = false).sample.get
     withDomain(RideV5) { d =>
       d.appendBlock(genesisTxs: _*)
-      (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include("Ride V6 feature has not been activated yet")
+      intercept[Exception](d.appendBlock(invoke)).getMessage should include("Ride V6 feature has not been activated yet")
     }
   }
 }
