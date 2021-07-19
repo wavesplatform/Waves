@@ -4,7 +4,7 @@ import com.wavesplatform.{TestTime, TransactionGen}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.lang.directives.values.V6
+import com.wavesplatform.lang.directives.values.{V5, V6}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -57,7 +57,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
        """.stripMargin
     )
 
-  private val verifier: Script =
+  private val matchingVerifier: Script =
     TestCompiler(V6).compileExpression(
       s"""
          | match tx {
@@ -67,13 +67,21 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
        """.stripMargin
     )
 
-  private def scenario(enoughFee: Boolean = true, issue: Boolean = true, withVerifier: Boolean = true) =
+  private val oldVerifier: Script =
+    TestCompiler(V5).compileExpression(
+      s"""
+         | match tx {
+         |   case _  => true
+         | }
+       """.stripMargin
+    )
+
+  private def scenario(enoughFee: Boolean = true, issue: Boolean = true, verifier: Option[Script] = None) =
     for {
       invoker <- accountGen
       fee     <- ciFee(freeCall = enoughFee, nonNftIssue = if (issue) 1 else 0)
       gtx    = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      script = if (withVerifier) Some(verifier) else None
-      stx    = SetScriptTransaction.selfSigned(TxVersion.V2, invoker, script, fee, ts).explicitGet()
+      stx    = SetScriptTransaction.selfSigned(TxVersion.V2, invoker, verifier, fee, ts).explicitGet()
       call   = expr(invoker, fee, issue)
       invoke = InvokeExpressionTransaction.selfSigned(TxVersion.V1, invoker, call, fee, Waves, ts).explicitGet()
     } yield (Seq(gtx, stx), invoke)
@@ -126,8 +134,18 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
     }
   }
 
+  property("forbid for old version verifier") {
+    val (genesisTxs, invoke) = scenario(verifier = Some(oldVerifier)).sample.get
+    withDomain(RideV6) { d =>
+      d.appendBlock(genesisTxs: _*)
+      intercept[Exception](d.appendBlock(invoke)).getMessage should include(
+        "Can't process InvokeExpressionTransaction from RIDE V5 verifier, it might be used from V6"
+      )
+    }
+  }
+
   property("activation") {
-    val (genesisTxs, invoke) = scenario(withVerifier = false).sample.get
+    val (genesisTxs, invoke) = scenario().sample.get
     withDomain(RideV5) { d =>
       d.appendBlock(genesisTxs: _*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include("Ride V6 feature has not been activated yet")

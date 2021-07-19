@@ -2,7 +2,6 @@ package com.wavesplatform.transaction.smart
 
 import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
-
 import cats.Id
 import cats.syntax.either._
 import cats.syntax.functor._
@@ -11,6 +10,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TermPrinter
@@ -26,7 +26,7 @@ import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExec
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TracedResult, TraceStep}
+import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TraceStep, TracedResult}
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.utils.ScorexLogging
 import org.msgpack.core.annotations.VisibleForTesting
@@ -54,6 +54,8 @@ object Verifier extends ScorexLogging {
           Left(GenericError("Can't process transaction with signature from scripted account"))
         case (_: SignedTransaction, Some(_)) =>
           Left(GenericError("Can't process transaction with signature from scripted account"))
+        case (_: InvokeExpressionTransaction, Some(script)) if script.script.stdLibVersion < V6 =>
+          Left(GenericError(s"Can't process InvokeExpressionTransaction from RIDE ${script.script.stdLibVersion} verifier, it might be used from $V6"))
         case (_, Some(script)) =>
           stats.accountScriptExecution
             .measureForType(pt.typeId)(verifyTx(blockchain, script.script, script.verifierComplexity.toInt, pt, None))
