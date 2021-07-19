@@ -4,7 +4,7 @@ import com.wavesplatform.{TestTime, TransactionGen}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.lang.directives.values.{V5, V6}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V5, V6}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -57,21 +57,11 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
        """.stripMargin
     )
 
-  private val matchingVerifier: Script =
-    TestCompiler(V6).compileExpression(
+  private def verifier(version: StdLibVersion): Script =
+    TestCompiler(version).compileExpression(
       s"""
          | match tx {
-         |   case i: InvokeExpressionTransaction => i.expression.size() > 0 && i.feeAssetId == unit
-         |   case _                              => false
-         | }
-       """.stripMargin
-    )
-
-  private val oldVerifier: Script =
-    TestCompiler(V5).compileExpression(
-      s"""
-         | match tx {
-         |   case _  => true
+         |   case _ => true
          | }
        """.stripMargin
     )
@@ -135,12 +125,21 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   }
 
   property("forbid for old version verifier") {
-    val (genesisTxs, invoke) = scenario(verifier = Some(oldVerifier)).sample.get
+    val (genesisTxs, invoke) = scenario(verifier = Some(verifier(V5))).sample.get
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include(
         "Can't process InvokeExpressionTransaction from RIDE V5 verifier, it might be used from V6"
       )
+    }
+  }
+
+  property("allow for V6 verifier") {
+    val (genesisTxs, invoke) = scenario(verifier = Some(verifier(V6))).sample.get
+    withDomain(RideV6) { d =>
+      d.appendBlock(genesisTxs: _*)
+      d.appendBlock(invoke)
+      d.blockchain.transactionInfo(invoke.txId).get._3 shouldBe true
     }
   }
 
