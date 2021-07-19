@@ -13,6 +13,7 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart._
+import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
 import com.wavesplatform.transaction.transfer._
 
 object FeeValidation {
@@ -58,21 +59,6 @@ object FeeValidation {
     } else {
       Either.cond(tx.assetFee._2 > 0 || !tx.isInstanceOf[Authorized], (), GenericError(s"Fee must be positive."))
     }
-  }
-
-  def calculateAssetFee(blockchain: Blockchain, feeAssetId: Asset, wavesFee: Long): FeeDetails = {
-    val assetFee = feeAssetId match {
-      case asset: Asset.IssuedAsset =>
-        val sponsorship = blockchain
-          .assetDescription(asset)
-          .map(_.sponsorship)
-          .getOrElse(0L)
-        Sponsorship.fromWaves(wavesFee, sponsorship)
-
-      case Asset.Waves => wavesFee
-    }
-
-    FeeDetails(feeAssetId, Chain.empty, assetFee, wavesFee)
   }
 
   private def notEnoughFeeError(txType: Byte, feeDetails: FeeDetails, feeAmount: Long): ValidationError = {
@@ -197,5 +183,27 @@ object FeeValidation {
         case FeeInfo(None, reqs, amountInWaves) =>
           FeeDetails(Waves, reqs, amountInWaves, amountInWaves)
       }
+  }
+
+  def calculateInvokeFee(blockchain: Blockchain, tx: InvokeTransaction): Option[FeeDetails] = {
+    val differ = TransactionDiffer(blockchain.lastBlockTimestamp, tx.timestamp, verify = false)(blockchain, _)
+    differ(tx)
+      .attributeOpt[Long](Attribute.MinFee)
+      .map(calculateAssetFee(blockchain, tx.feeAssetId, _))
+  }
+
+  private def calculateAssetFee(blockchain: Blockchain, feeAssetId: Asset, wavesFee: Long): FeeDetails = {
+    val assetFee = feeAssetId match {
+      case asset: Asset.IssuedAsset =>
+        val sponsorship = blockchain
+          .assetDescription(asset)
+          .map(_.sponsorship)
+          .getOrElse(0L)
+        Sponsorship.fromWaves(wavesFee, sponsorship)
+
+      case Asset.Waves => wavesFee
+    }
+
+    FeeDetails(feeAssetId, Chain.empty, assetFee, wavesFee)
   }
 }
