@@ -12,8 +12,10 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, LeaseCancel, Recipient}
@@ -46,6 +48,7 @@ class DebugApiRouteSpec
     with PathMockFactory
     with BlockchainStubHelpers
     with WithDomain {
+  import DomainPresets._
 
   val wavesSettings = WavesSettings.default()
   val configObject  = wavesSettings.config.root()
@@ -545,7 +548,7 @@ class DebugApiRouteSpec
 
     "invoke tx returning leases" in {
       val dAppPk        = TxHelpers.defaultSigner.publicKey
-      val dAppAddress = dAppPk.toAddress
+      val dAppAddress   = dAppPk.toAddress
       val invoke        = TxHelpers.invoke(dAppPk.toAddress, "test")
       val leaseCancelId = ByteStr(bytes32gen.sample.get)
 
@@ -748,9 +751,9 @@ class DebugApiRouteSpec
     }
 
     "invoke tx with nested call" in {
-      val dAppPk        = TxHelpers.defaultSigner.publicKey
+      val dAppPk      = TxHelpers.defaultSigner.publicKey
       val dAppAddress = dAppPk.toAddress
-      val invoke        = TxHelpers.invoke(dAppPk.toAddress, "test1")
+      val invoke      = TxHelpers.invoke(dAppPk.toAddress, "test1")
 
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
@@ -908,7 +911,6 @@ class DebugApiRouteSpec
       }
     }
 
-
     "transfer transaction with asset fail" in {
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue / 2)
@@ -1001,6 +1003,70 @@ class DebugApiRouteSpec
       validatePost(tx3) ~> route ~> check {
         val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe true
+      }
+    }
+
+    "InvokeExpression" in {
+      val blockchain = createBlockchainStub { blockchain =>
+        val settings = RideV6.blockchainSettings.functionalitySettings
+        (() => blockchain.settings).when().returns(WavesSettings.default().blockchainSettings.copy(functionalitySettings = settings))
+        (() => blockchain.activatedFeatures).when().returns(settings.preActivatedFeatures)
+        (blockchain.balance _).when(*, *).returns(ENOUGH_AMT)
+        (blockchain.accountScript _).when(*).returns(None)
+        (blockchain.assetScript _).when(*).returns(None)
+        (blockchain.assetDescription _).when(TestValues.asset).returns(Some(TestValues.assetDescription))
+      }
+      val route = routeWithBlockchain(blockchain)
+
+      val expression = TestCompiler(V6).compileFreeCall(
+        s"""
+           | let assetId = base58'${TestValues.asset}'
+           | [ Reissue(assetId, 1, true) ]
+         """.stripMargin
+      )
+      val invokeExpression = TxHelpers.invokeExpression(expression)
+      jsonPost(routePath("/validate"), invokeExpression.json()) ~> route ~> check {
+        val json = responseAs[JsValue]
+        (json \ "expression").as[String] shouldBe expression.bytes.value().base64
+        (json \ "valid").as[Boolean] shouldBe true
+        (json \ "trace").as[JsArray] should matchJson(
+          """
+            |  [
+            |    {
+            |      "type": "dApp",
+            |      "id": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+            |      "function": "default",
+            |      "args": [],
+            |      "invocations": [],
+            |      "result": {
+            |        "data": [],
+            |        "transfers": [],
+            |        "issues": [],
+            |        "reissues": [
+            |          {
+            |            "assetId": "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+            |            "isReissuable": true,
+            |            "quantity": 1
+            |          }
+            |        ],
+            |        "burns": [],
+            |        "sponsorFees": [],
+            |        "leases": [],
+            |        "leaseCancels": [],
+            |        "invokes": []
+            |      },
+            |      "error": null,
+            |      "vars": [
+            |        {
+            |          "name": "assetId",
+            |          "type": "ByteVector",
+            |          "value": "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+            |        }
+            |      ]
+            |    }
+            |  ]
+          """.stripMargin
+        )
       }
     }
   }
