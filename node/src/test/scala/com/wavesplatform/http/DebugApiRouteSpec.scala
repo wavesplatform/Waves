@@ -120,7 +120,7 @@ class DebugApiRouteSpec
       val route = routeWithBlockchain(d.blockchain)
       val tx    = TxHelpers.transfer(TxHelpers.secondSigner, TestValues.address, 1.waves)
       validatePost(tx) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe true
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
       }
@@ -134,7 +134,7 @@ class DebugApiRouteSpec
 
       val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, 1.waves)
       validatePost(tx) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe true
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
       }
@@ -148,7 +148,7 @@ class DebugApiRouteSpec
 
       val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, Long.MaxValue)
       validatePost(tx) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe false
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
         (json \ "error").as[String] should include("Attempt to transfer unavailable funds")
@@ -185,7 +185,7 @@ class DebugApiRouteSpec
       val route = routeWithBlockchain(blockchain)
       val tx    = TxHelpers.exchange(TxHelpers.order(OrderType.BUY, TestValues.asset), TxHelpers.order(OrderType.SELL, TestValues.asset))
       jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe false
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
         (json \ "error").as[String] should include("not allowed by script of the asset")
@@ -286,7 +286,7 @@ class DebugApiRouteSpec
         val tx = TxHelpers.invoke(TxHelpers.defaultAddress, name, fee = 102500000)
 
         jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
-          val json = Json.parse(responseAs[String])
+          val json = responseAs[JsValue]
 
           if ((json \ "valid").as[Boolean])
             assert(tx.json().fieldSet subsetOf json.as[JsObject].fieldSet)
@@ -301,7 +301,7 @@ class DebugApiRouteSpec
         val tx = TxHelpers.invoke(TxHelpers.secondAddress, "test", fee = 1300000, payments = Seq(Payment(1L, TestValues.asset)))
 
         jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
-          val json = Json.parse(responseAs[String])
+          val json = responseAs[JsValue]
 
           if ((json \ "valid").as[Boolean])
             assert(tx.json().fieldSet subsetOf json.as[JsObject].fieldSet)
@@ -632,7 +632,7 @@ class DebugApiRouteSpec
         .route
 
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, invoke.json().toString())) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe true
         (json \ "stateChanges").as[JsObject] should matchJson(s"""{
                                                                 |  "data" : [ ],
@@ -804,7 +804,7 @@ class DebugApiRouteSpec
         .route
 
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, invoke.json().toString())) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe true
         (json \ "stateChanges").as[JsObject] should matchJson(s"""{
                                                                  |  "data" : [ ],
@@ -986,20 +986,20 @@ class DebugApiRouteSpec
 
       val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TxHelpers.secondSigner.toAddress, 1.waves, fee = transferFee, version = TxVersion.V2)
       validatePost(tx) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe true
       }
 
       val tx2 = TxHelpers.transfer(TxHelpers.secondSigner, TestValues.address, 1.waves, fee = transferFee, version = TxVersion.V2)
       validatePost(tx2) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe false
         (json \ "error").as[String] should include("Requires 400000 extra fee")
       }
 
       val tx3 = TxHelpers.transfer(TxHelpers.signer(3), TestValues.address, 1.waves, fee = transferFee, version = TxVersion.V2)
       validatePost(tx3) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe true
       }
     }
