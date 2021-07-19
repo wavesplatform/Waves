@@ -5,6 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V6
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -13,7 +14,7 @@ import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, NewAssetInfo}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.InvokeExpressionTransaction
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import org.scalatest.EitherValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -56,16 +57,26 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
        """.stripMargin
     )
 
-  private def scenario(enoughFee: Boolean = true, issue: Boolean = true) =
+  private val verifier: Script =
+    TestCompiler(V6).compileExpression(
+      s"""
+         | match tx {
+         |   case i: InvokeExpressionTransaction => i.expression.size() > 0 && i.feeAssetId == unit
+         |   case _                              => false
+         | }
+       """.stripMargin
+    )
+
+  private def scenario(enoughFee: Boolean = true, issue: Boolean = true, withVerifier: Boolean = true) =
     for {
-      invoker  <- accountGen
-      address2 <- accountGen
-      fee      <- ciFee(freeCall = enoughFee, nonNftIssue = if (issue) 1 else 0)
-      gTx1   = GenesisTransaction.create(address2.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2   = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+      invoker <- accountGen
+      fee     <- ciFee(freeCall = enoughFee, nonNftIssue = if (issue) 1 else 0)
+      gtx    = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+      script = if (withVerifier) Some(verifier) else None
+      stx    = SetScriptTransaction.selfSigned(TxVersion.V2, invoker, script, fee, ts).explicitGet()
       call   = expr(invoker, fee, issue)
       invoke = InvokeExpressionTransaction.selfSigned(TxVersion.V1, invoker, call, fee, Waves, ts).explicitGet()
-    } yield (Seq(gTx1, gTx2), invoke)
+    } yield (Seq(gtx, stx), invoke)
 
   private def feeErrorMessage(invoke: InvokeExpressionTransaction, issue: Boolean = false) = {
     val expectingFee = FeeConstants(invoke.typeId) * FeeUnit + (if (issue) 1 else 0) * MinIssueFee
@@ -116,7 +127,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   }
 
   property("activation") {
-    val (genesisTxs, invoke) = scenario().sample.get
+    val (genesisTxs, invoke) = scenario(withVerifier = false).sample.get
     withDomain(RideV5) { d =>
       d.appendBlock(genesisTxs: _*)
       (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include("Ride V6 feature has not been activated yet")
