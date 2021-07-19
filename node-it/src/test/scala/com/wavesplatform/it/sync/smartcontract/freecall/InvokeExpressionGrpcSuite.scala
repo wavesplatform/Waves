@@ -14,8 +14,8 @@ import com.wavesplatform.lang.directives.values.StdLibVersion.V6
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.block.VanillaBlock
-import com.wavesplatform.transaction.smart.InvokeExpressionTransaction
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.smart.InvokeExpressionTransaction
 import org.scalatest.{Assertion, CancelAfterFailure}
 
 class InvokeExpressionGrpcSuite extends GrpcBaseTransactionSuite with CancelAfterFailure {
@@ -48,15 +48,9 @@ class InvokeExpressionGrpcSuite extends GrpcBaseTransactionSuite with CancelAfte
       findTxInBlockSeq(blocksSeqByAddress, id)
     ).foreach(checkTx)
 
-    /*
-    val txFromInfoById  = sender.transactionInfo[TransactionInfo](id)
-    val txFromByAddress = sender.transactionsByAddress(firstAddress, 100).find(_.id == id).get
-    List(txFromInfoById, txFromByAddress).foreach(checkTxInfo(_, lastBlock.height))
-
-    val stateChanges          = sender.debugStateChanges(id).stateChanges
-    val stateChangesByAddress = sender.debugStateChangesByAddress(firstAddress, 1).flatMap(_.stateChanges).headOption
-    List(stateChanges, stateChangesByAddress).foreach(checkStateChanges)
-     */
+    val stateChangesById      = sender.stateChanges(id)._2
+    val stateChangesByAddress = sender.stateChanges(ByteString.copyFrom(firstAcc.toAddress.bytes)).head._2
+    List(stateChangesById, stateChangesByAddress).foreach(checkStateChanges)
 
     sender.getDataByKey(firstAddress, "check").head.value.boolValue.get shouldBe true
   }
@@ -78,17 +72,6 @@ class InvokeExpressionGrpcSuite extends GrpcBaseTransactionSuite with CancelAfte
     tx.chainId shouldBe AddressScheme.current.chainId
   }
 
-  /*  private def checkTxInfo(tx: TransactionInfo, height: Int): Assertion = {
-    tx.fee shouldBe invokeExpressionFee
-    tx.sender.get shouldBe firstKeyPair.toAddress.toString
-    tx.expression.get shouldBe expr.bytes.value().base64
-    tx.version.get shouldBe 1
-    tx.timestamp should be > 0L
-    tx.chainId.get shouldBe AddressScheme.current.chainId
-    tx.height shouldBe height
-    checkStateChanges(tx.stateChanges)
-  }*/
-
-  private def checkStateChanges(s: Option[StateChangesDetails]): Assertion =
-    s.get.data.head shouldBe PutDataResponse("boolean", true, "check")
+  private def checkStateChanges(s: StateChangesDetails): Assertion =
+    s.data.head shouldBe PutDataResponse("boolean", true, "check")
 }
