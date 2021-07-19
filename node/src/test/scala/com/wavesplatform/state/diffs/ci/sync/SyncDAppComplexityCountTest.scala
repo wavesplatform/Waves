@@ -55,7 +55,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
   // ~1900 complexity
   private val verifierScript: Script = {
     val script = s"""
-                    | {-# STDLIB_VERSION 5        #-}
+                    | {-# STDLIB_VERSION 6        #-}
                     | {-# SCRIPT_TYPE ACCOUNT     #-}
                     | {-# CONTENT_TYPE EXPRESSION #-}
                     |
