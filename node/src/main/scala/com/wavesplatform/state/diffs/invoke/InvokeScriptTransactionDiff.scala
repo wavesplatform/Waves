@@ -81,7 +81,7 @@ object InvokeScriptTransactionDiff {
       )
 
       def executeMainScript(): TracedResult[ValidationError, MainScriptResult] = {
-        val scriptResultE = Stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId) {
+        val scriptResultE = Stats.invokedScriptExecution.measureForType(tx.typeId) {
           val fullLimit =
             if (blockchain.estimator == ScriptEstimatorV2)
               Int.MaxValue //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
