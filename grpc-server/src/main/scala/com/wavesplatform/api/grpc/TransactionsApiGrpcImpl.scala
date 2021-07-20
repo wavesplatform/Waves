@@ -31,7 +31,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
             .collect { case s if !s.isEmpty => s.toAddress }
 
           commonApi.transactionsByAddress(
-            ???,
+            ???, // FIXME
             maybeSender,
             Set.empty,
             None

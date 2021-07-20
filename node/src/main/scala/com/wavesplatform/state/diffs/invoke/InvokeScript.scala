@@ -3,8 +3,8 @@ package com.wavesplatform.state.diffs.invoke
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction, TxAmount, TxTimestamp}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import monix.eval.Coeval
@@ -13,7 +13,7 @@ trait InvokeScriptLike {
   def dApp: Recipient
   def funcCall: FUNCTION_CALL
   def payments: Seq[Payment]
-  def root: Option[InvokeScriptTransaction]
+  def root: Option[InvokeScriptTransactionLike]
   def senderAddress: Address
   def sender: PublicKey
 }
@@ -22,12 +22,17 @@ trait InvokeScriptTransactionLike extends InvokeScriptLike {
   def id: Coeval[ByteStr]
   def fee: TxAmount
   def feeAssetId: Asset
+  def checkedAssets: Seq[IssuedAsset]
   def transaction: Transaction
 }
 
 object InvokeScriptLike {
   implicit class ISLExt(val isl: InvokeScriptLike) extends AnyVal {
-    def enableEmptyKeys: Boolean        = isl.root.forall(_.isProtobufVersion)
+    def enableEmptyKeys: Boolean =
+      isl.root.forall(_.transaction match {
+        case ist: InvokeScriptTransaction => ist.version == 1
+        case _                            => true
+      })
     def timestamp: TxTimestamp          = isl.root.fold(0L)(_.timestamp)
     def txId: ByteStr                   = isl.root.fold(ByteStr.empty)(_.id())
     def paymentAssets: Seq[IssuedAsset] = isl.payments.collect(IssuedAssets)
@@ -42,7 +47,7 @@ case class InvokeScript(
     dAppAddress: WavesAddress,
     funcCall: FUNCTION_CALL,
     payments: Seq[Payment],
-    root: Option[InvokeScriptTransaction]
+    root: Option[InvokeScriptTransactionLike]
 ) extends InvokeScriptLike {
   val dApp: Recipient        = dAppAddress
   val senderAddress: Address = senderDApp

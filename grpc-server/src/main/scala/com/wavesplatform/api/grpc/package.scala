@@ -22,7 +22,7 @@ package object grpc extends ScorexLogging {
   }
 
   implicit class PBSignedTransactionConversions(val tx: PBSignedTransaction) extends AnyVal {
-    def toVanilla: Either[ValidationError, VanillaTransaction] = PBTransactions.vanilla(tx)
+    def toVanilla: Either[ValidationError, VanillaTransaction] = PBTransactions.vanilla(tx, unsafe = false)
   }
 
   implicit class VanillaHeaderConversionOps(val header: vb.BlockHeader) extends AnyVal {

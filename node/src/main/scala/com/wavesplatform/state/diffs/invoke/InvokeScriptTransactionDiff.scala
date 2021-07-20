@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
+import scala.util.Right
+
 import cats.Id
 import cats.syntax.either._
 import cats.syntax.semigroup._
@@ -25,16 +27,14 @@ import com.wavesplatform.metrics.{TxProcessingStats => Stats}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.transaction.{Proofs, TransactionType}
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
-import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
-import com.wavesplatform.transaction.{Proofs, Transaction, TransactionType}
+import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
+import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
 import monix.eval.Coeval
 import shapeless.Coproduct
-
-import scala.util.Right
 
 object InvokeScriptTransactionDiff {
 
@@ -215,7 +215,7 @@ object InvokeScriptTransactionDiff {
             directives <- DirectiveSet(version, Account, DAppType)
             payments   <- AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget)
             tthis = Coproduct[Environment.Tthis](RideRecipient.Address(ByteStr(dAppAddress.bytes)))
-            input <- buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, tthis)
+            input <- buildThisValue(Coproduct[TxOrd](tx.transaction), blockchain, directives, tthis)
           } yield (directives, payments, tthis, input)).leftMap(GenericError(_))
 
           invoker = RideRecipient.Address(ByteStr(tx.senderAddress.bytes))

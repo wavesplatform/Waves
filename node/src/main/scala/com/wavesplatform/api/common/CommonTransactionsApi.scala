@@ -2,7 +2,7 @@ package com.wavesplatform.api.common
 
 import scala.concurrent.Future
 
-import com.wavesplatform.account.{Address, AddressOrAlias}
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.{common, BlockMeta}
 import com.wavesplatform.block
 import com.wavesplatform.block.Block
@@ -84,8 +84,6 @@ object CommonTransactionsApi {
       publishTransaction: Transaction => Future[TracedResult[ValidationError, Boolean]],
       blockAt: Int => Option[(BlockMeta, Seq[Transaction])]
   ): CommonTransactionsApi = new CommonTransactionsApi {
-    private def resolve(subject: AddressOrAlias): Option[Address] = blockchain.resolveAlias(subject).toOption
-
     override def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)] = common.aliasesOfAddress(db, maybeDiff, address)
 
     override def transactionsByAddress(

@@ -15,9 +15,10 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.{Height, TxNum}
-import com.wavesplatform.state.diffs.invoke.{InvokeScriptLike, InvokeScriptTransactionLike}
+import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.transaction.EthereumTransaction.ABIConverter.ethTypeObj
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import monix.eval.Coeval
 import org.bouncycastle.util.encoders.Hex
 import org.web3j.abi.{FunctionReturnDecoder, TypeDecoder, TypeReference}
@@ -166,8 +167,12 @@ object EthereumTransaction {
                       case ByteStr.empty => Asset.Waves
                       case assetId       => Asset.IssuedAsset(assetId)
                     })
+
+                  case _ => ???
                 }
             }
+
+          case _ => Nil
         }
         (result.init, payment)
       }
@@ -198,7 +203,7 @@ object EthereumTransaction {
       .toMap
 
     def jsonABI: JsArray =
-      Json.arr(functionsWithArgs.map {
+      JsArray(functionsWithArgs.map {
         case (funcName, args) =>
           val paymentsArg = Json.obj("name" -> "payments", "type" -> ethTypeObj(ABIConverter.PaymentListType))
 
@@ -216,7 +221,7 @@ object EthereumTransaction {
             "inputs"          -> inputs,
             "outputs"         -> Json.arr(Json.obj("name" -> "", "type" -> "bool"))
           )
-      }: _*)
+      })
 
     def decodeFunctionCall(data: String): (FUNCTION_CALL, Seq[InvokeScriptTransaction.Payment]) = {
       val (methodId, argsData) = data.splitAt(8)
@@ -264,6 +269,7 @@ object EthereumTransaction {
       def sender: PublicKey                     = PublicKey(signerPublicKey())
       def id: Coeval[BlockId]                   = InvokeScript.this.id
       val (feeAssetId, fee)                     = InvokeScript.this.assetFee
+      def checkedAssets: Seq[Asset.IssuedAsset] = payments.collect { case InvokeScriptTransaction.Payment(_, asset: IssuedAsset) => asset }
       def transaction: InvokeScript             = InvokeScript.this
     }
 
