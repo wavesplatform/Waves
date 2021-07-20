@@ -153,11 +153,7 @@ class SubInvokeStateChangesSpec extends FlatSpec with WithDomain with JsonMatche
         |            "text" : "boom"
         |          }
         |        }
-        |      } ],
-        |      "error" : {
-        |        "code" : 1,
-        |        "text" : "FailedTransactionError(code = 1, error = boom, log =\n\t@p = false\n)"
-        |      }
+        |      } ]
         |    }
         |  } ],
         |  "error" : {
