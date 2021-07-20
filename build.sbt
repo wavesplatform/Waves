@@ -88,7 +88,7 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
   )
 
 lazy val `repl-jvm` = repl.jvm
-  .dependsOn(`lang-jvm`)
+  .dependsOn(`lang-jvm`, `lang-testkit` % "test")
   .settings(
     libraryDependencies ++= Dependencies.circe.value ++ Seq(
       "org.scala-js" %% "scalajs-stubs" % "1.0.0" % Provided,
@@ -106,6 +106,8 @@ lazy val root = (project in file("."))
     `lang-jvm`,
     `lang-tests`,
     `lang-testkit`,
+    `repl-js`,
+    `repl-jvm`,
     node,
     `node-it`,
     `node-generator`,
@@ -176,6 +178,7 @@ checkPRRaw := Def
     Def.task {
       (Test / compile).value
       (`lang-tests` / Test / test).value
+      (`repl-jvm` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
       (`grpc-server` / Test / test).value
       (node / Test / test).value
