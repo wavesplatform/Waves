@@ -12,6 +12,7 @@ import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.BaseGlobal.{ArrayView, DAppInfo}
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
+import com.wavesplatform.lang.v1.compiler.ScriptResultSource.CallableFunction
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler}
@@ -185,7 +186,7 @@ trait BaseGlobal {
       removeUnusedCode: Boolean
   ): Either[String, DAppInfo] =
     for {
-      dApp                                   <- ContractCompiler.compile(input, ctx, stdLibVersion, needCompaction, removeUnusedCode)
+      dApp                                   <- ContractCompiler.compile(input, ctx, stdLibVersion, CallableFunction, needCompaction, removeUnusedCode)
       userFunctionComplexities               <- ContractScript.estimateUserFunctions(stdLibVersion, dApp, estimator)
       globalVariableComplexities             <- ContractScript.estimateGlobalVariables(stdLibVersion, dApp, estimator)
       (maxComplexity, annotatedComplexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator)
