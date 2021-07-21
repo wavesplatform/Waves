@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 object TestValues {
   val keyPair: KeyPair   = TxHelpers.defaultSigner
-  val address: Address   = keyPair.toAddress
+  def address: Address   = keyPair.toAddress
   val asset: IssuedAsset = IssuedAsset(ByteStr(("A" * 32).getBytes("ASCII")))
   val bigMoney: Long     = com.wavesplatform.state.diffs.ENOUGH_AMT
   val timestamp: Long    = System.currentTimeMillis()

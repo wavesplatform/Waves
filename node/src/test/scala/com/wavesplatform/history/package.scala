@@ -40,9 +40,9 @@ package object history {
     featuresSettings = settings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
   )
 
-  val defaultSigner          = TestValues.keyPair
-  val generationSignature    = ByteStr(new Array[Byte](Block.GenerationSignatureLength))
-  val generationVRFSignature = ByteStr(new Array[Byte](Block.GenerationVRFSignatureLength))
+  def defaultSigner: KeyPair          = TestValues.keyPair
+  val generationSignature: ByteStr    = ByteStr(new Array[Byte](Block.GenerationSignatureLength))
+  val generationVRFSignature: ByteStr = ByteStr(new Array[Byte](Block.GenerationVRFSignatureLength))
 
   def correctGenerationSignature(version: Byte): ByteStr = if (version < Block.ProtoBlockVersion) generationSignature else generationVRFSignature
 

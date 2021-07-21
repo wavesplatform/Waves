@@ -360,9 +360,6 @@ object StateUpdate {
     }
   }
 
-  private val WavesAlias   = Alias.fromString("alias:W:waves").explicitGet()
-  private val WavesAddress = Address.fromString("3PGd1eQR8EhLkSogpmu9Ne7hSH1rQ5ALihd").explicitGet()
-
   def atomic(blockchainBeforeWithMinerReward: Blockchain, diff: Diff): StateUpdate = {
     val blockchain      = blockchainBeforeWithMinerReward
     val blockchainAfter = CompositeBlockchain(blockchain, diff)
@@ -402,7 +399,7 @@ object StateUpdate {
           newState.amount,
           newState.sender,
           newState.recipient match {
-            case `WavesAlias` => WavesAddress
+            case a: Alias if a.stringRepr == "alias:W:waves" => Address.fromString("3PGd1eQR8EhLkSogpmu9Ne7hSH1rQ5ALihd").explicitGet() // Mainnet aliases patch workaround
             case other        => blockchainAfter.resolveAlias(other).explicitGet()
           },
           newState.sourceId

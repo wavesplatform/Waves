@@ -24,9 +24,9 @@ object TxHelpers {
   def signer(i: Int): KeyPair  = KeyPair(Ints.toByteArray(i))
   def address(i: Int): Address = signer(i).toAddress
 
-  def defaultSigner: KeyPair  = signer(0)
+  val defaultSigner: KeyPair  = signer(0)
   def defaultAddress: Address = defaultSigner.toAddress
-  def secondSigner: KeyPair   = signer(1)
+  val secondSigner: KeyPair   = signer(1)
   def secondAddress: Address  = secondSigner.toAddress
 
   private[this] var lastTimestamp = System.currentTimeMillis()
