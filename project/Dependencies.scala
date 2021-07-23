@@ -1,6 +1,6 @@
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
-import sbt.Keys._
 import sbt._
+import sbt.Keys._
 
 //noinspection TypeAnnotation
 object Dependencies {
@@ -15,8 +15,6 @@ object Dependencies {
   private def kamonModule(module: String)                  = "io.kamon"                      %% s"kamon-$module"  % "2.2.0"
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.12.3"
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.68"
-
-  private def iq80leveldb(module: String) = "org.iq80.leveldb" % module % "0.12"
 
   private def catsModule(module: String, version: String = "2.6.1") = Def.setting("org.typelevel" %%% s"cats-$module"  % version)
   def monixModule(module: String)                                   = Def.setting("io.monix"      %%% s"monix-$module" % "3.4.0")
@@ -81,10 +79,12 @@ object Dependencies {
 
   val console = Seq("com.github.scopt" %% "scopt" % "4.0.1")
 
-  val langCompilerPlugins = Def.setting(Seq(
-    compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
-    kindProjector
-  ))
+  val langCompilerPlugins = Def.setting(
+    Seq(
+      compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
+      kindProjector
+    )
+  )
 
   val lang = Def.setting(
     Seq(
@@ -102,8 +102,8 @@ object Dependencies {
       "com.wavesplatform" % "zwaves"       % "0.1.0-SNAPSHOT",
       "com.wavesplatform" % "zwaves-bn256" % "0.1.5-SNAPSHOT",
       "org.web3j"         % "crypto"       % "5.0.0",
-      "org.web3j"             % "abi"          % "4.5.18",
-      "org.web3j"             % "rlp"          % "4.5.18"
+      "org.web3j"         % "abi"          % "4.5.18",
+      "org.web3j"         % "rlp"          % "4.5.18"
     ) ++ langCompilerPlugins.value ++ scalapbRuntime.value ++ protobuf.value
   )
 
@@ -117,9 +117,9 @@ object Dependencies {
   lazy val test = scalaTest +: Seq(
     logback,
     "org.scalatestplus" %% "scalacheck-1-15" % "3.2.9.0",
-    "org.scalacheck" %% "scalacheck" % "1.15.4",
-    "org.mockito"    % "mockito-all" % "1.10.19",
-    "org.scalamock"  %% "scalamock"  % "5.1.0"
+    "org.scalacheck"    %% "scalacheck"      % "1.15.4",
+    "org.mockito"       % "mockito-all"      % "1.10.19",
+    "org.scalamock"     %% "scalamock"       % "5.1.0"
   ).map(_ % Test)
 
   lazy val logDeps = Seq(

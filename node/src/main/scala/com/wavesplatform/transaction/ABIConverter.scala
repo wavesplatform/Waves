@@ -5,11 +5,11 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.{Terms, Types}
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import org.web3j.abi.datatypes.Type
 import org.web3j.abi.{FunctionReturnDecoder, TypeReference}
+import org.web3j.abi.datatypes.Type
 import play.api.libs.json.{JsArray, JsObject, Json}
 
 object ABIConverter {
@@ -44,9 +44,9 @@ object ABIConverter {
   }
 
   def toRideValue(ethValue: Type[_]): EVALUATED = {
-    import org.web3j.abi.{datatypes => dt}
-
     import scala.jdk.CollectionConverters._
+
+    import org.web3j.abi.{datatypes => dt}
 
     ethValue match {
       case bool: dt.Bool                   => Terms.CONST_BOOLEAN(bool.getValue)
@@ -84,6 +84,7 @@ final case class ABIConverter(script: Script) {
 
                 case _ => ???
               }
+            case _ => ???
           }
 
         case _ => Nil

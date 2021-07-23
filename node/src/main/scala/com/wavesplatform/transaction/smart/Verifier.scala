@@ -1,5 +1,7 @@
 package com.wavesplatform.transaction.smart
 
+import java.math.BigInteger
+
 import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
 
@@ -7,6 +9,7 @@ import cats.Id
 import cats.syntax.either._
 import cats.syntax.functor._
 import com.google.common.base.Throwables
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
@@ -23,13 +26,14 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange.{EthOrders, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TracedResult, TraceStep}
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.utils.ScorexLogging
 import org.msgpack.core.annotations.VisibleForTesting
+import org.web3j.crypto.{ECDSASignature, Hash, Sign}
 import shapeless.Coproduct
 
 object Verifier extends ScorexLogging {
@@ -43,11 +47,13 @@ object Verifier extends ScorexLogging {
   def apply(blockchain: Blockchain, limitedExecution: Boolean = false)(tx: Transaction): TracedResult[ValidationError, Int] = (tx: @unchecked) match {
     case _: GenesisTransaction => Right(0)
     case et: EthereumTransaction =>
-      stats.signatureVerification.measureForType(et.tpe)(Either.cond(
-        et.signatureValid(),
-        0,
-        GenericError("Invalid signature")
-      ))
+      stats.signatureVerification.measureForType(et.tpe)(
+        Either.cond(
+          et.signatureValid(),
+          0,
+          GenericError("Invalid signature")
+        )
+      )
     case pt: ProvenTransaction =>
       (pt, blockchain.accountScript(pt.sender.toAddress)) match {
         case (stx: PaymentTransaction, None) =>
@@ -247,7 +253,7 @@ object Verifier extends ScorexLogging {
             Left(GenericError("Can't process order with signature from scripted account"))
           }
         }
-        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(order).as(0)))
+        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyOrderSignature(order).as(0)))
 
       TracedResult(verificationResult)
     }
@@ -258,6 +264,22 @@ object Verifier extends ScorexLogging {
       buyerComplexity   <- orderVerification(buyOrder)
     } yield matcherComplexity + sellerComplexity + buyerComplexity
   }
+
+  def verifyOrderSignature(order: Order): Either[GenericError, Order] =
+    order.proofs.proofs match {
+      case p +: Nil if order.ethSignature =>
+        val signature = EthOrders.decodeSignature(p.arr)
+        val bytes     = EthOrders.encodeAsEthStruct(order)
+        val signerKey = Sign
+          .recoverFromSignature(
+            1,
+            new ECDSASignature(new BigInteger(1, signature.getR), new BigInteger(1, signature.getS)),
+            Hash.sha3(bytes)
+          )
+          .toByteArray
+        Either.cond(PublicKey(signerKey) == order.senderPublicKey, order, GenericError(s"Proof doesn't validate as ethereum signature for $order"))
+      case _ => verifyAsEllipticCurveSignature(order)
+    }
 
   def verifyAsEllipticCurveSignature[T <: Proven with Authorized](pt: T): Either[GenericError, T] =
     pt.proofs.proofs match {

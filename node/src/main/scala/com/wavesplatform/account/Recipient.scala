@@ -11,7 +11,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidAddress}
-import com.wavesplatform.utils.{StringBytes, base58Length}
+import com.wavesplatform.utils.{base58Length, StringBytes}
 import org.web3j.crypto.Keys
 import org.web3j.utils.Numeric._
 import play.api.libs.json._
@@ -68,6 +68,8 @@ object EthereumAddress {
   }
 
   def apply(hexString: String): EthereumAddress = new EthereumAddress(hexStringToByteArray(hexString))
+
+  def apply(publicKey: PublicKey): EthereumAddress = new EthereumAddress(Keys.getAddress(publicKey.arr))
 }
 
 final case class Alias(chainId: Byte, name: String) extends Recipient {

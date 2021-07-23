@@ -1,16 +1,16 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
+import scala.util.Try
+
+import com.wavesplatform.account.{Address, EthereumAddress, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.serialization.impl.OrderSerializer
 import monix.eval.Coeval
 import play.api.libs.json.{Format, JsObject}
-
-import scala.util.Try
 
 /**
   * Order to matcher service for asset exchange
@@ -27,11 +27,13 @@ case class Order(
     expiration: TxTimestamp,
     matcherFee: TxAmount,
     matcherFeeAssetId: Asset = Waves,
-    proofs: Proofs = Proofs.empty
+    proofs: Proofs = Proofs.empty,
+    ethSignature: Boolean = false
 ) extends Proven {
   import Order._
 
   val sender: PublicKey = senderPublicKey
+  def senderAddress: Address = if (ethSignature) EthereumAddress(sender) else sender.toAddress
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(amount, price) &&
@@ -41,7 +43,8 @@ case class Order(
     (timestamp > 0) :| "timestamp should be > 0" &&
     (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
     (expiration >= atTime) :| "expiration should be > currentTime" &&
-    (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves"
+    (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves" &&
+    (!ethSignature || version >= Order.V4) :| "ethSignature available only in V4"
   }
 
   def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {

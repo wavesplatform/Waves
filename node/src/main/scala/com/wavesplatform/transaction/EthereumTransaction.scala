@@ -2,27 +2,27 @@ package com.wavesplatform.transaction
 
 import java.math.BigInteger
 
+import scala.reflect.ClassTag
+
 import com.wavesplatform.account.{Address, AddressScheme, EthereumAddress, PublicKey, Recipient}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.transaction.PBRecipients
-import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.{Height, TxNum}
+import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import monix.eval.Coeval
 import org.bouncycastle.util.encoders.Hex
 import org.web3j.abi.TypeDecoder
-import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.abi.datatypes.{Address => EthAddress}
+import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto._
 import org.web3j.rlp.{RlpEncoder, RlpList}
 import org.web3j.utils.Numeric._
 import play.api.libs.json._
-
-import scala.reflect.ClassTag
 
 sealed abstract class EthereumTransaction(final val underlying: SignedRawTransaction) extends Transaction(TransactionType.Ethereum) {
   private final val signatureData: Sign.SignatureData = underlying.getSignatureData
@@ -66,7 +66,7 @@ sealed abstract class EthereumTransaction(final val underlying: SignedRawTransac
   def ethereumJson(blockId: Option[BlockId], height: Option[Height], num: Option[TxNum]): JsObject = Json.obj(
     "blockHash"        -> blockId.map(id => toHexString(id.arr)),
     "blockNumber"      -> height.map(h => toHexStringWithPrefix(BigInteger.valueOf(h))),
-    "from"             -> new EthereumAddress(Keys.getAddress(signerPublicKey())).toString,
+    "from"             -> EthereumAddress(PublicKey(signerPublicKey())).toString,
     "gas"              -> toHexStringWithPrefix(underlying.getGasLimit),
     "gasPrice"         -> toHexStringWithPrefix(underlying.getGasPrice),
     "hash"             -> toHexString(id().arr),
