@@ -68,7 +68,7 @@ class InvokeScriptPayAndTransferAssetGrpcSuite extends GrpcBaseTransactionSuite 
          |{-# STDLIB_VERSION 3 #-}
          |{-# CONTENT_TYPE DAPP #-}
          |
-         |let receiver = Address(base58'${receiver.toAddress.stringRepr}')
+         |let receiver = Address(base58'${receiver.toAddress.toString}')
          |
          |@Callable(i)
          |func resendPayment() = {

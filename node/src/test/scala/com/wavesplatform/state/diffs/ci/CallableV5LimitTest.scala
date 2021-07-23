@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -8,9 +9,8 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.{TestTime, TransactionGen}
 import org.scalatest.EitherValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
@@ -71,8 +71,8 @@ class CallableV5LimitTest
       setProhibitedScript   = SetScriptTransaction.selfSigned(1.toByte, dApp, Some(contract(6, V5)), fee, ts).explicitGet()
       setProhibitedV4Script = SetScriptTransaction.selfSigned(1.toByte, dApp, Some(contract(5, V4)), fee, ts).explicitGet()
       setSyncDApp           = SetScriptTransaction.selfSigned(1.toByte, syncDApp, Some(syncDAppScript(dApp.toAddress)), fee, ts).explicitGet()
-      invoke                = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, dApp.toAddress, None, Nil, fee, Waves, ts).explicitGet()
-      syncInvoke            = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, syncDApp.toAddress, None, Nil, fee, Waves, ts).explicitGet()
+      invoke                = Signed.invokeScript(TxVersion.V3, invoker, dApp.toAddress, None, Nil, fee, Waves, ts)
+      syncInvoke            = Signed.invokeScript(TxVersion.V3, invoker, syncDApp.toAddress, None, Nil, fee, Waves, ts)
     } yield (Seq(gTx1, gTx2, gTx3), setAcceptableScript, setProhibitedScript, setProhibitedV4Script, setSyncDApp, invoke, syncInvoke)
 
   property("callable limit is 10000 from V5") {

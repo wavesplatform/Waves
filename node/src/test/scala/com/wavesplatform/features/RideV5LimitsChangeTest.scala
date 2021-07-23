@@ -1,6 +1,5 @@
 package com.wavesplatform.features
 
-import com.wavesplatform.TestTime
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain

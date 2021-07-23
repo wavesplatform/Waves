@@ -46,7 +46,7 @@ class BasicMessagesRepoSpec extends FreeSpec {
 
     val transactionPBPrefix               = new ByteArrayOutputStream()
     val codedTransactionMaxLengthPBPrefix = CodedOutputStream.newInstance(transactionPBPrefix)
-    codedTransactionMaxLengthPBPrefix.writeTag(PBBlock.TRANSACTIONS_FIELD_NUMBER, WireFormat.WIRETYPE_LENGTH_DELIMITED)
+    codedTransactionMaxLengthPBPrefix.writeTag(PBBlock.WAVES_TRANSACTIONS_FIELD_NUMBER, WireFormat.WIRETYPE_LENGTH_DELIMITED)
     codedTransactionMaxLengthPBPrefix.writeUInt32NoTag(MiningConstraints.MaxTxsSizeInBytes)
     codedTransactionMaxLengthPBPrefix.flush()
 

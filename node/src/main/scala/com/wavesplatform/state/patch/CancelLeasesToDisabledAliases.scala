@@ -22,7 +22,7 @@ case object CancelLeasesToDisabledAliases extends PatchDataLoader with DiffPatch
     readPatchData[Seq[CancelDetails]]().map { cd =>
       ByteStr(Base58.decode(cd.id)) -> (LeaseDetails(
         PublicKey(Base58.decode(cd.senderPublicKey)),
-        Right(Alias.fromString(cd.recipientAlias).explicitGet()),
+        Alias.fromString(cd.recipientAlias).explicitGet(),
         cd.amount,
         LeaseDetails.Status.Expired(0),
         ByteStr(Base58.decode(cd.id)),

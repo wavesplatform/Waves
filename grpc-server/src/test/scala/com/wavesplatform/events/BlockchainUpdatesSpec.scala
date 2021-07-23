@@ -23,7 +23,7 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.{AssetDescription, Blockchain, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
-import com.wavesplatform.test.{FreeSpec, _}
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
@@ -423,8 +423,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
           ScriptEstimatorV3
         )
         .explicitGet()
-      val invoke = InvokeScriptTransaction
-        .selfSigned(
+      val invoke = Signed.invokeScript(
           2.toByte,
           invoker,
           issuer.toAddress,
@@ -434,7 +433,6 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
           Asset.Waves,
           ntpTime.getTimestamp()
         )
-        .explicitGet()
       d.appendBlock(
         GenesisTransaction.create(issuerAddress, 1000.waves, ntpTime.getTimestamp()).explicitGet(),
         GenesisTransaction.create(invoker.toAddress, 1000.waves, ntpTime.getTimestamp()).explicitGet(),

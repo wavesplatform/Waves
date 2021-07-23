@@ -206,7 +206,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
           InvokeScriptTxFee,
           IssuedAsset(feeAssetId),
           Now,
-          Proofs.empty
+          Proofs.empty,
+          dapp.chainId
         )
         .explicitGet()
 
@@ -434,7 +435,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
     }
 
     def decode(base64Str: String): Transaction = {
-      PBTransactions.vanilla(PBSignedTransaction.parseFrom(Base64.decode(base64Str))).explicitGet()
+      PBTransactions.vanilla(PBSignedTransaction.parseFrom(Base64.decode(base64Str)), unsafe = true).explicitGet()
     }
   }
 }

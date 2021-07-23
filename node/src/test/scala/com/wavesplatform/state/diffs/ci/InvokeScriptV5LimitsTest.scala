@@ -28,8 +28,8 @@ import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -315,26 +315,24 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
         FunctionHeader.User(funcBinding),
         List.fill(invocationParamsCount)(FALSE)
       )
-      ci = InvokeScriptTransaction
-        .selfSigned(
-          1.toByte,
-          invoker,
-          master.toAddress,
-          Some(fc),
-          payment.toSeq,
-          if (sponsored) {
-            sponsorTx.minSponsoredAssetFee.get * 5
-          } else {
-            fee
-          },
-          if (sponsored) {
-            IssuedAsset(issueTx.id())
-          } else {
-            Waves
-          },
-          ts
-        )
-        .explicitGet()
+      ci = Signed.invokeScript(
+        1.toByte,
+        invoker,
+        master.toAddress,
+        Some(fc),
+        payment.toSeq,
+        if (sponsored) {
+          sponsorTx.minSponsoredAssetFee.get * 5
+        } else {
+          fee
+        },
+        if (sponsored) {
+          IssuedAsset(issueTx.id())
+        } else {
+          Waves
+        },
+        ts
+      )
     } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
   }
 
@@ -386,8 +384,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
         Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet())))
       else
         None
-      ci = InvokeScriptTransaction
-        .selfSigned(
+      ci = Signed.invokeScript(
           txVersion,
           invoker,
           master.toAddress,
@@ -395,9 +392,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
           payment.toSeq,
           if (sponsored) sponsoredFee else fee,
           if (sponsored) sponsorTx.asset else Waves,
-          ts + 3
-        )
-        .explicitGet()
+          ts + 3)
     } yield (if (selfSend) List(genesis) else List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
 
   def preconditionsAndSetContractWithVerifier(
@@ -430,8 +425,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
         Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet())))
       else
         None
-      ci = InvokeScriptTransaction
-        .selfSigned(
+      ci = Signed.invokeScript(
           1.toByte,
           invoker,
           master.toAddress,
@@ -447,9 +441,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
           } else {
             Waves
           },
-          ts + 3
-        )
-        .explicitGet()
+          ts + 3)
     } yield (List(genesis, genesis2), setVerifier, setContract, ci, master, issueTx, sponsorTx)
 
   def preconditionsAndSetContractWithAlias(
@@ -481,8 +473,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
         Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet())))
       else
         None
-      ciWithAlias = InvokeScriptTransaction
-        .selfSigned(
+      ciWithAlias = Signed.invokeScript(
           1.toByte,
           invoker,
           masterAlias,
@@ -498,11 +489,8 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
           } else {
             Waves
           },
-          ts + 3
-        )
-        .explicitGet()
-      ciWithFakeAlias = InvokeScriptTransaction
-        .selfSigned(
+          ts + 3)
+      ciWithFakeAlias = Signed.invokeScript(
           1.toByte,
           invoker,
           fakeAlias,
@@ -518,9 +506,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
           } else {
             Waves
           },
-          ts + 3
-        )
-        .explicitGet()
+          ts + 3)
     } yield (List(genesis, genesis2), master, setContract, ciWithAlias, ciWithFakeAlias, aliasTx)
 
   property("Allow not more 30 non-data actions") {
@@ -615,9 +601,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
         ssTx1    = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10L, Waves))
-        invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
-          .explicitGet()
+        invokeTx = Signed.invokeScript(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
       } yield (Seq(gTx1, gTx2, gTx3, aliasTx, ssTx1, ssTx), invokeTx, master.toAddress, service.toAddress)
 
     forAll(scenario) {
@@ -716,9 +700,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
         ssTx1    = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10L, Waves))
-        invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
-          .explicitGet()
+        invokeTx = Signed.invokeScript(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
       } yield (Seq(gTx1, gTx2, gTx3, aliasTx, ssTx1, ssTx), invokeTx, master.toAddress, service.toAddress)
 
     forAll(scenario) {

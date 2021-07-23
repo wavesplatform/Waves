@@ -21,7 +21,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.{WavesEnvironment, buildThisValue}
-import com.wavesplatform.transaction.{DataTransaction, Proofs, ProvenTransaction, TxVersion, VersionedTransaction}
+import com.wavesplatform.transaction.{DataTransaction, Proofs, ProvenTransaction, Transaction, TxVersion, VersionedTransaction}
 import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.crypto
 import com.wavesplatform.test._
@@ -41,7 +41,7 @@ class TransactionBindingsTest
   def letProof(p: Proofs, prefix: String)(i: Int) =
     s"let ${prefix.replace(".", "")}proof$i = $prefix.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).toString}'"
 
-  def provenPart(t: ProvenTransaction): String = {
+  def provenPart(t: Transaction with ProvenTransaction): String = {
     val version = t match {
       case v: VersionedTransaction => v.version
       case _                       => 1

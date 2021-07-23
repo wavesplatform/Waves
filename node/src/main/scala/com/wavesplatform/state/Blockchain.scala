@@ -97,15 +97,15 @@ object Blockchain {
 
     def resolveAlias(aoa: Recipient): Either[ValidationError, WavesAddress] =
       aoa match {
-        case a: WavesAddress => Right(a)
+        case a: WavesAddress    => Right(a)
         case e: EthereumAddress => Right(e.toWaves)
-        case a: Alias   => blockchain.resolveAlias(a)
+        case a: Alias           => blockchain.resolveAlias(a)
       }
 
     def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
-      (aoa: @unchecked) match {
-        case Left(wa) => Right(wa)
-        case Right(alias) => blockchain.resolveAlias(alias)
+      aoa match {
+        case address: WavesAddress => Right(address)
+        case alias: Alias          => blockchain.resolveAlias(alias)
       }
 
     def canCreateAlias(alias: Alias): Boolean = blockchain.resolveAlias(alias) match {
@@ -190,8 +190,7 @@ object Blockchain {
       else if (isFeatureActivated(BlockchainFeatures.BlockV5, height)) ProtoBlockVersion
       else if (isFeatureActivated(BlockchainFeatures.BlockReward, height)) {
         if (blockchain.activatedFeatures(BlockchainFeatures.BlockReward.id) == height) NgBlockVersion else RewardBlockVersion
-      }
-      else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight + 1 < height) NgBlockVersion
+      } else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight + 1 < height) NgBlockVersion
       else if (height > 1) PlainBlockVersion
       else GenesisBlockVersion
     }

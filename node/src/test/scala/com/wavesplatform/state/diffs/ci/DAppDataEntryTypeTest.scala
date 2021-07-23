@@ -17,8 +17,7 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
-import com.wavesplatform.TestTime
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
@@ -91,8 +90,7 @@ class DAppDataEntryTypeTest
         genesis  <- GenesisTransaction.create(dAppAcc.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, dAppAcc, Some(dApp(constructor)), fee, ts)
-        invoke   <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, dAppAcc.toAddress, None, Nil, fee, Waves, ts)
-      } yield (List(genesis, genesis2, setDApp), invoke)
+      } yield (List(genesis, genesis2, setDApp), Signed.invokeScript(1.toByte, invoker, dAppAcc.toAddress, None, Nil, fee, Waves, ts))
     }.explicitGet()
 
   private def assert(constructor: String) = {

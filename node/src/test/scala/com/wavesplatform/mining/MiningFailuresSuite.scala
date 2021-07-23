@@ -20,6 +20,7 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
+import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
 
 class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithDB {
@@ -64,7 +65,8 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithDB {
         wallet,
         pos,
         scheduler,
-        scheduler
+        scheduler,
+        Observable.empty
       )
     }
 

@@ -283,9 +283,9 @@ object TransactionFactory {
     for {
       sender   <- wallet.findPrivateKey(request.sender)
       signer   <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      contract <- Recipient.fromString(request.dApp)
+      contract <- WavesRecipient.fromString(request.dApp)
 
-      tx <- InvokeScriptTransaction.signed(
+      tx <- InvokeScriptTransaction.create(
         request.version.getOrElse(1.toByte),
         sender.publicKey,
         contract,
@@ -294,14 +294,14 @@ object TransactionFactory {
         request.fee,
         Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
         request.timestamp.getOrElse(time.getTimestamp()),
-        signer.privateKey,
+        Proofs.empty,
         request.chainId.getOrElse(AddressScheme.current.chainId)
-      )
+      ).map(_.signWith(signer.privateKey))
     } yield tx
 
   def invokeScript(request: InvokeScriptRequest, sender: PublicKey): Either[ValidationError, InvokeScriptTransaction] =
     for {
-      addressOrAlias <- Recipient.fromString(request.dApp)
+      addressOrAlias <- WavesRecipient.fromString(request.dApp)
       fcOpt = request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart))
       tx <- InvokeScriptTransaction.create(
         request.version.getOrElse(1.toByte),

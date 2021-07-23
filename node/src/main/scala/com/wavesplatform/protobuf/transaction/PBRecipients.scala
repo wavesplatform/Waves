@@ -43,8 +43,8 @@ object PBRecipients {
   }
 
   def toAddressOrAlias(r: PBRecipient, chainId: Byte): Either[ValidationError, AddressOrAlias] = {
-    if (r.recipient.isPublicKeyHash) toAddress(r, chainId).map(Left(_))
-    else if (r.recipient.isAlias) toAlias(r, chainId).map(Right(_))
+    if (r.recipient.isPublicKeyHash) toAddress(r, chainId)
+    else if (r.recipient.isAlias) toAlias(r, chainId)
     else Left(GenericError(s"Not an address or alias: $r"))
   }
 

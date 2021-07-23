@@ -321,7 +321,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
   }
 
   test("/transactions/sign/{signerAddress} should sign a transaction by key of signerAddress") {
-    val firstAddress = sender.createKeyPairServerSide().toAddress.stringRepr
+    val firstAddress = sender.createKeyPairServerSide().toAddress.toString
 
     val json = Json.obj(
       "type"      -> TransferTransaction.typeId,

@@ -15,7 +15,7 @@ import scala.util.Random
 
 class AddressApiSuite extends BaseTransactionSuite with NTPTime {
   test("balance at height") {
-    val address = sender.createKeyPair().toAddress.stringRepr
+    val address = sender.createKeyPair().toAddress.toString
     sender.transfer(sender.keyPair, address, 1, waitForTx = true)
     nodes.waitForHeightArise()
     sender.transfer(sender.keyPair, address, 1, waitForTx = true)

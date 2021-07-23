@@ -302,7 +302,7 @@ class NarrowTransactionGenerator(
               .fold(Waves: Asset)(tx => IssuedAsset(tx.id()))
 
             logOption(
-              InvokeScriptTransaction.selfSigned(
+              Signed.invokeScript(
                 correctVersion(TxVersion.V1),
                 sender,
                 GeneratorSettings.toKeyPair(script.dappAccount).toAddress,

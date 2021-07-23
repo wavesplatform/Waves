@@ -11,27 +11,19 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
-import com.wavesplatform.TestTime
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TransactionType}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
 
-class InvokeActionsFeeTest
-    extends PropSpec
-    with Inside
-    with WithState
-    with DBCacheSettings
-    with MockFactory
-    with WithDomain
-    with EitherValues {
+class InvokeActionsFeeTest extends PropSpec with Inside with WithState with DBCacheSettings with MockFactory with WithDomain with EitherValues {
 
   private val time = new TestTime
   private def ts   = time.getTimestamp()
@@ -109,11 +101,9 @@ class InvokeActionsFeeTest
         )
         setVerifier <- SetScriptTransaction.selfSigned(1.toByte, scriptedInvoker, Some(verifier), fee, ts)
         setDApp     <- SetScriptTransaction.selfSigned(1.toByte, dAppAcc, Some(dApp(asset)), fee, ts)
-        payments = Seq(Payment(1, asset), Payment(1, asset))
-        invokeFromScripted = () =>
-          InvokeScriptTransaction.selfSigned(1.toByte, scriptedInvoker, dAppAcc.toAddress, None, payments, fee, Waves, ts).explicitGet()
-        invokeFromNonScripted = () =>
-          InvokeScriptTransaction.selfSigned(1.toByte, nonScriptedInvoker, dAppAcc.toAddress, None, payments, fee, Waves, ts).explicitGet()
+        payments              = Seq(Payment(1, asset), Payment(1, asset))
+        invokeFromScripted    = () => Signed.invokeScript(1.toByte, scriptedInvoker, dAppAcc.toAddress, None, payments, fee, Waves, ts)
+        invokeFromNonScripted = () => Signed.invokeScript(1.toByte, nonScriptedInvoker, dAppAcc.toAddress, None, payments, fee, Waves, ts)
       } yield (List(genesis, genesis2, genesis3, issue, transfer1, transfer2, setVerifier, setDApp), invokeFromScripted, invokeFromNonScripted)
     }.explicitGet()
 
@@ -128,12 +118,12 @@ class InvokeActionsFeeTest
       d.blockchain.bestLiquidDiff.get.errorMessage(invokeFromScripted1.id()).get.text should include(
         s"Fee in WAVES for InvokeScriptTransaction (${invokeFromScripted1.fee} in WAVES) " +
           s"with 6 total scripts invoked " +
-          s"does not exceed minimal value of ${FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + 6 * ScriptExtraFee} WAVES"
+          s"does not exceed minimal value of ${FeeConstants(TransactionType.InvokeScript) * FeeUnit + 6 * ScriptExtraFee} WAVES"
       )
       d.blockchain.bestLiquidDiff.get.errorMessage(invokeFromNonScripted1.id()).get.text should include(
         s"Fee in WAVES for InvokeScriptTransaction (${invokeFromNonScripted1.fee} in WAVES) " +
           s"with 5 total scripts invoked " +
-          s"does not exceed minimal value of ${FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + 5 * ScriptExtraFee} WAVES"
+          s"does not exceed minimal value of ${FeeConstants(TransactionType.InvokeScript) * FeeUnit + 5 * ScriptExtraFee} WAVES"
       )
 
       d.appendBlock()
@@ -145,7 +135,7 @@ class InvokeActionsFeeTest
       d.blockchain.bestLiquidDiff.get.errorMessage(invokeFromScripted2.id()).get.text should include(
         s"Fee in WAVES for InvokeScriptTransaction (${invokeFromScripted2.fee} in WAVES) " +
           s"with 1 total scripts invoked " +
-          s"does not exceed minimal value of ${FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee} WAVES"
+          s"does not exceed minimal value of ${FeeConstants(TransactionType.InvokeScript) * FeeUnit + ScriptExtraFee} WAVES"
       )
       d.blockchain.bestLiquidDiff.get.errorMessage(invokeFromNonScripted2.id()) shouldBe None
     }

@@ -11,12 +11,11 @@ import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
+import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart._
-import com.wavesplatform.TestTime
-import com.wavesplatform.test.PropSpec
 
 class SyncDAppRecursionTest extends PropSpec with WithDomain {
 
@@ -92,9 +91,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
         genesis2 = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
         setDApp1 = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp(dApp2.toAddress)), fee, ts).explicitGet()
         setDApp2 = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp(dApp2.toAddress, sendEnd = true)), fee, ts).explicitGet()
-        invoke = InvokeScriptTransaction
-          .selfSigned(1.toByte, dApp1, dApp1.toAddress, fc, Nil, fee, Waves, ts)
-          .explicitGet()
+        invoke   = Signed.invokeScript(1.toByte, dApp1, dApp1.toAddress, fc, Nil, fee, Waves, ts)
       } yield (List(genesis1, genesis2, setDApp1, setDApp2), invoke)
 
     val (preparingTxs, invoke) = preconditions.sample.get
@@ -123,9 +120,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
         setDApp1 = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp(dApp1.toAddress)), fee, ts).explicitGet()
         setDApp2 = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp(dApp3.toAddress)), fee, ts).explicitGet()
         setDApp3 = SetScriptTransaction.selfSigned(1.toByte, dApp3, Some(dApp(dApp1.toAddress)), fee, ts).explicitGet()
-        invoke = InvokeScriptTransaction
-          .selfSigned(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
-          .explicitGet()
+        invoke   = Signed.invokeScript(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
       } yield (List(genesis1, genesis2, genesis3, setDApp1, setDApp2, setDApp3), invoke)
 
     val (preparingTxs, invoke) = preconditions.sample.get
@@ -157,9 +152,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
           setDApp1 = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp(dApp1.toAddress)), fee, ts).explicitGet()
           setDApp2 = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp(dApp3.toAddress)), fee, ts).explicitGet()
           setDApp3 = SetScriptTransaction.selfSigned(1.toByte, dApp3, Some(dApp(dApp2.toAddress, reentrant = reentrant)), fee, ts).explicitGet()
-          invoke = InvokeScriptTransaction
-            .selfSigned(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
-            .explicitGet()
+          invoke   = Signed.invokeScript(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
         } yield (List(genesis1, genesis2, genesis3, setDApp1, setDApp2, setDApp3), invoke)
 
       val (preparingTxs, invoke) = preconditions.sample.get
@@ -201,9 +194,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
         setDApp3 = SetScriptTransaction
           .selfSigned(1.toByte, dApp3, Some(dApp(dApp2.toAddress, reentrant = true, sendEnd = true)), fee, ts)
           .explicitGet()
-        invoke = InvokeScriptTransaction
-          .selfSigned(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
-          .explicitGet()
+        invoke = Signed.invokeScript(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
       } yield (List(genesis1, genesis2, genesis3, setDApp1, setDApp2, setDApp3), invoke)
 
     val (preparingTxs, invoke) = preconditions.sample.get
@@ -235,9 +226,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
         setDApp2 = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp(dApp3.toAddress)), fee, ts).explicitGet()
         setDApp3 = SetScriptTransaction.selfSigned(1.toByte, dApp3, Some(dApp(dApp4.toAddress)), fee, ts).explicitGet()
         setDApp4 = SetScriptTransaction.selfSigned(1.toByte, dApp4, Some(dApp(dApp3.toAddress)), fee, ts).explicitGet()
-        invoke = InvokeScriptTransaction
-          .selfSigned(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
-          .explicitGet()
+        invoke   = Signed.invokeScript(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
       } yield (List(genesis1, genesis2, genesis3, genesis4, setDApp1, setDApp2, setDApp3, setDApp4), setDApp3, invoke)
 
     val (preparingTxs, setDApp3, invoke) = preconditions.sample.get
@@ -269,9 +258,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
         setDApp2 = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp(dApp3.toAddress)), fee, ts).explicitGet()
         setDApp3 = SetScriptTransaction.selfSigned(1.toByte, dApp3, Some(dApp(dApp4.toAddress, reentrant = true)), fee, ts).explicitGet()
         setDApp4 = SetScriptTransaction.selfSigned(1.toByte, dApp4, Some(dApp(dApp3.toAddress, sendEnd = true)), fee, ts).explicitGet()
-        invoke = InvokeScriptTransaction
-          .selfSigned(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
-          .explicitGet()
+        invoke   = Signed.invokeScript(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
       } yield (List(genesis1, genesis2, genesis3, genesis4, setDApp1, setDApp2, setDApp3, setDApp4), invoke)
 
     val (preparingTxs, invoke) = preconditions.sample.get
@@ -303,9 +290,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
         setDApp2 = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp(dApp3.toAddress, reentrant = true)), fee, ts).explicitGet()
         setDApp3 = SetScriptTransaction.selfSigned(1.toByte, dApp3, Some(dApp(dApp4.toAddress)), fee, ts).explicitGet()
         setDApp4 = SetScriptTransaction.selfSigned(1.toByte, dApp4, Some(dApp(dApp2.toAddress, sendEnd = true)), fee, ts).explicitGet()
-        invoke = InvokeScriptTransaction
-          .selfSigned(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
-          .explicitGet()
+        invoke   = Signed.invokeScript(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
       } yield (List(genesis1, genesis2, genesis3, genesis4, setDApp1, setDApp2, setDApp3, setDApp4), invoke)
 
     val (preparingTxs, invoke) = preconditions.sample.get
@@ -342,9 +327,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
           )
           .explicitGet()
         setDApp3 = SetScriptTransaction.selfSigned(1.toByte, dApp3, Some(dApp(dApp2.toAddress, sendChangeDApp = true)), fee, ts).explicitGet()
-        invoke = InvokeScriptTransaction
-          .selfSigned(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
-          .explicitGet()
+        invoke   = Signed.invokeScript(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
       } yield (List(genesis1, genesis2, genesis3, setDApp1, setDApp2, setDApp3), invoke)
 
     val (preparingTxs, invoke) = preconditions.sample.get
@@ -376,13 +359,11 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
         setDApp2 = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp(dApp3.toAddress, reentrant = true)), fee, ts).explicitGet()
         setDApp3 = SetScriptTransaction.selfSigned(1.toByte, dApp3, Some(dApp(dApp4.toAddress)), fee, ts).explicitGet()
         setDApp4 = SetScriptTransaction.selfSigned(1.toByte, dApp4, Some(dApp(dApp3.toAddress, sendEnd = true)), fee, ts).explicitGet()
-        invoke = InvokeScriptTransaction
-          .selfSigned(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
-          .explicitGet()
+        invoke   = Signed.invokeScript(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
       } yield (List(genesis1, genesis2, genesis3, genesis4, setDApp1, setDApp2, setDApp3, setDApp4), invoke, dApp3.toAddress)
 
     forAll(preconditions) {
-      case (preparingTxs, invoke,addr) =>
+      case (preparingTxs, invoke, addr) =>
         assertDiffEi(
           Seq(TestBlock.create(preparingTxs)),
           TestBlock.create(Seq(invoke)),
@@ -417,9 +398,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
         setDApp3 = SetScriptTransaction.selfSigned(1.toByte, dApp3, Some(dApp(dApp4.toAddress)), fee, ts).explicitGet()
         setDApp4 = SetScriptTransaction.selfSigned(1.toByte, dApp4, Some(dApp(dApp2.toAddress, sendChangeDApp = true)), fee, ts).explicitGet()
         setDApp5 = SetScriptTransaction.selfSigned(1.toByte, dApp5, Some(dApp(dApp2.toAddress, sendEnd = true)), fee, ts).explicitGet()
-        invoke = InvokeScriptTransaction
-          .selfSigned(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
-          .explicitGet()
+        invoke   = Signed.invokeScript(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
       } yield (List(genesis1, genesis2, genesis3, genesis4, genesis5, setDApp1, setDApp2, setDApp3, setDApp4, setDApp5), invoke)
 
     val (preparingTxs, invoke) = preconditions.sample.get
@@ -458,9 +437,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
           .selfSigned(1.toByte, dApp4, Some(dApp(dApp2.toAddress, sendChangeDApp = true, sendForceInvoke = true)), fee, ts)
           .explicitGet()
         setDApp5 = SetScriptTransaction.selfSigned(1.toByte, dApp5, Some(dApp(dApp2.toAddress, sendEnd = true)), fee, ts).explicitGet()
-        invoke = InvokeScriptTransaction
-          .selfSigned(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
-          .explicitGet()
+        invoke   = Signed.invokeScript(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
       } yield (List(genesis1, genesis2, genesis3, genesis4, genesis5, setDApp1, setDApp2, setDApp3, setDApp4, setDApp5), invoke, dApp2.toAddress)
 
     val (preparingTxs, invoke, errorAddress) = preconditions.sample.get
@@ -500,9 +477,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
           .explicitGet()
         setDApp4 = SetScriptTransaction.selfSigned(1.toByte, dApp4, Some(dApp(dApp2.toAddress)), fee, ts).explicitGet()
         setDApp5 = SetScriptTransaction.selfSigned(1.toByte, dApp5, Some(dApp(dApp3.toAddress, sendChangeDApp = true)), fee, ts).explicitGet()
-        invoke = InvokeScriptTransaction
-          .selfSigned(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
-          .explicitGet()
+        invoke   = Signed.invokeScript(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
       } yield (List(genesis1, genesis2, genesis3, genesis4, genesis5, setDApp1, setDApp2, setDApp3, setDApp4, setDApp5), invoke)
 
     val (preparingTxs, invoke) = preconditions.sample.get

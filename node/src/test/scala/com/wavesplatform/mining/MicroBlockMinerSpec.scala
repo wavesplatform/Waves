@@ -14,6 +14,7 @@ import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction
 import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.utx.UtxPoolImpl
 import monix.execution.Scheduler
+import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
 
 import scala.concurrent.duration._
@@ -36,6 +37,7 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
         settings.minerSettings,
         scheduler,
         scheduler,
+        Observable.empty,
         identity
       )
 

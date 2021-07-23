@@ -57,9 +57,10 @@ class InvokeScriptTransactionSpecification extends PropSpec {
           )
         )
       )
-      val proof        = crypto.sign(caller.privateKey, PBTransactions.vanilla(PBSignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
+
+      val proof        = crypto.sign(caller.privateKey, PBTransactions.vanilla(PBSignedTransaction(Some(unsigned)), unsafe = false).explicitGet().asInstanceOf[ProvenTransaction].bodyBytes())
       val signed       = PBSignedTransaction(Some(unsigned), Seq(ByteString.copyFrom(proof.arr)))
-      val convTx       = PBTransactions.vanilla(signed).explicitGet()
+      val convTx       = PBTransactions.vanilla(signed, unsafe = false).explicitGet()
       val unsafeConvTx = PBTransactions.vanillaUnsafe(signed)
       val modTx        = tx.copy(sender = caller.publicKey, proofs = Proofs(List(proof)))
       convTx.json() shouldBe modTx.json()
@@ -138,8 +139,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
                         }
     """)
 
-    val tx = InvokeScriptTransaction
-      .selfSigned(
+    val tx = Signed.invokeScript(
         1.toByte,
         KeyPair("test3".getBytes("UTF-8")),
         KeyPair("test4".getBytes("UTF-8")).toAddress,
@@ -154,7 +154,6 @@ class InvokeScriptTransactionSpecification extends PropSpec {
         Waves,
         1526910778245L
       )
-      .explicitGet()
 
     (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
 
@@ -182,8 +181,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
                         }
     """)
 
-    val tx = InvokeScriptTransaction
-      .selfSigned(
+    val tx = Signed.invokeScript(
         1.toByte,
         KeyPair("test3".getBytes("UTF-8")),
         KeyPair("test4".getBytes("UTF-8")).toAddress,
@@ -193,7 +191,6 @@ class InvokeScriptTransactionSpecification extends PropSpec {
         Waves,
         1526910778245L
       )
-      .explicitGet()
 
     (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
 
@@ -204,6 +201,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
   property("Signed InvokeScriptTransactionRequest parser") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedInvokeScriptRequest(
+      None,
       Some(1.toByte),
       senderPublicKey = publicKey,
       fee = 1,
@@ -235,7 +233,8 @@ class InvokeScriptTransactionSpecification extends PropSpec {
       1,
       Waves,
       1,
-      Proofs.empty
+      Proofs.empty,
+      AddressScheme.current.chainId
     ) should produce("more than 22 arguments")
   }
 
@@ -256,7 +255,8 @@ class InvokeScriptTransactionSpecification extends PropSpec {
         1,
         Waves,
         1,
-        Proofs.empty
+        Proofs.empty,
+        AddressScheme.current.chainId
       )
       .explicitGet()
   }
@@ -277,7 +277,8 @@ class InvokeScriptTransactionSpecification extends PropSpec {
       1,
       Waves,
       1,
-      Proofs.empty
+      Proofs.empty,
+      AddressScheme.current.chainId
     ) should produce("is unsupported")
   }
 
@@ -297,7 +298,8 @@ class InvokeScriptTransactionSpecification extends PropSpec {
       1,
       Waves,
       1,
-      Proofs.empty
+      Proofs.empty,
+      AddressScheme.current.chainId
     ) should produce("is unsupported")
   }
 
@@ -313,13 +315,15 @@ class InvokeScriptTransactionSpecification extends PropSpec {
       1,
       Waves,
       1,
-      Proofs.empty
+      Proofs.empty,
+      AddressScheme.current.chainId
     ) should produce("TooBigArray")
   }
 
   property("can't have zero amount") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedInvokeScriptRequest(
+      None,
       Some(1.toByte),
       senderPublicKey = publicKey,
       fee = 1,
@@ -343,6 +347,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
   property("can't have negative amount") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedInvokeScriptRequest(
+      None,
       Some(1.toByte),
       senderPublicKey = publicKey,
       fee = 1,

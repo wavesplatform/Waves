@@ -3,7 +3,6 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.Recipient
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -66,7 +65,7 @@ object TransferTxSerializer {
       TransferTransaction(
         version,
         sender,
-        recipient.fold[Recipient](identity, identity),
+        recipient,
         assetId,
         amount,
         feeAssetId,

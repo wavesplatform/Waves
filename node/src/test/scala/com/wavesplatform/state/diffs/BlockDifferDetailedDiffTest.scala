@@ -12,7 +12,7 @@ import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.BlockGen
-import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.test._
 import org.scalacheck.Gen
 
 class BlockDifferDetailedDiffTest extends FreeSpec with BlockGen with WithState {

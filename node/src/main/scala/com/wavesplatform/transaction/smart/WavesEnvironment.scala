@@ -131,7 +131,7 @@ class WavesEnvironment(
     (for {
       aoa <- addressOrAlias match {
         case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr)
-        case Alias(name)    => com.wavesplatform.account.Alias.create(name).map(Right(_))
+        case Alias(name)    => com.wavesplatform.account.Alias.create(name)
       }
       address <- blockchain.resolveAlias(aoa)
       balance = currentBlockchain().balance(address, Asset.fromCompatId(maybeAssetId.map(ByteStr(_))))
@@ -142,7 +142,7 @@ class WavesEnvironment(
     (for {
       aoa <- addressOrAlias match {
         case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr)
-        case Alias(name)    => com.wavesplatform.account.Alias.create(name).map(Right(_))
+        case Alias(name)    => com.wavesplatform.account.Alias.create(name)
       }
       address <- blockchain.resolveAlias(aoa)
       portfolio = currentBlockchain().wavesPortfolio(address)

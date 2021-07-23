@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.test.Signed
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -94,7 +95,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   val positiveLongGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L / 100)
   val positiveIntGen: Gen[Int]   = Gen.choose(1, Int.MaxValue / 100)
-  val smallFeeGen: Gen[Long]     = Gen.choose(400000, 100000000)
+  val smallFeeGen: Gen[Long]     = Gen.choose(400000L, 100000000L)
 
   val maxOrderTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + ntpTime.correctedTime())
   val timestampGen: Gen[Long]    = Gen.choose(1L, Long.MaxValue - 100)
@@ -183,10 +184,10 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   val selfPaymentGen: Gen[PaymentTransaction] = accountGen.flatMap(acc => paymentGeneratorP(acc, acc.toAddress))
 
-  def paymentGeneratorP(sender: KeyPair, recipient: Address): Gen[PaymentTransaction] =
+  def paymentGeneratorP(sender: KeyPair, recipient: WavesAddress): Gen[PaymentTransaction] =
     timestampGen.flatMap(ts => paymentGeneratorP(ts, sender, recipient))
 
-  def paymentGeneratorP(timestamp: Long, sender: KeyPair, recipient: Address): Gen[PaymentTransaction] =
+  def paymentGeneratorP(timestamp: Long, sender: KeyPair, recipient: WavesAddress): Gen[PaymentTransaction] =
     for {
       amount: Long <- positiveLongGen
       fee: Long    <- smallFeeGen
@@ -338,7 +339,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   } yield TransferTransaction(2.toByte, sender.publicKey, recipient, assetId, amount, feeAssetId, feeAmount, attachment, timestamp, proofs, recipient.chainId))
     .label("VersionedTransferTransaction")
 
-  def versionedTransferGenP(sender: PublicKey, recipient: Address, proofs: Proofs): Gen[TransferTransaction] =
+  def versionedTransferGenP(sender: PublicKey, recipient: AddressOrAlias, proofs: Proofs): Gen[TransferTransaction] =
     (for {
       amt       <- positiveLongGen
       fee       <- smallFeeGen
@@ -582,9 +583,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       fc          <- funcCallGen
       fee         <- smallFeeGen
       timestamp   <- timestampGen
-    } yield InvokeScriptTransaction
-      .selfSigned(1.toByte, sender, dappAddress.toAddress, Some(fc), payments, fee, Waves, timestamp)
-      .explicitGet()
+    } yield Signed.invokeScript(1.toByte, sender, dappAddress.toAddress, Some(fc), payments, fee, Waves, timestamp)
 
   val paymentListGen: Gen[Seq[Payment]] =
     for {
@@ -826,7 +825,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
         .explicitGet()
     }
 
-  val randomTransactionGen: Gen[ProvenTransaction] = (for {
+  val randomTransactionGen: Gen[Transaction with ProvenTransaction] = (for {
     tr <- transferV1Gen
     (is, ri, bu) <- issueReissueBurnGen.retryUntil {
       case (i, r, b) => i.version == 1 && r.version == 1 && b.version == 1
@@ -836,14 +835,14 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     tx <- Gen.oneOf(tr, is, ri, ca, bu, xt)
   } yield tx).label("random transaction")
 
-  def randomTransactionsGen(count: Int): Gen[Seq[ProvenTransaction]] =
+  def randomTransactionsGen(count: Int): Gen[Seq[Transaction]] =
     for {
       transactions <- Gen.listOfN(count, randomTransactionGen)
     } yield transactions
 
   val genesisGen: Gen[GenesisTransaction] = accountGen.flatMap(acc => genesisGeneratorP(acc.toAddress))
 
-  def genesisGeneratorP(recipient: Address): Gen[GenesisTransaction] =
+  def genesisGeneratorP(recipient: WavesAddress): Gen[GenesisTransaction] =
     for {
       amt <- Gen.choose(1, 100000000L * 100000000L)
       ts  <- positiveIntGen

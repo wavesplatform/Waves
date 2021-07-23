@@ -1,4 +1,5 @@
 package com.wavesplatform.state.diffs.ci
+
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures
@@ -6,15 +7,14 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
+import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, Transaction}
-import com.wavesplatform.TestTime
-import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
@@ -92,9 +92,9 @@ class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettin
         )
         call    = Some(FUNCTION_CALL(FunctionHeader.User("buyBack"), Nil))
         payment = Seq(Payment(1, IssuedAsset(issue.id())))
-        initInvoke <- InvokeScriptTransaction.selfSigned(1.toByte, master, master.toAddress, initCall, Nil, initFee, Waves, ts)
-        invoke1    <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, call, payment, fee, Waves, ts)
-        invoke2    <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, call, payment, fee, Waves, ts)
+        initInvoke = Signed.invokeScript(1.toByte, master, master.toAddress, initCall, Nil, initFee, Waves, ts)
+        invoke1    = Signed.invokeScript(1.toByte, invoker, master.toAddress, call, payment, fee, Waves, ts)
+        invoke2    = Signed.invokeScript(1.toByte, invoker, master.toAddress, call, payment, fee, Waves, ts)
       } yield (List(genesis, genesis2, setDApp, issue, data1, initInvoke), invoke1, data2, invoke2)
     }.explicitGet()
 

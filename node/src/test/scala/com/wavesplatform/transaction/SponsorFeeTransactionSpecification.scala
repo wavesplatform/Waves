@@ -4,17 +4,18 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.crypto
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
+import com.wavesplatform.transaction.serialization.impl.SponsorFeeTxSerializer
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.crypto
-import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
 import play.api.libs.json.Json
 
@@ -56,7 +57,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
         |}
         |""".stripMargin)
 
-    val tx = SponsorFeeTransaction.serializer.parseBytes(bytes).get
+    val tx = SponsorFeeTxSerializer.parseBytes(bytes).get
     tx.json() shouldBe json
     assert(crypto.verify(tx.signature, tx.bodyBytes(), tx.sender), "signature should be valid")
   }

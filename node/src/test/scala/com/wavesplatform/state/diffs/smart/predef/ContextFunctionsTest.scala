@@ -27,13 +27,13 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TransactionType, TxVersion}
 import com.wavesplatform.utils._
 import org.scalacheck.Gen
 import shapeless.Coproduct
@@ -529,18 +529,16 @@ class ContextFunctionsTest extends PropSpec with WithState {
             SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
           val fc = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)
 
-          val ci = InvokeScriptTransaction
-            .selfSigned(
+          val ci = Signed.invokeScript(
               1.toByte,
               masterAcc,
               masterAcc.toAddress,
               Some(fc),
               Seq.empty,
-              FeeValidation.FeeUnit * (FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee),
+              FeeValidation.FeeUnit * (FeeValidation.FeeConstants(TransactionType.InvokeScript) + FeeValidation.ScriptExtraFee),
               Waves,
               System.currentTimeMillis()
             )
-            .explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(ci)).explicitGet()
@@ -784,18 +782,16 @@ class ContextFunctionsTest extends PropSpec with WithState {
           val setScriptTx =
             SetScriptTransaction.selfSigned(1.toByte, recipient, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
 
-          val ci = InvokeScriptTransaction
-            .selfSigned(
+          val ci = Signed.invokeScript(
               1.toByte,
               masterAcc,
               recipient.toAddress,
               None,
               Seq.empty,
-              FeeUnit * (FeeConstants(InvokeScriptTransaction.typeId) + ScriptExtraFee),
+              FeeUnit * (FeeConstants(TransactionType.InvokeScript) + ScriptExtraFee),
               Waves,
               System.currentTimeMillis()
             )
-            .explicitGet()
 
           append(genesis).explicitGet()
           append(Seq(dataTransaction)).explicitGet()

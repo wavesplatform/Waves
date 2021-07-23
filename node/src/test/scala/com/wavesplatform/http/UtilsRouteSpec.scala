@@ -757,7 +757,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
     def responseJson: JsObject = {
       val fullJson = responseAs[JsObject]
-      (fullJson \ "address").as[String] shouldBe dAppAddress.stringRepr
+      (fullJson \ "address").as[String] shouldBe dAppAddress.toString
       (fullJson \ "expr").as[String] should not be empty
       (fullJson \ "result").asOpt[JsObject].getOrElse(fullJson - "address" - "expr")
     }
