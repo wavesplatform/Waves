@@ -36,7 +36,7 @@ case class SignedInvokeExpressionRequest(
         case _                  => Left(GenericError("Unexpected expression type for InvokeExpression"))
       }
       t <- InvokeExpressionTransaction.create(
-        version.getOrElse(2.toByte),
+        version.getOrElse(1.toByte),
         _sender,
         _expression,
         fee,
