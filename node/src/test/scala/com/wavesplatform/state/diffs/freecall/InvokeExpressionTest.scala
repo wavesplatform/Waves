@@ -3,7 +3,8 @@ package com.wavesplatform.state.diffs.freecall
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V5, V6}
+import com.wavesplatform.lang.directives.DirectiveDictionary
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -59,6 +60,44 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
       s"""
          | match tx {
          |   case _ => true
+         | }
+       """.stripMargin
+    )
+
+  private def dAppVerifier(version: StdLibVersion): Script =
+    TestCompiler(version).compileContract(
+      s"""
+         | @Verifier(tx)
+         | func verify() =
+         |   match tx {
+         |     case _ => true
+         |   }
+       """.stripMargin
+    )
+
+  private def dAppWithNoVerifier(version: StdLibVersion): Script =
+    TestCompiler(version).compileContract(
+      s"""
+         | @Callable(i)
+         | func default() = if (true) then throw() else throw()
+       """.stripMargin
+    )
+
+  private val forbidByTypeVerifier: Script =
+    TestCompiler(V6).compileExpression(
+      s"""
+         | match tx {
+         |   case _: InvokeExpressionTransaction => false
+         |   case _                              => true
+         | }
+       """.stripMargin
+    )
+
+  private val forbidAllVerifier: Script =
+    TestCompiler(V6).compileExpression(
+      s"""
+         | match tx {
+         |   case _ => false
          | }
        """.stripMargin
     )
@@ -122,12 +161,33 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   }
 
   property("forbid for old version verifier") {
-    val (genesisTxs, invoke) = scenario(verifier = Some(verifier(V5))).sample.get
-    withDomain(RideV6) { d =>
-      d.appendBlock(genesisTxs: _*)
-      intercept[Exception](d.appendBlock(invoke)).getMessage should include(
-        "Can't process InvokeExpressionTransaction from RIDE V5 verifier, it might be used from V6"
-      )
+    DirectiveDictionary[StdLibVersion].all
+      .filter(_ < V6)
+      .foreach { v =>
+        assertLowVersion(v)
+        if (v >= V3) {
+          assertLowVersion(v, dApp = true)
+          assertNoVerifierNoError(v)
+        }
+      }
+
+    def assertLowVersion(v: StdLibVersion, dApp: Boolean = false): Assertion = {
+      val (genesisTxs, invoke) = scenario(verifier = Some(if (dApp) dAppVerifier(v) else verifier(v))).sample.get
+      withDomain(RideV6) { d =>
+        d.appendBlock(genesisTxs: _*)
+        intercept[Exception](d.appendBlock(invoke)).getMessage should include(
+          s"Can't process InvokeExpressionTransaction from RIDE $v verifier, it might be used from V6"
+        )
+      }
+    }
+
+    def assertNoVerifierNoError(v: StdLibVersion): Assertion = {
+      val (genesisTxs, invoke) = scenario(verifier = Some(dAppWithNoVerifier(v))).sample.get
+      withDomain(RideV6) { d =>
+        d.appendBlock(genesisTxs: _*)
+        d.appendBlock(invoke)
+        d.blockchain.transactionInfo(invoke.id.value()).get._3 shouldBe true
+      }
     }
   }
 
@@ -137,6 +197,22 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invoke)
       d.blockchain.transactionInfo(invoke.txId).get._3 shouldBe true
+    }
+  }
+
+  property("disallow by V6 verifier by type") {
+    val (genesisTxs, invoke) = scenario(verifier = Some(forbidByTypeVerifier)).sample.get
+    withDomain(RideV6) { d =>
+      d.appendBlock(genesisTxs: _*)
+      intercept[Exception](d.appendBlock(invoke)).getMessage should include("TransactionNotAllowedByScript")
+    }
+  }
+
+  property("disallow by V6 verifier rejecting all") {
+    val (genesisTxs, invoke) = scenario(verifier = Some(forbidAllVerifier)).sample.get
+    withDomain(RideV6) { d =>
+      d.appendBlock(genesisTxs: _*)
+      intercept[Exception](d.appendBlock(invoke)).getMessage should include("TransactionNotAllowedByScript")
     }
   }
 
