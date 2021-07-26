@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, ci, produce}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -174,7 +174,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
         )
         .explicitGet()
 
-      invokeExpressionTx = toInvokeExpression(setScriptTxs.head, invoker, Some(fee))
+      invokeExpressionTx = ci.toInvokeExpression(setScriptTxs.head, invoker, Some(fee))
     } yield
       (
         Seq(invokerGenesis, assetIssue) ++ setVerifier ++ dAppGenesisTxs ++ setScriptTxs,

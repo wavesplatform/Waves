@@ -7,7 +7,7 @@ import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, ci}
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
@@ -69,7 +69,7 @@ class SyncDAppForbidOldVersionsTest
       ssTx               = SetScriptTransaction.selfSigned(1.toByte, callingDApp, Some(callingDAppScript(version)), fee, ts).explicitGet()
       ssTx2              = SetScriptTransaction.selfSigned(1.toByte, proxyDApp, Some(proxyDAppScript(callingDApp.toAddress)), fee, ts).explicitGet()
       invokeScriptTx     = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, proxyDApp.toAddress, None, Nil, fee, Waves, ts).explicitGet()
-      invokeExpressionTx = toInvokeExpression(ssTx2, invoker)
+      invokeExpressionTx = ci.toInvokeExpression(ssTx2, invoker)
       invokeTx           = if (invokeExpression) invokeExpressionTx else invokeScriptTx
     } yield (Seq(gTx1, gTx2, gTx3, ssTx, ssTx2), invokeTx, proxyDApp.toAddress, callingDApp.toAddress)
 
