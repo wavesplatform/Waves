@@ -13,7 +13,8 @@ import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, NewAssetInfo}
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.{TestTime, TransactionGen}
@@ -102,15 +103,19 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
        """.stripMargin
     )
 
-  private def scenario(enoughFee: Boolean = true, issue: Boolean = true, verifier: Option[Script] = None) =
+  private def scenario(enoughFee: Boolean = true, issue: Boolean = true, verifier: Option[Script] = None, sponsor: Boolean = false) =
     for {
       invoker <- accountGen
       fee     <- ciFee(freeCall = enoughFee, nonNftIssue = if (issue) 1 else 0)
-      gtx    = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      stx    = SetScriptTransaction.selfSigned(TxVersion.V2, invoker, verifier, fee, ts).explicitGet()
-      call   = expr(invoker, fee, issue)
-      invoke = InvokeExpressionTransaction.selfSigned(TxVersion.V1, invoker, call, fee, Waves, ts).explicitGet()
-    } yield (Seq(gtx, stx), invoke)
+      gtx       = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+      stx       = SetScriptTransaction.selfSigned(TxVersion.V2, invoker, verifier, fee, ts).explicitGet()
+      issueTx   = IssueTransaction.selfSigned(TxVersion.V2, invoker, "name", "", 1000, 1, true, None, fee, ts).explicitGet()
+      asset     = IssuedAsset(issueTx.id.value())
+      sponsorTx = SponsorFeeTransaction.selfSigned(TxVersion.V2, invoker, asset, Some(1000L), fee, ts).explicitGet()
+      call      = expr(invoker, fee, issue)
+      feeAsset  = if (sponsor) asset else Waves
+      invoke    = InvokeExpressionTransaction.selfSigned(TxVersion.V1, invoker, call, fee, feeAsset, ts).explicitGet()
+    } yield (Seq(gtx, issueTx, sponsorTx, stx), invoke)
 
   private def feeErrorMessage(invoke: InvokeExpressionTransaction, issue: Boolean = false) = {
     val expectingFee = FeeConstants(invoke.typeId) * FeeUnit + (if (issue) 1 else 0) * MinIssueFee
@@ -221,6 +226,15 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
     withDomain(RideV5) { d =>
       d.appendBlock(genesisTxs: _*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include("Ride V6 feature has not been activated yet")
+    }
+  }
+
+  property("sponsor fee") {
+    val (genesisTxs, invoke) = scenario(sponsor = true).sample.get
+    withDomain(RideV6) { d =>
+      d.appendBlock(genesisTxs: _*)
+      d.appendBlock(invoke)
+      d.blockchain.transactionInfo(invoke.id.value()).get._3 shouldBe true
     }
   }
 }
