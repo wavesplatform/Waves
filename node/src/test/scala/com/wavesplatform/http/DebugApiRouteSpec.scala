@@ -20,7 +20,7 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.PeerDatabase
-import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
+import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
@@ -35,6 +35,7 @@ import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet}
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
+import org.scalatest.Assertion
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 
 import scala.util.Random
@@ -1007,30 +1008,31 @@ class DebugApiRouteSpec
     }
 
     "InvokeExpression" in {
-      val blockchain = createBlockchainStub { blockchain =>
-        val settings = RideV6.blockchainSettings.functionalitySettings
-        (() => blockchain.settings).when().returns(WavesSettings.default().blockchainSettings.copy(functionalitySettings = settings))
-        (() => blockchain.activatedFeatures).when().returns(settings.preActivatedFeatures)
-        (blockchain.balance _).when(*, *).returns(ENOUGH_AMT)
-        (blockchain.accountScript _).when(*).returns(None)
-        (blockchain.assetScript _).when(*).returns(None)
-        (blockchain.assetDescription _).when(TestValues.asset).returns(Some(TestValues.assetDescription))
-      }
-      val route = routeWithBlockchain(blockchain)
+      def assert(wavesSettings: WavesSettings): Assertion = {
+        val blockchain = createBlockchainStub { blockchain =>
+          val settings = wavesSettings.blockchainSettings.functionalitySettings
+          (() => blockchain.settings).when().returns(WavesSettings.default().blockchainSettings.copy(functionalitySettings = settings))
+          (() => blockchain.activatedFeatures).when().returns(settings.preActivatedFeatures)
+          (blockchain.balance _).when(*, *).returns(ENOUGH_AMT)
+          (blockchain.accountScript _).when(*).returns(None)
+          (blockchain.assetScript _).when(*).returns(None)
+          (blockchain.assetDescription _).when(TestValues.asset).returns(Some(TestValues.assetDescription))
+        }
+        val route = routeWithBlockchain(blockchain)
 
-      val expression = TestCompiler(V6).compileFreeCall(
-        s"""
+        val expression = TestCompiler(V6).compileFreeCall(
+          s"""
            | let assetId = base58'${TestValues.asset}'
            | [ Reissue(assetId, 1, true) ]
          """.stripMargin
-      )
-      val invokeExpression = TxHelpers.invokeExpression(expression)
-      jsonPost(routePath("/validate"), invokeExpression.json()) ~> route ~> check {
-        val json = responseAs[JsValue]
-        (json \ "expression").as[String] shouldBe expression.bytes.value().base64
-        (json \ "valid").as[Boolean] shouldBe true
-        (json \ "trace").as[JsArray] should matchJson(
-          """
+        )
+        val invokeExpression = TxHelpers.invokeExpression(expression)
+        jsonPost(routePath("/validate"), invokeExpression.json()) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "expression").as[String] shouldBe expression.bytes.value().base64
+          (json \ "valid").as[Boolean] shouldBe true
+          (json \ "trace").as[JsArray] should matchJson(
+            """
             |  [
             |    {
             |      "type": "dApp",
@@ -1066,8 +1068,12 @@ class DebugApiRouteSpec
             |    }
             |  ]
           """.stripMargin
-        )
+          )
+        }
       }
+
+      assert(RideV6)
+      intercept[Exception](assert(RideV5)).getMessage should include("Ride V6 feature has not been activated yet")
     }
   }
 
