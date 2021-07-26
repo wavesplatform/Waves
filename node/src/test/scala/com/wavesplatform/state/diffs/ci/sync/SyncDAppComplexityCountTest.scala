@@ -11,9 +11,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V5
-import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.Portfolio
@@ -25,7 +23,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, InvokeTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, InvokeTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
 import org.scalacheck.Gen
@@ -128,14 +126,14 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
         )
         .explicitGet()
       asset   = IssuedAsset(assetIssue.id())
-      payment = List(Payment(1, asset))
+      payment = List(Payment(1L, asset))
 
       dAppGenesisTxs = dAppAccs.flatMap(
         a =>
           List(
             GenesisTransaction.create(a.toAddress, ENOUGH_AMT, ts).explicitGet(),
             TransferTransaction.selfSigned(TxVersion.V2, invoker, a.toAddress, asset, 10, Waves, fee, ByteStr.empty, ts).explicitGet()
-          )
+        )
       )
       invokerGenesis = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
@@ -176,23 +174,14 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
         )
         .explicitGet()
 
-      firstExpression = setScriptTxs.head.script.get.asInstanceOf[ContractScriptImpl].expr.callableFuncs.head.u.body
-      invokeExpressionTx = InvokeExpressionTransaction
-        .selfSigned(
-          TxVersion.V1,
-          invoker,
-          ExprScript(V5, firstExpression, isFreeCall = true).explicitGet(),
-          fee,
-          Waves,
-          ts + 10
-        )
-        .explicitGet()
-    } yield (
-      Seq(invokerGenesis, assetIssue) ++ setVerifier ++ dAppGenesisTxs ++ setScriptTxs,
-      if (invokeExpression) invokeExpressionTx else invokeScriptTx,
-      asset,
-      dAppAccs.head.toAddress
-    )
+      invokeExpressionTx = toInvokeExpression(setScriptTxs.head, invoker, Some(fee))
+    } yield
+      (
+        Seq(invokerGenesis, assetIssue) ++ setVerifier ++ dAppGenesisTxs ++ setScriptTxs,
+        if (invokeExpression) invokeExpressionTx else invokeScriptTx,
+        asset,
+        dAppAccs.head.toAddress
+      )
 
   private def assert(
       dAppCount: Int,
