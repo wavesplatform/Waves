@@ -1,4 +1,4 @@
-<h1 align="center">🔷 Waves Protocol Node</h1>
+<h1 align="center">🔷 Waves Node</h1>
 
 <p align="center">
   <a href="https://github.com/wavesplatform/Waves/actions" target="_blank">
@@ -25,8 +25,8 @@
   </a>
 </p>
 
-> Waves is an open source [blockchain platform](https://waves.tech/). <br/> 
-You can use it to build your own decentralised applications. Waves provides full blockchain ecosystem including smart contracts language called RIDE.
+> Waves is an open source [blockchain protocol](https://waves.tech/waves-protocol). <br/> 
+You can use it to build your own decentralized applications. Waves provides full blockchain ecosystem including smart contracts language called RIDE.
 
 
 ## ✨ Demo
@@ -35,12 +35,12 @@ You can use it to build your own decentralised applications. Waves provides full
     <img src="https://user-images.githubusercontent.com/1945126/78667964-88209480-78e2-11ea-9304-72178a6a5974.gif" alt="Waves Node Run Demo">
 </p>
 
-Waves node is a host connected to the blockchain network with the next functions:
+Waves node is a host connected to the blockchain network with the following functions:
 
 - Processing and validation of [transactions](https://docs.waves.tech/en/blockchain/transaction/transaction-validation)
 - Generation and storage of [blocks](https://docs.waves.tech/en/blockchain/block/)
-- Network [communication](https://docs.waves.tech/en/blockchain/transaction/) with other nodes
-- [REST API](https://docs.waves.tech/en/building-apps/how-to/basic/retrieve)
+- Network communication with [other nodes](https://docs.waves.tech/en/blockchain/blockchain/#node)
+- [REST API](https://docs.waves.tech/en/waves-node/node-api/)
 - [Extensions](https://docs.waves.tech/en/waves-node/extensions/) management
 
 Learn more about Waves Node in the [documentation](https://docs.waves.tech/en/waves-node/).
@@ -73,13 +73,13 @@ java -jar node/target/waves-all*.jar path/to/config/waves-{network}.conf
 
 Using docker, follow the [official image documentation](https://hub.docker.com/r/wavesplatform/wavesnode).
 
-> More details on how to install a node for different platforms you can [find in the documentation](https://docs.waves.tech/en/waves-node/how-to-install-a-node/how-to-install-a-node#system-requirements). 
+> More details on how to install a node for different platforms you can [find in the documentation](https://docs.waves.tech/en/waves-node/how-to-install-a-node/how-to-install-a-node). 
 
 ## 🔧 Configuration
 
-The best starting point to understand available configuration parameters is the [this article](https://docs.waves.tech/en/waves-node/node-configuration).
+The best starting point to understand available configuration parameters is [this article](https://docs.waves.tech/en/waves-node/node-configuration).
 
-The easiest way to start playing around with configurations is to use default configuration files for different networks, they're available [here](./node).
+The easiest way to start playing around with configurations is to use default configuration files for different networks; they're available [here](./node).
 
 Logging configuration with all available levels and parameters is described [here](https://docs.waves.tech/en/waves-node/logging-configuration).
 
@@ -165,14 +165,14 @@ sbt "extension-module/run /path/to/configuration"
 
 The majority of contributors to this project use IntelliJ IDEA for development, if you want to use it as well please follow these steps:
 
-1. Click on `Add configuration` (or `Edit configurations...`)
-2. Click on `+` to add a new configuration, choose `Application`
+1. Click `Add configuration` (or `Edit configurations...`).
+2. Click `+` to add a new configuration, choose `Application`.
 3. Specify:
    - Main class: `com.wavesplatform.Application`
    - Program arguments: `/path/to/configuration`
    - Use classpath of module: `extension-module`
-4. Click on `OK`
-5. Run this configuration
+4. Click `OK`.
+5. Run this configuration.
 
 </details>
 
