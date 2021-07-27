@@ -25,6 +25,8 @@ trait Script {
 
   val containsArray: Boolean
 
+  val isFreeCall: Boolean
+
   override def equals(obj: scala.Any): Boolean = obj match {
     case that: Script => stdLibVersion == that.stdLibVersion && expr == that.expr
     case _            => false
