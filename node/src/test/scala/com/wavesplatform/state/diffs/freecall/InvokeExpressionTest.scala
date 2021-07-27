@@ -16,7 +16,7 @@ import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.{TestTime, TransactionGen}
 import org.scalatest.{Assertion, EitherValues}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -130,20 +130,24 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
       transfersCount: Int = 0,
       sigVerifyCount: Int = 0,
       bigVerifier: Boolean = false
-  ) =
-    for {
-      invoker  <- accountGen
-      receiver <- accountGen
-      fee      <- ciFee(freeCall = enoughFee, nonNftIssue = if (issue) 1 else 0, sc = if (bigVerifier) 1 else 0)
-      genesis        = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      setVerifier    = SetScriptTransaction.selfSigned(TxVersion.V2, invoker, verifier, fee, ts).explicitGet()
-      sponsorIssueTx = IssueTransaction.selfSigned(TxVersion.V2, invoker, "name", "", 1000, 1, true, None, fee, ts).explicitGet()
-      sponsorAsset   = IssuedAsset(sponsorIssueTx.id.value())
-      sponsorTx      = SponsorFeeTransaction.selfSigned(TxVersion.V2, invoker, sponsorAsset, Some(1000L), fee, ts).explicitGet()
-      call           = expr(invoker, fee, issue, transfersCount, receiver.toAddress, sigVerifyCount)
-      feeAsset       = if (sponsor) sponsorAsset else Waves
-      invoke         = InvokeExpressionTransaction.selfSigned(version, invoker, call, fee, feeAsset, ts).explicitGet()
-    } yield (Seq(genesis, sponsorIssueTx, sponsorTx, setVerifier), invoke)
+  ): (Seq[Transaction], InvokeExpressionTransaction) = {
+    val invoker  = accountGen.sample.get
+    val receiver = accountGen.sample.get
+    val fee      = ciFee(freeCall = enoughFee, nonNftIssue = if (issue) 1 else 0, sc = if (bigVerifier) 1 else 0).sample.get
+
+    val genesis     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+    val setVerifier = SetScriptTransaction.selfSigned(TxVersion.V2, invoker, verifier, fee, ts).explicitGet()
+
+    val sponsorIssueTx = IssueTransaction.selfSigned(TxVersion.V2, invoker, "name", "", 1000, 1, true, None, fee, ts).explicitGet()
+    val sponsorAsset   = IssuedAsset(sponsorIssueTx.id.value())
+    val sponsorTx      = SponsorFeeTransaction.selfSigned(TxVersion.V2, invoker, sponsorAsset, Some(1000L), fee, ts).explicitGet()
+    val feeAsset       = if (sponsor) sponsorAsset else Waves
+
+    val call   = expr(invoker, fee, issue, transfersCount, receiver.toAddress, sigVerifyCount)
+    val invoke = InvokeExpressionTransaction.selfSigned(version, invoker, call, fee, feeAsset, ts).explicitGet()
+
+    (Seq(genesis, sponsorIssueTx, sponsorTx, setVerifier), invoke)
+  }
 
   private def feeErrorMessage(invoke: InvokeExpressionTransaction, issue: Boolean = false, verifier: Boolean = false) = {
     val expectingFee = FeeConstants(invoke.typeId) * FeeUnit + (if (issue) 1 else 0) * MinIssueFee + (if (verifier) 1 else 0) * ScriptExtraFee
@@ -166,7 +170,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   }
 
   property("successful applying to the state") {
-    val (genesisTxs, invoke) = scenario().sample.get
+    val (genesisTxs, invoke) = scenario()
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invoke)
@@ -178,7 +182,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   }
 
   property("insufficient fee leading to reject") {
-    val (genesisTxs, invoke) = scenario(enoughFee = false, issue = false).sample.get
+    val (genesisTxs, invoke) = scenario(enoughFee = false, issue = false)
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include(feeErrorMessage(invoke))
@@ -186,7 +190,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   }
 
   property("insufficient fee for issue leading to fail") {
-    val (genesisTxs, invoke) = scenario(enoughFee = false).sample.get
+    val (genesisTxs, invoke) = scenario(enoughFee = false)
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invoke)
@@ -195,7 +199,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   }
 
   property("insufficient fee for big verifier leading to fail") {
-    val (genesisTxs, invoke) = scenario(issue = false, verifier = Some(bigVerifier)).sample.get
+    val (genesisTxs, invoke) = scenario(issue = false, verifier = Some(bigVerifier))
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invoke)
@@ -204,7 +208,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   }
 
   property("big verifier with enough fee") {
-    val (genesisTxs, invoke) = scenario(issue = false, verifier = Some(bigVerifier), bigVerifier = true).sample.get
+    val (genesisTxs, invoke) = scenario(issue = false, verifier = Some(bigVerifier), bigVerifier = true)
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invoke)
@@ -224,7 +228,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
       }
 
     def assertLowVersion(v: StdLibVersion, dApp: Boolean = false): Assertion = {
-      val (genesisTxs, invoke) = scenario(verifier = Some(if (dApp) dAppVerifier(v) else verifier(v))).sample.get
+      val (genesisTxs, invoke) = scenario(verifier = Some(if (dApp) dAppVerifier(v) else verifier(v)))
       withDomain(RideV6) { d =>
         d.appendBlock(genesisTxs: _*)
         intercept[Exception](d.appendBlock(invoke)).getMessage should include(
@@ -234,7 +238,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
     }
 
     def assertNoVerifierNoError(v: StdLibVersion): Assertion = {
-      val (genesisTxs, invoke) = scenario(verifier = Some(dAppWithNoVerifier(v))).sample.get
+      val (genesisTxs, invoke) = scenario(verifier = Some(dAppWithNoVerifier(v)))
       withDomain(RideV6) { d =>
         d.appendBlock(genesisTxs: _*)
         d.appendBlock(invoke)
@@ -244,7 +248,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   }
 
   property("allow for V6 verifier") {
-    val (genesisTxs, invoke) = scenario(verifier = Some(verifier(V6))).sample.get
+    val (genesisTxs, invoke) = scenario(verifier = Some(verifier(V6)))
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invoke)
@@ -253,7 +257,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   }
 
   property("disallow by V6 verifier by type") {
-    val (genesisTxs, invoke) = scenario(verifier = Some(forbidByTypeVerifier)).sample.get
+    val (genesisTxs, invoke) = scenario(verifier = Some(forbidByTypeVerifier))
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include("TransactionNotAllowedByScript")
@@ -261,7 +265,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   }
 
   property("disallow by V6 verifier rejecting all") {
-    val (genesisTxs, invoke) = scenario(verifier = Some(forbidAllVerifier)).sample.get
+    val (genesisTxs, invoke) = scenario(verifier = Some(forbidAllVerifier))
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include("TransactionNotAllowedByScript")
@@ -269,7 +273,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   }
 
   property("activation") {
-    val (genesisTxs, invoke) = scenario().sample.get
+    val (genesisTxs, invoke) = scenario()
     withDomain(RideV5) { d =>
       d.appendBlock(genesisTxs: _*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include("Ride V6 feature has not been activated yet")
@@ -278,7 +282,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
 
   property("available versions") {
     val unsupportedVersion   = InvokeExpressionTransaction.supportedVersions.max + 1
-    val (genesisTxs, invoke) = scenario(version = unsupportedVersion.toByte).sample.get
+    val (genesisTxs, invoke) = scenario(version = unsupportedVersion.toByte)
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include("Invalid tx version")
@@ -286,7 +290,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   }
 
   property("sponsor fee") {
-    val (genesisTxs, invoke) = scenario(sponsor = true).sample.get
+    val (genesisTxs, invoke) = scenario(sponsor = true)
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invoke)
@@ -295,7 +299,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   }
 
   property("issue with 29 transfers") {
-    val (genesisTxs, invoke) = scenario(transfersCount = 29).sample.get
+    val (genesisTxs, invoke) = scenario(transfersCount = 29)
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invoke)
@@ -304,7 +308,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   }
 
   property("issue with 30 transfers") {
-    val (genesisTxs, invoke) = scenario(transfersCount = 30).sample.get
+    val (genesisTxs, invoke) = scenario(transfersCount = 30)
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invoke)
@@ -313,7 +317,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   }
 
   property("complexity limit") {
-    val (genesisTxs, invoke) = scenario(sigVerifyCount = 50).sample.get
+    val (genesisTxs, invoke) = scenario(sigVerifyCount = 50)
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include("Contract function (default) is too complex: 10413 > 10000")
