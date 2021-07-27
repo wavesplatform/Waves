@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.freecall
 
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.DirectiveDictionary
@@ -34,7 +34,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   private val assetDecimals     = 4
   private val assetIsReissuable = true
 
-  private def expr(invoker: KeyPair, fee: Long, issue: Boolean): ExprScript =
+  private def expr(invoker: KeyPair, fee: Long, issue: Boolean, transfersCount: Int, receiver: Address): ExprScript =
     TestCompiler(V6).compileFreeCall(
       s"""
          | let address   = Address(base58'${invoker.toAddress}')
@@ -52,6 +52,8 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
          |   BooleanEntry("check", check),
          |   BinaryEntry("transactionId", i.transactionId)
          |   ${if (issue) s""", Issue("$assetName", "$assetDescription", $assetVolume, $assetDecimals, $assetIsReissuable, unit, 0) """ else ""}
+         |   ${if (transfersCount > 0) "," else ""}
+         |   ${(1 to transfersCount).map(_ => s"ScriptTransfer(Address(base58'$receiver'), 1, unit)").mkString(",")}
          | ]
        """.stripMargin
     )
@@ -108,17 +110,19 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
       issue: Boolean = true,
       verifier: Option[Script] = None,
       sponsor: Boolean = false,
-      version: Byte = 1
+      version: Byte = 1,
+      transfersCount: Int = 0
   ) =
     for {
-      invoker <- accountGen
-      fee     <- ciFee(freeCall = enoughFee, nonNftIssue = if (issue) 1 else 0)
+      invoker  <- accountGen
+      receiver <- accountGen
+      fee      <- ciFee(freeCall = enoughFee, nonNftIssue = if (issue) 1 else 0)
       gtx       = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
       stx       = SetScriptTransaction.selfSigned(TxVersion.V2, invoker, verifier, fee, ts).explicitGet()
       issueTx   = IssueTransaction.selfSigned(TxVersion.V2, invoker, "name", "", 1000, 1, true, None, fee, ts).explicitGet()
       asset     = IssuedAsset(issueTx.id.value())
       sponsorTx = SponsorFeeTransaction.selfSigned(TxVersion.V2, invoker, asset, Some(1000L), fee, ts).explicitGet()
-      call      = expr(invoker, fee, issue)
+      call      = expr(invoker, fee, issue, transfersCount, receiver.toAddress)
       feeAsset  = if (sponsor) asset else Waves
       invoke    = InvokeExpressionTransaction.selfSigned(version, invoker, call, fee, feeAsset, ts).explicitGet()
     } yield (Seq(gtx, issueTx, sponsorTx, stx), invoke)
@@ -250,6 +254,24 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invoke)
       d.blockchain.transactionInfo(invoke.id.value()).get._3 shouldBe true
+    }
+  }
+
+  property("issue with 29 transfers") {
+    val (genesisTxs, invoke) = scenario(transfersCount = 29).sample.get
+    withDomain(RideV6) { d =>
+      d.appendBlock(genesisTxs: _*)
+      d.appendBlock(invoke)
+      d.blockchain.transactionInfo(invoke.id.value()).get._3 shouldBe true
+    }
+  }
+
+  property("issue with 30 transfers") {
+    val (genesisTxs, invoke) = scenario(transfersCount = 30).sample.get
+    withDomain(RideV6) { d =>
+      d.appendBlock(genesisTxs: _*)
+      d.appendBlock(invoke)
+      d.liquidDiff.errorMessage(invoke.txId).get.text shouldBe "Actions count limit is exceeded"
     }
   }
 }
