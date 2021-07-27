@@ -1,25 +1,31 @@
-<h1 align="center">🔷 Waves Platform Node</h1>
+<h1 align="center">🔷 Waves Protocol Node</h1>
 
 <p align="center">
-
-  <a href="https://travis-ci.org/wavesplatform/Waves" target="_blank">
-    <img alt="Build status" src="https://travis-ci.org/wavesplatform/Waves.svg?branch=master"  />
+  <a href="https://github.com/wavesplatform/Waves/actions" target="_blank">
+    <img alt="Checks status" src="https://badgen.net/github/checks/wavesplatform/waves?cache=600"  />
   </a>
   <a href="https://github.com/wavesplatform/Waves/releases" target="_blank">
-    <img alt="Downloads" src="https://img.shields.io/github/downloads/wavesplatform/Waves/total?cache=false&style=flat-square&style=flat-square" />
+    <img alt="Downloads" src="https://badgen.net/github/assets-dl/wavesplatform/waves?color=blue" />
+  </a>
+  <a href="https://hub.docker.com/r/wavesplatform/wavesnode" target="_blank">
+    <img alt="Docker pulls" src="https://badgen.net/docker/pulls/wavesplatform/wavesnode?icon=docker" />
   </a>
   <a href="https://github.com/wavesplatform/Waves/blob/master/LICENSE" target="_blank">
-    <img alt="License: MIT" src="https://badgen.net/github/license/wavesplatform/Waves"/>
+    <img alt="License: MIT" src="https://badgen.net/github/license/wavesplatform/Waves?color=gray"/>
   </a>
   <a href="https://github.com/wavesplatform/Waves/issues" target="_blank">
-    <img alt="Open Issues" src="https://badgen.net/github/open-issues/wavesplatform/Waves" />
+    <img alt="Open Issues" src="https://badgen.net/github/open-issues/wavesplatform/Waves?color=gray" />
   </a>
-  <a href="https://twitter.com/wavesplatform" target="_blank">
-    <img alt="Twitter: WavesPlatform" src="https://badgen.net/twitter/follow/wavesglobalnews" />
+  <br/>
+  <a href="https://twitter.com/wavesprotocol" target="_blank">
+    <img alt="Twitter: Waves Tech" src="https://badgen.net/twitter/follow/wavesprotocol?icon=twitter&label=follow%20on%20Twitter" />
+  </a>
+  <a href="https://medium.com/wavesprotocol" target="_blank">
+    <img alt="Medium: Waves Tech" src="https://badgen.net/runkit/msmolyakov/get-medium-followers?icon=medium&cache=86400" />
   </a>
 </p>
 
-> Waves is an open source [blockchain platform](https://wavesplatform.com/).<br /> 
+> Waves is an open source [blockchain platform](https://waves.tech/). <br/> 
 You can use it to build your own decentralised applications. Waves provides full blockchain ecosystem including smart contracts language called RIDE.
 
 
@@ -31,20 +37,20 @@ You can use it to build your own decentralised applications. Waves provides full
 
 Waves node is a host connected to the blockchain network with the next functions:
 
-- Processing and validation of [transactions](https://docs.wavesplatform.com/en/blockchain/transaction/transaction-validation.html)
-- Generation and storage of [blocks](https://docs.wavesplatform.com/en/blockchain/block.html)
-- Network [communication](https://docs.wavesplatform.com/en/blockchain/transaction.html) with other nodes
-- [REST API](https://docs.wavesplatform.com/en/building-apps/how-to/basic/retrieve)
-- [Extensions](https://docs.wavesplatform.com/en/waves-node/extensions/) management
+- Processing and validation of [transactions](https://docs.waves.tech/en/blockchain/transaction/transaction-validation)
+- Generation and storage of [blocks](https://docs.waves.tech/en/blockchain/block/)
+- Network [communication](https://docs.waves.tech/en/blockchain/transaction/) with other nodes
+- [REST API](https://docs.waves.tech/en/building-apps/how-to/basic/retrieve)
+- [Extensions](https://docs.waves.tech/en/waves-node/extensions/) management
 
-Learn more about Waves Node in the [documentation](https://docs.wavesplatform.com/en/waves-node/what-is-a-full-node.html).
+Learn more about Waves Node in the [documentation](https://docs.waves.tech/en/waves-node/).
 
 ## 🚀️ Getting started
 
 A quick introduction of the minimal setup you need to get a running node. 
 
 *Prerequisites:*
-- configuration file for a needed network from [here](https://github.com/wavesplatform/Waves/tree/master/node)
+- configuration file for a needed network from [here](https://github.com/wavesplatform/Waves/tree/HEAD/node)
 - `waves-all*.jar` file from [releases](https://github.com/wavesplatform/Waves/releases) 
 
 Linux systems:
@@ -65,20 +71,17 @@ Windows systems (assuming already installed OpenJDK 8):
 java -jar node/target/waves-all*.jar path/to/config/waves-{network}.conf
 ```
 
-Using docker image:
-```bash
-docker run -p 6869:6869 -p 6868:6868 -e WAVES_NETWORK=MAINNET -e WAVES_LOG_LEVEL=DEBUG -e WAVES_HEAP_SIZE=2g -v YOUR_LOCAL_PATH_HERE:/waves wavesplatform/node
-```
+Using docker, follow the [official image documentation](https://hub.docker.com/r/wavesplatform/wavesnode).
 
-> More details on how to install a node for different platforms you can [find in the documentation](https://docs.wavesplatform.com/en/waves-node/how-to-install-a-node/how-to-install-a-node#system-requirements). 
+> More details on how to install a node for different platforms you can [find in the documentation](https://docs.waves.tech/en/waves-node/how-to-install-a-node/how-to-install-a-node#system-requirements). 
 
 ## 🔧 Configuration
 
-The best starting point to understand available configuration parameters is the [this article](https://docs.wavesplatform.com/en/waves-node/node-configuration).
+The best starting point to understand available configuration parameters is the [this article](https://docs.waves.tech/en/waves-node/node-configuration).
 
 The easiest way to start playing around with configurations is to use default configuration files for different networks, they're available [here](./node).
 
-Logging configuration with all available levels and parameters is described [here](https://docs.wavesplatform.com/en/waves-node/logging-configuration).
+Logging configuration with all available levels and parameters is described [here](https://docs.waves.tech/en/waves-node/logging-configuration).
 
 ## 👨‍💻 Development
 
@@ -183,18 +186,18 @@ Please follow the [code of conduct](./CODE_OF_CONDUCT.md) during communication w
 
 ## ℹ️ Support (get help)
 
-Keep up with the latest news and articles, and find out all about events happening on the [Waves Platform](https://wavesplatform.com/).
+Keep up with the latest news and articles, and find out all about events happening on the [Waves Protocol](https://waves.tech/).
 
 - [Telegram Dev Chat](https://t.me/waves_ride_dapps_dev)
-- [Waves Blog](https://blog.wavesplatform.com/)
+- [Waves Blog](https://medium.com/wavesprotocol)
 
 ## ⛓ Links
 
-- [Documentation](https://docs.wavesplatform.com/)
+- [Documentation](https://docs.waves.tech/)
 - Blockchain clients for Mainnet: [Waves Exchange](https://waves.exchange/), [Waves FX](https://github.com/wavesfx), [SIGN app](https://www.sign-web.app/)
 - Blockchain clients for Testnet: [Waves Exchange](https://testnet.waves.exchange/)
-- Blockchain Explorer: [Mainnet](https://wavesexplorer.com/), [Testnet](https://wavesexplorer.com/testnet), [Stagenet](https://wavesexplorer.com/stagenet) 
-- [Ride Online IDE](https://ide.wavesplatform.com/)
+- Blockchain Explorer: [Mainnet](https://wavesexplorer.com/), [Testnet](https://testnet.wavesexplorer.com/), [Stagenet](https://stagenet.wavesexplorer.com/) 
+- [Ride Online IDE](https://waves-ide.com/)
 
 ## 📝 Licence
 
