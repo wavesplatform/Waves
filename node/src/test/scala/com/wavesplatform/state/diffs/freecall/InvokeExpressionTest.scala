@@ -34,7 +34,14 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   private val assetDecimals     = 4
   private val assetIsReissuable = true
 
-  private def expr(invoker: KeyPair, fee: Long, issue: Boolean, transfersCount: Int, receiver: Address, sigVerifyCount: Int): ExprScript =
+  private def expr(
+      invoker: KeyPair,
+      fee: Long,
+      issue: Boolean,
+      transfersCount: Int,
+      receiver: Address,
+      sigVerifyCount: Int
+  ): ExprScript =
     TestCompiler(V6).compileFreeCall(
       s"""
          | ${(1 to sigVerifyCount).map(i => s"strict r$i = sigVerify(base58'', base58'', base58'')").mkString("\n")}
@@ -106,6 +113,14 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
        """.stripMargin
     )
 
+  private val bigVerifier: Script =
+    TestCompiler(V6).compileExpression(
+      s"""
+         | strict r = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" && ")}
+         | true
+       """.stripMargin
+    )
+
   private def scenario(
       enoughFee: Boolean = true,
       issue: Boolean = true,
@@ -113,26 +128,28 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
       sponsor: Boolean = false,
       version: Byte = 1,
       transfersCount: Int = 0,
-      sigVerifyCount: Int = 0
+      sigVerifyCount: Int = 0,
+      bigVerifier: Boolean = false
   ) =
     for {
       invoker  <- accountGen
       receiver <- accountGen
-      fee      <- ciFee(freeCall = enoughFee, nonNftIssue = if (issue) 1 else 0)
-      gtx       = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      stx       = SetScriptTransaction.selfSigned(TxVersion.V2, invoker, verifier, fee, ts).explicitGet()
-      issueTx   = IssueTransaction.selfSigned(TxVersion.V2, invoker, "name", "", 1000, 1, true, None, fee, ts).explicitGet()
-      asset     = IssuedAsset(issueTx.id.value())
-      sponsorTx = SponsorFeeTransaction.selfSigned(TxVersion.V2, invoker, asset, Some(1000L), fee, ts).explicitGet()
-      call      = expr(invoker, fee, issue, transfersCount, receiver.toAddress, sigVerifyCount)
-      feeAsset  = if (sponsor) asset else Waves
-      invoke    = InvokeExpressionTransaction.selfSigned(version, invoker, call, fee, feeAsset, ts).explicitGet()
-    } yield (Seq(gtx, issueTx, sponsorTx, stx), invoke)
+      fee      <- ciFee(freeCall = enoughFee, nonNftIssue = if (issue) 1 else 0, sc = if (bigVerifier) 1 else 0)
+      genesis        = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+      setVerifier    = SetScriptTransaction.selfSigned(TxVersion.V2, invoker, verifier, fee, ts).explicitGet()
+      sponsorIssueTx = IssueTransaction.selfSigned(TxVersion.V2, invoker, "name", "", 1000, 1, true, None, fee, ts).explicitGet()
+      sponsorAsset   = IssuedAsset(sponsorIssueTx.id.value())
+      sponsorTx      = SponsorFeeTransaction.selfSigned(TxVersion.V2, invoker, sponsorAsset, Some(1000L), fee, ts).explicitGet()
+      call           = expr(invoker, fee, issue, transfersCount, receiver.toAddress, sigVerifyCount)
+      feeAsset       = if (sponsor) sponsorAsset else Waves
+      invoke         = InvokeExpressionTransaction.selfSigned(version, invoker, call, fee, feeAsset, ts).explicitGet()
+    } yield (Seq(genesis, sponsorIssueTx, sponsorTx, setVerifier), invoke)
 
-  private def feeErrorMessage(invoke: InvokeExpressionTransaction, issue: Boolean = false) = {
-    val expectingFee = FeeConstants(invoke.typeId) * FeeUnit + (if (issue) 1 else 0) * MinIssueFee
+  private def feeErrorMessage(invoke: InvokeExpressionTransaction, issue: Boolean = false, verifier: Boolean = false) = {
+    val expectingFee = FeeConstants(invoke.typeId) * FeeUnit + (if (issue) 1 else 0) * MinIssueFee + (if (verifier) 1 else 0) * ScriptExtraFee
     val issueErr     = if (issue) " with 1 assets issued" else ""
-    s"Fee in WAVES for InvokeExpressionTransaction (${invoke.fee} in WAVES)$issueErr does not exceed minimal value of $expectingFee WAVES."
+    val verifierErr  = if (verifier) " with 1 total scripts invoked" else ""
+    s"Fee in WAVES for InvokeExpressionTransaction (${invoke.fee} in WAVES)$issueErr$verifierErr does not exceed minimal value of $expectingFee WAVES."
   }
 
   private def checkAsset(
@@ -168,12 +185,30 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
     }
   }
 
-  property("insufficient fee leading to fail") {
+  property("insufficient fee for issue leading to fail") {
     val (genesisTxs, invoke) = scenario(enoughFee = false).sample.get
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invoke)
       d.liquidDiff.errorMessage(invoke.txId).get.text shouldBe feeErrorMessage(invoke, issue = true)
+    }
+  }
+
+  property("insufficient fee for big verifier leading to fail") {
+    val (genesisTxs, invoke) = scenario(issue = false, verifier = Some(bigVerifier)).sample.get
+    withDomain(RideV6) { d =>
+      d.appendBlock(genesisTxs: _*)
+      d.appendBlock(invoke)
+      d.liquidDiff.errorMessage(invoke.txId).get.text shouldBe feeErrorMessage(invoke, verifier = true)
+    }
+  }
+
+  property("big verifier with enough fee") {
+    val (genesisTxs, invoke) = scenario(issue = false, verifier = Some(bigVerifier), bigVerifier = true).sample.get
+    withDomain(RideV6) { d =>
+      d.appendBlock(genesisTxs: _*)
+      d.appendBlock(invoke)
+      d.blockchain.transactionInfo(invoke.id.value()).get._3 shouldBe true
     }
   }
 
