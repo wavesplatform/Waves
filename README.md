@@ -10,18 +10,20 @@
   <a href="https://hub.docker.com/r/wavesplatform/wavesnode" target="_blank">
     <img alt="Docker pulls" src="https://badgen.net/docker/pulls/wavesplatform/wavesnode?icon=docker" />
   </a>
-  <a href="https://github.com/wavesplatform/Waves/blob/master/LICENSE" target="_blank">
-    <img alt="License: MIT" src="https://badgen.net/github/license/wavesplatform/Waves?color=gray"/>
-  </a>
-  <a href="https://github.com/wavesplatform/Waves/issues" target="_blank">
-    <img alt="Open Issues" src="https://badgen.net/github/open-issues/wavesplatform/Waves?color=gray" />
-  </a>
+
   <br/>
+
   <a href="https://twitter.com/wavesprotocol" target="_blank">
     <img alt="Twitter: Waves Tech" src="https://badgen.net/twitter/follow/wavesprotocol?icon=twitter&label=follow%20on%20Twitter" />
   </a>
   <a href="https://medium.com/wavesprotocol" target="_blank">
     <img alt="Medium: Waves Tech" src="https://badgen.net/runkit/msmolyakov/get-medium-followers?icon=medium&cache=86400" />
+  </a>
+  <a href="https://t.me/waves_ride_dapps_dev" target="_blank">
+    <img alt="Telegram" src="https://badgen.net/badge/icon/Waves%20Dev%20Jedi?icon=telegram&label=Telegram"/>
+  </a>
+  <a href="https://github.com/msmolyakov/awesome-waves" target="_blank">
+    <img alt="Awesome Waves" src="https://badgen.net/badge/icon/Awesome%20Waves?icon=awesome&label&color=pink" />
   </a>
 </p>
 
