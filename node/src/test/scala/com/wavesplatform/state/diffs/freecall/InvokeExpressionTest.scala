@@ -34,9 +34,10 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
   private val assetDecimals     = 4
   private val assetIsReissuable = true
 
-  private def expr(invoker: KeyPair, fee: Long, issue: Boolean, transfersCount: Int, receiver: Address): ExprScript =
+  private def expr(invoker: KeyPair, fee: Long, issue: Boolean, transfersCount: Int, receiver: Address, sigVerifyCount: Int): ExprScript =
     TestCompiler(V6).compileFreeCall(
       s"""
+         | ${(1 to sigVerifyCount).map(i => s"strict r$i = sigVerify(base58'', base58'', base58'')").mkString("\n")}
          | let address   = Address(base58'${invoker.toAddress}')
          | let publicKey = base58'${invoker.publicKey}'
          | let check =
@@ -111,7 +112,8 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
       verifier: Option[Script] = None,
       sponsor: Boolean = false,
       version: Byte = 1,
-      transfersCount: Int = 0
+      transfersCount: Int = 0,
+      sigVerifyCount: Int = 0
   ) =
     for {
       invoker  <- accountGen
@@ -122,7 +124,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
       issueTx   = IssueTransaction.selfSigned(TxVersion.V2, invoker, "name", "", 1000, 1, true, None, fee, ts).explicitGet()
       asset     = IssuedAsset(issueTx.id.value())
       sponsorTx = SponsorFeeTransaction.selfSigned(TxVersion.V2, invoker, asset, Some(1000L), fee, ts).explicitGet()
-      call      = expr(invoker, fee, issue, transfersCount, receiver.toAddress)
+      call      = expr(invoker, fee, issue, transfersCount, receiver.toAddress, sigVerifyCount)
       feeAsset  = if (sponsor) asset else Waves
       invoke    = InvokeExpressionTransaction.selfSigned(version, invoker, call, fee, feeAsset, ts).explicitGet()
     } yield (Seq(gtx, issueTx, sponsorTx, stx), invoke)
@@ -272,6 +274,14 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invoke)
       d.liquidDiff.errorMessage(invoke.txId).get.text shouldBe "Actions count limit is exceeded"
+    }
+  }
+
+  property("complexity limit") {
+    val (genesisTxs, invoke) = scenario(sigVerifyCount = 50).sample.get
+    withDomain(RideV6) { d =>
+      d.appendBlock(genesisTxs: _*)
+      intercept[Exception](d.appendBlock(invoke)).getMessage should include("Contract function (default) is too complex: 10413 > 10000")
     }
   }
 }
