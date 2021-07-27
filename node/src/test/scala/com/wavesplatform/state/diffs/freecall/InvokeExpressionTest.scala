@@ -103,7 +103,13 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
        """.stripMargin
     )
 
-  private def scenario(enoughFee: Boolean = true, issue: Boolean = true, verifier: Option[Script] = None, sponsor: Boolean = false) =
+  private def scenario(
+      enoughFee: Boolean = true,
+      issue: Boolean = true,
+      verifier: Option[Script] = None,
+      sponsor: Boolean = false,
+      version: Byte = 1
+  ) =
     for {
       invoker <- accountGen
       fee     <- ciFee(freeCall = enoughFee, nonNftIssue = if (issue) 1 else 0)
@@ -114,7 +120,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
       sponsorTx = SponsorFeeTransaction.selfSigned(TxVersion.V2, invoker, asset, Some(1000L), fee, ts).explicitGet()
       call      = expr(invoker, fee, issue)
       feeAsset  = if (sponsor) asset else Waves
-      invoke    = InvokeExpressionTransaction.selfSigned(TxVersion.V1, invoker, call, fee, feeAsset, ts).explicitGet()
+      invoke    = InvokeExpressionTransaction.selfSigned(version, invoker, call, fee, feeAsset, ts).explicitGet()
     } yield (Seq(gtx, issueTx, sponsorTx, stx), invoke)
 
   private def feeErrorMessage(invoke: InvokeExpressionTransaction, issue: Boolean = false) = {
@@ -226,6 +232,15 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
     withDomain(RideV5) { d =>
       d.appendBlock(genesisTxs: _*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include("Ride V6 feature has not been activated yet")
+    }
+  }
+
+  property("available versions") {
+    val unsupportedVersion   = InvokeExpressionTransaction.supportedVersions.max + 1
+    val (genesisTxs, invoke) = scenario(version = unsupportedVersion.toByte).sample.get
+    withDomain(RideV6) { d =>
+      d.appendBlock(genesisTxs: _*)
+      intercept[Exception](d.appendBlock(invoke)).getMessage should include("Invalid tx version")
     }
   }
 
