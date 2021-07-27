@@ -252,6 +252,17 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       }
     }
 
+    "should handle stream from arbitrary height" in withDomainAndRepo { (d, repo) =>
+      d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
+
+      (1 until 10).foreach(_ => d.appendBlock())
+      val subscription = repo.createSubscription(SubscribeRequest.of(8, 15))
+      (1 to 10).foreach(_ => d.appendBlock())
+
+      val result = Await.result(subscription, 20 seconds)
+      result.map(_.toUpdate.height) shouldBe(8 to 15)
+    }
+
     "should handle genesis and payment" in withFuncSettings(currentFS.copy(blockVersion3AfterHeight = 3))(withGenerateSubscription() { d =>
       val tx =
         PaymentTransaction.create(TxHelpers.defaultSigner, TxHelpers.secondAddress, 100, 100000, TxHelpers.timestamp).explicitGet()

@@ -360,8 +360,8 @@ object StateUpdate {
     }
   }
 
-  private val WavesAlias   = Alias.fromString("alias:W:waves").explicitGet()
-  private val WavesAddress = Address.fromString("3PGd1eQR8EhLkSogpmu9Ne7hSH1rQ5ALihd").explicitGet()
+  private lazy val WavesAlias   = Alias.fromString("alias:W:waves").explicitGet()
+  private lazy val WavesAddress = Address.fromString("3PGd1eQR8EhLkSogpmu9Ne7hSH1rQ5ALihd").explicitGet()
 
   def atomic(blockchainBeforeWithMinerReward: Blockchain, diff: Diff): StateUpdate = {
     val blockchain      = blockchainBeforeWithMinerReward
