@@ -1,7 +1,5 @@
 package com.wavesplatform.transaction.smart
 
-import scala.annotation.tailrec
-import scala.util.{Failure, Success, Try}
 import cats.Id
 import cats.syntax.either._
 import cats.syntax.functor._
@@ -10,7 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V6}
+import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -22,17 +20,20 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TraceStep, TracedResult}
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
+import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TraceStep, TracedResult}
 import com.wavesplatform.utils.ScorexLogging
 import org.msgpack.core.annotations.VisibleForTesting
 import shapeless.Coproduct
+
+import scala.annotation.tailrec
+import scala.util.{Failure, Success, Try}
 
 object Verifier extends ScorexLogging {
 
