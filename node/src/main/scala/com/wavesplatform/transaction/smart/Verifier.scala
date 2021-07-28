@@ -1,7 +1,5 @@
 package com.wavesplatform.transaction.smart
 
-import java.math.BigInteger
-
 import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
 
@@ -9,7 +7,6 @@ import cats.Id
 import cats.syntax.either._
 import cats.syntax.functor._
 import com.google.common.base.Throwables
-import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
@@ -33,7 +30,6 @@ import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, A
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.utils.ScorexLogging
 import org.msgpack.core.annotations.VisibleForTesting
-import org.web3j.crypto.{ECDSASignature, Hash, Sign}
 import shapeless.Coproduct
 
 object Verifier extends ScorexLogging {
@@ -266,18 +262,11 @@ object Verifier extends ScorexLogging {
   }
 
   def verifyOrderSignature(order: Order): Either[GenericError, Order] =
-    order.proofs.proofs match {
-      case p +: Nil if order.ethSignature =>
-        val signature = EthOrders.decodeSignature(p.arr)
-        val bytes     = EthOrders.encodeAsEthStruct(order)
-        val signerKey = Sign
-          .recoverFromSignature(
-            1,
-            new ECDSASignature(new BigInteger(1, signature.getR), new BigInteger(1, signature.getS)),
-            Hash.sha3(bytes)
-          )
-          .toByteArray
-        Either.cond(PublicKey(signerKey) == order.senderPublicKey, order, GenericError(s"Proof doesn't validate as ethereum signature for $order"))
+    order.ethSignature match {
+      case Some(ethSignature) =>
+        val signerKey = EthOrders.recoverEthSignerKey(order, ethSignature.arr)
+        Either.cond(signerKey == order.senderPublicKey, order, GenericError(s"Ethereum signature invalid for $order"))
+
       case _ => verifyAsEllipticCurveSignature(order)
     }
 

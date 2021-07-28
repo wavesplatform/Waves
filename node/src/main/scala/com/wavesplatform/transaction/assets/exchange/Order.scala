@@ -28,12 +28,12 @@ case class Order(
     matcherFee: TxAmount,
     matcherFeeAssetId: Asset = Waves,
     proofs: Proofs = Proofs.empty,
-    ethSignature: Boolean = false
+    ethSignature: Option[ByteStr] = None
 ) extends Proven {
   import Order._
 
-  val sender: PublicKey = senderPublicKey
-  def senderAddress: Address = if (ethSignature) EthereumAddress(sender) else sender.toAddress
+  val sender: PublicKey      = senderPublicKey
+  def senderAddress: Address = if (ethSignature.isDefined) EthereumAddress(sender) else sender.toAddress
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(amount, price) &&
@@ -44,7 +44,8 @@ case class Order(
     (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
     (expiration >= atTime) :| "expiration should be > currentTime" &&
     (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves" &&
-    (!ethSignature || version >= Order.V4) :| "ethSignature available only in V4"
+    (ethSignature.isEmpty || version >= Order.V4) :| "ethSignature available only in V4" &&
+    ethSignature.forall(es => es.size == 65 && es.size == 129) :| "ethSignature should be of length 65 or 129"
   }
 
   def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {
@@ -54,9 +55,9 @@ case class Order(
   }
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.bodyBytes(this))
-  val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(crypto.fastHash(bodyBytes())))
-  val idStr: Coeval[String] = Coeval.evalOnce(id().toString)
-  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.toBytes(this))
+  val id: Coeval[ByteStr]            = Coeval.evalOnce(ByteStr(crypto.fastHash(bodyBytes())))
+  val idStr: Coeval[String]          = Coeval.evalOnce(id().toString)
+  val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(OrderSerializer.toBytes(this))
 
   def getReceiveAssetId: Asset = orderType match {
     case OrderType.BUY  => assetPair.amountAsset
@@ -108,7 +109,8 @@ object Order {
       matcherFee: TxAmount,
       matcherFeeAssetId: Asset = Asset.Waves
   ): Order =
-    Order(version, sender.publicKey, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId).signWith(sender.privateKey)
+    Order(version, sender.publicKey, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
+      .signWith(sender.privateKey)
 
   def buy(
       version: TxVersion,

@@ -16,7 +16,7 @@ object PublicKey extends TaggedType[ByteStr] {
   val KeyStringLength: Int = base58Length(KeyLength)
 
   def apply(publicKey: ByteStr): PublicKey = {
-    require(publicKey.arr.length == KeyLength, s"invalid public key length: ${publicKey.arr.length}")
+    require(publicKey.arr.length == KeyLength || publicKey.arr.length == EthereumKeyLength, s"invalid public key length: ${publicKey.arr.length}")
     interner.intern(publicKey @@ this)
   }
 
@@ -34,6 +34,7 @@ object PublicKey extends TaggedType[ByteStr] {
 
   implicit class PublicKeyImplicitOps(private val pk: PublicKey) extends AnyVal {
     def toAddress: WavesAddress                = Address.fromPublicKey(pk)
+    def toEthAddress: EthereumAddress          = EthereumAddress(pk)
     def toAddress(chainId: Byte): WavesAddress = Address.fromPublicKey(pk, chainId)
   }
 

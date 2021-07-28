@@ -1,19 +1,21 @@
 package com.wavesplatform.transaction.assets.exchange
 
+import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.util
 
 import scala.jdk.CollectionConverters._
 
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.account.{AddressScheme, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import org.bouncycastle.util.encoders.Hex
 import org.web3j.abi.datatypes.generated.Bytes32
+import org.web3j.crypto.{ECDSASignature, Hash, Sign, StructuredDataEncoder}
 import org.web3j.crypto.Sign.SignatureData
-import org.web3j.crypto.StructuredDataEncoder
 
-object EthOrders {
+object EthOrders extends App {
   private[this] lazy val encoder = new StructuredDataEncoder(orderDomainJson)
 
   def encodeAsset(asset: Asset): String = asset match {
@@ -47,13 +49,36 @@ object EthOrders {
     )
   }
 
+  def recoverEthSignerKey(order: Order, signature: Array[Byte]): PublicKey = {
+    val bytes = encodeAsEthStruct(order)
+    recoverEthSignerKey(bytes, signature)
+  }
+
+  def recoverEthSignerKey(message: Array[Byte], signature: Array[Byte]): PublicKey = {
+    val signatureData = EthOrders.decodeSignature(signature)
+    val signerKey = Sign
+      .recoverFromSignature(
+        0,
+        new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS)),
+        Hash.sha3(message)
+      )
+      .toByteArray
+      .takeRight(64)
+    PublicKey(ByteStr(signerKey))
+  }
+
   def decodeSignature(signature: Array[Byte]): SignatureData = {
     val buffer = ByteBuffer.wrap(signature)
-    val R = new Array[Byte](64)
-    val S = new Array[Byte](64)
-    buffer.get(R) // 0-64
-    buffer.get(S) // 64-128
-    val V = buffer.get() // Last byte
+    val paramSize = buffer.remaining() match {
+      case 129 => 64
+      case 65  => 32
+      case _   => ???
+    }
+    val R = new Array[Byte](paramSize)
+    val S = new Array[Byte](paramSize)
+    buffer.get(R)
+    buffer.get(S)
+    val V = buffer.get()
     new SignatureData(V, R, S)
   }
 
@@ -83,10 +108,6 @@ object EthOrders {
       |      {
       |        "name": "version",
       |        "type": "int32"
-      |      },
-      |      {
-      |        "name": "senderPublicKey",
-      |        "type": "bytes32"
       |      },
       |      {
       |        "name": "matcherPublicKey",
@@ -135,7 +156,7 @@ object EthOrders {
       |    "name": "Waves Exchange",
       |    "version": "1",
       |    "chainId": ${AddressScheme.current.chainId},
-      |    "verifyingContract": "0x${Hex.toHexString(Array.fill[Byte](32)(AddressScheme.current.chainId))}"
+      |    "verifyingContract": "0x${Hex.toHexString(Array.fill[Byte](20)(AddressScheme.current.chainId))}"
       |  },
       |  "message": {}
       |}
