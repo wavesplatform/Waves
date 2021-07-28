@@ -40,11 +40,13 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
       issue: Boolean,
       transfersCount: Int,
       receiver: Address,
-      sigVerifyCount: Int
+      sigVerifyCount: Int,
+      raiseError: Boolean
   ): ExprScript =
     TestCompiler(V6).compileFreeCall(
       s"""
          | ${(1 to sigVerifyCount).map(i => s"strict r$i = sigVerify(base58'', base58'', base58'')").mkString("\n")}
+         | ${if (raiseError) "strict f = throw()" else ""}
          | let address   = Address(base58'${invoker.toAddress}')
          | let publicKey = base58'${invoker.publicKey}'
          | let check =
@@ -129,7 +131,8 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
       version: Byte = 1,
       transfersCount: Int = 0,
       sigVerifyCount: Int = 0,
-      bigVerifier: Boolean = false
+      bigVerifier: Boolean = false,
+      raiseError: Boolean = false
   ): (Seq[Transaction], InvokeExpressionTransaction) = {
     val invoker  = accountGen.sample.get
     val receiver = accountGen.sample.get
@@ -143,7 +146,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
     val sponsorTx      = SponsorFeeTransaction.selfSigned(TxVersion.V2, invoker, sponsorAsset, Some(1000L), fee, ts).explicitGet()
     val feeAsset       = if (sponsor) sponsorAsset else Waves
 
-    val call   = expr(invoker, fee, issue, transfersCount, receiver.toAddress, sigVerifyCount)
+    val call   = expr(invoker, fee, issue, transfersCount, receiver.toAddress, sigVerifyCount, raiseError)
     val invoke = InvokeExpressionTransaction.selfSigned(version, invoker, call, fee, feeAsset, ts).explicitGet()
 
     (Seq(genesis, sponsorIssueTx, sponsorTx, setVerifier), invoke)
@@ -321,6 +324,23 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include("Contract function (default) is too complex: 10413 > 10000")
+    }
+  }
+
+  property("reject due to script error") {
+    val (genesisTxs, invoke) = scenario(raiseError = true)
+    withDomain(RideV6) { d =>
+      d.appendBlock(genesisTxs: _*)
+      intercept[Exception](d.appendBlock(invoke)).getMessage should include("ScriptExecutionError(error = Explicit script termination")
+    }
+  }
+
+  property("fail due to script error") {
+    val (genesisTxs, invoke) = scenario(raiseError = true, sigVerifyCount = 5)
+    withDomain(RideV6) { d =>
+      d.appendBlock(genesisTxs: _*)
+      d.appendBlock(invoke)
+      d.liquidDiff.errorMessage(invoke.id.value()).get.text should include("Explicit script termination")
     }
   }
 }
