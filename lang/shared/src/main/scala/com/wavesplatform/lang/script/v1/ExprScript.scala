@@ -21,20 +21,21 @@ object ExprScript {
 
   val checksumLength = 4
 
-  def validateBytes(bs: Array[Byte]): Either[String, Unit] =
+  def validateBytes(bs: Array[Byte], isFreeCall: Boolean): Either[String, Unit] = {
+    val limit = if (isFreeCall) MaxContractSizeInBytes else MaxExprSizeInBytes
     Either.cond(
-      bs.length <= MaxExprSizeInBytes,
+      bs.length <= limit,
       (),
-      s"Script is too large: ${bs.length} bytes > $MaxExprSizeInBytes bytes"
+      s"Script is too large: ${bs.length} bytes > $limit bytes"
     )
-
+  }
   @VisibleForTesting
   def apply(x: EXPR): Either[String, Script] = apply(V1, x)
 
   def apply(version: StdLibVersion, x: EXPR, isFreeCall: Boolean = false, checkSize: Boolean = true): Either[String, ExprScript] =
     ExprScriptImpl(version, isFreeCall, x)
       .asRight[String]
-      .flatTap(s => if (checkSize) validateBytes(s.bytes().arr) else Right(()))
+      .flatTap(s => if (checkSize) validateBytes(s.bytes().arr, isFreeCall) else Right(()))
 
   def estimateExact(
       expr: EXPR,
