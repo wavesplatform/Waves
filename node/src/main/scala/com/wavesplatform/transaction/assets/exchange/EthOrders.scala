@@ -2,9 +2,6 @@ package com.wavesplatform.transaction.assets.exchange
 
 import java.math.BigInteger
 import java.nio.ByteBuffer
-import java.util
-
-import scala.jdk.CollectionConverters._
 
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -12,15 +9,15 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import org.bouncycastle.util.encoders.Hex
 import org.web3j.abi.datatypes.generated.Bytes32
-import org.web3j.crypto.{ECDSASignature, Hash, Sign, StructuredDataEncoder}
+import org.web3j.crypto.{ECDSASignature, Sign, StructuredDataEncoder}
 import org.web3j.crypto.Sign.SignatureData
+import org.web3j.utils.Numeric
+import play.api.libs.json.{JsObject, Json}
 
 object EthOrders extends App {
-  private[this] lazy val encoder = new StructuredDataEncoder(orderDomainJson)
-
   def encodeAsset(asset: Asset): String = asset match {
-    case IssuedAsset(id) => Hex.toHexString(id.arr)
-    case Waves           => Hex.toHexString(Bytes32.DEFAULT.getValue)
+    case IssuedAsset(id) => Numeric.toHexString(id.arr)
+    case Waves           => Numeric.toHexString(Bytes32.DEFAULT.getValue)
   }
 
   def encodeOrderType(orderType: OrderType): Boolean = orderType match {
@@ -28,29 +25,28 @@ object EthOrders extends App {
     case OrderType.SELL => true
   }
 
-  def encodeAsEthStruct(order: Order): Array[Byte] = {
-    encoder.encodeData(
-      "Order",
-      new util.HashMap(
-        Map(
-          "version"           -> order.version.toInt,
-          "matcherPublicKey"  -> Hex.toHexString(order.matcherPublicKey.arr),
-          "amountAsset"       -> encodeAsset(order.assetPair.amountAsset),
-          "priceAsset"        -> encodeAsset(order.assetPair.priceAsset),
-          "orderType"         -> encodeOrderType(order.orderType),
-          "amount"            -> order.amount,
-          "price"             -> order.price,
-          "timestamp"         -> order.timestamp,
-          "expiration"        -> order.expiration,
-          "matcherFee"        -> order.matcherFee,
-          "matcherFeeAssetId" -> encodeAsset(order.matcherFeeAssetId)
-        ).asJava
-      ).asInstanceOf[util.HashMap[String, AnyRef]]
+  def hashOrderStruct(order: Order): Array[Byte] = {
+    val message = Json.obj(
+      "version"           -> order.version.toInt,
+      "matcherPublicKey"  -> Numeric.toHexString(order.matcherPublicKey.arr),
+      "amountAsset"       -> encodeAsset(order.assetPair.amountAsset),
+      "priceAsset"        -> encodeAsset(order.assetPair.priceAsset),
+      "orderType"         -> encodeOrderType(order.orderType),
+      "amount"            -> order.amount,
+      "price"             -> order.price,
+      "timestamp"         -> order.timestamp,
+      "expiration"        -> order.expiration,
+      "matcherFee"        -> order.matcherFee,
+      "matcherFeeAssetId" -> encodeAsset(order.matcherFeeAssetId)
     )
+
+    val json = Json.parse(orderDomainJson).as[JsObject] ++ Json.obj("message" -> message)
+    val encoder = new StructuredDataEncoder(json.toString)
+    encoder.hashStructuredData()
   }
 
   def recoverEthSignerKey(order: Order, signature: Array[Byte]): PublicKey = {
-    val bytes = encodeAsEthStruct(order)
+    val bytes = hashOrderStruct(order)
     recoverEthSignerKey(bytes, signature)
   }
 
@@ -58,9 +54,9 @@ object EthOrders extends App {
     val signatureData = EthOrders.decodeSignature(signature)
     val signerKey = Sign
       .recoverFromSignature(
-        0,
+        signatureData.getV.head - 27,
         new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS)),
-        Hash.sha3(message)
+        message
       )
       .toByteArray
       .takeRight(64)
@@ -123,7 +119,7 @@ object EthOrders extends App {
       |      },
       |      {
       |        "name": "orderType",
-      |        "type": "boolean"
+      |        "type": "bool"
       |      },
       |      {
       |        "name": "amount",
