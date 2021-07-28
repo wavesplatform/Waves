@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract.freecall
 import com.typesafe.config.Config
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
@@ -11,6 +12,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.directives.values.StdLibVersion.V6
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.transaction.smart.InvokeExpressionTransaction
 import org.scalatest.{Assertion, CancelAfterFailure}
 
 class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -55,6 +57,20 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     List(stateChanges, stateChangesByAddress).foreach(checkStateChanges)
 
     sender.getDataByKey(firstAddress, "check").value shouldBe true
+  }
+
+  test("reject on illegal fields") {
+    val unsupportedVersion = InvokeExpressionTransaction.supportedVersions.max + 1
+    assertApiError(
+      sender.invokeExpression(firstKeyPair, expr, version = unsupportedVersion.toByte),
+      AssertiveApiError(CustomValidationError.Id, s"Bad transaction type (18) and version ($unsupportedVersion)")
+    )
+
+    val illegalExpression = TestCompiler(V6).compileExpression("true").asInstanceOf[ExprScript]
+    assertApiError(
+      sender.invokeExpression(firstKeyPair, illegalExpression),
+      AssertiveApiError(CustomValidationError.Id, "Script type for Invoke Expression Transaction should be CALL")
+    )
   }
 
   private def checkTx(tx: Transaction, checkStatus: Boolean = true): Assertion = {
