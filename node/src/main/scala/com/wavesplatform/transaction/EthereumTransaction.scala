@@ -4,7 +4,7 @@ import java.math.BigInteger
 
 import scala.reflect.ClassTag
 
-import com.wavesplatform.account.{Address, AddressScheme, EthereumAddress, PublicKey, Recipient}
+import com.wavesplatform.account._
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -14,6 +14,7 @@ import com.wavesplatform.state.{Height, TxNum}
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.utils.EthEncoding
 import monix.eval.Coeval
 import org.bouncycastle.util.encoders.Hex
 import org.web3j.abi.TypeDecoder
@@ -21,7 +22,6 @@ import org.web3j.abi.datatypes.{Address => EthAddress}
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto._
 import org.web3j.rlp.{RlpEncoder, RlpList}
-import org.web3j.utils.Numeric._
 import play.api.libs.json._
 
 sealed abstract class EthereumTransaction(final val underlying: SignedRawTransaction) extends Transaction(TransactionType.Ethereum) {
@@ -64,20 +64,20 @@ sealed abstract class EthereumTransaction(final val underlying: SignedRawTransac
   )
 
   def ethereumJson(blockId: Option[BlockId], height: Option[Height], num: Option[TxNum]): JsObject = Json.obj(
-    "blockHash"        -> blockId.map(id => toHexString(id.arr)),
-    "blockNumber"      -> height.map(h => toHexStringWithPrefix(BigInteger.valueOf(h))),
+    "blockHash"        -> blockId.map(id => EthEncoding.toHexString(id.arr)),
+    "blockNumber"      -> height.map(h => EthEncoding.toHexString(BigInteger.valueOf(h))),
     "from"             -> EthereumAddress(PublicKey(signerPublicKey())).toString,
-    "gas"              -> toHexStringWithPrefix(underlying.getGasLimit),
-    "gasPrice"         -> toHexStringWithPrefix(underlying.getGasPrice),
-    "hash"             -> toHexString(id().arr),
+    "gas"              -> EthEncoding.toHexString(underlying.getGasLimit),
+    "gasPrice"         -> EthEncoding.toHexString(underlying.getGasPrice),
+    "hash"             -> EthEncoding.toHexString(id().arr),
     "input"            -> underlying.getData,
-    "nonce"            -> toHexStringWithPrefix(underlying.getNonce),
+    "nonce"            -> EthEncoding.toHexString(underlying.getNonce),
     "to"               -> underlying.getTo,
-    "transactionIndex" -> num.map(n => toHexStringWithPrefix(BigInteger.valueOf(n))),
-    "value"            -> toHexStringWithPrefix(underlying.getValue),
-    "v"                -> toHexString(underlying.getSignatureData.getV),
-    "r"                -> toHexString(underlying.getSignatureData.getR),
-    "s"                -> toHexString(underlying.getSignatureData.getS)
+    "transactionIndex" -> num.map(n => EthEncoding.toHexString(BigInteger.valueOf(n))),
+    "value"            -> EthEncoding.toHexString(underlying.getValue),
+    "v"                -> EthEncoding.toHexString(underlying.getSignatureData.getV),
+    "r"                -> EthEncoding.toHexString(underlying.getSignatureData.getR),
+    "s"                -> EthEncoding.toHexString(underlying.getSignatureData.getS)
   )
 }
 
@@ -108,7 +108,7 @@ object EthereumTransaction {
           "amount"    -> amount,
           "asset" -> (asset match {
             case Left(_)      => JsNull
-            case Right(erc20) => toHexString(erc20.arr)
+            case Right(erc20) => EthEncoding.toHexString(erc20.arr)
           })
         )
       )
@@ -143,14 +143,14 @@ object EthereumTransaction {
   }
 
   def apply(bytes: Array[Byte]): EthereumTransaction =
-    apply(TransactionDecoder.decode(toHexString(bytes)).asInstanceOf[SignedRawTransaction])
+    apply(TransactionDecoder.decode(EthEncoding.toHexString(bytes)).asInstanceOf[SignedRawTransaction])
 
   val ERC20TransferPrefix: String = "a9059cbb"
 
   def apply(underlying: SignedRawTransaction): EthereumTransaction = {
-    val hexData          = cleanHexPrefix(underlying.getData)
-    val senderAddress    = PBRecipients.toAddress(hexStringToByteArray(underlying.getFrom), underlying.getChainId.toByte).explicitGet()
-    val recipientAddress = ByteStr(hexStringToByteArray(underlying.getTo))
+    val hexData          = EthEncoding.cleanHexPrefix(underlying.getData)
+    val senderAddress    = PBRecipients.toAddress(EthEncoding.toBytes(underlying.getFrom), underlying.getChainId.toByte).explicitGet()
+    val recipientAddress = ByteStr(EthEncoding.toBytes(underlying.getTo))
     if (hexData.isEmpty) {
       new Transfer(
         senderAddress,
@@ -166,7 +166,7 @@ object EthereumTransaction {
         senderAddress,
         Right(ERC20Address(recipientAddress)),
         amount.getValue.longValueExact(),
-        new EthereumAddress(hexStringToByteArray(recipient.toString)),
+        new EthereumAddress(EthEncoding.toBytes(recipient.toString)),
         underlying
       )
     } else new InvokeScript(senderAddress, new EthereumAddress(recipientAddress.arr), ByteStr(Hex.decode(hexData)), underlying)

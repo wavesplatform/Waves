@@ -7,28 +7,28 @@ import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.utils.EthEncoding
 import org.bouncycastle.util.encoders.Hex
 import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.crypto.{ECDSASignature, Sign, StructuredDataEncoder}
 import org.web3j.crypto.Sign.SignatureData
-import org.web3j.utils.Numeric
 import play.api.libs.json.{JsObject, Json}
 
 object EthOrders extends App {
-  def encodeAsset(asset: Asset): String = asset match {
-    case IssuedAsset(id) => Numeric.toHexString(id.arr)
-    case Waves           => Numeric.toHexString(Bytes32.DEFAULT.getValue)
-  }
-
-  def encodeOrderType(orderType: OrderType): Boolean = orderType match {
-    case OrderType.BUY  => false
-    case OrderType.SELL => true
-  }
-
   def hashOrderStruct(order: Order): Array[Byte] = {
+    def encodeAsset(asset: Asset): String = asset match {
+      case IssuedAsset(id) => EthEncoding.toHexString(id.arr)
+      case Waves           => EthEncoding.toHexString(Bytes32.DEFAULT.getValue)
+    }
+
+    def encodeOrderType(orderType: OrderType): Boolean = orderType match {
+      case OrderType.BUY  => false
+      case OrderType.SELL => true
+    }
+
     val message = Json.obj(
       "version"           -> order.version.toInt,
-      "matcherPublicKey"  -> Numeric.toHexString(order.matcherPublicKey.arr),
+      "matcherPublicKey"  -> EthEncoding.toHexString(order.matcherPublicKey.arr),
       "amountAsset"       -> encodeAsset(order.assetPair.amountAsset),
       "priceAsset"        -> encodeAsset(order.assetPair.priceAsset),
       "orderType"         -> encodeOrderType(order.orderType),
@@ -40,7 +40,7 @@ object EthOrders extends App {
       "matcherFeeAssetId" -> encodeAsset(order.matcherFeeAssetId)
     )
 
-    val json = Json.parse(orderDomainJson).as[JsObject] ++ Json.obj("message" -> message)
+    val json    = Json.parse(orderDomainJson).as[JsObject] ++ Json.obj("message" -> message)
     val encoder = new StructuredDataEncoder(json.toString)
     encoder.hashStructuredData()
   }

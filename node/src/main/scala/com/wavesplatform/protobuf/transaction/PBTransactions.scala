@@ -20,12 +20,10 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{EthereumTransaction, Proofs, TxValidationError}
-import com.wavesplatform.utils.StringBytes
+import com.wavesplatform.utils.{EthEncoding, StringBytes}
 import com.wavesplatform.{transaction => vt}
 import org.web3j.crypto.{SignedRawTransaction, TransactionDecoder}
-import org.web3j.utils.Numeric.toHexString
 import scalapb.UnknownFieldSet.empty
-
 import scala.util.Try
 
 object PBTransactions {
@@ -64,7 +62,7 @@ object PBTransactions {
       case PBTransactionWrapper.Transaction.Empty                   => ???
       case PBTransactionWrapper.Transaction.WavesTransaction(value) => vanilla(value, unsafe)
       case PBTransactionWrapper.Transaction.EthereumTransaction(bytes) =>
-        Right(EthereumTransaction(TransactionDecoder.decode(toHexString(bytes.toByteArray)).asInstanceOf[SignedRawTransaction]))
+        Right(EthereumTransaction(TransactionDecoder.decode(EthEncoding.toHexString(bytes.toByteArray)).asInstanceOf[SignedRawTransaction]))
     }
   }
 
