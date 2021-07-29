@@ -8,9 +8,8 @@ import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CaseObj}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
-import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart.predef
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.TxValidationError.InvalidAddress
 import org.scalacheck.Gen
 

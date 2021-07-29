@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair, WavesRecipient}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
@@ -9,6 +9,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.StringDataEntry
+import com.wavesplatform.test.Signed
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -96,14 +97,14 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
 
     def invokeScript(
         from: KeyPair,
-        dapp: Address,
+        dapp: WavesRecipient,
         call: FUNCTION_CALL,
         payments: Seq[InvokeScriptTransaction.Payment] = Nil,
         timestamp: Gen[Long] = timestampGen
     ): Gen[InvokeScriptTransaction] =
       for {
         timestamp <- timestamp
-      } yield InvokeScriptTransaction.selfSigned(1.toByte, from, dapp, Some(call), payments, FeeAmount * 2, Waves, timestamp).explicitGet()
+      } yield Signed.invokeScript(1.toByte, from, dapp, Some(call), payments, FeeAmount * 2, Waves, timestamp)
   }
 
   object UnsafeBlocks {
@@ -135,10 +136,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         ts: Long
     ): (Block, MicroBlock) = {
       val newTotalBlock = unsafeBlock(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
-      val unsigned      = new MicroBlock(version, signer.publicKey, txs, prevTotal.id(), newTotalBlock.signature, ByteStr.empty)
-      val signature     = crypto.sign(signer.privateKey, unsigned.bytes())
-      val signed        = unsigned.copy(signature = signature)
-      (newTotalBlock, signed)
+      (newTotalBlock, MicroBlock.buildAndSign(version, signer, txs, prevTotal.id(), newTotalBlock.signature).explicitGet())
     }
 
     def unsafeBlock(

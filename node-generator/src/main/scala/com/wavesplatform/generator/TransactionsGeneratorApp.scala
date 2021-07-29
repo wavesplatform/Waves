@@ -227,7 +227,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
             nodeRestUrl,
             () => canContinue,
             initialUniTransactions ++ initialGenTransactions,
-            finalConfig.privateKeyAccounts.map(_.toAddress.stringRepr),
+            finalConfig.privateKeyAccounts.map(_.toAddress.toString),
             initialTailTransactions ++ initialGenTailTransactions
           )
       }

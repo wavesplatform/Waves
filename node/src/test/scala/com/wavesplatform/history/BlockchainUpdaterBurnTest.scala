@@ -5,8 +5,8 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxVersion}

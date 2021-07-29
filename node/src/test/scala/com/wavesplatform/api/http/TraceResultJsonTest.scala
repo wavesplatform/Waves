@@ -31,7 +31,8 @@ class TraceResultJsonTest extends PropSpec with JsonMatchers {
         fee = 10000000L,
         feeAssetId = Waves,
         timestamp = 1111L,
-        proofs = Proofs(List(proof))
+        proofs = Proofs(List(proof)),
+        address.chainId
       )
     } yield tx
   ).explicitGet()

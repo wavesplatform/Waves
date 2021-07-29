@@ -268,7 +268,7 @@ object PBTransactions {
         import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
         for {
-          dApp <- PBRecipients.toRecipient(dappAddress, chainId)
+          dApp <- PBRecipients.toAddressOrAlias(dappAddress, chainId)
 
           fcOpt <- Deser
             .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
@@ -490,7 +490,7 @@ object PBTransactions {
         vt.smart.InvokeScriptTransaction(
           version.toByte,
           sender,
-          PBRecipients.toRecipient(dappAddress, chainId).explicitGet(),
+          PBRecipients.toAddressOrAlias(dappAddress, chainId).explicitGet(),
           Deser
             .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
             .map(_.explicitGet().asInstanceOf[FUNCTION_CALL]),
@@ -587,7 +587,7 @@ object PBTransactions {
 
       case tx: vt.lease.LeaseTransaction =>
         import tx._
-        val data = LeaseTransactionData(Some(recipient.recipient.toPb), amount)
+        val data = LeaseTransactionData(Some(recipient.toPb), amount)
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Lease(data))
 
       case tx: vt.lease.LeaseCancelTransaction =>

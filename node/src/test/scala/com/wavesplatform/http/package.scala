@@ -64,8 +64,8 @@ package object http {
         Base58
           .tryDecodeWithLimit(str)
           .toEither
-          .flatMap(AddressOrAlias.fromBytes(_, 0))
-          .map { case (x, _) => JsSuccess(x) }
+          .flatMap(AddressOrAlias.fromBytes)
+          .map(JsSuccess(_))
           .getOrElse(JsError("Can't read PublicKey"))
 
       case _ => JsError("Can't read PublicKey")

@@ -15,8 +15,8 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
@@ -33,16 +33,26 @@ class ListParamInvokeTest extends PropSpec with WithState with Inside {
         List(
           CallableFunction(
             CallableAnnotation("i"),
-            FUNC("f", List("args"),
+            FUNC(
+              "f",
+              List("args"),
               FUNCTION_CALL(
                 Native(FunctionIds.CREATE_LIST),
                 List(
-                  FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("entry1").explicitGet(), FUNCTION_CALL(Native(FunctionIds.GET_LIST), List(REF("args"), CONST_LONG(0))))),
+                  FUNCTION_CALL(
+                    User("DataEntry"),
+                    List(CONST_STRING("entry1").explicitGet(), FUNCTION_CALL(Native(FunctionIds.GET_LIST), List(REF("args"), CONST_LONG(0))))
+                  ),
                   FUNCTION_CALL(
                     Native(FunctionIds.CREATE_LIST),
                     List(
-                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("entry2").explicitGet(), FUNCTION_CALL(Native(FunctionIds.GET_LIST), List(REF("args"), CONST_LONG(1))))),
-                      REF("nil")))
+                      FUNCTION_CALL(
+                        User("DataEntry"),
+                        List(CONST_STRING("entry2").explicitGet(), FUNCTION_CALL(Native(FunctionIds.GET_LIST), List(REF("args"), CONST_LONG(1))))
+                      ),
+                      REF("nil")
+                    )
+                  )
                 )
               )
             )
@@ -80,17 +90,22 @@ class ListParamInvokeTest extends PropSpec with WithState with Inside {
         Some(
           FUNCTION_CALL(
             User("f"),
-            List(ARR(IndexedSeq(
-              CONST_STRING("value1").explicitGet(),
-              CONST_STRING("value2").explicitGet()
-            ), false).explicitGet())
+            List(
+              ARR(
+                IndexedSeq(
+                  CONST_STRING("value1").explicitGet(),
+                  CONST_STRING("value2").explicitGet()
+                ),
+                false
+              ).explicitGet()
+            )
           )
         )
       for {
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp), fee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, functionCall, Nil, fee, Waves, ts + 3)
+        ci = Signed.invokeScript(1.toByte, invoker, master.toAddress, functionCall, Nil, fee, Waves, ts + 3)
       } yield (List(genesis, genesis2), setDApp, ci, master.toAddress)
     }.explicitGet()
 
@@ -130,7 +145,7 @@ class ListParamInvokeTest extends PropSpec with WithState with Inside {
     val parameters = Seq(
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.SmartAssets,
-      BlockchainFeatures.Ride4DApps,
+      BlockchainFeatures.Ride4DApps
     ) ++ v4ForkO
     TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = parameters.map(_.id -> 0).toMap)
   }

@@ -6,12 +6,13 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.serialization.impl.IssueTxSerializer
 import play.api.libs.json.Json
 
 class IssueTransactionV1Specification extends PropSpec {
   property("Issue serialization roundtrip") {
     forAll(issueGen) { issue: IssueTransaction =>
-      val recovered = issue.builder.parseBytes(issue.bytes()).get
+      val recovered = IssueTxSerializer.parseBytes(issue.bytes()).get
       recovered.bytes() shouldEqual issue.bytes()
     }
   }
@@ -40,7 +41,7 @@ class IssueTransactionV1Specification extends PropSpec {
                        }
     """)
 
-    val tx = IssueTransaction.serializer.parseBytes(bytes).get
+    val tx = IssueTxSerializer.parseBytes(bytes).get
     tx.json() shouldBe json
     assert(crypto.verify(tx.signature, tx.bodyBytes(), tx.sender), "signature should be valid")
   }

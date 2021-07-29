@@ -6,8 +6,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
-import com.wavesplatform.state.diffs._
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
 import org.scalacheck.Gen
@@ -211,7 +210,7 @@ class CommonFunctionsTest extends PropSpec {
   property("data constructors") {
     forAll(transferV2Gen, longEntryGen(dataAsciiKeyGen)) { (t, entry) =>
       val compareClause = (t.recipient: @unchecked) match {
-        case addr: Address => s"tx.recipient == Address(base58'${addr.stringRepr}')"
+        case addr: Address => s"tx.recipient == Address(base58'$addr')"
         case alias: Alias  => s"""tx.recipient == Alias("${alias.name}")"""
       }
       val transferResult = runScript(

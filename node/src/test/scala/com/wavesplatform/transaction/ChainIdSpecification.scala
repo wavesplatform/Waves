@@ -39,7 +39,7 @@ class ChainIdSpecification extends PropSpec {
     tx.chainId should not be AddressScheme.current.chainId
 
     val protoTx       = PBTransactions.protobuf(tx)
-    val recoveredTxEi = PBTransactions.vanilla(PBSignedTransaction.parseFrom(protoTx.toByteArray))
+    val recoveredTxEi = PBTransactions.vanilla(PBSignedTransaction.parseFrom(protoTx.toByteArray), unsafe = false)
 
     recoveredTxEi.explicitGet()
 

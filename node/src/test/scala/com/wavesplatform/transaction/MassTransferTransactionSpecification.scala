@@ -7,6 +7,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.serialization.impl.MassTransferTxSerializer
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.transfer._
 import play.api.libs.json.Json
@@ -67,7 +68,7 @@ class MassTransferTransactionSpecification extends PropSpec {
                        }
   """)
 
-    val tx = MassTransferTransaction.serializer.parseBytes(bytes).get
+    val tx = MassTransferTxSerializer.parseBytes(bytes).get
     tx.json() shouldBe json
     assert(crypto.verify(tx.signature, tx.bodyBytes(), tx.sender), "signature should be valid")
   }

@@ -13,11 +13,10 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Portfolio}
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.TestTime
-import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
@@ -64,9 +63,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         genesis2Tx  = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp), fee, ts + 2).explicitGet()
         call        = Some(FUNCTION_CALL(User(func), Nil))
-        invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V2, invoker, master.toAddress, call, Seq(), fee, Waves, ts + 3)
-          .explicitGet()
+        invokeTx = Signed.invokeScript(TxVersion.V2, invoker, master.toAddress, call, Seq(), fee, Waves, ts + 3)
       } yield (activated, func, invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
 
     val (activated, func, invoke, genesisTxs) = transferBase58WavesDAppScenario.sample.get
@@ -190,12 +187,24 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         genesis2 = GenesisTransaction.create(emptyDAppAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
         setDApp  = SetScriptTransaction.selfSigned(1.toByte, dAppAcc, Some(dApp(emptyDAppAcc.toAddress)), fee, ts).explicitGet()
         setDApp2 = SetScriptTransaction.selfSigned(1.toByte, emptyDAppAcc, Some(emptyDApp), fee, ts).explicitGet()
-        invokeInvalidLength = InvokeScriptTransaction
-          .selfSigned(1.toByte, dAppAcc, dAppAcc.toAddress, Some(FUNCTION_CALL(User("invalidLength"), Nil)), Nil, fee, Waves, ts)
-          .explicitGet()
-        invokeUnexisting = InvokeScriptTransaction
-          .selfSigned(1.toByte, dAppAcc, dAppAcc.toAddress, Some(FUNCTION_CALL(User("unexisting"), Nil)), Nil, fee, Waves, ts)
-          .explicitGet()
+        invokeInvalidLength = Signed.invokeScript(
+            1.toByte,
+            dAppAcc,
+            dAppAcc.toAddress,
+            Some(FUNCTION_CALL(User("invalidLength"), Nil)),
+            Nil,
+            fee,
+            Waves,
+            ts)
+        invokeUnexisting = Signed.invokeScript(
+            1.toByte,
+            dAppAcc,
+            dAppAcc.toAddress,
+            Some(FUNCTION_CALL(User("unexisting"), Nil)),
+            Nil,
+            fee,
+            Waves,
+            ts)
       } yield (List(genesis, genesis2, setDApp, setDApp2), invokeInvalidLength, invokeUnexisting)
 
     val (preparingTxs, invokeInvalidLength, invokeUnexisting) = preconditions.sample.get

@@ -7,7 +7,6 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
 import com.wavesplatform.state.diffs.invoke.{InvokeScriptLike, InvokeScriptTransactionLike}
-import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -15,12 +14,13 @@ import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
+
 import scala.util.Try
 
 case class InvokeScriptTransaction(
     version: TxVersion,
     sender: PublicKey,
-    dApp: Recipient,
+    dApp: WavesRecipient,
     funcCallOpt: Option[FUNCTION_CALL],
     payments: Seq[Payment],
     fee: TxAmount,
@@ -73,7 +73,7 @@ object InvokeScriptTransaction extends TransactionParser {
   def create(
       version: TxVersion,
       sender: PublicKey,
-      dappAddress: Recipient,
+      dappAddress: WavesRecipient,
       fc: Option[FUNCTION_CALL],
       p: Seq[Payment],
       fee: TxAmount,
@@ -83,31 +83,4 @@ object InvokeScriptTransaction extends TransactionParser {
       chainId: Byte
   ): Either[ValidationError, InvokeScriptTransaction] =
     InvokeScriptTransaction(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs, chainId).validatedEither
-
-  def signed(
-      version: TxVersion,
-      sender: PublicKey,
-      dappAddress: Recipient,
-      fc: Option[FUNCTION_CALL],
-      p: Seq[Payment],
-      fee: TxAmount,
-      feeAssetId: Asset,
-      timestamp: TxTimestamp,
-      signer: PrivateKey,
-      chainId: Byte
-  ): Either[ValidationError, InvokeScriptTransaction] =
-    create(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
-
-  def selfSigned(
-      version: TxVersion,
-      sender: KeyPair,
-      dappAddress: Recipient,
-      fc: Option[FUNCTION_CALL],
-      p: Seq[Payment],
-      fee: TxAmount,
-      feeAssetId: Asset,
-      timestamp: TxTimestamp,
-      chainId: Byte
-  ): Either[ValidationError, InvokeScriptTransaction] =
-    signed(version, sender.publicKey, dappAddress, fc, p, fee, feeAssetId, timestamp, sender.privateKey, chainId)
 }

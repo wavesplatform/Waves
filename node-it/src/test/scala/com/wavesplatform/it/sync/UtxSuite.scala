@@ -8,10 +8,11 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.{BaseFunSuite, Node}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
 import scala.util.{Random, Try}
@@ -154,11 +155,9 @@ class UtxSuite extends BaseFunSuite {
           .selfSigned(TxVersion.V1, whitelistedAccount, UtxSuite.createAccount.toAddress, Waves, 1L, Waves, minTransferFee, ByteStr.empty, time)
           .explicitGet()
       }
-      val byDApp = (1 to 5).map { _ =>
-        InvokeScriptTransaction
-          .selfSigned(TxVersion.V1, invokeAccount, whitelistedDAppAccount.toAddress, None, Seq.empty, minInvokeFee, Waves, time)
-          .explicitGet()
-      }
+      val byDApp = Seq.fill(5)(
+        Signed.invokeScript(TxVersion.V1, invokeAccount, whitelistedDAppAccount.toAddress, None, Seq.empty, minInvokeFee, Waves, time)
+      )
       Random.shuffle(bySender ++ byDApp)
     }
 
@@ -184,7 +183,7 @@ class UtxSuite extends BaseFunSuite {
     whitelistedAccount = createAccount
     whitelistedDAppAccount = createAccount
 
-    val whitelist = Seq(whitelistedAccount, whitelistedDAppAccount).map(_.toAddress.stringRepr)
+    val whitelist = Seq(whitelistedAccount, whitelistedDAppAccount).map(_.toAddress.toString)
 
     val minerConfig    = ConfigFactory.parseString(UtxSuite.minerConfigPredef(whitelist))
     val notMinerConfig = ConfigFactory.parseString(UtxSuite.notMinerConfigPredef(whitelist))

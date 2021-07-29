@@ -61,7 +61,7 @@ object MassTransferTxSerializer {
       def readTransfer(buf: ByteBuffer): ParsedTransfer = {
         val addressOrAlias = AddressOrAlias.fromBytes(buf).explicitGet()
         val amount         = buf.getLong
-        ParsedTransfer(addressOrAlias.recipient, amount)
+        ParsedTransfer(addressOrAlias, amount)
       }
 
       val entryCount = buf.getShort

@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import com.wavesplatform.TestTime
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -13,7 +12,7 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import org.scalacheck.Gen
@@ -199,7 +198,8 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
       dAppWithFix   <- Gen.listOfN(allDAppVersions.size, accountGen).map(_.zip(allDAppVersions))
       dAppWithNoFix <- Gen.listOfN(dAppVersionsBeforeActivation.size, accountGen).map(_.zip(dAppVersionsBeforeActivation))
       fee           <- ciFee()
-      genesisTxs     = (accWithFix ::: accWithNoFix ::: dAppWithFix ::: dAppWithNoFix).map(a => GenesisTransaction.create(a._1.toAddress, ENOUGH_AMT, ts).explicitGet())
+      genesisTxs = (accWithFix ::: accWithNoFix ::: dAppWithFix ::: dAppWithNoFix)
+        .map(a => GenesisTransaction.create(a._1.toAddress, ENOUGH_AMT, ts).explicitGet())
       invokerGenesis = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
       setNoFix       = accWithNoFix.map(a => SetScriptTransaction.selfSigned(1.toByte, a._1, Some(checkNoFixScript(a._2)), fee, ts).explicitGet())
       setFix         = accWithFix.map(a => SetScriptTransaction.selfSigned(1.toByte, a._1, Some(checkFixScript(a._2)), fee, ts).explicitGet())
@@ -220,19 +220,8 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
               .explicitGet()
         )
       checkFixDApp = dAppWithFix
-        .map(
-          a =>
-            InvokeScriptTransaction
-              .selfSigned(TxVersion.V2, invoker, a._1.toAddress, None, Nil, fee, Waves, ts)
-              .explicitGet()
-        )
-      checkNoFixDApp = () =>
-        dAppWithNoFix.map(
-          a =>
-            InvokeScriptTransaction
-              .selfSigned(TxVersion.V2, invoker, a._1.toAddress, None, Nil, fee, Waves, ts)
-              .explicitGet()
-        )
+        .map(a => Signed.invokeScript(TxVersion.V2, invoker, a._1.toAddress, None, Nil, fee, Waves, ts))
+      checkNoFixDApp = () => dAppWithNoFix.map(a => Signed.invokeScript(TxVersion.V2, invoker, a._1.toAddress, None, Nil, fee, Waves, ts))
     } yield (invokerGenesis :: genesisTxs, setNoFix, setFix, checkFix, checkNoFix, setNoFixDApp, setFixDApp, checkFixDApp, checkNoFixDApp)
 
   property(s"string functions return correct results for unicode input after ${BlockchainFeatures.SynchronousCalls} activation") {

@@ -1,11 +1,10 @@
 package com.wavesplatform.state.appender
 
-import com.wavesplatform.TestTime
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.network.{ExtensionBlocks, InvalidBlockStorage, PeerDatabase}
-import com.wavesplatform.test.FlatSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.SystemTime
 import com.wavesplatform.utx.UtxPoolImpl

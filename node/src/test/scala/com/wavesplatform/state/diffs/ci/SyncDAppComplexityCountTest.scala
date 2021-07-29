@@ -17,8 +17,8 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.Portfolio
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -167,18 +167,16 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
       else
         Nil
 
-      invokeTx = InvokeScriptTransaction
-        .selfSigned(
-          TxVersion.V3,
-          invoker,
-          dAppAccs.last.toAddress,
-          None,
-          if (withPayment) payment else Nil,
-          fee,
-          Waves,
-          ts + 10
-        )
-        .explicitGet()
+      invokeTx = Signed.invokeScript(
+        TxVersion.V3,
+        invoker,
+        dAppAccs.last.toAddress,
+        None,
+        if (withPayment) payment else Nil,
+        fee,
+        Waves,
+        ts + 10
+      )
     } yield (
       Seq(invokerGenesis, assetIssue) ++ setVerifier ++ dAppGenesisTxs ++ setScriptTxs,
       invokeTx,

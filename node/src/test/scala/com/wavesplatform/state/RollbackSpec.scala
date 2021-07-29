@@ -1,6 +1,6 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.account.{Address, KeyPair, WavesAddress}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -8,6 +8,7 @@ import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.features._
+import com.wavesplatform.history
 import com.wavesplatform.history.Domain
 import com.wavesplatform.it.util.AddressOrAliasExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -19,16 +20,15 @@ import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.traits.domain.Lease
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.utils.StringBytes
-import com.wavesplatform.{TestTime, history}
 import org.scalacheck.Gen.alphaLowerChar
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{Assertion, Assertions}
@@ -37,10 +37,10 @@ class RollbackSpec extends FreeSpec with WithDomain {
   private val time   = new TestTime
   private def nextTs = time.getTimestamp()
 
-  private def genesisBlock(genesisTs: Long, address: Address, initialBalance: Long): Block =
+  private def genesisBlock(genesisTs: Long, address: WavesAddress, initialBalance: Long): Block =
     genesisBlock(genesisTs, Map(address -> initialBalance))
 
-  private def genesisBlock(genesisTs: Long, initialBalances: Map[Address, Long]): Block = TestBlock.create(
+  private def genesisBlock(genesisTs: Long, initialBalances: Map[WavesAddress, Long]): Block = TestBlock.create(
     genesisTs,
     ByteStr(Array.fill[Byte](SignatureLength)(0)),
     initialBalances.map { case (address, initialBalance) => GenesisTransaction.create(address, initialBalance, genesisTs).explicitGet() }.toSeq
@@ -49,7 +49,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
   private def transfer(sender: KeyPair, recipient: Address, amount: Long) =
     TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, 1, ByteStr.empty, nextTs).explicitGet()
 
-  private def randomOp(sender: KeyPair, recipient: Address, amount: Long, op: Int, nextTs: => Long = nextTs) = {
+  private def randomOp(sender: KeyPair, recipient: WavesAddress, amount: Long, op: Int, nextTs: => Long = nextTs) = {
     import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
     op match {
       case 1 =>
@@ -535,11 +535,8 @@ class RollbackSpec extends FreeSpec with WithDomain {
         } yield (dApp, sender, genesis, setScriptTx)
 
       def appendBlock(d: Domain, invoker: KeyPair, dApp: KeyPair)(parentBlockId: ByteStr, fc: Terms.FUNCTION_CALL): ByteStr = {
-        val fee = 150000000L
-        val invoke =
-          InvokeScriptTransaction
-            .selfSigned(2.toByte, invoker, dApp.toAddress, Some(fc), Seq.empty, fee, Waves, nextTs)
-            .explicitGet()
+        val fee    = 150000000L
+        val invoke = Signed.invokeScript(2.toByte, invoker, dApp.toAddress, Some(fc), Seq.empty, fee, Waves, nextTs)
 
         d.appendBlock(
           TestBlock.create(

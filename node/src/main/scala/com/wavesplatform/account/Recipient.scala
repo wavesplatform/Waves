@@ -42,7 +42,11 @@ sealed trait Address extends Recipient {
   override def hashCode(): Int = java.util.Arrays.hashCode(publicKeyHash)
 }
 
-final class WavesAddress(val chainId: Byte, val publicKeyHash: Array[Byte], checksum: Array[Byte]) extends Address {
+sealed trait WavesRecipient extends Recipient {
+  def chainId: Byte
+}
+
+final class WavesAddress(val chainId: Byte, val publicKeyHash: Array[Byte], checksum: Array[Byte]) extends Address with WavesRecipient {
   override def asWaves: WavesAddress   = this
   override lazy val bytes: Array[Byte] = Array(1.toByte, chainId) ++ publicKeyHash ++ checksum
   override lazy val toString: String   = ByteStr(bytes).toString
@@ -72,16 +76,16 @@ object EthereumAddress {
   def apply(publicKey: PublicKey): EthereumAddress = new EthereumAddress(Keys.getAddress(publicKey.arr))
 }
 
-final case class Alias(chainId: Byte, name: String) extends Recipient {
+final case class Alias(chainId: Byte, name: String) extends WavesRecipient {
   override lazy val bytes: Array[Byte] = Bytes.concat(Array(Alias.AddressVersion, chainId), Deser.serializeArrayWithLength(name.utf8Bytes))
   override lazy val toString: String   = s"alias:${chainId.toChar}:$name"
 }
 
-object AddressOrAlias {
+object WavesRecipient {
   def fromRide(r: RideRecipient): Either[ValidationError, AddressOrAlias] =
     r match {
-      case RideRecipient.Address(bytes) => Address.fromBytes(bytes.arr).map(Left(_))
-      case RideRecipient.Alias(name)    => Alias.create(name).map(Right(_))
+      case RideRecipient.Address(bytes) => Address.fromBytes(bytes.arr)
+      case RideRecipient.Alias(name)    => Alias.create(name)
     }
 
   def fromString(s: String): Either[ValidationError, AddressOrAlias]       = ???

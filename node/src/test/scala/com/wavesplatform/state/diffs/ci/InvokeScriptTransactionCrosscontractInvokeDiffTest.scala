@@ -15,12 +15,12 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
 import org.scalatest.EitherValues
 
@@ -116,8 +116,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
 
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10L, Waves))
-        invokeTx = InvokeScriptTransaction
-          .selfSigned(
+        invokeTx = Signed.invokeScript(
             TxVersion.V3,
             invoker,
             mainAcc.toAddress,
@@ -125,9 +124,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
             payments,
             fee,
             Waves,
-            ts + 10
-          )
-          .explicitGet()
+            ts + 10)
       } yield (Seq(gTx1, gTx2, gTx3, ssTxMain, ssTxSecond, dataTxSecond, dataTxSecond2), invokeTx, secondAcc.toAddress)
 
     forAll(scenario) {
@@ -204,8 +201,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
 
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10L, Waves))
-        invokeTx = InvokeScriptTransaction
-          .selfSigned(
+        invokeTx = Signed.invokeScript(
             TxVersion.V3,
             invoker,
             mainAcc.toAddress,
@@ -213,9 +209,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
             payments,
             fee,
             Waves,
-            ts + 10
-          )
-          .explicitGet()
+            ts + 10)
       } yield (Seq(gTx1, gTx2, ssTxMain, dataTxMain, dataTxMain2), invokeTx, mainAcc.toAddress)
 
     forAll(scenario) {
@@ -382,8 +376,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
 
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10L, Waves))
-        invokeTx = InvokeScriptTransaction
-          .selfSigned(
+        invokeTx = Signed.invokeScript(
             TxVersion.V3,
             invoker,
             mainAcc.toAddress,
@@ -391,9 +384,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
             payments,
             fee * 100,
             Waves,
-            ts + 10
-          )
-          .explicitGet()
+            ts + 10)
       } yield (
         Seq(gTx1, gTx2, gTx3, gTx4, ssTxMain, ssTxSecond, ssTxThird, paymentIssue, transferIssue),
         invokeTx,

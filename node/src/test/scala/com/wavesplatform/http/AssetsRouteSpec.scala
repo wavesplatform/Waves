@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{RequestGen, TestTime, TestValues}
+import com.wavesplatform.{RequestGen, TestValues}
 import monix.reactive.Observable
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
@@ -151,9 +151,9 @@ class AssetsRouteSpec
       val response = responseAs[JsObject]
       response shouldBe Json.obj(
         "hasNext"  -> false,
-        "lastItem" -> TestValues.address.stringRepr,
+        "lastItem" -> TestValues.address.toString,
         "items" -> Json.obj(
-          TestValues.address.stringRepr -> 10L
+          TestValues.address.toString -> 10L
         )
       )
     }

@@ -1,4 +1,4 @@
-package com.wavesplatform
+package com.wavesplatform.test
 
 import com.wavesplatform.utils.Time
 

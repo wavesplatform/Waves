@@ -1,5 +1,4 @@
 package com.wavesplatform.state.diffs.smart.predef
-import com.wavesplatform.TestTime
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -9,9 +8,9 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.{BooleanDataEntry, EmptyDataEntry}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
 
 class IsDataStorageUntouchedTest extends PropSpec with WithDomain {
@@ -45,7 +44,7 @@ class IsDataStorageUntouchedTest extends PropSpec with WithDomain {
       dataTx       = DataTransaction.selfSigned(TxVersion.V2, master, Seq(BooleanDataEntry("q", true)), 15000000, ts).explicitGet()
       deleteDataTx = DataTransaction.selfSigned(TxVersion.V2, master, Seq(EmptyDataEntry("q")), 15000000, ts).explicitGet()
       ssTx         = SetScriptTransaction.selfSigned(1.toByte, master, Some(contract), fee, ts).explicitGet()
-      invokeTx     = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, master.toAddress, None, Nil, fee, Waves, ts).explicitGet()
+      invokeTx     = Signed.invokeScript(TxVersion.V3, invoker, master.toAddress, None, Nil, fee, Waves, ts)
     } yield (Seq(gTx1, gTx2, ssTx), dataTx, deleteDataTx, invokeTx, master.toAddress)
 
   property("isDataStorageUntouched true") {
@@ -117,7 +116,7 @@ class IsDataStorageUntouchedTest extends PropSpec with WithDomain {
         genesis2 = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
         setDApp1 = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(syncDApp(dApp2.toAddress)), fee, ts).explicitGet()
         setDApp2 = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(contract), fee, ts).explicitGet()
-        invoke   = InvokeScriptTransaction.selfSigned(1.toByte, dApp1, dApp1.toAddress, None, Nil, fee, Waves, ts).explicitGet()
+        invoke   = Signed.invokeScript(1.toByte, dApp1, dApp1.toAddress, None, Nil, fee, Waves, ts)
       } yield (List(genesis1, genesis2, setDApp1, setDApp2), invoke)
 
     val (genesisTxs, invokeTx) = scenario.sample.get

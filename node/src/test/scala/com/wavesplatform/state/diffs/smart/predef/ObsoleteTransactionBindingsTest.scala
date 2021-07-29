@@ -28,7 +28,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with WithState {
        |    let genTimestamp = gen.timestamp== ${g.timestamp}
        |    let genVersion = gen.version == 1
        |    let genAmount = gen.amount == ${g.amount}
-       |    let genRecipient = gen.recipient == Address(base58'${g.recipient.stringRepr}')
+       |    let genRecipient = gen.recipient == Address(base58'${g.recipient}')
        |    genId && genFee && genTimestamp && genVersion && genAmount && genRecipient
        |   case _ => false
        | }
@@ -40,7 +40,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with WithState {
        |    let payTimestamp = pay.timestamp== ${p.timestamp}
        |    let payVersion = pay.version == 1
        |    let payAmount = pay.amount == ${p.amount}
-       |    let payRecipient = pay.recipient == Address(base58'${p.recipient.stringRepr}')
+       |    let payRecipient = pay.recipient == Address(base58'${p.recipient}')
        |
        |    let bodyBytes = pay.bodyBytes == base64'${ByteStr(p.bodyBytes.apply()).base64}'
        |    let sender = pay.sender == addressFromPublicKey(base58'${p.sender}')

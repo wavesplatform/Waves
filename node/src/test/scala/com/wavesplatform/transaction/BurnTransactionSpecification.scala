@@ -7,12 +7,13 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.BurnTransaction
 import com.wavesplatform.crypto
 import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.serialization.impl.BurnTxSerializer
 import play.api.libs.json.Json
 
 class BurnTransactionSpecification extends PropSpec {
   property("Burn serialization roundtrip") {
-    forAll(burnGen) { tx: BurnTransaction =>
-      val recovered = tx.builder.parseBytes(tx.bytes()).get
+    forAll(burnGen) { tx =>
+      val recovered = BurnTxSerializer.parseBytes(tx.bytes()).get
       recovered.bytes() shouldEqual tx.bytes()
     }
   }

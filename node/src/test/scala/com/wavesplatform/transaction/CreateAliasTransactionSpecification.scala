@@ -4,13 +4,14 @@ import com.wavesplatform.account.{Alias, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.serialization.impl.CreateAliasTxSerializer
 import play.api.libs.json.Json
 
 class CreateAliasTransactionSpecification extends PropSpec {
 
   property("CreateAliasTransaction serialization roundtrip") {
     forAll(createAliasGen) { tx: CreateAliasTransaction =>
-      val recovered = tx.builder.parseBytes(tx.bytes()).get
+      val recovered = CreateAliasTxSerializer.parseBytes(tx.bytes()).get
       recovered shouldEqual tx
     }
   }

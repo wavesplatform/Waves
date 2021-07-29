@@ -2,7 +2,6 @@ package com.wavesplatform.state.diffs.ci
 
 import cats.instances.list._
 import cats.syntax.traverse._
-import com.wavesplatform.TestTime
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -15,9 +14,9 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
+import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
@@ -201,7 +200,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       for {
         genesis  <- GenesisTransaction.create(dAppAcc.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
-        invoke   <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, dAppAcc.toAddress, None, Nil, fee, Waves, ts)
+        invoke   = Signed.invokeScript(1.toByte, invoker, dAppAcc.toAddress, None, Nil, fee, Waves, ts)
         leasesFromDApp <- (1 to leaseCancelCount).toList.traverse(
           i => LeaseTransaction.selfSigned(2.toByte, dAppAcc, invoker.toAddress, leaseTxAmount1, fee, ts + i)
         )

@@ -19,19 +19,19 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WalletSettings, WavesSettings}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG, diffs}
-import com.wavesplatform.test.FlatSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{BlocksTransactionsHelpers, TestTime, crypto, protobuf}
+import com.wavesplatform.{BlocksTransactionsHelpers, crypto, protobuf}
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler
-import monix.reactive.Observer
+import monix.reactive.{Observable, Observer}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.enablers.Length
@@ -472,7 +472,7 @@ class BlockV5Test
     val utxPool           = new UtxPoolImpl(time, blockchain, Observer.stopped, settings.utxSettings)
     val minerScheduler    = Scheduler.singleThread("miner")
     val appenderScheduler = Scheduler.singleThread("appender")
-    val miner             = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler)
+    val miner             = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler, Observable.empty)
     val blockAppender     = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler) _
     f(miner, blockAppender, appenderScheduler)
   }

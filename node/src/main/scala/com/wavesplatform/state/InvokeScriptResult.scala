@@ -2,7 +2,7 @@ package com.wavesplatform.state
 
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, WavesAddress}
+import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias, WavesAddress}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.Serde
@@ -75,9 +75,9 @@ object InvokeScriptResult {
   case class Lease(recipient: AddressOrAlias, amount: Long, nonce: Long, id: ByteStr)
   object Lease {
     implicit val recipientWrites = Writes[AddressOrAlias] {
-      case Left(address) => implicitly[Writes[Address]].writes(address)
-      case Right(alias)  => JsString(alias.toString)
-      case _             => JsNull
+      case address: Address => implicitly[Writes[Address]].writes(address)
+      case alias: Alias     => JsString(alias.toString)
+      case _                => JsNull
     }
     implicit val jsonWrites = Json.writes[Lease]
   }
@@ -191,9 +191,14 @@ object InvokeScriptResult {
         val transfers    = actions.collect { case t: lang.AssetTransfer => langTransferToPayment(t) }
         val leases       = actions.collect { case l: lang.Lease         => langLeaseToLease(l) }
         val leaseCancels = actions.collect { case l: lang.LeaseCancel   => l }
-        val invokes     = result.invokes.map {
-          case (dApp, fname, args, payments, r) => Invocation(langAddressToAddress(dApp), Call(fname, args), (payments.map { case CaseObj(t, fields) =>
-            ((fields("assetId"), fields("amount")): @unchecked) match {
+        val invokes = result.invokes.map {
+          case (dApp, fname, args, payments, r) =>
+            Invocation(
+              langAddressToAddress(dApp),
+              Call(fname, args),
+              (payments.map {
+                case CaseObj(t, fields) =>
+                  ((fields("assetId"), fields("amount")): @unchecked) match {
                     case (CONST_BYTESTR(b), CONST_LONG(a)) => InvokeScriptResult.AttachedPayment(IssuedAsset(b), a)
                     case (_, CONST_LONG(a))                => InvokeScriptResult.AttachedPayment(Waves, a)
                   }

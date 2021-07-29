@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import java.util.concurrent.ThreadLocalRandom
 
+import com.wavesplatform.BlockGen
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -10,9 +11,8 @@ import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.BlockGen
-import com.wavesplatform.test.FreeSpec
 
 class BlockDifferTest extends FreeSpec with BlockGen with WithState {
   private val TransactionFee = 10
