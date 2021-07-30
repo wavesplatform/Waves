@@ -9,6 +9,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.{block => vb}
 import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
+import monix.execution.atomic.AtomicAny
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observable
 
@@ -29,7 +30,7 @@ package object grpc extends ScorexLogging {
   }
 
   implicit class StreamObserverMonixOps[T](val streamObserver: StreamObserver[T]) extends AnyVal {
-    private[grpc] def id: String =
+    def id: String =
       Integer.toHexString(System.identityHashCode(streamObserver))
 
     def completeWith(obs: Observable[T])(implicit sc: Scheduler): Unit =
@@ -66,43 +67,35 @@ package object grpc extends ScorexLogging {
 
   private[this] def wrapObservable[A](source: Observable[A], dest: StreamObserver[A])(implicit s: Scheduler): Unit = dest match {
     case cso: ServerCallStreamObserver[A] @unchecked =>
-      var nextItem = Option.empty[(Promise[Ack], A)]
+      val nextItem = AtomicAny(Option.empty[(Promise[Ack], A)])
 
-      cso.setOnReadyHandler { () =>
-        for ((p, elem) <- nextItem)
-          try {
-            cso.onNext(elem)
-            p.trySuccess(Ack.Continue)
-          } catch {
-            case NonFatal(t) =>
-              cso.onError(t)
-              p.tryFailure(t)
-          }
+      def sendNextItem(): Unit =
+        for ((p, elem) <- nextItem.getAndSet(None)) try {
+          cso.onNext(elem)
+          p.trySuccess(Ack.Continue)
+        } catch {
+          case NonFatal(t) =>
+            cso.onError(t)
+            p.tryFailure(t)
+        }
 
-        nextItem = None
-      }
+      cso.setOnReadyHandler(() => sendNextItem())
 
       val cancelable = source.subscribe(
         (elem: A) =>
           if (cso.isCancelled) {
-            log.trace("STREAM HAS BEEN CANCELLED")
             Ack.Stop
-          } else if (cso.isReady) try {
-            cso.onNext(elem)
-            Ack.Continue
-          } catch {
-            case NonFatal(t) =>
-              cso.onError(t)
-              Future.failed(t)
-          } else if (nextItem.isEmpty) {
-
+          } else {
             val p = Promise[Ack]()
-            nextItem = Some((p, elem))
-            p.future
-          } else Future.failed(new IllegalArgumentException("Element pending")),
-        err => cso.onError(err),
-        {() =>
-          log.debug("Observer completed")
+            if (nextItem.compareAndSet(None, Some(p -> elem))) {
+              if (cso.isReady)
+                sendNextItem()
+
+              p.future
+            } else Future.failed(new IllegalStateException(s"An element ${nextItem()} is pending"))
+          },
+        err => cso.onError(err), { () =>
+          log.debug("Source observer completed")
           cso.onCompleted()
         }
       )
@@ -112,7 +105,7 @@ package object grpc extends ScorexLogging {
       }
 
     case _ =>
-      log.warn(s"Unexpected StreamObserver: $dest")
+      log.warn(s"Unsupported StreamObserver type: $dest")
       source.subscribe(
         { (elem: A) =>
           dest.onNext(elem)

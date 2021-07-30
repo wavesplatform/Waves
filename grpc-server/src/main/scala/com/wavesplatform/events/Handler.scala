@@ -1,63 +1,86 @@
 package com.wavesplatform.events
-import com.wavesplatform.block.{Block, MicroBlock}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.repo.LiquidState
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.{Ack, Scheduler}
-import monix.reactive.Observer
+import monix.reactive.subjects.PublishToOneSubject
 
 import scala.collection.mutable.ArrayBuffer
 import scala.util.{Failure, Success}
 
-class Handler(id: String, liquidState: Seq[BlockchainUpdated], subject: Observer[BlockchainUpdated])(implicit s: Scheduler)
-    extends ScorexLogging
-    with BlockchainUpdateTriggers {
+class Handler(id: String, maybeLiquidState: Option[LiquidState], subject: PublishToOneSubject[BlockchainUpdated], maxQueueSize: Int)(
+    implicit s: Scheduler
+) extends ScorexLogging {
 
-  private[this] val queue = ArrayBuffer.from(liquidState)
+  private[this] val queue = maybeLiquidState.fold(ArrayBuffer.empty[BlockchainUpdated])(ls => ArrayBuffer.from(ls.keyBlock +: ls.microBlocks))
+
   @volatile
   private[this] var cancelled = false
 
-  sendUpdate()
-
-  override def onProcessBlock(
-      block: Block,
-      diff: BlockDiffer.DetailedDiff,
-      minerReward: Option[Long],
-      blockchainBeforeWithMinerReward: Blockchain
-  ): Unit = handleAndSendUpdate(Handler.processBlock(queue, block, diff, blockchainBeforeWithMinerReward, fail))
-
-  override def onProcessMicroBlock(
-      microBlock: MicroBlock,
-      diff: BlockDiffer.DetailedDiff,
-      blockchainBeforeWithMinerReward: Blockchain,
-      totalBlockId: ByteStr,
-      totalTransactionsRoot: ByteStr
-  ): Unit = handleAndSendUpdate {
-    queue.append(MicroBlockAppended.from(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot))
+  subject.subscription.onComplete {
+    case Success(Ack.Continue) => sendUpdate()
+    case _                     => cancelled = true
   }
 
-  override def onRollback(blockchainBefore: Blockchain, toBlockId: ByteStr, toHeight: Int): Unit =
-    handleAndSendUpdate(Handler.rollback(queue, blockchainBefore, toBlockId, toHeight, fail))
-
-  override def onMicroBlockRollback(blockchainBefore: Blockchain, toBlockId: ByteStr): Unit =
-    handleAndSendUpdate(Handler.rollbackMicroBlock(queue, blockchainBefore, toBlockId, fail))
-
-  def cancel(): Unit = {
-    log.trace("Cancelling subscription")
-    cancelled = true
+  def handleUpdate(ba: BlockchainUpdated): Unit = queue.synchronized {
+    if (queue.size >= maxQueueSize) {
+      log.debug(s"[$id] Queue is full, cancelling subscription")
+      cancelled = true
+      queue.clear()
+      subject.onComplete()
+    } else {
+      queue.append(ba)
+      sendUpdate()
+    }
   }
 
-  private def handleAndSendUpdate(f: => Unit): Unit = {
-    queue.synchronized(f)
+  private def revertMicroBlock(rollbackEvent: MicroBlockRollbackCompleted): Unit = {
+    queue.zipWithIndex.reverseIterator.collectFirst {
+      case (bu, idx) if bu.id == rollbackEvent.id => idx
+    } match {
+      case None =>
+        queue.clear()
+        queue.append(rollbackEvent)
+      case Some(idx) =>
+        queue.takeInPlace(idx + 1)
+    }
+  }
+
+  def rollbackMicroBlock(rollbackEvent: MicroBlockRollbackCompleted): Unit = {
+    queue.synchronized(revertMicroBlock(rollbackEvent))
     sendUpdate()
   }
 
-  private def fail(message: String): Unit = {
-    val ex = new IllegalStateException(message)
-    log.error(s"[$id] Error in handler", ex)
-    subject.onError(ex)
+  private def revertBlock(rollbackEvent: RollbackCompleted): Unit = {
+    queue.zipWithIndex.reverseIterator
+      .collectFirst {
+        case (bu, idx) if bu.id == rollbackEvent.id => idx
+      } match {
+      case Some(idx) =>
+        log.trace(s"[$id] Dropping ${queue.length - (idx + 1)} buffered events after ${rollbackEvent.ref}")
+        queue.takeInPlace(idx + 1)
+      case None =>
+        log.trace(s"[$id] Buffering rollback ${rollbackEvent.ref})")
+        queue.append(rollbackEvent)
+    }
+  }
+
+  def rollbackBlock(revertedMicros: Seq[MicroBlockRollbackCompleted], revertedBlocks: Seq[RollbackCompleted]): Unit = queue.synchronized {
+    revertedMicros.foreach(revertMicroBlock)
+    revertedBlocks.foreach { rb =>
+      queue.lastOption match {
+        case Some(_: BlockAppended | _: MicroBlockAppended) => revertBlock(rb)
+        case _                                              => queue.append(rb)
+      }
+    }
+
+    sendUpdate()
+  }
+
+  def shutdown(): Unit = queue.synchronized {
+    log.trace(s"[$id] Stopping subscription")
+    cancelled = true
+    queue.clear()
+    subject.onComplete()
   }
 
   private def sendUpdate(): Unit =
@@ -65,85 +88,19 @@ class Handler(id: String, liquidState: Seq[BlockchainUpdated], subject: Observer
       s.execute(
         () =>
           queue.synchronized {
-            val v = queue.remove(0)
-            log.trace(s"[$id] Sending $v to subscriber")
-            subject.onNext(v).onComplete {
-              case Success(Ack.Continue) =>
-                log.trace(s"[$id] Sent $v to subscriber, attempting to send one more")
-              case Success(Ack.Stop) =>
-                log.debug(s"[$id] Subscriber stopped")
-              case Failure(exception) =>
-                log.error(s"[$id] Error sending update", exception)
+            if (queue.nonEmpty) {
+              val v = queue.remove(0)
+              log.trace(s"[$id] Sending ${v.ref} to subscriber")
+              subject.onNext(v).onComplete {
+                case Success(Ack.Continue) =>
+                  log.trace(s"[$id] Sent ${v.ref} to subscriber, attempting to send one more")
+                  sendUpdate()
+                case Success(Ack.Stop) =>
+                  log.debug(s"[$id] Subscriber stopped")
+                case Failure(exception) =>
+                  log.error(s"[$id] Error sending ${v.ref}", exception)
+              }
             }
           }
       )
-    else log.trace(s"Queue is empty")
-}
-
-object Handler {
-  def processBlock(
-      queue: ArrayBuffer[BlockchainUpdated],
-      block: Block,
-      diff: BlockDiffer.DetailedDiff,
-      blockchainBeforeWithMinerReward: Blockchain,
-      fail: String => Unit
-  ): Unit = {
-    queue.lastOption match {
-      case Some(mba: MicroBlockAppended) =>
-        if (mba.id != block.header.reference)
-          fail(s"Block reference ${block.header.reference} does not match last microblock ${mba.id}")
-        else {
-          val updatesToFlatten = queue.zipWithIndex.reverseIterator
-            .takeWhile {
-              case (m: MicroBlockAppended, _) => mba.height == m.height
-              case (b: BlockAppended, _)      => mba.height == b.height
-              case _                          => false
-            }
-            .toSeq
-            .reverse
-
-          for ((_, idx) <- updatesToFlatten.headOption) queue.remove(idx, updatesToFlatten.size)
-
-          val blocksCollector = Seq.newBuilder[(BlockAppended, Int)]
-          val microsCollector = Seq.newBuilder[(MicroBlockAppended, Int)]
-
-          updatesToFlatten.foreach {
-            case (b: BlockAppended, i)      => blocksCollector += (b -> i)
-            case (m: MicroBlockAppended, i) => microsCollector += (m -> i)
-          }
-
-          val block = blocksCollector.result()
-          if (block.size != 1) fail(s"Expecting single block, but got ${block.map(_._1.id).mkString("[", ",", "]")}")
-
-          val micros = microsCollector.result()
-          if (block.head._2 >= micros.head._2) fail("Block update is not the first one in liquid chain")
-
-          queue.append(LiquidState.solidify(block.head._1, micros.map(_._1)))
-        }
-      case _ => // previous block had no micro blocks
-    }
-    queue.append(BlockAppended.from(block, diff, blockchainBeforeWithMinerReward))
-  }
-
-  def rollback(queue: ArrayBuffer[BlockchainUpdated], blockchainBefore: Blockchain, toBlockId: ByteStr, toHeight: Int, fail: String => Unit): Unit =
-    ???
-
-  def rollbackMicroBlock(queue: ArrayBuffer[BlockchainUpdated], blockchainBefore: Blockchain, toBlockId: ByteStr, fail: String => Unit): Unit =
-    queue.lastOption match {
-      case None => fail("Could not rollback a microblock from empty liquid state")
-      case Some(bu) =>
-        queue.zipWithIndex.reverseIterator
-          .takeWhile(_._1.height == bu.height)
-          .find(_._1.id == toBlockId) match {
-          case Some((_, idx)) =>
-            val drop        = queue.slice(idx, queue.length).collect { case mb: MicroBlockAppended => mb }.toSeq
-            val removedTxs  = drop.flatMap(_.microBlock.transactionData).map(_.id()).reverse
-            val stateUpdate = MicroBlockAppended.revertMicroBlocks(drop)
-            val result      = RollbackResult.micro(removedTxs, stateUpdate)
-            val refAssets   = StateUpdate.referencedAssets(blockchainBefore, Seq(result.stateUpdate))
-            queue.takeRightInPlace(idx + 1)
-            queue.append(MicroBlockRollbackCompleted(toBlockId, blockchainBefore.height, result, refAssets))
-          case None => fail(s"Could not find rollback target $toBlockId in liquid state")
-        }
-    }
 }
