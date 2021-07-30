@@ -139,6 +139,8 @@ object Expressions {
   }
   case class FUNCTION_CALL(position: Pos, name: PART[String], args: List[EXPR], resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
 
+  case class GENERIC_FUNCTION_CALL(position: Pos, expr: EXPR, name: PART[String], `type`: Single, resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
+
   case class FOLD(position: Pos, limit: Int, list: EXPR, acc: EXPR, func: REF, resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
 
   sealed trait Pattern {
