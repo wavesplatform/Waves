@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.common.utils._
-import com.wavesplatform.lang.v1.compiler.CompilationError.FunctionNotFound
+import com.wavesplatform.lang.v1.compiler.CompilationError.{GenericFunctionNotFound, TypeCastAllowedOnlyForGenericList}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler.CompilationStepResultExpr
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -13,23 +13,28 @@ object TypeCast {
 
   def apply(p: Pos, name: String, expr: CompilationStepResultExpr, t: FINAL): CompilationStepResultExpr =
     name match {
-      case ExactAs => exactTo(t, expr)
-      case As      => to(t, expr)
-      case other   => expr.copy(errors = Seq(FunctionNotFound(p.start, p.end, other, Nil)))
+      case ExactAs => exactTo(p, t, expr)
+      case As      => to(p, t, expr)
+      case other   => expr.copy(errors = Seq(GenericFunctionNotFound(p.start, p.end, other)))
     }
 
-  private def exactTo(t: FINAL, expr: CompilationStepResultExpr): CompilationStepResultExpr =
-    cast(t, t, expr, FUNCTION_CALL(throwWithMessage, List(CONST_STRING(s"Type cast error").explicitGet())))
+  private def exactTo(p: Pos, t: FINAL, expr: CompilationStepResultExpr): CompilationStepResultExpr =
+    cast(p, t, t, expr, FUNCTION_CALL(throwWithMessage, List(CONST_STRING(s"Couldn't cast ${expr.t} to $t").explicitGet())))
 
-  private def to(t: FINAL, expr: CompilationStepResultExpr): CompilationStepResultExpr =
-    cast(t, UNION(t, UNIT), expr, REF(unitVarName))
+  private def to(p: Pos, t: FINAL, expr: CompilationStepResultExpr): CompilationStepResultExpr =
+    cast(p, t, UNION(t, UNIT), expr, REF(unitVarName))
 
-  private def cast(t: FINAL, resultType: FINAL, expr: CompilationStepResultExpr, onError: EXPR): CompilationStepResultExpr = {
-    val r = IF(
-      FUNCTION_CALL(_isInstanceOf.header, List(expr.expr, CONST_STRING(t.name).explicitGet())),
-      expr.expr,
-      onError
-    )
-    expr.copy(t = resultType, expr = r)
+  private def cast(p: Pos, expectingType: FINAL, resultType: FINAL, expr: CompilationStepResultExpr, onError: EXPR): CompilationStepResultExpr = {
+    expectingType match {
+      case LIST(t) if t != ANY =>
+        expr.copy(errors = Seq(TypeCastAllowedOnlyForGenericList(p.start, p.end)))
+      case _ =>
+        val r = IF(
+          FUNCTION_CALL(_isInstanceOf.header, List(expr.expr, CONST_STRING(expectingType.name).explicitGet())),
+          expr.expr,
+          onError
+        )
+        expr.copy(t = resultType, expr = r)
+    }
   }
 }

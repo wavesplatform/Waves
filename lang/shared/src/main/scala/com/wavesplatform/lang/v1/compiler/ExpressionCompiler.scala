@@ -622,7 +622,7 @@ object ExpressionCompiler {
       p: Pos,
       e: Expressions.EXPR,
       namePart: PART[String],
-      rawType: Expressions.Single,
+      rawType: Expressions.Type,
       saveExprContext: Boolean,
       allowIllFormedStrings: Boolean
   ): CompileM[CompilationStepResultExpr] =

@@ -220,10 +220,10 @@ object Parser {
   )
 
   sealed trait Accessor
-  case class Method(name: PART[String], args: Seq[EXPR])       extends Accessor
-  case class Getter(name: PART[String])                        extends Accessor
-  case class ListIndex(index: EXPR)                            extends Accessor
-  case class GenericMethod(name: PART[String], `type`: Single) extends Accessor
+  case class Method(name: PART[String], args: Seq[EXPR])     extends Accessor
+  case class Getter(name: PART[String])                      extends Accessor
+  case class ListIndex(index: EXPR)                          extends Accessor
+  case class GenericMethod(name: PART[String], `type`: Type) extends Accessor
 
   def singleTypeP[_: P]: P[Single] = (anyVarName ~~ ("[" ~~ Index ~ unionTypeP ~ Index ~~ "]").?).map {
     case (t, param) => Single(t, param.map { case (start, param, end) => VALID(Pos(start, end), param) })
@@ -359,13 +359,13 @@ object Parser {
   def functionCallOrGetter[_: P]: P[Accessor] = {
     sealed trait ArgsOrType
     case class Args(args: Seq[EXPR])    extends ArgsOrType
-    case class Type(name: PART[String]) extends ArgsOrType
+    case class Type(t: Expressions.Type) extends ArgsOrType
 
-    (accessorName.map(Getter) ~/ comment ~~ (("(" ~/ comment ~ functionCallArgs ~/ comment ~ ")").map(Args) | ("[" ~~ anyVarName ~ "]").map(Type)).?).map {
+    (accessorName.map(Getter) ~/ comment ~~ (("(" ~/ comment ~ functionCallArgs ~/ comment ~ ")").map(Args) | ("[" ~ unionTypeP ~ "]").map(Type)).?).map {
       case (g @ Getter(name), args) =>
         args.fold(g: Accessor) {
           case Args(a) => Method(name, a)
-          case Type(t) => GenericMethod(name, Single(t))
+          case Type(t) => GenericMethod(name, t)
         }
     }
   }
