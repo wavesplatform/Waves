@@ -6,13 +6,11 @@ import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.{GenesisTransaction, PaymentTransaction}
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.PropSpec
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class PaymentTransactionDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class PaymentTransactionDiffTest extends PropSpec with WithState {
 
   val preconditionsAndPayments: Gen[(GenesisTransaction, PaymentTransaction, PaymentTransaction)] = for {
     master    <- accountGen

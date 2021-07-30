@@ -1,16 +1,22 @@
 package com.wavesplatform.lang.script
 
 import cats.data.NonEmptyChain
+import cats.instances.either._
+import cats.instances.list._
+import cats.instances.map._
 import cats.kernel.CommutativeSemigroup
-import cats.implicits._
-import com.wavesplatform.lang.directives.{Directive, DirectiveKey, DirectiveParser}
+import cats.syntax.foldable._
+import cats.syntax.option._
+import cats.syntax.traverse._
+import cats.syntax.unorderedTraverse._
 import com.wavesplatform.lang.directives.values.{Imports, Library}
+import com.wavesplatform.lang.directives.{Directive, DirectiveKey, DirectiveParser}
 
 object ScriptPreprocessor {
   def apply(
-    scriptText: String,
-    libraries:  Map[String, String],
-    imports:    Imports
+      scriptText: String,
+      libraries: Map[String, String],
+      imports: Imports
   ): Either[String, String] =
     for {
       matchedLibraries <- resolveLibraries(libraries, imports)
@@ -18,8 +24,8 @@ object ScriptPreprocessor {
     } yield gatherScriptText(scriptText, matchedLibraries)
 
   private def resolveLibraries(
-    libraries: Map[String, String],
-    imports:   Imports
+      libraries: Map[String, String],
+      imports: Imports
   ): Either[String, Map[String, String]] = {
     implicit val cs: CommutativeSemigroup[NonEmptyChain[String]] = _ ++ _
     imports.fileNames
@@ -31,7 +37,7 @@ object ScriptPreprocessor {
   }
 
   private def checkLibrariesDirectives(
-    matchedLibraries: Map[String, String]
+      matchedLibraries: Map[String, String]
   ): Either[String, List[Unit]] =
     matchedLibraries
       .map { case (name, src) => checkLibraryDirectives(name, src) }
@@ -39,8 +45,8 @@ object ScriptPreprocessor {
       .sequence
 
   private def checkLibraryDirectives(
-    libraryName: String,
-    librarySrc:  String
+      libraryName: String,
+      librarySrc: String
   ): Either[String, Unit] =
     for {
       directives <- DirectiveParser(librarySrc)
@@ -48,7 +54,7 @@ object ScriptPreprocessor {
       _          <- Either.cond(ds.contentType == Library, (), s"CONTENT_TYPE of `$libraryName` is not LIBRARY")
     } yield ()
 
-  private val importRegex = s"\\${DirectiveParser.start}\\s*${DirectiveKey.IMPORT.text}.*${DirectiveParser.end}"
+  private val importRegex    = s"\\${DirectiveParser.start}\\s*${DirectiveKey.IMPORT.text}.*${DirectiveParser.end}"
   private val directiveRegex = s"\\${DirectiveParser.start}.*${DirectiveParser.end}"
 
   private def gatherScriptText(src: String, libraries: Map[String, String]) = {

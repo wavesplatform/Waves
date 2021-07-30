@@ -8,9 +8,7 @@ object CommonSettings extends AutoPlugin {
   override def trigger: PluginTrigger = allRequirements
 
   // These options doesn't work for ScalaJS
-  override def projectSettings: Seq[Def.Setting[_]] = Seq(
-    packageSource := sourceDirectory.value / "package"
-  )
+  override def projectSettings: Seq[Def.Setting[_]] = Seq()
 }
 
 trait CommonKeys {

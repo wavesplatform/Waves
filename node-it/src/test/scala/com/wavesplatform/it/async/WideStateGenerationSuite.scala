@@ -5,17 +5,14 @@ import java.util.concurrent.TimeoutException
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
-import org.scalatest._
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 @LoadTest
-class WideStateGenerationSuite extends FreeSpec with WaitForHeight2 with Matchers with TransferSending with NodesFromDocker {
+class WideStateGenerationSuite extends BaseFreeSpec with WaitForHeight2 with TransferSending {
 
   override protected def createDocker: Docker = new Docker(
     suiteConfig = ConfigFactory.parseString(
@@ -57,7 +54,8 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2 with Matcher
       b <- dumpBalances()
       uploadedTxs <- processRequests(
         generateTransfersToRandomAddresses(requestsCount / 2, nodeAddresses) ++
-          generateTransfersBetweenAccounts(requestsCount / 2, b))
+          generateTransfersBetweenAccounts(requestsCount / 2, b)
+      )
 
       _ <- Await.ready(traverse(nodes)(_.waitFor[Int]("UTX is empty")(_.utxSize, _ == 0, 5.seconds)), 7.minutes)
 

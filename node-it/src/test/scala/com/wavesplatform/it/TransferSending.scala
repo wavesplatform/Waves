@@ -30,10 +30,6 @@ trait TransferSending extends ScorexLogging {
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = 'I'.toByte
-  }
-
   def generateTransfersFromAccount(n: Int, accountAddress: String): Seq[Req] = {
     val fee      = 100000 + 400000 // + 400000 for scripted accounts
     val seedSize = 32

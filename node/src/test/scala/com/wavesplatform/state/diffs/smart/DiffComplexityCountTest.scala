@@ -18,17 +18,13 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
+import com.wavesplatform.TestTime
+import com.wavesplatform.test.PropSpec
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.scalatest.{EitherValues, Inside}
 
 class DiffComplexityCountTest
     extends PropSpec
-    with ScalaCheckPropertyChecks
-    with Matchers
-    with TransactionGen
-    with NoShrink
     with Inside
     with WithState
     with DBCacheSettings
@@ -110,7 +106,7 @@ class DiffComplexityCountTest
         genesis  <- GenesisTransaction.create(account1.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(account2.toAddress, ENOUGH_AMT, ts)
         issue    <- IssueTransaction.selfSigned(2.toByte, account1, "Asset", "Description", ENOUGH_AMT, 8, true, Some(verifier), fee, ts)
-        asset = IssuedAsset(issue.id.value())
+        asset = IssuedAsset(issue.id())
         transfer1   <- TransferTransaction.selfSigned(2.toByte, account1, account2.toAddress, asset, Int.MaxValue, Waves, fee, ByteStr.empty, ts)
         setVerifier <- SetScriptTransaction.selfSigned(1.toByte, account2, Some(verifier), fee, ts)
         setDApp     <- SetScriptTransaction.selfSigned(1.toByte, account1, Some(dApp(asset)), fee, ts)
@@ -127,7 +123,7 @@ class DiffComplexityCountTest
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)
-      d.blockchain.bestLiquidDiff.get.errorMessage(invoke1.id.value()) shouldBe empty
+      d.blockchain.bestLiquidDiff.get.errorMessage(invoke1.id()) shouldBe empty
       d.blockchain.bestLiquidDiff.get.scriptsComplexity shouldBe 13382  // dApp + 3 actions + 2 payments + verifier = 7 * 1900 = 13300
 
       d.appendBlock()
@@ -135,7 +131,7 @@ class DiffComplexityCountTest
 
       val invoke2 = invoke()
       d.appendBlock(invoke2)
-      d.blockchain.bestLiquidDiff.get.errorMessage(invoke2.id.value()) shouldBe empty
+      d.blockchain.bestLiquidDiff.get.errorMessage(invoke2.id()) shouldBe empty
       d.blockchain.bestLiquidDiff.get.scriptsComplexity shouldBe 17
     }
   }

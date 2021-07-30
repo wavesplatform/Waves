@@ -4,6 +4,10 @@ import java.net.{InetSocketAddress, NetworkInterface}
 import java.nio.channels.ClosedChannelException
 import java.util.concurrent.ConcurrentHashMap
 
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
+import scala.util.Random
+
 import com.wavesplatform.Version
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network.MessageObserver.Messages
@@ -21,15 +25,11 @@ import io.netty.util.concurrent.DefaultThreadFactory
 import monix.reactive.Observable
 import org.influxdb.dto.Point
 
-import scala.jdk.CollectionConverters._
-import scala.concurrent.duration._
-import scala.util.Random
-
 trait NS {
   def connect(remoteAddress: InetSocketAddress): Unit
   def shutdown(): Unit
-  val messages: Messages
-  val closedChannels: Observable[Channel]
+  def messages: Messages
+  def closedChannels: Observable[Channel]
 }
 
 object NetworkServer extends ScorexLogging {
@@ -91,8 +91,8 @@ object NetworkServer extends ScorexLogging {
     val (messageObserver, networkMessages)            = MessageObserver()
     val (channelClosedHandler, closedChannelsSubject) = ChannelClosedHandler()
     val discardingHandler                             = new DiscardingHandler(lastBlockInfos.map(_.ready))
-    val peerConnections                               = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
-    val serverHandshakeHandler                        = new HandshakeHandler.Server(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
+    val peerConnectionsMap                            = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
+    val serverHandshakeHandler                        = new HandshakeHandler.Server(handshake, peerInfo, peerConnectionsMap, peerDatabase, allChannels)
 
     def peerSynchronizer: ChannelHandlerAdapter = {
       if (settings.networkSettings.enablePeersExchange) {
@@ -137,7 +137,7 @@ object NetworkServer extends ScorexLogging {
 
     val outgoingChannels = new ConcurrentHashMap[InetSocketAddress, Channel]
 
-    val clientHandshakeHandler = new HandshakeHandler.Client(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
+    val clientHandshakeHandler = new HandshakeHandler.Client(handshake, peerInfo, peerConnectionsMap, peerDatabase, allChannels)
 
     val bootstrap = new Bootstrap()
       .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, settings.networkSettings.connectionTimeout.toMillis.toInt: Integer)
@@ -148,7 +148,7 @@ object NetworkServer extends ScorexLogging {
           Seq(
             new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
             new HandshakeDecoder(peerDatabase),
-            new HandshakeTimeoutHandler(if (peerConnections.isEmpty) AverageHandshakePeriod else settings.networkSettings.handshakeTimeout),
+            new HandshakeTimeoutHandler(if (peerConnectionsMap.isEmpty) AverageHandshakePeriod else settings.networkSettings.handshakeTimeout),
             clientHandshakeHandler
           ) ++ pipelineTail
         )
@@ -205,7 +205,7 @@ object NetworkServer extends ScorexLogging {
       )
 
     def scheduleConnectTask(): Unit = if (!shutdownInitiated) {
-      val delay = (if (peerConnections.isEmpty) AverageHandshakePeriod else 5.seconds) +
+      val delay = (if (peerConnectionsMap.isEmpty) AverageHandshakePeriod else 5.seconds) +
         (Random.nextInt(1000) - 500).millis // add some noise so that nodes don't attempt to connect to each other simultaneously
       log.trace(s"Next connection attempt in $delay")
 
@@ -240,25 +240,25 @@ object NetworkServer extends ScorexLogging {
 
     scheduleConnectTask()
 
-    def doShutdown(): Unit =
-      try {
-        shutdownInitiated = true
-        serverChannel.foreach(_.close().await())
-        log.debug("Unbound server")
-        allChannels.close().await()
-        log.debug("Closed all channels")
-      } finally {
-        workerGroup.shutdownGracefully().await()
-        bossGroup.shutdownGracefully().await()
-        messageObserver.shutdown()
-        channelClosedHandler.shutdown()
-      }
-
     new NS {
       override def connect(remoteAddress: InetSocketAddress): Unit = doConnect(remoteAddress)
-      override def shutdown(): Unit = doShutdown()
-      override val messages: Messages = networkMessages
-      override val closedChannels: Observable[Channel] = closedChannelsSubject
+
+      override def shutdown(): Unit =
+        try {
+          shutdownInitiated = true
+          serverChannel.foreach(_.close().await())
+          log.debug("Unbound server")
+          allChannels.close().await()
+          log.debug("Closed all channels")
+        } finally {
+          workerGroup.shutdownGracefully().await()
+          bossGroup.shutdownGracefully().await()
+          messageObserver.shutdown()
+          channelClosedHandler.shutdown()
+        }
+
+      override val messages: Messages                     = networkMessages
+      override val closedChannels: Observable[Channel]    = closedChannelsSubject
     }
   }
 }

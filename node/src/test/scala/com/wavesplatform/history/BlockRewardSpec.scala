@@ -15,22 +15,13 @@ import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, RewardsSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.{Blockchain, Height}
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.{EitherMatchers, NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{FreeSpec, Matchers}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class BlockRewardSpec
-    extends FreeSpec
-    with ScalaCheckPropertyChecks
-    with WithDomain
-    with Matchers
-    with EitherMatchers
-    with TransactionGen
-    with NoShrink {
+class BlockRewardSpec extends FreeSpec with WithDomain {
 
   private val BlockRewardActivationHeight = 5
   private val NGActivationHeight          = 0

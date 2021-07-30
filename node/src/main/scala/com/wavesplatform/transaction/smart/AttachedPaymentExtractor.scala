@@ -38,7 +38,7 @@ object AttachedPaymentExtractor {
     Right(AttachedPayments.Multi(tx.payments.map(p => (p.amount, p.assetId.compatId))))
 
   private def scriptErrorMessage(apt: AttachedPaymentTarget, version: StdLibVersion): String = {
-    val name = apt match {
+    val name = (apt: @unchecked) match {
       case DApp            => "DApp"
       case InvokerScript   => "Invoker script"
       case AssetScript(id) => s"Attached asset script id=$id"

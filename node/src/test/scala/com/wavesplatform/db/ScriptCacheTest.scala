@@ -14,11 +14,11 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.{EitherMatchers, TransactionGen, WithDB}
+import com.wavesplatform.WithDB
+import com.wavesplatform.test.FreeSpec
 import org.scalacheck.Gen
-import org.scalatest.{FreeSpec, Matchers}
 
-class ScriptCacheTest extends FreeSpec with Matchers with WithDB with TransactionGen with EitherMatchers {
+class ScriptCacheTest extends FreeSpec with WithDB {
 
   val CACHE_SIZE = 1
   val AMOUNT     = 10000000000L
@@ -99,10 +99,12 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
     }
 
     "Return correct script after rollback" in {
-      val scripts @ List((script, complexity)) = mkScripts(1)
+      val scripts = mkScripts(1)
+      val (script, complexity) = scripts.head
 
       withBlockchain(blockGen(scripts, _)) {
-        case (List(account), bcu) =>
+        case (accounts, bcu) =>
+          val account = accounts.head
           bcu.accountScript(account.toAddress) shouldEqual Some(AccountScriptInfo(account.publicKey, script, complexity))
 
           val lastBlockHeader = bcu.lastBlockHeader.get

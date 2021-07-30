@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.compiler
 
-import cats.implicits._
+import cats.syntax.traverse._
+import cats.instances.list._
 
 object Types {
 

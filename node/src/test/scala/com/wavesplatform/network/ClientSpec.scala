@@ -2,18 +2,18 @@ package com.wavesplatform.network
 
 import java.util.concurrent.ConcurrentHashMap
 
-import com.wavesplatform.{TransactionGen, Version}
+import com.wavesplatform.Version
+import com.wavesplatform.test.FreeSpec
 import io.netty.buffer.{ByteBuf, Unpooled}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
-class ClientSpec extends FreeSpec with Matchers with MockFactory with TransactionGen {
+class ClientSpec extends FreeSpec with MockFactory {
 
   private val clientHandshake = new Handshake(
     applicationName = "wavesI",

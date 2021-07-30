@@ -55,8 +55,10 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
       val transactionIdSet = transactionIds.toSet
       responseObserver.completeWith(
         stream
-          .filter { case TransactionMeta(_, tx, _) => transactionIdSet.isEmpty || transactionIdSet(tx.id()) }
-          .map(TransactionsApiGrpcImpl.toTransactionResponse)
+          .collect {
+            case m if transactionIdSet.isEmpty || transactionIdSet(m.transaction.id()) =>
+              TransactionsApiGrpcImpl.toTransactionResponse(m)
+          }
       )
     }
 
@@ -120,14 +122,13 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
 
 private object TransactionsApiGrpcImpl {
   def toTransactionResponse(meta: TransactionMeta): TransactionResponse = {
-    val TransactionMeta(height, tx, succeeded) = meta
-    val transactionId                          = tx.id().toByteString
-    val status                                 = if (succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
+    val transactionId                          = meta.transaction.id().toByteString
+    val status                                 = if (meta.succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
     val invokeScriptResult = meta match {
       case TransactionMeta.Invoke(_, _, _, r) => r.map(VISR.toPB)
       case _                                  => None
     }
 
-    TransactionResponse(transactionId, height, Some(tx.toPB), status, invokeScriptResult)
+    TransactionResponse(transactionId, meta.height, Some(meta.transaction.toPB), status, invokeScriptResult)
   }
 }

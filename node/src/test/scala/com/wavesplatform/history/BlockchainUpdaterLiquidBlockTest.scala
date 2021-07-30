@@ -3,24 +3,15 @@ package com.wavesplatform.history
 import com.wavesplatform._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
-import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class BlockchainUpdaterLiquidBlockTest
-    extends PropSpec
-    with PropertyChecks
-    with DomainScenarioDrivenPropertyCheck
-    with Matchers
-    with EitherMatchers
-    with TransactionGen
-    with BlocksTransactionsHelpers
-    with NoShrink {
+class BlockchainUpdaterLiquidBlockTest extends PropSpec with DomainScenarioDrivenPropertyCheck with BlocksTransactionsHelpers {
   import QuickTX._
   import UnsafeBlocks._
 

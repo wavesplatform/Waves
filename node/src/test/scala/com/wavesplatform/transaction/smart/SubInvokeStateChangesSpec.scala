@@ -2,16 +2,15 @@ package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.JsonMatchers
-import org.scalatest.{FlatSpec, Matchers}
 import play.api.libs.json.Json
 
-class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain with JsonMatchers {
+class SubInvokeStateChangesSpec extends FlatSpec with WithDomain with JsonMatchers {
   val ContractFunction            = "default"
   val compileV5: String => Script = TestCompiler(StdLibVersion.V5).compileContract(_)
 
@@ -154,11 +153,7 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain w
         |            "text" : "boom"
         |          }
         |        }
-        |      } ],
-        |      "error" : {
-        |        "code" : 1,
-        |        "text" : "FailedTransactionError(code = 1, error = boom, log =\n\t@p = false\n)"
-        |      }
+        |      } ]
         |    }
         |  } ],
         |  "error" : {

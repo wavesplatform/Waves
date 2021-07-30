@@ -40,11 +40,11 @@ object NumberAsStringSerializer extends JsonSerializer[JsValue] {
     "value"
   )
 
-  override def serialize(value: JsValue, json: JsonGenerator, provider: SerializerProvider): Unit = {
+  override def serialize(value: JsValue, json: JsonGenerator, provider: SerializerProvider): Unit =
     value match {
       case JsNumber(v)  => json.writeNumber(v.bigDecimal)
       case JsString(v)  => json.writeString(v)
-      case JsBoolean(v) => json.writeBoolean(v)
+      case v: JsBoolean => json.writeBoolean(v.value)
 
       case JsArray(elements) =>
         json.writeStartArray()
@@ -66,7 +66,6 @@ object NumberAsStringSerializer extends JsonSerializer[JsValue] {
 
       case JsNull => json.writeNull()
     }
-  }
 }
 
 object CustomJson {

@@ -6,10 +6,10 @@ import java.nio.file.Files
 import cats.syntax.option._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.WalletSettings
+import com.wavesplatform.test.FunSuite
 import com.wavesplatform.wallet.Wallet
-import org.scalatest.{FunSuite, Matchers}
 
-class WalletSpecification extends FunSuite with Matchers {
+class WalletSpecification extends FunSuite {
 
   private val walletSize = 10
   val w                  = Wallet(WalletSettings(None, "cookies".some, ByteStr.decodeBase58("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").toOption))
@@ -52,7 +52,7 @@ class WalletSpecification extends FunSuite with Matchers {
     val w1 = Wallet(WalletSettings(walletFile, "cookies".some, ByteStr.decodeBase58("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").toOption))
     w1.generateNewAccounts(10)
     val w1PrivateKeys = w1.privateKeyAccounts
-    val w1nonce              = w1.nonce
+    val w1nonce       = w1.nonce
 
     val w2 = Wallet(WalletSettings(walletFile, "cookies".some, None))
     w2.privateKeyAccounts.nonEmpty shouldBe true

@@ -4,19 +4,19 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.RxScoreObserver.ChannelClosedAndSyncWith
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.{BlockGen, RxScheduler, TransactionGen}
+import com.wavesplatform.{BlockGen, RxScheduler}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.local.LocalChannel
 import monix.eval.{Coeval, Task}
 import monix.reactive.Observable
 import monix.reactive.subjects.{PublishSubject => PS}
-import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 
-class RxExtensionLoaderSpec extends FreeSpec with Matchers with TransactionGen with RxScheduler with BlockGen {
+class RxExtensionLoaderSpec extends FreeSpec with RxScheduler with BlockGen {
 
   val MaxRollback = 10
   type Applier = (Channel, ExtensionBlocks) => Task[Either[ValidationError, Option[BigInt]]]

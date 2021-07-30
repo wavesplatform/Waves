@@ -8,8 +8,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.Transaction
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{Node, NodeConfigs, ReportingTestName, TransferSending}
+import com.wavesplatform.it.{BaseFunSuite, NodeConfigs, TransferSending}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state._
@@ -18,15 +17,10 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
 import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
 
 class RideCreateMerkleRootTestSuite
-    extends FunSuite
-    with CancelAfterFailure
+    extends BaseFunSuite
     with TransferSending
-    with NodesFromDocker
-    with ReportingTestName
-    with Matchers
     with TableDrivenPropertyChecks {
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
@@ -42,8 +36,6 @@ class RideCreateMerkleRootTestSuite
       )
       .withDefault(1)
       .buildNonConflicting()
-
-  private def sender: Node = nodes.last
 
   test("Ride createMerkleRoot") {
     val script  = """

@@ -11,9 +11,9 @@ import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.transactions.OverflowBlock
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.util._
 import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -203,7 +203,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
   test("accept invalid by asset script in payment InvokeScriptTransaction to utx and save it as failed after activation height") {
     sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(true), waitForTx = true)
 
-    val invokesCount = MaxTxsInMicroBlock * 2
+    val invokesCount  = MaxTxsInMicroBlock * 2
     val callerBalance = sender.balance(caller).balance
     val callerAssetBalance = {
       val balance = sender.assetBalance(caller, asset).balance
@@ -406,7 +406,6 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           buy.matcherFee,
           sell.matcherFee,
           matcherFee + smartFee * 3,
-          matcherFeeAssetId = Some(feeAsset),
           version = TxVersion.V3
         )
         .id
@@ -436,7 +435,6 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           buy.matcherFee,
           sell.matcherFee,
           matcherFee + smartFee * 3,
-          matcherFeeAssetId = Some(feeAsset),
           version = TxVersion.V3
         )
         .id
