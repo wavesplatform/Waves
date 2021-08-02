@@ -543,12 +543,12 @@ object Parser {
 
   def parseExpr(str: String): Parsed[EXPR] = {
     def expr[_:P] = P(Start ~ unusedText ~ (baseExpr | invalid) ~ End)
-    parse(str, expr(_))
+    parse(str, expr(_), verboseFailures = true)
   }
 
   def parseExprOrDecl(str: String): Parsed[EXPR] = {
     def e[_:P] = P(Start ~ unusedText ~ (baseExprOrDecl | invalid) ~ End)
-    parse(str, e(_))
+    parse(str, e(_), verboseFailures = true)
   }
 
   def parseContract(str: String): Parsed[DAPP] = {
@@ -556,7 +556,8 @@ object Parser {
       .map {
         case (ds, fs, t, end) => (DAPP(Pos(0, end), ds.flatten.toList, fs.toList), t)
       }
-    parse(str, contract(_)) match {
+    
+    parse(str, contract(_), verboseFailures = true) match {
       case Parsed.Success((s, t), _) if(t.nonEmpty) =>
         def contract[_:P] = P(Start ~ unusedText ~ (declaration.rep) ~ comment ~ (annotatedFunc.rep) ~ !declaration.rep(1) ~ End ~~ Index)
         parse(str, contract(_)) match {

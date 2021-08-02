@@ -2,15 +2,16 @@ package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
 
+import scala.util.Try
+
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.protobuf.transaction.PBOrders
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.utils.EthEncoding
 import play.api.libs.json.{JsObject, Json}
-
-import scala.util.Try
 
 object OrderSerializer {
   def toJson(order: Order): JsObject = {
@@ -30,7 +31,8 @@ object OrderSerializer {
       "matcherFee"       -> matcherFee,
       "signature"        -> proofs.toSignature.toString,
       "proofs"           -> proofs.proofs.map(_.toString)
-    ) ++ (if (version >= Order.V3) Json.obj("matcherFeeAssetId" -> matcherFeeAssetId) else JsObject.empty)
+    ) ++ (if (version >= Order.V3) Json.obj("matcherFeeAssetId" -> matcherFeeAssetId) else JsObject.empty) ++
+      (if (version >= Order.V4) Json.obj("ethSignature"         -> ethSignature.map(bs => EthEncoding.toHexString(bs.arr))) else JsObject.empty) // TODO: Should it be hex or base58?
   }
 
   def bodyBytes(order: Order): Array[Byte] = {

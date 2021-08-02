@@ -45,7 +45,8 @@ case class Order(
     (expiration >= atTime) :| "expiration should be > currentTime" &&
     (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves" &&
     (ethSignature.isEmpty || version >= Order.V4) :| "ethSignature available only in V4" &&
-    ethSignature.forall(es => es.size == 65 && es.size == 129) :| "ethSignature should be of length 65 or 129"
+    ethSignature.forall(es => es.size == 65 || es.size == 129) :| "ethSignature should be of length 65 or 129" &&
+    (ethSignature.isEmpty || proofs.isEmpty) :| "ethSignature excludes proofs"
   }
 
   def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {

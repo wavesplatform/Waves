@@ -28,6 +28,8 @@ object TxHelpers {
   val defaultAddress: WavesAddress = defaultSigner.toAddress
   val secondSigner: KeyPair   = signer(1)
   val secondAddress: WavesAddress  = secondSigner.toAddress
+  
+  val matcher: KeyPair = defaultSigner
 
   private[this] var lastTimestamp = System.currentTimeMillis()
   def timestamp: Long = {
@@ -77,11 +79,11 @@ object TxHelpers {
     )
   }
 
-  def exchange(order1: Order, order2: Order): ExchangeTransaction = {
+  def exchange(order1: Order, order2: Order, version: TxVersion = TxVersion.V2, timestamp: TxTimestamp = this.timestamp): ExchangeTransaction = {
     ExchangeTransaction
       .signed(
-        TxVersion.V2,
-        defaultSigner.privateKey,
+        version,
+        matcher.privateKey,
         order1,
         order2,
         order1.amount,

@@ -15,7 +15,7 @@ import org.web3j.crypto.Sign.SignatureData
 import play.api.libs.json.{JsObject, Json}
 
 object EthOrders extends App {
-  def hashOrderStruct(order: Order): Array[Byte] = {
+  def toEip712Json(order: Order): JsObject = {
     def encodeAsset(asset: Asset): String = asset match {
       case IssuedAsset(id) => EthEncoding.toHexString(id.arr)
       case Waves           => EthEncoding.toHexString(Bytes32.DEFAULT.getValue)
@@ -40,7 +40,11 @@ object EthOrders extends App {
       "matcherFeeAssetId" -> encodeAsset(order.matcherFeeAssetId)
     )
 
-    val json    = Json.parse(orderDomainJson).as[JsObject] ++ Json.obj("message" -> message)
+    Json.parse(orderDomainJson).as[JsObject] ++ Json.obj("message" -> message)
+  }
+
+  def hashOrderStruct(order: Order): Array[Byte] = {
+    val json    = toEip712Json(order)
     val encoder = new StructuredDataEncoder(json.toString)
     encoder.hashStructuredData()
   }
