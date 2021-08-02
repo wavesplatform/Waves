@@ -81,7 +81,7 @@ Using docker, follow the [official image documentation](https://hub.docker.com/r
 
 The best starting point to understand available configuration parameters is [this article](https://docs.waves.tech/en/waves-node/node-configuration).
 
-The easiest way to start playing around with configurations is to use default configuration files for different networks; they're available [here](./node).
+The easiest way to start playing around with configurations is to use default configuration files for different networks; they're available in [network-defaults.conf](./node/src/main/resources/network-defaults.conf).
 
 Logging configuration with all available levels and parameters is described [here](https://docs.waves.tech/en/waves-node/logging-configuration).
 
