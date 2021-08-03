@@ -5,7 +5,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync.{aliasTxSupportedVersions, minFee, transferAmount}
-import com.wavesplatform.it.util._
+import com.wavesplatform.test._
 import com.wavesplatform.protobuf.transaction.{PBRecipients, Recipient}
 import io.grpc.Status.Code
 import org.scalatest.prop.TableDrivenPropertyChecks

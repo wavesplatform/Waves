@@ -145,7 +145,7 @@ object Tasks {
          | }
       """.stripMargin
 
-    val rawDocFile = sourceManaged.value / "com" / "wavesplatform" / "DocSource.scala"
+    val rawDocFile = (Compile / sourceManaged).value / "com" / "wavesplatform" / "DocSource.scala"
 
     IO.write(rawDocFile, sourceStr)
     Seq(rawDocFile)

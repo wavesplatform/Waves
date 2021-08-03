@@ -2,15 +2,15 @@ package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.TxHelpers
-import org.scalatest.{FlatSpec, Matchers}
+import com.wavesplatform.utils.JsonMatchers
 import play.api.libs.json.Json
 
-class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
+class SubInvokeStateChangesSpec extends FlatSpec with WithDomain with JsonMatchers {
   val ContractFunction            = "default"
   val compileV5: String => Script = TestCompiler(StdLibVersion.V5).compileContract(_)
 
@@ -57,7 +57,7 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
 
     val stateChanges = d.commonApi.invokeScriptResult(invoke.id())
     val json         = Json.toJson(stateChanges)
-    json shouldBe Json.parse(
+    json should matchJson(
       """{
         |  "data" : [ ],
         |  "transfers" : [ ],
@@ -73,7 +73,10 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
         |      "function" : "default",
         |      "args" : [ ]
         |    },
-        |    "payments" : [ ],
+        |    "payment" : [ {
+        |            "assetId" : null,
+        |            "amount" : 17
+        |    } ],
         |    "stateChanges" : {
         |      "data" : [ ],
         |      "transfers" : [ ],
@@ -89,7 +92,10 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
         |          "function" : "default",
         |          "args" : [ ]
         |        },
-        |        "payments" : [ ],
+        |        "payment" : [ {
+        |          "assetId" : null,
+        |          "amount" : 17
+        |        } ],
         |        "stateChanges" : {
         |          "data" : [ ],
         |          "transfers" : [ ],
@@ -109,7 +115,10 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
         |      "function" : "default",
         |      "args" : [ ]
         |    },
-        |    "payments" : [ ],
+        |    "payment" : [ {
+        |        "assetId" : null,
+        |        "amount" : 17
+        |    } ],
         |    "stateChanges" : {
         |      "data" : [ ],
         |      "transfers" : [ ],
@@ -125,7 +134,10 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
         |          "function" : "default",
         |          "args" : [ ]
         |        },
-        |        "payments" : [ ],
+        |        "payment" : [ {
+        |            "assetId" : null,
+        |            "amount" : 17
+        |        } ],
         |        "stateChanges" : {
         |          "data" : [ ],
         |          "transfers" : [ ],
@@ -141,11 +153,7 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
         |            "text" : "boom"
         |          }
         |        }
-        |      } ],
-        |      "error" : {
-        |        "code" : 1,
-        |        "text" : "FailedTransactionError(code = 1, error = boom, log =\n\t@p = false\n)"
-        |      }
+        |      } ]
         |    }
         |  } ],
         |  "error" : {
@@ -169,7 +177,7 @@ class SubInvokeStateChangesSpec extends FlatSpec with Matchers with WithDomain {
        |@Callable(i)
        |func $ContractFunction() = {
        |  ${calls.zipWithIndex
-         .map { case (address, i) => s"""strict r$i = invoke(Address(base58'$address'), "$ContractFunction", [], [])""" }
+         .map { case (address, i) => s"""strict r$i = invoke(Address(base58'$address'), "$ContractFunction", [], [AttachedPayment(unit, 17)])""" }
          .mkString("\n")}
        |  if ($fail && !(${(1 to 10).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")})) then throw("boom") else []
        |}""".stripMargin

@@ -5,13 +5,13 @@ import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.smart.Verifier
-import com.wavesplatform.{NTPTime, TransactionGen}
+import com.wavesplatform.NTPTime
+import com.wavesplatform.test.PropSpec
 import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.util.Random
 
-class OrderSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with ValidationMatcher with NTPTime {
+class OrderSpecification extends PropSpec with ValidationMatcher with NTPTime {
   property("Order serialization roundtrip") {
     forAll(orderV1Gen) { order =>
       val recovered = Order.parseBytes(Order.V1, order.bytes()).get

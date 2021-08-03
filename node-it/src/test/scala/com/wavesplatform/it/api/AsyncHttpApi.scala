@@ -35,7 +35,7 @@ import org.asynchttpclient.Dsl.{delete => _delete, get => _get, post => _post, p
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
 import org.scalactic.source.Position
-import org.scalatest.{Assertions, Matchers}
+import org.scalatest.{Assertions, matchers}
 import play.api.libs.json.Json.{stringify, toJson}
 import play.api.libs.json._
 
@@ -49,7 +49,7 @@ import scala.util.{Failure, Success}
 object AsyncHttpApi extends Assertions {
 
   //noinspection ScalaStyle
-  implicit class NodeAsyncHttpApi(val n: Node) extends Assertions with Matchers {
+  implicit class NodeAsyncHttpApi(val n: Node) extends Assertions with matchers.should.Matchers {
 
     def get(
         path: String,
@@ -749,7 +749,6 @@ object AsyncHttpApi extends Assertions {
         sellMatcherFee: Long,
         fee: Long,
         version: Byte,
-        matcherFeeAssetId: Option[String],
         amountsAsStrings: Boolean = false,
         validate: Boolean = true
     ): Future[Transaction] = {
@@ -904,23 +903,6 @@ object AsyncHttpApi extends Assertions {
       executeRequest
     }
 
-    def once(r: Request): Future[Response] = {
-      val id = UUID.randomUUID()
-      n.log.trace(s"[$id] Executing request ${r.getMethod} ${r.getUrl}")
-      n.client
-        .executeRequest(
-          r,
-          new AsyncCompletionHandler[Response] {
-            override def onCompleted(response: Response): Response = {
-              n.log.debug(s"[$id] Response for ${r.getUrl} is ${response.getStatusCode}")
-              response
-            }
-          }
-        )
-        .toCompletableFuture
-        .toScala
-    }
-
     def debugStateAt(height: Long): Future[Map[String, Long]] = getWithApiKey(s"/debug/stateWaves/$height").as[Map[String, Long]]
 
     def debugBalanceHistory(address: String, amountsAsStrings: Boolean = false): Future[Seq[BalanceHistory]] = {
@@ -954,23 +936,20 @@ object AsyncHttpApi extends Assertions {
     def accountsBalances(height: Option[Int], accounts: Seq[String], asset: Option[String]): Future[Seq[(String, Long)]] =
       n.balances(height, accounts, asset).map(_.map(b => (b.address, b.balance)))
 
-    def accountBalances(acc: String): Future[(Long, Long)] = {
-      n.balance(acc).map(_.balance).zip(n.effectiveBalance(acc).map(_.balance))
-    }
+    def accountBalances(acc: String): Future[(Long, Long)] =
+      n.balanceDetails(acc).map(bd => bd.regular -> bd.effective)
 
-    def assertBalances(acc: String, balance: Long, effectiveBalance: Long)(implicit pos: Position): Future[Unit] = {
+    def assertBalances(acc: String, balance: Long, effectiveBalance: Long)(implicit pos: Position): Future[Unit] =
       for {
-        newBalance          <- accountBalance(acc)
-        newEffectiveBalance <- accountEffectiveBalance(acc)
+        newBalance          <- balanceDetails(acc)
       } yield {
         withClue(s"effective balance of $acc") {
-          newEffectiveBalance shouldBe effectiveBalance
+          newBalance.effective shouldBe effectiveBalance
         }
         withClue(s"balance of $acc") {
-          newBalance shouldBe balance
+          newBalance.regular shouldBe balance
         }
       }
-    }
 
     def assertAssetBalance(acc: String, assetIdString: String, balance: Long)(implicit pos: Position): Future[Unit] = {
       for {
@@ -998,7 +977,7 @@ object AsyncHttpApi extends Assertions {
     }
   }
 
-  implicit class NodesAsyncHttpApi(nodes: Seq[Node]) extends Matchers {
+  implicit class NodesAsyncHttpApi(nodes: Seq[Node]) extends matchers.should.Matchers {
     def height: Future[Seq[Int]] = traverse(nodes)(_.height)
 
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit p: Position): Future[Unit] =

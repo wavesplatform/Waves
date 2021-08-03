@@ -1,7 +1,9 @@
 package com.wavesplatform.transaction.smart
 
+import java.util
+
 import cats.Id
-import cats.implicits._
+import cats.syntax.semigroup._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{ContentType, ScriptType, StdLibVersion}
@@ -13,8 +15,6 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{ExecutionError, Global}
 import com.wavesplatform.state._
 import monix.eval.Coeval
-
-import java.util
 
 object BlockchainContext {
 

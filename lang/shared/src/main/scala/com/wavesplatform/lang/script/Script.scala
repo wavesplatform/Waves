@@ -53,7 +53,7 @@ object Script {
       case _             => DAppType
     }
     val ctx = getDecompilerContext(s.stdLibVersion, cType)
-    val (scriptText, directives) = s match {
+    val (scriptText, directives) = (s: @unchecked) match {
       case e: ExprScript                   => (Decompiler(e.expr, ctx), List(s.stdLibVersion, Expression))
       case ContractScriptImpl(_, contract) => (Decompiler(contract, ctx), List(s.stdLibVersion, Account, DAppType))
     }
@@ -70,7 +70,7 @@ object Script {
       estimator: ScriptEstimator,
       useContractVerifierLimit: Boolean
   ): Either[String, ComplexityInfo] =
-    script match {
+    (script: @unchecked) match {
       case script: ExprScript =>
         ExprScript
           .estimate(script.expr, script.stdLibVersion, estimator, useContractVerifierLimit)

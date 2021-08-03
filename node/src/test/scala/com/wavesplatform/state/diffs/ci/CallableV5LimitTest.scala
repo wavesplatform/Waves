@@ -6,19 +6,18 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4, V5}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
-import org.scalatest.{EitherValues, Matchers, PropSpec}
+import com.wavesplatform.{TestTime, TransactionGen}
+import org.scalatest.EitherValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class CallableV5LimitTest
     extends PropSpec
     with ScalaCheckPropertyChecks
-    with Matchers
     with TransactionGen
-    with NoShrink
     with WithDomain
     with EitherValues {
 

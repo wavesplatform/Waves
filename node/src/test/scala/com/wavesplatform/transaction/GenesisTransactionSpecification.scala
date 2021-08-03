@@ -3,11 +3,10 @@ package com.wavesplatform.transaction
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.test.PropSpec
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class GenesisTransactionSpecification extends PropSpec with PropertyChecks with Matchers {
+class GenesisTransactionSpecification extends PropSpec {
 
   private val defaultRecipient = PublicKey(Array.fill(32)(0: Byte))
 

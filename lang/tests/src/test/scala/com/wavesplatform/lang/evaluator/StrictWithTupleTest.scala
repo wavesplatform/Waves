@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.evaluator
 
-import com.wavesplatform.lang.Common.produce
+import com.wavesplatform.test._
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4}
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 

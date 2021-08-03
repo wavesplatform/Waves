@@ -1,6 +1,7 @@
 package com.wavesplatform.api.http.requests
 
-import cats.implicits._
+import cats.instances.list._
+import cats.syntax.traverse._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}

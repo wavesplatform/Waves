@@ -233,10 +233,12 @@ class PureFunctionsRebenchmark {
 
 object PureFunctionsRebenchmark {
   val context: EvaluationContext[Environment, Id] =
-    Monoid.combine(
-      PureContext.build(V4, fixUnicodeFunctions = true).evaluationContext,
-      CryptoContext.build(Global, V4).evaluationContext
-    ).asInstanceOf[EvaluationContext[Environment, Id]]
+    Monoid
+      .combine(
+        PureContext.build(V4, fixUnicodeFunctions = true).evaluationContext,
+        CryptoContext.build(Global, V4).evaluationContext
+      )
+      .asInstanceOf[EvaluationContext[Environment, Id]]
 
   val eval: EXPR => (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
     EvaluatorV2.applyCompleted(context, _, V4)
@@ -252,7 +254,7 @@ object PureFunctionsRebenchmark {
 
   @State(Scope.Benchmark)
   class SplitString {
-    val separator = ","
+    val separator       = ","
     val separatedString = List.fill(1000)(Random.nextPrintableChar().toString * 31).mkString(separator)
     val expr: EXPR =
       FUNCTION_CALL(

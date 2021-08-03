@@ -1,6 +1,5 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.{EitherMatchers, NoShrink, TransactionGen}
 import com.wavesplatform.account.{AddressOrAlias, Alias, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
@@ -10,23 +9,15 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{Constants, FunctionalitySettings}
-import com.wavesplatform.state.{Blockchain, LeaseBalance}
 import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.state.{Blockchain, LeaseBalance}
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import org.scalacheck.Gen
 import org.scalactic.source.Position
-import org.scalatest.{FreeSpec, Matchers}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class LeasingExpirySpec
-    extends FreeSpec
-    with ScalaCheckPropertyChecks
-    with WithDomain
-    with Matchers
-    with EitherMatchers
-    with TransactionGen
-    with NoShrink {
+class LeasingExpirySpec extends FreeSpec with WithDomain {
   private val LeasingExpiryActivationHeight = 4
   private val LeasingValidity               = 2
 

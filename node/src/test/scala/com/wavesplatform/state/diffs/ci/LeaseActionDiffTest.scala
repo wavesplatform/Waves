@@ -1,6 +1,8 @@
 package com.wavesplatform.state.diffs.ci
 
-import cats.implicits._
+import cats.instances.list._
+import cats.syntax.traverse._
+import com.wavesplatform.TestTime
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -15,19 +17,17 @@ import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{Authorized, GenesisTransaction, Transaction}
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.exceptions.TestFailedException
-import org.scalatest.{EitherValues, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.util.Random
 
-class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDomain with EitherValues {
+class LeaseActionDiffTest extends PropSpec with WithDomain {
   private val time = new TestTime
   private def ts   = time.getTimestamp()
 
@@ -206,13 +206,13 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           i => LeaseTransaction.selfSigned(2.toByte, dAppAcc, invoker.toAddress, leaseTxAmount1, fee, ts + i)
         )
         leaseToDApp <- LeaseTransaction.selfSigned(2.toByte, invoker, dAppAcc.toAddress, leaseTxAmount2, fee, ts + 100)
-        calculatedId = Lease.calculateId(Lease(recipient, leaseAmount, 0), invoke.id.value())
+        calculatedId = Lease.calculateId(Lease(recipient, leaseAmount, 0), invoke.id())
         leaseCancelId = if (cancelLeaseActionByTx) calculatedId
-        else if (cancelLeaseFromInvoker) leaseToDApp.id.value()
-        else leasesFromDApp.head.id.value()
+        else if (cancelLeaseFromInvoker) leaseToDApp.id()
+        else leasesFromDApp.head.id()
         leaseCancelAcc = if (cancelLeaseFromInvoker) invoker else dAppAcc
         leaseCancel <- LeaseCancelTransaction.signed(2.toByte, leaseCancelAcc.publicKey, leaseCancelId, fee, ts + 100, leaseCancelAcc.privateKey)
-        multipleCancelDApp = multipleLeaseCancelsDApp(leasesFromDApp.map(_.id.value()))
+        multipleCancelDApp = multipleLeaseCancelsDApp(leasesFromDApp.map(_.id()))
         dApp               = if (useLeaseCancelDApp) multipleCancelDApp else customDApp.getOrElse(singleLeaseDApp(recipient, leaseAmount))
         setDApp <- SetScriptTransaction.selfSigned(1.toByte, dAppAcc, Some(dApp), setScriptFee, ts + 100)
         preparingTxs = List(genesis, genesis2) ::: aliasTxs ::: List(setDApp)
@@ -485,7 +485,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()) shouldBe empty
+            diff.errorMessage(invoke.id()) shouldBe empty
             diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee)
             diff.portfolios(dAppAcc) shouldBe Portfolio(-leaseCancelTx.fee)
         }
@@ -501,7 +501,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "InvalidAddress(Wrong addressBytes length: expected: 26, actual: 0)"
+            diff.errorMessage(invoke.id()).get.text shouldBe "InvalidAddress(Wrong addressBytes length: expected: 26, actual: 0)"
         }
     }
   }
@@ -515,7 +515,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "InvalidAddress(Wrong addressBytes length: expected: 26, actual: 10)"
+            diff.errorMessage(invoke.id()).get.text shouldBe "InvalidAddress(Wrong addressBytes length: expected: 26, actual: 10)"
         }
     }
   }
@@ -532,7 +532,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "InvalidAddress(Bad address checksum)"
+            diff.errorMessage(invoke.id()).get.text shouldBe "InvalidAddress(Bad address checksum)"
         }
     }
   }
@@ -546,7 +546,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "Alias 'alias:T:alias2' does not exists."
+            diff.errorMessage(invoke.id()).get.text shouldBe "Alias 'alias:T:alias2' does not exists."
         }
     }
   }
@@ -560,7 +560,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe s"Alias should contain only following characters: ${Alias.AliasAlphabet}"
+            diff.errorMessage(invoke.id()).get.text shouldBe s"Alias should contain only following characters: ${Alias.AliasAlphabet}"
         }
     }
   }
@@ -574,7 +574,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "NonPositiveAmount(0,waves)"
+            diff.errorMessage(invoke.id()).get.text shouldBe "NonPositiveAmount(0,waves)"
         }
     }
   }
@@ -588,7 +588,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "NonPositiveAmount(-100,waves)"
+            diff.errorMessage(invoke.id()).get.text shouldBe "NonPositiveAmount(-100,waves)"
         }
     }
   }
@@ -620,7 +620,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe s"Cannot lease more than own: Balance: $dAppBalance, already leased: 0"
+            diff.errorMessage(invoke.id()).get.text shouldBe s"Cannot lease more than own: Balance: $dAppBalance, already leased: 0"
         }
     }
   }
@@ -629,14 +629,15 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
     val setScriptFee = ciFee(1).sample.get
     val dAppBalance  = ENOUGH_AMT - setScriptFee
     forAll(leasePreconditions(customSetScriptFee = Some(setScriptFee), customAmount = Some(dAppBalance))) {
-      case (preparingTxs, invoke, _, _, _, leaseTxs @ List(leaseFromDApp, _), _) =>
+      case (preparingTxs, invoke, _, _, _, leaseTxs, _) =>
+        val leaseFromDApp = leaseTxs.head
         assertDiffAndState(
           Seq(TestBlock.create(preparingTxs ::: leaseTxs)),
           TestBlock.create(Seq(invoke)),
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe
+            diff.errorMessage(invoke.id()).get.text shouldBe
               s"Cannot lease more than own: Balance: ${dAppBalance - leaseFromDApp.fee}, already leased: ${leaseFromDApp.amount}"
         }
     }
@@ -653,8 +654,8 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            val id = Lease.calculateId(Lease(recipient, amount, nonce = 0), invoke.id.value())
-            diff.errorMessage(invoke.id.value()).get.text shouldBe s"Lease with id=$id is already in the state"
+            val id = Lease.calculateId(Lease(recipient, amount, nonce = 0), invoke.id())
+            diff.errorMessage(invoke.id()).get.text shouldBe s"Lease with id=$id is already in the state"
         }
     }
   }
@@ -668,7 +669,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "Cannot lease to self"
+            diff.errorMessage(invoke.id()).get.text shouldBe "Cannot lease to self"
         }
     }
   }
@@ -682,7 +683,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "Cannot lease to self"
+            diff.errorMessage(invoke.id()).get.text shouldBe "Cannot lease to self"
         }
     }
   }
@@ -699,7 +700,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()) shouldBe empty
+            diff.errorMessage(invoke.id()) shouldBe empty
             diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee)
             diff.portfolios(dAppAcc) shouldBe Portfolio(lease = LeaseBalance(in = 0, out = amount * 10))
             diff.portfolios(recipient) shouldBe Portfolio(lease = LeaseBalance(in = amount * 10, out = 0))
@@ -719,7 +720,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "Actions count limit is exceeded"
+            diff.errorMessage(invoke.id()).get.text shouldBe "Actions count limit is exceeded"
         }
     }
   }
@@ -766,7 +767,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text should include("is already in the state")
+            diff.errorMessage(invoke.id()).get.text should include("is already in the state")
         }
     }
   }
@@ -782,7 +783,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()) shouldBe empty
+            diff.errorMessage(invoke.id()) shouldBe empty
             diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee)
             diff.portfolios(dAppAcc) shouldBe Portfolio(lease = LeaseBalance(in = 0, out = amount))
             diff.portfolios(recipient) shouldBe Portfolio(lease = LeaseBalance(in = amount, 0))
@@ -792,7 +793,8 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
 
   property(s"LeaseCancel action for lease performed via LeaseTransaction") {
     forAll(leasePreconditions(useLeaseCancelDApp = true)) {
-      case (preparingTxs, invoke, _, dAppAcc, invoker, leaseTxs @ List(leaseFromDApp, _), _) =>
+      case (preparingTxs, invoke, _, dAppAcc, invoker, leaseTxs, _) =>
+        val leaseFromDApp = leaseTxs.head
         assertDiffAndState(
           Seq(TestBlock.create(preparingTxs ++ leaseTxs)),
           TestBlock.create(Seq(invoke)),
@@ -815,7 +817,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe s"Lease with id=$leaseId not found"
+            diff.errorMessage(invoke.id()).get.text shouldBe s"Lease with id=$leaseId not found"
         }
     }
   }
@@ -830,7 +832,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe s"Lease id=$leaseId has invalid length = 1 byte(s) while expecting 32"
+            diff.errorMessage(invoke.id()).get.text shouldBe s"Lease id=$leaseId has invalid length = 1 byte(s) while expecting 32"
         }
     }
   }
@@ -846,8 +848,8 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            val leaseId = Lease.calculateId(Lease(recipient, amount, nonce = 0), invoke.id.value())
-            diff.errorMessage(invoke.id.value()).get.text shouldBe s"Duplicate LeaseCancel id(s): $leaseId"
+            val leaseId = Lease.calculateId(Lease(recipient, amount, nonce = 0), invoke.id())
+            diff.errorMessage(invoke.id()).get.text shouldBe s"Duplicate LeaseCancel id(s): $leaseId"
         }
     }
   }
@@ -861,21 +863,22 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "Cannot cancel already cancelled lease"
+            diff.errorMessage(invoke.id()).get.text shouldBe "Cannot cancel already cancelled lease"
         }
     }
   }
 
   property(s"10 LeaseCancel actions") {
     forAll(leasePreconditions(useLeaseCancelDApp = true, leaseCancelCount = 10)) {
-      case (preparingTxs, invoke, _, dAppAcc, invoker, leaseTxs :+ _, _) =>
+      case (preparingTxs, invoke, _, dAppAcc, invoker, ltx, _) =>
+        val leaseTxs = ltx.init
         assertDiffAndState(
           Seq(TestBlock.create(preparingTxs ++ leaseTxs)),
           TestBlock.create(Seq(invoke)),
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()) shouldBe empty
+            diff.errorMessage(invoke.id()) shouldBe empty
             diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee, LeaseBalance(in = -leaseTxs.map(_.amount).sum, out = 0))
             diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(in = 0, out = -leaseTxs.map(_.amount).sum))
         }
@@ -884,14 +887,14 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
 
   property(s"31 LeaseCancel actions") {
     forAll(leasePreconditions(useLeaseCancelDApp = true, leaseCancelCount = 31)) {
-      case (preparingTxs, invoke, _, _, _, leaseTxs :+ _, _) =>
+      case (preparingTxs, invoke, _, _, _, ltx, _) =>
         assertDiffAndState(
-          Seq(TestBlock.create(preparingTxs ++ leaseTxs)),
+          Seq(TestBlock.create(preparingTxs ++ ltx.init)),
           TestBlock.create(Seq(invoke)),
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "Actions count limit is exceeded"
+            diff.errorMessage(invoke.id()).get.text shouldBe "Actions count limit is exceeded"
         }
     }
   }
@@ -912,7 +915,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()) shouldBe empty
+            diff.errorMessage(invoke.id()) shouldBe empty
             diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee)
             diff.portfolios(dAppAcc) shouldBe Portfolio(-transfersCount, lease = LeaseBalance(in = 0, out = leaseAmount))
             diff.portfolios(recipient) shouldBe Portfolio(transfersCount, lease = LeaseBalance(in = leaseAmount, out = 0))
@@ -935,7 +938,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id.value()).get.text shouldBe "Actions count limit is exceeded"
+            diff.errorMessage(invoke.id()).get.text shouldBe "Actions count limit is exceeded"
         }
     }
   }

@@ -4,11 +4,11 @@ import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.test.FunSuite
 import com.wavesplatform.transaction.Proofs
-import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
 
-class SignedRequestsTest extends FunSuite with Matchers {
+class SignedRequestsTest extends FunSuite {
 
   test("AssetIssueRequest json parsing works") {
     val json =
@@ -255,7 +255,9 @@ class SignedRequestsTest extends FunSuite with Matchers {
       """.stripMargin
     val req = Json.parse(json).validate[SignedSetAssetScriptRequest].get
     req.assetId.id.toString shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
-    req.proofs shouldBe Proofs(Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get))
+    req.proofs shouldBe Proofs(
+      Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get)
+    )
     req.fee shouldBe 100000L
     req.timestamp shouldBe 1520945679531L
 

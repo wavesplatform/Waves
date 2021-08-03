@@ -10,15 +10,14 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{Constants, GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
-import com.wavesplatform.{BlockGen, NoShrink}
+import com.wavesplatform.BlockGen
+import com.wavesplatform.test.FreeSpec
 import org.scalacheck.Gen
 import org.scalactic.source.Position
-import org.scalatest.{FreeSpec, Matchers}
-import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 import scala.concurrent.duration._
 
-class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyChecks with BlockGen with WithDomain with Matchers with NoShrink {
+class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
   def transferGen(sender: KeyPair, rs: Gen[AddressOrAlias], maxAmount: Long): Gen[TransferTransaction] =
     for {
       recipient <- rs

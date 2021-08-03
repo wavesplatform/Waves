@@ -2,11 +2,13 @@ package com.wavesplatform.lang.v1
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
+
 import cats.Id
-import cats.implicits._
+import cats.syntax.bifunctor._
 import com.wavesplatform.account
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto.Curve25519
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, DApp, V4}
 import com.wavesplatform.lang.script.Script
@@ -19,13 +21,11 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Functions, WavesConte
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
-import com.wavesplatform.lang.{Common, Global}
-import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.{Common, Global, ValidationError}
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Coeval
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
-import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey, Signature}
 
 import scala.util.Random
 
@@ -69,7 +69,7 @@ class EnvironmentFunctionsBenchmark {
   def secureHash_test(): Array[Byte] = hashTest(Global.secureHash)
 
   @Benchmark
-  def curve25519_generateKeypair_test(): (PrivateKey, PublicKey) = curve25519.generateKeypair
+  def curve25519_generateKeypair_test(): (Array[Byte], Array[Byte]) = curve25519.generateKeypair
 
   @Benchmark
   def curve25519_sign_full_test(): Array[Byte] = {
@@ -82,7 +82,7 @@ class EnvironmentFunctionsBenchmark {
     val (privateKey, publicKey) = curve25519.generateKeypair
     val message                 = randomBytes(DataBytesLength)
     val signature               = curve25519.sign(privateKey, message)
-    Curve25519.verify(Signature @@ signature, message, publicKey)
+    Curve25519.verify(signature, message, publicKey)
   }
 
   @Benchmark
@@ -128,8 +128,15 @@ object EnvironmentFunctionsBenchmark {
           _.toString,
           address => Address(ByteStr(address.bytes))
         )
-    override def accountScript(addressOrAlias: Recipient): Option[Script]                                        = ???
-    override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], availableComplexity: Int, reentrant: Boolean): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
+    override def accountScript(addressOrAlias: Recipient): Option[Script] = ???
+    override def callScript(
+        dApp: Address,
+        func: String,
+        args: List[EVALUATED],
+        payments: Seq[(Option[Array[Byte]], Long)],
+        availableComplexity: Int,
+        reentrant: Boolean
+    ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
   }
 
   val environmentFunctions = new EnvironmentFunctions(defaultEnvironment)
@@ -150,21 +157,23 @@ object EnvironmentFunctionsBenchmark {
   def hashTest[T](len: Int, f: Array[Byte] => T): T = f(randomBytes(len))
 
   object curve25519 {
-    def generateKeypair: (PrivateKey, PublicKey)                        = Curve25519.createKeyPair(randomBytes(SeedBytesLength))
-    def sign(privateKey: PrivateKey, message: Array[Byte]): Array[Byte] = Curve25519.sign(privateKey, message)
+    def generateKeypair                                                  = Curve25519.createKeyPair(randomBytes(SeedBytesLength))
+    def sign(privateKey: Array[Byte], message: Array[Byte]): Array[Byte] = Curve25519.sign(privateKey, message)
   }
 }
 
 @State(Scope.Benchmark)
 class AddressFromString {
   val ctx: EvaluationContext[Environment, Id] =
-    WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
+    WavesContext
+      .build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
       .evaluationContext(defaultEnvironment)
 
   val expr: Array[EXPR] =
     (1 to 100).map { _ =>
       val address =
-        Wallet.generateNewAccount(Random.nextBytes(8), 1)
+        Wallet
+          .generateNewAccount(Random.nextBytes(8), 1)
           .publicKey
           .toAddress(ChainId)
           .toString

@@ -36,8 +36,8 @@ object TransactionDiffer {
       tx: Transaction
   ): TracedResult[ValidationError, Diff] =
     validate(prevBlockTs, currentBlockTs, verify, limitedExecution = false)(blockchain, tx) match {
-      case isFailedTransaction((complexity, scriptResult, trace)) if acceptFailed(blockchain) =>
-        TracedResult(failedTransactionDiff(blockchain, tx, complexity, scriptResult), trace)
+      case isFailedTransaction((complexity, scriptResult, trace, attributes)) if acceptFailed(blockchain) =>
+        TracedResult(failedTransactionDiff(blockchain, tx, complexity, scriptResult), trace, attributes)
       case result =>
         result
     }
@@ -275,10 +275,11 @@ object TransactionDiffer {
   }
 
   private object isFailedTransaction {
-    def unapply(result: TracedResult[ValidationError, Diff]): Option[(Long, Option[InvokeScriptResult], List[TraceStep])] =
+    def unapply(result: TracedResult[ValidationError, Diff]): Option[(Long, Option[InvokeScriptResult], List[TraceStep], TracedResult.Attributes)] =
       result match {
-        case TracedResult(Left(TransactionValidationError(e: FailedTransactionError, _)), trace) => Some((e.spentComplexity, scriptResult(e), trace))
-        case _                                                                                   => None
+        case TracedResult(Left(TransactionValidationError(e: FailedTransactionError, _)), trace, attributes) =>
+          Some((e.spentComplexity, scriptResult(e), trace, attributes))
+        case _ => None
       }
 
     private[this] def scriptResult(cf: FailedTransactionError): Option[InvokeScriptResult] =

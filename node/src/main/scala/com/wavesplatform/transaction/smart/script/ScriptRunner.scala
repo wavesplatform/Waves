@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.smart.script
 
 import cats.Id
-import cats.implicits._
+import cats.syntax.either._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures

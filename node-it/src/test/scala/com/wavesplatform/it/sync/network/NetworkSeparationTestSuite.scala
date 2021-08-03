@@ -3,20 +3,12 @@ package com.wavesplatform.it.sync.network
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{issueAmount, issueFee, minFee}
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{Node, ReportingTestName, WaitForHeight2}
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
+import com.wavesplatform.it.{BaseFreeSpec, Node, WaitForHeight2}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class NetworkSeparationTestSuite
-    extends FreeSpec
-    with Matchers
-    with WaitForHeight2
-    with CancelAfterFailure
-    with ReportingTestName
-    with NodesFromDocker {
+class NetworkSeparationTestSuite extends BaseFreeSpec with WaitForHeight2 {
   import NetworkSeparationTestSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs

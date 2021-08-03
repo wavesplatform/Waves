@@ -2,14 +2,13 @@ package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{FreeSpec, Matchers, OptionValues}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.scalatest.OptionValues
 import play.api.libs.json._
 
-class RequestsSpec extends FreeSpec with Matchers with OptionValues with ScalaCheckPropertyChecks with TransactionGen with NoShrink {
+class RequestsSpec extends FreeSpec with OptionValues {
   private def transferRequestGen(version: Int): Gen[(KeyPair, JsObject)] =
     (for {
       sender    <- accountGen

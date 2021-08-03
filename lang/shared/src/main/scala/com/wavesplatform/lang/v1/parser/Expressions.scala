@@ -50,7 +50,7 @@ object Expressions {
     case class VALID[T](position: Pos, v: T) extends PART[T] {
       override def equals(obj: Any): Boolean =
         obj match {
-          case VALID(_, value) => value.equals(this.v)
+          case VALID(_, value) => value == this.v
           case _               => false
         }
 

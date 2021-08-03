@@ -1,19 +1,17 @@
 package com.wavesplatform.lang
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import org.scalatest.{Assertion, FreeSpec, Matchers}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test._
+import org.scalatest.Assertion
 
-class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with NoShrink {
+class ContractSerdeTest extends FreeSpec {
 
   def roundTrip(c: DApp): Assertion = {
     val bytes = ContractSerDe.serialize(c)

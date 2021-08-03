@@ -94,7 +94,7 @@ object Blockchain {
     def lastBlockIds(howMany: Int): Seq[ByteStr]   = (blockchain.height to blockchain.height - howMany by -1).flatMap(blockId)
 
     def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
-      aoa match {
+      (aoa: @unchecked) match {
         case a: Address => Right(a)
         case a: Alias   => blockchain.resolveAlias(a)
       }

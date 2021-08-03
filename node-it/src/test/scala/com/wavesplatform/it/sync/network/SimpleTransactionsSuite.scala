@@ -14,11 +14,10 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.network.{RawBytes, TransactionSpec}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer._
-import org.scalatest._
 
 import scala.concurrent.duration._
 
-class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
+class SimpleTransactionsSuite extends BaseTransactionSuite {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))

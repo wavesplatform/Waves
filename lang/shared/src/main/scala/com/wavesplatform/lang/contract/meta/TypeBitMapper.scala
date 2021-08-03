@@ -1,6 +1,9 @@
 package com.wavesplatform.lang.contract.meta
 
-import cats.implicits._
+import cats.syntax.either._
+import cats.syntax.traverse._
+import cats.instances.list._
+import cats.instances.either._
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, LIST, UNION}
 
 import scala.util.Try
@@ -17,12 +20,11 @@ case class SingleTypeMapper(types: Seq[FINAL]) extends TypeBitMapper {
   override def toIndex(t: FINAL): Either[String, Int] =
     types.indexOf(t) match {
       case -1 => Left(s"Unexpected callable func arg type: $t")
-      case  i => Right(1 << i)
+      case i  => Right(1 << i)
     }
 
   override def fromIndex(i: Int): Either[String, FINAL] =
-    Try(types(i))
-      .toEither
+    Try(types(i)).toEither
       .leftMap(_ => s"Unexpected callable type absence for index=$i")
 
   override def length: Int =
@@ -44,17 +46,16 @@ case class UnionTypeMapper(bitMapper: TypeBitMapper) extends TypeBitMapper {
       Left(s"Unexpected negative index=$i")
     else if (i == 0)
       constructType(types)
+    else if (i % 2 == 1)
+      bitMapper.fromIndex(offset).flatMap(t => fromIndexRec(i >> 1, offset + 1, t :: types))
     else
-      if (i % 2 == 1)
-        bitMapper.fromIndex(offset).flatMap(t => fromIndexRec(i >> 1, offset + 1, t :: types))
-      else
-        fromIndexRec(i >> 1, offset + 1, types)
+      fromIndexRec(i >> 1, offset + 1, types)
 
   private def constructType(foundTypes: List[FINAL]): Either[String, FINAL] =
     foundTypes match {
-      case List(single)  => Right(single)
-      case l@List(_, _*) => Right(UNION.create(l))
       case Nil           => Left("Unexpected callable func arg type absence")
+      case single :: Nil => Right(single)
+      case l             => Right(UNION.create(l))
     }
 
   override def length: Int =

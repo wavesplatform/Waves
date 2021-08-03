@@ -5,17 +5,17 @@ import java.util.concurrent.atomic.AtomicLong
 
 import com.google.common.base.Ticker
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.utils.ObservedLoadingCacheSpecification.FakeTicker
 import monix.execution.Ack
 import monix.reactive.Observer
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{FreeSpec, Matchers}
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
+import scala.jdk.CollectionConverters._
 
-class ObservedLoadingCacheSpecification extends FreeSpec with Matchers with MockFactory {
+class ObservedLoadingCacheSpecification extends FreeSpec with MockFactory {
   private val ExpiringTime = 10.minutes
 
   "notifies" - {

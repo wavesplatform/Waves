@@ -1,12 +1,15 @@
 package com.wavesplatform.lang.evaluator
 
+import java.nio.ByteBuffer
+
 import cats.Id
 import cats.data.EitherT
-import cats.implicits._
 import cats.kernel.Monoid
+import cats.syntax.bifunctor._
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.crypto._
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.values._
@@ -24,19 +27,15 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, EnvironmentFunctions, PureContext, _}
 import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, EvaluatorV2, FunctionIds, Log}
-import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.{Common, EvalF, ExecutionError, Global}
+import com.wavesplatform.test._
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{EitherValues, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
-import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
+import org.scalatest.EitherValues
 
-import java.nio.ByteBuffer
 
-class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink with EitherValues {
+class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   implicit val version: StdLibVersion = V4
 
@@ -439,7 +438,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     val (_, publicKey) = Curve25519.createKeyPair(seed)
     val bodyBytes      = "message".getBytes("UTF-8")
 
-    val r = sigVerifyTest(bodyBytes, publicKey, Signature("signature".getBytes("UTF-8")))
+    val r = sigVerifyTest(bodyBytes, publicKey, "signature".getBytes("UTF-8"))
     r.isLeft shouldBe false
   }
 
@@ -794,7 +793,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     }
   }
 
-  private def sigVerifyTest(bodyBytes: Array[Byte], publicKey: PublicKey, signature: Signature, lim_n: Option[Short] = None)(
+  private def sigVerifyTest(bodyBytes: Array[Byte], publicKey: Array[Byte], signature: Array[Byte], lim_n: Option[Short] = None)(
       implicit version: StdLibVersion
   ): Either[ExecutionError, Boolean] = {
     val txType = CASETYPEREF(
@@ -861,7 +860,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
             .explicitGet()
             ._1
         )
-      case fastparse.Parsed.Failure(_, index, _) => Left(s"Parse error at $index")
+      case f: fastparse.Parsed.Failure => Left(s"Parse error at ${f.index}")
     }
   }
 
@@ -922,8 +921,11 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
   }
 
   property("List weight correct") {
-    val Right(ARR(Seq(a, b))) = recArrWeight("[[0] ++ [1], 0::1::nil]")
-    a.weight shouldBe b.weight
+    val xs = recArrWeight("[[0] ++ [1], 0::1::nil]")
+      .explicitGet()
+      .asInstanceOf[ARR]
+      .xs
+    xs(0).weight shouldBe xs(1).weight
   }
 
   private def genRCO(cnt: Int) = {
@@ -966,11 +968,11 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   private def multiSig(
       bodyBytes: Array[Byte],
-      senderPK: PublicKey,
-      alicePK: PublicKey,
-      bobPK: PublicKey,
-      aliceProof: Signature,
-      bobProof: Signature
+      senderPK: Array[Byte],
+      alicePK: Array[Byte],
+      bobPK: Array[Byte],
+      aliceProof: Array[Byte],
+      bobProof: Array[Byte]
   ): Either[(ExecutionError, Log[Id]), (Boolean, Log[Id])] = {
     val txType = CASETYPEREF(
       "Transaction",
@@ -1030,9 +1032,9 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
   property("checking a hash of some message by crypto function invoking") {
     val bodyText      = "some text for test"
     val bodyBytes     = bodyText.getBytes("UTF-8")
-    val hashFunctions = Map(SHA256 -> Sha256, BLAKE256 -> Blake2b256, KECCAK256 -> Keccak256)
+    val hashFunctions = Map(SHA256 -> Sha256.hash _, BLAKE256 -> Blake2b256.hash _, KECCAK256 -> Keccak256.hash _)
 
-    for ((funcName, funcClass) <- hashFunctions) hashFuncTest(bodyBytes, funcName) shouldBe Right(ByteStr(funcClass.hash(bodyText)))
+    for ((funcName, funcClass) <- hashFunctions) hashFuncTest(bodyBytes, funcName) shouldBe Right(ByteStr(funcClass(bodyBytes)))
   }
 
   private def hashFuncTest(bodyBytes: Array[Byte], funcName: Short): Either[ExecutionError, ByteStr] = {

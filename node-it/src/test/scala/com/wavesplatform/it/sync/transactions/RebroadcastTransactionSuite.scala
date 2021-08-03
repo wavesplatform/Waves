@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.transactions
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.Node
@@ -56,15 +57,30 @@ class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDoc
     nodes.waitForHeightArise()
     nodeB.utxSize shouldBe 0
     nodeB.ensureTxDoesntExist(txId)
+  }
 
+  test("should not broadcast a transaction if there are not enough peers") {
+    val tx = TransferTransaction
+      .selfSigned(2.toByte, nodeA.keyPair, Address.fromString(nodeB.address).explicitGet(), Waves, transferAmount, Waves, minFee, ByteStr.empty,  System.currentTimeMillis())
+      .explicitGet()
+      .json()
+
+    val testNode = dockerNodes().head
+    try {
+      docker.restartNode(testNode, configWithMinimumPeers(999))
+      assertApiError(testNode.signedBroadcast(tx), CustomValidationError("There are not enough connections with peers \\(\\d+\\) to accept transaction").assertiveRegex)
+    } finally {
+      docker.restartNode(testNode, configWithMinimumPeers(0))
+    }
   }
 }
 object RebroadcastTransactionSuite {
-
   private val configWithRebroadcastAllowed =
     parseString("waves.synchronization.utx-synchronizer.allow-tx-rebroadcasting = true")
 
   private val configWithRebroadcastNotAllowed =
     parseString("waves.synchronization.utx-synchronizer.allow-tx-rebroadcasting = false")
 
+  private def configWithMinimumPeers(n: Int) =
+    parseString(s"waves.rest-api.minimum-peers = $n")
 }

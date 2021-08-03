@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
+import com.wavesplatform.TestTime
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
@@ -7,26 +8,23 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
+import org.scalatest.{EitherValues, Inside}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class SyncDAppForbidOldVersionsTest
-  extends PropSpec
-  with ScalaCheckPropertyChecks
-  with Matchers
-  with TransactionGen
-  with NoShrink
-  with Inside
-  with WithState
-  with DBCacheSettings
-  with MockFactory
-  with WithDomain
-  with EitherValues {
+    extends PropSpec
+    with ScalaCheckPropertyChecks
+    with Inside
+    with WithState
+    with DBCacheSettings
+    with MockFactory
+    with WithDomain
+    with EitherValues {
   import DomainPresets._
 
   private val time = new TestTime
