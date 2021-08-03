@@ -1,22 +1,20 @@
 package com.wavesplatform.state.diffs.smart.predef
-import com.wavesplatform.NoShrink
+
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.FPPoSSelectorTest.accountGen
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{EitherValues, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import shapeless.Coproduct
 
-class ScriptRunnerTest extends PropSpec with ScalaCheckPropertyChecks with Matchers with MockFactory with NoShrink with EitherValues {
+class ScriptRunnerTest extends PropSpec with MockFactory {
   property("ScriptRunner.applyGeneric() avoids Blockchain calls") {
     val tx = TransferTransaction.selfSigned(1.toByte, accountGen.sample.get, accountGen.sample.get.toAddress, Waves, 1, Waves, 1, ByteStr.empty, 0)
     ScriptRunner.applyGeneric(
