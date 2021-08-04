@@ -26,8 +26,10 @@ import com.wavesplatform.lang.v1.parser.Expressions.{
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{BaseGlobal, ContractLimits, FunctionHeader}
-
 import java.nio.charset.StandardCharsets
+
+import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
+
 import scala.util.Try
 
 object ExpressionCompiler {
@@ -564,10 +566,11 @@ object ExpressionCompiler {
       checkObjectType: Boolean
   ): CompileM[CompilationStepResultExpr] =
     for {
-      ctx           <- get[Id, CompilerContext, CompilationError]
-      fieldWithErr  <- handlePart(fieldPart).handleError()
-      compiledRef   <- compileExprWithCtx(refExpr, saveExprContext, allowIllFormedStrings)
-      getterWithErr <- mkGetter(p, ctx, compiledRef.t, fieldWithErr._1.getOrElse("NO_NAME"), compiledRef.expr, checkObjectType).toCompileM.handleError()
+      ctx          <- get[Id, CompilerContext, CompilationError]
+      fieldWithErr <- handlePart(fieldPart).handleError()
+      compiledRef  <- compileExprWithCtx(refExpr, saveExprContext, allowIllFormedStrings)
+      getterWithErr <- mkGetter(p, ctx, compiledRef.t, fieldWithErr._1.getOrElse("NO_NAME"), compiledRef.expr, checkObjectType).toCompileM
+        .handleError()
 
       errorList     = fieldWithErr._2 ++ getterWithErr._2
       parseNodeExpr = Expressions.GETTER(p, compiledRef.parseNodeExpr, fieldPart, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
@@ -777,7 +780,7 @@ object ExpressionCompiler {
               p.caseType.fold(expr) { _ =>
                 val let = Expressions.LET(p.position, newRef.key, newRef, Some(caseType), allowShadowing = true)
                 Expressions.BLOCK(p.position, let, expr)
-              }
+            }
           )
       }
 
@@ -832,8 +835,12 @@ object ExpressionCompiler {
                       .map(t => Expressions.FUNCTION_CALL(pos, PART.VALID(pos, "_isInstanceOf"), List(refTmp, Expressions.CONST_STRING(pos, t))))
                       .reduceLeft[Expressions.EXPR] { case (c, r) => BINARY_OP(pos, c, BinaryOperation.OR_OP, r) }
                   BINARY_OP(pos, cond, BinaryOperation.AND_OP, typeChecks)
-                } else
-                  cond
+                } else {
+                  val size        = Expressions.CONST_LONG(pos, p.patternsWithFields.size)
+                  val getSize     = Expressions.FUNCTION_CALL(pos, PART.VALID(pos, "size"), List(refTmp))
+                  val compareSize = BINARY_OP(pos, getSize, BinaryOperation.EQ_OP, size)
+                  BINARY_OP(pos, cond, BinaryOperation.AND_OP, compareSize)
+                }
               } else
                 cond
             Right(
@@ -846,7 +853,7 @@ object ExpressionCompiler {
                       Expressions.FUNCTION_CALL(pos, PART.VALID(pos, "_isInstanceOf"), List(refTmp, Expressions.CONST_STRING(pos, t.name))),
                       BinaryOperation.AND_OP,
                       Expressions.BLOCK(pos, Expressions.LET(pos, newRef.key, newRef, Some(caseType), true), checkingCond)
-                    )
+                  )
                 ),
                 blockWithNewVar,
                 further
@@ -1057,6 +1064,6 @@ object ExpressionCompiler {
             res.errors.isEmpty,
             (res.ctx, res.expr, res.t),
             s"Compilation failed: [${res.errors.map(e => Show[CompilationError].show(e)).mkString("; ")}]"
-          )
+        )
       )
 }
