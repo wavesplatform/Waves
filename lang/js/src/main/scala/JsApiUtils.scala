@@ -111,7 +111,7 @@ package object JsApiUtils {
         mergeJSObjects(commonDataObj, additionalDataObj)
       }
 
-      case Expressions.GETTER(_, ref, field, _, _) => {
+      case Expressions.GETTER(_, ref, field, _, _, _) => {
         val additionalDataObj = jObj.applyDynamic("apply")(
           "ref"   -> serExpr(ref),
           "field" -> serPartStr(field)
