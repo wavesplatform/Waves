@@ -42,7 +42,7 @@ class ObjectTypesTest extends PropSpec {
         }
     if (unusedDocTypes.nonEmpty)
       throw new TestFailedException(
-        s"For RIDE $version documented types is unused: ${unusedDocTypes.map(_._1).mkString(", ")}",
+        s"For RIDE $version documented types are unused: ${unusedDocTypes.map(_._1).mkString(", ")}",
         0
       )
   }
