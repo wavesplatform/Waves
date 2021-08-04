@@ -145,7 +145,7 @@ object ExpressionCompiler {
             List(Generic(x.position.start, x.position.end, x.message))
           ).pure[CompileM]
 
-        case Expressions.GETTER(p, ref, field, _, _)        => compileGetter(p, field, ref, saveExprContext, allowIllFormedStrings)
+        case Expressions.GETTER(p, ref, field, _, _, c)     => compileGetter(p, field, ref, saveExprContext, allowIllFormedStrings, c)
         case Expressions.BLOCK(p, dec, body, _, _)          => compileBlock(p, dec, body, saveExprContext, allowIllFormedStrings)
         case Expressions.IF(p, cond, ifTrue, ifFalse, _, _) => compileIf(p, cond, ifTrue, ifFalse, saveExprContext, allowIllFormedStrings)
         case Expressions.REF(p, key, _, _)                  => compileRef(p, key, saveExprContext)
@@ -340,7 +340,7 @@ object ExpressionCompiler {
 
   private def exprContainsRef(expr: Expressions.EXPR, ref: String): Boolean =
     expr match {
-      case Expressions.GETTER(_, expr, _, _, _) =>
+      case Expressions.GETTER(_, expr, _, _, _, _) =>
         exprContainsRef(expr, ref)
 
       case Expressions.BLOCK(_, decl, body, _, _) =>
@@ -560,13 +560,14 @@ object ExpressionCompiler {
       fieldPart: PART[String],
       refExpr: Expressions.EXPR,
       saveExprContext: Boolean,
-      allowIllFormedStrings: Boolean
+      allowIllFormedStrings: Boolean,
+      checkObjectType: Boolean
   ): CompileM[CompilationStepResultExpr] =
     for {
       ctx           <- get[Id, CompilerContext, CompilationError]
       fieldWithErr  <- handlePart(fieldPart).handleError()
       compiledRef   <- compileExprWithCtx(refExpr, saveExprContext, allowIllFormedStrings)
-      getterWithErr <- mkGetter(p, ctx, compiledRef.t, fieldWithErr._1.getOrElse("NO_NAME"), compiledRef.expr).toCompileM.handleError()
+      getterWithErr <- mkGetter(p, ctx, compiledRef.t, fieldWithErr._1.getOrElse("NO_NAME"), compiledRef.expr, checkObjectType).toCompileM.handleError()
 
       errorList     = fieldWithErr._2 ++ getterWithErr._2
       parseNodeExpr = Expressions.GETTER(p, compiledRef.parseNodeExpr, fieldPart, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
@@ -875,7 +876,7 @@ object ExpressionCompiler {
 
   private def mkGet(path: Seq[(PART[String], Option[Single])], ref: Expressions.EXPR, pos: Pos): Expressions.EXPR =
     path.map(_._1).foldRight(ref) { (field, exp) =>
-      Expressions.GETTER(pos, exp, field)
+      Expressions.GETTER(pos, exp, field, checkObjectType = false)
     }
 
   private def makeConditionsFromCompositePattern(p: CompositePattern, newRef: Expressions.REF): Seq[Expressions.EXPR] =
@@ -978,7 +979,8 @@ object ExpressionCompiler {
       ctx: CompilerContext,
       objectType: FINAL,
       fieldName: String,
-      expr: EXPR
+      expr: EXPR,
+      checkObjectType: Boolean
   ): Either[CompilationError, (CompilerContext, GETTER, FINAL)] = {
     lazy val err =
       FieldNotFound(p.start, p.end, fieldName, objectType.name)
@@ -988,7 +990,7 @@ object ExpressionCompiler {
     objectType.typeList
       .traverse(_.fields.find(_._1 == fieldName).map(_._2))
       .map(TypeInferrer.findCommonType)
-      .fold(err)(t => if (t == NOTHING) err else Right((ctx, getter, t)))
+      .fold(err)(t => if (t == NOTHING && checkObjectType) err else Right((ctx, getter, t)))
   }
 
   private def handleCompositeType(

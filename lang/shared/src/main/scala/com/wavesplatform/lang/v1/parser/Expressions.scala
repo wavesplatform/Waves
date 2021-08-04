@@ -55,7 +55,7 @@ object Expressions {
           case _               => false
         }
 
-      override def hashCode: Int = v.hashCode
+      override def hashCode: Int    = v.hashCode
       override def toString: String = v.toString
     }
     case class INVALID(position: Pos, message: String) extends PART[Nothing]
@@ -122,7 +122,16 @@ object Expressions {
   case class CONST_LONG(position: Pos, value: Long, ctxOpt: CtxOpt = None) extends EXPR {
     val resultType: Option[FINAL] = Some(LONG)
   }
-  case class GETTER(position: Pos, ref: EXPR, field: PART[String], resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
+
+  case class GETTER(
+      position: Pos,
+      ref: EXPR,
+      field: PART[String],
+      resultType: Option[FINAL] = None,
+      ctxOpt: CtxOpt = None,
+      checkObjectType: Boolean = true
+  ) extends EXPR
+
   case class CONST_BYTESTR(position: Pos, value: PART[ByteStr], ctxOpt: CtxOpt = None) extends EXPR {
     val resultType: Option[FINAL] = Some(BYTESTR)
   }
