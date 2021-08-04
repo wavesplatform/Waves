@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -14,12 +15,13 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalamock.scalatest.MockFactory
 import shapeless.Coproduct
 
-class ScriptRunnerTest extends PropSpec with MockFactory {
+class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
   property("ScriptRunner.applyGeneric() avoids Blockchain calls") {
-    val tx = TransferTransaction.selfSigned(1.toByte, accountGen.sample.get, accountGen.sample.get.toAddress, Waves, 1, Waves, 1, ByteStr.empty, 0)
+    val tx        = TransferTransaction.selfSigned(1.toByte, accountGen.sample.get, accountGen.sample.get.toAddress, Waves, 1, Waves, 1, ByteStr.empty, 0)
+    val emptyStub = stub[Blockchain]
     ScriptRunner.applyGeneric(
       Coproduct(tx.explicitGet()),
-      stub[Blockchain],
+      emptyStub,
       TestCompiler(V5).compileExpression("true"),
       isAssetScript = false,
       Coproduct(Recipient.Address(ByteStr.empty)),
