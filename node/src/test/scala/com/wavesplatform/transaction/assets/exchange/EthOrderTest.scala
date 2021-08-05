@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets.exchange
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.test.FlatSpec
+import com.wavesplatform.test.{FlatSpec, TestTime}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.common.utils._
@@ -130,7 +130,7 @@ class EthOrderTest
       )
     )
 
-    val differ      = TransactionDiffer.forceValidate(Some(1L), 100L)(blockchain, _)
+    val differ      = blockchain.stub.transactionDiffer(TestTime(100))
     val transaction = TxHelpers.exchange(buyOrder, sellOrder, TxVersion.V3, 100)
     val diff        = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
@@ -299,7 +299,7 @@ class EthOrderTest
       )
     )
 
-    val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
+    val differ      = blockchain.stub.transactionDiffer(TestTime(100))
     val transaction = TxHelpers.exchange(buyOrder, sellOrder, TxVersion.V3, 100)
     val diff        = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())

@@ -9,12 +9,14 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, LeaseBalance, NG, VolumeAndFee}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Diff, Height, LeaseBalance, NG, VolumeAndFee}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.{SystemTime, Time}
 import io.netty.channel.Channel
 import org.scalamock.MockFactoryBase
@@ -93,8 +95,13 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
         .returns(Some(AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 1L, Map.empty.withDefaultValue(Map.empty.withDefaultValue(1L)))))
     }
 
+    def transactionDiffer(time: Time = SystemTime, withFailed: Boolean = false): Transaction => TracedResult[ValidationError, Diff] = {
+      if (withFailed) TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, _)
+      else TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, _)
+    }
+
     def transactionPublisher(time: Time = SystemTime): TransactionPublisher = (tx: Transaction, _: Option[Channel]) => {
-      val differ = TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, _)
+      val differ = transactionDiffer(time)
       Future.successful(differ(tx).map(_ => true))
     }
   }
