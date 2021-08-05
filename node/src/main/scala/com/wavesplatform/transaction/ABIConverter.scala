@@ -1,5 +1,7 @@
 package com.wavesplatform.transaction
 
+import com.esaulpaugh.headlong.abi.{Function, Tuple}
+import com.esaulpaugh.headlong.util.FastHex
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
@@ -8,12 +10,15 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.{Terms, Types}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import org.web3j.abi.{FunctionReturnDecoder, TypeReference}
 import org.web3j.abi.datatypes.Type
-import play.api.libs.json.{JsArray, JsObject, Json}
+import org.web3j.abi.TypeReference
+import play.api.libs.json.{JsArray, JsObject, JsString, Json}
+
+import scala.jdk.CollectionConverters._
 
 object ABIConverter {
   val PaymentListType: Types.LIST = Types.LIST(Types.TUPLE(List(Types.BYTESTR, Types.LONG)))
+  val PaymentArgSignature: String = "(bytes,int64)[]"
 
   private def buildMethodId(str: String): String = {
     val cls    = Class.forName("org.web3j.abi.FunctionEncoder")
@@ -29,33 +34,105 @@ object ABIConverter {
     def t(s: String) = Json.obj("type" -> s)
 
     argType match {
-      case Types.LONG    => t("int64")
-      case Types.BIGINT  => t("int256")
-      case Types.BYTESTR => t("bytes")
       case Types.BOOLEAN => t("bool")
+      case Types.LONG    => t("int64")
+      case Types.BYTESTR => t("bytes")
       case Types.STRING  => t("string")
       case Types.LIST(innerType) =>
         val base = ethTypeObj(innerType)
-        base ++ Json.obj("type" -> (base.value("type").as[String] + "[]"))
+        if (base.value("type").asInstanceOf[JsString].value == "tuple") {
+          Json.obj(
+            "type"       -> "tuple[]",
+            "components" -> base.value("components")
+          )
+        } else {
+          Json.obj("type" -> (base.value("type").as[String] + "[]"))
+        }
+
+      case Types.UNION(typeList, _) =>
+        t("tuple") ++ Json.obj(
+          "components" -> {
+            // Index start from 0 and count from element after typeIndex (from second element of the tuple)
+            Json.obj("name" -> s"typeIndex", "type" -> "uint8") ::
+              typeList.map(t => Json.obj("name" -> t.name) ++ ethTypeObj(t))
+          }
+        )
+
+      // only for payments
       case Types.TUPLE(types) =>
-        t("tuple") ++ Json.obj("components" -> types.zipWithIndex.map { case (t, i) => ethTypeObj(t) ++ Json.obj("name" -> s"_$i") })
+        t("tuple") ++ Json.obj(
+          "components" -> types.map(t => Json.obj("name" -> t.name) ++ ethTypeObj(t))
+        )
+
       case _ => ???
     }
   }
 
-  def toRideValue(ethValue: Type[_]): EVALUATED = {
-    import scala.jdk.CollectionConverters._
+  def ethFuncSignatureTypeName(argType: Types.FINAL): String = {
+    argType match {
+      case Types.BOOLEAN         => "bool"
+      case Types.LONG            => "int64"
+      case Types.BYTESTR         => "bytes"
+      case Types.STRING          => "string"
+      case Types.LIST(innerType) => s"${ethFuncSignatureTypeName(innerType)}[]"
+      case Types.UNION(typeList, _) => {
+        val unionElementIdxType = "uint8"
+        val typeNameList        = unionElementIdxType :: typeList.map(ethFuncSignatureTypeName)
+        s"(${typeNameList.mkString(",")})"
+      }
+      case Types.TUPLE(types) => s"(${types.map(ethFuncSignatureTypeName).mkString(",")})"
+      case _                  => ???
+    }
+  }
 
-    import org.web3j.abi.{datatypes => dt}
+  def toRideValue(ethArg: Any, rideType: Types.FINAL): EVALUATED = {
 
-    ethValue match {
-      case bool: dt.Bool                   => Terms.CONST_BOOLEAN(bool.getValue)
-      case bytes: dt.Bytes                 => Terms.CONST_BYTESTR(ByteStr(bytes.getValue)).explicitGet()
-      case str: dt.Utf8String              => Terms.CONST_STRING(str.getValue).explicitGet()
-      case i: dt.Int if i.getBitSize <= 64 => Terms.CONST_LONG(i.getValue.longValueExact())
-      case i: dt.NumericType               => Terms.CONST_BIGINT(i.getValue)
-      case t: dt.Array[_]                  => Terms.ARR(t.getValue.asScala.map(toRideValue).toVector, limited = true).explicitGet()
-      case _                               => throw new UnsupportedOperationException(s"Type not supported: $ethValue")
+    ethArg match {
+      case bool: Boolean        => Terms.CONST_BOOLEAN(bool)
+      case i: Int               => Terms.CONST_LONG(i)
+      case l: Long              => Terms.CONST_LONG(l)
+      case byteArr: Array[Byte] => Terms.CONST_BYTESTR(ByteStr(byteArr)).explicitGet() //FastHex.encodeToString(byteArr, 0, byteArr.length)
+      case str: String          => Terms.CONST_STRING(str).explicitGet()
+
+      case arr: Array[_] => {
+        val innerType = rideType match {
+          case list: Types.LIST =>
+            list.innerType
+          case _ =>
+            Types.ANY
+        }
+        Terms
+          .ARR(
+            arr.toVector.map(el => toRideValue(el, innerType)),
+            limited = true
+          )
+          .explicitGet()
+      }
+
+      case t: Tuple if rideType.isInstanceOf[Types.UNION] => {
+        val tupleValList = t.asScala.toVector
+        if (tupleValList.nonEmpty) {
+          val unionSubtypeIdx: Int = tupleValList.head.asInstanceOf[Int]
+          if (unionSubtypeIdx < tupleValList.length) {
+            toRideValue(tupleValList(unionSubtypeIdx + 1), rideType.asInstanceOf[Types.UNION].typeList(unionSubtypeIdx))
+          } else {
+            throw new UnsupportedOperationException(s"Incorrect tuple size for Union type.")
+          }
+        } else {
+          throw new UnsupportedOperationException(s"Incorrect tuple size for Union type. Empty tuple.")
+        }
+      }
+
+      case t: Tuple => {
+        Terms
+          .ARR(
+            t.asScala.toVector.map(el => toRideValue(el, Types.ANY)),
+            limited = true
+          )
+          .explicitGet()
+      }
+
+      case _ => throw new UnsupportedOperationException(s"Type not supported: $ethArg")
     }
   }
 }
@@ -67,15 +144,19 @@ final case class ABIConverter(script: Script) {
   }
 
   case class FunctionRef(name: String, args: Seq[FunctionArg]) {
+
     def decodeArgs(data: String): (List[EVALUATED], Seq[InvokeScriptTransaction.Payment]) = {
-      import scala.jdk.CollectionConverters._
-      val argsWithPayment = this.args :+ FunctionArg("payments", ABIConverter.PaymentListType)
-      val result          = FunctionReturnDecoder.decode(data, argsWithPayment.map(_.ethTypeRef).asJava).asScala.map(ABIConverter.toRideValue).toList
+      val ethFunc     = new Function(ethSignature)
+      val ethArgsList = ethFunc.decodeCall(FastHex.decode(data)).asScala.toList
+
+      val result =
+        ethArgsList.zip(args.map(_.rideType) :+ ABIConverter.PaymentListType).map { case (ethArg, rideT) => ABIConverter.toRideValue(ethArg, rideT) }
+
       val payment = result.last match {
         case Terms.ARR(xs) =>
           xs.map {
-            case Terms.CaseObj(_, fields) =>
-              fields.values.toSeq match {
+            case Terms.ARR(fields) =>
+              fields match {
                 case Seq(Terms.CONST_BYTESTR(assetId), Terms.CONST_LONG(amount)) =>
                   InvokeScriptTransaction.Payment(amount, assetId match {
                     case ByteStr.empty => Asset.Waves
@@ -93,9 +174,7 @@ final case class ABIConverter(script: Script) {
     }
 
     lazy val ethSignature: String = {
-      val argTypes = args.map { case FunctionArg(_, argType) => ABIConverter.ethType(argType) } :+ ABIConverter.ethType(
-        ABIConverter.PaymentListType
-      )
+      val argTypes = (args.map(_.rideType).map(ABIConverter.ethFuncSignatureTypeName)) :+ ABIConverter.PaymentArgSignature
       s"$name(${argTypes.mkString(",")})"
     }
 
@@ -104,18 +183,22 @@ final case class ABIConverter(script: Script) {
 
   private[this] lazy val funcsWithTypes = Global.dAppFuncTypes(script)
 
-  private[this] def functionsWithArgs: Seq[(String, List[(String, Types.FINAL)])] = funcsWithTypes match {
-    case Right(signatures) => signatures.argsWithFuncName
-    case Left(_)           => Nil
+  private[this] def functionsWithArgs: Seq[(String, List[(String, Types.FINAL)])] = {
+    funcsWithTypes match {
+      case Right(signatures) => signatures.argsWithFuncName
+      case Left(_)           => Nil
+    }
   }
 
-  lazy val funcByMethodId: Map[String, FunctionRef] = functionsWithArgs
-    .map {
-      case (funcName, args) =>
-        FunctionRef(funcName, args.map { case (name, argType) => FunctionArg(name, argType) })
-    }
-    .map(func => func.ethMethodId -> func)
-    .toMap
+  lazy val funcByMethodId: Map[String, FunctionRef] = {
+    functionsWithArgs
+      .map {
+        case (funcName, args) =>
+          FunctionRef(funcName, args.map { case (name, argType) => FunctionArg(name, argType) })
+      }
+      .map(func => func.ethMethodId -> func)
+      .toMap
+  }
 
   def jsonABI: JsArray =
     JsArray(functionsWithArgs.map {
@@ -139,9 +222,9 @@ final case class ABIConverter(script: Script) {
     })
 
   def decodeFunctionCall(data: String): (FUNCTION_CALL, Seq[InvokeScriptTransaction.Payment]) = {
-    val (methodId, argsData) = data.splitAt(8)
-    val function             = funcByMethodId.getOrElse(methodId, throw new NoSuchElementException(s"Function not defined: $methodId"))
-    val (args, payment)      = function.decodeArgs(argsData)
+    val methodId        = data.substring(0, 8)
+    val function        = funcByMethodId.getOrElse("0x" + methodId, throw new NoSuchElementException(s"Function not defined: $methodId"))
+    val (args, payment) = function.decodeArgs(data)
     (FUNCTION_CALL(FunctionHeader.User(function.name), args), payment)
   }
 }

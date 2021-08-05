@@ -101,9 +101,10 @@ object Dependencies {
       bouncyCastle("bcprov"),
       "com.wavesplatform" % "zwaves"       % "0.1.0-SNAPSHOT",
       "com.wavesplatform" % "zwaves-bn256" % "0.1.5-SNAPSHOT",
-      "org.web3j"         % "crypto"       % "5.0.0",
-      "org.web3j"         % "abi"          % "4.5.18",
-      "org.web3j"         % "rlp"          % "4.5.18"
+      "org.web3j"         % "crypto"       % "4.8.6",
+      "org.web3j"         % "abi"          % "4.8.6",
+      "org.web3j"         % "rlp"          % "4.8.6",
+      "com.esaulpaugh"    % "headlong"     % "5.3.0"
     ) ++ langCompilerPlugins.value ++ scalapbRuntime.value ++ protobuf.value
   )
 

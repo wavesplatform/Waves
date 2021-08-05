@@ -295,6 +295,7 @@ object TransactionDiffer {
       case ptx: PaymentTransaction =>
         Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
       case et: EthereumTransaction.Transfer => Map[Address, Portfolio](et.sender -> Portfolio(-et.assetFee._2)).asRight
+      case et: EthereumTransaction.InvokeScript => Map[Address, Portfolio](et.senderAddress -> Portfolio(-et.assetFee._2)).asRight    //TODO check - metamask debug
       case ptx: ProvenTransaction =>
         ptx.assetFee match {
           case (Waves, fee) => Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty)).asRight
