@@ -2047,7 +2047,7 @@ class IntegrationTest extends PropSpec with Inside {
          |}
          |
       """.stripMargin
-    eval[EVALUATED](sampleScript, version = V4) shouldBe evaluated(5)
+    eval[EVALUATED](sampleScript, version = V6) shouldBe evaluated(5)
   }
 
   property("typed tuple destruct") {
