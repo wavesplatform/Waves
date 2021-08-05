@@ -1,6 +1,5 @@
 package com.wavesplatform.api.http.eth
 
-import org.web3j.abi.datatypes.generated.Uint8
 import org.web3j.abi.datatypes.{Utf8String, Type => EthType}
 
 sealed trait Type

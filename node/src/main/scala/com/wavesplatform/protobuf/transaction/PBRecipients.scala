@@ -9,7 +9,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object PBRecipients {
-  def create(addressOrAlias: AddressOrAlias): PBRecipient = ???
+  def create(addressOrAlias: AddressOrAlias): PBRecipient = create(addressOrAlias: Recipient)
   def create(recipient: Recipient): PBRecipient = recipient match {
     case a: Address => PBRecipient().withPublicKeyHash(ByteString.copyFrom(publicKeyHash(a)))
     case a: Alias => PBRecipient().withAlias(a.name)

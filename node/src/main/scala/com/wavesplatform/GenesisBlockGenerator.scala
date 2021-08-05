@@ -96,6 +96,7 @@ object GenesisBlockGenerator extends App {
     .map(new File(_).getAbsoluteFile.ensuring(f => !f.isDirectory && f.getParentFile.isDirectory || f.getParentFile.mkdirs()))
 
   val settings: Settings = {
+    import net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
     ConfigFactory.parseFile(inputConfFile).as[Settings]("genesis-generator")
   }
 

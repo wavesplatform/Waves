@@ -2,27 +2,28 @@ package com.wavesplatform.transaction
 
 import java.math.BigInteger
 
-import scala.reflect.ClassTag
-
 import com.wavesplatform.account._
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.transaction.PBRecipients
-import com.wavesplatform.state.{Height, TxNum}
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
+import com.wavesplatform.state.{Height, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.EthEncoding
 import monix.eval.Coeval
 import org.bouncycastle.util.encoders.Hex
 import org.web3j.abi.TypeDecoder
-import org.web3j.abi.datatypes.{Address => EthAddress}
 import org.web3j.abi.datatypes.generated.Uint256
+import org.web3j.abi.datatypes.{Address => EthAddress}
 import org.web3j.crypto._
 import org.web3j.rlp.{RlpEncoder, RlpList}
 import play.api.libs.json._
+
+import scala.reflect.ClassTag
 
 sealed abstract class EthereumTransaction(final val underlying: SignedRawTransaction) extends Transaction(TransactionType.Ethereum) {
   private final val signatureData: Sign.SignatureData = underlying.getSignatureData
@@ -50,7 +51,7 @@ sealed abstract class EthereumTransaction(final val underlying: SignedRawTransac
         new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS)),
         Hash.sha3(bs)
       )
-      .toByteArray
+      .toByteArray.takeRight(EthereumKeyLength)
   }
 
   val signatureValid: Coeval[Boolean] = signerPublicKey.map(_ => true)
@@ -120,19 +121,20 @@ object EthereumTransaction {
       val dApp: Recipient,
       val callData: ByteStr,
       underlying: SignedRawTransaction
-  ) extends EthereumTransaction(underlying) with ProvenTransaction {
+  ) extends EthereumTransaction(underlying)
+      with ProvenTransaction {
     private[this] def hexCallData: String = Hex.toHexString(callData.arr)
 
     final class Invokable(script: Script) extends InvokeScriptTransactionLike {
-      lazy val (funcCall, payments)             = ABIConverter(script).decodeFunctionCall(hexCallData)
-      def dApp: Recipient                       = InvokeScript.this.dApp
-      def root: Option[InvokeScriptTransaction] = None
-      def senderAddress: Address                = InvokeScript.this.senderAddress
-      def sender: PublicKey                     = PublicKey(signerPublicKey())
-      def id: Coeval[BlockId]                   = InvokeScript.this.id
-      val (feeAssetId, fee)                     = InvokeScript.this.assetFee
-      def checkedAssets: Seq[Asset.IssuedAsset] = payments.collect { case InvokeScriptTransaction.Payment(_, asset: IssuedAsset) => asset }
-      def transaction: InvokeScript             = InvokeScript.this
+      lazy val (funcCall, payments)                 = ABIConverter(script).decodeFunctionCall(hexCallData)
+      def dApp: Recipient                           = InvokeScript.this.dApp
+      def root: Option[InvokeScriptTransactionLike] = Some(this)
+      def senderAddress: Address                    = InvokeScript.this.senderAddress
+      def sender: PublicKey                         = PublicKey(signerPublicKey())
+      def id: Coeval[BlockId]                       = InvokeScript.this.id
+      val (feeAssetId, fee)                         = InvokeScript.this.assetFee
+      def checkedAssets: Seq[Asset.IssuedAsset]     = payments.collect { case InvokeScriptTransaction.Payment(_, asset: IssuedAsset) => asset }
+      def transaction: InvokeScript                 = InvokeScript.this
     }
 
     def toInvokable(script: Script): Invokable = new Invokable(script)
@@ -141,9 +143,9 @@ object EthereumTransaction {
       _ ++ Json.obj("invokeScript" -> Json.obj("sender" -> senderAddress.asWaves.toString, "dApp" -> dApp.toString, "callData" -> hexCallData))
     )
 
-    override def proofs: Proofs = Proofs(Seq.empty)   // TODO fix
+    override def proofs: Proofs = Proofs(Seq.empty) // TODO fix
 
-    override val sender: PublicKey = PublicKey(signerPublicKey())   // TODO fix
+    override val sender: PublicKey = PublicKey(signerPublicKey()) // TODO fix
   }
 
   def apply(bytes: Array[Byte]): EthereumTransaction =

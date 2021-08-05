@@ -303,7 +303,7 @@ class MinerImpl(
     val nonScriptedAccounts = wallet.privateKeyAccounts.filterNot(kp => tempBlockchain.getOrElse(blockchainUpdater).hasAccountScript(kp.toAddress))
     scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map { account =>
       generateBlockTask(account, tempBlockchain)
-        .onErrorHandle(err => log.warn(s"Error mining Block: $err"))
+        .onErrorHandle(err => log.warn(s"Error mining Block", err))
         .runAsyncLogErr(appenderScheduler)
     }.toSet)
     microBlockAttempt := SerialCancelable()
