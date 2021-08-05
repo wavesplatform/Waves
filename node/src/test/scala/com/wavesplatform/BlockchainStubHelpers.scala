@@ -13,8 +13,10 @@ import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, LeaseBalance, NG, VolumeAndFee}
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.{Asset, TxHelpers}
+import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.utils.{SystemTime, Time}
+import io.netty.channel.Channel
 import org.scalamock.MockFactoryBase
 import org.scalamock.matchers.MockParameter
 
@@ -53,6 +55,10 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
     Future.successful(TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, transaction).map(_ => true))
   }
 
+  implicit class BlockchainStubOps(blockchain: Blockchain) {
+    def stub: StubHelpers = StubHelpers(blockchain)
+  }
+
   case class StubHelpers(blockchain: Blockchain) {
     def creditBalance(address: MockParameter[Address], asset: MockParameter[Asset], amount: Long = Long.MaxValue / 3): Unit = {
       (blockchain.balance _).when(address, asset).returns(amount)
@@ -85,6 +91,11 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
       (blockchain.accountScript _)
         .when(address)
         .returns(Some(AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 1L, Map.empty.withDefaultValue(Map.empty.withDefaultValue(1L)))))
+    }
+
+    def transactionPublisher(time: Time = SystemTime): TransactionPublisher = (tx: Transaction, _: Option[Channel]) => {
+      val differ = TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, _)
+      Future.successful(differ(tx).map(_ => true))
     }
   }
 }

@@ -15,8 +15,10 @@ object PublicKey extends TaggedType[ByteStr] {
 
   val KeyStringLength: Int = base58Length(KeyLength)
 
+  def isValidSize(length: Int): Boolean = length == KeyLength || length == EthereumKeyLength
+
   def apply(publicKey: ByteStr): PublicKey = {
-    require(publicKey.arr.length == KeyLength || publicKey.arr.length == EthereumKeyLength, s"invalid public key length: ${publicKey.arr.length}")
+    require(isValidSize(publicKey.size), s"invalid public key length: ${publicKey.arr.length}")
     interner.intern(publicKey @@ this)
   }
 
