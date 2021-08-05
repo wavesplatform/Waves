@@ -119,7 +119,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPubli
             resp(id, "")
         }
       case "eth_estimateGas" =>
-        resp(id, toHexStringWithPrefixSafe(BigInteger.valueOf(21000)))
+        resp(id, toHexStringWithPrefixSafe(BigInteger.valueOf(2100000)))
       case "net_version" =>
         resp(id, "1")
       case "eth_gasPrice" =>

@@ -39,7 +39,8 @@ object FeeValidation {
     TransactionType.SponsorFee      -> 1000,
     TransactionType.SetAssetScript  -> (1000 - 4),
     TransactionType.InvokeScript    -> 5,
-    TransactionType.UpdateAssetInfo -> 1
+    TransactionType.UpdateAssetInfo -> 1,
+    TransactionType.Ethereum        -> 5    //TODO check - metamask debug
   )
 
   def apply(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] = {
