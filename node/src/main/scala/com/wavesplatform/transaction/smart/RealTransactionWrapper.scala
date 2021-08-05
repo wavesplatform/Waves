@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import cats.syntax.either._
-import com.wavesplatform.account.{AddressOrAlias, Recipient}
+import com.wavesplatform.account.{AddressOrAlias, Recipient, WavesAddress}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
@@ -122,6 +122,18 @@ object RealTransactionWrapper {
             )
           }
 
+      case ethCI: EthereumTransaction.InvokeScript =>     // TODO fix
+        Right(
+          Tx.CI(
+            proven(ethCI),
+            toRide(ethCI.dApp),
+            AttachedPayments.Single(None),
+            ethCI.assetFee._1.compatId,
+            Some("deposit"),
+            List.empty
+          )
+        )
+
       case u: UpdateAssetInfoTransaction =>
         Tx.UpdateAssetInfo(proven(u), u.assetId.id, u.name, u.description).asRight
     }
@@ -136,6 +148,6 @@ object RealTransactionWrapper {
       attachment = t.attachment
     )
 
-  def toRide(recipient: Recipient): RideRecipient = ???
-  def toRide(aoa: AddressOrAlias): RideRecipient  = ???
+  def toRide(recipient: Recipient): RideRecipient = RideRecipient.Address(ByteStr(WavesAddress(recipient.bytes).bytes))
+  def toRide(aoa: AddressOrAlias): RideRecipient  = RideRecipient.Address(ByteStr(WavesAddress(aoa.bytes).bytes))
 }

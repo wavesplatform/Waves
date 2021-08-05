@@ -120,7 +120,7 @@ object EthereumTransaction {
       val dApp: Recipient,
       val callData: ByteStr,
       underlying: SignedRawTransaction
-  ) extends EthereumTransaction(underlying) {
+  ) extends EthereumTransaction(underlying) with ProvenTransaction {
     private[this] def hexCallData: String = Hex.toHexString(callData.arr)
 
     final class Invokable(script: Script) extends InvokeScriptTransactionLike {
@@ -140,6 +140,10 @@ object EthereumTransaction {
     override val json: Coeval[JsObject] = baseJson.map(
       _ ++ Json.obj("invokeScript" -> Json.obj("sender" -> senderAddress.asWaves.toString, "dApp" -> dApp.toString, "callData" -> hexCallData))
     )
+
+    override def proofs: Proofs = Proofs(Seq.empty)   // TODO fix
+
+    override val sender: PublicKey = PublicKey(signerPublicKey())   // TODO fix
   }
 
   def apply(bytes: Array[Byte]): EthereumTransaction =
