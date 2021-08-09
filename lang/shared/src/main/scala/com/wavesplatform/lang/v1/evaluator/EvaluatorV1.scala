@@ -1,12 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.data.EitherT
-import cats.instances.list._
-import cats.syntax.applicative._
-import cats.syntax.traverse._
-import cats.syntax.functor._
-import cats.instances.either._
-import cats.syntax.bifunctor._
+import cats.implicits._
 import cats.{Eval, Id, Monad, StackSafeMonad}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.User
@@ -36,7 +31,7 @@ object EvaluatorV1 {
   def apply(): EvaluatorV1[Id, Environment] = evaluator
 }
 
-class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: Monad[CoevalF[F, ?]]) {
+class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: Monad[CoevalF[F, *]]) {
   private val lenses = new Lenses[F, C]
   import lenses._
 

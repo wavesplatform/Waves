@@ -1,5 +1,5 @@
 package com.wavesplatform.lang.v1.estimator
-import com.wavesplatform.common.state.diffs.ProduceError.produce
+
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.StdLibVersion
@@ -8,6 +8,7 @@ import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONST_STRING, FUNCTION_CALL, REF}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.test.produce
 
 class NativeFoldEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
   property("fold costs") {

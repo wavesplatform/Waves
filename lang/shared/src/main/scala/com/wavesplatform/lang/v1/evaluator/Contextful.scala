@@ -1,12 +1,11 @@
 package com.wavesplatform.lang.v1.evaluator
 
-import cats.syntax.functor._
-import cats.syntax.either._
 import cats.syntax.applicative._
+import cats.syntax.either._
 import cats.{Eval, Monad}
-import com.wavesplatform.lang.{CoevalF, ExecutionError}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.Types.TYPE
+import com.wavesplatform.lang.{CoevalF, ExecutionError}
 import monix.eval.Coeval
 
 sealed trait ContextfulNativeFunction[C[_[_]]] {
@@ -40,7 +39,7 @@ object ContextfulNativeFunction {
         evaluatedArgs: List[EVALUATED],
         availableComplexity: Int,
         evaluateUserFunction: InternalCall[F]
-    )(implicit m: Monad[CoevalF[F, ?]]): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]]
+    )(implicit m: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]]
   }
 }
 

@@ -133,7 +133,7 @@ object ScriptEstimatorV3 extends ScriptEstimator {
       .map(
         info =>
           args
-            .get(info.functionIndex)
+            .lift(info.functionIndex)
             .toRight(s"${errorPrefix}only ${args.size} args passed while ${info.functionIndex + 1} expected")
             .flatMap {
               case CONST_STRING(function) =>

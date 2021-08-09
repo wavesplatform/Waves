@@ -6,9 +6,7 @@ import cats.syntax.functor._
 import cats.{Id, Monad}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.{CoevalF, ExecutionError}
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -21,6 +19,7 @@ import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, Contextful
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
+import com.wavesplatform.lang.{CoevalF, ExecutionError}
 import monix.eval.Coeval
 import shapeless.Coproduct.unsafeGet
 
@@ -560,7 +559,7 @@ object Functions {
             args: List[EVALUATED],
             availableComplexity: Int,
             evaluateUserFunction: InternalCall[F]
-        )(implicit m: Monad[CoevalF[F, ?]]): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] = {
+        )(implicit m: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] = {
           val dAppBytes = args match {
             case (dApp: CaseObj) :: _ if dApp.caseType == addressType =>
               dApp.fields("bytes") match {

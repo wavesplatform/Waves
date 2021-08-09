@@ -4,9 +4,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.charset.{MalformedInputException, StandardCharsets}
 import java.nio.{BufferUnderflowException, ByteBuffer}
 
-import cats.instances.list._
-import cats.syntax.either._
-import cats.syntax.traverse._
+import cats.implicits._
 import cats.{Id, Monad}
 import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
@@ -1494,7 +1492,7 @@ object PureContext {
             args: List[EVALUATED],
             availableComplexity: Int,
             evaluateUserFunction: InternalCall[F]
-        )(implicit m: Monad[CoevalF[F, ?]]): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] =
+        )(implicit m: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] =
           args match {
             case ARR(list) :: accumulator :: CONST_STRING(function) :: Nil =>
               if (list.size > limit) {

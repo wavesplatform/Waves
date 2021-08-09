@@ -12,7 +12,7 @@ package object lang {
   type EvalF[F[_], A]                 = Eval[F[A]]
   type TrampolinedExecResult[F[_], T] = EitherT[EvalF[F, *], ExecutionError, T]
 
-  implicit val idCoevalFMonad: Monad[CoevalF[Id, ?]] = new StackSafeMonad[CoevalF[Id, ?]] {
+  implicit val idCoevalFMonad: Monad[CoevalF[Id, *]] = new StackSafeMonad[CoevalF[Id, *]] {
     override def flatMap[A, B](fa: Coeval[A])(f: A => Coeval[B]): Coeval[B] =
       fa.flatMap(f).memoize
 
