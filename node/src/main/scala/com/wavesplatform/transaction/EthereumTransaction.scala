@@ -21,6 +21,7 @@ import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.abi.datatypes.{Address => EthAddress}
 import org.web3j.crypto._
 import org.web3j.rlp.{RlpEncoder, RlpList}
+import org.web3j.utils.Numeric
 import play.api.libs.json._
 
 import scala.reflect.ClassTag
@@ -46,12 +47,12 @@ sealed abstract class EthereumTransaction(final val underlying: SignedRawTransac
 
   val signerPublicKey: Coeval[Array[Byte]] = bodyBytes.map { bs =>
     Sign
-      .recoverFromSignature(
-        1,
-        new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS)),
-        Hash.sha3(bs)
+      .signedMessageToKey(
+        bs,
+        new Sign.SignatureData(underlying.getRealV(Numeric.toBigInt(signatureData.getV)), signatureData.getR, signatureData.getS)
       )
-      .toByteArray.takeRight(EthereumKeyLength)
+      .toByteArray
+      .takeRight(EthereumKeyLength)
   }
 
   val signatureValid: Coeval[Boolean] = signerPublicKey.map(_ => true)

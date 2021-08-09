@@ -82,7 +82,7 @@ object EthOrders extends App {
     new SignatureData(V, R, S)
   }
 
-  private[this] def orderDomainJson: String =
+  def orderDomainJson: String =
     s"""
       |{
       |  "types": {

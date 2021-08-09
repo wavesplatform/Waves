@@ -2,24 +2,25 @@ package com.wavesplatform.api.http.eth
 
 import java.math.BigInteger
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.jdk.CollectionConverters._
-
 import akka.http.scaladsl.server._
-import com.wavesplatform.account.{AddressScheme, EthereumAddress}
+import com.wavesplatform.account.{AddressScheme, EthereumAddress, PublicKey}
 import com.wavesplatform.api.http._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction}
 import com.wavesplatform.utils.EthEncoding
 import org.web3j.abi._
 import org.web3j.abi.datatypes.generated.{Uint256, Uint8}
 import org.web3j.crypto._
-import play.api.libs.json._
+import org.web3j.utils.Numeric
 import play.api.libs.json.Json.JsValueWrapper
+import play.api.libs.json._
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.jdk.CollectionConverters._
 
 class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPublisher) extends ApiRoute {
   private def quantity(v: Long) = s"0x${java.lang.Long.toString(v, 16)}"
@@ -70,7 +71,8 @@ class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPubli
         resp(
           id,
           transactionPublisher.validateAndBroadcast(et, None).map[JsValueWrapper] { _ =>
-            log.info(s"Published transaction $et")
+            val senderAddress = EthereumAddress(PublicKey(et.signerPublicKey()))
+            log.info(s"Published transaction from $senderAddress/${Numeric.toHexString(et.signerPublicKey())}")
             EthEncoding.toHexString(et.id().arr)
           }
         )
@@ -103,6 +105,8 @@ class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPubli
         val dataString      = (call \ "data").as[String]
         val contractAddress = (call \ "to").as[String]
 
+        log.info(s"balance: contract address = $contractAddress, assetId = ${assetId(contractAddress)}")
+
         EthEncoding.cleanHexPrefix(dataString).take(8) match {
           case "95d89b41" =>
             resp(id, encodeResponse(assetDescription(contractAddress).get.name.toStringUtf8))
@@ -118,7 +122,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPubli
               )
             )
           case _ =>
-            log.info(s"CALL $dataString")
+            log.info(s"Unexpected call $dataString at $contractAddress")
             resp(id, "")
         }
       case "eth_estimateGas" =>
@@ -127,6 +131,9 @@ class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPubli
         resp(id, "1")
       case "eth_gasPrice" =>
         resp(id, "0x1")
+      case "eth_getCode" =>
+        log.info(s"Get code at ${params.get.head.as[String]}")
+        resp(id, "0xff")
       case _ =>
         log.info(Json.stringify(jso))
         complete(Json.obj())
