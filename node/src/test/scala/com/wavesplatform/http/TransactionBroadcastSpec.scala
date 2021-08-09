@@ -32,8 +32,7 @@ class TransactionBroadcastSpec
     with RestAPISettingsHelper
     with PathMockFactory
     with BlockchainStubHelpers
-    with EthHelpers
-    with EthSetChainId {
+    with EthHelpers {
   private val blockchain           = stub[Blockchain]
   private val transactionPublisher = stub[TransactionPublisher]
   private val testTime             = new TestTime
@@ -51,7 +50,7 @@ class TransactionBroadcastSpec
   private val route = seal(transactionsApiRoute.route)
 
   "exchange" - {
-    "accepted with ETH signed orders" in {
+    "accepted with ETH signed orders" in EthChainId.withEChainId {
       val blockchain = createBlockchainStub { blockchain =>
         val sh = StubHelpers(blockchain)
         sh.creditBalance(TxHelpers.matcher.toAddress, *)

@@ -185,6 +185,61 @@ class EthOrderTest
     diff should containAppliedTx(transaction.id())
   }
 
+  it should "not work in exchange transaction with changed signature" in {
+    val blockchain = createBlockchainStub { blockchain =>
+      val sh = StubHelpers(blockchain)
+      sh.creditBalance(TxHelpers.matcher.toAddress, *)
+      sh.creditBalance(TestEthPublicKey.toEthAddress.asWaves, *)
+      sh.issueAsset(ByteStr(EthStubBytes32))
+    }
+
+    val buyOrder = Order.selfSigned(
+      Order.V3,
+      TxHelpers.defaultSigner,
+      TxHelpers.matcher.publicKey,
+      AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
+      OrderType.BUY,
+      1,
+      100L,
+      1,
+      123,
+      100000,
+      Waves
+    )
+
+    val sellOrder = Order(
+      Order.V4,
+      TestEthPublicKey,
+      TxHelpers.matcher.publicKey,
+      AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
+      OrderType.SELL,
+      1,
+      100L,
+      1,
+      123,
+      100000,
+      Waves,
+      ethSignature = EthSignature(
+        "0xd1a95bf94c6a3be6b7bf929d2c68263b1c88a520c67445ff1fba1d73e2b852ca2a09ebc50a0760e8683d72e4060109030591a3678d51b259da034c24579648aa1b"
+      )
+    )
+
+    val differ = TransactionDiffer(Some(1L), 100L)(blockchain, _)
+    val transaction = TxHelpers
+      .exchange(buyOrder, sellOrder, TxVersion.V3, 100)
+      .copy(
+        order2 = sellOrder.copy(
+          ethSignature = EthSignature(
+            "0x1717804a1d60149988821546732442eabc69f46b2764e231eaeef48351d9f36577278c3f29fe3d61500932190dba8c045b19acda117a4690bfd3d2c28bb67bf91c"
+          )
+        )
+      )
+
+    differ(transaction).resultE should matchPattern {
+      case Left(err) if err.toString.contains("Proof doesn't validate as signature") =>
+    }
+  }
+
   it should "work in exchange transaction with asset script" in {
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)

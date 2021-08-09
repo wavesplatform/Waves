@@ -25,9 +25,9 @@ object TxHelpers {
   def address(i: Int): Address = signer(i).toAddress
 
   val defaultSigner: KeyPair  = signer(0)
-  val defaultAddress: WavesAddress = defaultSigner.toAddress
+  def defaultAddress: WavesAddress = defaultSigner.toAddress
   val secondSigner: KeyPair   = signer(1)
-  val secondAddress: WavesAddress  = secondSigner.toAddress
+  def secondAddress: WavesAddress  = secondSigner.toAddress
   
   val matcher: KeyPair = defaultSigner
 

@@ -87,9 +87,16 @@ object WavesRecipient {
       case RideRecipient.Alias(name)    => Alias.create(name)
     }
 
-  def fromString(s: String): Either[ValidationError, AddressOrAlias]       = ???
-  def fromBytes(buf: ByteBuffer): Either[ValidationError, AddressOrAlias]  = ???
-  def fromBytes(buf: Array[Byte]): Either[ValidationError, AddressOrAlias] = ???
+  def fromString(s: String): Either[ValidationError, AddressOrAlias] = s match {
+    case alias if alias.startsWith(Alias.Prefix) => Alias.fromString(s)
+    case address                                 => Address.fromString(address)
+  }
+
+  def fromBytes(buf: Array[Byte]): Either[ValidationError, AddressOrAlias] = buf.headOption match {
+    case Some(Address.AddressVersion) => Address.fromBytes(buf)
+    case Some(Alias.AddressVersion)   => Alias.fromBytes(buf)
+    case _                            => throw new IllegalArgumentException(s"Not a valid recipient: ${ByteStr(buf)}")
+  }
 }
 
 object Address {
