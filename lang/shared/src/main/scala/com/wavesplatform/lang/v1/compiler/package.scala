@@ -59,4 +59,38 @@ package object compiler {
     }
     horTraversal(Queue(e))
   }
+
+  /**
+    * (a1,...,an),...,(z1,...,zk)
+    *              ||
+    *              \/
+    * (a1,...,z1),...,(a1,...,zk),...,(an,...,zk)
+    *
+    * regroup(
+    *   List(
+    *     List(1, 2),
+    *     List("a", "b", "c")
+    *   )
+    * ) =
+    *   List(
+    *     List(1, "a"),
+    *     List(2, "a"),
+    *     List(1, "b"),
+    *     List(2, "b"),
+    *     List(1, "c"),
+    *     List(2, "c")
+    *   )
+    */
+  def regroup[A](listOfLists: Seq[Seq[A]]): Seq[Seq[A]] = {
+    def combine(acc: Seq[Seq[A]], next: Seq[A]): Seq[Seq[A]] =
+      if (acc.isEmpty)
+        next.map(Seq(_))
+      else
+        for {
+          a <- acc
+          b <- next
+        } yield a :+ b
+
+    listOfLists.foldLeft(Seq.empty[Seq[A]])(combine)
+  }
 }
