@@ -188,6 +188,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
         d.blockchain.removeAfter(mb1Id) // Should not do anything
         d.appendKeyBlock(ref = Some(mb2Id))
 
+        Thread.sleep(1000)
         sub.cancel()
         val result = sub.futureValue.map(_.toUpdate)
         result should matchPattern {

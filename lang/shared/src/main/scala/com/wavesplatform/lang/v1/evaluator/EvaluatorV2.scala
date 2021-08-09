@@ -150,7 +150,7 @@ class EvaluatorV2(
               case _: CaseObj =>
                 Coeval.now(unused)
               case ev: EVALUATED =>
-                throw EvaluationException(s"GETTER of non-case-object $ev", unused)
+                throw EvaluationException(s"GETTER of non-case-object $ev with field '${g.field}", unused)
               case _ =>
                 Coeval.now(unused)
             }

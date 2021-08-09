@@ -1,7 +1,5 @@
 package com.wavesplatform.lang
 
-import java.nio.charset.StandardCharsets
-
 import cats.Id
 import cats.kernel.Monoid
 import cats.syntax.either._
@@ -31,6 +29,7 @@ import com.wavesplatform.test._
 import org.scalatest.Inside
 import org.web3j.crypto.Keys
 
+import java.nio.charset.StandardCharsets
 import scala.util.{Random, Try}
 
 class IntegrationTest extends PropSpec with Inside {

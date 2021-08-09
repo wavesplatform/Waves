@@ -8,6 +8,7 @@ object Expressions {
   sealed trait Pos {
     def end: Int
     def start: Int
+    override def toString: String = ""
   }
 
   object Pos {
@@ -54,7 +55,8 @@ object Expressions {
           case _               => false
         }
 
-      override def hashCode: Int = v.hashCode
+      override def hashCode: Int    = v.hashCode
+      override def toString: String = v.toString
     }
     case class INVALID(position: Pos, message: String) extends PART[Nothing]
 
@@ -76,11 +78,11 @@ object Expressions {
   }
 
   case class LET(
-    position: Pos,
-    name: PART[String],
-    value: EXPR,
-    types: Option[FINAL] = None,
-    allowShadowing: Boolean = false
+      position: Pos,
+      name: PART[String],
+      value: EXPR,
+      types: Option[FINAL] = None,
+      allowShadowing: Boolean = false
   ) extends Declaration
 
   sealed trait Type {
@@ -92,16 +94,16 @@ object Expressions {
         case Tuple(types) => types.exists(_.isEmpty)
       }
   }
-  case class Single(name: PART[String], parameter: Option[PART[Type]] = None)   extends Type
-  case class AnyType(position: Pos)                                             extends Type
-  case class Union(types: Seq[Type])                                            extends Type
+  case class Single(name: PART[String], parameter: Option[PART[Type]] = None) extends Type
+  case class AnyType(position: Pos)                                           extends Type
+  case class Union(types: Seq[Type])                                          extends Type
   object Union {
     def apply(types: Seq[Type]): Type = types match {
       case Seq(t) => t
-      case _ => new Union(types)
+      case _      => new Union(types)
     }
   }
-  case class Tuple(types: Seq[Type])                                            extends Type
+  case class Tuple(types: Seq[Type]) extends Type
 
   type CtxOpt = Option[Map[String, Pos]]
 
@@ -120,7 +122,16 @@ object Expressions {
   case class CONST_LONG(position: Pos, value: Long, ctxOpt: CtxOpt = None) extends EXPR {
     val resultType: Option[FINAL] = Some(LONG)
   }
-  case class GETTER(position: Pos, ref: EXPR, field: PART[String], resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
+
+  case class GETTER(
+      position: Pos,
+      ref: EXPR,
+      field: PART[String],
+      resultType: Option[FINAL] = None,
+      ctxOpt: CtxOpt = None,
+      checkObjectType: Boolean = true
+  ) extends EXPR
+
   case class CONST_BYTESTR(position: Pos, value: PART[ByteStr], ctxOpt: CtxOpt = None) extends EXPR {
     val resultType: Option[FINAL] = Some(BYTESTR)
   }
@@ -143,41 +154,41 @@ object Expressions {
 
   sealed trait Pattern {
     def isRest: Boolean = false
-    def subpatterns: Seq[(SimplePattern, Seq[PART[String]])]
+    def subpatterns: Seq[(SimplePattern, Seq[(PART[String], Option[Single])])]
     def position: Pos
   }
 
   sealed trait SimplePattern extends Pattern {
-    def subpatterns: Seq[(SimplePattern, Seq[PART[String]])] = Seq((this, Seq()))
+    def subpatterns: Seq[(SimplePattern, Seq[(PART[String], Option[Single])])] = Seq((this, Seq()))
   }
 
   sealed trait CompositePattern extends Pattern {
     def caseType: Option[Single]
+    val patternsWithFields: Seq[(String, Pattern)]
+
+    def subpatterns: Seq[(SimplePattern, Seq[(PART[String], Option[Single])])] =
+      for {
+        (field, p) <- patternsWithFields
+        (sp, path) <- p.subpatterns
+        nextPath = Expressions.PART.VALID(p.position, field)
+      } yield (sp, path :+ ((nextPath, caseType)))
   }
 
   case class TypedVar(newVarName: Option[PART[String]], caseType: Type) extends SimplePattern {
     override def isRest: Boolean = caseType.isEmpty || caseType.isInstanceOf[AnyType]
-    def position: Pos = newVarName.fold(Pos.AnyPos: Pos)(_.position)
+    def position: Pos            = newVarName.fold(Pos.AnyPos: Pos)(_.position)
   }
 
-  case class ConstsPat(constatns: Seq[EXPR], position: Pos) extends SimplePattern
+  case class ConstsPat(constants: Seq[EXPR], position: Pos) extends SimplePattern
 
   case class TuplePat(patterns: Seq[Pattern], position: Pos) extends CompositePattern {
-    val subpatterns: Seq[(SimplePattern, Seq[PART[String]])] = patterns.zipWithIndex.flatMap {
-      case (p, i) => p.subpatterns.map {
-        case (sp, path) => (sp, Expressions.PART.VALID(p.position, s"_${i+1}") +: path)
-      }
-    }
-    val caseType: Option[Single] = None
+    val patternsWithFields: Seq[(String, Pattern)] = patterns.zipWithIndex.map { case (p, i) => (s"_${i + 1}", p) }
+    val caseType: Option[Single]                   = None
   }
 
   case class ObjPat(patterns: Map[String, Pattern], objType: Single, position: Pos) extends CompositePattern {
-    val subpatterns: Seq[(SimplePattern, Seq[PART[String]])] = patterns.toSeq.flatMap {
-      case (i, p) => p.subpatterns.map {
-        case (sp, path) => (sp, Expressions.PART.VALID(p.position, i) +: path)
-      }
-    }
-    val caseType: Option[Single] = Some(objType)
+    val patternsWithFields: Seq[(String, Pattern)] = patterns.toSeq
+    val caseType: Option[Single]                   = Some(objType)
   }
 
   case class MATCH_CASE(
@@ -190,10 +201,10 @@ object Expressions {
 
   object MATCH_CASE {
     def apply(
-      position: Pos,
-      newVarName: Option[PART[String]],
-      types: Seq[PART[String]],
-      expr: EXPR
+        position: Pos,
+        newVarName: Option[PART[String]],
+        types: Seq[PART[String]],
+        expr: EXPR
     ): MATCH_CASE =
       MATCH_CASE(position, TypedVar(newVarName, Union(types.map(Single(_, None)))), expr)
   }
