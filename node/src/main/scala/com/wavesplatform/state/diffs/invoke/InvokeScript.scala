@@ -33,7 +33,7 @@ object InvokeScriptLike {
         case ist: InvokeScriptTransaction => ist.version == 1
         case _                            => true
       })
-    def timestamp: TxTimestamp          = isl.root.fold(0L)(_.timestamp)
+    def timestamp: TxTimestamp          = isl.root.fold(0L)(_.transaction.timestamp)
     def txId: ByteStr                   = isl.root.fold(ByteStr.empty)(_.id())
     def paymentAssets: Seq[IssuedAsset] = isl.payments.collect(IssuedAssets)
   }
