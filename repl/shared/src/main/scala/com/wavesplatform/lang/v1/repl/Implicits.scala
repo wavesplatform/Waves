@@ -15,8 +15,8 @@ object Implicits {
         x.pure[F].pure[Eval]
     }
 
-  implicit def stackUnsafeMonadCoeval[F[_]: Monad]: Monad[CoevalF[F, ?]] =
-    new StackSafeMonad[CoevalF[F, ?]] {
+  implicit def stackUnsafeMonadCoeval[F[_]: Monad]: Monad[CoevalF[F, *]] =
+    new StackSafeMonad[CoevalF[F, *]] {
       override def flatMap[A, B](fa: Coeval[F[A]])(f: A => Coeval[F[B]]): Coeval[F[B]] =
         fa.map(_.flatMap(f(_).value()))
 
