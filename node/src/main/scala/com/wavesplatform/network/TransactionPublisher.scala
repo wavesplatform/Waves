@@ -24,20 +24,27 @@ object TransactionPublisher extends ScorexLogging {
       putIfNew: (Transaction, Boolean) => TracedResult[ValidationError, Boolean],
       broadcast: (Transaction, Option[Channel]) => Unit,
       timedScheduler: Scheduler,
-      allowRebroadcast: Boolean
+      allowRebroadcast: Boolean,
+      canBroadcast: () => Either[ValidationError, Unit]
   ): TransactionPublisher = { (tx, source) =>
-    timedScheduler
-      .executeCatchingInterruptedException(putIfNew(tx, source.isEmpty))
-      .recover {
-        case err: ExecutionException if err.getCause.isInstanceOf[InterruptedException] =>
-          log.trace(s"Transaction took too long to validate: ${tx.id()}")
-          TracedResult(Left(GenericError("Transaction took too long to validate")))
-        case err =>
-          log.warn(s"Error validating transaction ${tx.id()}", err)
-          TracedResult(Left(GenericError(err)))
-      }
-      .andThen {
-        case Success(TracedResult(Right(isNew), _, _)) if isNew || (allowRebroadcast && source.isEmpty) => broadcast(tx, source)
-      }
+    canBroadcast() match {
+      case Right(_) =>
+        timedScheduler
+          .executeCatchingInterruptedException(putIfNew(tx, source.isEmpty))
+          .recover {
+            case err: ExecutionException if err.getCause.isInstanceOf[InterruptedException] =>
+              log.trace(s"Transaction took too long to validate: ${tx.id()}")
+              TracedResult(Left(GenericError("Transaction took too long to validate")))
+            case err =>
+              log.warn(s"Error validating transaction ${tx.id()}", err)
+              TracedResult(Left(GenericError(err)))
+          }
+          .andThen {
+            case Success(TracedResult(Right(isNew), _, _)) if isNew || (allowRebroadcast && source.isEmpty) => broadcast(tx, source)
+          }
+
+      case Left(err) =>
+        Future.successful(TracedResult.wrapE(Left(err)))
+    }
   }
 }
