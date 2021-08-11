@@ -6,6 +6,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.TxValidationError.InvalidAddress
 import com.wavesplatform.utils.base58Length
+import org.web3j.crypto.Keys
 import play.api.libs.json.{Format, Writes}
 import supertagged._
 import supertagged.postfix._
@@ -35,11 +36,10 @@ object PublicKey extends TaggedType[ByteStr] {
     Some(apply(arg))
 
   implicit class PublicKeyImplicitOps(private val pk: PublicKey) extends AnyVal {
-    def toAddress: WavesAddress       = toAddress(AddressScheme.current.chainId)
-    def toEthAddress: EthereumAddress = EthereumAddress(pk)
+    def toAddress: WavesAddress = toAddress(AddressScheme.current.chainId)
     def toAddress(chainId: Byte): WavesAddress = pk.size match {
       case KeyLength         => Address.fromPublicKey(pk, chainId)
-      case EthereumKeyLength => toEthAddress.asWaves
+      case EthereumKeyLength => WavesAddress(Keys.getAddress(pk.arr))
     }
   }
 

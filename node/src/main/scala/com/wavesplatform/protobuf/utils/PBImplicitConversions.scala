@@ -1,6 +1,5 @@
 package com.wavesplatform.protobuf.utils
 
-import com.wavesplatform.account.EthereumAddress
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.{Amount, _}
@@ -15,7 +14,6 @@ object PBImplicitConversions {
     def toPb: Recipient = r match {
       case va.Alias(_, name)     => Recipient.of(Recipient.Recipient.Alias(name))
       case w: va.WavesAddress    => Recipient.of(Recipient.Recipient.PublicKeyHash(PBByteString.copyFrom(w.publicKeyHash)))
-      case e: va.EthereumAddress => Recipient.of(Recipient.Recipient.EthereumAddress(PBByteString.copyFrom(e.publicKeyHash)))
 
     }
   }
@@ -24,7 +22,6 @@ object PBImplicitConversions {
     def toAddress(chainId: Byte): Either[ValidationError, va.Address]               = PBRecipients.toAddress(recipient, chainId)
     def toAlias(chainId: Byte): Either[ValidationError, va.Alias]                   = PBRecipients.toAlias(recipient, chainId)
     def toAddressOrAlias(chainId: Byte): Either[ValidationError, va.AddressOrAlias] = PBRecipients.toAddressOrAlias(recipient, chainId)
-    def toRecipient(chainId: Byte): Either[ValidationError, va.Recipient]           = Right(new EthereumAddress(recipient.recipient.publicKeyHash.map(_.toByteArray)getOrElse(Array[Byte]())))    //TODO remove
   }
 
   implicit def fromAssetIdAndAmount(v: (VanillaAssetId, Long)): Amount = v match {

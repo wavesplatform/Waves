@@ -59,7 +59,7 @@ object PBTransactions {
 
   def vanilla(txWrapper: PBTransactionWrapper, unsafe: Boolean): Either[ValidationError, VanillaTransaction] = {
     txWrapper.transaction match {
-      case PBTransactionWrapper.Transaction.Empty                   => ???
+      case PBTransactionWrapper.Transaction.Empty                   => Left(GenericError("Transaction must be specified"))
       case PBTransactionWrapper.Transaction.WavesTransaction(value) => vanilla(value, unsafe)
       case PBTransactionWrapper.Transaction.EthereumTransaction(bytes) =>
         Right(EthereumTransaction(TransactionDecoder.decode(EthEncoding.toHexString(bytes.toByteArray)).asInstanceOf[SignedRawTransaction]))
@@ -131,7 +131,7 @@ object PBTransactions {
 
       case Data.Transfer(TransferTransactionData(Some(recipient), Some(amount), attachment, `empty`)) =>
         for {
-          address <- recipient.toRecipient(chainId)
+          address <- recipient.toAddressOrAlias(chainId)
           tx <- vt.transfer.TransferTransaction.create(
             version.toByte,
             sender,
@@ -238,7 +238,7 @@ object PBTransactions {
           version.toByte,
           sender,
           PBAmounts.toVanillaAssetId(mt.assetId),
-          mt.transfers.flatMap(t => t.getRecipient.toRecipient(chainId).toOption.map(ParsedTransfer(_, t.amount))).toList,
+          mt.transfers.flatMap(t => t.getRecipient.toAddressOrAlias(chainId).toOption.map(ParsedTransfer(_, t.amount))).toList,
           feeAmount,
           timestamp,
           mt.attachment.toByteStr,
@@ -346,7 +346,7 @@ object PBTransactions {
         vt.transfer.TransferTransaction(
           version.toByte,
           sender,
-          recipient.toRecipient(chainId).explicitGet(),
+          recipient.toAddressOrAlias(chainId).explicitGet(),
           amount.vanillaAssetId,
           amount.longAmount,
           feeAssetId,
@@ -461,7 +461,7 @@ object PBTransactions {
           version.toByte,
           sender,
           PBAmounts.toVanillaAssetId(mt.assetId),
-          mt.transfers.flatMap(t => t.getRecipient.toRecipient(chainId).toOption.map(ParsedTransfer(_, t.amount))).toList,
+          mt.transfers.flatMap(t => t.getRecipient.toAddressOrAlias(chainId).toOption.map(ParsedTransfer(_, t.amount))).toList,
           feeAmount,
           timestamp,
           mt.attachment.toByteStr,

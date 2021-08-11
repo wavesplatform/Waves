@@ -1,6 +1,6 @@
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
-import sbt._
 import sbt.Keys._
+import sbt._
 
 //noinspection TypeAnnotation
 object Dependencies {

@@ -11,8 +11,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidAddress}
-import com.wavesplatform.utils.{base58Length, EthEncoding, StringBytes}
-import org.web3j.crypto.Keys
+import com.wavesplatform.utils.{EthEncoding, StringBytes, base58Length}
 import play.api.libs.json._
 
 sealed trait Recipient {
@@ -23,8 +22,6 @@ object Recipient {
   def fromString(s: String): Either[ValidationError, Recipient] =
     if (s.startsWith(Alias.Prefix)) {
       Alias.fromString(s)
-    } else if (s.startsWith("0x")) {
-      Right(EthereumAddress(s))
     } else {
       Address.fromString(s)
     }
@@ -57,22 +54,8 @@ object WavesAddress {
     publicKeyHash,
     crypto.secureHash(Array(1.toByte, AddressScheme.current.chainId) ++ publicKeyHash).take(4)
   )
-}
 
-final class EthereumAddress(val publicKeyHash: Array[Byte]) extends Address {
-  lazy val asWaves: WavesAddress     = WavesAddress(publicKeyHash)
-  override def bytes: Array[Byte]    = publicKeyHash
-  override lazy val toString: String = Keys.toChecksumAddress(EthEncoding.toHexString(publicKeyHash))
-}
-
-object EthereumAddress {
-  implicit class EAExt(val e: EthereumAddress) extends AnyVal {
-    def toWaves: WavesAddress = WavesAddress(e.publicKeyHash)
-  }
-
-  def apply(hexString: String): EthereumAddress = new EthereumAddress(EthEncoding.toBytes(hexString))
-
-  def apply(publicKey: PublicKey): EthereumAddress = new EthereumAddress(Keys.getAddress(publicKey.arr))
+  def fromHexString(hexString: String): WavesAddress = WavesAddress(EthEncoding.toBytes(hexString))
 }
 
 final case class Alias(chainId: Byte, name: String) extends WavesRecipient {

@@ -42,7 +42,7 @@ class EthOrderTest
 
     val result = EthOrders.recoverEthSignerKey(testOrder, signature)
     result shouldBe TestEthPublicKey
-    result.toEthAddress shouldBe TestEthPublicKey.toEthAddress
+    result.toAddress shouldBe TestEthPublicKey.toAddress
   }
 
   it should "be of version 4" in {
@@ -92,7 +92,7 @@ class EthOrderTest
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      sh.creditBalance(TestEthPublicKey.toEthAddress.asWaves, *)
+      sh.creditBalance(TestEthPublicKey.toAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
@@ -140,7 +140,7 @@ class EthOrderTest
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      sh.creditBalance(TestEthPublicKey.toEthAddress.asWaves, *)
+      sh.creditBalance(TestEthPublicKey.toAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
@@ -189,7 +189,7 @@ class EthOrderTest
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      sh.creditBalance(TestEthPublicKey.toEthAddress.asWaves, *)
+      sh.creditBalance(TestEthPublicKey.toAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
@@ -244,7 +244,7 @@ class EthOrderTest
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      sh.creditBalance(TestEthPublicKey.toEthAddress.asWaves, *)
+      sh.creditBalance(TestEthPublicKey.toAddress, *)
 
       // TODO: something more smart ?
       val script = TxHelpers.script("""
@@ -301,7 +301,7 @@ class EthOrderTest
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      sh.creditBalance(TestEthPublicKey.toEthAddress.asWaves, *)
+      sh.creditBalance(TestEthPublicKey.toAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(

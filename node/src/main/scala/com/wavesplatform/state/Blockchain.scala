@@ -98,7 +98,6 @@ object Blockchain {
     def resolveAlias(aoa: Recipient): Either[ValidationError, WavesAddress] =
       aoa match {
         case a: WavesAddress    => Right(a)
-        case e: EthereumAddress => Right(e.toWaves)
         case a: Alias           => blockchain.resolveAlias(a)
       }
 

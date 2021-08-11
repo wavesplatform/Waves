@@ -1,16 +1,16 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import scala.util.Try
-
-import com.wavesplatform.account.{Address, EthereumAddress, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{Address, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.serialization.impl.OrderSerializer
 import monix.eval.Coeval
 import play.api.libs.json.{Format, JsObject}
+
+import scala.util.Try
 
 /**
   * Order to matcher service for asset exchange
@@ -33,7 +33,7 @@ case class Order(
   import Order._
 
   val sender: PublicKey      = senderPublicKey
-  def senderAddress: Address = if (ethSignature.isDefined) EthereumAddress(sender) else sender.toAddress
+  def senderAddress: Address = sender.toAddress
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(amount, price) &&

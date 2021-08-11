@@ -68,7 +68,7 @@ sealed abstract class EthereumTransaction(final val underlying: SignedRawTransac
   def ethereumJson(blockId: Option[BlockId], height: Option[Height], num: Option[TxNum]): JsObject = Json.obj(
     "blockHash"        -> blockId.map(id => EthEncoding.toHexString(id.arr)),
     "blockNumber"      -> height.map(h => EthEncoding.toHexString(BigInteger.valueOf(h))),
-    "from"             -> EthereumAddress(PublicKey(signerPublicKey())).toString,
+    "from"             -> EthEncoding.toHexString(Keys.getAddress(signerPublicKey())),
     "gas"              -> EthEncoding.toHexString(underlying.getGasLimit),
     "gasPrice"         -> EthEncoding.toHexString(underlying.getGasPrice),
     "hash"             -> EthEncoding.toHexString(id().arr),
@@ -99,7 +99,7 @@ object EthereumTransaction {
       val sender: Address,
       val asset: Either[Asset.Waves.type, ERC20Address],
       val amount: TxAmount,
-      val recipient: EthereumAddress,
+      val recipient: WavesAddress,
       underlying: SignedRawTransaction
   ) extends EthereumTransaction(underlying) {
     override val json: Coeval[JsObject] = baseJson.map(
@@ -163,7 +163,7 @@ object EthereumTransaction {
         senderAddress,
         Left(Asset.Waves),
         underlying.getValue.divide(BigInt(AmountMultiplier).bigInteger).longValueExact(),
-        new EthereumAddress(recipientAddress.arr),
+        WavesAddress(recipientAddress.arr),
         underlying
       )
     } else if (hexData.startsWith(ERC20TransferPrefix)) {
@@ -173,9 +173,9 @@ object EthereumTransaction {
         senderAddress,
         Right(ERC20Address(recipientAddress)),
         amount.getValue.longValueExact(),
-        new EthereumAddress(EthEncoding.toBytes(recipient.toString)),
+        WavesAddress(EthEncoding.toBytes(recipient.toString)),
         underlying
       )
-    } else new InvokeScript(senderAddress, new EthereumAddress(recipientAddress.arr), ByteStr(Hex.decode(hexData)), underlying)
+    } else new InvokeScript(senderAddress, WavesAddress(recipientAddress.arr), ByteStr(Hex.decode(hexData)), underlying)
   }
 }
