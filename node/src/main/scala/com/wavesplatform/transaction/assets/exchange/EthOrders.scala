@@ -7,9 +7,7 @@ import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.utils.EthEncoding
 import org.bouncycastle.util.encoders.Hex
-import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.crypto.{ECDSASignature, Sign, StructuredDataEncoder}
 import org.web3j.crypto.Sign.SignatureData
 import play.api.libs.json.{JsObject, Json}
@@ -17,18 +15,18 @@ import play.api.libs.json.{JsObject, Json}
 object EthOrders extends App {
   def toEip712Json(order: Order): JsObject = {
     def encodeAsset(asset: Asset): String = asset match {
-      case IssuedAsset(id) => EthEncoding.toHexString(id.arr)
-      case Waves           => EthEncoding.toHexString(Bytes32.DEFAULT.getValue)
+      case IssuedAsset(id) => id.toString
+      case Waves           => "WAVES"
     }
 
-    def encodeOrderType(orderType: OrderType): Boolean = orderType match {
-      case OrderType.BUY  => false
-      case OrderType.SELL => true
+    def encodeOrderType(orderType: OrderType): String = orderType match {
+      case OrderType.BUY  => "BUY"
+      case OrderType.SELL => "SELL"
     }
 
     val message = Json.obj(
       "version"           -> order.version.toInt,
-      "matcherPublicKey"  -> EthEncoding.toHexString(order.matcherPublicKey.arr),
+      "matcherPublicKey"  -> order.matcherPublicKey.toString,
       "amountAsset"       -> encodeAsset(order.assetPair.amountAsset),
       "priceAsset"        -> encodeAsset(order.assetPair.priceAsset),
       "orderType"         -> encodeOrderType(order.orderType),
@@ -111,19 +109,19 @@ object EthOrders extends App {
       |      },
       |      {
       |        "name": "matcherPublicKey",
-      |        "type": "bytes32"
+      |        "type": "string"
       |      },
       |      {
       |        "name": "amountAsset",
-      |        "type": "bytes32"
+      |        "type": "string"
       |      },
       |      {
       |        "name": "priceAsset",
-      |        "type": "bytes32"
+      |        "type": "string"
       |      },
       |      {
       |        "name": "orderType",
-      |        "type": "bool"
+      |        "type": "string"
       |      },
       |      {
       |        "name": "amount",
@@ -147,7 +145,7 @@ object EthOrders extends App {
       |      },
       |      {
       |        "name": "matcherFeeAssetId",
-      |        "type": "bytes32"
+      |        "type": "string"
       |      }
       |    ]
       |  },
