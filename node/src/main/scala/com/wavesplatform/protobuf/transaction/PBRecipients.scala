@@ -3,17 +3,17 @@ package com.wavesplatform.protobuf.transaction
 import com.google.common.primitives.Bytes
 import com.google.protobuf.ByteString
 import com.wavesplatform.account._
-import com.wavesplatform.protobuf.transaction.{Recipient => PBRecipient}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.transaction.{Recipient => PBRecipient}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object PBRecipients {
   def create(addressOrAlias: AddressOrAlias): PBRecipient = create(addressOrAlias: Recipient)
   def create(recipient: Recipient): PBRecipient = recipient match {
     case a: Address => PBRecipient().withPublicKeyHash(ByteString.copyFrom(publicKeyHash(a)))
-    case a: Alias => PBRecipient().withAlias(a.name)
-    case _        => sys.error("Should not happen " + recipient)
+    case a: Alias   => PBRecipient().withAlias(a.name)
+    case _          => sys.error("Should not happen " + recipient)
   }
 
   def toAddress(bytes: Array[Byte], chainId: Byte): Either[ValidationError, WavesAddress] = bytes.length match {
@@ -34,12 +34,12 @@ object PBRecipients {
 
   def toAddress(r: PBRecipient, chainId: Byte): Either[ValidationError, WavesAddress] = r.recipient match {
     case PBRecipient.Recipient.PublicKeyHash(bytes) => toAddress(bytes.toByteArray, chainId)
-    case _                                        => Left(GenericError(s"Not an address: $r"))
+    case _                                          => Left(GenericError(s"Not an address: $r"))
   }
 
   def toAlias(r: PBRecipient, chainId: Byte): Either[ValidationError, Alias] = r.recipient match {
     case PBRecipient.Recipient.Alias(alias) => Alias.createWithChainId(alias, chainId)
-    case _                                => Left(GenericError(s"Not an alias: $r"))
+    case _                                  => Left(GenericError(s"Not an alias: $r"))
   }
 
   def toAddressOrAlias(r: PBRecipient, chainId: Byte): Either[ValidationError, AddressOrAlias] = {
@@ -47,8 +47,6 @@ object PBRecipients {
     else if (r.recipient.isAlias) toAlias(r, chainId)
     else Left(GenericError(s"Not an address or alias: $r"))
   }
-
-  def toRecipient(r: PBRecipient, chainId: Byte): Either[ValidationError, Recipient] = ???
 
   @inline
   final def publicKeyHash(address: Address): Array[Byte] =

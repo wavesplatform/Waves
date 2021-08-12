@@ -10,16 +10,16 @@ import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.state.{EmptyDataEntry, SponsorshipValue}
+import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.state.diffs._
-import com.wavesplatform.state.{EmptyDataEntry, SponsorshipValue}
 import com.wavesplatform.test._
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TransactionType, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TransactionType, TxVersion}
+import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
 import org.scalacheck.Gen
 import org.scalatest.EitherValues
 
@@ -134,7 +134,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        )(_ should produce(s" with 6 total scripts invoked does not exceed minimal value of $minimalFee WAVES"))
+        )(_ should produceE(s" with 6 total scripts invoked does not exceed minimal value of $minimalFee WAVES"))
     }
   }
 

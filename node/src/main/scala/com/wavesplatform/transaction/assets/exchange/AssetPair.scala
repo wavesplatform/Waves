@@ -35,7 +35,7 @@ object AssetPair {
   val WavesName = "WAVES"
 
   implicit class AssetPairExt(val p: AssetPair) extends AnyVal {
-    def checkedAssets: Seq[IssuedAsset] = Seq(p.amountAsset, p.priceAsset).collect { case ia: Asset.IssuedAsset => ia }
+    def checkedAssets: Seq[IssuedAsset] = Seq(p.priceAsset, p.amountAsset).collect { case ia: Asset.IssuedAsset => ia }
   }
 
   def assetIdStr(aid: Asset): String = aid match {

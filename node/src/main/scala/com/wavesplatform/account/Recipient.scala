@@ -11,7 +11,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidAddress}
-import com.wavesplatform.utils.{EthEncoding, StringBytes, base58Length}
+import com.wavesplatform.utils.{base58Length, EthEncoding, StringBytes}
 import play.api.libs.json._
 
 sealed trait Recipient {
@@ -134,7 +134,7 @@ object Address {
           )
           .flatMap {
             _ =>
-              val Array(version, network, _*) = addressBytes
+              val Array(version, network, _*) = (addressBytes: @unchecked)
 
               (for {
                 _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")

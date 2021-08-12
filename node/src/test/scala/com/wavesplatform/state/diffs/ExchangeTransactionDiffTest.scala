@@ -1187,7 +1187,6 @@ class ExchangeTransactionDiffTest
       val order2FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
 
       test(priceAssetIssue, amountAssetIssue, order1FeeAssetIssue, order2FeeAssetIssue, TestValues.rejectAssetScriptComplexity)
-
     }
 
     withClue("amount asset fails") {

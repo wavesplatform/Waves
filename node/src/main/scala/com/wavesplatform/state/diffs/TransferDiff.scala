@@ -1,17 +1,25 @@
 package com.wavesplatform.state.diffs
 
+import scala.util.Right
+import scala.util.control.NonFatal
+
 import cats.instances.map._
 import cats.syntax.semigroup._
 import com.wavesplatform.account.{Address, Recipient}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.{Asset, TxValidationError}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.{Asset, TxValidationError}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 
-import scala.util.Right
-import scala.util.control.NonFatal
+object TransferTransactionDiff {
+  def apply(blockchain: Blockchain)(tx: TransferTransaction): Either[ValidationError, Diff] = {
+    TransferDiff(blockchain)(tx.sender.toAddress, tx.recipient, tx.amount, tx.assetId, tx.fee, tx.feeAssetId)
+      .map(_.copy(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
+  }
+}
 
 object TransferDiff {
   def apply(

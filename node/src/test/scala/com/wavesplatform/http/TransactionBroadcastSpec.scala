@@ -1,5 +1,8 @@
 package com.wavesplatform.http
 
+import scala.concurrent.Future
+import scala.util.Random
+
 import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.common.CommonTransactionsApi
@@ -12,20 +15,17 @@ import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
 import com.wavesplatform.test.TestTime
+import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
-import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxVersion}
 import com.wavesplatform.utils.EthHelpers
 import com.wavesplatform.wallet.Wallet
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json.{JsObject, JsValue, Json}
-
-import scala.concurrent.Future
-import scala.util.Random
+import play.api.libs.json.{JsObject, Json, JsValue}
 
 class TransactionBroadcastSpec
     extends RouteSpec("/transactions")
@@ -62,7 +62,7 @@ class TransactionBroadcastSpec
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = transactionPublisher).route
 
-      val buyOrder = Order(
+      val ethBuyOrder = Order(
         Order.V4,
         TestEthPublicKey,
         TxHelpers.matcher.publicKey,
@@ -75,11 +75,11 @@ class TransactionBroadcastSpec
         100000,
         Waves,
         ethSignature = EthSignature(
-          "0x1717804a1d60149988821546732442eabc69f46b2764e231eaeef48351d9f36577278c3f29fe3d61500932190dba8c045b19acda117a4690bfd3d2c28bb67bf91c"
+          "0xe5ff562bfb0296e95b631365599c87f1c5002597bf56a131f289765275d2580f5344c62999404c37cd858ea037328ac91eca16ad1ce69c345ebb52fde70b66251c"
         )
       )
 
-      val sellOrder = Order(
+      val ethSellOrder = Order(
         Order.V4,
         TestEthPublicKey,
         TxHelpers.matcher.publicKey,
@@ -92,11 +92,11 @@ class TransactionBroadcastSpec
         100000,
         Waves,
         ethSignature = EthSignature(
-          "0xd1a95bf94c6a3be6b7bf929d2c68263b1c88a520c67445ff1fba1d73e2b852ca2a09ebc50a0760e8683d72e4060109030591a3678d51b259da034c24579648aa1b"
+          "0xc8ba2bdafd27742546b3be34883efc51d6cdffbb235798d7b51876c6854791f019b0522d7a39b6f2087cba46ae86919b71a2d9d7920dfc8e00246d8f02a258f21b"
         )
       )
 
-      val transaction = TxHelpers.exchange(buyOrder, sellOrder, TxVersion.V3, 100)
+      val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, TxVersion.V3, 100)
       testTime.setTime(100)
       Post(routePath("/broadcast"), transaction.json()) ~> route ~> check {
         responseAs[JsObject] should matchJson(transaction.json())

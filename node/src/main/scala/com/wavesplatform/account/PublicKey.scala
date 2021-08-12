@@ -40,6 +40,7 @@ object PublicKey extends TaggedType[ByteStr] {
     def toAddress(chainId: Byte): WavesAddress = pk.size match {
       case KeyLength         => Address.fromPublicKey(pk, chainId)
       case EthereumKeyLength => WavesAddress(Keys.getAddress(pk.arr))
+      case _ => ???
     }
   }
 

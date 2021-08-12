@@ -1,19 +1,19 @@
 package com.wavesplatform.transaction.smart
 
 import cats.syntax.either._
-import com.wavesplatform.account.{AddressOrAlias, Recipient, WavesAddress}
+import com.wavesplatform.account.{Alias, Recipient, WavesAddress}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
-import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
 import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient, _}
+import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.transfer._
 
@@ -122,7 +122,7 @@ object RealTransactionWrapper {
             )
           }
 
-      case ethCI: EthereumTransaction.InvokeScript =>     // TODO fix
+      case ethCI: EthereumTransaction.InvokeScript => // TODO fix
         Right(
           Tx.CI(
             proven(ethCI),
@@ -148,6 +148,8 @@ object RealTransactionWrapper {
       attachment = t.attachment
     )
 
-  def toRide(recipient: Recipient): RideRecipient = RideRecipient.Address(ByteStr(WavesAddress(recipient.bytes).bytes))
-  def toRide(aoa: AddressOrAlias): RideRecipient  = RideRecipient.Address(ByteStr(WavesAddress(aoa.bytes).bytes))
+  def toRide(recipient: Recipient): RideRecipient = recipient match {
+    case address: WavesAddress => RideRecipient.Address(ByteStr(address.bytes))
+    case recipient: Alias      => RideRecipient.Alias(recipient.name)
+  }
 }

@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs
 
+import scala.collection.mutable
+
 import cats.instances.either._
 import cats.instances.map._
 import cats.kernel.Monoid
@@ -14,21 +16,19 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
+import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
+import com.wavesplatform.transaction.smart.script.trace.{TracedResult, TraceStep}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json
-
-import scala.collection.mutable
 
 object TransactionDiffer {
   def apply(prevBlockTs: Option[Long], currentBlockTs: Long, verify: Boolean = true)(
@@ -167,18 +167,17 @@ object TransactionDiffer {
           case rtx: ReissueTransaction           => AssetTransactionsDiff.reissue(blockchain, currentBlockTs)(rtx).traced
           case btx: BurnTransaction              => AssetTransactionsDiff.burn(blockchain)(btx).traced
           case uaitx: UpdateAssetInfoTransaction => AssetTransactionsDiff.updateInfo(blockchain)(uaitx).traced
-          case ttx: TransferTransaction =>
-            TransferDiff(blockchain)(ttx.sender.toAddress, ttx.recipient, ttx.amount, ttx.assetId, ttx.fee, ttx.feeAssetId).traced
-          case mtx: MassTransferTransaction    => MassTransferTransactionDiff(blockchain, currentBlockTs)(mtx).traced
-          case ltx: LeaseTransaction           => LeaseTransactionsDiff.lease(blockchain)(ltx).traced
-          case ltx: LeaseCancelTransaction     => LeaseTransactionsDiff.leaseCancel(blockchain, currentBlockTs)(ltx).traced
-          case atx: CreateAliasTransaction     => CreateAliasTransactionDiff(blockchain)(atx).traced
-          case dtx: DataTransaction            => DataTransactionDiff(blockchain)(dtx).traced
-          case sstx: SetScriptTransaction      => SetScriptTransactionDiff(blockchain)(sstx).traced
-          case sstx: SetAssetScriptTransaction => AssetTransactionsDiff.setAssetScript(blockchain)(sstx).traced
-          case stx: SponsorFeeTransaction      => AssetTransactionsDiff.sponsor(blockchain)(stx).traced
-          case et: EthereumTransaction         => EthereumTransactionDiff(blockchain, currentBlockTs)(et)
-          case _                               => UnsupportedTransactionType.asLeft.traced
+          case ttx: TransferTransaction          => TransferTransactionDiff(blockchain)(ttx).traced
+          case mtx: MassTransferTransaction      => MassTransferTransactionDiff(blockchain, currentBlockTs)(mtx).traced
+          case ltx: LeaseTransaction             => LeaseTransactionsDiff.lease(blockchain)(ltx).traced
+          case ltx: LeaseCancelTransaction       => LeaseTransactionsDiff.leaseCancel(blockchain, currentBlockTs)(ltx).traced
+          case atx: CreateAliasTransaction       => CreateAliasTransactionDiff(blockchain)(atx).traced
+          case dtx: DataTransaction              => DataTransactionDiff(blockchain)(dtx).traced
+          case sstx: SetScriptTransaction        => SetScriptTransactionDiff(blockchain)(sstx).traced
+          case sstx: SetAssetScriptTransaction   => AssetTransactionsDiff.setAssetScript(blockchain)(sstx).traced
+          case stx: SponsorFeeTransaction        => AssetTransactionsDiff.sponsor(blockchain)(stx).traced
+          case et: EthereumTransaction           => EthereumTransactionDiff(blockchain, currentBlockTs)(et)
+          case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
       .map(d => initDiff |+| d.bindTransaction(tx))
@@ -295,7 +294,8 @@ object TransactionDiffer {
       case ptx: PaymentTransaction =>
         Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
       case et: EthereumTransaction.Transfer => Map[Address, Portfolio](et.sender -> Portfolio(-et.assetFee._2)).asRight
-      case et: EthereumTransaction.InvokeScript => Map[Address, Portfolio](et.senderAddress -> Portfolio(-et.assetFee._2)).asRight    //TODO check - metamask debug
+      case et: EthereumTransaction.InvokeScript =>
+        Map[Address, Portfolio](et.senderAddress -> Portfolio(-et.assetFee._2)).asRight //TODO check - metamask debug
       case ptx: ProvenTransaction =>
         ptx.assetFee match {
           case (Waves, fee) => Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty)).asRight

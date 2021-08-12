@@ -21,7 +21,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, _}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, _}
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.DiffsCommon
@@ -343,7 +343,7 @@ object InvokeDiffsCommon {
         s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize(stdLibVersion)} entries"
       )
       _ <- Either.cond(
-        !tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
+        tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
         (),
         s"Empty keys aren't allowed in tx version >= 2"
       )
