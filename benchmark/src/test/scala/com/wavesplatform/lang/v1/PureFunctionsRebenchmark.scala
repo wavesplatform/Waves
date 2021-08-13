@@ -26,15 +26,11 @@ import scala.util.Random
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(1)
 @Fork(1)
-@Warmup(iterations = 30)
-@Measurement(iterations = 20)
+@Warmup(iterations = 20, time = 1)
+@Measurement(iterations = 20, time = 1)
 class PureFunctionsRebenchmark {
   @Benchmark
   def parseIntValue(st: ParseIntVal, bh: Blackhole): Unit =
-    bh.consume(eval(st.expr))
-
-  @Benchmark
-  def splitString(st: SplitString, bh: Blackhole): Unit =
     bh.consume(eval(st.expr))
 
   @Benchmark
@@ -51,10 +47,6 @@ class PureFunctionsRebenchmark {
 
   @Benchmark
   def fromBase64(st: FromBase64, bh: Blackhole): Unit =
-    bh.consume(eval(st.expr))
-
-  @Benchmark
-  def sumString(st: SumString, bh: Blackhole): Unit =
     bh.consume(eval(st.expr))
 
   @Benchmark
@@ -135,10 +127,6 @@ class PureFunctionsRebenchmark {
     bh.consume(evalV5(st.expr))
 
   @Benchmark
-  def splitStringV5(st: SplitString, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
   def toBase58V5(st: ToBase58, bh: Blackhole): Unit =
     bh.consume(evalV5(st.expr))
 
@@ -152,10 +140,6 @@ class PureFunctionsRebenchmark {
 
   @Benchmark
   def fromBase64V5(st: FromBase64, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def sumStringV5(st: SumString, bh: Blackhole): Unit =
     bh.consume(evalV5(st.expr))
 
   @Benchmark
@@ -235,8 +219,8 @@ object PureFunctionsRebenchmark {
   val context: EvaluationContext[Environment, Id] =
     Monoid
       .combine(
-        PureContext.build(V4, fixUnicodeFunctions = true).evaluationContext,
-        CryptoContext.build(Global, V4).evaluationContext
+        PureContext.build(V5, fixUnicodeFunctions = true).evaluationContext[Id],
+        CryptoContext.build(Global, V5).evaluationContext[Id]
       )
       .asInstanceOf[EvaluationContext[Environment, Id]]
 
@@ -250,20 +234,6 @@ object PureFunctionsRebenchmark {
     val bytes = new Array[Byte](length)
     ThreadLocalRandom.current().nextBytes(bytes)
     bytes
-  }
-
-  @State(Scope.Benchmark)
-  class SplitString {
-    val separator       = ","
-    val separatedString = List.fill(1000)(Random.nextPrintableChar().toString * 31).mkString(separator)
-    val expr: EXPR =
-      FUNCTION_CALL(
-        PureContext.splitStr,
-        List(
-          CONST_STRING(separatedString).explicitGet(),
-          CONST_STRING(separator).explicitGet()
-        )
-      )
   }
 
   @State(Scope.Benchmark)
@@ -322,20 +292,6 @@ object PureFunctionsRebenchmark {
         Native(FunctionIds.FROMBASE64),
         List(
           CONST_STRING(string, reduceLimit = false).explicitGet()
-        )
-      )
-  }
-
-  @State(Scope.Benchmark)
-  class SumString {
-    val string1 = "a"
-    val string2 = Random.nextPrintableChar().toString * 32766
-    val expr: EXPR =
-      FUNCTION_CALL(
-        Native(FunctionIds.SUM_STRING),
-        List(
-          CONST_STRING(string1).explicitGet(),
-          CONST_STRING(string2).explicitGet()
         )
       )
   }
