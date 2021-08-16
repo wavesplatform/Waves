@@ -6,16 +6,17 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
-import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient, _}
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
+import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient, _}
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state._
-import com.wavesplatform.transaction._
+import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{EthereumTransaction, _}
 
 object RealTransactionWrapper {
   private def header(tx: Transaction, txIdOpt: Option[ByteStr] = None): Header = {
@@ -23,7 +24,7 @@ object RealTransactionWrapper {
       case vt: VersionedTransaction => vt.version
       case _                        => TxVersion.V1
     }
-    Header(txIdOpt.getOrElse(ByteStr(tx.id().arr)), tx.assetFee._2, tx.timestamp, v)
+    Header(txIdOpt.getOrElse(ByteStr(tx.id().arr)), tx.fee, tx.timestamp, v)
   }
   private def proven(tx: Transaction with ProvenTransaction, txIdOpt: Option[ByteStr] = None): Proven =
     Proven(
@@ -57,7 +58,7 @@ object RealTransactionWrapper {
     )
 
   def apply(
-      tx: Transaction,
+      tx: TransactionBase,
       blockchain: Blockchain,
       stdLibVersion: StdLibVersion,
       target: AttachedPaymentTarget
@@ -108,31 +109,34 @@ object RealTransactionWrapper {
             }.toIndexedSeq
           )
           .asRight
-      case ci: InvokeScriptTransaction =>
+      case ci: InvokeScriptTransactionLike =>
+        val (version, bodyBytes, proofs) = ci match {
+          case ist: InvokeScriptTransaction =>
+            (ist.version, ist.bodyBytes(), ist.proofs)
+          case _ =>
+            (0.toByte, Array.emptyByteArray, Proofs.empty)
+        }
+
         AttachedPaymentExtractor
           .extractPayments(ci, stdLibVersion, blockchain, target)
           .map { payments =>
             Tx.CI(
-              proven(ci),
+              Proven(
+                Header(ci.id(), ci.fee, ci.timestamp, version),
+                RideRecipient.Address(ByteStr(ci.sender.toAddress.bytes)),
+                ByteStr(bodyBytes),
+                ci.sender,
+                proofs.toIndexedSeq
+              ),
               toRide(ci.dApp),
               payments,
               ci.feeAssetId.compatId,
-              ci.funcCallOpt.map(_.function.funcName),
-              ci.funcCallOpt.map(_.args.map(arg => arg.asInstanceOf[EVALUATED])).getOrElse(List.empty)
+              Some(ci.funcCall.function.funcName),
+              ci.funcCall.args.map(arg => arg.asInstanceOf[EVALUATED])
             )
           }
 
-      case ethCI: EthereumTransaction.InvokeScript => // TODO fix
-        Right(
-          Tx.CI(
-            proven(ethCI),
-            toRide(ethCI.dApp),
-            AttachedPayments.Single(None),
-            ethCI.assetFee._1.compatId,
-            Some("deposit"),
-            List.empty
-          )
-        )
+      case _: EthereumTransaction => Left("No mapping for Ethereum transfers")
 
       case u: UpdateAssetInfoTransaction =>
         Tx.UpdateAssetInfo(proven(u), u.assetId.id, u.name, u.description).asRight

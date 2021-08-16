@@ -48,7 +48,7 @@ class TransactionBindingsTest
     }
     s"""
        |   let id = t.id == base58'${t.id().toString}'
-       |   let fee = t.fee == ${t.assetFee._2}
+       |   let fee = t.fee == ${t.fee}
        |   let timestamp = t.timestamp == ${t.timestamp}
        |   let bodyBytes = blake2b256(t.bodyBytes) == base64'${ByteStr(crypto.fastHash(t.bodyBytes.apply().array)).base64}'
        |   let sender = t.sender == addressFromPublicKey(base58'${t.sender}')

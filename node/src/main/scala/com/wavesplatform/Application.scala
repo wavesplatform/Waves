@@ -5,10 +5,6 @@ import java.security.Security
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
-import scala.concurrent.{Await, Future}
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
@@ -39,13 +35,13 @@ import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerDebugInfo, MinerImpl}
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.utils._
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
+import com.wavesplatform.utils._
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -61,6 +57,11 @@ import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
 import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
+import scala.util.{Failure, Success, Try}
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: NTP) extends ScorexLogging {
   app =>
@@ -142,7 +143,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTargetOpt)
 
     if (settings.minerSettings.enable)
-      miner = new MinerImpl(allChannels, blockchainUpdater, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler, utxEvents.collect { case _: UtxEvent.TxAdded => () })
+      miner =
+        new MinerImpl(allChannels, blockchainUpdater, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler, utxEvents.collect {
+          case _: UtxEvent.TxAdded => ()
+        })
 
     val processBlock =
       BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, appenderScheduler) _
@@ -317,7 +321,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         )
 
       val apiRoutes = Seq(
-        new EthRpcRoute(blockchainUpdater, transactionPublisher),
+        new EthRpcRoute(blockchainUpdater, extensionContext.transactionsApi),
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => shutdown()),
         BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, time),
         TransactionsApiRoute(
@@ -563,8 +567,8 @@ object Application extends ScorexLogging {
     Metrics.start(settings.metrics, time)
 
     def dumpMinerConfig(): Unit = {
-      import settings.{minerSettings => miner}
       import settings.synchronizationSettings.microBlockSynchronizer
+      import settings.{minerSettings => miner}
 
       Metrics.write(
         Point

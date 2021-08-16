@@ -80,8 +80,8 @@ object Address {
     .maximumSize(200000)
     .build()
 
-  def apply(publicKeyHash: Array[Byte]): Address = new WavesAddress(
-    AddressScheme.current.chainId,
+  def apply(publicKeyHash: Array[Byte], chainId: Byte = AddressScheme.current.chainId): Address = new WavesAddress(
+    chainId,
     publicKeyHash,
     crypto.secureHash(Array(1.toByte, AddressScheme.current.chainId) ++ publicKeyHash).take(4)
   )

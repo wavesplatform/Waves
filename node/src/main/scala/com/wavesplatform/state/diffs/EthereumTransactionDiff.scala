@@ -9,19 +9,19 @@ import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, EthereumTransaction}
 
 object EthereumTransactionDiff {
-  def apply(blockchain: Blockchain, currentBlockTs: Long)(e: EthereumTransaction): TracedResult[ValidationError, Diff] = e match {
+  def apply(blockchain: Blockchain, currentBlockTs: Long)(e: EthereumTransaction): TracedResult[ValidationError, Diff] = e.payload match {
     case et: EthereumTransaction.Transfer =>
       TracedResult(for {
         asset <- et.asset.map[Either[ValidationError, Asset]](c => blockchain.resolveERC20Address(c).toRight(InvalidAssetId)).valueOr(Right(_))
-        diff  <- TransferDiff(blockchain)(et.sender, et.recipient, et.amount, asset, et.assetFee._2, et.assetFee._1)
+        diff  <- TransferDiff(blockchain)(e.senderAddress(), et.recipient, et.amount, asset, e.fee, e.feeAssetId)
       } yield diff)
 
-    case et: EthereumTransaction.InvokeScript => {
+    case et: EthereumTransaction.Invocation =>
       for {
         dAppAddress <- TracedResult(blockchain.resolveAlias(et.dApp))
-        scriptInfo <- TracedResult(blockchain.accountScript(dAppAddress).toRight(GenericError(s"No script at address $dAppAddress")))
-        diff <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution = true)(et.toInvokable(scriptInfo.script))
+        scriptInfo  <- TracedResult(blockchain.accountScript(dAppAddress).toRight(GenericError(s"No script at address $dAppAddress")))
+        diff        <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution = true)(et.toInvokeScriptLike(e, scriptInfo.script))
       } yield diff
-    }
+
   }
 }

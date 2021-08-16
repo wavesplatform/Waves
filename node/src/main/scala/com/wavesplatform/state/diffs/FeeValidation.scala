@@ -48,13 +48,13 @@ object FeeValidation {
       for {
         feeDetails <- getMinFee(blockchain, tx)
         _ <- Either.cond(
-          feeDetails.minFeeInAsset <= tx.assetFee._2,
+          feeDetails.minFeeInAsset <= tx.fee,
           (),
-          notEnoughFeeError(tx.tpe, feeDetails, tx.assetFee._2)
+          notEnoughFeeError(tx.tpe, feeDetails, tx.fee)
         )
       } yield ()
     } else {
-      Either.cond(tx.assetFee._2 > 0 || !tx.isInstanceOf[Authorized], (), GenericError(s"Fee must be positive."))
+      Either.cond(tx.fee > 0 || !tx.isInstanceOf[Authorized], (), GenericError(s"Fee must be positive."))
     }
   }
 
@@ -186,7 +186,7 @@ object FeeValidation {
   }
 
   def getMinFee(blockchain: Blockchain, tx: Transaction): Either[ValidationError, FeeDetails] = {
-    feeAfterSponsorship(tx.assetFee._1, blockchain, tx)
+    feeAfterSponsorship(tx.feeAssetId, blockchain, tx)
       .map(feeAfterSmartTokens(blockchain, tx))
       .map(feeAfterSmartAccounts(blockchain, tx))
       .map {

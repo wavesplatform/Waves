@@ -1,7 +1,5 @@
 package com.wavesplatform.state.diffs.invoke
 
-import scala.util.{Failure, Right, Success, Try}
-
 import cats.instances.map._
 import cats.syntax.either._
 import cats.syntax.semigroup._
@@ -21,31 +19,33 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, _}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.DiffsCommon
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.{Asset, AssetIdLength, TransactionType}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
+import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.validation.impl.{LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, TransactionType}
 import com.wavesplatform.utils._
 import shapeless.Coproduct
+
+import scala.util.{Failure, Right, Success, Try}
 
 object InvokeDiffsCommon {
   def txFeeDiff(blockchain: Blockchain, tx: InvokeScriptTransactionLike): Either[GenericError, (Long, Map[Address, Portfolio])] = {
     val attachedFee = tx.fee
     tx.feeAssetId match {
-      case Waves => Right((attachedFee, Map(tx.senderAddress -> Portfolio(-attachedFee))))
+      case Waves => Right((attachedFee, Map(tx.sender.toAddress -> Portfolio(-attachedFee))))
       case asset @ IssuedAsset(_) =>
         for {
           assetInfo <- blockchain
@@ -58,7 +58,7 @@ object InvokeDiffsCommon {
           )
         } yield {
           val portfolioDiff =
-            Map[Address, Portfolio](tx.senderAddress          -> Portfolio(assets = Map(asset              -> -attachedFee))) |+|
+            Map[Address, Portfolio](tx.sender.toAddress          -> Portfolio(assets = Map(asset              -> -attachedFee))) |+|
               Map[Address, Portfolio](assetInfo.issuer.toAddress -> Portfolio(-feeInWaves, assets = Map(asset -> attachedFee)))
           (feeInWaves, portfolioDiff)
         }
@@ -111,8 +111,8 @@ object InvokeDiffsCommon {
             else
               ""
 
-            val assetName = tx.feeAssetId.fold("WAVES")(_.id.toString)
-            s"Fee in $assetName for ${TransactionType.InvokeScript.transactionName} (${tx.fee} in $assetName)" +
+          val assetName = tx.feeAssetId.fold("WAVES")(_.id.toString)
+          s"Fee in $assetName for ${TransactionType.InvokeScript.transactionName} (${tx.fee} in $assetName)" +
             s"$stepsInfo$totalScriptsInvokedInfo$issuesInfo " +
             s"does not exceed minimal value of $minFee WAVES."
         }
@@ -198,7 +198,7 @@ object InvokeDiffsCommon {
         sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
 
       actionComplexities     = actionAssets.flatMap(blockchain.assetScript(_).map(_.complexity))
-      verifierCount          = if (blockchain.hasPaidVerifier(tx.senderAddress)) 1 else 0
+      verifierCount          = if (blockchain.hasPaidVerifier(tx.sender.toAddress)) 1 else 0
       additionalScriptsCount = actionComplexities.size + verifierCount + tx.paymentAssets.count(blockchain.hasAssetScript)
 
       feeDiff <- if (isSyncCall)
@@ -206,19 +206,17 @@ object InvokeDiffsCommon {
       else {
         val feeActionsCount = if (blockchain.isFeatureActivated(SynchronousCalls)) verifierCount else additionalScriptsCount
         val stepLimit       = ContractLimits.MaxComplexityByVersion(version)
-        tx.root
-          .map(
-            calcAndCheckFee(
-              FailedTransactionError.feeForActions,
-              _,
-              blockchain,
-              stepLimit,
-              storingComplexity.min(stepLimit), // complexity increased by sync calls should not require fee for additional steps
-              issueList ++ otherIssues,
-              feeActionsCount
-            ).map(_._2)
-          )
-          .getOrElse(TracedResult(Right(Map[Address, Portfolio]())))
+
+        calcAndCheckFee(
+          FailedTransactionError.feeForActions,
+          tx.root,
+          blockchain,
+          stepLimit,
+          storingComplexity.min(stepLimit), // complexity increased by sync calls should not require fee for additional steps
+          issueList ++ otherIssues,
+          feeActionsCount
+        ).map(_._2)
+
       }
 
       _ <- TracedResult(
@@ -234,7 +232,7 @@ object InvokeDiffsCommon {
       } else if (version < V5) {
         paymentsPart(tx, dAppAddress, feeDiff)
       } else {
-        Diff(portfolios = txFeeDiff(blockchain, tx.root.get).explicitGet()._2)
+        Diff(portfolios = txFeeDiff(blockchain, tx.root).explicitGet()._2)
       }
 
       compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff, complexityLimit)
@@ -276,11 +274,11 @@ object InvokeDiffsCommon {
           case InvokeScriptTransaction.Payment(amt, assetId) =>
             assetId match {
               case asset @ IssuedAsset(_) =>
-                Map(tx.senderAddress -> Portfolio(assets = Map(asset -> -amt))) |+|
-                  Map(dAppAddress    -> Portfolio(assets = Map(asset -> amt)))
+                Map(tx.sender.toAddress -> Portfolio(assets = Map(asset -> -amt))) |+|
+                  Map(dAppAddress       -> Portfolio(assets = Map(asset -> amt)))
               case Waves =>
-                Map(tx.senderAddress -> Portfolio(-amt)) |+|
-                  Map(dAppAddress    -> Portfolio(amt))
+                Map(tx.sender.toAddress -> Portfolio(-amt)) |+|
+                  Map(dAppAddress       -> Portfolio(amt))
             }
         }
         .foldLeft(Map[Address, Portfolio]())(_ |+| _)
@@ -303,7 +301,7 @@ object InvokeDiffsCommon {
       transfers: List[AssetTransfer]
   ): Either[String, Unit] =
     if (blockchain.disallowSelfPayment && version >= V4)
-      if (tx.payments.nonEmpty && tx.senderAddress == dAppAddress)
+      if (tx.payments.nonEmpty && tx.sender.toAddress == dAppAddress)
         "DApp self-payment is forbidden since V4".asLeft[Unit]
       else if (transfers.exists(_.address.bytes == ByteStr(dAppAddress.bytes)))
         "DApp self-transfer is forbidden since V4".asLeft[Unit]

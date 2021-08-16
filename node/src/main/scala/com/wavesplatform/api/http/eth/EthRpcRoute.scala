@@ -8,9 +8,10 @@ import scala.jdk.CollectionConverters._
 
 import akka.http.scaladsl.server._
 import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.network.TransactionPublisher
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -21,7 +22,7 @@ import org.web3j.crypto._
 import play.api.libs.json._
 import play.api.libs.json.Json.JsValueWrapper
 
-class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPublisher) extends ApiRoute {
+class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi) extends ApiRoute {
   private def quantity(v: Long) = s"0x${java.lang.Long.toString(v, 16)}"
 
   private def resp(id: JsValue, resp: JsValueWrapper) = complete(Json.obj("id" -> id, "jsonrpc" -> "2.0", "result" -> resp))
@@ -35,6 +36,11 @@ class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPubli
     blockchain.resolveERC20Address(ERC20Address(ByteStr(EthEncoding.toBytes(contractAddress))))
 
   private def encodeResponse(values: Type*): String = FunctionEncoder.encodeConstructor(values.map(Type.unwrap).asJava)
+
+  private def extractTransaction(transactionHex: String) = TransactionDecoder.decode(transactionHex) match {
+    case srt: SignedRawTransaction => EthereumTransaction(srt)
+    case _: RawTransaction         => throw new UnsupportedOperationException("Cannot process unsigned transactions")
+  }
 
   val route: Route = (post & path("eth") & entity(as[JsObject])) { jso =>
     val id     = (jso \ "id").get
@@ -61,16 +67,15 @@ class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPubli
           )
         )
       case "eth_sendRawTransaction" =>
-        val transactionHex = params.get.head.as[String]
-        val et: EthereumTransaction = TransactionDecoder.decode(transactionHex) match {
-          case srt: SignedRawTransaction => EthereumTransaction(srt)
-          case _: RawTransaction         => throw new UnsupportedOperationException("Cannot process unsigned transactions")
-        }
+        val str = params.get.head.as[String]
+        log.info(str)
+
+        val et = extractTransaction(str)
 
         resp(
           id,
-          transactionPublisher.validateAndBroadcast(et, None).map[JsValueWrapper] { result =>
-            log.info(s"Validation result: $result")
+          transactionsApi.broadcastTransaction(et).map[JsValueWrapper] { result =>
+            log.info(s"Validation result from ${EthEncoding.toHexString(et.senderAddress().publicKeyHash)}: $result")
             EthEncoding.toHexString(et.id().arr)
           }
         )
@@ -124,14 +129,24 @@ class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPubli
             resp(id, "")
         }
       case "eth_estimateGas" =>
-        resp(id, EthEncoding.toHexString(BigInteger.valueOf(2100000)))
+        val txParams = params.get.head.as[JsObject]
+        val tx = RawTransaction.createEtherTransaction(
+          BigInteger.valueOf(System.currentTimeMillis()),
+          BigInteger.ZERO,
+          BigInteger.ZERO,
+          (txParams \ "to").as[String],
+          new BigInteger(EthEncoding.cleanHexPrefix((txParams \ "value").as[String]), 16)
+        )
+
+        val (_, txFee, _) = transactionsApi.calculateFee(EthereumTransaction(tx)).explicitGet()
+
+        resp(id, EthEncoding.toHexString(BigInteger.valueOf(txFee)))
       case "net_version" =>
         resp(id, "1")
       case "eth_gasPrice" =>
         resp(id, "0x1")
       case "eth_getCode" =>
-        log.info(s"Get code at ${params.get.head.as[String]}")
-        resp(id, "0xff")
+        resp(id, if (blockchain.hasDApp(Address.fromHexString(params.get.head.as[String]))) "0xff" else "0x")
       case _ =>
         log.info(Json.stringify(jso))
         complete(Json.obj())

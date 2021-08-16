@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures, BlockchainFeatureStatus}
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.traits.domain.Issue
 import com.wavesplatform.settings.BlockchainSettings
@@ -94,7 +95,7 @@ object Blockchain {
     def lastBlockId: Option[ByteStr]               = lastBlockHeader.map(_.id())
     def lastBlockTimestamp: Option[Long]           = lastBlockHeader.map(_.header.timestamp)
     def lastBlockIds(howMany: Int): Seq[ByteStr]   = (blockchain.height to blockchain.height - howMany by -1).flatMap(blockId)
-    
+
     def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
       aoa match {
         case address: Address => Right(address)
@@ -191,5 +192,13 @@ object Blockchain {
     def binaryData(address: Address, key: String): Option[ByteStr] = blockchain.accountData(address, key).collect {
       case BinaryDataEntry(_, value) => value
     }
+
+    def hasDApp(address: Address): Boolean =
+      blockchain.hasAccountScript(address) && blockchain
+        .accountScript(address)
+        .exists(_.script match {
+          case _: ContractScript.ContractScriptImpl => true
+          case _                                    => false
+        })
   }
 }

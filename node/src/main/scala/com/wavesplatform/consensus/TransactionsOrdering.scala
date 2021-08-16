@@ -11,7 +11,7 @@ object TransactionsOrdering {
     private def orderBy(t: Transaction): (Boolean, Double, Long, Long) = {
       val byWhiteList = !isWhitelisted(t) // false < true
       val size        = t.bytes().length
-      val byFee       = if (t.assetFee._1 != Waves) 0 else -t.assetFee._2
+      val byFee       = if (t.feeAssetId != Waves) 0 else -t.fee
       val byTimestamp = txTimestampOrder(t.timestamp)
 
       (byWhiteList, byFee.toDouble / size.toDouble, byFee, byTimestamp)

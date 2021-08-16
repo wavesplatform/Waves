@@ -24,7 +24,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with WithState {
        |let genTotal = match genTx {
        |  case gen: GenesisTransaction =>
        |    let genId = gen.id == base58'${g.id().toString}'
-       |    let genFee = gen.fee == ${g.assetFee._2}
+       |    let genFee = gen.fee == ${g.fee}
        |    let genTimestamp = gen.timestamp== ${g.timestamp}
        |    let genVersion = gen.version == 1
        |    let genAmount = gen.amount == ${g.amount}
@@ -36,7 +36,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with WithState {
        |let payTotal = match payTx {
        |  case pay: PaymentTransaction =>
        |    let payId = pay.id == base58'${p.id().toString}'
-       |    let payFee = pay.fee == ${p.assetFee._2}
+       |    let payFee = pay.fee == ${p.fee}
        |    let payTimestamp = pay.timestamp== ${p.timestamp}
        |    let payVersion = pay.version == 1
        |    let payAmount = pay.amount == ${p.amount}
