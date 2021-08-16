@@ -45,7 +45,7 @@
     {
       name: "rsaVerify"
       params: [
-        "RsaDigestAlgs"
+        "Md5|NoAlg|Sha1|Sha224|Sha256|Sha3224|Sha3256|Sha3384|Sha3512|Sha384|Sha512"
         "ByteVector"
         "ByteVector"
         "ByteVector"
@@ -57,7 +57,7 @@
     {
       name: "rsaVerify_16Kb"
       params: [
-        "RsaDigestAlgs"
+        "Md5|NoAlg|Sha1|Sha224|Sha256|Sha3224|Sha3256|Sha3384|Sha3512|Sha384|Sha512"
         "ByteVector"
         "ByteVector"
         "ByteVector"
@@ -69,7 +69,7 @@
     {
       name: "rsaVerify_32Kb"
       params: [
-        "RsaDigestAlgs"
+        "Md5|NoAlg|Sha1|Sha224|Sha256|Sha3224|Sha3256|Sha3384|Sha3512|Sha384|Sha512"
         "ByteVector"
         "ByteVector"
         "ByteVector"
@@ -81,7 +81,7 @@
     {
       name: "rsaVerify_64Kb"
       params: [
-        "RsaDigestAlgs"
+        "Md5|NoAlg|Sha1|Sha224|Sha256|Sha3224|Sha3256|Sha3384|Sha3512|Sha384|Sha512"
         "ByteVector"
         "ByteVector"
         "ByteVector"
@@ -93,7 +93,7 @@
     {
       name: "rsaVerify_128Kb"
       params: [
-        "RsaDigestAlgs"
+        "Md5|NoAlg|Sha1|Sha224|Sha256|Sha3224|Sha3256|Sha3384|Sha3512|Sha384|Sha512"
         "ByteVector"
         "ByteVector"
         "ByteVector"

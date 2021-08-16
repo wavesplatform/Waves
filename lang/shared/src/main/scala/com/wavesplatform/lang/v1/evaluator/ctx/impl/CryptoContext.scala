@@ -27,7 +27,7 @@ object CryptoContext {
   }
 
   private def digestAlgorithmType(v: StdLibVersion) =
-    UNION.create(rsaHashAlgs(v), if (v > V3) Some("RsaDigestAlgs") else None)
+    UNION.create(rsaHashAlgs(v), if (v > V3 && v < V6) Some("RsaDigestAlgs") else None)
 
   private val rsaHashLib = {
     import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA._
@@ -202,7 +202,7 @@ object CryptoContext {
       }
     }
 
-    val rsaVerifyL: Array[BaseFunction[NoContext]] = lgen(
+    def rsaVerifyL(version: StdLibVersion): Array[BaseFunction[NoContext]] = lgen(
       Array(16, 32, 64, 128),
       (n => (s"rsaVerify_${n._1}Kb", (RSAVERIFY_LIM + n._2).toShort)),
       ({
@@ -218,7 +218,7 @@ object CryptoContext {
           notImplemented[Id, Unit](s"rsaVerify_${n}Kb(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }),
       BOOLEAN,
-      ("digest", digestAlgorithmType(V4)),
+      ("digest", digestAlgorithmType(version)),
       ("message", BYTESTR),
       ("sig", BYTESTR),
       ("pub", BYTESTR)
@@ -472,6 +472,7 @@ object CryptoContext {
 
     val v4RsaDig = rsaHashAlgs(V4)
     val v4Types  = v4RsaDig :+ digestAlgorithmType(V4)
+    val v6Types  = v4RsaDig :+ digestAlgorithmType(V6)
 
     val v4Vars: Map[String, (FINAL, ContextfulVal[NoContext])] =
       rsaVarNames.zip(v4RsaDig.map(t => (t, digestAlgValue(t)))).toMap
@@ -490,7 +491,7 @@ object CryptoContext {
         fromBase16StringF(checkLength = false)
       )
 
-    val v4Functions =
+    def fromV4Functions(version: StdLibVersion) =
       Array(
         bls12Groth16VerifyF,
         bn256Groth16VerifyF,
@@ -499,16 +500,18 @@ object CryptoContext {
         rsaVerifyF,
         toBase16StringF(checkLength = true),
         fromBase16StringF(checkLength = true) // from V3
-      ) ++ sigVerifyL ++ rsaVerifyL ++ keccak256F_lim ++ blake2b256F_lim ++ sha256F_lim ++ bls12Groth16VerifyL ++ bn256Groth16VerifyL
+      ) ++ sigVerifyL ++ rsaVerifyL(version) ++ keccak256F_lim ++ blake2b256F_lim ++ sha256F_lim ++ bls12Groth16VerifyL ++ bn256Groth16VerifyL
 
     val fromV1Ctx = CTX[NoContext](Seq(), Map(), v1Functions)
     val fromV3Ctx = fromV1Ctx |+| CTX[NoContext](v3Types, v3Vars, v3Functions)
-    val fromV4Ctx = fromV1Ctx |+| CTX[NoContext](v4Types, v4Vars, v4Functions)
+    val fromV4Ctx = fromV1Ctx |+| CTX[NoContext](v4Types, v4Vars, fromV4Functions(V4))
+    val fromV6Ctx = fromV1Ctx |+| CTX[NoContext](v6Types, v4Vars, fromV4Functions(V6))
 
     version match {
       case V1 | V2  => fromV1Ctx
       case V3       => fromV3Ctx
-      case _        => fromV4Ctx
+      case V4 | V5  => fromV4Ctx
+      case _        => fromV6Ctx
     }
   }
 
