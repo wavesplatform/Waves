@@ -9,7 +9,8 @@ inTask(docker)(
     dockerfile := NativeDockerfile(baseDirectory.value.getParentFile / "docker" / "Dockerfile"),
     buildOptions := BuildOptions(),
     dockerBuildArguments := Map(
-      "ENABLE_GRPC" -> "true"
+      "ENABLE_GRPC" -> "true",
+      "WAVES_NETWORK" -> "custom"
     )
   )
 )
