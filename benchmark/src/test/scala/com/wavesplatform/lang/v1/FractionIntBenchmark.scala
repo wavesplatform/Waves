@@ -16,8 +16,8 @@ import java.util.concurrent.TimeUnit
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(1)
 @Fork(1)
-@Warmup(iterations = 30)
-@Measurement(iterations = 30)
+@Warmup(iterations = 10, time = 1)
+@Measurement(iterations = 10, time = 1)
 class FractionIntBenchmark {
   @Benchmark
   def fraction1(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr1, V5))
@@ -42,13 +42,15 @@ class FractionIntBenchmark {
 class St {
   val ds  = DirectiveSet(V5, Account, Expression).fold(null, identity)
   val ctx = lazyContexts(ds).value().evaluationContext(Common.emptyBlockchainEnvironment())
-  val max = Long.MaxValue
 
-  val expr1 = TestCompiler(V5).compileExpression(s"fraction($max, -$max, 1)").expr.asInstanceOf[EXPR]
+  val max     = Long.MaxValue
+  val maxSqrt = 3037000499L
+
+  val expr1 = TestCompiler(V5).compileExpression(s"fraction($max / 2, 3, 3)").expr.asInstanceOf[EXPR]
   val expr2 = TestCompiler(V5).compileExpression(s"fraction($max, -$max, -$max)").expr.asInstanceOf[EXPR]
-  val expr3 = TestCompiler(V5).compileExpression(s"fraction($max, $max, ${-max / 2 + 1})").expr.asInstanceOf[EXPR]
+  val expr3 = TestCompiler(V5).compileExpression(s"fraction($maxSqrt, $maxSqrt, $maxSqrt)").expr.asInstanceOf[EXPR]
 
-  val expr1Round = TestCompiler(V5).compileExpression(s"fraction($max, -$max, 1, HALFEVEN)").expr.asInstanceOf[EXPR]
+  val expr1Round = TestCompiler(V5).compileExpression(s"fraction($max / 2, 3, 3, HALFEVEN)").expr.asInstanceOf[EXPR]
   val expr2Round = TestCompiler(V5).compileExpression(s"fraction($max, -$max, -$max, HALFEVEN)").expr.asInstanceOf[EXPR]
-  val expr3Round = TestCompiler(V5).compileExpression(s"fraction($max, $max, ${-max / 2 + 1}, HALFEVEN)").expr.asInstanceOf[EXPR]
+  val expr3Round = TestCompiler(V5).compileExpression(s"fraction($maxSqrt, $maxSqrt, $maxSqrt, HALFEVEN)").expr.asInstanceOf[EXPR]
 }
