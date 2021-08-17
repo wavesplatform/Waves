@@ -1,8 +1,8 @@
 package com.wavesplatform.protobuf.utils
 
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.{Amount, _}
+import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 
@@ -10,8 +10,8 @@ object PBImplicitConversions {
   import com.google.protobuf.{ByteString => PBByteString}
   import com.wavesplatform.{account => va}
 
-  implicit class RecipientExt(val r: va.Recipient) extends AnyVal {
-    def toPb: Recipient = r match {
+  implicit class AddressOrAliasToPBExt(val r: va.AddressOrAlias) extends AnyVal {
+    def toPB: Recipient = r match {
       case va.Alias(_, name)     => Recipient.of(Recipient.Recipient.Alias(name))
       case w: va.WavesAddress    => Recipient.of(Recipient.Recipient.PublicKeyHash(PBByteString.copyFrom(w.publicKeyHash)))
 

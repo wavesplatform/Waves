@@ -1,21 +1,21 @@
 package com.wavesplatform.api.grpc
 
+import scala.concurrent.Future
+
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
-import com.wavesplatform.state.{InvokeScriptResult => VISR}
+import com.wavesplatform.state.{Blockchain, InvokeScriptResult => VISR}
 import com.wavesplatform.transaction.Authorized
-import io.grpc.stub.StreamObserver
 import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
 import monix.reactive.Observable
 
-import scala.concurrent.Future
-
-class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Scheduler) extends TransactionsApiGrpc.TransactionsApi {
+class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransactionsApi)(implicit sc: Scheduler) extends TransactionsApiGrpc.TransactionsApi {
 
   override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit =
     responseObserver.interceptErrors {
@@ -24,14 +24,15 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
         // By recipient
         case Some(subject) =>
           val recipientAddrOrAlias = subject
-            .toRecipient(AddressScheme.current.chainId)
+            .toAddressOrAlias(AddressScheme.current.chainId)
+            .flatMap(blockchain.resolveAlias(_))
             .fold(e => throw new IllegalArgumentException(e.toString), identity)
 
           val maybeSender = Option(request.sender)
             .collect { case s if !s.isEmpty => s.toAddress }
 
           commonApi.transactionsByAddress(
-            ???, // FIXME
+            recipientAddrOrAlias,
             maybeSender,
             Set.empty,
             None

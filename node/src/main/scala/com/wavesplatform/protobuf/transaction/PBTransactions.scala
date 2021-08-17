@@ -1,7 +1,10 @@
 package com.wavesplatform.protobuf.transaction
 
+import scala.util.Try
+
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{PublicKey, Recipient => VRecipient}
+import com.wavesplatform.{transaction => vt}
+import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
@@ -13,18 +16,16 @@ import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.transaction.{EthereumTransaction, Proofs, TxValidationError}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{EthereumTransaction, Proofs, TxValidationError}
 import com.wavesplatform.utils.{EthEncoding, StringBytes}
-import com.wavesplatform.{transaction => vt}
 import org.web3j.crypto.{SignedRawTransaction, TransactionDecoder}
 import scalapb.UnknownFieldSet.empty
-import scala.util.Try
 
 object PBTransactions {
 
@@ -521,7 +522,7 @@ object PBTransactions {
 
   def wrapped(tx: VanillaTransaction): PBTransactionWrapper = tx match {
     case et: EthereumTransaction => PBTransactionWrapper(PBTransactionWrapper.Transaction.EthereumTransaction(ByteString.copyFrom(et.bytes())))
-    case wt => PBTransactionWrapper(PBTransactionWrapper.Transaction.WavesTransaction(protobuf(wt)))
+    case wt                      => PBTransactionWrapper(PBTransactionWrapper.Transaction.WavesTransaction(protobuf(wt)))
 
   }
 
@@ -541,7 +542,7 @@ object PBTransactions {
 
       case tx: vt.transfer.TransferTransaction =>
         import tx._
-        val data = TransferTransactionData(Some(recipient.toPb), Some((assetId, amount)), attachment.toByteString)
+        val data = TransferTransactionData(Some(recipient.toPB), Some((assetId, amount)), attachment.toByteString)
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, version, proofs, Data.Transfer(data))
 
       case tx: vt.CreateAliasTransaction =>
@@ -585,7 +586,7 @@ object PBTransactions {
 
       case tx: vt.lease.LeaseTransaction =>
         import tx._
-        val data = LeaseTransactionData(Some(recipient.toPb), amount)
+        val data = LeaseTransactionData(Some(recipient.toPB), amount)
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Lease(data))
 
       case tx: vt.lease.LeaseCancelTransaction =>
@@ -596,7 +597,7 @@ object PBTransactions {
       case tx @ MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, attachment, proofs, chainId) =>
         val data = MassTransferTransactionData(
           PBAmounts.toPBAssetId(assetId),
-          transfers.map(pt => MassTransferTransactionData.Transfer(Some(pt.address.toPb), pt.amount)),
+          transfers.map(pt => MassTransferTransactionData.Transfer(Some(pt.address.toPB), pt.amount)),
           attachment.toByteString
         )
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.MassTransfer(data))
@@ -628,7 +629,7 @@ object PBTransactions {
     }
   }
 
-  def toPBInvokeScriptData(dappAddress: VRecipient, fcOpt: Option[FUNCTION_CALL], payment: Seq[Payment]): InvokeScriptTransactionData = {
+  def toPBInvokeScriptData(dappAddress: AddressOrAlias, fcOpt: Option[FUNCTION_CALL], payment: Seq[Payment]): InvokeScriptTransactionData = {
     import com.wavesplatform.lang.v1.Serde
 
     InvokeScriptTransactionData(

@@ -1,10 +1,10 @@
 package com.wavesplatform.protobuf.transaction
 
+import com.wavesplatform.{transaction => vt}
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.order.AssetPair
-import com.wavesplatform.{transaction => vt}
 
 object PBOrders {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions._
@@ -49,7 +49,7 @@ object PBOrders {
       Some((order.matcherFeeAssetId, order.matcherFee)),
       order.version,
       order.proofs.map(_.toByteString),
-      order.ethSignature.getOrElse(ByteStr.empty).toByteString
+      order.eip712Signature.getOrElse(ByteStr.empty).toByteString
     )
   }
 }

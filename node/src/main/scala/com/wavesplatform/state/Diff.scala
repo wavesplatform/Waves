@@ -1,20 +1,20 @@
 package com.wavesplatform.state
 
+import scala.collection.immutable.VectorMap
+
 import cats.data.Ior
 import cats.instances.map._
 import cats.kernel.{Monoid, Semigroup}
 import cats.syntax.semigroup._
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey, WavesAddress}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
-
-import scala.collection.immutable.VectorMap
+import com.wavesplatform.transaction.Asset.IssuedAsset
 
 case class LeaseBalance(in: Long, out: Long)
 
@@ -148,7 +148,7 @@ case class Diff(
     portfolios: Map[Address, Portfolio] = Map.empty,
     issuedAssets: Map[IssuedAsset, NewAssetInfo] = Map.empty,
     updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
-    aliases: Map[Alias, WavesAddress] = Map.empty,
+    aliases: Map[Alias, Address] = Map.empty,
     orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
     leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
     scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,

@@ -4,18 +4,18 @@ import cats.data.Ior
 import cats.syntax.option._
 import cats.syntax.semigroup._
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, Alias, WavesAddress}
-import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 final class CompositeBlockchain private (
     inner: Blockchain,
@@ -71,7 +71,7 @@ final class CompositeBlockchain private (
 
   override def height: Int = inner.height + blockMeta.fold(0)(_ => 1)
 
-  override def resolveAlias(alias: Alias): Either[ValidationError, WavesAddress] = inner.resolveAlias(alias) match {
+  override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
     case l @ Left(AliasIsDisabled(_)) => l
     case Right(addr)                  => Right(diff.aliases.getOrElse(alias, addr))
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))

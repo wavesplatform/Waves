@@ -262,7 +262,7 @@ object Verifier extends ScorexLogging {
   }
 
   def verifyOrderSignature(order: Order): Either[GenericError, Order] =
-    order.ethSignature match {
+    order.eip712Signature match {
       case Some(ethSignature) =>
         val signerKey = EthOrders.recoverEthSignerKey(order, ethSignature.arr)
         Either.cond(signerKey == order.senderPublicKey, order, GenericError(s"Ethereum signature invalid for $order"))

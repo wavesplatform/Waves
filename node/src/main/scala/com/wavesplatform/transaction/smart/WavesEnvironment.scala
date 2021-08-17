@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.smart
 
+import cats.kernel.Monoid
 import cats.syntax.either._
 import com.wavesplatform.account
 import com.wavesplatform.account.AddressOrAlias
@@ -30,7 +31,6 @@ import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import monix.eval.Coeval
-import cats.syntax.monoid._
 import shapeless._
 
 object WavesEnvironment {
@@ -286,7 +286,7 @@ object DAppEnvironment {
   }
 
   final case class DAppInvocation(
-      dAppAddress: com.wavesplatform.account.WavesAddress,
+      dAppAddress: com.wavesplatform.account.Address,
       call: FUNCTION_CALL,
       payments: Seq[InvokeScriptTransaction.Payment]
   )
@@ -301,7 +301,7 @@ class DAppEnvironment(
     tthis: Environment.Tthis,
     ds: DirectiveSet,
     tx: Option[InvokeScriptTransactionLike],
-    currentDApp: com.wavesplatform.account.WavesAddress,
+    currentDApp: com.wavesplatform.account.Address,
     currentDAppPk: com.wavesplatform.account.PublicKey,
     calledAddresses: Set[com.wavesplatform.account.Address],
     limitedExecution: Boolean,
@@ -377,7 +377,7 @@ class DAppEnvironment(
         scriptResults = Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))),
         scriptsRun = diff.scriptsRun + 1
       )
-      currentDiff = currentDiff |+| fixedDiff
+      currentDiff = Monoid.combine(currentDiff, fixedDiff)
       mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions

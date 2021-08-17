@@ -1,17 +1,17 @@
 package com.wavesplatform.utils
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{Address, Alias, WavesAddress}
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 trait EmptyBlockchain extends Blockchain {
   override lazy val settings: BlockchainSettings = BlockchainSettings.fromRootConfig(ConfigFactory.load())
@@ -52,7 +52,7 @@ trait EmptyBlockchain extends Blockchain {
 
   override def assetDescription(id: IssuedAsset): Option[AssetDescription] = None
 
-  override def resolveAlias(a: Alias): Either[ValidationError, WavesAddress] = Left(GenericError("Empty blockchain"))
+  override def resolveAlias(a: Alias): Either[ValidationError, Address] = Left(GenericError("Empty blockchain"))
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = None
 

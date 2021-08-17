@@ -32,7 +32,7 @@ object OrderSerializer {
       "signature"        -> proofs.toSignature.toString,
       "proofs"           -> proofs.proofs.map(_.toString)
     ) ++ (if (version >= Order.V3) Json.obj("matcherFeeAssetId" -> matcherFeeAssetId) else JsObject.empty) ++
-      (if (version >= Order.V4) Json.obj("ethSignature"         -> ethSignature.map(bs => EthEncoding.toHexString(bs.arr))) else JsObject.empty) // TODO: Should it be hex or base58?
+      (if (version >= Order.V4) Json.obj("eip712Signature"         -> eip712Signature.map(bs => EthEncoding.toHexString(bs.arr))) else JsObject.empty) // TODO: Should it be hex or base58?
   }
 
   def bodyBytes(order: Order): Array[Byte] = {

@@ -36,10 +36,10 @@ object PublicKey extends TaggedType[ByteStr] {
     Some(apply(arg))
 
   implicit class PublicKeyImplicitOps(private val pk: PublicKey) extends AnyVal {
-    def toAddress: WavesAddress = toAddress(AddressScheme.current.chainId)
-    def toAddress(chainId: Byte): WavesAddress = pk.size match {
+    def toAddress: Address = toAddress(AddressScheme.current.chainId)
+    def toAddress(chainId: Byte): Address = pk.size match {
       case KeyLength         => Address.fromPublicKey(pk, chainId)
-      case EthereumKeyLength => WavesAddress(Keys.getAddress(pk.arr))
+      case EthereumKeyLength => Address(Keys.getAddress(pk.arr))
       case _ => ???
     }
   }

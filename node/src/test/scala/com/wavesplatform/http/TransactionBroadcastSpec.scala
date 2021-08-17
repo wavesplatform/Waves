@@ -74,7 +74,7 @@ class TransactionBroadcastSpec
         123,
         100000,
         Waves,
-        ethSignature = EthSignature(
+        eip712Signature = EthSignature(
           "0xe5ff562bfb0296e95b631365599c87f1c5002597bf56a131f289765275d2580f5344c62999404c37cd858ea037328ac91eca16ad1ce69c345ebb52fde70b66251c"
         )
       )
@@ -91,7 +91,7 @@ class TransactionBroadcastSpec
         123,
         100000,
         Waves,
-        ethSignature = EthSignature(
+        eip712Signature = EthSignature(
           "0xc8ba2bdafd27742546b3be34883efc51d6cdffbb235798d7b51876c6854791f019b0522d7a39b6f2087cba46ae86919b71a2d9d7920dfc8e00246d8f02a258f21b"
         )
       )
@@ -99,7 +99,65 @@ class TransactionBroadcastSpec
       val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, TxVersion.V3, 100)
       testTime.setTime(100)
       Post(routePath("/broadcast"), transaction.json()) ~> route ~> check {
-        responseAs[JsObject] should matchJson(transaction.json())
+        responseAs[JsObject] should matchJson(s"""{
+                                                |  "type" : 7,
+                                                |  "id" : "${transaction.id()}",
+                                                |  "sender" : "3FrCwv8uFRxQazhX6Lno45aZ68Bof6ScaeF",
+                                                |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                                |  "fee" : 1000000,
+                                                |  "feeAssetId" : null,
+                                                |  "timestamp" : 100,
+                                                |  "proofs" : [ "${transaction.signature}" ],
+                                                |  "version" : 3,
+                                                |  "chainId" : 69,
+                                                |  "order1" : {
+                                                |    "version" : 4,
+                                                |    "id" : "${ethBuyOrder.id()}",
+                                                |    "sender" : "3FzoJXUesFqzf4nmMYejpUDYmFJvkwEiQG6",
+                                                |    "senderPublicKey" : "5BQPcwDXaZexgonPb8ipDrLRXY3RHn1kFLP9fqp1s6M6xiRhC4LvsAq2HueXCMzkpuXsrLnuBA3SdkJyuhNZXMCd",
+                                                |    "matcherPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                                |    "assetPair" : {
+                                                |      "amountAsset" : "5fQPsn8hoaVddFG26cWQ5QFdqxWtUPNaZ9zH2E6LYzFn",
+                                                |      "priceAsset" : null
+                                                |    },
+                                                |    "orderType" : "buy",
+                                                |    "amount" : 1,
+                                                |    "price" : 100,
+                                                |    "timestamp" : 1,
+                                                |    "expiration" : 123,
+                                                |    "matcherFee" : 100000,
+                                                |    "signature" : "",
+                                                |    "proofs" : [ ],
+                                                |    "matcherFeeAssetId" : null,
+                                                |    "eip712Signature" : "0xe5ff562bfb0296e95b631365599c87f1c5002597bf56a131f289765275d2580f5344c62999404c37cd858ea037328ac91eca16ad1ce69c345ebb52fde70b66251c"
+                                                |  },
+                                                |  "order2" : {
+                                                |    "version" : 4,
+                                                |    "id" : "${ethSellOrder.id()}",
+                                                |    "sender" : "3FzoJXUesFqzf4nmMYejpUDYmFJvkwEiQG6",
+                                                |    "senderPublicKey" : "5BQPcwDXaZexgonPb8ipDrLRXY3RHn1kFLP9fqp1s6M6xiRhC4LvsAq2HueXCMzkpuXsrLnuBA3SdkJyuhNZXMCd",
+                                                |    "matcherPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                                |    "assetPair" : {
+                                                |      "amountAsset" : "5fQPsn8hoaVddFG26cWQ5QFdqxWtUPNaZ9zH2E6LYzFn",
+                                                |      "priceAsset" : null
+                                                |    },
+                                                |    "orderType" : "sell",
+                                                |    "amount" : 1,
+                                                |    "price" : 100,
+                                                |    "timestamp" : 1,
+                                                |    "expiration" : 123,
+                                                |    "matcherFee" : 100000,
+                                                |    "signature" : "",
+                                                |    "proofs" : [ ],
+                                                |    "matcherFeeAssetId" : null,
+                                                |    "eip712Signature" : "0xc8ba2bdafd27742546b3be34883efc51d6cdffbb235798d7b51876c6854791f019b0522d7a39b6f2087cba46ae86919b71a2d9d7920dfc8e00246d8f02a258f21b"
+                                                |  },
+                                                |  "amount" : 1,
+                                                |  "price" : 100,
+                                                |  "buyMatcherFee" : 100000,
+                                                |  "sellMatcherFee" : 100000
+                                                |}
+                                                |""".stripMargin)
       }
     }
   }

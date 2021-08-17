@@ -2,24 +2,24 @@ package com.wavesplatform.api.http.eth
 
 import java.math.BigInteger
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.jdk.CollectionConverters._
+
 import akka.http.scaladsl.server._
-import com.wavesplatform.account.{AddressScheme, WavesAddress}
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.api.http._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.EthEncoding
 import org.web3j.abi._
 import org.web3j.abi.datatypes.generated.{Uint256, Uint8}
 import org.web3j.crypto._
-import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.jdk.CollectionConverters._
+import play.api.libs.json.Json.JsValueWrapper
 
 class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPublisher) extends ApiRoute {
   private def quantity(v: Long) = s"0x${java.lang.Long.toString(v, 16)}"
@@ -57,7 +57,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPubli
         resp(
           id,
           EthEncoding.toHexString(
-            BigInt(blockchain.balance(WavesAddress.fromHexString(params.get.head.as[String]))) * EthereumTransaction.AmountMultiplier
+            BigInt(blockchain.balance(Address.fromHexString(params.get.head.as[String]))) * EthereumTransaction.AmountMultiplier
           )
         )
       case "eth_sendRawTransaction" =>
@@ -115,7 +115,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionPublisher: TransactionPubli
               id,
               encodeResponse(
                 new Uint256(
-                  blockchain.balance(WavesAddress.fromHexString(dataString.takeRight(40)), assetId(contractAddress).get)
+                  blockchain.balance(Address.fromHexString(dataString.takeRight(40)), assetId(contractAddress).get)
                 )
               )
             )

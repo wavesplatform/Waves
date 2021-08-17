@@ -1,6 +1,6 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.account.WavesAddress
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.SignatureLength
@@ -15,7 +15,7 @@ class CommonSpec extends FreeSpec with WithDomain {
   private def nextTs        = time.getTimestamp()
   private val AssetIdLength = 32
 
-  private def genesisBlock(genesisTs: Long, address: WavesAddress, initialBalance: Long) = TestBlock.create(
+  private def genesisBlock(genesisTs: Long, address: Address, initialBalance: Long) = TestBlock.create(
     genesisTs,
     ByteStr(Array.fill[Byte](SignatureLength)(0)),
     Seq(GenesisTransaction.create(address, initialBalance, genesisTs).explicitGet())

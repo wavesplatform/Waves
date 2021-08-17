@@ -5,36 +5,36 @@ import java.security.SecureRandom
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.syntax.either._
 import cats.syntax.semigroup._
-import com.wavesplatform.account.{Address, AddressScheme, PublicKey, WavesAddress}
+import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, ScriptCompilerError, TooBigArrayAllocation}
-import com.wavesplatform.api.http.requests.{ScriptWithImportsRequest, byteStrFormat}
+import com.wavesplatform.api.http.requests.{byteStrFormat, ScriptWithImportsRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
+import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
-import com.wavesplatform.lang.v1.{ContractLimits, Serde}
-import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
 import monix.eval.Coeval
 import monix.execution.Scheduler
@@ -273,8 +273,8 @@ case class UtilsApiRoute(
       complete(responseJson)
     }
 
-  private[this] val ScriptedAddress: PathMatcher1[WavesAddress] = AddrSegment.map {
-    case address: WavesAddress if blockchain.hasAccountScript(address) => address
+  private[this] val ScriptedAddress: PathMatcher1[Address] = AddrSegment.map {
+    case address: Address if blockchain.hasAccountScript(address) => address
     case other =>
       throw ApiException(CustomValidationError(s"Address $other is not dApp"))
   }
@@ -304,7 +304,7 @@ object UtilsApiRoute {
         .map(_._1)
     }
 
-    def executeExpression(blockchain: Blockchain, script: Script, address: WavesAddress, limit: Int)(
+    def executeExpression(blockchain: Blockchain, script: Script, address: Address, limit: Int)(
         expr: EXPR
     ): Either[ValidationError, (EVALUATED, Int)] = {
       for {

@@ -2,14 +2,14 @@ package com.wavesplatform.account
 
 import java.util
 
+import scala.util.{Failure, Success}
+
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.Curve25519
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils
 import play.api.libs.json.{Format, Json, Writes}
-
-import scala.util.{Failure, Success}
 
 final class KeyPair(val seed: Array[Byte]) {
   lazy val privateKey: PrivateKey = PrivateKey(Curve25519.privateKeyFromSeed(seed))
@@ -34,8 +34,8 @@ object KeyPair {
   }
 
   implicit class KeyPairImplicitOps(private val kp: KeyPair) extends AnyVal {
-    def toAddress: WavesAddress                = kp.publicKey.toAddress
-    def toAddress(chainId: Byte): WavesAddress = kp.publicKey.toAddress(chainId)
+    def toAddress: Address                = kp.publicKey.toAddress
+    def toAddress(chainId: Byte): Address = kp.publicKey.toAddress(chainId)
   }
 
   implicit val jsonFormat: Format[KeyPair] = Format(

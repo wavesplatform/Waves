@@ -1,5 +1,7 @@
 package com.wavesplatform.transaction.smart
 
+import scala.util.Try
+
 import com.wavesplatform.account._
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -15,12 +17,10 @@ import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.util.Try
-
 case class InvokeScriptTransaction(
     version: TxVersion,
     sender: PublicKey,
-    dApp: WavesRecipient,
+    dApp: AddressOrAlias,
     funcCallOpt: Option[FUNCTION_CALL],
     payments: Seq[Payment],
     fee: TxAmount,
@@ -66,14 +66,14 @@ object InvokeScriptTransaction extends TransactionParser {
 
   case class Payment(amount: TxAmount, assetId: Asset)
   object Payment {
-    import play.api.libs.json.{Json, _}
+    import play.api.libs.json._
     implicit val jsonFormat: Format[Payment] = Json.format
   }
 
   def create(
       version: TxVersion,
       sender: PublicKey,
-      dappAddress: WavesRecipient,
+      dappAddress: AddressOrAlias,
       fc: Option[FUNCTION_CALL],
       p: Seq[Payment],
       fee: TxAmount,

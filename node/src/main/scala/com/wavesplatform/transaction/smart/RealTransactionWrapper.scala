@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import cats.syntax.either._
-import com.wavesplatform.account.{Alias, Recipient, WavesAddress}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
@@ -148,8 +148,8 @@ object RealTransactionWrapper {
       attachment = t.attachment
     )
 
-  def toRide(recipient: Recipient): RideRecipient = recipient match {
-    case address: WavesAddress => RideRecipient.Address(ByteStr(address.bytes))
-    case recipient: Alias      => RideRecipient.Alias(recipient.name)
+  def toRide(recipient: AddressOrAlias): RideRecipient = recipient match {
+    case address: Address => RideRecipient.Address(ByteStr(address.bytes))
+    case recipient: Alias => RideRecipient.Alias(recipient.name)
   }
 }

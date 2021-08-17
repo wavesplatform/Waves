@@ -1,18 +1,18 @@
 package com.wavesplatform.transaction.validation
 
+import scala.util.Try
+
 import cats.data.Validated
 import cats.data.Validated.{Invalid, Valid}
 import cats.syntax.validated._
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{AddressOrAlias, Alias, Recipient, WavesAddress}
+import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.{Asset, TxValidationError, TxVersion, VersionedTransaction}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TxValidationError, TxVersion, VersionedTransaction}
-
-import scala.util.Try
 
 object TxConstraints {
   // Generic
@@ -84,17 +84,6 @@ object TxConstraints {
       .condNel(
         addr.chainId == chainId,
         addr,
-        GenericError("Address or alias from other network")
-      )
-
-  def addressChainId(r: Recipient, chainId: Byte): ValidatedV[Recipient] =
-    Validated
-      .condNel(
-        r match {
-          case wa: WavesAddress => wa.chainId == chainId
-          case wl: Alias => wl.chainId == chainId
-        },
-        r,
         GenericError("Address or alias from other network")
       )
 

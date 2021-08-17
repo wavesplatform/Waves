@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.TestValues
-import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair, WavesAddress}
+import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.script.Script
@@ -12,12 +12,12 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
 object TxHelpers {
@@ -25,9 +25,9 @@ object TxHelpers {
   def address(i: Int): Address = signer(i).toAddress
 
   val defaultSigner: KeyPair  = signer(0)
-  def defaultAddress: WavesAddress = defaultSigner.toAddress
+  def defaultAddress: Address = defaultSigner.toAddress
   val secondSigner: KeyPair   = signer(1)
-  def secondAddress: WavesAddress  = secondSigner.toAddress
+  def secondAddress: Address  = secondSigner.toAddress
   
   val matcher: KeyPair = defaultSigner
 
@@ -37,7 +37,7 @@ object TxHelpers {
     lastTimestamp
   }
 
-  def genesis(address: WavesAddress, amount: Long = 100_000_000.waves): GenesisTransaction =
+  def genesis(address: Address, amount: Long = 100_000_000.waves): GenesisTransaction =
     GenesisTransaction.create(address, amount, timestamp).explicitGet()
 
   def transfer(from: KeyPair = defaultSigner, to: AddressOrAlias = secondAddress, amount: Long = 1.waves, asset: Asset = Waves, fee: Long = TestValues.fee, version: Byte = TxVersion.V1): TransferTransaction =

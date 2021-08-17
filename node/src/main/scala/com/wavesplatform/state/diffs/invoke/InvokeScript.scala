@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import monix.eval.Coeval
 
 trait InvokeScriptLike {
-  def dApp: Recipient
+  def dApp: AddressOrAlias
   def funcCall: FUNCTION_CALL
   def payments: Seq[Payment]
   def root: Option[InvokeScriptTransactionLike]
@@ -42,13 +42,13 @@ object InvokeScriptLike {
 }
 
 case class InvokeScript(
-    senderDApp: WavesAddress,
+    senderDApp: Address,
     sender: PublicKey,
-    dAppAddress: WavesAddress,
+    dAppAddress: Address,
     funcCall: FUNCTION_CALL,
     payments: Seq[Payment],
     root: Option[InvokeScriptTransactionLike]
 ) extends InvokeScriptLike {
-  val dApp: Recipient        = dAppAddress
+  val dApp: AddressOrAlias   = dAppAddress
   val senderAddress: Address = senderDApp
 }

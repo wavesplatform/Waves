@@ -1,34 +1,34 @@
 package com.wavesplatform.transaction.assets.exchange
 
+import scala.util.Try
+
 import com.wavesplatform.account.{Address, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.serialization.impl.OrderSerializer
 import monix.eval.Coeval
 import play.api.libs.json.{Format, JsObject}
 
-import scala.util.Try
-
 /**
   * Order to matcher service for asset exchange
   */
 case class Order(
-    version: Order.Version,
-    senderPublicKey: PublicKey,
-    matcherPublicKey: PublicKey,
-    assetPair: AssetPair,
-    orderType: OrderType,
-    amount: TxAmount,
-    price: TxAmount,
-    timestamp: TxTimestamp,
-    expiration: TxTimestamp,
-    matcherFee: TxAmount,
-    matcherFeeAssetId: Asset = Waves,
-    proofs: Proofs = Proofs.empty,
-    ethSignature: Option[ByteStr] = None
+                  version: Order.Version,
+                  senderPublicKey: PublicKey,
+                  matcherPublicKey: PublicKey,
+                  assetPair: AssetPair,
+                  orderType: OrderType,
+                  amount: TxAmount,
+                  price: TxAmount,
+                  timestamp: TxTimestamp,
+                  expiration: TxTimestamp,
+                  matcherFee: TxAmount,
+                  matcherFeeAssetId: Asset = Waves,
+                  proofs: Proofs = Proofs.empty,
+                  eip712Signature: Option[ByteStr] = None
 ) extends Proven {
   import Order._
 
@@ -44,9 +44,9 @@ case class Order(
     (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
     (expiration >= atTime) :| "expiration should be > currentTime" &&
     (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves" &&
-    (ethSignature.isEmpty || version >= Order.V4) :| "ethSignature available only in V4" &&
-    ethSignature.forall(es => es.size == 65 || es.size == 129) :| "ethSignature should be of length 65 or 129" &&
-    (ethSignature.isEmpty || proofs.isEmpty) :| "ethSignature excludes proofs"
+    (eip712Signature.isEmpty || version >= Order.V4) :| "eip712Signature available only in V4" &&
+    eip712Signature.forall(es => es.size == 65 || es.size == 129) :| "eip712Signature should be of length 65 or 129" &&
+    (eip712Signature.isEmpty || proofs.isEmpty) :| "eip712Signature excludes proofs"
   }
 
   def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {

@@ -2,6 +2,8 @@ package com.wavesplatform.transaction
 
 import java.math.BigInteger
 
+import scala.reflect.ClassTag
+
 import com.wavesplatform.account._
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
@@ -9,22 +11,20 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.transaction.PBRecipients
-import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.{Height, TxNum}
+import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.EthEncoding
 import monix.eval.Coeval
 import org.bouncycastle.util.encoders.Hex
 import org.web3j.abi.TypeDecoder
-import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.abi.datatypes.{Address => EthAddress}
+import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto._
 import org.web3j.rlp.{RlpEncoder, RlpList}
 import org.web3j.utils.Numeric
 import play.api.libs.json._
-
-import scala.reflect.ClassTag
 
 sealed abstract class EthereumTransaction(final val underlying: SignedRawTransaction) extends Transaction(TransactionType.Ethereum) {
   private final val signatureData: Sign.SignatureData = underlying.getSignatureData
@@ -99,7 +99,7 @@ object EthereumTransaction {
       val sender: Address,
       val asset: Either[Asset.Waves.type, ERC20Address],
       val amount: TxAmount,
-      val recipient: WavesAddress,
+      val recipient: Address,
       underlying: SignedRawTransaction
   ) extends EthereumTransaction(underlying) {
     override val json: Coeval[JsObject] = baseJson.map(
@@ -119,7 +119,7 @@ object EthereumTransaction {
 
   class InvokeScript(
       val senderAddress: Address,
-      val dApp: Recipient,
+      val dApp: AddressOrAlias,
       val callData: ByteStr,
       underlying: SignedRawTransaction
   ) extends EthereumTransaction(underlying)
@@ -128,7 +128,7 @@ object EthereumTransaction {
 
     final class Invokable(script: Script) extends InvokeScriptTransactionLike {
       lazy val (funcCall, payments)                 = ABIConverter(script).decodeFunctionCall(hexCallData)
-      def dApp: Recipient                           = InvokeScript.this.dApp
+      def dApp: AddressOrAlias                      = InvokeScript.this.dApp
       def root: Option[InvokeScriptTransactionLike] = Some(this)
       def senderAddress: Address                    = InvokeScript.this.senderAddress
       def sender: PublicKey                         = PublicKey(signerPublicKey())
@@ -163,7 +163,7 @@ object EthereumTransaction {
         senderAddress,
         Left(Asset.Waves),
         underlying.getValue.divide(BigInt(AmountMultiplier).bigInteger).longValueExact(),
-        WavesAddress(recipientAddress.arr),
+         Address(recipientAddress.arr),
         underlying
       )
     } else if (hexData.startsWith(ERC20TransferPrefix)) {
@@ -173,9 +173,9 @@ object EthereumTransaction {
         senderAddress,
         Right(ERC20Address(recipientAddress)),
         amount.getValue.longValueExact(),
-        WavesAddress(EthEncoding.toBytes(recipient.toString)),
+      Address(EthEncoding.toBytes(recipient.toString)),
         underlying
       )
-    } else new InvokeScript(senderAddress, WavesAddress(recipientAddress.arr), ByteStr(Hex.decode(hexData)), underlying)
+    } else new InvokeScript(senderAddress, Address(recipientAddress.arr), ByteStr(Hex.decode(hexData)), underlying)
   }
 }

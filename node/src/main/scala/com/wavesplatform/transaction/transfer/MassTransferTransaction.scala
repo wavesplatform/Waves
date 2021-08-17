@@ -1,22 +1,22 @@
 package com.wavesplatform.transaction.transfer
 
+import scala.util.{Either, Try}
+
 import cats.instances.list._
 import cats.syntax.traverse._
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.MassTransferTxSerializer
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.MassTransferTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-
-import scala.util.{Either, Try}
 
 case class MassTransferTransaction(
     version: TxVersion,
@@ -78,7 +78,7 @@ object MassTransferTransaction extends TransactionParser {
     implicit val jsonFormat = Json.format[Transfer]
   }
 
-  case class ParsedTransfer(address: Recipient, amount: Long)
+  case class ParsedTransfer(address: AddressOrAlias, amount: Long)
 
   def create(
       version: TxVersion,
@@ -119,7 +119,7 @@ object MassTransferTransaction extends TransactionParser {
   def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] = {
     transfers.traverse {
       case Transfer(recipient, amount) =>
-        Recipient.fromString(recipient).map(ParsedTransfer(_, amount))
+        AddressOrAlias.fromString(recipient).map(ParsedTransfer(_, amount))
     }
   }
 

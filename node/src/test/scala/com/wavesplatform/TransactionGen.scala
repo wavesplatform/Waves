@@ -1,34 +1,34 @@
 package com.wavesplatform
 
+import scala.concurrent.duration._
+import scala.util.Random
+
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values.V3
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.testing.{ScriptGen, TypedScriptGen}
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.Signed
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer._
-import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import org.scalatest.Suite
-
-import scala.concurrent.duration._
-import scala.util.Random
 
 trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _: Suite =>
 
@@ -184,10 +184,10 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   val selfPaymentGen: Gen[PaymentTransaction] = accountGen.flatMap(acc => paymentGeneratorP(acc, acc.toAddress))
 
-  def paymentGeneratorP(sender: KeyPair, recipient: WavesAddress): Gen[PaymentTransaction] =
+  def paymentGeneratorP(sender: KeyPair, recipient: Address): Gen[PaymentTransaction] =
     timestampGen.flatMap(ts => paymentGeneratorP(ts, sender, recipient))
 
-  def paymentGeneratorP(timestamp: Long, sender: KeyPair, recipient: WavesAddress): Gen[PaymentTransaction] =
+  def paymentGeneratorP(timestamp: Long, sender: KeyPair, recipient: Address): Gen[PaymentTransaction] =
     for {
       amount: Long <- positiveLongGen
       fee: Long    <- smallFeeGen
@@ -842,7 +842,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   val genesisGen: Gen[GenesisTransaction] = accountGen.flatMap(acc => genesisGeneratorP(acc.toAddress))
 
-  def genesisGeneratorP(recipient: WavesAddress): Gen[GenesisTransaction] =
+  def genesisGeneratorP(recipient: Address): Gen[GenesisTransaction] =
     for {
       amt <- Gen.choose(1, 100000000L * 100000000L)
       ts  <- positiveIntGen

@@ -5,7 +5,7 @@ import scala.util.control.NonFatal
 
 import cats.instances.map._
 import cats.syntax.semigroup._
-import com.wavesplatform.account.{Address, Recipient}
+import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
@@ -24,7 +24,7 @@ object TransferTransactionDiff {
 object TransferDiff {
   def apply(
       blockchain: Blockchain
-  )(senderAddress: Address, recipient: Recipient, amount: Long, assetId: Asset, fee: Long, feeAssetId: Asset): Either[ValidationError, Diff] = {
+  )(senderAddress: Address, recipient: AddressOrAlias, amount: Long, assetId: Asset, fee: Long, feeAssetId: Asset): Either[ValidationError, Diff] = {
 
     val isSmartAsset = feeAssetId match {
       case Waves => false

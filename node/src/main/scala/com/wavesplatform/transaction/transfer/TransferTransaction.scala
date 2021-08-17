@@ -1,11 +1,13 @@
 package com.wavesplatform.transaction.transfer
 
+import scala.util.Try
+
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.serialization.impl.TransferTxSerializer
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.transaction.validation.impl.TransferTxValidator
@@ -13,12 +15,10 @@ import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.util.Try
-
 case class TransferTransaction(
     version: TxVersion,
     sender: PublicKey,
-    recipient: Recipient,
+    recipient: AddressOrAlias,
     assetId: Asset,
     amount: TxAmount,
     feeAssetId: Asset,
@@ -61,7 +61,7 @@ object TransferTransaction extends TransactionParser {
   def create(
       version: TxVersion,
       sender: PublicKey,
-      recipient: Recipient,
+      recipient: AddressOrAlias,
       asset: Asset,
       amount: TxAmount,
       feeAsset: Asset,
@@ -75,7 +75,7 @@ object TransferTransaction extends TransactionParser {
   def signed(
       version: TxVersion,
       sender: PublicKey,
-      recipient: Recipient,
+      recipient: AddressOrAlias,
       asset: Asset,
       amount: TxAmount,
       feeAsset: Asset,
@@ -89,7 +89,7 @@ object TransferTransaction extends TransactionParser {
   def selfSigned(
       version: TxVersion,
       sender: KeyPair,
-      recipient: Recipient,
+      recipient: AddressOrAlias,
       asset: Asset,
       amount: TxAmount,
       feeAsset: Asset,

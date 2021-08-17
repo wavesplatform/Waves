@@ -1,21 +1,21 @@
 package com.wavesplatform.state
 
 import com.wavesplatform.account._
-import com.wavesplatform.block.Block._
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
+import com.wavesplatform.block.Block._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
-import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatureStatus, BlockchainFeatures}
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures, BlockchainFeatureStatus}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.traits.domain.Issue
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 trait Blockchain {
   def settings: BlockchainSettings
@@ -49,7 +49,7 @@ trait Blockchain {
 
   def assetDescription(id: IssuedAsset): Option[AssetDescription]
 
-  def resolveAlias(a: Alias): Either[ValidationError, WavesAddress]
+  def resolveAlias(a: Alias): Either[ValidationError, Address]
 
   def leaseDetails(leaseId: ByteStr): Option[LeaseDetails]
 
@@ -94,16 +94,10 @@ object Blockchain {
     def lastBlockId: Option[ByteStr]               = lastBlockHeader.map(_.id())
     def lastBlockTimestamp: Option[Long]           = lastBlockHeader.map(_.header.timestamp)
     def lastBlockIds(howMany: Int): Seq[ByteStr]   = (blockchain.height to blockchain.height - howMany by -1).flatMap(blockId)
-
-    def resolveAlias(aoa: Recipient): Either[ValidationError, WavesAddress] =
-      aoa match {
-        case a: WavesAddress    => Right(a)
-        case a: Alias           => blockchain.resolveAlias(a)
-      }
-
+    
     def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
       aoa match {
-        case address: WavesAddress => Right(address)
+        case address: Address => Right(address)
         case alias: Alias          => blockchain.resolveAlias(alias)
       }
 

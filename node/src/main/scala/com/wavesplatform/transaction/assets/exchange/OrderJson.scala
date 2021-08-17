@@ -82,7 +82,7 @@ object OrderJson {
       proofs: Option[Array[Array[Byte]]],
       version: TxVersion,
       matcherFeeAssetId: Asset,
-      ethSignature: Option[Array[Byte]]
+      eip712Signature: Option[Array[Byte]]
   ): Order = {
 
     val eproofs =
@@ -104,7 +104,7 @@ object OrderJson {
       matcherFee,
       matcherFeeAssetId,
       eproofs,
-      ethSignature.map(ByteStr(_))
+      eip712Signature.map(ByteStr(_))
     )
   }
 
@@ -159,7 +159,7 @@ object OrderJson {
       (JsPath \ "matcherFeeAssetId")
         .readNullable[Array[Byte]]
         .map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_)))) and
-      (JsPath \ "ethSignature")
+      (JsPath \ "eip712Signature")
         .readNullable[String]
         .map(_.map(EthEncoding.toBytes))
 

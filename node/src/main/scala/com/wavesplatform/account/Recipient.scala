@@ -14,22 +14,9 @@ import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidAdd
 import com.wavesplatform.utils.{base58Length, EthEncoding, StringBytes}
 import play.api.libs.json._
 
-sealed trait Recipient {
-  def bytes: Array[Byte]
-}
-
-object Recipient {
-  def fromString(s: String): Either[ValidationError, Recipient] =
-    if (s.startsWith(Alias.Prefix)) {
-      Alias.fromString(s)
-    } else {
-      Address.fromString(s)
-    }
-}
-
-sealed trait Address extends Recipient {
+sealed trait Address extends AddressOrAlias {
   def publicKeyHash: Array[Byte]
-  def asWaves: WavesAddress
+  def asWaves: Address
   override def equals(obj: Any): Boolean = obj match {
     case a: Address => java.util.Arrays.equals(publicKeyHash, a.publicKeyHash)
     case _          => false
@@ -38,32 +25,23 @@ sealed trait Address extends Recipient {
   override def hashCode(): Int = java.util.Arrays.hashCode(publicKeyHash)
 }
 
-sealed trait WavesRecipient extends Recipient {
+sealed trait AddressOrAlias {
   def chainId: Byte
+  def bytes: Array[Byte]
 }
 
-final class WavesAddress(val chainId: Byte, val publicKeyHash: Array[Byte], checksum: Array[Byte]) extends Address with WavesRecipient {
-  override def asWaves: WavesAddress   = this
+final class WavesAddress(val chainId: Byte, val publicKeyHash: Array[Byte], checksum: Array[Byte]) extends Address with AddressOrAlias {
+  override def asWaves: Address   = this
   override lazy val bytes: Array[Byte] = Array(1.toByte, chainId) ++ publicKeyHash ++ checksum
   override lazy val toString: String   = ByteStr(bytes).toString
 }
 
-object WavesAddress {
-  def apply(publicKeyHash: Array[Byte]): WavesAddress = new WavesAddress(
-    AddressScheme.current.chainId,
-    publicKeyHash,
-    crypto.secureHash(Array(1.toByte, AddressScheme.current.chainId) ++ publicKeyHash).take(4)
-  )
-
-  def fromHexString(hexString: String): WavesAddress = WavesAddress(EthEncoding.toBytes(hexString))
-}
-
-final case class Alias(chainId: Byte, name: String) extends WavesRecipient {
+final case class Alias(chainId: Byte, name: String) extends AddressOrAlias {
   override lazy val bytes: Array[Byte] = Bytes.concat(Array(Alias.AddressVersion, chainId), Deser.serializeArrayWithLength(name.utf8Bytes))
   override lazy val toString: String   = s"alias:${chainId.toChar}:$name"
 }
 
-object WavesRecipient {
+object AddressOrAlias {
   def fromRide(r: RideRecipient): Either[ValidationError, AddressOrAlias] =
     r match {
       case RideRecipient.Address(bytes) => Address.fromBytes(bytes.arr)
@@ -90,19 +68,27 @@ object Address {
   val AddressLength: Int       = 1 + 1 + HashLength + ChecksumLength
   val AddressStringLength: Int = base58Length(AddressLength)
 
-  private[this] val publicKeyBytesCache: Cache[(ByteStr, Byte), WavesAddress] = CacheBuilder
+  private[this] val publicKeyBytesCache: Cache[(ByteStr, Byte), Address] = CacheBuilder
     .newBuilder()
     .softValues()
     .maximumSize(200000)
     .build()
 
-  private[this] val bytesCache: Cache[ByteStr, Either[InvalidAddress, WavesAddress]] = CacheBuilder
+  private[this] val bytesCache: Cache[ByteStr, Either[InvalidAddress, Address]] = CacheBuilder
     .newBuilder()
     .softValues()
     .maximumSize(200000)
     .build()
 
-  def fromPublicKey(publicKey: PublicKey, chainId: Byte = scheme.chainId): WavesAddress = {
+  def apply(publicKeyHash: Array[Byte]): Address = new WavesAddress(
+    AddressScheme.current.chainId,
+    publicKeyHash,
+    crypto.secureHash(Array(1.toByte, AddressScheme.current.chainId) ++ publicKeyHash).take(4)
+  )
+
+  def fromHexString(hexString: String): Address = Address(EthEncoding.toBytes(hexString))
+
+  def fromPublicKey(publicKey: PublicKey, chainId: Byte = scheme.chainId): Address = {
     publicKeyBytesCache.get(
       (publicKey, chainId), { () =>
         val withoutChecksum = ByteBuffer
@@ -123,7 +109,7 @@ object Address {
     )
   }
 
-  def fromBytes(addressBytes: Array[Byte], chainId: Byte = scheme.chainId): Either[InvalidAddress, WavesAddress] = {
+  def fromBytes(addressBytes: Array[Byte], chainId: Byte = scheme.chainId): Either[InvalidAddress, Address] = {
     bytesCache.get(
       ByteStr(addressBytes), { () =>
         Either
@@ -152,7 +138,7 @@ object Address {
     )
   }
 
-  def fromString(addressStr: String): Either[ValidationError, WavesAddress] = {
+  def fromString(addressStr: String): Either[ValidationError, Address] = {
     val base58String = if (addressStr.startsWith(Prefix)) addressStr.drop(Prefix.length) else addressStr
     for {
       _ <- Either.cond(
@@ -179,7 +165,7 @@ object Address {
   private[this] def scheme: AddressScheme = AddressScheme.current
 
   // Optimization, should not be used externally
-  private[wavesplatform] def createUnsafe(addressBytes: Array[Byte]): WavesAddress =
+  private[wavesplatform] def createUnsafe(addressBytes: Array[Byte]): Address =
     new WavesAddress(addressBytes(1), addressBytes.drop(2).dropRight(4), addressBytes.takeRight(4))
 }
 

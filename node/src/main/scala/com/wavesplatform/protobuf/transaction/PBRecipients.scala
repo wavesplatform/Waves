@@ -9,14 +9,12 @@ import com.wavesplatform.protobuf.transaction.{Recipient => PBRecipient}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object PBRecipients {
-  def create(addressOrAlias: AddressOrAlias): PBRecipient = create(addressOrAlias: Recipient)
-  def create(recipient: Recipient): PBRecipient = recipient match {
+  def create(recipient: AddressOrAlias): PBRecipient = recipient match {
     case a: Address => PBRecipient().withPublicKeyHash(ByteString.copyFrom(publicKeyHash(a)))
     case a: Alias   => PBRecipient().withAlias(a.name)
-    case _          => sys.error("Should not happen " + recipient)
   }
 
-  def toAddress(bytes: Array[Byte], chainId: Byte): Either[ValidationError, WavesAddress] = bytes.length match {
+  def toAddress(bytes: Array[Byte], chainId: Byte): Either[ValidationError, Address] = bytes.length match {
     case Address.HashLength => // Compressed address
       val withHeader = Bytes.concat(Array(Address.AddressVersion, chainId), bytes)
       val checksum   = Address.calcCheckSum(withHeader)
@@ -32,7 +30,7 @@ object PBRecipients {
       Left(GenericError(s"Invalid address length: ${bytes.length}"))
   }
 
-  def toAddress(r: PBRecipient, chainId: Byte): Either[ValidationError, WavesAddress] = r.recipient match {
+  def toAddress(r: PBRecipient, chainId: Byte): Either[ValidationError, Address] = r.recipient match {
     case PBRecipient.Recipient.PublicKeyHash(bytes) => toAddress(bytes.toByteArray, chainId)
     case _                                          => Left(GenericError(s"Not an address: $r"))
   }

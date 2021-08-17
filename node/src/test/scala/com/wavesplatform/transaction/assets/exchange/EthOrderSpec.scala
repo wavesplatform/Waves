@@ -32,7 +32,7 @@ class EthOrderSpec
     123,
     100000,
     Waves,
-    ethSignature = EthSignature(
+    eip712Signature = EthSignature(
       "0xe5ff562bfb0296e95b631365599c87f1c5002597bf56a131f289765275d2580f5344c62999404c37cd858ea037328ac91eca16ad1ce69c345ebb52fde70b66251c"
     )
   )
@@ -49,7 +49,7 @@ class EthOrderSpec
     123,
     100000,
     Waves,
-    ethSignature = EthSignature(
+    eip712Signature = EthSignature(
       "0xc8ba2bdafd27742546b3be34883efc51d6cdffbb235798d7b51876c6854791f019b0522d7a39b6f2087cba46ae86919b71a2d9d7920dfc8e00246d8f02a258f21b"
     )
   )
@@ -92,12 +92,12 @@ class EthOrderSpec
       321,
       1,
       Waves,
-      ethSignature = EthSignature(
+      eip712Signature = EthSignature(
         "0xb557dae4c614146dd35ba6fd80e4702a75d33ffcb8af09e80e0c1a7386b8ffcb5b76bd8037f6484de809a80a5b39a224301c76e8bad9b1a9e7ada53ba6fa7e361c"
       )
     )
 
-    testOrder.isValid(123).labels shouldBe Set("ethSignature available only in V4")
+    testOrder.isValid(123).labels shouldBe Set("eip712Signature available only in V4")
   }
 
   it should "be not contain proofs" in {
@@ -114,12 +114,12 @@ class EthOrderSpec
       1,
       Waves,
       Proofs(ByteStr.empty),
-      ethSignature = EthSignature(
+      eip712Signature = EthSignature(
         "0xb557dae4c614146dd35ba6fd80e4702a75d33ffcb8af09e80e0c1a7386b8ffcb5b76bd8037f6484de809a80a5b39a224301c76e8bad9b1a9e7ada53ba6fa7e361c"
       )
     )
 
-    testOrder.isValid(123).labels shouldBe Set("ethSignature excludes proofs")
+    testOrder.isValid(123).labels shouldBe Set("eip712Signature excludes proofs")
   }
 
   it should "work in exchange transaction" in {
@@ -177,7 +177,7 @@ class EthOrderSpec
       .exchange(ethBuyOrder, ethSellOrder, TxVersion.V3, 100)
       .copy(
         order2 = ethSellOrder.copy(
-          ethSignature = EthSignature(
+          eip712Signature = EthSignature(
             "0x1717804a1d60149988821546732442eabc69f46b2764e231eaeef48351d9f36577278c3f29fe3d61500932190dba8c045b19acda117a4690bfd3d2c28bb67bf91c"
           )
         )

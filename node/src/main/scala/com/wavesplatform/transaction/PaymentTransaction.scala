@@ -1,6 +1,8 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.account.{KeyPair, PublicKey, WavesAddress}
+import scala.util.Try
+
+import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -10,11 +12,9 @@ import com.wavesplatform.transaction.validation.impl.PaymentTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.util.Try
-
 case class PaymentTransaction private (
     sender: PublicKey,
-    recipient: WavesAddress,
+    recipient: Address,
     amount: TxAmount,
     fee: TxAmount,
     timestamp: TxTimestamp,
@@ -48,14 +48,14 @@ object PaymentTransaction extends TransactionParser {
 
   implicit val validator: TxValidator[PaymentTransaction] = PaymentTxValidator
 
-  def create(sender: KeyPair, recipient: WavesAddress, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] =
+  def create(sender: KeyPair, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] =
     create(sender.publicKey, recipient, amount, fee, timestamp, ByteStr.empty).map(unsigned => {
       unsigned.copy(signature = crypto.sign(sender.privateKey, unsigned.bodyBytes()))
     })
 
   def create(
       sender: PublicKey,
-      recipient: WavesAddress,
+      recipient: Address,
       amount: Long,
       fee: Long,
       timestamp: Long,

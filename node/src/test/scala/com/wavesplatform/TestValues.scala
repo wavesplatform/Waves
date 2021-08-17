@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import com.wavesplatform.account.{KeyPair, WavesAddress}
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 object TestValues {
   val keyPair: KeyPair   = TxHelpers.defaultSigner
-  val address: WavesAddress   = keyPair.toAddress
+  val address: Address   = keyPair.toAddress
   val asset: IssuedAsset = IssuedAsset(ByteStr(("A" * 32).getBytes("ASCII")))
   val bigMoney: Long     = com.wavesplatform.state.diffs.ENOUGH_AMT
   val timestamp: Long    = System.currentTimeMillis()

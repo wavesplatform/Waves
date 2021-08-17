@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.validation.impl
 
-import com.wavesplatform.account.{Alias, WavesAddress}
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.MaxTransferCount
@@ -16,7 +16,7 @@ object MassTransferTxValidator extends TxValidator[MassTransferTransaction] {
       V.cond(transfers.forall(_.amount >= 0), GenericError("One of the transfers has negative amount")),
       V.fee(fee),
       V.chainIds(chainId, transfers.view.map(_.address).collect {
-        case wa: WavesAddress => wa.chainId
+        case wa: Address => wa.chainId
         case wl: Alias        => wl.chainId
       }.toSeq: _*)
     )

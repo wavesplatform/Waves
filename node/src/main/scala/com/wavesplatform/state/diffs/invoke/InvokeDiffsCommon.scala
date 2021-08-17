@@ -7,7 +7,7 @@ import cats.syntax.either._
 import cats.syntax.semigroup._
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey, WavesAddress}
+import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
@@ -146,7 +146,7 @@ object InvokeDiffsCommon {
   def processActions(
       actions: List[CallableAction],
       version: StdLibVersion,
-      dAppAddress: WavesAddress,
+      dAppAddress: Address,
       dAppPublicKey: PublicKey,
       storingComplexity: Int,
       tx: InvokeScriptLike,
@@ -296,7 +296,7 @@ object InvokeDiffsCommon {
     }
 
   private def checkSelfPayments(
-      dAppAddress: WavesAddress,
+      dAppAddress: Address,
       blockchain: Blockchain,
       tx: InvokeScriptLike,
       version: StdLibVersion,

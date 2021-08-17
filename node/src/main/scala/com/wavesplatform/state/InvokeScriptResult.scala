@@ -2,16 +2,16 @@ package com.wavesplatform.state
 
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias, WavesAddress}
+import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.protobuf.{Amount, _}
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBUtils
-import com.wavesplatform.protobuf.{Amount, _}
 import com.wavesplatform.state.{InvokeScriptResult => R}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -58,7 +58,7 @@ object InvokeScriptResult {
     def fromFunctionCall(fc: FUNCTION_CALL): Call = Call(fc.function.funcName, fc.args.collect { case e: EVALUATED => e })
   }
 
-  final case class Invocation(dApp: WavesAddress, call: Call, payments: Seq[AttachedPayment], stateChanges: InvokeScriptResult)
+  final case class Invocation(dApp: Address, call: Call, payments: Seq[AttachedPayment], stateChanges: InvokeScriptResult)
   object Invocation {
     def calledAddresses(inv: InvokeScriptResult.Invocation): LazyList[Address] =
       LazyList(inv.dApp) #::: inv.stateChanges.invokes.to(LazyList).flatMap(calledAddresses)
@@ -168,7 +168,7 @@ object InvokeScriptResult {
   def fromLangResult(invokeId: ByteStr, result: ScriptResult): InvokeScriptResult = {
     import com.wavesplatform.lang.v1.traits.{domain => lang}
 
-    def langAddressToAddress(a: lang.Recipient.Address): WavesAddress =
+    def langAddressToAddress(a: lang.Recipient.Address): Address =
       Address.fromBytes(a.bytes.arr).explicitGet()
 
     def langTransferToPayment(t: lang.AssetTransfer): Payment =

@@ -57,7 +57,7 @@ object InvokeScriptTransactionDiff {
         pk: PublicKey,
         version: StdLibVersion,
         contract: DApp,
-        dAppAddress: WavesAddress,
+        dAppAddress: Address,
         invocationComplexity: Int,
         fixedInvocationComplexity: Int,
         environment: DAppEnvironment,

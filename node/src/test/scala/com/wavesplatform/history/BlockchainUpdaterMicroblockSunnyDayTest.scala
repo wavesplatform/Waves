@@ -1,6 +1,6 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.account.{Address, KeyPair, Recipient}
+import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
@@ -176,7 +176,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with DomainScenar
     }
   }
 
-  private def effBalance(aa: Recipient, domain: Domain): Long = aa match {
+  private def effBalance(aa: AddressOrAlias, domain: Domain): Long = aa match {
     case address: Address => domain.effBalance(address)
     case _                => fail("Unexpected address object")
   }

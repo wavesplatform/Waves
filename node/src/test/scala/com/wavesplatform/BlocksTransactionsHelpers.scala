@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import com.wavesplatform.account.{AddressOrAlias, KeyPair, WavesRecipient}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
@@ -10,12 +10,12 @@ import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.test.Signed
+import com.wavesplatform.transaction.{DataTransaction, Transaction, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{DataTransaction, Transaction, TxVersion}
 import com.wavesplatform.utils._
 import org.scalacheck.Gen
 
@@ -97,7 +97,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
 
     def invokeScript(
         from: KeyPair,
-        dapp: WavesRecipient,
+        dapp: AddressOrAlias,
         call: FUNCTION_CALL,
         payments: Seq[InvokeScriptTransaction.Payment] = Nil,
         timestamp: Gen[Long] = timestampGen
