@@ -1,5 +1,8 @@
 package com.wavesplatform.events
 
+import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
+
 import cats.Monoid
 import cats.syntax.monoid._
 import com.google.protobuf.ByteString
@@ -7,15 +10,12 @@ import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
+import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.protobuf.TransactionMetadata
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
-import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
-import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
-import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{
   AccountDataInfo,
   AssetDescription,
@@ -29,14 +29,14 @@ import com.wavesplatform.state.{
   InvokeScriptResult,
   LeaseBalance
 }
+import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
+import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
+import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxAmount}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxAmount}
-
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 
 final case class StateUpdate(
     balances: Seq[BalanceUpdate],
@@ -151,8 +151,8 @@ object StateUpdate {
       case object Inactive extends LeaseStatus
     }
 
-    import com.wavesplatform.events.protobuf.StateUpdate.LeaseUpdate.{LeaseStatus => PBLeaseStatus}
     import com.wavesplatform.events.protobuf.StateUpdate.{LeaseUpdate => PBLeaseUpdate}
+    import com.wavesplatform.events.protobuf.StateUpdate.LeaseUpdate.{LeaseStatus => PBLeaseStatus}
 
     def fromPB(v: PBLeaseUpdate): LeaseUpdate = {
       LeaseUpdate(
@@ -196,8 +196,8 @@ object StateUpdate {
   object AssetStateUpdate {
     final case class AssetDetails(assetId: ByteStr, desc: AssetDescription)
 
-    import com.wavesplatform.events.protobuf.StateUpdate.AssetDetails.{AssetScriptInfo => PBAssetScriptInfo}
     import com.wavesplatform.events.protobuf.StateUpdate.{AssetDetails => PBAssetDetails, AssetStateUpdate => PBAssetStateUpdate}
+    import com.wavesplatform.events.protobuf.StateUpdate.AssetDetails.{AssetScriptInfo => PBAssetScriptInfo}
 
     def fromPB(self: PBAssetStateUpdate): AssetStateUpdate = {
 
@@ -415,10 +415,10 @@ object StateUpdate {
 
         tx.transaction match {
           case tt: TransferTransaction =>
-            TransactionMetadata.Metadata.Transfer(TransactionMetadata.TransferMetadata(???))
+            TransactionMetadata.Metadata.Transfer(TransactionMetadata.TransferMetadata(tt.recipient.resolve.toByteString))
 
           case mtt: MassTransferTransaction =>
-            TransactionMetadata.Metadata.MassTransfer(TransactionMetadata.MassTransferMetadata(mtt.transfers.map(_ => ???)))
+            TransactionMetadata.Metadata.MassTransfer(TransactionMetadata.MassTransferMetadata(mtt.transfers.map(_.address.resolve.toByteString)))
 
           case lt: LeaseTransaction =>
             TransactionMetadata.Metadata.LeaseMeta(TransactionMetadata.LeaseMetadata(lt.recipient.resolve.toByteString))
@@ -438,7 +438,7 @@ object StateUpdate {
 
             TransactionMetadata.Metadata.InvokeScript(
               TransactionMetadata.InvokeScriptMetadata(
-                ???,
+                ist.dApp.resolve.toByteString,
                 ist.funcCall.function.funcName,
                 ist.funcCall.args.map(x => Argument(argumentToPB(x))),
                 ist.payments.map(p => Amount(PBAmounts.toPBAssetId(p.assetId), p.amount)),
