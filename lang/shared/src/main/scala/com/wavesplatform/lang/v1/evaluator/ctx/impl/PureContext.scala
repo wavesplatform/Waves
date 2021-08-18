@@ -22,6 +22,7 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding._
 import com.wavesplatform.lang.v1.evaluator.{ContextfulUserFunction, ContextfulVal}
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
@@ -410,36 +411,36 @@ object PureContext {
           rm      = p.abs /% d.abs
           presult = rm._1
           m       = rm._2
-          result <- r.caseType match {
-            case RoundDown => Right(presult * s)
-            case RoundUp   => Right((presult + m.sign) * s)
-            case RoundHalfUp =>
+          result <- Rounding.byValue(r) match {
+            case Down => Right(presult * s)
+            case Up   => Right((presult + m.sign) * s)
+            case HalfUp =>
               val x = d.abs - m * 2
               if (x <= 0) {
                 Right((presult + 1) * s)
               } else {
                 Right(presult * s)
               }
-            case RoundHalfDown =>
+            case HalfDown =>
               val x = d.abs - m * 2
               if (x < 0) {
                 Right((presult + 1) * s)
               } else {
                 Right(presult * s)
               }
-            case RoundCeiling =>
+            case Ceiling =>
               Right((if (s > 0) {
                        presult + m.sign
                      } else {
                        presult
                      }) * s)
-            case RoundFloor =>
+            case Floor =>
               Right((if (s < 0) {
                        presult + m.sign
                      } else {
                        presult
                      }) * s)
-            case RoundHalfEven =>
+            case HalfEven =>
               val x = d.abs - m * 2
               if (x < 0) {
                 Right((presult + 1) * s)
@@ -1350,15 +1351,6 @@ object PureContext {
     UserFunction("!", Map[StdLibVersion, Long](V1 -> 11, V2 -> 11, V3 -> 1, V4 -> 1), BOOLEAN, ("@p", BOOLEAN)) {
       IF(REF("@p"), FALSE, TRUE)
     }
-
-  val RoundCeiling  = CASETYPEREF("Ceiling", List.empty, true)
-  val RoundFloor    = CASETYPEREF("Floor", List.empty, true)
-  val RoundHalfEven = CASETYPEREF("HalfEven", List.empty, true)
-  val RoundDown     = CASETYPEREF("Down", List.empty, true)
-  val RoundUp       = CASETYPEREF("Up", List.empty, true)
-  val RoundHalfUp   = CASETYPEREF("HalfUp", List.empty, true)
-  val RoundHalfDown = CASETYPEREF("HalfDown", List.empty, true)
-  val rounds        = UNION(RoundDown, RoundUp, RoundHalfUp, RoundHalfDown, RoundCeiling, RoundFloor, RoundHalfEven)
 
   def pow(roundTypes: UNION): BaseFunction[NoContext] = {
     NativeFunction("pow", 100, POW, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", roundTypes)) {
