@@ -63,7 +63,7 @@ trait TransferSending extends ScorexLogging {
       }
 
     val sourceAndDest = (1 to n).map { _ =>
-      val Seq((srcConfig, _), (_, destPrivateKey)) = Random.shuffle(srcDest).take(2)
+      val Seq((srcConfig, _), (_, destPrivateKey)) = (Random.shuffle(srcDest).take(2): @unchecked)
       (srcConfig, destPrivateKey.toAddress.toString)
     }
 

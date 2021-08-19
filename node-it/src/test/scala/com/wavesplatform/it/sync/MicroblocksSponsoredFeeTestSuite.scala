@@ -54,6 +54,8 @@ class MicroblocksSponsoredFeeTestSuite extends BaseFreeSpec with ScorexLogging {
       minerBalances.zip(filteredBlocksFee).sliding(2).foreach {
         case Seq((minerBalance1, blockFee1), (minerBalance2, blockFee2)) =>
           minerBalance2 should be(minerBalance1 + blockFee1 * 6 / 10 + blockFee2 * 4 / 10)
+
+        case _ => ???
       }
 
       val block   = notMiner.blockAt(height)
