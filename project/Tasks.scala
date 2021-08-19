@@ -18,7 +18,14 @@ object Tasks {
     def toMapChecked[K, V](data: Seq[V], key: V => K): Map[K, V] =
       data.distinct
         .groupBy(key)
-        .ensuring(_.forall { case (_, v) => if (v.size == 1) true else { println(v); false } }, "Duplicate detected")
+        .ensuring(_.forall {
+          case (_, v) =>
+            if (v.size == 1) true
+            else {
+              println(v)
+              false
+            }
+        }, "Duplicate detected")
         .mapValues(_.head)
 
     def str(s: String): String = "\"" + s + "\""
@@ -46,19 +53,19 @@ object Tasks {
         toMapChecked(seq, key).map { case (_, v) => (keyStr(v), valueStr(v)) }
       )
 
-    def buildVarsStr(vars: Seq[VarSourceData], ver: String): String =
+    def buildVarsStr(vars: Seq[VarSourceData], version: Int): String =
       kvStr[String, VarSourceData](
         vars,
         _.name,
-        v => Seq(str(v.name), ver),
+        v => Seq(str(v.name), version.toString),
         v => Seq(str(v.doc))
       )
 
-    def buildFuncsStr(funcs: Seq[FuncSourceData], ver: String): String =
+    def buildFuncsStr(funcs: Seq[FuncSourceData], version: Int): String =
       kvStr[(String, List[String]), FuncSourceData](
         funcs,
         f => (f.name, f.params),
-        f => Seq(str(f.name), listStr(f.params.map(str)), ver),
+        f => Seq(str(f.name), listStr(f.params.map(str)), version.toString),
         f => Seq(str(f.doc), listStr(f.paramsDoc.map(str)), f.complexity.toString)
       )
 
@@ -71,11 +78,11 @@ object Tasks {
       )
 
     def readV1V2Data(): (String, String) =
-      Seq("1", "2")
-        .map { ver =>
-          val DocSourceData(vars, funcs) = mapper.readValue[DocSourceData](new File(s"$baseLangDir/doc/v$ver/data.json"))
-          val varDataStr                 = buildVarsStr(vars, ver)
-          val funcDataStr                = buildFuncsStr(funcs, ver)
+      Seq(1, 2)
+        .map { version =>
+          val DocSourceData(vars, funcs) = mapper.readValue[DocSourceData](new File(s"$baseLangDir/doc/v$version/data.json"))
+          val varDataStr                 = buildVarsStr(vars, version)
+          val funcDataStr                = buildFuncsStr(funcs, version)
           (varDataStr, funcDataStr)
         }
         .reduce { (a, b) =>
@@ -83,15 +90,15 @@ object Tasks {
           val (v2, f2) = b
           (
             sumMapStr(v1, v2),
-            sumMapStr(f1, f2),
+            sumMapStr(f1, f2)
           )
         }
 
-    def buildCategorizedFuncsStr(funcs: Seq[(FuncSourceData, String)], ver: String): String =
+    def buildCategorizedFuncsStr(funcs: Seq[(FuncSourceData, String)], version: Int): String =
       kvStr[(String, List[String]), (FuncSourceData, String)](
         funcs,
         f => (f._1.name, f._1.params),
-        f => Seq(str(f._1.name), listStr(f._1.params.map(str)), ver),
+        f => Seq(str(f._1.name), listStr(f._1.params.map(str)), version.toString),
         f =>
           Seq(
             str(f._1.doc.replace("\n", "\\n")),
@@ -101,20 +108,20 @@ object Tasks {
           )
       )
 
-    def readCategorizedData(ver: String): (String, String) = {
+    def readFuncs(version: Int): String = {
       val funcs = for {
-        path <- Files.list(Paths.get(s"$baseLangDir/doc/v$ver/funcs")).iterator.asScala
+        path <- Files.list(Paths.get(s"$baseLangDir/doc/v$version/funcs")).iterator.asScala
         json = JsonValue.readHjson(Files.newBufferedReader(path)).asObject().toString
         funcs <- mapper.readValue[Map[String, List[FuncSourceData]]](json).head._2
         category = path.getName(path.getNameCount - 1).toString.split('.').head
       } yield (funcs, category)
 
-      val funcsStr = buildCategorizedFuncsStr(funcs.toSeq, ver)
+      buildCategorizedFuncsStr(funcs.toSeq, version)
+    }
 
-      val vars    = mapper.readValue[Map[String, List[VarSourceData]]](new File(s"$baseLangDir/doc/v$ver/vars.json")).head._2
-      val varsStr = buildVarsStr(vars, ver)
-
-      (varsStr, funcsStr)
+    def readVars(version: Int): String = {
+      val vars = mapper.readValue[Map[String, List[VarSourceData]]](new File(s"$baseLangDir/doc/v$version/vars.json")).head._2
+      buildVarsStr(vars, version)
     }
 
     def readTypeData(ver: String): String = {
@@ -123,11 +130,20 @@ object Tasks {
       buildTypesStr(types, ver)
     }
 
-    val types             = (1 to 5).map(v => readTypeData(v.toString)).mkString(" ++ ")
-    val (vars, funcs)     = readV1V2Data()
-    val (varsV3, funcsV3) = readCategorizedData("3")
-    val (varsV4, funcsV4) = readCategorizedData("4")
-    val (varsV5, funcsV5) = readCategorizedData("5")
+    val docFolderR = "^v(\\d+)$".r
+    val currentRideVersion =
+      new File(s"$baseLangDir/doc")
+        .listFiles()
+        .map(_.name)
+        .collect { case docFolderR(version) => version.toInt }
+        .max
+
+    val (v1V2Vars, v1V2Funcs) = readV1V2Data()
+    val fromV3FuncDefs        = (3 to currentRideVersion).map(v => s"lazy val funcsV$v = ${readFuncs(v)}").mkString("\n")
+    val fromV3VarDefs         = (3 to currentRideVersion).map(v => s"lazy val varsV$v = ${readVars(v)}").mkString("\n")
+    val fromV3Vars            = (3 to currentRideVersion).map(v => s"varsV$v").mkString(" ++ ")
+    val fromV3Funcs           = (3 to currentRideVersion).map(v => s"funcsV$v").mkString(" ++ ")
+    val types                 = (1 to currentRideVersion).map(v => readTypeData(v.toString)).mkString(" ++ ")
 
     val sourceStr =
       s"""
@@ -136,12 +152,12 @@ object Tasks {
          | object DocSource {
          |   private val regex = "\\\\[(.+?)\\\\]\\\\(.+?\\\\)".r
          |
+         |   $fromV3FuncDefs
+         |   $fromV3VarDefs
+         |
          |   lazy val typeData = $types
-         |   lazy val varData  = $vars ++ $varsV3 ++ $varsV4 ++ $varsV5
-         |   lazy val funcData = $funcs ++ (categorizedfuncDataV3 ++ categorizedfuncDataV4 ++ categorizedfuncDataV5).view.mapValues(v => (regex.replaceAllIn(v._1, _.group(1)), v._2, v._4))
-         |   lazy val categorizedfuncDataV3 = $funcsV3
-         |   lazy val categorizedfuncDataV4 = $funcsV4
-         |   lazy val categorizedfuncDataV5 = $funcsV5
+         |   lazy val varData  = $v1V2Vars ++ $fromV3Vars
+         |   lazy val funcData = $v1V2Funcs ++ ($fromV3Funcs).view.mapValues(v => (regex.replaceAllIn(v._1, _.group(1)), v._2, v._4))
          | }
       """.stripMargin
 

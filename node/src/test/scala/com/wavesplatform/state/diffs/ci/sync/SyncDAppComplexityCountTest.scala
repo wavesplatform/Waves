@@ -1,4 +1,4 @@
-package com.wavesplatform.state.diffs.ci
+package com.wavesplatform.state.diffs.ci.sync
 
 import cats.instances.list._
 import cats.instances.map._
@@ -17,6 +17,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.Portfolio
+import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}

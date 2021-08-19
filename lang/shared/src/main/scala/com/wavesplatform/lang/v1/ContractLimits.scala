@@ -5,16 +5,16 @@ import com.wavesplatform.lang.v1.compiler.Terms
 
 object ContractLimits {
   val MaxComplexityByVersion: StdLibVersion => Int = {
-    case V1 | V2      => 2000
-    case V3 | V4 | V5 => 4000
+    case V1 | V2 => 2000
+    case _       => 4000
   }
 
   val MaxCallableComplexityByVersion: StdLibVersion => Int =
     v => if (v < V5) 4000 else 10000
 
   val MaxTotalInvokeComplexity: StdLibVersion => Int = {
-    case V5 => 26000
-    case v => MaxComplexityByVersion(v) * (MaxAttachedPaymentAmount + MaxCallableActionsAmount(V4) + 1)
+    case v if v < V5 => MaxComplexityByVersion(v) * (MaxAttachedPaymentAmount + MaxCallableActionsAmount(V4) + 1)
+    case _           => 26000
   }
 
   val MaxSyncDAppCalls: StdLibVersion => Int =
@@ -37,8 +37,8 @@ object ContractLimits {
   val MaxDeclarationNameInBytes = 255
 
   // Data	0.001 per kilobyte, rounded up, fee for CI is 0.005
-  val MaxInvokeScriptSizeInBytes = 5 * 1024
-  val MaxWriteSetSizeInBytes     = 5 * 1024
+  val MaxInvokeScriptSizeInBytes        = 5 * 1024
+  val MaxWriteSetSizeInBytes            = 5 * 1024
   def MaxWriteSetSize(v: StdLibVersion) = 100
 
   // should conform DataEntry limits

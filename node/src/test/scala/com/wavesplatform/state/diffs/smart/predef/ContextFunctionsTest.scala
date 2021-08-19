@@ -5,9 +5,8 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.db.WithState
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.{BlockV5, FeeSponsorship, SynchronousCalls}
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing._
@@ -38,7 +37,8 @@ import com.wavesplatform.utils._
 import org.scalacheck.Gen
 import shapeless.Coproduct
 
-class ContextFunctionsTest extends PropSpec with WithState {
+class ContextFunctionsTest extends PropSpec with WithDomain {
+  import DomainPresets._
 
   def compactDataTransactionGen(sender: KeyPair): Gen[DataTransaction] =
     for {
@@ -285,23 +285,9 @@ class ContextFunctionsTest extends PropSpec with WithState {
     forAll(for {
       (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
       version                                                                               <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
-      v4Activation                                                                          <- if (version >= V4) Gen.const(true) else Gen.oneOf(false, true)
-      v5Activation                                                                          <- if (version >= V5) Gen.const(true) else Gen.oneOf(false, true)
-    } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, v4Activation, v5Activation)) {
-      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, v4Activation, v5Activation) =>
-        val fs = {
-          val features = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (FeeSponsorship.id -> 0))
-          val features1 =
-            if (v4Activation)
-              features.copy(preActivatedFeatures = features.preActivatedFeatures + (BlockV5.id -> 0))
-            else
-              features
-          if (v5Activation)
-            features1.copy(preActivatedFeatures = features1.preActivatedFeatures + (SynchronousCalls.id -> 0))
-          else
-            features1
-        }
-
+    } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version)) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version) =>
+        val fs = settingsForRide(version).blockchainSettings.functionalitySettings
         assertDiffAndState(fs) { append =>
           append(genesis).explicitGet()
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
@@ -439,13 +425,8 @@ class ContextFunctionsTest extends PropSpec with WithState {
         val generationSignature =
           if (withVrf) ByteStr(new Array[Byte](Block.GenerationVRFSignatureLength)) else ByteStr(new Array[Byte](Block.GenerationSignatureLength))
 
-        val fs =
-          if (version >= V5) smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (SynchronousCalls.id -> 0))
-          else smartEnabledFS
-
-        val fsWithVrf =
-          if (withVrf) fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockV5.id -> 0))
-          else fs
+        val settingsVersion = if (withVrf) Seq(version, V4).max else version
+        val settings        = settingsForRide(settingsVersion).blockchainSettings.functionalitySettings
 
         val (v4DeclOpt, v4CheckOpt) =
           if (version >= V4)
@@ -455,7 +436,7 @@ class ContextFunctionsTest extends PropSpec with WithState {
               (s"let checkVrf = block.vrf == unit", "&& checkVrf")
           else ("", "")
 
-        assertDiffAndState(fsWithVrf) { append =>
+        assertDiffAndState(settings) { append =>
           append(genesis).explicitGet()
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
           append(Seq(transferTx)).explicitGet()
@@ -739,10 +720,7 @@ class ContextFunctionsTest extends PropSpec with WithState {
 
     forAll(preconditions) {
       case (version, masterAcc, recipient, genesis, dataTransaction, transferTx) =>
-        val fs = smartEnabledFS.copy(
-          preActivatedFeatures = smartEnabledFS.preActivatedFeatures ++
-            Map(BlockchainFeatures.SynchronousCalls.id -> 0)
-        )
+        val fs = settingsForRide(version).blockchainSettings.functionalitySettings
         assertDiffAndState(fs) { append =>
           val (intKey, intValue)         = dataTransaction.data.collectFirst { case IntegerDataEntry(key, value) => (key, value) }.get
           val (booleanKey, booleanValue) = dataTransaction.data.collectFirst { case BooleanDataEntry(key, value) => (key, value) }.get

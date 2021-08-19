@@ -1,5 +1,6 @@
-package com.wavesplatform.state.diffs.ci
+package com.wavesplatform.state.diffs.ci.sync
 
+import com.wavesplatform.TestTime
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -11,12 +12,12 @@ import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart._
-import com.wavesplatform.TestTime
-import com.wavesplatform.test.PropSpec
 
 class SyncDAppRecursionTest extends PropSpec with WithDomain {
 

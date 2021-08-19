@@ -75,13 +75,13 @@ class InvokePaymentsLimitTest extends PropSpec
 
   private def assertLimit(version: StdLibVersion, count: Int, nested: Boolean) = {
     val (preparingTxs, invoke) = scenario(version, count, nested).sample.get
-    withDomain(RideV5) { d =>
+    withDomain(settingsForRide(version)) { d =>
       d.appendBlock(preparingTxs: _*)
       d.appendBlock(invoke)
       d.blockchain.transactionInfo(invoke.id.value()).get._3 shouldBe true
     }
     val (preparingTxs2, invoke2) = scenario(version, count + 1, nested).sample.get
-    withDomain(RideV5) { d =>
+    withDomain(settingsForRide(version)) { d =>
       d.appendBlock(preparingTxs2: _*)
       (the[RuntimeException] thrownBy d.appendBlock(invoke2)).getMessage should include(
         s"Script payment amount=${count + 1} should not exceed $count"

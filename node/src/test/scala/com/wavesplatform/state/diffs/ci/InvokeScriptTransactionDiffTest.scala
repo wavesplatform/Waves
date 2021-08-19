@@ -6,7 +6,7 @@ import com.wavesplatform.account._
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.{DBCacheSettings, WithState}
+import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
@@ -28,7 +28,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.settings.{TestFunctionalitySettings, TestSettings}
+import com.wavesplatform.settings.TestSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
@@ -46,33 +46,15 @@ import com.wavesplatform.transaction.{Asset, _}
 import com.wavesplatform.utils._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{EitherValues, Inside}
 
 import scala.collection.immutable
 
-class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCacheSettings with EitherValues with Inside with MockFactory {
+class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCacheSettings with EitherValues with Inside with MockFactory {
+  import DomainPresets._
 
-  private val fs = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
-      BlockchainFeatures.SmartAccounts.id  -> 0,
-      BlockchainFeatures.SmartAssets.id    -> 0,
-      BlockchainFeatures.Ride4DApps.id     -> 0,
-      BlockchainFeatures.FeeSponsorship.id -> 0
-    )
-  )
-
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
-      BlockchainFeatures.SmartAccounts.id    -> 0,
-      BlockchainFeatures.SmartAssets.id      -> 0,
-      BlockchainFeatures.Ride4DApps.id       -> 0,
-      BlockchainFeatures.FeeSponsorship.id   -> 0,
-      BlockchainFeatures.DataTransaction.id  -> 0,
-      BlockchainFeatures.BlockV5.id          -> 0,
-      BlockchainFeatures.SynchronousCalls.id -> 0
-    )
-  )
+  private val fs = settingsForRide(V3).blockchainSettings.functionalitySettings
+  private val fsWithV5 = settingsForRide(V5).blockchainSettings.functionalitySettings
 
   val assetAllowed: Script = ExprScript(
     FUNCTION_CALL(FunctionHeader.Native(FunctionIds.GT_LONG), List(GETTER(REF("tx"), "fee"), CONST_LONG(-1)))
@@ -1359,17 +1341,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
       )
     } yield (r._1, r._2, r._3, version)) {
       case (genesis, setScript, ci, version) =>
-        val settings =
-          version match {
-            case V3 => fs
-            case V4 => fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
-            case V5 =>
-              fs.copy(
-                preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0) + (BlockchainFeatures.SynchronousCalls.id -> 0)
-              )
-            case v => throw new TestFailedException(s"Unexpected $v", 0)
-          }
-
+        val settings = settingsForRide(version).blockchainSettings.functionalitySettings
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), settings) {
           if (version == V3)
             _ shouldBe Symbol("right")
