@@ -17,6 +17,7 @@ import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, Co
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
@@ -250,10 +251,56 @@ trait BaseGlobal {
 
   // Math functions
 
-  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long]
+  def pow(b: Long, bp: Int, e: Long, ep: Int, rp: Int, round: Rounding): Either[String, Long]
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long]
   def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt]
   def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt]
+
+  def divide(a: BigInt, b: BigInt, rounding: Rounding): Either[String, BigInt] = {
+    val sign                  = a.sign * b.sign
+    val (division, remainder) = a.abs /% b.abs
+    rounding match {
+      case Down => Right(division * sign)
+      case Up   => Right((division + remainder.sign) * sign)
+      case HalfUp =>
+        val x = b.abs - remainder * 2
+        if (x <= 0) {
+          Right((division + 1) * sign)
+        } else {
+          Right(division * sign)
+        }
+      case HalfDown =>
+        val x = b.abs - remainder * 2
+        if (x < 0) {
+          Right((division + 1) * sign)
+        } else {
+          Right(division * sign)
+        }
+      case HalfEven =>
+        val x = b.abs - remainder * 2
+        if (x < 0) {
+          Right((division + 1) * sign)
+        } else if (x > 0) {
+          Right(division * sign)
+        } else {
+          Right((division + division % 2) * sign)
+        }
+      case Ceiling =>
+        Right((if (sign > 0) {
+          division + remainder.sign
+        } else {
+          division
+        }) * sign)
+      case Floor =>
+        Right((if (sign < 0) {
+          division + remainder.sign
+        } else {
+          division
+        }) * sign)
+      case _ =>
+        Left(s"unsupported rounding $rounding")
+    }
+  }
 
   def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
 

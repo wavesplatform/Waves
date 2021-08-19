@@ -1,7 +1,8 @@
 package com.wavesplatform.lang
 
-import java.math.{MathContext, BigDecimal => BD}
+import java.math.{BigInteger, MathContext, RoundingMode, BigDecimal => BD}
 import java.security.spec.InvalidKeySpecException
+
 import cats.syntax.either._
 import ch.obermuhlner.math.big.BigDecimalMath
 import com.google.common.base.Utf8
@@ -42,12 +43,12 @@ object Global extends BaseGlobal {
   private val base16Encoder: BaseEncoding = BaseEncoding.base16().lowerCase()
 
   override def base16EncodeImpl(input: Array[Byte]): Either[String, String] =
-    toEither(base16Encoder.encode(input))
+    tryEither(base16Encoder.encode(input))
 
   override def base16DecodeImpl(input: String): Either[String, Array[Byte]] =
-    toEither(base16Encoder.decode(input.toLowerCase))
+    tryEither(base16Encoder.decode(input.toLowerCase))
 
-  private def toEither[A](f: => A): Either[String, A] =
+  private def tryEither[A](f: => A): Either[String, A] =
     Try(f).toEither
       .leftMap { exception =>
         val cause = findThrowableCause(exception)
@@ -78,28 +79,48 @@ object Global extends BaseGlobal {
     Merkle.verify(rootBytes, proofBytes, valueBytes)
 
   // Math functions
-  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long] =
-    (Try {
-      val base = BD.valueOf(b, bp.toInt)
-      val exp  = BD.valueOf(e, ep.toInt)
-      val res  = BigDecimalMath.pow(base, exp, MathContext.DECIMAL128)
-      res.setScale(rp.toInt, round.mode).unscaledValue.longValueExact
-    }).toEither.left.map(_.toString)
+  def pow(
+      base: Long,
+      basePrecision: Int,
+      exponent: Long,
+      exponentPrecision: Int,
+      resultPrecision: Int,
+      round: Rounding
+  ): Either[String, Long] =
+    tryEither {
+      val precision = 19 // max count of long digits
+      val baseBD    = BD.valueOf(base, basePrecision)
+      val expBD     = BD.valueOf(exponent, exponentPrecision)
+      val context   = new MathContext(precision, RoundingMode.HALF_EVEN)
+      val result    = BigDecimalMath.pow(baseBD, expBD, context)
+      val value     = result.unscaledValue()
+      val scale     = result.scale()
+      if (scale > resultPrecision)
+        if (scale - resultPrecision > precision - 1)
+          Right(BigInt(0))
+        else
+          divide(value, BigInteger.TEN.pow(scale - resultPrecision), round)
+      else
+        if (resultPrecision - scale > precision - 1)
+          Left("Pow overflow")
+        else
+          Right(BigInt(value) * BigInteger.TEN.pow(resultPrecision - scale))
+    }.flatten.map(_.bigInteger.longValueExact())
 
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long] =
-    (Try {
+    tryEither {
       val base = BD.valueOf(b, bp.toInt)
       val exp  = BD.valueOf(e, ep.toInt)
       val res  = BigDecimalMath.log(base, MathContext.DECIMAL128).divide(BigDecimalMath.log(exp, MathContext.DECIMAL128), MathContext.DECIMAL128)
       res.setScale(rp.toInt, round.mode).unscaledValue.longValueExact
-    }).toEither.left.map(_.toString)
+    }
 
   val bigMathContext = new MathContext(156 + 40)
 
   def toJBig(v: BigInt, p: Long) = BigDecimal(v).bigDecimal.multiply(BD.valueOf(1L, p.toInt))
 
   def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =
-    toEither {
+    tryEither {
       val base = toJBig(b, bp)
       val exp  = toJBig(e, ep)
       val res  = BigDecimalMath.pow(base, exp, bigMathContext)
@@ -107,7 +128,7 @@ object Global extends BaseGlobal {
     }
 
   def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =
-    toEither {
+    tryEither {
       val base = toJBig(b, bp)
       val exp  = toJBig(e, ep)
       val res  = BigDecimalMath.log(base, bigMathContext).divide(BigDecimalMath.log(exp, bigMathContext), bigMathContext)

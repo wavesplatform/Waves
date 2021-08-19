@@ -22,7 +22,6 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding._
 import com.wavesplatform.lang.v1.evaluator.{ContextfulUserFunction, ContextfulVal}
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
@@ -406,54 +405,10 @@ object PureContext {
       case CONST_BIGINT(v) :: CONST_BIGINT(n) :: CONST_BIGINT(d) :: (r: CaseObj) :: Nil =>
         for {
           _ <- Either.cond(d != 0, (), "Fraction: division by zero")
-          p       = v * n
-          s       = p.sign * d.sign
-          rm      = p.abs /% d.abs
-          presult = rm._1
-          m       = rm._2
-          result <- Rounding.byValue(r) match {
-            case Down => Right(presult * s)
-            case Up   => Right((presult + m.sign) * s)
-            case HalfUp =>
-              val x = d.abs - m * 2
-              if (x <= 0) {
-                Right((presult + 1) * s)
-              } else {
-                Right(presult * s)
-              }
-            case HalfDown =>
-              val x = d.abs - m * 2
-              if (x < 0) {
-                Right((presult + 1) * s)
-              } else {
-                Right(presult * s)
-              }
-            case Ceiling =>
-              Right((if (s > 0) {
-                       presult + m.sign
-                     } else {
-                       presult
-                     }) * s)
-            case Floor =>
-              Right((if (s < 0) {
-                       presult + m.sign
-                     } else {
-                       presult
-                     }) * s)
-            case HalfEven =>
-              val x = d.abs - m * 2
-              if (x < 0) {
-                Right((presult + 1) * s)
-              } else if (x > 0) {
-                Right(presult * s)
-              } else {
-                Right((presult + presult % 2) * s)
-              }
-            case _ => Left(s"unsupported rounding $r")
-          }
-          _ <- Either.cond(result <= BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
-          _ <- Either.cond(result >= BigIntMin, (), s"Long overflow: value `$result` less than -2^511")
-        } yield CONST_BIGINT(result)
+          r <- global.divide(v * n, d, Rounding.byValue(r))
+          _ <- Either.cond(r <= BigIntMax, (), s"Long overflow: value `$r` greater than 2^511-1")
+          _ <- Either.cond(r >= BigIntMin, (), s"Long overflow: value `$r` less than -2^511")
+        } yield CONST_BIGINT(r)
       case xs =>
         notImplemented[Id, EVALUATED](
           "fraction(value: BigInt, numerator: BigInt, denominator: BigInt, round: Ceiling|Down|Floor|HalfEven|HalfUp)",
@@ -1363,7 +1318,7 @@ object PureContext {
             || rp > 8) {
           Left("pow: scale out of range 0-8")
         } else {
-          global.pow(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_LONG)
+          global.pow(b, bp.toInt, e, ep.toInt, rp.toInt, Rounding.byValue(round)).map(CONST_LONG)
         }
       case xs => notImplemented[Id, EVALUATED]("pow(base: Int, bp: Int, exponent: Int, ep: Int, rp: Int, round: Rounds)", xs)
     }
