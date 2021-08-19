@@ -28,7 +28,7 @@ final class Address private(val chainId: Byte, val publicKeyHash: Array[Byte], c
     case _          => false
   }
   
-  override def hashCode(): Int = (publicKeyHash, chainId).hashCode()
+  override def hashCode(): Int = (ByteStr(publicKeyHash), chainId).hashCode()
 }
 
 final case class Alias(chainId: Byte, name: String) extends AddressOrAlias {
