@@ -1,13 +1,13 @@
 package com.wavesplatform.protobuf.block
 
+import scala.util.Try
+
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.network.MicroBlockResponse
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction.PBTransactions
-
-import scala.util.Try
 
 object PBMicroBlocks {
 
@@ -18,7 +18,7 @@ object PBMicroBlocks {
     val transactions =
       if (microBlock.version < VanillaBlock.HybridBlockVersion)
         microBlock.wavesTransactions.map(PBTransactions.vanilla(_, unsafe).explicitGet())
-      else microBlock.wrappedTransactions.map(PBTransactions.vanilla(_, unsafe).explicitGet())
+      else microBlock.wrappedTransactions.map(PBTransactions.vanillaW(_, unsafe).explicitGet())
 
     MicroBlockResponse(
       VanillaMicroBlock(

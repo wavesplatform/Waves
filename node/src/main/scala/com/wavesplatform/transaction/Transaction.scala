@@ -15,6 +15,7 @@ abstract class Transaction(val tpe: TransactionType.TransactionType, val checked
 
   def bytesSize: Int         = bytes().length
   val protoSize: Coeval[Int] = Coeval(PBTransactions.protobuf(this).serializedSize)
+  val bodyBytes: Coeval[Array[Byte]]
   val bytes: Coeval[Array[Byte]]
   val json: Coeval[JsObject]
 

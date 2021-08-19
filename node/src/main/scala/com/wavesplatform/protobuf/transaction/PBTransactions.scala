@@ -58,7 +58,7 @@ object PBTransactions {
   def tryToVanilla(signedTx: PBSignedTransaction): Try[VanillaTransaction] =
     Try(vanilla(signedTx, unsafe = false).explicitGet())
 
-  def vanilla(txWrapper: PBTransactionWrapper, unsafe: Boolean): Either[ValidationError, VanillaTransaction] = {
+  def vanillaW(txWrapper: PBTransactionWrapper, unsafe: Boolean = false): Either[ValidationError, VanillaTransaction] = {
     txWrapper.transaction match {
       case PBTransactionWrapper.Transaction.Empty                   => Left(GenericError("Transaction must be specified"))
       case PBTransactionWrapper.Transaction.WavesTransaction(value) => vanilla(value, unsafe)
@@ -67,7 +67,7 @@ object PBTransactions {
     }
   }
 
-  def vanilla(signedTx: PBSignedTransaction, unsafe: Boolean): Either[ValidationError, VanillaTransaction] = {
+  def vanilla(signedTx: PBSignedTransaction, unsafe: Boolean = false): Either[ValidationError, VanillaTransaction] = {
     for {
       parsedTx <- signedTx.transaction.toRight(GenericError("Transaction must be specified"))
       (feeAsset, feeAmount) = PBAmounts.toAssetAndAmount(parsedTx.fee.getOrElse(Amount.defaultInstance))

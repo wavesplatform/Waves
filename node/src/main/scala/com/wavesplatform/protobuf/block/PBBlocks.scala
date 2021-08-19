@@ -1,5 +1,7 @@
 package com.wavesplatform.protobuf.block
 
+import scala.util.Try
+
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.BlockHeader
@@ -8,8 +10,6 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.Block.{Header => PBHeader}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.protobuf.transaction.TransactionWrapper.Transaction.WavesTransaction
-
-import scala.util.Try
 
 object PBBlocks {
   def vanilla(header: PBBlock.Header): BlockHeader =
@@ -31,7 +31,7 @@ object PBBlocks {
     val transactions =
       if (header.version < VanillaBlock.HybridBlockVersion)
         block.wavesTransactions.map(PBTransactions.vanilla(_, unsafe).explicitGet())
-      else block.wrappedTransactions.map(PBTransactions.vanilla(_, unsafe).explicitGet())
+      else block.wrappedTransactions.map(PBTransactions.vanillaW(_, unsafe).explicitGet())
 
     VanillaBlock(vanilla(header), block.signature.toByteStr, transactions)
   }
@@ -65,7 +65,6 @@ object PBBlocks {
         wrappedTransactions = transactionData.map(PBTransactions.wrapped)
       )
     }
-
 
   }
 

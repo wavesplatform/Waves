@@ -38,7 +38,7 @@ class BlocksApiSuite extends GrpcBaseTransactionSuite {
       case (h1, h2) =>
         h1.getBlock.header shouldEqual h2.getBlock.header
         h1.getBlock.signature shouldEqual h2.getBlock.signature
-        h1.getBlock.transactions should be(empty)
+        h1.getBlock.wavesTransactions should be(empty)
         h1.height shouldEqual h2.height
     }
 
