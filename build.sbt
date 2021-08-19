@@ -183,6 +183,7 @@ checkPRRaw := Def
       (`grpc-server` / Test / test).value
       (node / Test / test).value
       (`repl-js` / Compile / fastOptJS).value
+      (`node-it` / Test / compile).value
     }
   )
   .value

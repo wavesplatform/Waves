@@ -16,13 +16,13 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
     super.beforeAll()
 
     val issuedAsset = sender.broadcastIssue(firstAcc, "name", someAssetAmount, 8, true, issueFee, waitForTx = true)
-    issuedAssetId = PBTransactions.vanilla(issuedAsset).explicitGet().id().toString
+    issuedAssetId = PBTransactions.vanilla(issuedAsset, unsafe = false).explicitGet().id().toString
   }
 
   test("asset transfer changes sender's and recipient's asset balance by transfer amount and waves by fee") {
     for (v <- transferTxSupportedVersions) {
       val issuedAsset      = sender.broadcastIssue(firstAcc, "name", someAssetAmount, 8, true, issueFee, waitForTx = true)
-      val issuedAssetId    = PBTransactions.vanilla(issuedAsset).explicitGet().id().toString
+      val issuedAssetId    = PBTransactions.vanilla(issuedAsset, unsafe = false).explicitGet().id().toString
       val firstBalance     = sender.wavesBalance(firstAddress).available
       val firstEffBalance  = sender.wavesBalance(firstAddress).effective
       val secondBalance    = sender.wavesBalance(secondAddress).available

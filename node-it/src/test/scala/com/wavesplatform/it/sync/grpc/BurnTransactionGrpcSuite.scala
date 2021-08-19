@@ -13,7 +13,8 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   test("burning assets changes issuer's asset balance; issuer's waves balance is decreased by fee") {
     for (v <- burnTxSupportedVersions) {
       val issuedAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(firstAcc, s"name+$v", issueAmount, decimals, reissuable = false, fee = issueFee, waitForTx = true)
+        sender.broadcastIssue(firstAcc, s"name+$v", issueAmount, decimals, reissuable = false, fee = issueFee, waitForTx = true),
+        unsafe = false
       ).explicitGet().id().toString
 
       sender.assetsBalance(firstAddress, Seq(issuedAssetId))(issuedAssetId) shouldBe issueAmount
@@ -39,7 +40,8 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val transferredQuantity = issuedQuantity / 2
 
       val issuedAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true)
+        sender.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true),
+        unsafe = false
       ).explicitGet().id().toString
       sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(secondAddress), transferredQuantity, minFee, assetId = issuedAssetId, waitForTx = true)
 
@@ -62,7 +64,8 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val burnedQuantity = issuedQuantity + 1
 
       val issuedAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true)
+        sender.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true),
+        unsafe = false
       ).explicitGet().id().toString
 
       sender.waitForHeightArise()
@@ -82,7 +85,8 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val burnedQuantity      = transferredQuantity + 1
 
       val issuedAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true)
+        sender.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true),
+        unsafe = false
       ).explicitGet().id().toString
       sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(secondAddress), transferredQuantity, minFee, assetId = issuedAssetId, waitForTx = true)
 
@@ -100,7 +104,8 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val transferredQuantity = issuedQuantity / 2
 
       val issuedAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = true, issueFee, waitForTx = true)
+        sender.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = true, issueFee, waitForTx = true),
+        unsafe = false
       ).explicitGet().id().toString
 
       sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(secondAddress), transferredQuantity, minFee, assetId = issuedAssetId, waitForTx = true)

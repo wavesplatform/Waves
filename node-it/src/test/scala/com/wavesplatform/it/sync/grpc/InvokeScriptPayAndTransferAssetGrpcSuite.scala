@@ -26,7 +26,8 @@ class InvokeScriptPayAndTransferAssetGrpcSuite extends GrpcBaseTransactionSuite 
   test("issue and transfer asset") {
     assetId = PBTransactions
       .vanilla(
-        sender.broadcastIssue(caller, "Asset", assetQuantity, 2, reissuable = true, fee = issueFee, waitForTx = true)
+        sender.broadcastIssue(caller, "Asset", assetQuantity, 2, reissuable = true, fee = issueFee, waitForTx = true),
+        unsafe = false
       )
       .explicitGet()
       .id()
@@ -35,7 +36,8 @@ class InvokeScriptPayAndTransferAssetGrpcSuite extends GrpcBaseTransactionSuite 
     val script = Right(Some(ScriptCompiler.compile("true", estimator).explicitGet()._1))
     smartAssetId = PBTransactions
       .vanilla(
-        sender.broadcastIssue(caller, "Smart", assetQuantity, 2, reissuable = true, fee = issueFee, script = script, waitForTx = true)
+        sender.broadcastIssue(caller, "Smart", assetQuantity, 2, reissuable = true, fee = issueFee, script = script, waitForTx = true),
+        unsafe = false
       )
       .explicitGet()
       .id()
@@ -45,7 +47,8 @@ class InvokeScriptPayAndTransferAssetGrpcSuite extends GrpcBaseTransactionSuite 
     val smartScript = Right(Some(ScriptCompiler.compile(scriptText, estimator).explicitGet()._1))
     rejAssetId = PBTransactions
       .vanilla(
-        sender.broadcastIssue(caller, "Reject", assetQuantity, 2, reissuable = true, fee = issueFee, script = smartScript, waitForTx = true)
+        sender.broadcastIssue(caller, "Reject", assetQuantity, 2, reissuable = true, fee = issueFee, script = smartScript, waitForTx = true),
+        unsafe = false
       )
       .explicitGet()
       .id()

@@ -32,7 +32,7 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
 
   test("exchange tx with orders v1,v2") {
     val exchAsset          = sender.broadcastIssue(buyer, Base64.encode("exchAsset".utf8Bytes), someAssetAmount, 8, reissuable = true, 1.waves, waitForTx = true)
-    val exchAssetId        = PBTransactions.vanilla(exchAsset).explicitGet().id().toString
+    val exchAssetId        = PBTransactions.vanilla(exchAsset, unsafe = false).explicitGet().id().toString
     val price              = 500000L
     val amount             = 40000000L
     val priceAssetSpending = amount * price / 100000000L
@@ -58,7 +58,7 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
 
   test("exchange tx with orders v3") {
     val feeAsset           = sender.broadcastIssue(buyer, "feeAsset", someAssetAmount, 8, reissuable = true, 1.waves, waitForTx = true)
-    val feeAssetId         = PBTransactions.vanilla(feeAsset).explicitGet().id()
+    val feeAssetId         = PBTransactions.vanilla(feeAsset, unsafe = false).explicitGet().id()
     val price              = 500000L
     val amount             = 40000000L
     val priceAssetSpending = price * amount / 100000000L
