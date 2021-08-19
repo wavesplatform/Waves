@@ -32,12 +32,15 @@ class EthereumTransaction(
     encodeTransaction(underlying, signatureData)
   }
 
-  override val bodyBytes: Coeval[Array[TxVersion]] = bytes
-  
-  override val id: Coeval[ByteStr] = Coeval.evalOnce {
+  override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce {
+    // FIXME more convenient way to encode?
     val bs = encodeTransaction(underlying, null) ++ Array(67, 0x80, 0x80).map(_.toByte)
     bs(0) = (bs(0) + 3).toByte
-    ByteStr(Hash.sha3(bs))
+    bs
+  }
+  
+  override val id: Coeval[ByteStr] = Coeval.evalOnce {
+    ByteStr(Hash.sha3(bodyBytes()))
   }
 
   override def assetFee: (Asset, Long) = Asset.Waves -> underlying.getGasLimit.longValueExact()
