@@ -13,13 +13,8 @@ object PBMicroBlocks {
 
   def vanilla(signedMicro: PBSignedMicroBlock, unsafe: Boolean = false): Try[MicroBlockResponse] = Try {
     require(signedMicro.microBlock.isDefined, "microblock is missing")
-    val microBlock = signedMicro.getMicroBlock
-
-    val transactions =
-      if (microBlock.version < VanillaBlock.HybridBlockVersion)
-        microBlock.wavesTransactions.map(PBTransactions.vanilla(_, unsafe).explicitGet())
-      else microBlock.wrappedTransactions.map(PBTransactions.vanillaW(_, unsafe).explicitGet())
-
+    val microBlock   = signedMicro.getMicroBlock
+    val transactions = microBlock.transactions.map(PBTransactions.vanilla(_, unsafe).explicitGet())
     MicroBlockResponse(
       VanillaMicroBlock(
         microBlock.version.toByte,
@@ -33,24 +28,18 @@ object PBMicroBlocks {
     )
   }
 
-  def protobuf(microBlock: VanillaMicroBlock, totalBlockId: BlockId): PBSignedMicroBlock = {
-    val template = PBMicroBlock(
-      version = microBlock.version,
-      reference = microBlock.reference.toByteString,
-      updatedBlockSignature = microBlock.totalResBlockSig.toByteString,
-      senderPublicKey = microBlock.sender.toByteString
-    )
-
-    val actualBlock = if (microBlock.version < VanillaBlock.HybridBlockVersion) {
-      template.copy(wavesTransactions = microBlock.transactionData.map(PBTransactions.protobuf))
-    } else {
-      template.copy(wrappedTransactions = microBlock.transactionData.map(PBTransactions.wrapped))
-    }
-
+  def protobuf(microBlock: VanillaMicroBlock, totalBlockId: BlockId): PBSignedMicroBlock =
     new PBSignedMicroBlock(
-      microBlock = Some(actualBlock),
+      microBlock = Some(
+        PBMicroBlock(
+          version = microBlock.version,
+          reference = microBlock.reference.toByteString,
+          updatedBlockSignature = microBlock.totalResBlockSig.toByteString,
+          senderPublicKey = microBlock.sender.toByteString,
+          transactions = microBlock.transactionData.map(PBTransactions.protobuf)
+        )
+      ),
       signature = microBlock.signature.toByteString,
       totalBlockId = totalBlockId.toByteString
     )
-  }
 }

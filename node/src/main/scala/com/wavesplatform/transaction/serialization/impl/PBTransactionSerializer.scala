@@ -9,7 +9,7 @@ import scala.util.Try
 
 object PBTransactionSerializer {
   def bodyBytes(tx: Transaction): Array[Byte] =
-    PBUtils.encodeDeterministic(PBTransactions.protobuf(tx).getTransaction)
+    PBUtils.encodeDeterministic(PBTransactions.protobuf(tx).getWavesTransaction)
 
   def bytes(tx: Transaction): Array[Byte] =
     PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))

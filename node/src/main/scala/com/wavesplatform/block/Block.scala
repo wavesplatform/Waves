@@ -185,7 +185,6 @@ object Block extends ScorexLogging {
   val NgBlockVersion: Byte      = 3
   val RewardBlockVersion: Byte  = 4
   val ProtoBlockVersion: Byte   = 5
-  val HybridBlockVersion: Byte = 6
 
   // Merkle
   implicit class BlockTransactionsRootOps(private val block: Block) extends AnyVal {

@@ -13,9 +13,6 @@ package object transaction {
   type PBSignedTransaction = com.wavesplatform.protobuf.transaction.SignedTransaction
   val PBSignedTransaction = com.wavesplatform.protobuf.transaction.SignedTransaction
 
-  type PBTransactionWrapper = com.wavesplatform.protobuf.transaction.TransactionWrapper
-  val PBTransactionWrapper = com.wavesplatform.protobuf.transaction.TransactionWrapper
-
   type VanillaTransaction = com.wavesplatform.transaction.Transaction
   val VanillaTransaction = com.wavesplatform.transaction.Transaction
 

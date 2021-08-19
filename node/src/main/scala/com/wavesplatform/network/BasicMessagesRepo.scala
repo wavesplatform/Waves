@@ -301,7 +301,7 @@ object PBTransactionSpec extends MessageSpec[Transaction] {
     PBTransactions.tryToVanilla(PBSignedTransaction.parseFrom(bytes))
 
   override def serializeData(data: Transaction): Array[MessageCode] =
-    PBTransactions.protobuf(data).toByteArray
+    PBTransactions.toByteArray(data)
 }
 
 // Virtual, only for logs

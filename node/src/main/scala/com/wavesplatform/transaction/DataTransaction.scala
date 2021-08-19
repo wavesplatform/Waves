@@ -32,7 +32,7 @@ case class DataTransaction(
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(DataTxSerializer.toBytes(this))
   override val json: Coeval[JsObject]         = Coeval.evalOnce(DataTxSerializer.toJson(this))
 
-  private[wavesplatform] lazy val protoDataPayload = PBTransactions.protobuf(this).getTransaction.getDataTransaction.toByteArray
+  private[wavesplatform] lazy val protoDataPayload = PBTransactions.protobuf(this).getWavesTransaction.getDataTransaction.toByteArray
 }
 
 object DataTransaction extends TransactionParser {

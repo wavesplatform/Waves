@@ -50,7 +50,7 @@ package object block {
     }
   }
 
-  def mkMerkleTree(txs: Seq[Transaction]): TransactionsMerkleTree = mkLevels(txs.map(PBTransactions.protobuf(_).toByteArray))
+  def mkMerkleTree(txs: Seq[Transaction]): TransactionsMerkleTree = mkLevels(txs.map(PBTransactions.toByteArray))
 
   def mkTransactionsRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
     if (version < Block.ProtoBlockVersion) ByteStr.empty

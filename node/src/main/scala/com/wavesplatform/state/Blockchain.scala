@@ -1,22 +1,22 @@
 package com.wavesplatform.state
 
 import com.wavesplatform.account._
-import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.block.Block._
+import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
-import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures, BlockchainFeatureStatus}
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.traits.domain.Issue
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 trait Blockchain {
   def settings: BlockchainSettings
@@ -97,9 +97,9 @@ object Blockchain {
     def lastBlockIds(howMany: Int): Seq[ByteStr]   = (blockchain.height to blockchain.height - howMany by -1).flatMap(blockId)
 
     def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
-      aoa match {
-        case address: Address => Right(address)
-        case alias: Alias          => blockchain.resolveAlias(alias)
+      (aoa: @unchecked) match {
+        case a: Address => Right(a)
+        case a: Alias   => blockchain.resolveAlias(a)
       }
 
     def canCreateAlias(alias: Alias): Boolean = blockchain.resolveAlias(alias) match {
@@ -179,15 +179,13 @@ object Blockchain {
     def featureActivationHeight(feature: Short): Option[Int] = blockchain.activatedFeatures.get(feature)
     def featureApprovalHeight(feature: Short): Option[Int]   = blockchain.approvedFeatures.get(feature)
 
-    def blockVersionAt(height: Int): Byte = {
-      if (isFeatureActivated(BlockchainFeatures.SynchronousCalls)) HybridBlockVersion
-      else if (isFeatureActivated(BlockchainFeatures.BlockV5, height)) ProtoBlockVersion
+    def blockVersionAt(height: Int): Byte =
+      if (isFeatureActivated(BlockchainFeatures.BlockV5, height)) ProtoBlockVersion
       else if (isFeatureActivated(BlockchainFeatures.BlockReward, height)) {
         if (blockchain.activatedFeatures(BlockchainFeatures.BlockReward.id) == height) NgBlockVersion else RewardBlockVersion
       } else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight + 1 < height) NgBlockVersion
       else if (height > 1) PlainBlockVersion
       else GenesisBlockVersion
-    }
 
     def binaryData(address: Address, key: String): Option[ByteStr] = blockchain.accountData(address, key).collect {
       case BinaryDataEntry(_, value) => value

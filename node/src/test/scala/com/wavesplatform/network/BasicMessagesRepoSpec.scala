@@ -46,7 +46,7 @@ class BasicMessagesRepoSpec extends FreeSpec {
 
     val transactionPBPrefix               = new ByteArrayOutputStream()
     val codedTransactionMaxLengthPBPrefix = CodedOutputStream.newInstance(transactionPBPrefix)
-    codedTransactionMaxLengthPBPrefix.writeTag(PBBlock.WAVES_TRANSACTIONS_FIELD_NUMBER, WireFormat.WIRETYPE_LENGTH_DELIMITED)
+    codedTransactionMaxLengthPBPrefix.writeTag(PBBlock.TRANSACTIONS_FIELD_NUMBER, WireFormat.WIRETYPE_LENGTH_DELIMITED)
     codedTransactionMaxLengthPBPrefix.writeUInt32NoTag(MiningConstraints.MaxTxsSizeInBytes)
     codedTransactionMaxLengthPBPrefix.flush()
 
@@ -75,7 +75,7 @@ class BasicMessagesRepoSpec extends FreeSpec {
 
   "PBTransactionSpec max length" in {
     val maxSizeTransaction = PBSignedTransaction(
-      Some(
+      PBSignedTransaction.Transaction.WavesTransaction(
         PBTransaction(
           Byte.MaxValue,
           ByteString.copyFrom(bytes32gen.sample.get),
