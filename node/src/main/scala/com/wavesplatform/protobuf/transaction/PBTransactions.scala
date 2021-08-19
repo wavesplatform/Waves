@@ -31,7 +31,7 @@ object PBTransactions {
 
   def createGenesis(chainId: Byte, timestamp: Long, signature: ByteStr, data: GenesisTransactionData): SignedTransaction =
     new SignedTransaction(
-      Some(Transaction(chainId, timestamp = timestamp, data = Data.Genesis(data))),
+      SignedTransaction.Transaction.WavesTransaction(Transaction(chainId, timestamp = timestamp, data = Data.Genesis(data))),
       Seq(ByteString.copyFrom(signature.arr))
     )
 
@@ -46,7 +46,7 @@ object PBTransactions {
       data: com.wavesplatform.protobuf.transaction.Transaction.Data = com.wavesplatform.protobuf.transaction.Transaction.Data.Empty
   ): SignedTransaction =
     new SignedTransaction(
-      Some(Transaction(chainId, sender.toByteString, Some((feeAssetId, fee): Amount), timestamp, version, data)),
+      SignedTransaction.Transaction.WavesTransaction(Transaction(chainId, sender.toByteString, Some((feeAssetId, fee): Amount), timestamp, version, data)),
       proofsArray.map(bs => ByteString.copyFrom(bs.arr))
     )
 
@@ -69,7 +69,7 @@ object PBTransactions {
 
   def vanilla(signedTx: PBSignedTransaction, unsafe: Boolean = false): Either[ValidationError, VanillaTransaction] = {
     for {
-      parsedTx <- signedTx.transaction.toRight(GenericError("Transaction must be specified"))
+      parsedTx <- signedTx.transaction.wavesTransaction.toRight(GenericError("Transaction must be specified"))
       (feeAsset, feeAmount) = PBAmounts.toAssetAndAmount(parsedTx.fee.getOrElse(Amount.defaultInstance))
       sender = Option(parsedTx.senderPublicKey)
         .filterNot(_.isEmpty)

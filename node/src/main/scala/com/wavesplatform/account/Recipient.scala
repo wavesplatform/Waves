@@ -20,7 +20,7 @@ sealed trait AddressOrAlias {
 }
 
 final class Address private(val chainId: Byte, val publicKeyHash: Array[Byte], checksum: Array[Byte]) extends AddressOrAlias {
-  override lazy val bytes: Array[Byte] = Array(1.toByte, chainId) ++ publicKeyHash ++ checksum
+  override lazy val bytes: Array[Byte] = Bytes.concat(Array(1.toByte, chainId), publicKeyHash, checksum)
   override lazy val toString: String   = ByteStr(bytes).toString
 
   override def equals(obj: Any): Boolean = obj match {
