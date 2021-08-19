@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.freecall
 
-import com.wavesplatform.{TestTime, TransactionGen}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -16,10 +15,8 @@ import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import org.scalatest.EitherValues
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.wavesplatform.{TestTime, TransactionGen}
-import org.scalatest.Assertion
+import org.scalatest.{Assertion, EitherValues}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with TransactionGen with WithDomain with EitherValues {

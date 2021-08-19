@@ -18,6 +18,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
+import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -56,7 +57,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
   // ~1900 complexity
   private val verifierScript: Script = {
     val script = s"""
-                    | {-# STDLIB_VERSION 6        #-}
+                    | {-# STDLIB_VERSION 5        #-}
                     | {-# SCRIPT_TYPE ACCOUNT     #-}
                     | {-# CONTENT_TYPE EXPRESSION #-}
                     |

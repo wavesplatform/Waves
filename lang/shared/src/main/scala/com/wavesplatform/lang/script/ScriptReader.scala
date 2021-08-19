@@ -1,4 +1,5 @@
 package com.wavesplatform.lang.script
+
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.ContractSerDe
 import com.wavesplatform.lang.directives.DirectiveDictionary
@@ -32,7 +33,7 @@ object ScriptReader {
             else
               Right((contentTypes(bytes(1)), stdLibVersions(bytes(2)), false, 3))
           case FreeCallHeader =>
-            Right(Expression, stdLibVersions(bytes(1)), true, 2)
+            Right((Expression, stdLibVersions(bytes(1)), true, 2))
           case v if !stdLibVersions.contains(v) => Left(ScriptParseError(s"Invalid version of script: $v"))
           case v                                => Right((Expression, stdLibVersions(v.toInt), false, 1))
         }
