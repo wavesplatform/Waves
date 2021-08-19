@@ -2,15 +2,15 @@ package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithState
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.test._
@@ -21,7 +21,9 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.{GenesisTransaction, TransactionType}
 import org.scalacheck.Gen
 
-class OverdraftTest extends PropSpec with WithState {
+class OverdraftTest extends PropSpec with WithDomain {
+  import DomainPresets._
+
   private val InvokeFee    = FeeConstants(TransactionType.InvokeScript) * FeeValidation.FeeUnit
   private val SetScriptFee = FeeConstants(TransactionType.SetScript) * FeeValidation.FeeUnit
   private val IssueFee     = FeeConstants(TransactionType.Issue) * FeeValidation.FeeUnit
@@ -33,24 +35,11 @@ class OverdraftTest extends PropSpec with WithState {
 
   private val dAppVersionWithSettingsGen: Gen[(StdLibVersion, FunctionalitySettings)] =
     for {
-      version    <- Gen.oneOf(dAppVersions)
-      activateV4 <- Gen.oneOf(true, version >= V4)
-      activateV5 <- Gen.oneOf(true, version >= V5)
-    } yield (version, features(activateV4, activateV5))
+      version <- Gen.oneOf(dAppVersions)
+    } yield (version, settingsForRide(version).blockchainSettings.functionalitySettings)
 
-  private val allActivatedSettings = features(activateV4 = true, activateV5 = true)
-
-  private def features(activateV4: Boolean, activateV5: Boolean) = {
-    val v4ForkO = if (activateV4) Seq(BlockchainFeatures.BlockV5) else Seq()
-    val v5ForkO = if (activateV5) Seq(BlockchainFeatures.SynchronousCalls) else Seq()
-    val parameters =
-      Seq(
-        BlockchainFeatures.SmartAccounts,
-        BlockchainFeatures.SmartAssets,
-        BlockchainFeatures.Ride4DApps
-      ) ++ v4ForkO ++ v5ForkO
-    TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = parameters.map(_.id -> 0).toMap)
-  }
+  private val allActivatedSettings =
+    settingsForRide(DirectiveDictionary[StdLibVersion].all.last).blockchainSettings.functionalitySettings
 
   property("insufficient fee") {
     forAll(

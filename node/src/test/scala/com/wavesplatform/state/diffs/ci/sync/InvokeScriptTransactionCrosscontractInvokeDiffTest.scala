@@ -1,4 +1,4 @@
-package com.wavesplatform.state.diffs.ci
+package com.wavesplatform.state.diffs.ci.sync
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
@@ -14,6 +14,7 @@ import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.{IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}

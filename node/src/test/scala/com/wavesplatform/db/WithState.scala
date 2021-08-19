@@ -1,7 +1,5 @@
 package com.wavesplatform.db
 
-import java.nio.file.Files
-
 import cats.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
@@ -12,6 +10,7 @@ import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
 import com.wavesplatform.state.diffs.BlockDiffer
@@ -27,6 +26,8 @@ import monix.reactive.subjects.{PublishSubject, Subject}
 import org.iq80.leveldb.{DB, Options}
 import org.scalatest.Suite
 import org.scalatest.matchers.should.Matchers
+
+import java.nio.file.Files
 
 trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
   protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = PublishSubject()
@@ -186,15 +187,27 @@ trait WithDomain extends WithState { _: Suite =>
       BlockchainFeatures.NG
     )
 
-    val RideV4 = NG.addFeatures(
+    val RideV3 = NG.addFeatures(
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.DataTransaction,
       BlockchainFeatures.Ride4DApps,
-      BlockchainFeatures.SmartAssets,
-      BlockchainFeatures.BlockV5
+      BlockchainFeatures.FeeSponsorship,
+      BlockchainFeatures.SmartAssets
     )
 
+    val RideV4 = RideV3.addFeatures(BlockchainFeatures.BlockV5)
     val RideV5 = RideV4.addFeatures(BlockchainFeatures.SynchronousCalls)
+    val RideV6 = RideV5.addFeatures(BlockchainFeatures.RideV6)
+
+    def settingsForRide(v: StdLibVersion): WavesSettings =
+      v match {
+        case V1 => RideV3
+        case V2 => RideV3
+        case V3 => RideV3
+        case V4 => RideV4
+        case V5 => RideV5
+        case V6 => RideV6
+      }
   }
 
 

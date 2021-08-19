@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.v1.evaluator.ctx.BaseFunction
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Functions.{addressFromStringF, _}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Vals._
@@ -72,18 +73,28 @@ object WavesContext {
       detailedIssueActionConstructor
     ) ++ balanceV4Functions
 
-  private def fromV5Funcs(proofsEnabled: Boolean, version: StdLibVersion, contentType: ContentType) =
-    fromV4Funcs(proofsEnabled, version) ++ Array(
+  private def fromV5Funcs(proofsEnabled: Boolean, version: StdLibVersion, contentType: ContentType, scriptType: ScriptType) = {
+    val v5Funcs = Array(
       simplifiedLeaseActionConstructor,
       detailedLeaseActionConstructor,
       calculateLeaseId,
       isDataStorageUntouchedF
-    ) ++ (if (contentType == DApp)
-            Array(
-              callDAppF(reentrant = false),
-              callDAppF(reentrant = true)
-            )
-          else Array())
+    )
+
+    val dAppFuncs =
+      if (contentType == DApp)
+        Array(callDAppF(reentrant = false), callDAppF(reentrant = true))
+      else
+        Array[BaseFunction[Environment]]()
+
+    val accountFuncs =
+      if (scriptType == Account)
+        selfCallFunctions(V5)
+      else
+        Array[BaseFunction[Environment]]()
+
+    fromV4Funcs(proofsEnabled, version) ++ v5Funcs ++ dAppFuncs ++ accountFuncs
+  }
 
   private def selfCallFunctions(v: StdLibVersion) =
     Array(
@@ -110,11 +121,11 @@ object WavesContext {
 
     val versionSpecificFuncs =
       version match {
-        case V1 | V2                     => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
-        case V3                          => fromV3Funcs(proofsEnabled, version) ++ balanceV123Functions
-        case V4                          => fromV4Funcs(proofsEnabled, version)
-        case V5 if scriptType == Account => fromV5Funcs(proofsEnabled, version, contentType) ++ selfCallFunctions(V5)
-        case V5                          => fromV5Funcs(proofsEnabled, version, contentType)
+        case V1 | V2 => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
+        case V3      => fromV3Funcs(proofsEnabled, version) ++ balanceV123Functions
+        case V4      => fromV4Funcs(proofsEnabled, version)
+        case V5      => fromV5Funcs(proofsEnabled, version, contentType, scriptType)
+        case V6      => fromV5Funcs(proofsEnabled, version, contentType, scriptType)
       }
     commonFuncs ++ versionSpecificFuncs
   }
@@ -129,7 +140,7 @@ object WavesContext {
     version match {
       case V1 => Map(txVal)
       case V2 => Map(sell, buy, txVal)
-      case V3 | V4 | V5 =>
+      case _ =>
         val `this` = if (isTokenContext) assetThis(version) else accountThis
         val txO    = if (contentType == Expression) Map(txVal) else Map()
         val common = Map(sell, buy, lastBlock(version), `this`)

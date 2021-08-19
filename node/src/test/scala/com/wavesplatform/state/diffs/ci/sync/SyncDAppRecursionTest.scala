@@ -1,4 +1,4 @@
-package com.wavesplatform.state.diffs.ci
+package com.wavesplatform.state.diffs.ci.sync
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
@@ -16,6 +16,7 @@ import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart._
+import com.wavesplatform.state.diffs.ci.ciFee
 
 class SyncDAppRecursionTest extends PropSpec with WithDomain {
 

@@ -67,18 +67,18 @@ object Types {
       "Invocation",
       payments(v.supportsMultiPayment) ::
         List(
-          "caller"          -> addressType,
-          "callerPublicKey" -> BYTESTR,
-          "transactionId"   -> BYTESTR,
-          "fee"             -> LONG,
-          "feeAssetId"      -> optionByteVector
-        ) :::
+        "caller"          -> addressType,
+        "callerPublicKey" -> BYTESTR,
+        "transactionId"   -> BYTESTR,
+        "fee"             -> LONG,
+        "feeAssetId"      -> optionByteVector
+      ) :::
         (if (v >= V5)
-           List(
-             "originCaller"          -> addressType,
-             "originCallerPublicKey" -> BYTESTR
-           )
-         else Nil)
+         List(
+           "originCaller"          -> addressType,
+           "originCallerPublicKey" -> BYTESTR
+         )
+       else Nil)
     )
 
   private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)
@@ -199,10 +199,10 @@ object Types {
 
   private def callableTypes(version: StdLibVersion): List[CASETYPEREF] =
     version match {
-      case V3 => callableV3Results
-      case V4 => callableV4Actions
-      case V5 => callableV4Actions ::: callableV5Actions
-      case _  => Nil
+      case V3           => callableV3Results
+      case V4           => callableV4Actions
+      case v if v >= V5 => callableV4Actions ::: callableV5Actions
+      case _            => Nil
     }
 
   def dAppTypes(version: StdLibVersion): List[CASETYPEREF] =
@@ -229,10 +229,10 @@ object Types {
 
   def callableReturnType(v: StdLibVersion): Either[ExecutionError, FINAL] =
     v match {
-      case V3 => Right(callableV3ReturnType)
-      case V4 => Right(callableV4ReturnType)
-      case V5 => Right(callableV5ReturnType)
-      case v  => Left(s"DApp is not supported for $v")
+      case V1 | V2 => Left(s"DApp is not supported for $v")
+      case V3      => Right(callableV3ReturnType)
+      case V4      => Right(callableV4ReturnType)
+      case _       => Right(callableV5ReturnType)
     }
 
   private def payments(multiPaymentAllowed: Boolean) =
@@ -473,12 +473,12 @@ object Types {
       addProofsIfNeeded(
         (if (version < V5) List("feeAssetId" -> optionByteVector) else Nil) :::
           List(
-            "assetId"       -> optionByteVector,
-            "totalAmount"   -> LONG,
-            "transfers"     -> listTransfers,
-            "transferCount" -> LONG,
-            "attachment"    -> BYTESTR
-          ) ::: header ::: proven,
+          "assetId"       -> optionByteVector,
+          "totalAmount"   -> LONG,
+          "transfers"     -> listTransfers,
+          "transferCount" -> LONG,
+          "attachment"    -> BYTESTR
+        ) ::: header ::: proven,
         proofsEnabled
       )
     )

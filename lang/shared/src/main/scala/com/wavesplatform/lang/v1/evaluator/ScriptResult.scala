@@ -271,13 +271,13 @@ object ScriptResult {
     }
 
   private def processScriptResult(
-    ctx: EvaluationContext[Environment, Id],
-    txId: ByteStr,
-    actions: Seq[EVALUATED],
-    handlers: ActionHandlers,
-    version: StdLibVersion,
-    unusedComplexity: Int,
-    ret: EVALUATED = unit
+      ctx: EvaluationContext[Environment, Id],
+      txId: ByteStr,
+      actions: Seq[EVALUATED],
+      handlers: ActionHandlers,
+      version: StdLibVersion,
+      unusedComplexity: Int,
+      ret: EVALUATED = unit
   ): Either[String, ScriptResultV4] =
     actions.toList
       .traverse {
@@ -320,17 +320,23 @@ object ScriptResult {
       e: EVALUATED,
       version: StdLibVersion,
       unusedComplexity: Int
-  ): Either[ExecutionError, ScriptResult] =
+  ): Either[ExecutionError, ScriptResult] = {
+    def processResultWithValue(
+        tpe: CASETYPEREF,
+        fields: Map[String, EVALUATED],
+        v: StdLibVersion
+    ) =
+      (fields.get("_1"), fields.get("_2")) match {
+        case (Some(ARR(actions)), Some(ret)) => processScriptResult(ctx, txId, actions, v5ActionHandlers, v, unusedComplexity, ret)
+        case _                               => err(tpe.name, version)
+      }
+
     (e, version) match {
-      case (CaseObj(tpe, fields), V3) => processScriptResultV3(ctx, tpe, fields, unusedComplexity)
-      case (ARR(actions), V4)         => processScriptResult(ctx, txId, actions, v4ActionHandlers, V4, unusedComplexity)
-      case (ARR(actions), V5)         => processScriptResult(ctx, txId, actions, v5ActionHandlers, V5, unusedComplexity)
-      case (CaseObj(tpe, fields), V5) if fields.size == 2 =>
-        // XXX check tpe
-        (fields("_1"), fields("_2")) match {
-          case (ARR(actions), ret) => processScriptResult(ctx, txId, actions, v5ActionHandlers, V5, unusedComplexity, ret)
-          case _                   => err(tpe.name, version)
-        }
-      case c => err(c.toString, version)
+      case (CaseObj(tpe, fields), V3)           => processScriptResultV3(ctx, tpe, fields, unusedComplexity)
+      case (ARR(actions), V4)                   => processScriptResult(ctx, txId, actions, v4ActionHandlers, V4, unusedComplexity)
+      case (ARR(actions), v) if v >= V5         => processScriptResult(ctx, txId, actions, v5ActionHandlers, v, unusedComplexity)
+      case (CaseObj(tpe, fields), v) if v >= V5 => processResultWithValue(tpe, fields, v)
+      case c                                    => err(c.toString, version)
     }
+  }
 }
