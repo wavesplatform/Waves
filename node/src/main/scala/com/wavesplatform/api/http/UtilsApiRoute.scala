@@ -5,36 +5,38 @@ import java.security.SecureRandom
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.syntax.either._
 import cats.syntax.semigroup._
-import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
+import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, ScriptCompilerError, TooBigArrayAllocation}
-import com.wavesplatform.api.http.requests.{byteStrFormat, ScriptWithImportsRequest}
+import com.wavesplatform.api.http.requests.{ScriptWithImportsRequest, byteStrFormat}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
-import com.wavesplatform.lang.v1.{ContractLimits, Serde}
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
+import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
+import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
-import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment, InvokeScriptTransaction}
 import com.wavesplatform.utils.Time
 import monix.eval.Coeval
 import monix.execution.Scheduler
@@ -234,7 +236,8 @@ case class UtilsApiRoute(
   }
 
   def transactionSerialize: Route =
-    path("transactionSerialize")(jsonPost[JsObject] { jsv => ???
+    path("transactionSerialize")(jsonPost[JsObject] { jsv =>
+      ???
 //      parseOrCreateTransaction(jsv)(tx => Json.obj("bytes" -> tx.bodyBytes().map(_.toInt & 0xff)))
     })
 
@@ -319,7 +322,27 @@ object UtilsApiRoute {
               blockchain,
               Coproduct[Environment.Tthis](Recipient.Address(ByteStr(address.bytes))),
               ds,
-              tx = None,
+              new InvokeScriptTransactionLike {
+                override def dApp: AddressOrAlias = address
+
+                override def funcCall: Terms.FUNCTION_CALL = Terms.FUNCTION_CALL(FunctionHeader.User(""), Nil)
+
+                override def payments: Seq[InvokeScriptTransaction.Payment] = Seq.empty
+
+                override def root: InvokeScriptTransactionLike = this
+
+                override def sender: PublicKey = PublicKey(ByteStr(new Array[Byte](32)))
+
+                override def assetFee: (Asset, Long) = Asset.Waves -> 0L
+
+                override def timestamp: Long = System.currentTimeMillis()
+
+                override def chainId: Byte = AddressScheme.current.chainId
+
+                override def id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr.empty)
+
+                override def checkedAssets: Seq[Asset.IssuedAsset] = Seq.empty
+              },
               address,
               PublicKey(ByteStr.fill(KeyLength)(1)),
               Set.empty[Address],

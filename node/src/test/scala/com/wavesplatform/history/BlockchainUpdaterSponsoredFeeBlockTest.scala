@@ -130,8 +130,8 @@ class BlockchainUpdaterSponsoredFeeBlockTest extends PropSpec with DomainScenari
         val (block0, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(Seq(masterToAlice, feeAsset, sponsor), Seq(aliceToBob, bobToMaster)))
 
         val block0TotalFee = block0.transactionData
-          .filter(_.assetFee._1 == Waves)
-          .map(_.assetFee._2)
+          .filter(_.feeAssetId == Waves)
+          .map(_.fee)
           .sum
 
         {

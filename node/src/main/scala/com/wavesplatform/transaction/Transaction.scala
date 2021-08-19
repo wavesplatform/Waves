@@ -6,13 +6,22 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-abstract class Transaction(val tpe: TransactionType.TransactionType, val checkedAssets: Seq[IssuedAsset] = Nil) {
-  val id: Coeval[ByteStr]
-
+trait TransactionBase {
   def assetFee: (Asset, Long)
   def timestamp: Long
   def chainId: Byte
+  def id: Coeval[ByteStr]
+  def checkedAssets: Seq[IssuedAsset]
+}
 
+object TransactionBase {
+  implicit class TBExt(val t: TransactionBase) extends AnyVal {
+    def fee: Long = t.assetFee._2
+    def feeAssetId: Asset = t.assetFee._1
+  }
+}
+
+abstract class Transaction(val tpe: TransactionType.TransactionType, val checkedAssets: Seq[IssuedAsset] = Nil) extends TransactionBase {
   def bytesSize: Int         = bytes().length
   val protoSize: Coeval[Int] = Coeval(PBTransactions.protobuf(this).serializedSize)
   val bodyBytes: Coeval[Array[Byte]]

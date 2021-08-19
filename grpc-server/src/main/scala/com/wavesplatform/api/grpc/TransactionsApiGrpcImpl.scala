@@ -123,8 +123,8 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
 
 private object TransactionsApiGrpcImpl {
   def toTransactionResponse(meta: TransactionMeta): TransactionResponse = {
-    val transactionId                          = meta.transaction.id().toByteString
-    val status                                 = if (meta.succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
+    val transactionId = meta.transaction.id().toByteString
+    val status        = if (meta.succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
     val invokeScriptResult = meta match {
       case TransactionMeta.Invoke(_, _, _, r) => r.map(VISR.toPB)
       case _                                  => None

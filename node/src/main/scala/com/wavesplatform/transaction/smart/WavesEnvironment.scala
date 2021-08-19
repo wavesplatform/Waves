@@ -16,12 +16,11 @@ import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
 import com.wavesplatform.lang.v1.traits._
-import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff, InvokeScriptTransactionLike}
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -30,11 +29,12 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Asset, TransactionBase}
 import monix.eval.Coeval
 import shapeless._
 
 object WavesEnvironment {
-  type In = Transaction :+: Order :+: PseudoTx :+: CNil
+  type In = TransactionBase :+: Order :+: PseudoTx :+: CNil
 }
 
 class WavesEnvironment(
@@ -300,7 +300,7 @@ class DAppEnvironment(
     blockchain: Blockchain,
     tthis: Environment.Tthis,
     ds: DirectiveSet,
-    tx: Option[InvokeScriptTransactionLike],
+    tx: InvokeScriptTransactionLike,
     currentDApp: com.wavesplatform.account.Address,
     currentDAppPk: com.wavesplatform.account.PublicKey,
     calledAddresses: Set[com.wavesplatform.account.Address],
@@ -311,7 +311,7 @@ class DAppEnvironment(
     var availableData: Int,
     var currentDiff: Diff,
     val invocationRoot: DAppEnvironment.InvocationTreeTracker
-) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.map(_.id()).getOrElse(ByteStr.empty)) {
+) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
 
   private[this] var mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
 
@@ -346,7 +346,6 @@ class DAppEnvironment(
           )
           .map(
             InvokeScript(
-              currentDApp,
               currentDAppPk,
               _,
               FUNCTION_CALL(User(func, func), args),
@@ -357,7 +356,7 @@ class DAppEnvironment(
       )
       invocationTracker = {
         // Log sub-contract invocation
-        val invocation = DAppEnvironment.DAppInvocation(invoke.dAppAddress, invoke.funcCall, invoke.payments)
+        val invocation = DAppEnvironment.DAppInvocation(invoke.dApp, invoke.funcCall, invoke.payments)
         invocationRoot.record(invocation)
       }
       (diff, evaluated, remainingActions, remainingData) <- InvokeScriptDiff( // This is a recursive call
@@ -369,7 +368,7 @@ class DAppEnvironment(
         remainingCalls,
         availableActions,
         availableData,
-        if (reentrant) calledAddresses else calledAddresses + invoke.senderAddress,
+        if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
         invocationTracker
       )(invoke)
     } yield {

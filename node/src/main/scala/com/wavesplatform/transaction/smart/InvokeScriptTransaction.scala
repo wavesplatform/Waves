@@ -36,15 +36,13 @@ case class InvokeScriptTransaction(
     with LegacyPBSwitch.V2
     with InvokeScriptTransactionLike {
 
-  override def transaction: Transaction = this
-
   val funcCall = funcCallOpt.getOrElse(FUNCTION_CALL(FunctionHeader.User(ContractEvaluator.DEFAULT_FUNC_NAME), List.empty))
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(InvokeScriptTxSerializer.bodyBytes(this))
   val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(InvokeScriptTxSerializer.toBytes(this))
   val json: Coeval[JsObject]         = Coeval.evalOnce(InvokeScriptTxSerializer.toJson(this))
 
-  override def root: Option[InvokeScriptTransaction] = Some(this)
+  override def root: InvokeScriptTransaction = this
   def senderAddress: Address                         = sender.toAddress
 }
 

@@ -42,14 +42,7 @@ object Verifier extends ScorexLogging {
 
   def apply(blockchain: Blockchain, limitedExecution: Boolean = false)(tx: Transaction): TracedResult[ValidationError, Int] = (tx: @unchecked) match {
     case _: GenesisTransaction => Right(0)
-    case et: EthereumTransaction =>
-      stats.signatureVerification.measureForType(et.tpe)(
-        Either.cond(
-          et.signatureValid(),
-          0,
-          GenericError("Invalid signature")
-        )
-      )
+    case _: EthereumTransaction => Right(0)
     case pt: ProvenTransaction =>
       (pt, blockchain.accountScript(pt.sender.toAddress)) match {
         case (stx: PaymentTransaction, None) =>

@@ -39,8 +39,8 @@ object PublicKey extends TaggedType[ByteStr] {
     def toAddress: Address = toAddress(AddressScheme.current.chainId)
     def toAddress(chainId: Byte): Address = pk.size match {
       case KeyLength         => Address.fromPublicKey(pk, chainId)
-      case EthereumKeyLength => Address(Keys.getAddress(pk.arr))
-      case _ => ???
+      case EthereumKeyLength => Address(Keys.getAddress(pk.arr), chainId)
+      case other             => throw new IllegalArgumentException(s"Unexpected public key length: $other")
     }
   }
 

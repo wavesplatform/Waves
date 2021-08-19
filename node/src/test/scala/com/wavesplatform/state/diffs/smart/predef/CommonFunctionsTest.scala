@@ -120,7 +120,7 @@ class CommonFunctionsTest extends PropSpec {
           s"""
              |match tx {
              | case tx : TransferTransaction  => tx.id == base58'${transfer.id().toString}'
-             | case tx : IssueTransaction => tx.fee == ${transfer.assetFee._2}
+             | case tx : IssueTransaction => tx.fee == ${transfer.fee}
              | case tx : MassTransferTransaction => tx.timestamp == ${transfer.timestamp}
              | case _ => throw()
              | }
@@ -140,7 +140,7 @@ class CommonFunctionsTest extends PropSpec {
                |let t = 100
                |match tx {
                | case t: TransferTransaction  => t.id == base58'${transfer.id().toString}'
-               | case t: IssueTransaction => t.fee == ${transfer.assetFee._2}
+               | case t: IssueTransaction => t.fee == ${transfer.fee}
                | case t: MassTransferTransaction => t.timestamp == ${transfer.timestamp}
                | case _ => throw()
                | }
@@ -181,7 +181,7 @@ class CommonFunctionsTest extends PropSpec {
                | case tx: TransferTransaction | IssueTransaction => {
                |  match tx {
                |    case tx: TransferTransaction  => tx.id == base58'${transfer.id().toString}'
-               |    case tx: IssueTransaction => tx.fee == ${transfer.assetFee._2}
+               |    case tx: IssueTransaction => tx.fee == ${transfer.fee}
                |  }
                |  }
                | case _ => throw()

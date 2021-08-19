@@ -54,8 +54,8 @@ object InvokeScriptDiff {
   )(
       tx: InvokeScript
   ): CoevalR[(Diff, EVALUATED, Int, Int)] = {
-    val dAppAddress = tx.dAppAddress
-    val invoker     = tx.senderDApp
+    val dAppAddress = tx.dApp
+    val invoker     = tx.sender.toAddress
 
     val result = blockchain.accountScript(dAppAddress) match {
       case Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities)) =>
@@ -107,9 +107,9 @@ object InvokeScriptDiff {
               val usedComplexity = totalComplexityLimit - nextRemainingComplexity
               val pseudoTx = ScriptTransfer(
                 Some(assetId),
-                RideRecipient.Address(ByteStr(tx.senderDApp.bytes)),
+                RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes)),
                 tx.sender,
-                RideRecipient.Address(ByteStr(tx.dAppAddress.bytes)),
+                RideRecipient.Address(ByteStr(tx.dApp.bytes)),
                 amount,
                 tx.timestamp,
                 tx.txId
@@ -143,10 +143,7 @@ object InvokeScriptDiff {
 
           tthis = Coproduct[Environment.Tthis](RideRecipient.Address(ByteStr(dAppAddress.bytes)))
           input <- traced(
-            tx.root
-              .map(t => buildThisValue(Coproduct[TxOrd](t.transaction), blockchain, directives, tthis).leftMap(GenericError.apply))
-              .getOrElse(Right(null))
-          )
+            buildThisValue(Coproduct[TxOrd](tx.root), blockchain, directives, tthis).leftMap(GenericError.apply))
 
           result <- for {
             (diff, (scriptResult, log), availableActions, availableData) <- {
@@ -156,14 +153,14 @@ object InvokeScriptDiff {
                   tx.funcCall,
                   RideRecipient.Address(ByteStr(invoker.bytes)),
                   ByteStr(tx.sender.arr),
-                  RideRecipient.Address(ByteStr(tx.root.fold[Address](invoker)(_.senderAddress).bytes)),
-                  ByteStr(tx.root.getOrElse(tx).sender.arr),
+                  RideRecipient.Address(ByteStr(tx.root.sender.toAddress.bytes)),
+                  ByteStr(tx.root.sender.arr),
                   payments,
                   tx.txId,
-                  tx.root.map(_.fee).getOrElse(0L),
-                  tx.root.flatMap(_.feeAssetId.compatId)
+                  tx.root.fee,
+                  tx.root.feeAssetId.compatId
                 )
-                val paymentsPart                                    = InvokeDiffsCommon.paymentsPart(tx, tx.dAppAddress, Map())
+                val paymentsPart                                    = InvokeDiffsCommon.paymentsPart(tx, tx.dApp, Map())
                 val (paymentsPartInsideDApp, paymentsPartToResolve) = if (version < V5) (Diff.empty, paymentsPart) else (paymentsPart, Diff.empty)
                 val environment = new DAppEnvironment(
                   AddressScheme.current.chainId,
@@ -173,7 +170,7 @@ object InvokeScriptDiff {
                   tthis,
                   directives,
                   tx.root,
-                  tx.dAppAddress,
+                  tx.dApp,
                   pk,
                   calledAddresses,
                   limitedExecution,
@@ -257,7 +254,7 @@ object InvokeScriptDiff {
           } yield (resultDiff, evaluated, remainingActions1, remainingData1)
         } yield result
 
-      case _ => traced(Left(GenericError(s"No contract at address ${tx.dAppAddress}")))
+      case _ => traced(Left(GenericError(s"No contract at address ${tx.dApp}")))
     }
 
     result.leftMap { err =>

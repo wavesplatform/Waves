@@ -548,7 +548,7 @@ object PBTransactions {
       case tx: vt.CreateAliasTransaction =>
         import tx._
         val data = CreateAliasTransactionData(alias.name)
-        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.CreateAlias(data))
+        PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.CreateAlias(data))
 
       case tx: vt.assets.exchange.ExchangeTransaction =>
         import tx._
@@ -559,40 +559,40 @@ object PBTransactions {
           sellMatcherFee,
           Seq(PBOrders.protobuf(order1), PBOrders.protobuf(order2))
         )
-        PBTransactions.create(tx.sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Exchange(data))
+        PBTransactions.create(tx.sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.Exchange(data))
 
       case tx: vt.assets.IssueTransaction =>
         import tx._
         val data = IssueTransactionData(name.toStringUtf8, description.toStringUtf8, quantity, decimals, reissuable, toPBScript(script))
-        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Issue(data))
+        PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.Issue(data))
 
       case tx: vt.assets.ReissueTransaction =>
         import tx._
         val data = ReissueTransactionData(Some(Amount(asset.id.toByteString, quantity)), reissuable)
-        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Reissue(data))
+        PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.Reissue(data))
 
       case tx: vt.assets.BurnTransaction =>
         import tx._
         val data = BurnTransactionData(Some(Amount(asset.id.toByteString, quantity)))
-        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Burn(data))
+        PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.Burn(data))
 
       case tx @ vt.assets.SetAssetScriptTransaction(_, sender, assetId, script, fee, timestamp, proofs, chainId) =>
         val data = SetAssetScriptTransactionData(assetId.id.toByteString, toPBScript(script))
-        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, tx.version, proofs, Data.SetAssetScript(data))
+        PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, tx.version, proofs, Data.SetAssetScript(data))
 
       case tx @ vt.smart.SetScriptTransaction(_, sender, script, fee, timestamp, proofs, chainId) =>
         val data = SetScriptTransactionData(toPBScript(script))
-        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, tx.version, proofs, Data.SetScript(data))
+        PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, tx.version, proofs, Data.SetScript(data))
 
       case tx: vt.lease.LeaseTransaction =>
         import tx._
         val data = LeaseTransactionData(Some(recipient.toPB), amount)
-        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Lease(data))
+        PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.Lease(data))
 
       case tx: vt.lease.LeaseCancelTransaction =>
         import tx._
         val data = LeaseCancelTransactionData(leaseId.toByteString)
-        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.LeaseCancel(data))
+        PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.LeaseCancel(data))
 
       case tx @ MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, attachment, proofs, chainId) =>
         val data = MassTransferTransactionData(
@@ -600,15 +600,15 @@ object PBTransactions {
           transfers.map(pt => MassTransferTransactionData.Transfer(Some(pt.address.toPB), pt.amount)),
           attachment.toByteString
         )
-        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.MassTransfer(data))
+        PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.MassTransfer(data))
 
       case tx @ vt.DataTransaction(version, sender, data, fee, timestamp, proofs, chainId) =>
         val txData = DataTransactionData(data.map(toPBDataEntry))
-        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.DataTransaction(txData))
+        PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.DataTransaction(txData))
 
       case tx @ vt.assets.SponsorFeeTransaction(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs, chainId) =>
         val data = SponsorFeeTransactionData(Some(Amount(assetId.id.toByteString, minSponsoredAssetFee.getOrElse(0L))))
-        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.SponsorFee(data))
+        PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.SponsorFee(data))
 
       case vt.smart.InvokeScriptTransaction(version, sender, dappAddress, fcOpt, payment, fee, feeAssetId, timestamp, proofs, chainId) =>
         val data = Data.InvokeScript(toPBInvokeScriptData(dappAddress, fcOpt, payment))
