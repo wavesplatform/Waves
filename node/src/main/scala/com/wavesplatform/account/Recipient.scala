@@ -14,26 +14,21 @@ import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidAdd
 import com.wavesplatform.utils.{base58Length, EthEncoding, StringBytes}
 import play.api.libs.json._
 
-sealed trait Address extends AddressOrAlias {
-  def publicKeyHash: Array[Byte]
-  def asWaves: Address
-  override def equals(obj: Any): Boolean = obj match {
-    case a: Address => java.util.Arrays.equals(publicKeyHash, a.publicKeyHash)
-    case _          => false
-  }
-
-  override def hashCode(): Int = java.util.Arrays.hashCode(publicKeyHash)
-}
-
 sealed trait AddressOrAlias {
   def chainId: Byte
   def bytes: Array[Byte]
 }
 
-final class WavesAddress(val chainId: Byte, val publicKeyHash: Array[Byte], checksum: Array[Byte]) extends Address with AddressOrAlias {
-  override def asWaves: Address   = this
+final class Address private(val chainId: Byte, val publicKeyHash: Array[Byte], checksum: Array[Byte]) extends AddressOrAlias {
   override lazy val bytes: Array[Byte] = Array(1.toByte, chainId) ++ publicKeyHash ++ checksum
   override lazy val toString: String   = ByteStr(bytes).toString
+
+  override def equals(obj: Any): Boolean = obj match {
+    case a: Address => java.util.Arrays.equals(publicKeyHash, a.publicKeyHash) && chainId == a.chainId
+    case _          => false
+  }
+  
+  override def hashCode(): Int = (publicKeyHash, chainId).hashCode()
 }
 
 final case class Alias(chainId: Byte, name: String) extends AddressOrAlias {
@@ -80,7 +75,7 @@ object Address {
     .maximumSize(200000)
     .build()
 
-  def apply(publicKeyHash: Array[Byte], chainId: Byte = AddressScheme.current.chainId): Address = new WavesAddress(
+  def apply(publicKeyHash: Array[Byte], chainId: Byte = AddressScheme.current.chainId): Address = new Address(
     chainId,
     publicKeyHash,
     crypto.secureHash(Array(1.toByte, AddressScheme.current.chainId) ++ publicKeyHash).take(4)
@@ -165,8 +160,8 @@ object Address {
   private[this] def scheme: AddressScheme = AddressScheme.current
 
   // Optimization, should not be used externally
-  private[wavesplatform] def createUnsafe(addressBytes: Array[Byte]): Address =
-    new WavesAddress(addressBytes(1), addressBytes.drop(2).dropRight(4), addressBytes.takeRight(4))
+  private[this] def createUnsafe(addressBytes: Array[Byte]): Address =
+    new Address(addressBytes(1), addressBytes.drop(2).dropRight(4), addressBytes.takeRight(4))
 }
 
 object Alias {

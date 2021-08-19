@@ -1,6 +1,6 @@
 package com.wavesplatform.api.http
 
-import com.wavesplatform.account.WavesAddress
+import com.wavesplatform.account.Address
 import com.wavesplatform.lang.contract.meta.FunctionSignatures
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.trace.TraceStep
@@ -8,7 +8,7 @@ import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
 trait JsonFormats {
-  implicit lazy val wavesAddressWrites: Writes[WavesAddress] = Writes(w => JsString(w.toString))
+  implicit lazy val wavesAddressWrites: Writes[Address] = Writes(w => JsString(w.toString))
 
   implicit lazy val TransactionJsonWrites: OWrites[Transaction] = OWrites(_.json())
 

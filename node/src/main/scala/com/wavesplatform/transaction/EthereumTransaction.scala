@@ -31,6 +31,9 @@ class EthereumTransaction(
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     encodeTransaction(underlying, signatureData)
   }
+
+  override val bodyBytes: Coeval[Array[TxVersion]] = bytes
+  
   override val id: Coeval[ByteStr] = Coeval.evalOnce {
     val bs = encodeTransaction(underlying, null) ++ Array(67, 0x80, 0x80).map(_.toByte)
     bs(0) = (bs(0) + 3).toByte
@@ -78,7 +81,7 @@ object EthereumTransaction {
   sealed trait Payload
 
   case class Transfer(asset: Either[Asset.Waves.type, ERC20Address], amount: Long, recipient: Address) extends Payload {
-    def json(senderAddress: WavesAddress): JsObject =
+    def json(senderAddress: Address): JsObject =
       Json.obj(
         "transfer" -> Json.obj(
           "sender"    -> senderAddress.toString,
@@ -105,7 +108,7 @@ object EthereumTransaction {
       override def checkedAssets: Seq[Asset.IssuedAsset] = this.paymentAssets
     }
 
-    def json(senderAddress: WavesAddress): JsObject =
+    def json(senderAddress: Address): JsObject =
       Json.obj("invokeScript" -> Json.obj("sender" -> senderAddress.toString, "dApp" -> dApp.toString))
   }
 
