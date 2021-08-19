@@ -8,14 +8,15 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry}
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
-import org.scalatest.{EitherValues, Matchers, PropSpec}
+import com.wavesplatform.{TestTime, TransactionGen}
+import org.scalatest.EitherValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class FreeCallTest extends PropSpec with ScalaCheckPropertyChecks with Matchers with TransactionGen with NoShrink with WithDomain with EitherValues {
+class FreeCallTest extends PropSpec with ScalaCheckPropertyChecks with TransactionGen with WithDomain with EitherValues {
 
   import DomainPresets._
 

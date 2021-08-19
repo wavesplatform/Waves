@@ -34,6 +34,7 @@ import com.wavesplatform.transaction.{Proofs, Transaction}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.defaultCall
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
+import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import monix.eval.Coeval
