@@ -1,5 +1,7 @@
 package com.wavesplatform.transaction
 
+import scala.util.Try
+
 import com.wavesplatform.account._
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.api.http.requests.DataRequest._
@@ -402,7 +404,7 @@ object TransactionFactory {
         val version = value getOrElse (1: Byte)
         val txJson  = jsv ++ Json.obj("version" -> version)
 
-        TransactionType(typeId) match {
+        Try(TransactionType(typeId)).collect {
           case TransactionType.Transfer       => TransactionFactory.transferAsset(txJson.as[TransferRequest], wallet, signerAddress, time)
           case TransactionType.CreateAlias    => TransactionFactory.createAlias(txJson.as[CreateAliasRequest], wallet, signerAddress, time)
           case TransactionType.Lease          => TransactionFactory.lease(txJson.as[LeaseRequest], wallet, signerAddress, time)
@@ -416,8 +418,7 @@ object TransactionFactory {
           case TransactionType.SetScript      => TransactionFactory.setScript(txJson.as[SetScriptRequest], wallet, signerAddress, time)
           case TransactionType.SetAssetScript => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], wallet, signerAddress, time)
           case TransactionType.SponsorFee     => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)
-          case _                              => Left(TxValidationError.UnsupportedTransactionType)
-        }
+        }.getOrElse(Left(TxValidationError.UnsupportedTransactionType))
     }
   }
 }
