@@ -3,12 +3,11 @@ package com.wavesplatform.transaction
 import java.math.BigInteger
 
 import com.wavesplatform.account._
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
-import com.wavesplatform.state.{Blockchain, Height, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.EthEncoding
 import monix.eval.Coeval
@@ -17,10 +16,8 @@ import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.abi.datatypes.{Address => EthAddress}
 import org.web3j.crypto.Sign.SignatureData
 import org.web3j.crypto._
-import org.web3j.rlp.{RlpEncoder, RlpList, RlpString}
 import play.api.libs.json._
 
-import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
 
 class EthereumTransaction(
@@ -31,34 +28,15 @@ class EthereumTransaction(
 ) extends Transaction(TransactionType.Ethereum) {
   import EthereumTransaction._
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(encode(signatureData))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(encodeTransaction(underlying, signatureData))
 
-  private def encode(signatureData: SignatureData) = {
-    underlying.getTransaction match {
-      case _: org.web3j.crypto.transaction.`type`.Transaction1559 =>
-        encodeTransaction(underlying, signatureData)
-      case lt: org.web3j.crypto.transaction.`type`.LegacyTransaction =>
-        val list = lt.asRlpValues(signatureData)
-        if (signatureData == null) {
-          list.addAll(Seq(RlpString.create(chainId.toLong), RlpString.create(0L), RlpString.create(0L)).asJava)
-        }
-        RlpEncoder.encode(new RlpList(list))
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(TransactionEncoder.encode(underlying, chainId.toLong))
 
-      case _ => ???
-    }
-  }
-
-  override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(encode(null))
-
-  override val id: Coeval[ByteStr] = Coeval.evalOnce {
-    ByteStr(Hash.sha3(bodyBytes()))
-  }
+  override val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(Hash.sha3(bodyBytes())))
 
   override def assetFee: (Asset, Long) = Asset.Waves -> underlying.getGasLimit.longValueExact()
 
   override val timestamp: TxTimestamp = underlying.getNonce.longValueExact()
-
-  override val protoSize: Coeval[Int] = bytes.map(_.length)
 
   val signerPublicKey: Coeval[PublicKey] = Coeval.evalOnce {
     require(signatureData != null, "empty signature data")
@@ -76,18 +54,16 @@ class EthereumTransaction(
     )
   }
 
-  val senderAddress: Coeval[Address] = signerPublicKey.map(_.toAddress(chainId))
+  val senderAddress: Coeval[Address] = Coeval.evalOnce(signerPublicKey().toAddress(chainId))
 
   val baseJson: Coeval[JsObject] = for {
     idValue <- id
   } yield Json.obj(
-    "id"                  -> idValue.toString,
-    "type"                -> tpe.id,
+    "id"    -> idValue.toString,
+    "type"  -> tpe.id,
     "bytes" -> EthEncoding.toHexString(bytes()),
-    "from" -> EthEncoding.toHexString(senderAddress().publicKeyHash)
+    "from"  -> EthEncoding.toHexString(senderAddress().publicKeyHash)
   )
-
-  def ethereumJson(blockId: Option[BlockId], height: Option[Height], num: Option[TxNum]): JsObject = Json.obj()
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(baseJson())
 
@@ -184,7 +160,12 @@ object EthereumTransaction {
   }
 
   def apply(underlying: RawTransaction): EthereumTransaction =
-    new EthereumTransaction(extractPayload(underlying), underlying, null, AddressScheme.current.chainId)
+    new EthereumTransaction(
+      extractPayload(underlying),
+      underlying,
+      new SignatureData(Array.emptyByteArray, Array.emptyByteArray, Array.emptyByteArray),
+      AddressScheme.current.chainId
+    )
 
   def apply(underlying: SignedRawTransaction): EthereumTransaction =
     new EthereumTransaction(

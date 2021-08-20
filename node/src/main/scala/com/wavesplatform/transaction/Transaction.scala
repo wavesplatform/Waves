@@ -24,7 +24,7 @@ object TransactionBase {
 
 abstract class Transaction(val tpe: TransactionType.TransactionType, protected val checkedAssets: Seq[IssuedAsset] = Nil) extends TransactionBase {
   def bytesSize: Int         = bytes().length
-  val protoSize: Coeval[Int] = Coeval(PBTransactions.protobuf(this).serializedSize)
+  lazy val protoSize: Coeval[Int] = Coeval(PBTransactions.protobuf(this).serializedSize)
   val bodyBytes: Coeval[Array[Byte]]
   val bytes: Coeval[Array[Byte]]
   val json: Coeval[JsObject]
