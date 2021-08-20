@@ -1361,7 +1361,7 @@ object PureContext {
             || ep > 18
             || rp < 0
             || rp > 18) {
-          Left("pow: scale out of range 0-12")
+          Left("pow: scale out of range 0-18")
         } else {
           global
             .powBigInt(b, bp, e, ep, rp, Rounding.byValue(round))
@@ -1392,7 +1392,7 @@ object PureContext {
               || ep > 18
               || rp < 0
               || rp > 18) {
-            Left("Scale out of range 0-12")
+            Left("Scale out of range 0-18")
           } else {
             global.logBigInt(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_BIGINT)
           }
@@ -1402,7 +1402,7 @@ object PureContext {
 
   val getListMedian: BaseFunction[NoContext] =
     NativeFunction("median", 20, MEDIAN_LIST, LONG, ("arr", PARAMETERIZEDLIST(LONG))) {
-      case xs @ (ARR(arr) :: Nil) =>
+      case xs @ ARR(arr) :: Nil =>
         if (arr.headOption.forall(_.isInstanceOf[CONST_LONG])) {
           if (arr.nonEmpty)
             Right(CONST_LONG(global.median(arr.asInstanceOf[IndexedSeq[CONST_LONG]].map(_.t).toArray)))
@@ -1416,7 +1416,7 @@ object PureContext {
 
   val getBigIntListMedian: BaseFunction[NoContext] =
     NativeFunction("median", 20 * 8, MEDIAN_LISTBIGINT, BIGINT, ("arr", PARAMETERIZEDLIST(BIGINT))) {
-      case xs @ (ARR(arr) :: Nil) =>
+      case xs @ ARR(arr) :: Nil =>
         if (arr.headOption.forall(_.isInstanceOf[CONST_BIGINT])) {
           if (arr.nonEmpty)
             Right(CONST_BIGINT(global.median(arr.asInstanceOf[IndexedSeq[CONST_BIGINT]].map(_.t).toArray)))
