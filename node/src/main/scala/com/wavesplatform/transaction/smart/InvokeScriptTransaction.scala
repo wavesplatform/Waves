@@ -33,7 +33,7 @@ case class InvokeScriptTransaction(
     with VersionedTransaction
     with TxWithFee.InCustomAsset
     with FastHashId
-    with LegacyPBSwitch.V2
+    with PBSince.V2
     with InvokeScriptTransactionLike {
 
   val funcCall = funcCallOpt.getOrElse(FUNCTION_CALL(FunctionHeader.User(ContractEvaluator.DEFAULT_FUNC_NAME), List.empty))

@@ -29,7 +29,7 @@ case class ReissueTransaction(
     with SigProofsSwitch
     with TxWithFee.InWaves
     with FastHashId
-    with LegacyPBSwitch.V3 {
+    with PBSince.V3 {
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(ReissueTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(ReissueTxSerializer.toBytes(this))

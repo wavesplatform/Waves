@@ -27,6 +27,7 @@ import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.database.{DBExt, Keys, openDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{History, StorageFactory}
@@ -243,7 +244,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // Network server should be started only after all extensions initialized
     val networkServer =
-      NetworkServer(settings, lastBlockInfo, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
+      NetworkServer(
+        settings,
+        lastBlockInfo,
+        historyReplier,
+        utxStorage,
+        peerDatabase,
+        allChannels,
+        establishedConnections,
+        () => blockchainUpdater.isFeatureActivated(BlockchainFeatures.BlockV5)
+      )
     maybeNetworkServer = Some(networkServer)
     val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = networkServer.messages
 

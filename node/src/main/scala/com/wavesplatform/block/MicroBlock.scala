@@ -6,7 +6,6 @@ import com.wavesplatform.block.serialization.MicroBlockSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.block.PBMicroBlocks
 import com.wavesplatform.state._
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.ScorexLogging
@@ -22,13 +21,13 @@ case class MicroBlock(
     totalResBlockSig: BlockId,
     signature: ByteStr
 ) extends Signed {
-  private[block] val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(
-    if (version < Block.ProtoBlockVersion) MicroBlockSerializer.toBytes(copy(signature = ByteStr.empty))
-    else PBMicroBlocks.protobuf(this, totalResBlockSig).getMicroBlock.toByteArray
-  )
+  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(MicroBlockSerializer.toBytes(this))
+
+  private[block] val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(copy(signature = ByteStr.empty).bytes())
 
   override val signatureValid: Coeval[Boolean]        = Coeval.evalOnce(crypto.verify(signature, bytesWithoutSignature(), sender))
   override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
+
 
   override def toString: String = s"MicroBlock(... -> ${reference.trim}, txs=${transactionData.size}"
 

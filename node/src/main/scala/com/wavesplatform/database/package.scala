@@ -28,7 +28,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{EthereumTransaction, GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
+import com.wavesplatform.transaction.{EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils._
 import monix.eval.Task
 import monix.reactive.Observable
@@ -558,7 +558,7 @@ package object database extends ScorexLogging {
   def writeTransaction(v: (Transaction, Boolean)): Array[Byte] = {
     val (tx, succeeded) = v
     val ptx = tx match {
-      case lps: LegacyPBSwitch if !lps.isProtobufVersion => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case lps: PBSince if !lps.isProtobufVersion => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _: GenesisTransaction                         => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _: PaymentTransaction                         => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case et: EthereumTransaction                       => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))

@@ -29,7 +29,7 @@ case class ExchangeTransaction(
     with TxWithFee.InWaves
     with FastHashId
     with SigProofsSwitch
-    with LegacyPBSwitch.V3 {
+    with PBSince.V3 {
 
   val (buyOrder, sellOrder) = if (order1.orderType == OrderType.BUY) (order1, order2) else (order2, order1)
 

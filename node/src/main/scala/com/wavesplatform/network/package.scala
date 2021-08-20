@@ -8,7 +8,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
-import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
+import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture}
 import io.netty.channel.local.LocalAddress
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.channel.{Channel, ChannelHandlerContext}
@@ -82,22 +82,6 @@ package object network extends ScorexLogging {
           st.stop()
         }
     }
-
-    def broadcastMany(messages: Seq[AnyRef], except: Set[Channel] = Set.empty): Unit = {
-      val channelMatcher: ChannelMatcher = { (channel: Channel) =>
-        !except.contains(channel)
-      }
-      messages.foreach { message =>
-        logBroadcast(message, except)
-        allChannels.write(message, channelMatcher)
-      }
-
-      allChannels.flush(channelMatcher)
-    }
-
-    def broadcastTx(tx: Transaction, except: Option[Channel] = None): Unit = allChannels.broadcast(RawBytes.fromTransaction(tx), except)
-
-    def broadcastTx(txs: Seq[Transaction]): Unit = allChannels.broadcastMany(txs.map(RawBytes.fromTransaction))
 
     private def logBroadcast(message: AnyRef, except: Set[Channel]): Unit = message match {
       case RawBytes(TransactionSpec.messageCode | PBTransactionSpec.messageCode, _) =>

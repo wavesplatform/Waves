@@ -27,7 +27,7 @@ case class UpdateAssetInfoTransaction(
     with VersionedTransaction
     with FastHashId
     with ProvenTransaction
-    with ProtobufOnly { self =>
+    with PBSince.V1 { self =>
 
   override def assetFee: (Asset, TxAmount) = (feeAsset, feeAmount)
 

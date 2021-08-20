@@ -36,7 +36,7 @@ case class MassTransferTransaction(
     with VersionedTransaction
     with TxWithFee.InWaves
     with FastHashId
-    with LegacyPBSwitch.V2 {
+    with PBSince.V2 {
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(MassTransferTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(MassTransferTxSerializer.toBytes(this))

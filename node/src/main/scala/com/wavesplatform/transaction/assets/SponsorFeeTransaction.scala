@@ -26,7 +26,7 @@ case class SponsorFeeTransaction(
     with VersionedTransaction
     with TxWithFee.InWaves
     with FastHashId
-    with LegacyPBSwitch.V2 {
+    with PBSince.V2 {
 
   val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(SponsorFeeTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(SponsorFeeTxSerializer.toBytes(this))

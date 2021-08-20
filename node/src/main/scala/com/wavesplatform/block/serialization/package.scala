@@ -34,6 +34,6 @@ package object serialization {
   def mkTxsCountBytes(version: Byte, txsCount: Int): Array[Byte] =
     if (version <= PlainBlockVersion) Array(txsCount.toByte)
     else if (version <= ProtoBlockVersion) Ints.toByteArray(txsCount)
-    else throw new IllegalArgumentException(s"Unexpected block version: ${version}")
+    else throw new IllegalArgumentException(s"Unexpected block version: $version")
 
 }

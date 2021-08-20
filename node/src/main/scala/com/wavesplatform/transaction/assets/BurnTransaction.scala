@@ -27,7 +27,7 @@ final case class BurnTransaction(
     with SigProofsSwitch
     with TxWithFee.InWaves
     with FastHashId
-    with LegacyPBSwitch.V3 {
+    with PBSince.V3 {
 
   override val bodyBytes: Coeval[Array[Byte]] = BurnTxSerializer.bodyBytes(this)
   override val bytes: Coeval[Array[Byte]]     = BurnTxSerializer.toBytes(this)

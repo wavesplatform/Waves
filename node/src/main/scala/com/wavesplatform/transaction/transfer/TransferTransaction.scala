@@ -35,7 +35,7 @@ case class TransferTransaction(
     with SigProofsSwitch
     with FastHashId
     with TxWithFee.InCustomAsset
-    with LegacyPBSwitch.V3 {
+    with PBSince.V3 {
 
   val bodyBytes: Coeval[TxByteArray] = Coeval.evalOnce(TransferTxSerializer.bodyBytes(this))
   val bytes: Coeval[TxByteArray]     = Coeval.evalOnce(TransferTxSerializer.toBytes(this))

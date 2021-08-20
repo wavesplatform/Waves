@@ -25,7 +25,7 @@ final case class CreateAliasTransaction(
     with SigProofsSwitch
     with VersionedTransaction
     with TxWithFee.InWaves
-    with LegacyPBSwitch.V3 {
+    with PBSince.V3 {
 
   lazy val alias: Alias = Alias.createWithChainId(aliasName, chainId).explicitGet()
 

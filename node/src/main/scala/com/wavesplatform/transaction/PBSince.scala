@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.protobuf.transaction.PBTransactions
 
-trait LegacyPBSwitch { self: Transaction with VersionedTransaction =>
+trait PBSince { self: Transaction with VersionedTransaction =>
   def protobufVersion: TxVersion
   final def isProtobufVersion: Boolean = self.version >= protobufVersion
 
@@ -10,12 +10,16 @@ trait LegacyPBSwitch { self: Transaction with VersionedTransaction =>
     if (isProtobufVersion) PBTransactions.protobuf(self).serializedSize else bytes().length
 }
 
-object LegacyPBSwitch {
-  trait V2 extends LegacyPBSwitch { self: Transaction with VersionedTransaction =>
+object PBSince {
+  trait V1 extends PBSince { self: Transaction with VersionedTransaction =>
+    override def protobufVersion: TxVersion = TxVersion.V1
+  }
+
+  trait V2 extends PBSince { self: Transaction with VersionedTransaction =>
     override def protobufVersion: TxVersion = TxVersion.V2
   }
 
-  trait V3 extends LegacyPBSwitch { self: Transaction with VersionedTransaction =>
+  trait V3 extends PBSince { self: Transaction with VersionedTransaction =>
     override def protobufVersion: TxVersion = TxVersion.V3
   }
 }

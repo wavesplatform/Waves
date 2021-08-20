@@ -11,7 +11,7 @@ import io.netty.channel.embedded.EmbeddedChannel
 class MessageCodecSpec extends FreeSpec {
 
   "should block a sender of invalid messages" in {
-    val codec = new SpiedMessageCodec
+    val codec = new SpyingMessageCodec
     val ch    = new EmbeddedChannel(codec)
 
     ch.writeInbound(RawBytes(TransactionSpec.messageCode, "foo".getBytes(StandardCharsets.UTF_8)))
@@ -21,17 +21,17 @@ class MessageCodecSpec extends FreeSpec {
   }
 
   "should not block a sender of valid messages" in forAll(randomTransactionGen) { origTx: Transaction with ProvenTransaction =>
-    val codec = new SpiedMessageCodec
+    val codec = new SpyingMessageCodec
     val ch    = new EmbeddedChannel(codec)
 
-    ch.writeInbound(RawBytes.fromTransaction(origTx))
+    ch.writeInbound(RawBytes.fromTransaction(origTx, forceProtobuf = false))
     val decodedTx = ch.readInbound[Transaction]()
 
     decodedTx shouldBe origTx
     codec.blockCalls shouldBe 0
   }
 
-  private class SpiedMessageCodec extends MessageCodec(PeerDatabase.NoOp) {
+  private class SpyingMessageCodec extends MessageCodec(PeerDatabase.NoOp) {
     var blockCalls = 0
 
     override def block(ctx: ChannelHandlerContext, e: Throwable): Unit = {

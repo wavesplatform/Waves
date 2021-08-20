@@ -25,7 +25,7 @@ final case class LeaseTransaction(
     with VersionedTransaction
     with TxWithFee.InWaves
     with FastHashId
-    with LegacyPBSwitch.V3 {
+    with PBSince.V3 {
   override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(LeaseTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(LeaseTxSerializer.toBytes(this))
   override val json: Coeval[JsObject]              = Coeval.evalOnce(LeaseTxSerializer.toJson(this))

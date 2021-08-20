@@ -25,7 +25,7 @@ case class SetScriptTransaction(
     with VersionedTransaction
     with TxWithFee.InWaves
     with FastHashId
-    with LegacyPBSwitch.V2 {
+    with PBSince.V2 {
 
   val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(SetScriptTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(SetScriptTxSerializer.toBytes(this))

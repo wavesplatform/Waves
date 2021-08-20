@@ -166,7 +166,7 @@ object CommonValidation {
     }
 
     val versionsBarrier = tx match {
-      case p: LegacyPBSwitch if p.isProtobufVersion =>
+      case p: PBSince if p.isProtobufVersion =>
         activationBarrier(BlockchainFeatures.BlockV5)
 
 //      case v: VersionedTransaction =>
