@@ -51,7 +51,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
       val json = Json.obj("type" -> CreateAliasTransaction.typeId, "sender" -> firstAddress, "alias" -> "alias", "fee" -> 100000)
       val js   = if (Option(v).isDefined) json ++ Json.obj("version" -> v) else json
       assertSignBadJson(js - "type", "failed to parse json message")
-      assertSignBadJson(js + ("type" -> -100), "Bad transaction type")
+      assertSignBadJson(js + ("type" -> JsNumber(-100)), "Bad transaction type")
       assertSignBadJson(js - "alias", "failed to parse json message")
     }
 

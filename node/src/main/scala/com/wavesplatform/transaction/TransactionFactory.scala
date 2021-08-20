@@ -1,11 +1,9 @@
 package com.wavesplatform.transaction
 
-import scala.util.Try
-
 import com.wavesplatform.account._
+import com.wavesplatform.api.http.requests._
 import com.wavesplatform.api.http.requests.DataRequest._
 import com.wavesplatform.api.http.requests.SponsorFeeRequest._
-import com.wavesplatform.api.http.requests._
 import com.wavesplatform.api.http.versionReads
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
