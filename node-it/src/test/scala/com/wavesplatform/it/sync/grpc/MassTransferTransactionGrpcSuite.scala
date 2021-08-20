@@ -20,7 +20,7 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
       val transfers = List(Transfer(Some(Recipient().withPublicKeyHash(secondAddress)), transferAmount))
       val assetId = PBTransactions.vanilla(
-        sender.broadcastIssue(firstAcc, "name", issueAmount, 8, reissuable = false, issueFee, waitForTx = true)
+        sender.broadcastIssue(firstAcc, "name", issueAmount, 8, reissuable = false, issueFee, waitForTx = true), unsafe = false
       ).explicitGet().id().toString
       sender.waitForTransaction(assetId)
 

@@ -303,7 +303,7 @@ object SyncGrpcApi extends Assertions {
     }
 
     def signedBroadcast(tx: PBSignedTransaction, waitForTx: Boolean = false): PBSignedTransaction = {
-      maybeWaitForTransaction(sync(async(n).broadcast(tx.getTransaction, tx.proofs)), waitForTx)
+      maybeWaitForTransaction(sync(async(n).broadcast(tx.getWavesTransaction, tx.proofs)), waitForTx)
     }
 
     def broadcast(tx: PBTransaction, proofs: Seq[ByteString], waitForTx: Boolean = false): PBSignedTransaction = {

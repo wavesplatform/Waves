@@ -449,7 +449,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
         val tx = PBTransactions.protobuf(
           mkExchange(buyer, seller, matcher, assetPair, fee, buyMatcherFeeAssetId, sellMatcherFeeAssetId, buyMatcherFee, sellMatcherFee)
         )
-        sender.broadcast(tx.transaction.get, tx.proofs)
+        sender.broadcast(tx.getWavesTransaction, tx.proofs)
       }
       overflowBlock()
       sendTxsAndThenPriorityTx(
@@ -515,7 +515,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
         val tx = PBTransactions.protobuf(
           mkExchange(buyer, seller, matcher, assetPair, fee, buyMatcherFeeAssetId, sellMatcherFeeAssetId, buyMatcherFee, sellMatcherFee)
         )
-        sender.broadcast(tx.transaction.get, tx.proofs)
+        sender.broadcast(tx.getWavesTransaction, tx.proofs)
       }
 
       overflowBlock()

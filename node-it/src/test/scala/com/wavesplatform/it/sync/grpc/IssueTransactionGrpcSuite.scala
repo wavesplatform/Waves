@@ -36,13 +36,13 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
         script = scriptText(v),
         waitForTx = true
       )
-      val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().toString
+      val issuedAssetId = PBTransactions.vanilla(issuedAssetTx, unsafe = false).explicitGet().id().toString
 
       sender.wavesBalance(issuerAddress).available shouldBe issuerBalance - issueFee
       sender.wavesBalance(issuerAddress).effective shouldBe issuerEffBalance - issueFee
       sender.assetsBalance(issuerAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe someAssetAmount
 
-      val assetInfo = sender.getTransaction(issuedAssetId).getTransaction.getIssue
+      val assetInfo = sender.getTransaction(issuedAssetId).getWavesTransaction.getIssue
 
       assetInfo.decimals shouldBe 8
       assetInfo.amount shouldBe someAssetAmount
@@ -94,7 +94,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
         script = scriptText(v),
         waitForTx = true
       )
-      val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().toString
+      val issuedAssetId = PBTransactions.vanilla(issuedAssetTx, unsafe = false).explicitGet().id().toString
 
       val issuedAssetTx2 = sender.broadcastIssue(
         issuer,
@@ -108,13 +108,13 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
         script = scriptText(v),
         waitForTx = true
       )
-      val issuedAssetId2 = PBTransactions.vanilla(issuedAssetTx2).explicitGet().id().toString
+      val issuedAssetId2 = PBTransactions.vanilla(issuedAssetTx2, unsafe = false).explicitGet().id().toString
 
       sender.assetsBalance(issuerAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe someAssetAmount
       sender.assetsBalance(issuerAddress, Seq(issuedAssetId2)).getOrElse(issuedAssetId2, 0L) shouldBe someAssetAmount
 
-      sender.getTransaction(issuedAssetId).getTransaction.getIssue.name shouldBe assetName
-      sender.getTransaction(issuedAssetId2).getTransaction.getIssue.name shouldBe assetName
+      sender.getTransaction(issuedAssetId).getWavesTransaction.getIssue.name shouldBe assetName
+      sender.getTransaction(issuedAssetId2).getWavesTransaction.getIssue.name shouldBe assetName
     }
   }
 
