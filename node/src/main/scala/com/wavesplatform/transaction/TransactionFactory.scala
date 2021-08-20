@@ -1,15 +1,15 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.account._
-import com.wavesplatform.api.http.requests._
 import com.wavesplatform.api.http.requests.DataRequest._
 import com.wavesplatform.api.http.requests.SponsorFeeRequest._
+import com.wavesplatform.api.http.requests._
 import com.wavesplatform.api.http.versionReads
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxValidationError.{GenericError, WrongChain}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, UnsupportedTransactionType, UnsupportedTypeAndVersion, WrongChain}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -285,18 +285,20 @@ object TransactionFactory {
       signer   <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       contract <- AddressOrAlias.fromString(request.dApp)
 
-      tx <- InvokeScriptTransaction.create(
-        request.version.getOrElse(1.toByte),
-        sender.publicKey,
-        contract,
-        request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)),
-        request.payment,
-        request.fee,
-        Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
-        request.timestamp.getOrElse(time.getTimestamp()),
-        Proofs.empty,
-        request.chainId.getOrElse(AddressScheme.current.chainId)
-      ).map(_.signWith(signer.privateKey))
+      tx <- InvokeScriptTransaction
+        .create(
+          request.version.getOrElse(1.toByte),
+          sender.publicKey,
+          contract,
+          request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)),
+          request.payment,
+          request.fee,
+          Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
+          request.timestamp.getOrElse(time.getTimestamp()),
+          Proofs.empty,
+          request.chainId.getOrElse(AddressScheme.current.chainId)
+        )
+        .map(_.signWith(signer.privateKey))
     } yield tx
 
   def invokeScript(request: InvokeScriptRequest, sender: PublicKey): Either[ValidationError, InvokeScriptTransaction] =
@@ -365,6 +367,8 @@ object TransactionFactory {
     import InvokeScriptRequest._
     val chainId = (jsv \ "chainId").asOpt[Byte]
     val typeId  = (jsv \ "type").as[Byte]
+    val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
+
     val pf: PartialFunction[TransactionType.TransactionType, Either[ValidationError, Transaction]] = {
       case TransactionType.Transfer        => jsv.as[TransferRequest].toTx
       case TransactionType.CreateAlias     => jsv.as[CreateAliasRequest].toTx
@@ -385,9 +389,12 @@ object TransactionFactory {
 
     if (chainId.exists(_ != AddressScheme.current.chainId)) {
       Left(WrongChain(AddressScheme.current.chainId, chainId.get))
-    } else {
-      pf(TransactionType(typeId))
-    }
+    } else
+      try pf(TransactionType(typeId))
+      catch {
+        case _: NoSuchElementException => Left(UnsupportedTypeAndVersion(typeId, version))
+        case _: MatchError => Left(UnsupportedTransactionType)
+      }
   }
 
   def parseRequestAndSign(wallet: Wallet, signerAddress: String, time: Time, jsv: JsObject): Either[ValidationError, Transaction] = {
@@ -402,7 +409,7 @@ object TransactionFactory {
         val version = value getOrElse (1: Byte)
         val txJson  = jsv ++ Json.obj("version" -> version)
 
-        TransactionType(typeId) match {
+        try (TransactionType(typeId): @unchecked) match {
           case TransactionType.Transfer       => TransactionFactory.transferAsset(txJson.as[TransferRequest], wallet, signerAddress, time)
           case TransactionType.CreateAlias    => TransactionFactory.createAlias(txJson.as[CreateAliasRequest], wallet, signerAddress, time)
           case TransactionType.Lease          => TransactionFactory.lease(txJson.as[LeaseRequest], wallet, signerAddress, time)
@@ -416,7 +423,9 @@ object TransactionFactory {
           case TransactionType.SetScript      => TransactionFactory.setScript(txJson.as[SetScriptRequest], wallet, signerAddress, time)
           case TransactionType.SetAssetScript => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], wallet, signerAddress, time)
           case TransactionType.SponsorFee     => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)
-          case _                              => Left(TxValidationError.UnsupportedTransactionType)
+        } catch {
+          case _: NoSuchElementException => Left(UnsupportedTypeAndVersion(typeId, version))
+          case _: MatchError => Left(UnsupportedTransactionType)
         }
     }
   }
