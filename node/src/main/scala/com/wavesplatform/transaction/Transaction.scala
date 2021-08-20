@@ -2,6 +2,7 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
@@ -11,7 +12,7 @@ trait TransactionBase {
   def timestamp: Long
   def chainId: Byte
   def id: Coeval[ByteStr]
-  def checkedAssets: Seq[IssuedAsset]
+  def smartAssets(blockchain: Blockchain): Seq[IssuedAsset]
 }
 
 object TransactionBase {
@@ -21,7 +22,7 @@ object TransactionBase {
   }
 }
 
-abstract class Transaction(val tpe: TransactionType.TransactionType, val checkedAssets: Seq[IssuedAsset] = Nil) extends TransactionBase {
+abstract class Transaction(val tpe: TransactionType.TransactionType, protected val checkedAssets: Seq[IssuedAsset] = Nil) extends TransactionBase {
   def bytesSize: Int         = bytes().length
   val protoSize: Coeval[Int] = Coeval(PBTransactions.protobuf(this).serializedSize)
   val bodyBytes: Coeval[Array[Byte]]
@@ -36,6 +37,8 @@ abstract class Transaction(val tpe: TransactionType.TransactionType, val checked
   }
 
   override def hashCode(): Int = id().hashCode()
+
+  override def smartAssets(blockchain: Blockchain): Seq[IssuedAsset] = checkedAssets.filter(blockchain.hasAssetScript)
 }
 
 object Transaction {

@@ -98,10 +98,9 @@ object Verifier extends ScorexLogging {
       blockchain.assetDescription(asset).flatMap(_.script)
 
     val assets = for {
-      asset  <- tx.checkedAssets.toList
+      asset  <- tx.smartAssets(blockchain).toList
       script <- assetScript(asset)
-      context = AssetContext.fromTxAndAsset(tx, asset)
-    } yield AssetForCheck(asset, script, context)
+    } yield AssetForCheck(asset, script, AssetContext.fromTxAndAsset(tx, asset))
 
     val additionalAssets = tx match {
       case e: ExchangeTransaction =>

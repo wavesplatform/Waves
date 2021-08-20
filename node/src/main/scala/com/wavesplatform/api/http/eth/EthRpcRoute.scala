@@ -2,10 +2,6 @@ package com.wavesplatform.api.http.eth
 
 import java.math.BigInteger
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.jdk.CollectionConverters._
-
 import akka.http.scaladsl.server._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.api.common.CommonTransactionsApi
@@ -13,14 +9,18 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.utils.EthEncoding
+import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction}
+import com.wavesplatform.utils.EthEncoding._
 import org.web3j.abi._
 import org.web3j.abi.datatypes.generated.{Uint256, Uint8}
 import org.web3j.crypto._
-import play.api.libs.json._
 import play.api.libs.json.Json.JsValueWrapper
+import play.api.libs.json._
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.jdk.CollectionConverters._
 
 class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi) extends ApiRoute {
   private def quantity(v: Long) = s"0x${java.lang.Long.toString(v, 16)}"
@@ -33,7 +33,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
     assetId(contractAddress).flatMap(blockchain.assetDescription)
 
   private def assetId(contractAddress: String): Option[IssuedAsset] =
-    blockchain.resolveERC20Address(ERC20Address(ByteStr(EthEncoding.toBytes(contractAddress))))
+    blockchain.resolveERC20Address(ERC20Address(ByteStr(toBytes(contractAddress))))
 
   private def encodeResponse(values: Type*): String = FunctionEncoder.encodeConstructor(values.map(Type.unwrap).asJava)
 
@@ -62,7 +62,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
       case "eth_getBalance" =>
         resp(
           id,
-          EthEncoding.toHexString(
+          toHexString(
             BigInt(blockchain.balance(Address.fromHexString(params.get.head.as[String]))) * EthereumTransaction.AmountMultiplier
           )
         )
@@ -75,13 +75,13 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
         resp(
           id,
           transactionsApi.broadcastTransaction(et).map[JsValueWrapper] { result =>
-            log.info(s"Validation result from ${EthEncoding.toHexString(et.senderAddress().publicKeyHash)}: $result")
-            EthEncoding.toHexString(et.id().arr)
+            log.info(s"Validation result from ${toHexString(et.senderAddress().publicKeyHash)}: $result")
+            toHexString(et.id().arr)
           }
         )
       case "eth_getTransactionReceipt" =>
         val transactionHex = params.get.head.as[String]
-        val txId           = ByteStr(EthEncoding.toBytes(transactionHex))
+        val txId           = ByteStr(toBytes(transactionHex))
         log.info(s"Get receipt for $transactionHex/$txId")
 
         resp(
@@ -89,17 +89,17 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           blockchain.transactionInfo(txId).fold[JsValue](JsNull) {
             case (height, tx, _) =>
               Json.obj(
-                "transactionHash"   -> EthEncoding.toHexString(tx.id().arr),
+                "transactionHash"   -> toHexString(tx.id().arr),
                 "transactionIndex"  -> "0x01",
-                "blockHash"         -> EthEncoding.toHexString(blockchain.lastBlockId.get.arr),
-                "blockNumber"       -> EthEncoding.toHexString(BigInteger.valueOf(height)),
-                "from"              -> EthEncoding.toHexString(new Array[Byte](20)),
-                "to"                -> EthEncoding.toHexString(new Array[Byte](20)),
-                "cumulativeGasUsed" -> EthEncoding.toHexString(BigInteger.ZERO),
-                "gasUsed"           -> EthEncoding.toHexString(BigInteger.ZERO),
+                "blockHash"         -> toHexString(blockchain.lastBlockId.get.arr),
+                "blockNumber"       -> toHexString(BigInteger.valueOf(height)),
+                "from"              -> toHexString(new Array[Byte](20)),
+                "to"                -> toHexString(new Array[Byte](20)),
+                "cumulativeGasUsed" -> toHexString(BigInteger.ZERO),
+                "gasUsed"           -> toHexString(BigInteger.ZERO),
                 "contractAddress"   -> JsNull,
                 "logs"              -> Json.arr(),
-                "logsBloom"         -> EthEncoding.toHexString(new Array[Byte](32))
+                "logsBloom"         -> toHexString(new Array[Byte](32))
               )
           }
         )
@@ -110,7 +110,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
 
         log.info(s"balance: contract address = $contractAddress, assetId = ${assetId(contractAddress)}")
 
-        EthEncoding.cleanHexPrefix(dataString).take(8) match {
+        cleanHexPrefix(dataString).take(8) match {
           case "95d89b41" =>
             resp(id, encodeResponse(assetDescription(contractAddress).get.name.toStringUtf8))
           case "313ce567" =>
@@ -130,17 +130,18 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
         }
       case "eth_estimateGas" =>
         val txParams = params.get.head.as[JsObject]
-        val tx = RawTransaction.createEtherTransaction(
+        val tx = RawTransaction.createTransaction(
           BigInteger.valueOf(System.currentTimeMillis()),
           BigInteger.ZERO,
           BigInteger.ZERO,
           (txParams \ "to").as[String],
-          new BigInteger(EthEncoding.cleanHexPrefix((txParams \ "value").as[String]), 16)
+          (txParams \ "value").asOpt[String].fold(BigInteger.ZERO)(s => new BigInteger(cleanHexPrefix(s), 16)),
+          (txParams \ "data").asOpt[String].getOrElse("0x")
         )
 
         val (_, txFee, _) = transactionsApi.calculateFee(EthereumTransaction(tx)).explicitGet()
 
-        resp(id, EthEncoding.toHexString(BigInteger.valueOf(txFee)))
+        resp(id, toHexString(BigInteger.valueOf(txFee)))
       case "net_version" =>
         resp(id, "1")
       case "eth_gasPrice" =>

@@ -25,7 +25,7 @@ import com.wavesplatform.transaction.{Authorized, Transaction}
 
 object DiffsCommon {
   def countScriptRuns(blockchain: Blockchain, tx: Transaction with Authorized): Int =
-    tx.checkedAssets.count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
+    tx.smartAssets(blockchain).size + Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
   def countVerifierComplexity(
       script: Option[Script],

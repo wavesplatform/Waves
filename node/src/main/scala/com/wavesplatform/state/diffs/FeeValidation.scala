@@ -5,9 +5,9 @@ import cats.syntax.foldable._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart._
@@ -40,7 +40,7 @@ object FeeValidation {
     TransactionType.SetAssetScript  -> (1000 - 4),
     TransactionType.InvokeScript    -> 5,
     TransactionType.UpdateAssetInfo -> 1,
-    TransactionType.Ethereum        -> 5    //TODO check - metamask debug
+    TransactionType.Ethereum        -> 0
   )
 
   def apply(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] = {
@@ -108,6 +108,11 @@ object FeeValidation {
           case _: SponsorFeeTransaction =>
             val multiplier = if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) BlockV5Multiplier else 1
             (baseFee * multiplier).toLong
+          case et: EthereumTransaction =>
+            et.payload match {
+              case _: EthereumTransaction.Transfer   => 1
+              case _: EthereumTransaction.Invocation => 5
+            }
           case _ => baseFee
         }
       }
@@ -151,8 +156,8 @@ object FeeValidation {
     val assetsCount = tx match {
       case _: InvokeScriptTransaction if blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) => 0
       case tx: ExchangeTransaction =>
-        tx.checkedAssets.count(blockchain.hasAssetScript) /* *3 if we decide to check orders and transaction */
-      case _ => tx.checkedAssets.count(blockchain.hasAssetScript)
+        tx.smartAssets(blockchain).size /* *3 if we decide to check orders and transaction */
+      case _ => tx.smartAssets(blockchain).size
     }
 
     val finalAssetsCount =

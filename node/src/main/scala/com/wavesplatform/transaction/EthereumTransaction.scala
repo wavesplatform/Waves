@@ -8,7 +8,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
-import com.wavesplatform.state.{Height, TxNum}
+import com.wavesplatform.state.{Blockchain, Height, TxNum}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.EthEncoding
 import monix.eval.Coeval
 import org.web3j.abi.TypeDecoder
@@ -16,8 +17,10 @@ import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.abi.datatypes.{Address => EthAddress}
 import org.web3j.crypto.Sign.SignatureData
 import org.web3j.crypto._
+import org.web3j.rlp.{RlpEncoder, RlpList, RlpString}
 import play.api.libs.json._
 
+import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
 
 class EthereumTransaction(
@@ -28,17 +31,25 @@ class EthereumTransaction(
 ) extends Transaction(TransactionType.Ethereum) {
   import EthereumTransaction._
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
-    encodeTransaction(underlying, signatureData)
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(encode(signatureData))
+
+  private def encode(signatureData: SignatureData) = {
+    underlying.getTransaction match {
+      case _: org.web3j.crypto.transaction.`type`.Transaction1559 =>
+        encodeTransaction(underlying, signatureData)
+      case lt: org.web3j.crypto.transaction.`type`.LegacyTransaction =>
+        val list = lt.asRlpValues(signatureData)
+        if (signatureData == null) {
+          list.addAll(Seq(RlpString.create(chainId.toLong), RlpString.create(0L), RlpString.create(0L)).asJava)
+        }
+        RlpEncoder.encode(new RlpList(list))
+
+      case _ => ???
+    }
   }
 
-  override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce {
-    // FIXME more convenient way to encode?
-    val bs = encodeTransaction(underlying, null) ++ Array(67, 0x80, 0x80).map(_.toByte)
-    bs(0) = (bs(0) + 3).toByte
-    bs
-  }
-  
+  override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(encode(null))
+
   override val id: Coeval[ByteStr] = Coeval.evalOnce {
     ByteStr(Hash.sha3(bodyBytes()))
   }
@@ -72,18 +83,28 @@ class EthereumTransaction(
   } yield Json.obj(
     "id"                  -> idValue.toString,
     "type"                -> tpe.id,
-    "ethereumTransaction" -> ethereumJson(None, None, None)
+    "bytes" -> EthEncoding.toHexString(bytes()),
+    "from" -> EthEncoding.toHexString(senderAddress().publicKeyHash)
   )
 
   def ethereumJson(blockId: Option[BlockId], height: Option[Height], num: Option[TxNum]): JsObject = Json.obj()
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(Json.obj())
+  override val json: Coeval[JsObject] = Coeval.evalOnce(baseJson())
+
+  override def smartAssets(blockchain: Blockchain): Seq[IssuedAsset] = payload.smartAssets(blockchain)
 }
 
 object EthereumTransaction {
-  sealed trait Payload
+  sealed trait Payload {
+    def smartAssets(blockchain: Blockchain): Seq[IssuedAsset]
+  }
 
   case class Transfer(asset: Either[Asset.Waves.type, ERC20Address], amount: Long, recipient: Address) extends Payload {
+    override def smartAssets(blockchain: Blockchain): Seq[IssuedAsset] = asset match {
+      case Right(erc20) => blockchain.resolveERC20Address(erc20).filter(blockchain.hasAssetScript).toSeq
+      case _            => Seq.empty
+    }
+
     def json(senderAddress: Address): JsObject =
       Json.obj(
         "transfer" -> Json.obj(
@@ -99,16 +120,18 @@ object EthereumTransaction {
   }
 
   case class Invocation(dApp: Address, hexCallData: String) extends Payload {
+    override def smartAssets(blockchain: Blockchain): Seq[IssuedAsset] = Seq.empty
+
     def toInvokeScriptLike(tx: EthereumTransaction, script: Script): InvokeScriptTransactionLike = new InvokeScriptTransactionLike {
-      lazy val (funcCall, payments)                      = ABIConverter(script).decodeFunctionCall(hexCallData)
-      override def id: Coeval[ByteStr]                   = tx.id
-      override def dApp: AddressOrAlias                  = Invocation.this.dApp
-      override def sender: PublicKey                     = tx.signerPublicKey()
-      override def root: InvokeScriptTransactionLike     = this
-      override def assetFee: (Asset, TxTimestamp)        = tx.assetFee
-      override def timestamp: TxTimestamp                = tx.timestamp
-      override def chainId: TxVersion                    = tx.chainId
-      override def checkedAssets: Seq[Asset.IssuedAsset] = this.paymentAssets
+      lazy val (funcCall, payments)                                      = ABIConverter(script).decodeFunctionCall(hexCallData)
+      override def id: Coeval[ByteStr]                                   = tx.id
+      override def dApp: AddressOrAlias                                  = Invocation.this.dApp
+      override def sender: PublicKey                                     = tx.signerPublicKey()
+      override def root: InvokeScriptTransactionLike                     = this
+      override def assetFee: (Asset, TxTimestamp)                        = tx.assetFee
+      override def timestamp: TxTimestamp                                = tx.timestamp
+      override def chainId: TxVersion                                    = tx.chainId
+      override def smartAssets(blockchain: Blockchain): Seq[IssuedAsset] = Invocation.this.smartAssets(blockchain)
     }
 
     def json(senderAddress: Address): JsObject =

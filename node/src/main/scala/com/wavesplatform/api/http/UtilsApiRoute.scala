@@ -340,7 +340,7 @@ object UtilsApiRoute {
 
                 override def id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr.empty)
 
-                override def checkedAssets: Seq[Asset.IssuedAsset] = Seq.empty
+                override def smartAssets(blockchain: Blockchain): Seq[Asset.IssuedAsset] = Seq.empty
               },
               address,
               PublicKey(ByteStr.fill(KeyLength)(1)),

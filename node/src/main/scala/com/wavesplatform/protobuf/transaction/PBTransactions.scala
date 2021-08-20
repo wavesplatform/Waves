@@ -613,6 +613,9 @@ object PBTransactions {
 
         PBTransactions.create(sender, chainId, feeAmount, feeAsset, timestamp, version, proofs, Data.UpdateAssetInfo(data))
 
+      case et: EthereumTransaction =>
+        PBSignedTransaction(PBSignedTransaction.Transaction.EthereumTransaction(ByteString.copyFrom(et.bytes())))
+
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
     }

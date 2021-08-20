@@ -88,7 +88,7 @@ object InvokeScriptTransactionDiff {
             else
               fullLimit
 
-          val paymentsComplexity = tx.checkedAssets.flatMap(blockchain.assetScript).map(_.complexity.toInt).sum
+          val paymentsComplexity = tx.smartAssets(blockchain).flatMap(blockchain.assetScript).map(_.complexity.toInt).sum
 
           for {
             (result, log) <- evaluateV2(
