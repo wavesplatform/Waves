@@ -168,6 +168,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
         d.triggers = Seq(repo)
         for (_ <- 1 to 10) d.appendBlock()
         intercept[RuntimeException](d.rollbackTo(1)) // Should fail
+        d.appendBlock()
         repo.getBlockUpdatesRange(GetBlockUpdatesRangeRequest.of(1, 10)).futureValue.updates.map(_.height) shouldBe (1 to 10)
       }
     }

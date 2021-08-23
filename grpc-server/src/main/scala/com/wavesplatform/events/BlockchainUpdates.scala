@@ -52,10 +52,30 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     )
     .addService(BlockchainUpdatesApiGrpc.bindService(repo, scheduler))
     .build()
-    .start()
 
   override def start(): Unit = {
     log.info(s"BlockchainUpdates extension starting with settings $settings")
+
+    val nodeHeight      = context.blockchain.height
+    val extensionHeight = repo.height
+
+    if (extensionHeight < nodeHeight)
+      throw new IllegalStateException(s"BlockchainUpdates height $extensionHeight is lower than node height $nodeHeight")
+
+    if (extensionHeight > nodeHeight) {
+      log.info(s"Rolling back from $extensionHeight to node height $nodeHeight")
+      repo.rollbackData(nodeHeight)
+    }
+
+    val lastUpdateId = repo.getBlockUpdate(nodeHeight).update.map(bu => ByteStr(bu.id.toByteArray))
+    val lastBlockId  = context.blockchain.blockHeader(nodeHeight).map(_.id())
+
+    if (lastUpdateId != lastBlockId)
+      throw new IllegalStateException(s"Last update ID $lastUpdateId does not match last block ID $lastBlockId at height $nodeHeight")
+
+    log.info(s"BlockchainUpdates startup check successful at height $extensionHeight")
+
+    grpcServer.start()
     log.info(s"BlockchainUpdates extension started gRPC API on port ${settings.grpcPort}")
   }
 

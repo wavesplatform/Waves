@@ -37,6 +37,23 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
     handlers.foreach(_.shutdown())
   }
 
+  def height: Int =
+    liquidState.fold(db.readOnly { ro =>
+      val iter = ro.newIterator
+      try if (iter.hasNext) try {
+        iter.seekToLast()
+        Ints.fromByteArray(iter.next().getKey)
+      } catch {
+        case _: UnsupportedOperationException =>
+          var last = 0
+          do {
+            last = Ints.fromByteArray(iter.next().getKey)
+          } while (iter.hasNext)
+          last
+      } else 0
+      finally iter.close()
+    })(_.keyBlock.height)
+
   override def onProcessBlock(
       block: Block,
       diff: BlockDiffer.DetailedDiff,
@@ -77,21 +94,17 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
     handlers.foreach(_.handleUpdate(mba))
   }
 
-  private def rollbackData(toHeight: Int, toBlockId: ByteStr): Seq[BlockAppended] =
+  def rollbackData(toHeight: Int): Seq[BlockAppended] =
     db.readWrite { rw =>
       log.debug(s"Rolling back to $toHeight")
       var buf: List[BlockAppended] = Nil
-      val iter                     = rw.iterator
+      val iter                     = rw.newIterator
       try {
         iter.seek(Ints.toByteArray(toHeight + 1))
         while (iter.hasNext) {
           val e           = iter.next()
           val height      = Ints.fromByteArray(e.getKey)
           val stateUpdate = Loader.parseUpdate(e.getValue, blocksApi, height).vanillaAppend
-          require(
-            height != toHeight || stateUpdate.id == toBlockId,
-            s"Stored update ID ${stateUpdate.id} at target height $height does not match target ID $toBlockId"
-          )
           buf = stateUpdate :: buf
         }
       } finally iter.close()
@@ -142,9 +155,9 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
           ls.microBlocks.reverse.map(revertMicroBlock(_, blockchainBefore)) -> Seq(revertBlock(ls.keyBlock, blockchainBefore))
         } else {
           ls.microBlocks.reverse.map(revertMicroBlock(_, blockchainBefore)) ->
-            (ls.keyBlock +: rollbackData(toHeight, toBlockId)).map(revertBlock(_, blockchainBefore))
+            (ls.keyBlock +: rollbackData(toHeight)).map(revertBlock(_, blockchainBefore))
         }
-      case None => Seq.empty -> rollbackData(toHeight, toBlockId).map(revertBlock(_, blockchainBefore))
+      case None => Seq.empty -> rollbackData(toHeight).map(revertBlock(_, blockchainBefore))
     }
 
     liquidState = None
@@ -208,6 +221,7 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
       .map(updates => GetBlockUpdatesRangeResponse(updates))
 
   private def stream(fromHeight: Int, toHeight: Int, streamId: String): Observable[PBBlockchainUpdated] = {
+    require(fromHeight <= blocksApi.currentHeight, "Requested start height exceeds current blockchain height")
     require(fromHeight > 0, "fromHeight must be > 0")
     require(toHeight == 0 || toHeight >= fromHeight, "fromHeight must not exceed toHeight")
     monitor.synchronized {

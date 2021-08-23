@@ -37,7 +37,11 @@ package object grpc extends ScorexLogging {
       wrapObservable(obs, streamObserver)
 
     def failWith(error: Throwable): Unit = {
-      log.error(s"[${streamObserver.id}] gRPC call completed with error", error)
+      error match {
+        case _: IllegalArgumentException => log.warn(s"[${streamObserver.id}] gRPC call completed with error", error)
+        case _                           => log.error(s"[${streamObserver.id}] gRPC call completed with error", error)
+      }
+
       streamObserver.onError(GRPCErrors.toStatusException(error))
     }
 
