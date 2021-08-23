@@ -5,7 +5,7 @@ import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, DBResource, Keys}
 import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, NewTransactionInfo, TransactionId, TxNum}
-import com.wavesplatform.transaction.{Authorized, GenesisTransaction, Transaction, TransactionType}
+import com.wavesplatform.transaction.{Authorized, EthereumTransaction, GenesisTransaction, Transaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
@@ -35,9 +35,10 @@ trait AddressTransactions {
 object AddressTransactions {
   private def loadTransaction(db: DB, height: Height, txNum: TxNum, sender: Option[Address]): Option[(Height, Transaction, Boolean)] =
     db.get(Keys.transactionAt(height, txNum)) match {
-      case Some((tx: Authorized, status)) if sender.forall(_ == tx.sender.toAddress) => Some((height, tx, status))
-      case Some((gt: GenesisTransaction, status)) if sender.isEmpty                  => Some((height, gt, status))
-      case _                                                                         => None
+      case Some((tx: Authorized, status)) if sender.forall(_ == tx.sender.toAddress)         => Some((height, tx, status))
+      case Some((gt: GenesisTransaction, status)) if sender.isEmpty                          => Some((height, gt, status))
+      case Some((et: EthereumTransaction, status)) if sender.forall(_ == et.senderAddress()) => Some((height, et, status))
+      case _                                                                                 => None
     }
 
   private def loadInvokeScriptResult(resource: DBResource, txId: ByteStr): Option[InvokeScriptResult] =

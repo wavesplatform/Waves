@@ -211,7 +211,15 @@ case class TransactionsApiRoute(
       import com.wavesplatform.transaction.transfer._
       meta.transaction match {
         case mtt: MassTransferTransaction if mtt.sender.toAddress != address =>
-          aliasesOfAddress.map(aliases => mtt.compactJson(address, aliases) ++ serializer.transactionMetaJson(meta))
+          (if (mtt.transfers.exists(
+                 pt =>
+                   pt.address match {
+                     case address: Address => false
+                     case a: Alias         => true
+                   }
+               )) aliasesOfAddress.map(aliases => mtt.compactJson(address, aliases))
+           else Task.now(mtt.compactJson(address, Set.empty))).map(_ ++ serializer.transactionMetaJson(meta))
+
         case _ => Task.now(serializer.transactionWithMetaJson(meta))
       }
     }
