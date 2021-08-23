@@ -6,7 +6,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import org.openjdk.jmh.annotations._
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.PureFunctionsRebenchmark.evalV5
-import com.wavesplatform.lang.v1.StringSplitBenchmark.{SplitString, SplitString20x10, SplitString20x25}
+import com.wavesplatform.lang.v1.StringSplitBenchmark._
 import org.openjdk.jmh.infra.Blackhole
 
 import scala.util.Random
@@ -20,6 +20,18 @@ import scala.util.Random
 class StringSplitBenchmark {
   @Benchmark
   def splitString(st: SplitString, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def splitString200x30(st: SplitString200x30, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def splitString100x50(st: SplitString100x50, bh: Blackhole): Unit =
+    bh.consume(evalV5(st.expr))
+
+  @Benchmark
+  def splitString100x60(st: SplitString100x60, bh: Blackhole): Unit =
     bh.consume(evalV5(st.expr))
 
   @Benchmark
@@ -47,6 +59,15 @@ object StringSplitBenchmark {
 
   @State(Scope.Benchmark)
   class SplitString extends StringSplit(1000, 31)
+
+  @State(Scope.Benchmark)
+  class SplitString200x30 extends StringSplit(200, 30)
+
+  @State(Scope.Benchmark)
+  class SplitString100x50 extends StringSplit(100, 50)
+
+  @State(Scope.Benchmark)
+  class SplitString100x60 extends StringSplit(100, 60)
 
   @State(Scope.Benchmark)
   class SplitString20x25 extends StringSplit(20, 25)
