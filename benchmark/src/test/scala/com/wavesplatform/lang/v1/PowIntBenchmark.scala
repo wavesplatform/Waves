@@ -57,14 +57,17 @@ class PowIntSt {
 
   val max = Long.MaxValue
 
-  val expr1  = TestCompiler(V5).compileExpression(s"pow($max, 0, $max, 8, 8, DOWN)").expr.asInstanceOf[EXPR]               // ERROR
-  val expr2  = TestCompiler(V5).compileExpression(s"pow($max, 0, $max, 0, 0, DOWN)").expr.asInstanceOf[EXPR]               // ERROR
-  val expr3  = TestCompiler(V5).compileExpression(s"pow(-$max, 0, $max, 0, 0, DOWN)").expr.asInstanceOf[EXPR]              // ERROR
-  val expr4  = TestCompiler(V5).compileExpression(s"pow($max, 0, -$max, 0, 8, DOWN)").expr.asInstanceOf[EXPR]              // ERROR
-  val expr5  = TestCompiler(V5).compileExpression(s"pow(1, 8, -$max, 0, 8, DOWN)").expr.asInstanceOf[EXPR]                 // ERROR
-  val expr6  = TestCompiler(V5).compileExpression(s"pow(98765432, 8, -$max, 0, 8, DOWN)").expr.asInstanceOf[EXPR]          // ERROR
-  val expr7  = TestCompiler(V5).compileExpression(s"pow(98765432, 8, $max, 0, 8, DOWN)").expr.asInstanceOf[EXPR]           // ERROR
-  val expr8  = TestCompiler(V5).compileExpression(s"pow(98765432, 8, $max, 8, 8, DOWN)").expr.asInstanceOf[EXPR]           // 0
-  val expr9  = TestCompiler(V5).compileExpression(s"pow(98765432, 8, 145998765432, 8, 8, HALFUP)").expr.asInstanceOf[EXPR] // 1
-  val expr10 = TestCompiler(V5).compileExpression(s"pow(198765432, 8, 6298765432, 8, 0, DOWN)").expr.asInstanceOf[EXPR]    // ≈ 6 * 10^18
+  val expr1  = compile(s"pow($max, 0, $max, 8, 8, DOWN)")               // ERROR
+  val expr2  = compile(s"pow($max, 0, $max, 0, 0, DOWN)")               // ERROR
+  val expr3  = compile(s"pow(-$max, 0, $max, 0, 0, DOWN)")              // ERROR
+  val expr4  = compile(s"pow($max, 0, -$max, 0, 8, DOWN)")              // ERROR
+  val expr5  = compile(s"pow(1, 8, -$max, 0, 8, DOWN)")                 // ERROR
+  val expr6  = compile(s"pow(98765432, 8, -$max, 0, 8, DOWN)")          // ERROR
+  val expr7  = compile(s"pow(98765432, 8, $max, 0, 8, DOWN)")           // ERROR
+  val expr8  = compile(s"pow(98765432, 8, $max, 8, 8, DOWN)")           // 0
+  val expr9  = compile(s"pow(98765432, 8, 145998765432, 8, 8, HALFUP)") // 1
+  val expr10 = compile(s"pow(198765432, 8, 6298765432, 8, 0, DOWN)")    // ≈ 6 * 10^18
+
+  private def compile(e: String): EXPR =
+    TestCompiler(V5).compileExpression(e).expr.asInstanceOf[EXPR]
 }
