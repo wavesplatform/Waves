@@ -1,6 +1,6 @@
 package com.wavesplatform.lang
 
-import java.math.{BigInteger, MathContext, RoundingMode, BigDecimal => BD}
+import java.math.{BigInteger, MathContext, BigDecimal => BD}
 import java.security.spec.InvalidKeySpecException
 
 import cats.syntax.either._
@@ -78,6 +78,12 @@ object Global extends BaseGlobal {
   override def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean =
     Merkle.verify(rootBytes, proofBytes, valueBytes)
 
+  private val longDigits  = 19
+  private val longContext = new MathContext(longDigits)
+
+  private val bigIntDigits = 154
+  private val bigMathContext = new MathContext(bigIntDigits)
+
   // Math functions
   def pow(
       base: Long,
@@ -88,23 +94,10 @@ object Global extends BaseGlobal {
       round: Rounding
   ): Either[String, Long] =
     tryEither {
-      val precision = 19 // max count of long digits
-      val baseBD    = BD.valueOf(base, basePrecision)
-      val expBD     = BD.valueOf(exponent, exponentPrecision)
-      val context   = new MathContext(precision, RoundingMode.HALF_EVEN)
-      val result    = BigDecimalMath.pow(baseBD, expBD, context)
-      val value     = result.unscaledValue()
-      val scale     = result.scale()
-      if (scale > resultPrecision)
-        if (scale - resultPrecision > precision - 1)
-          Right(BigInt(0))
-        else
-          divide(value, BigInteger.TEN.pow(scale - resultPrecision), round)
-      else
-        if (resultPrecision - scale > precision - 1)
-          Left("Pow overflow")
-        else
-          Right(BigInt(value) * BigInteger.TEN.pow(resultPrecision - scale))
+      val baseBD  = BD.valueOf(base, basePrecision)
+      val expBD   = BD.valueOf(exponent, exponentPrecision)
+      val result  = BigDecimalMath.pow(baseBD, expBD, longContext)
+      setScale(resultPrecision, round, longDigits, result)
     }.flatten.map(_.bigInteger.longValueExact())
 
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long] =
@@ -115,8 +108,6 @@ object Global extends BaseGlobal {
       res.setScale(rp.toInt, round.mode).unscaledValue.longValueExact
     }
 
-  val bigMathContext = new MathContext(156 + 40)
-
   def toJBig(v: BigInt, p: Long) = BigDecimal(v).bigDecimal.multiply(BD.valueOf(1L, p.toInt))
 
   def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =
@@ -124,8 +115,8 @@ object Global extends BaseGlobal {
       val base = toJBig(b, bp)
       val exp  = toJBig(e, ep)
       val res  = BigDecimalMath.pow(base, exp, bigMathContext)
-      BigInt(res.setScale(rp.toInt, round.mode).unscaledValue)
-    }
+      setScale(rp.toInt, round, bigIntDigits, res)
+    }.flatten
 
   def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =
     tryEither {
@@ -134,6 +125,25 @@ object Global extends BaseGlobal {
       val res  = BigDecimalMath.log(base, bigMathContext).divide(BigDecimalMath.log(exp, bigMathContext), bigMathContext)
       BigInt(res.setScale(rp.toInt, round.mode).unscaledValue)
     }
+
+  private def setScale(
+      resultPrecision: Int,
+      round: Rounding,
+      precision: Int,
+      result: java.math.BigDecimal
+  ): Either[ExecutionError, BigInt] = {
+    val value = result.unscaledValue()
+    val scale = result.scale()
+    if (scale > resultPrecision)
+      if (scale - resultPrecision > precision - 1)
+        Right(BigInt(0))
+      else
+        divide(value, BigInteger.TEN.pow(scale - resultPrecision), round)
+    else if (resultPrecision - scale > precision - 1)
+      Left("Pow overflow")
+    else
+      Right(BigInt(value) * BigInteger.TEN.pow(resultPrecision - scale))
+  }
 
   override def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
     Bls12Groth16.verify(verifyingKey, proof, inputs)
