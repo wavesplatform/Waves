@@ -13,6 +13,7 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.events.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.protobuf.TransactionMetadata
+import com.wavesplatform.events.protobuf.TransactionMetadata.{EthereumMetadata, TransferMetadata}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
@@ -31,8 +32,9 @@ import com.wavesplatform.state.{
 }
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
+import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxAmount}
+import com.wavesplatform.transaction.{Asset, EthereumTransaction, GenesisTransaction, TxAmount}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -407,12 +409,34 @@ object StateUpdate {
   }
 
   private[this] def transactionsMetadata(blockchain: Blockchain, diff: Diff): Seq[TransactionMetadata] = {
+    implicit class AddressResolver(addr: AddressOrAlias) {
+      def resolve: Address = blockchain.resolveAlias(addr).explicitGet()
+    }
+
+    def invokeScriptLikeToMetadata(ist: InvokeScriptTransactionLike) = {
+      import TransactionMetadata.InvokeScriptMetadata.Argument
+      import TransactionMetadata.InvokeScriptMetadata.Argument.Value
+
+      def argumentToPB(arg: Terms.EXPR): Value = arg match {
+        case Terms.CONST_LONG(t)     => Value.IntegerValue(t)
+        case bs: Terms.CONST_BYTESTR => Value.BinaryValue(bs.bs.toByteString)
+        case str: Terms.CONST_STRING => Value.StringValue(str.s)
+        case Terms.CONST_BOOLEAN(b)  => Value.BooleanValue(b)
+        case Terms.ARR(xs)           => Value.List(Argument.List(xs.map(x => Argument(argumentToPB(x)))))
+        case _                       => Value.Empty
+      }
+
+      TransactionMetadata.InvokeScriptMetadata(
+        ist.dApp.resolve.toByteString,
+        ist.funcCall.function.funcName,
+        ist.funcCall.args.map(x => Argument(argumentToPB(x))),
+        ist.payments.map(p => Amount(PBAmounts.toPBAssetId(p.assetId), p.amount)),
+        diff.scriptResults.get(ist.id()).map(InvokeScriptResult.toPB)
+      )
+    }
+
     diff.transactions.values
       .map[TransactionMetadata.Metadata] { tx =>
-        implicit class AddressResolver(addr: AddressOrAlias) {
-          def resolve: Address = blockchain.resolveAlias(addr).explicitGet()
-        }
-
         tx.transaction match {
           case tt: TransferTransaction =>
             TransactionMetadata.Metadata.Transfer(TransactionMetadata.TransferMetadata(tt.recipient.resolve.toByteString))
@@ -421,30 +445,25 @@ object StateUpdate {
             TransactionMetadata.Metadata.MassTransfer(TransactionMetadata.MassTransferMetadata(mtt.transfers.map(_.address.resolve.toByteString)))
 
           case lt: LeaseTransaction =>
-            TransactionMetadata.Metadata.LeaseMeta(TransactionMetadata.LeaseMetadata(lt.recipient.resolve.toByteString))
+            TransactionMetadata.Metadata.Lease(TransactionMetadata.LeaseMetadata(lt.recipient.resolve.toByteString))
 
           case ist: InvokeScriptTransaction =>
-            import TransactionMetadata.InvokeScriptMetadata.Argument
-            import TransactionMetadata.InvokeScriptMetadata.Argument.Value
+            TransactionMetadata.Metadata.InvokeScript(invokeScriptLikeToMetadata(ist))
 
-            def argumentToPB(arg: Terms.EXPR): Value = arg match {
-              case Terms.CONST_LONG(t)     => Value.IntegerValue(t)
-              case bs: Terms.CONST_BYTESTR => Value.BinaryValue(bs.bs.toByteString)
-              case str: Terms.CONST_STRING => Value.StringValue(str.s)
-              case Terms.CONST_BOOLEAN(b)  => Value.BooleanValue(b)
-              case Terms.ARR(xs)           => Value.List(Argument.List(xs.map(x => Argument(argumentToPB(x)))))
-              case _                       => Value.Empty
+          case et: EthereumTransaction =>
+            val metadataOpt: Option[EthereumMetadata] = et.payload match {
+              case EthereumTransaction.Transfer(_, _, recipient) =>
+                Some(EthereumMetadata(et.senderAddress().toByteString, EthereumMetadata.Action.Transfer(TransferMetadata(recipient.toByteString))))
+
+              case inv @ EthereumTransaction.Invocation(dApp, _) =>
+                for {
+                  script <- blockchain.accountScript(dApp)
+                  invoke = inv.toInvokeScriptLike(et, script.script)
+                } yield EthereumMetadata(et.senderAddress().toByteString, EthereumMetadata.Action.Invoke(invokeScriptLikeToMetadata(invoke)))
             }
-
-            TransactionMetadata.Metadata.InvokeScript(
-              TransactionMetadata.InvokeScriptMetadata(
-                ist.dApp.resolve.toByteString,
-                ist.funcCall.function.funcName,
-                ist.funcCall.args.map(x => Argument(argumentToPB(x))),
-                ist.payments.map(p => Amount(PBAmounts.toPBAssetId(p.assetId), p.amount)),
-                diff.scriptResults.get(ist.id()).map(InvokeScriptResult.toPB)
-              )
-            )
+            metadataOpt
+              .map(TransactionMetadata.Metadata.Ethereum)
+              .getOrElse(TransactionMetadata.Metadata.Empty)
 
           case _ =>
             TransactionMetadata.Metadata.Empty
