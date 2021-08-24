@@ -32,15 +32,15 @@ class SumStringBenchmark {
     bh.consume(evalV5(st.expr))
 
   @Benchmark
-  def sumString1_6000(st: SumString1_6000, bh: Blackhole): Unit =
+  def sumString1_10000(st: SumString1_10000, bh: Blackhole): Unit =
     bh.consume(evalV5(st.expr))
 
   @Benchmark
-  def sumString6000_1(st: SumString6000_1, bh: Blackhole): Unit =
+  def sumString10000_1(st: SumString10000_1, bh: Blackhole): Unit =
     bh.consume(evalV5(st.expr))
 
   @Benchmark
-  def sumString3000_3000(st: SumString3000_3000, bh: Blackhole): Unit =
+  def sumString5000_5000(st: SumString5000_5000, bh: Blackhole): Unit =
     bh.consume(evalV5(st.expr))
 }
 
@@ -68,11 +68,11 @@ object SumStringBenchmark {
   class SumString16383_16383 extends SumString(32766 / 2, 32766 / 2)
 
   @State(Scope.Benchmark)
-  class SumString1_6000 extends SumString(1, 6000)
+  class SumString1_10000 extends SumString(1, 10000)
 
   @State(Scope.Benchmark)
-  class SumString6000_1 extends SumString(6000, 1)
+  class SumString10000_1 extends SumString(10000, 1)
 
   @State(Scope.Benchmark)
-  class SumString3000_3000 extends SumString(3000, 3000)
+  class SumString5000_5000 extends SumString(5000, 5000)
 }
