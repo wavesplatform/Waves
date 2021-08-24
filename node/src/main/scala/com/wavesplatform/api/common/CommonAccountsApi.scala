@@ -6,12 +6,12 @@ import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
-import com.wavesplatform.database.{DBExt, KeyTags, Keys}
+import com.wavesplatform.database.{DBExt, Keys, KeyTags}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
 import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
 import com.wavesplatform.state.reader.LeaseDetails.Status
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TransactionType
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -81,18 +81,17 @@ object CommonAccountsApi extends ScorexLogging {
 
     override def portfolio(address: Address): Observable[(IssuedAsset, Long)] = {
       val currentDiff = diff()
-        db.resourceObservable.flatMap { resource =>
-          Observable.fromIterator(Task(assetBalanceIterator(resource, address, currentDiff, includeNft(blockchain))))
-        }
+      db.resourceObservable.flatMap { resource =>
+        Observable.fromIterator(Task(assetBalanceIterator(resource, address, currentDiff, includeNft(blockchain))))
       }
+    }
 
-    override def nftList(address: Address, after: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)] =
-      {
-        val currentDiff = diff()
-        db.resourceObservable.flatMap { resource =>
-          Observable.fromIterator(Task(nftIterator(resource, address, currentDiff, after, blockchain.assetDescription)))
-        }
+    override def nftList(address: Address, after: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)] = {
+      val currentDiff = diff()
+      db.resourceObservable.flatMap { resource =>
+        Observable.fromIterator(Task(nftIterator(resource, address, currentDiff, after, blockchain.assetDescription)))
       }
+    }
 
     override def script(address: Address): Option[AccountScriptInfo] = blockchain.accountScript(address)
 
@@ -101,8 +100,7 @@ object CommonAccountsApi extends ScorexLogging {
 
     override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[_]] = Observable.defer {
       val pattern = regex.map(_.r.pattern)
-      val entriesFromDiff = diff()
-        .accountData
+      val entriesFromDiff = diff().accountData
         .get(address)
         .fold[Map[String, DataEntry[_]]](Map.empty)(_.data.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) })
 
@@ -148,7 +146,7 @@ object CommonAccountsApi extends ScorexLogging {
               LeaseInfo.Status.Active
             )
           )
-        case TransactionMeta.Invoke(invokeHeight, originTransaction, true, Some(scriptResult)) =>
+        case inv @ TransactionMeta.Invoke(invokeHeight, originTransaction, true, Some(scriptResult)) =>
           def extractLeases(sender: Address, result: InvokeScriptResult): Seq[LeaseInfo] =
             result.leases.collect {
               case lease if leaseIsActive(lease.id) =>
@@ -165,7 +163,7 @@ object CommonAccountsApi extends ScorexLogging {
               result.invokes.flatMap(i => extractLeases(i.dApp, i.stateChanges))
             }
 
-          extractLeases(blockchain.resolveAlias(originTransaction.dApp).explicitGet(), scriptResult)
+          extractLeases(blockchain.resolveAlias(inv.dApp).explicitGet(), scriptResult)
         case _ => Seq()
       }
 

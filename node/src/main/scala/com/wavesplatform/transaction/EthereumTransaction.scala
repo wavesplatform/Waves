@@ -2,6 +2,8 @@ package com.wavesplatform.transaction
 
 import java.math.BigInteger
 
+import scala.reflect.ClassTag
+
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.EthereumKeyLength
@@ -12,18 +14,16 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.EthEncoding
 import monix.eval.Coeval
 import org.web3j.abi.TypeDecoder
-import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.abi.datatypes.{Address => EthAddress}
-import org.web3j.crypto.Sign.SignatureData
+import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto._
+import org.web3j.crypto.Sign.SignatureData
 import play.api.libs.json._
 
-import scala.reflect.ClassTag
-
-class EthereumTransaction(
-    val payload: EthereumTransaction.Payload,
-    val underlying: RawTransaction,
-    val signatureData: SignatureData,
+final case class EthereumTransaction(
+    payload: EthereumTransaction.Payload,
+    underlying: RawTransaction,
+    signatureData: SignatureData,
     override val chainId: Byte
 ) extends Transaction(TransactionType.Ethereum) {
   import EthereumTransaction._
