@@ -61,6 +61,7 @@ object PureContext {
     createTryOp(SUM_OP, LONG, LONG, SUM_LONG)((a, b) => Math.addExact(a, b))
   lazy val subLong: BaseFunction[NoContext] =
     createTryOp(SUB_OP, LONG, LONG, SUB_LONG)((a, b) => Math.subtractExact(a, b))
+
   lazy val sumString: BaseFunction[NoContext] =
     createRawOp(
       SUM_OP,
@@ -69,15 +70,17 @@ object PureContext {
       SUM_STRING,
       Map[StdLibVersion, Long](V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 20L)
     ) {
-      case (CONST_STRING(a), CONST_STRING(b)) =>
-        if (a.length + b.length <= Terms.DataEntryValueMax) {
-          CONST_STRING(a + b)
+      case (s1 @ CONST_STRING(a), s2 @ CONST_STRING(b)) =>
+        val sumWeight = (s1.weight + s2.weight).toInt
+        if (sumWeight <= Terms.DataEntryValueMax) {
+          CONST_STRING(a + b, bytesLength = Some(sumWeight))
         } else {
           Left(s"String length = ${a.length + b.length} exceeds ${Terms.DataEntryValueMax}")
         }
       case args =>
         Left(s"Unexpected args $args for string concatenation operator")
     }
+
   lazy val sumByteStr: BaseFunction[NoContext] =
     createRawOp(
       SUM_OP,
