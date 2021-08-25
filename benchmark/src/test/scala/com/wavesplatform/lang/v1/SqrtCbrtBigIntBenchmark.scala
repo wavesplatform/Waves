@@ -44,10 +44,10 @@ class SqrtBigIntSt {
   val e1 = "toBigInt(5)"
   val e2 = "toBigInt(3333333333333333)"
 
-  val expr1 = compile(s"pow($max, 0, $e1, 1, 16, DOWN)")
-  val expr2 = compile(s"pow($max, 16, $e1, 1, 16, DOWN)")
-  val expr3 = compile(s"pow($max, 0, $e2, 16, 16, DOWN)")
-  val expr4 = compile(s"pow($min, 16, $e2, 16, 16, DOWN)")
+  val expr1 = compile(s"pow($max, 0, $e1, 1, 18, DOWN)")
+  val expr2 = compile(s"pow($max, 18, $e1, 1, 18, DOWN)")
+  val expr3 = compile(s"pow($max, 0, $e2, 16, 18, DOWN)")
+  val expr4 = compile(s"pow($min, 18, $e2, 16, 18, DOWN)")
 
   private def compile(e: String): EXPR =
     TestCompiler(V5).compileExpression(e).expr.asInstanceOf[EXPR]
