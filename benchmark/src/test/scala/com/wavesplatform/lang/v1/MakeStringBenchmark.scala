@@ -49,7 +49,7 @@ class MakeStringBenchmark {
     bh.consume(evalV5(st.expr))
 
   @Benchmark
-  def makeString14x70(st: MakeString14x70, bh: Blackhole): Unit =
+  def makeString7x70(st: MakeString7x70, bh: Blackhole): Unit =
     bh.consume(evalV5(st.expr))
 }
 
@@ -89,5 +89,5 @@ object MakeStringBenchmark {
   class MakeString1x70 extends MakeString(listSize = 70, stringSize = 1)
 
   @State(Scope.Benchmark)
-  class MakeString14x70 extends MakeString(listSize = 70, stringSize = 7)
+  class MakeString7x70 extends MakeString(listSize = 70, stringSize = 7)
 }
