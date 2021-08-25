@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransac
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.utils.ScorexLogging
-import org.scalatest.Matchers
+import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.JsObject
 
 import scala.concurrent.duration._
@@ -43,7 +43,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
   }
 
   object restApi {
-    import com.wavesplatform.it.api.SyncHttpApi._
+    import com.wavesplatform.it.api.SyncHttpApi.{NodeExtSync, assertApiError}
 
     /**
       * Checks that transactions contain failed and returns them.

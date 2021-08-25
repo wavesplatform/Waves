@@ -6,7 +6,7 @@ import com.wavesplatform.lang.v1.traits.domain.{Burn => BurnAction}
 
 case class TransferItem(recipient: Recipient, amount: Long)
 
-trait Tx
+sealed trait Tx
 sealed trait PseudoTx
 
 object Tx {

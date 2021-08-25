@@ -5,18 +5,15 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.transactions.OverflowBlock
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.util._
-import com.wavesplatform.it.{Node, NodeConfigs}
-import org.scalatest.FunSuite
+import com.wavesplatform.it.{BaseFunSuite, NodeConfigs}
+import com.wavesplatform.test._
 
-class DebugPortfoliosSuite extends FunSuite with NodesFromDocker with OverflowBlock {
+class DebugPortfoliosSuite extends BaseFunSuite with NodesFromDocker with OverflowBlock {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
       .withDefault(entitiesNumber = 1)
       .buildNonConflicting()
-
-  def sender: Node = nodes.head
 
   private lazy val firstAcc  = sender.createKeyPair()
   private lazy val secondAcc = sender.createKeyPair()

@@ -1,7 +1,9 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.Id
-import cats.implicits._
+import cats.syntax.either._
+import cats.syntax.foldable._
+import cats.instances.lazyList._
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -148,7 +150,7 @@ class EvaluatorV2(
               case _: CaseObj =>
                 Coeval.now(unused)
               case ev: EVALUATED =>
-                throw EvaluationException(s"GETTER of non-case-object $ev", unused)
+                throw EvaluationException(s"GETTER of non-case-object $ev with field '${g.field}", unused)
               case _ =>
                 Coeval.now(unused)
             }

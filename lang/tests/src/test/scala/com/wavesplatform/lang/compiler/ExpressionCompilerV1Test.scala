@@ -19,16 +19,14 @@ import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions.Pos
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
-import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Common, Global}
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test._
 
 import scala.util.Try
 
-class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+class ExpressionCompilerV1Test extends PropSpec {
 
   property("should infer generic function return type") {
     import com.wavesplatform.lang.v1.parser.Expressions._
@@ -556,6 +554,20 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     val u1 = "\u0064"
     TestCompiler(V4).compileExpression(s""" "$u1" == "$u1" """) shouldBe
       TestCompiler(V4).compileExpression(s""" "d" == "d" """)
+  }
+
+  property("accessing to Any as to tuple") {
+    val script =
+      """
+        | func f(a: Any) = a._1 == a._2
+        | true
+      """.stripMargin
+    ExpressionCompiler.compile(script, compilerContext) should produce(
+      "Compilation failed: [" +
+        "Undefined field `_1` of variable of type `Any` in 19-23; " +
+        "Undefined field `_2` of variable of type `Any` in 27-31" +
+        "]"
+    )
   }
 
   treeTypeTest("GETTER")(

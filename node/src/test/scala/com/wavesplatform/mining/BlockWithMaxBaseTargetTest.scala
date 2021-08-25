@@ -21,19 +21,19 @@ import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.BaseTargetReachedMaximum
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{TransactionGen, WithDB}
+import com.wavesplatform.WithDB
+import com.wavesplatform.test.FreeSpec
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with TransactionGen with DBCacheSettings {
+class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettings {
 
   "base target limit" - {
     "node should stop if base target greater than maximum in block creation " in {

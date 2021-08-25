@@ -1,11 +1,11 @@
 package com.wavesplatform.mining.microblocks
 
-import scala.concurrent.duration._
-
-import cats.implicits._
+import cats.syntax.applicativeError._
+import cats.syntax.bifunctor._
+import cats.syntax.either._
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining._
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl._
@@ -21,6 +21,8 @@ import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
+
+import scala.concurrent.duration._
 
 class MicroBlockMinerImpl(
     setDebugState: MinerDebugInfo.State => Unit,

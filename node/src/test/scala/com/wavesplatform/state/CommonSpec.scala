@@ -8,11 +8,10 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
-import org.scalatest.{FreeSpec, Matchers}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.TestTime
+import com.wavesplatform.test.FreeSpec
 
-class CommonSpec extends FreeSpec with Matchers with WithDomain with TransactionGen with PropertyChecks with NoShrink {
+class CommonSpec extends FreeSpec with WithDomain {
   private val time          = new TestTime
   private def nextTs        = time.getTimestamp()
   private val AssetIdLength = 32

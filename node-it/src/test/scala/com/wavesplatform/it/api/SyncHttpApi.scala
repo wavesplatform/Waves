@@ -24,8 +24,7 @@ import com.wavesplatform.transaction.{Asset, TxVersion}
 import io.grpc.Status.Code
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
-import org.scalatest.Matchers._
-import org.scalatest.{Assertion, Assertions, Matchers}
+import org.scalatest.{Assertion, Assertions, matchers}
 import play.api.libs.json.Json.parse
 import play.api.libs.json._
 
@@ -35,7 +34,7 @@ import scala.concurrent.{Await, Awaitable, Future}
 import scala.util._
 import scala.util.control.NonFatal
 
-object SyncHttpApi extends Assertions {
+object SyncHttpApi extends Assertions with matchers.should.Matchers {
   case class ApiCallException(cause: Throwable) extends Exception("Error in API call", cause)
   case class ErrorMessage(error: Int, message: String)
   implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
@@ -61,6 +60,7 @@ object SyncHttpApi extends Assertions {
 
   implicit class ApiErrorOps(error: ApiError) {
     def assertive(matchMessage: Boolean = false): AssertiveApiError = AssertiveApiError(error.id, error.message, error.code, matchMessage)
+    def assertiveRegex: AssertiveApiError = assertive(matchMessage = true)
   }
 
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
@@ -142,7 +142,7 @@ object SyncHttpApi extends Assertions {
     }
 
   //noinspection ScalaStyle
-  implicit class NodeExtSync(n: Node) extends Assertions with Matchers {
+  implicit class NodeExtSync(n: Node) extends Assertions with matchers.should.Matchers {
     import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
 
     private def maybeWaitForTransaction(tx: Transaction, wait: Boolean): Transaction = {
@@ -408,7 +408,6 @@ object SyncHttpApi extends Assertions {
         sellMatcherFee: Long,
         fee: Long,
         version: Byte = 2,
-        matcherFeeAssetId: Option[String] = None,
         waitForTx: Boolean = false,
         amountsAsStrings: Boolean = false,
         validate: Boolean = true
@@ -425,7 +424,6 @@ object SyncHttpApi extends Assertions {
             sellMatcherFee,
             fee,
             version,
-            matcherFeeAssetId,
             amountsAsStrings,
             validate
           )
@@ -786,18 +784,16 @@ object SyncHttpApi extends Assertions {
 
     def rollback(height: Int, returnToUTX: Boolean = true): Unit = {
       val combinations = nodes.combinations(2).toSeq
-      nodes.combinations(2).foreach {
-        case Seq(n1, n2) =>
-          n1.blacklist(n2.networkAddress)
-          n2.blacklist(n1.networkAddress)
+      combinations.foreach { ns =>
+        ns.head.blacklist(ns(1).networkAddress)
+        ns(1).blacklist(ns.head.networkAddress)
       }
 
       nodes.rollbackWithoutBlacklisting(height, returnToUTX)
       nodes.foreach(_.clearBlacklist())
 
-      combinations.foreach {
-        case Seq(n1, n2) =>
-          n1.connect(n2.networkAddress)
+      combinations.foreach { ns =>
+        ns.head.connect(ns(1).networkAddress)
       }
     }
 

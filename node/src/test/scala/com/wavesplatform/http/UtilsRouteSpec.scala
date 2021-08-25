@@ -61,7 +61,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   )
 
   (() => utilsApi.blockchain.activatedFeatures).when().returning(Map()).anyNumberOfTimes()
-  private val route = utilsApi.route
+  private val route = seal(utilsApi.route)
 
   val script = FUNCTION_CALL(
     function = PureContext.eq.header,

@@ -98,7 +98,7 @@ case class AssetsApiRoute(
               }
           }
         } ~ pathPrefix("details") {
-          (pathEndOrSingleSlash & parameters(("id".as[String].*, "full".as[Boolean] ? false))) { (ids, full) =>
+          (pathEndOrSingleSlash & parameters("id".as[String].*, "full".as[Boolean] ? false)) { (ids, full) =>
             multipleDetailsGet(ids.toSeq.reverse, full)
           } ~ (path(AssetId) & parameter("full".as[Boolean] ? false)) { (assetId, full) =>
             singleDetails(assetId, full)
@@ -181,7 +181,7 @@ case class AssetsApiRoute(
     }
 
   def balanceDistributionAtHeight(assetId: IssuedAsset, heightParam: Int, limitParam: Int, afterParam: Option[String]): Route =
-    optionalHeaderValueByType[Accept](()) { accept =>
+    optionalHeaderValueByType(Accept) { accept =>
       val paramsEi: Either[ValidationError, DistributionParams] =
         AssetsApiRoute
           .validateDistributionParams(blockchain, heightParam, limitParam, settings.distributionAddressLimit, afterParam, maxDistributionDepth)

@@ -1,17 +1,21 @@
 import CommonSettings.autoImport.network
 import com.typesafe.sbt.SbtNativePackager.Universal
-import com.typesafe.sbt.packager.Keys.executableScriptName
-import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbtassembly.MergeStrategy
+
+name := "waves"
+maintainer := "com.wavesplatform"
 
 enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning, VersionObject)
 
 libraryDependencies ++= Dependencies.node.value
-coverageExcludedPackages := ""
 
 inConfig(Compile)(
   Seq(
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
+    PB.protoSources += PB.externalIncludePath.value,
+    PB.generate / includeFilter := { (f: File) =>
+      (** / "waves" / "*.proto").matches(f.toPath)
+    },
     PB.deleteTargetDirectory := false,
     packageDoc / publishArtifact := false,
     packageSrc / publishArtifact := false
@@ -23,23 +27,23 @@ inTask(assembly)(
     test := {},
     assemblyJarName := s"waves-all-${version.value}.jar",
     assemblyMergeStrategy := {
-      case "module-info.class"                                  => MergeStrategy.discard
-      case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.concat
-      case other                                                => (assemblyMergeStrategy in assembly).value(other)
+      case p
+          if p.endsWith(".proto") ||
+            p.endsWith("module-info.class") ||
+            p.endsWith("io.netty.versions.properties") =>
+        MergeStrategy.discard
+      case "scala-collection-compat.properties" => MergeStrategy.discard
+      case other                                => (assembly / assemblyMergeStrategy).value(other)
     }
   )
 )
 
-// Adds "$lib_dir/*" to app_classpath in the executable file
-// Logback creates a "waves.directory_UNDEFINED" without this option.
+// Adds "$lib_dir/*" to app_classpath in the executable file, this is needed for extensions
 scriptClasspath += "*"
 
-bashScriptExtraDefines ++= Seq(
-  s"""addJava "-Dwaves.defaults.blockchain.type=${network.value}"""",
-  s"""addJava "-Dwaves.defaults.directory=/var/lib/${(Universal / normalizedName).value}"""",
-  s"""addJava "-Dwaves.defaults.config.directory=/etc/${(Universal / normalizedName).value}"""",
-  // Workaround to ignore the -h option
-  """process_args() {
+bashScriptExtraDefines +=
+  """# Workaround to ignore the -h option
+    |process_args() {
     |  local no_more_snp_opts=0
     |  while [[ $# -gt 0 ]]; do
     |    case "$1" in
@@ -65,23 +69,14 @@ bashScriptExtraDefines ++= Seq(
     |  }
     |}
     |""".stripMargin
-)
+
+bashScriptExtraDefines += bashScriptEnvConfigLocation.value.fold("")(envFile => s"[[ -f $envFile ]] && . $envFile")
+
+linuxScriptReplacements += ("network" -> network.value.toString)
 
 inConfig(Universal)(
   Seq(
     mappings += (baseDirectory.value / s"waves-sample.conf" -> "doc/waves.conf.sample"),
-    mappings := {
-      val linuxScriptPattern = "bin/(.+)".r
-      val batScriptPattern   = "bin/([^.]+)\\.bat".r
-      val scriptSuffix       = network.value.packageSuffix
-      mappings.value.map {
-        case m @ (file, batScriptPattern(script)) =>
-          if (script.endsWith(scriptSuffix)) m else (file, s"bin/$script$scriptSuffix.bat")
-        case m @ (file, linuxScriptPattern(script)) =>
-          if (script.endsWith(scriptSuffix)) m else (file, s"bin/$script$scriptSuffix")
-        case other => other
-      }
-    },
     javaOptions ++= Seq(
       // -J prefix is required by the bash script
       "-J-server",
@@ -98,54 +93,49 @@ inConfig(Universal)(
 
 inConfig(Linux)(
   Seq(
-    maintainer := "wavesplatform.com",
     packageSummary := "Waves node",
-    packageDescription := "Waves node"
+    packageDescription := "Waves node",
+    name := s"${name.value}${network.value.packageSuffix}",
+    normalizedName := name.value,
+    packageName := normalizedName.value
   )
 )
 
-// Variable options are used in different tasks and configs, so we will specify all of them
-val nameFix = Seq(
-  name := "waves",
-  packageName := s"${name.value}${network.value.packageSuffix}",
-  normalizedName := s"${name.value}${network.value.packageSuffix}"
-)
+def fixScriptName(path: String, name: String, packageName: String): String =
+  path.replace(s"/bin/$name", s"/bin/$packageName")
+
+linuxPackageMappings := linuxPackageMappings.value.map { lpm =>
+  lpm.copy(mappings = lpm.mappings.map {
+    case (file, path) if path.endsWith(s"/bin/${name.value}") => file -> fixScriptName(path, name.value, (Linux / packageName).value)
+    case (file, path) if path.endsWith("/conf/application.ini") =>
+      val dest = (Debian / target).value / path
+      IO.write(dest,
+        s"""-J-Dwaves.defaults.blockchain.type=${network.value}
+           |-J-Dwaves.defaults.directory=/var/lib/${(Linux / packageName).value}
+           |-J-Dwaves.defaults.config.directory=/var/lib/${(Linux / packageName).value}
+           |""".stripMargin)
+      IO.append(dest, IO.readBytes(file))
+      dest -> path
+    case other                                                => other
+  })
+}
+
+linuxPackageSymlinks := linuxPackageSymlinks.value.map { lsl =>
+  if (lsl.link.endsWith(s"/bin/${name.value}"))
+    lsl.copy(
+      fixScriptName(lsl.link, name.value, (Linux / packageName).value),
+      fixScriptName(lsl.destination, name.value, (Linux / packageName).value)
+    )
+  else lsl
+}
 
 inConfig(Debian)(
   Seq(
+    packageSource := sourceDirectory.value / "package",
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
     debianPackageDependencies += "java8-runtime-headless",
-    serviceAutostart := false,
-    maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm")),
-    linuxPackageMappings ++= {
-      val upstartScript = {
-        val src    = packageSource.value / "upstart.conf"
-        val dest   = (target in Debian).value / "upstart" / s"${packageName.value}.conf"
-        val result = TemplateWriter.generateScript(src.toURI.toURL, linuxScriptReplacements.value)
-        IO.write(dest, result)
-        dest
-      }
-
-      Seq(upstartScript -> s"/etc/init/${packageName.value}.conf").map(packageMapping(_).withConfig().withPerms("644"))
-    },
-    linuxScriptReplacements += "detect-loader" ->
-      """is_systemd() {
-        |    which systemctl >/dev/null 2>&1 && \
-        |    systemctl | grep -- -\.mount >/dev/null 2>&1
-        |}
-        |is_upstart() {
-        |    /sbin/init --version | grep upstart >/dev/null 2>&1
-        |}
-        |""".stripMargin
-  ) ++ nameFix
+    maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("postinst", "postrm", "prerm")),
+  )
 )
 
 V.scalaPackage := "com.wavesplatform"
-
-// Hack for https://youtrack.jetbrains.com/issue/SCL-15210
-
-moduleName := s"waves${network.value.packageSuffix}" // waves-*.jar instead of node-*.jar
-executableScriptName := moduleName.value             // bin/waves instead of bin/node
-
-nameFix
-inScope(Global)(nameFix)

@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import cats.implicits._
+import cats.syntax.semigroup._
 import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -29,11 +29,10 @@ import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils._
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
-import org.scalatest.PropSpec
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.TestTime
+import com.wavesplatform.test.PropSpec
 
-class BalancesV4Test extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class BalancesV4Test extends PropSpec with WithState {
 
   val MinFee: Long            = Constants.UnitsInWave / 1000L
   val DataTxFee: Long         = 15000000L
@@ -115,7 +114,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
           rideV4Activated
         ) {
           case (d, s) =>
-            val apiBalance = com.wavesplatform.api.common.CommonAccountsApi(d, db, s).balanceDetails(acc1.toAddress)
+            val apiBalance = com.wavesplatform.api.common.CommonAccountsApi(() => d, db, s).balanceDetails(acc1.toAddress)
             val data       = d.accountData(dapp.toAddress)
             data.data("available") shouldBe IntegerDataEntry("available", apiBalance.available)
             apiBalance.available shouldBe 16 * Constants.UnitsInWave

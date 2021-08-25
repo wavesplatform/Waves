@@ -17,18 +17,16 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
+import com.wavesplatform.TestTime
+import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
+import org.scalatest.{EitherValues, Inside}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class DAppDataEntryTypeTest
     extends PropSpec
     with ScalaCheckPropertyChecks
-    with Matchers
-    with TransactionGen
-    with NoShrink
     with Inside
     with WithState
     with DBCacheSettings

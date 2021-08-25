@@ -55,7 +55,7 @@ object CommonAccountsApi extends ScorexLogging {
 
   final case class BalanceDetails(regular: Long, generating: Long, available: Long, effective: Long, leaseIn: Long, leaseOut: Long)
 
-  def apply(diff: => Diff, db: DB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
+  def apply(diff: () => Diff, db: DB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
 
     override def balance(address: Address, confirmations: Int = 0): Long = {
       blockchain.balance(address, blockchain.height, confirmations)
@@ -79,14 +79,19 @@ object CommonAccountsApi extends ScorexLogging {
 
     override def assetBalance(address: Address, asset: IssuedAsset): Long = blockchain.balance(address, asset)
 
-    override def portfolio(address: Address): Observable[(IssuedAsset, Long)] =
-      db.resourceObservable.flatMap { resource =>
-        Observable.fromIterator(Task(assetBalanceIterator(resource, address, diff, includeNft(blockchain))))
+    override def portfolio(address: Address): Observable[(IssuedAsset, Long)] = {
+      val currentDiff = diff()
+        db.resourceObservable.flatMap { resource =>
+          Observable.fromIterator(Task(assetBalanceIterator(resource, address, currentDiff, includeNft(blockchain))))
+        }
       }
 
     override def nftList(address: Address, after: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)] =
-      db.resourceObservable.flatMap { resource =>
-        Observable.fromIterator(Task(nftIterator(resource, address, diff, after, blockchain.assetDescription)))
+      {
+        val currentDiff = diff()
+        db.resourceObservable.flatMap { resource =>
+          Observable.fromIterator(Task(nftIterator(resource, address, currentDiff, after, blockchain.assetDescription)))
+        }
       }
 
     override def script(address: Address): Option[AccountScriptInfo] = blockchain.accountScript(address)
@@ -96,7 +101,8 @@ object CommonAccountsApi extends ScorexLogging {
 
     override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[_]] = Observable.defer {
       val pattern = regex.map(_.r.pattern)
-      val entriesFromDiff = diff.accountData
+      val entriesFromDiff = diff()
+        .accountData
         .get(address)
         .fold[Map[String, DataEntry[_]]](Map.empty)(_.data.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) })
 
@@ -124,7 +130,7 @@ object CommonAccountsApi extends ScorexLogging {
     override def activeLeases(address: Address): Observable[LeaseInfo] =
       addressTransactions(
         db,
-        Some(Height(blockchain.height) -> diff),
+        Some(Height(blockchain.height) -> diff()),
         address,
         None,
         Set(LeaseTransaction.typeId, InvokeScriptTransaction.typeId),

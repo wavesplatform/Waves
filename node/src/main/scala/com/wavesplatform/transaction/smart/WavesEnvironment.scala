@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart
 
-import cats.implicits._
+import cats.syntax.either._
+import cats.syntax.semigroup._
 import com.wavesplatform.account
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.block.BlockHeader
@@ -15,12 +16,11 @@ import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
 import com.wavesplatform.lang.v1.traits._
-import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff}
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -29,6 +29,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless._
 
@@ -269,8 +270,14 @@ object DAppEnvironment {
         InvokeScriptTrace(invocationId, inv.root.dAppAddress, inv.root.call, inv.result, inv.log, inv.toTraceList(invocationId))
       }
 
-    def getErrorMessage: Option[InvokeScriptResult.ErrorMessage] =
-      this.result.left.toOption.map(errorMessage)
+    def getErrorMessage: Option[InvokeScriptResult.ErrorMessage] = {
+      def isNestedError(ve: ValidationError) = invocations.exists(_.result.left.map(_.toString) == Left(ve.toString))
+
+      this.result.left.toOption.collect {
+        case ve if !isNestedError(ve) =>
+          errorMessage(ve)
+      }
+    }
 
     private[this] def errorMessage(ve: ValidationError): InvokeScriptResult.ErrorMessage = {
       val fte = FailedTransactionError.asFailedScriptError(ve)

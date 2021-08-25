@@ -4,28 +4,20 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncGrpcApi._
-import com.wavesplatform.it.util._
+import com.wavesplatform.test.NumericExt
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions, Recipient}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
-import org.scalatest.{BeforeAndAfterAll, Matchers, RecoverMethods, Suite}
+import org.scalatest._
 
 trait GrpcIntegrationSuiteWithThreeAddress
-    extends BeforeAndAfterAll
-    with Matchers
+    extends BaseSuite
     with ScalaFutures
     with IntegrationPatience
     with RecoverMethods
-    with IntegrationTestsScheme
-    with Nodes
     with ScorexLogging {
-  this: Suite =>
-
-  def miner: Node    = nodes.head
-  def notMiner: Node = nodes.last
-
-  protected def sender: Node = miner
+  this: TestSuite with Nodes =>
 
   protected lazy val firstAcc: KeyPair  = KeyPair("first_acc".getBytes("UTF-8"))
   protected lazy val secondAcc: KeyPair = KeyPair("second_acc".getBytes("UTF-8"))
@@ -42,8 +34,8 @@ trait GrpcIntegrationSuiteWithThreeAddress
 
     def dumpBalances(node: Node, accounts: Seq[ByteString], label: String): Unit = {
       accounts.foreach(acc => {
-        val balance = miner.wavesBalance(acc).available
-        val eff     = miner.wavesBalance(acc).effective
+        val balance = node.wavesBalance(acc).available
+        val eff     = node.wavesBalance(acc).effective
 
         val formatted = s"$acc: balance = $balance, effective = $eff"
         log.debug(s"$label account balance:\n$formatted")

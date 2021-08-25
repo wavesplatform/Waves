@@ -3,9 +3,8 @@ package com.wavesplatform.api.common
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{DBExt, DBResource, Keys, protobuf => pb}
+import com.wavesplatform.database.{DBExt, DBResource, Keys}
 import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, NewTransactionInfo, TransactionId, TxNum}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Authorized, GenesisTransaction, Transaction}
 import monix.eval.Task
 import monix.reactive.Observable
@@ -43,8 +42,8 @@ object AddressTransactions {
 
   private def loadInvokeScriptResult(resource: DBResource, txId: ByteStr): Option[InvokeScriptResult] =
     for {
-      pb.TransactionMeta(h, txNum, InvokeScriptTransaction.typeId, _) <- resource.get(Keys.transactionMetaById(TransactionId(txId)))
-      scriptResult                                                    <- resource.get(Keys.invokeScriptResult(h, TxNum(txNum.toShort)))
+      tm           <- resource.get(Keys.transactionMetaById(TransactionId(txId)))
+      scriptResult <- resource.get(Keys.invokeScriptResult(tm.height, TxNum(tm.num.toShort)))
     } yield scriptResult
 
   def loadInvokeScriptResult(db: DB, txId: ByteStr): Option[InvokeScriptResult] =

@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.estimator.v3
 
-import cats.implicits._
+import cats.instances.list._
+import cats.syntax.traverse._
 import cats.{Id, Monad}
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.FunctionHeader

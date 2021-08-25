@@ -1,9 +1,9 @@
 package com.wavesplatform
 
 import com.wavesplatform.serialization.Deser
-import org.scalatest.{FreeSpec, Matchers}
+import com.wavesplatform.test.FreeSpec
 
-class DeserializationTests extends FreeSpec with Matchers {
+class DeserializationTests extends FreeSpec {
 
   "serializeArray" - {
     "works with arrays < 32k" in {

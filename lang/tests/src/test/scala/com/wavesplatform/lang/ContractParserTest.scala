@@ -1,20 +1,18 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
+import com.wavesplatform.test._
 import fastparse.Parsed.{Failure, Success}
 import org.scalatest.exceptions.TestFailedException
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ContractParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
+class ContractParserTest extends PropSpec with ScriptGenParser {
 
   private def parse(x: String): DAPP = Parser.parseContract(x) match {
     case Success(r, _)      => r
-    case f@Failure(_, _, _) => throw new TestFailedException(f.msg, 0)
+    case f: Failure => throw new TestFailedException(f.msg, 0)
   }
 
   private def cleanOffsets(l: LET): LET =

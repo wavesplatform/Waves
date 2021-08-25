@@ -14,30 +14,27 @@ import com.wavesplatform.mining.{MultiDimensionalMiningConstraint, OneDimensiona
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool.PackStrategy
-import com.wavesplatform.{BlocksTransactionsHelpers, EitherMatchers, NoShrink, TestValues, TransactionGen}
+import com.wavesplatform.{BlocksTransactionsHelpers, TestValues}
 import org.scalacheck.Gen
 import org.scalacheck.Gen.chooseNum
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.EitherValues
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.PatienceConfiguration.{Interval, Timeout}
-import org.scalatest.{EitherValues, FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 import scala.concurrent.duration._
 
 class UtxPriorityPoolSpecification
     extends FreeSpec
-    with Matchers
-    with EitherMatchers
     with MockFactory
     with ScalaCheckDrivenPropertyChecks
-    with TransactionGen
-    with NoShrink
     with BlocksTransactionsHelpers
     with WithDomain
     with EitherValues

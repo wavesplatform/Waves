@@ -9,22 +9,14 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{EitherValues, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import org.scalatest.EitherValues
 
-class ReissueTransactionDiffTest
-    extends PropSpec
-    with PropertyChecks
-    with Matchers
-    with TransactionGen
-    with WithState
-    with EitherValues
-    with NoShrink {
+class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValues {
   import ReissueTransactionDiffTest._
 
   private val beforeActivationScenario =

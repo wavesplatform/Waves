@@ -6,11 +6,11 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.state.StateHash.SectionId
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.{FreeSpec, Matchers}
 
-class StateHashSpec extends FreeSpec with Matchers {
+class StateHashSpec extends FreeSpec {
   "state hash" - {
     val stateHash = new StateHashBuilder
     val address   = Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet()

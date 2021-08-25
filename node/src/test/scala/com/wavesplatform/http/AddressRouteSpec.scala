@@ -2,6 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
+import com.wavesplatform.{crypto, TestTime, TestWallet}
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.AddressApiRoute
@@ -23,11 +24,9 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.Schedulers
-import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
 import io.netty.util.HashedWheelTimer
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
 import scala.concurrent.duration._
@@ -35,10 +34,8 @@ import scala.concurrent.duration._
 class AddressRouteSpec
     extends RouteSpec("/addresses")
     with PathMockFactory
-    with PropertyChecks
     with RestAPISettingsHelper
     with TestWallet
-    with NoShrink
     with WithDomain {
 
   testWallet.generateNewAccounts(10)
@@ -76,7 +73,7 @@ class AddressRouteSpec
 
   routePath("/balance/{address}/{confirmations}") in withDomain() { d =>
     val route =
-      addressApiRoute.copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(d.liquidDiff, d.db, d.blockchainUpdater)).route
+      addressApiRoute.copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater)).route
     val address = TxHelpers.signer(1).toAddress
 
     d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress))

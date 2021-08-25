@@ -5,7 +5,8 @@ import com.wavesplatform.lang.v1.parser.Expressions._
 
 object Macro {
   def unwrapStrict(blockPos: Pos, strictLetDecs: Seq[LET], strictBody: EXPR): EXPR = {
-    val strictLetDec :: otherLets = strictLetDecs
+    val strictLetDec = strictLetDecs.head
+    val otherLets = strictLetDecs.tail
     val strictPos                 = strictLetDec.position
     val strictLetName             = strictLetDec.name
     BLOCK(

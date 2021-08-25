@@ -18,28 +18,23 @@ import com.wavesplatform.settings.{GenesisSettings, TestFunctionalitySettings, T
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils._
 import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, TxNum}
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.utils.{SystemTime, Time}
-import com.wavesplatform.{EitherMatchers, RequestGen, TransactionGen, WithDB, database}
+import com.wavesplatform.{RequestGen, WithDB, database}
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{FreeSpec, Matchers}
-import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 import scala.concurrent.duration.Duration
 
 //noinspection NameBooleanParameters
 class LevelDBWriterSpec
     extends FreeSpec
-    with Matchers
-    with EitherMatchers
-    with TransactionGen
     with WithDB
     with DBCacheSettings
-    with RequestGen
-    with ScalaCheckDrivenPropertyChecks {
+    with RequestGen {
   "Slice" - {
     "drops tail" in {
       LevelDBWriter.slice(Seq(10, 7, 4), 7, 10) shouldEqual Seq(10, 7)

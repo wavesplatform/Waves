@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.activation
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.{FeatureActivationStatus, NodeFeatureStatus}
 import org.scalactic.source.Position
-import org.scalatest.Matchers
+import org.scalatest.matchers.should.Matchers
 
 trait ActivationStatusRequest extends Matchers {
   def assertVotingStatus(

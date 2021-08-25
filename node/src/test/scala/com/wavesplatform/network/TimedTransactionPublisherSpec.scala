@@ -4,17 +4,18 @@ import java.util.concurrent.CountDownLatch
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Schedulers
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.util.HashedWheelTimer
 import monix.execution.atomic.AtomicInt
-import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
+import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.duration._
 
-class TimedTransactionPublisherSpec extends FreeSpec with Matchers with BeforeAndAfterAll {
+class TimedTransactionPublisherSpec extends FreeSpec with BeforeAndAfterAll {
   private[this] val timer     = new HashedWheelTimer
   private[this] val scheduler = Schedulers.timeBoundedFixedPool(timer, 1.second, 1, "test-utx-sync")
 
@@ -48,7 +49,7 @@ class TimedTransactionPublisherSpec extends FreeSpec with Matchers with BeforeAn
   }
 
   private def withUPS(putIfNew: Transaction => TracedResult[ValidationError, Boolean])(f: TransactionPublisher => Unit): Unit =
-    f(TransactionPublisher.timeBounded((tx, _) => putIfNew(tx), (_, _) => (), scheduler, false))
+    f(TransactionPublisher.timeBounded((tx, _) => putIfNew(tx), (_, _) => (), scheduler, allowRebroadcast = false, () => Right(())))
 
   override protected def afterAll(): Unit = {
     super.afterAll()
