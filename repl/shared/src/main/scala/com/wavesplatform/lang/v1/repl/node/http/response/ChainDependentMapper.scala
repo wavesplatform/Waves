@@ -128,7 +128,7 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       _ <- Either.cond(
         network == chainId,
         (),
-        s"Data from other network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})"
+        s"Address belongs to another: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})"
       )
       checkSum          = addressBytes.takeRight(ChecksumLength)
       checkSumGenerated = global.secureHash(addressBytes.dropRight(ChecksumLength)).take(ChecksumLength)

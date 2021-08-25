@@ -38,7 +38,7 @@ class IllegalAddressChainIdTest extends PropSpec with WithDomain {
       invokeTx = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, master.toAddress, None, Nil, fee, Waves, ts).explicitGet()
     } yield (Seq(gTx1, gTx2, ssTx), invokeTx)
 
-  private val error = "Data from other network: expected: 84(T), actual: 87(W)"
+  private val error = "Address belongs to another network: expected: 84(T), actual: 87(W)"
 
   property("no fail before fix") {
     withDomain(RideV5) { d =>
