@@ -263,4 +263,9 @@ class BigIntTest extends EvaluatorSpec {
     eval(s"pow($d18, 18, $e1, 18, 18, HALFUP)") shouldBe Right(CONST_BIGINT(BigInt(3)))
     eval(s"pow($d19, 18, $e2, 18, 0, DOWN)") shouldBe Right(CONST_BIGINT(r))
   }
+
+  property("sqrt") {
+    eval(s"pow($max, 0, toBigInt(5), 1, 18, DOWN)") shouldBe Right(CONST_BIGINT(BigInt("81877371507464127617551201542979628307507432471243237061821853600756754782485292915524036944801")))
+    eval(s"pow($max, 18, toBigInt(5), 1, 18, DOWN)") shouldBe Right(CONST_BIGINT(BigInt("81877371507464127617551201542979628307507432471243237061821853600756754782485292915524")))
+  }
 }
