@@ -94,9 +94,13 @@ object Global extends BaseGlobal {
       round: Rounding
   ): Either[String, Long] =
     tryEither {
-      val baseBD  = BD.valueOf(base, basePrecision)
-      val expBD   = BD.valueOf(exponent, exponentPrecision)
-      val result  = BigDecimalMath.pow(baseBD, expBD, longContext)
+      val baseBD = BD.valueOf(base, basePrecision)
+      val expBD  = BD.valueOf(exponent, exponentPrecision)
+      val result = if (expBD == BigDecimal(0.5).bigDecimal) {
+        BigDecimalMath.sqrt(baseBD, longContext)
+      } else {
+        BigDecimalMath.pow(baseBD, expBD, longContext)
+      }
       setScale(resultPrecision, round, longDigits, result)
     }.flatten.map(_.bigInteger.longValueExact())
 
@@ -114,7 +118,11 @@ object Global extends BaseGlobal {
     tryEither {
       val base = toJBig(b, bp)
       val exp  = toJBig(e, ep)
-      val res  = BigDecimalMath.pow(base, exp, bigMathContext)
+      val res = if (exp == BigDecimal(0.5).bigDecimal) {
+        BigDecimalMath.sqrt(base, bigMathContext)
+      } else {
+        BigDecimalMath.pow(base, exp, bigMathContext)
+      }
       setScale(rp.toInt, round, bigIntDigits, res)
     }.flatten
 
