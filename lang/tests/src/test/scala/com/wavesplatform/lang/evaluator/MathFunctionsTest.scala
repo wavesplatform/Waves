@@ -67,4 +67,9 @@ class MathFunctionsTest extends EvaluatorSpec {
     eval(s"pow(98765432, 8, $max, 8, 8, DOWN)") shouldBe Right(CONST_LONG(0))
     eval(s"pow(98765432, 8, $max, 0, 8, DOWN)") shouldBe Left("Underflow")
   }
+
+  property("sqrt") {
+    eval(s"pow(${Long.MaxValue}, 0, 5, 1, 8, DOWN)") shouldBe Right(CONST_LONG(303700049997604969L))
+    eval(s"pow(${Long.MaxValue}, 8, 5, 1, 8, DOWN)") shouldBe Right(CONST_LONG(30370004999760L))
+  }
 }
