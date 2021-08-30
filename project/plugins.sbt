@@ -24,7 +24,7 @@ Seq(
 libraryDependencies ++= Seq(
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.12.1",
   "org.hjson"                    % "hjson"                     % "3.0.0",
-  "org.vafer"                    % "jdeb"                      % "1.5" artifacts Artifact("jdeb", "jar", "jar"),
+  "org.vafer"                    % "jdeb"                      % "1.8" artifacts Artifact("jdeb", "jar", "jar"),
   "org.slf4j"                    % "jcl-over-slf4j"            % "1.7.30",
   ("com.spotify" % "docker-client" % "8.16.0")
     .exclude("commons-logging", "commons-logging")

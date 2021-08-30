@@ -424,8 +424,8 @@ object StateUpdate {
             TransactionMetadata.Metadata.LeaseMeta(TransactionMetadata.LeaseMetadata(lt.recipient.resolve.toByteString))
 
           case ist: InvokeScriptTransaction =>
-            import TransactionMetadata.InvokeScriptMetadata.Argument
-            import TransactionMetadata.InvokeScriptMetadata.Argument.Value
+            import com.wavesplatform.protobuf.transaction.InvokeScriptResult.Call.Argument
+            import com.wavesplatform.protobuf.transaction.InvokeScriptResult.Call.Argument.Value
 
             def argumentToPB(arg: Terms.EXPR): Value = arg match {
               case Terms.CONST_LONG(t)     => Value.IntegerValue(t)
