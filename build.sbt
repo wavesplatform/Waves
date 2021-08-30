@@ -131,7 +131,9 @@ inScope(Global)(
       "-Xlint",
       "-opt:l:inline",
       "-opt-inline-from:**",
-      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s" // Ignore gRPC warnings
+      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s", // Ignore gRPC warnings
+      "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult:s",
+      "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult:s"
     ),
     crossPaths := false,
     scalafmtOnCompile := false,
