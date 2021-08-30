@@ -200,6 +200,16 @@ object InvokeScriptDiff {
             }
             _ = invocationRoot.setLog(log)
 
+            newBlockchain = CompositeBlockchain(blockchain, diff)
+            newBalance    = newBlockchain.balance(invoker)
+            _ <- traced {
+              Either.cond(
+                blockchain.height < blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight || newBalance >= 0,
+                (),
+                GenericError(s"Sync call leads to temporary negative balance = $newBalance for address $invoker"),
+              )
+            }
+
             doProcessActions = (actions: List[CallableAction], unusedComplexity: Int) => {
               val storingComplexity = if (blockchain.storeEvaluatedComplexity) complexityAfterPayments - unusedComplexity else invocationComplexity
               CoevalR(
@@ -211,7 +221,7 @@ object InvokeScriptDiff {
                     pk,
                     storingComplexity.toInt,
                     tx,
-                    CompositeBlockchain(blockchain, diff),
+                    newBlockchain,
                     blockTime,
                     isSyncCall = true,
                     limitedExecution,
