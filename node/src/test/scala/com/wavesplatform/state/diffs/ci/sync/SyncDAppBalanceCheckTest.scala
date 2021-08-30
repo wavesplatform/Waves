@@ -56,7 +56,7 @@ class SyncDAppBalanceCheckTest extends PropSpec with WithDomain {
       invokeTx = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts).explicitGet()
     } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx2), invokeTx)
 
-  property("temprorary negative balance of sync call doesn't produce error before activation RideV6") {
+  property("temporary negative balance of sync call doesn't produce error before activation RideV6") {
     val (preparingTxs, invoke) = scenario.sample.get
     withDomain(RideV5) { d =>
       d.appendBlock(preparingTxs: _*)
@@ -65,12 +65,12 @@ class SyncDAppBalanceCheckTest extends PropSpec with WithDomain {
     }
   }
 
-  property("temprorary negative balance of sync call produce error after activation RideV6") {
+  property("temporary negative balance of sync call produce error after activation RideV6") {
     val (preparingTxs, invoke) = scenario.sample.get
     withDomain(RideV6) { d =>
       d.appendBlock(preparingTxs: _*)
       (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include(
-        s"Sync call leads to negative balance = -100 for address ${invoke.dAppAddressOrAlias}")
+        s"Sync call leads to temporary negative balance = -100 for address ${invoke.dAppAddressOrAlias}")
     }
   }
 }

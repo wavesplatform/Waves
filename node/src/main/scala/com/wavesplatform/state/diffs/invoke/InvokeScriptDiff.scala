@@ -206,7 +206,7 @@ object InvokeScriptDiff {
               Either.cond(
                 !blockchain.isFeatureActivated(BlockchainFeatures.RideV6) || newBalance >= 0,
                 (),
-                GenericError(s"Sync call leads to negative balance = $newBalance for address $invoker"),
+                GenericError(s"Sync call leads to temporary negative balance = $newBalance for address $invoker"),
               )
             }
 
