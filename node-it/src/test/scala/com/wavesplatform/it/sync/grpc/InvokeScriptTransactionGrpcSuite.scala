@@ -1,12 +1,14 @@
 package com.wavesplatform.it.sync.grpc
 
 import com.google.protobuf.ByteString
+import com.typesafe.config.Config
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.smartcontract.invokeScrTxSupportedVersions
+import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
@@ -19,6 +21,14 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import io.grpc.Status.Code
 
 class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(0))
+      .overrideBase(_ => """waves.blockchain.custom.functionality.pre-activated-features.16 = 0""")
+      .withDefault(1)
+      .withSpecial(_.nonMiner)
+      .buildNonConflicting()
+
   private val (firstContract, firstContractAddr)   = (firstAcc, firstAddress)
   private val (secondContract, secondContractAddr) = (secondAcc, secondAddress)
   private val thirdContract                        = KeyPair("thirdContract".getBytes("UTF-8"))
@@ -29,6 +39,7 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
+
     val scriptText =
       """
         |{-# STDLIB_VERSION 3 #-}
