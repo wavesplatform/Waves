@@ -20,6 +20,7 @@ import com.wavesplatform.utils._
 import play.api.libs.json._
 import PBInvokeScriptResult.Call.Argument
 import PBInvokeScriptResult.Call.Argument.Value
+import com.wavesplatform.lang.v1.compiler.Terms
 
 final case class InvokeScriptResult(
     data: Seq[R.DataEntry] = Nil,
@@ -214,8 +215,25 @@ object InvokeScriptResult {
     }
   }
 
+  import com.wavesplatform.protobuf.transaction.{InvokeScriptResult => PBISR}
+
+  def rideExprToPB(arg: Terms.EXPR): PBISR.Call.Argument.Value = {
+    import PBISR.Call.Argument
+    import PBISR.Call.Argument.Value
+
+    arg match {
+      case Terms.CONST_LONG(t)     => Value.IntegerValue(t)
+      case bs: Terms.CONST_BYTESTR => Value.BinaryValue(bs.bs.toByteString)
+      case str: Terms.CONST_STRING => Value.StringValue(str.s)
+      case Terms.CONST_BOOLEAN(b)  => Value.BooleanValue(b)
+      case Terms.ARR(xs)           => Value.List(Argument.List(xs.map(x => Argument(rideExprToPB(x)))))
+      case _                       => Value.Empty
+    }
+  }
+
   private def toPbCall(c: Call): PBInvokeScriptResult.Call = {
-    PBInvokeScriptResult.Call(c.function, c.args.map(b => ByteString.copyFrom(Serde.serialize(b, true))))
+    // argsBytes = c.args.map(b => ByteString.copyFrom(Serde.serialize(b, true)))
+    PBInvokeScriptResult.Call(c.function, args = c.args.map(a => PBISR.Call.Argument(rideExprToPB(a))))
   }
 
   private def toPbInvocation(i: Invocation) = {

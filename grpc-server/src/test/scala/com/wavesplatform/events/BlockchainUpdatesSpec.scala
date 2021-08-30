@@ -2,15 +2,21 @@ package com.wavesplatform.events
 
 import java.nio.file.Files
 
+import scala.concurrent.{Await, Promise}
+import scala.concurrent.duration._
+import scala.reflect.ClassTag
+import scala.util.Random
+
 import com.google.common.primitives.Longs
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
+import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.api.grpc.BlockchainUpdatesApiGrpcImpl
 import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdatesRangeRequest, SubscribeEvent, SubscribeRequest}
 import com.wavesplatform.events.protobuf.serde._
@@ -20,14 +26,17 @@ import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
+import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation}
+import com.wavesplatform.protobuf.transaction.InvokeScriptResult
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
-import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.{AssetDescription, Blockchain, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
+import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.test.{FreeSpec, _}
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, PaymentTransaction, TxHelpers}
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import io.grpc.StatusException
 import io.grpc.stub.{CallStreamObserver, StreamObserver}
 import monix.execution.CancelableFuture
@@ -35,11 +44,6 @@ import monix.execution.Scheduler.Implicits.global
 import org.scalactic.source.Position
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.ScalaFutures
-
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Promise}
-import scala.reflect.ClassTag
-import scala.util.Random
 
 class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures with PathMockFactory {
   var currentSettings: WavesSettings = domainSettingsWithFS(
@@ -69,6 +73,40 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
   }
 
   "BlockchainUpdates" - {
+    "should process nested invoke with args" in withDomainAndRepo {
+      case (d, repo) =>
+        val script = TxHelpers.script("""
+            |{-# STDLIB_VERSION 5 #-}
+            |{-# CONTENT_TYPE DAPP #-}
+            |
+            |@Callable(inv)
+            |func foo() = {
+            |  strict ii = invoke(this, "bar", [1], [])
+            |  [IntegerEntry("test1", 1)]
+            |}
+            |
+            |@Callable(inv)
+            |func bar(i: Int) = [IntegerEntry("test", 2)]
+            |
+        """.stripMargin)
+
+        d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
+        d.appendBlock(TxHelpers.setScript(TxHelpers.defaultSigner, script))
+        d.appendBlock(TxHelpers.invoke(TxHelpers.defaultAddress, "foo"))
+        val subscription = repo.createSubscription(SubscribeRequest.of(1, 0))
+        Thread.sleep(1000)
+        subscription.cancel()
+        val events      = subscription.futureValue.map(_.toUpdate)
+        val invocations = events.last.asInstanceOf[BlockAppended].transactionMetadata.head.getInvokeScript.getResult.invokes
+        invocations shouldBe List(
+          Invocation(
+            ByteString.copyFrom(TxHelpers.defaultAddress.bytes),
+            Some(Call("bar", args = Seq(Call.Argument(Call.Argument.Value.IntegerValue(1))))),
+            stateChanges = Some(InvokeScriptResult(data = Seq(DataEntry("test", DataEntry.Value.IntValue(2)))))
+          )
+        )
+    }
+
     "should not freeze on micro rollback" in withDomainAndRepo {
       case (d, repo) =>
         val keyBlockId = d.appendKeyBlock().id()
