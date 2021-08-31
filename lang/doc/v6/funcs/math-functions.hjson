@@ -12,7 +12,7 @@
         "The number of decimals of the resulting value."
         "One of the rounding functions. The HalfUp() function may be used as the default value."
       ]
-      complexity: 100
+      complexity: 28
     }
     {
       name: "log"
@@ -43,7 +43,7 @@
         "The number of decimals of the resulting value."
         "One of the rounding functions. The HalfUp() function may be used as the default value."
       ]
-      complexity: 200
+      complexity: 270
     }
     {
       name: "log"
@@ -67,28 +67,28 @@
       params: [ "Int", "Int", "Int" ]
       doc: "Multiply and division with unlimited intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]
-      complexity: 14
+      complexity: 1
     }
     {
       name: "fraction"
       params: [ "Int", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Multiply and division with big integer intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor", "Rounding mode" ]
-      complexity: 17
+      complexity: 4
     }
     {
       name: "fraction"
       params: [ "BigInt", "BigInt", "BigInt" ]
       doc: "Multiply and division with unlimited intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]
-      complexity: 128
+      complexity: 3
     }
     {
       name: "fraction"
       params: [ "BigInt", "BigInt", "BigInt", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Multiply and division with unlimited intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor", "Rounding mode" ]
-      complexity: 128
+      complexity: 4
     }
   ]
 }

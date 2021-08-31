@@ -68,7 +68,7 @@ object PureContext {
       STRING,
       STRING,
       SUM_STRING,
-      Map[StdLibVersion, Long](V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 20L)
+      Map[StdLibVersion, Long](V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 20L, V5 -> 20L, V6 -> 1L)
     ) {
       case (s1 @ CONST_STRING(a), s2 @ CONST_STRING(b)) =>
         val sumWeight = (s1.weight + s2.weight).toInt
@@ -130,7 +130,7 @@ object PureContext {
     }
 
   lazy val bigIntToString: BaseFunction[NoContext] =
-    NativeFunction("toString", 65, BIGINT_TO_STRING, STRING, ("n", BIGINT)) {
+    NativeFunction("toString", Map(V5 -> 65L, V6 -> 2L), BIGINT_TO_STRING, STRING, ("n", BIGINT)) {
       case CONST_BIGINT(n) :: Nil => CONST_STRING(n.toString)
       case xs                     => notImplemented[Id, EVALUATED]("toString(n: BigInt)", xs)
     }
@@ -330,7 +330,7 @@ object PureContext {
   def fraction(fixLimitCheck: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "fraction",
-      Map[StdLibVersion, Long](V1 -> 1, V2 -> 1, V3 -> 1, V4 -> 1, V5 -> 14),
+      Map[StdLibVersion, Long](V1 -> 1, V2 -> 1, V3 -> 1, V4 -> 1, V5 -> 14, V6 -> 1),
       FRACTION,
       LONG,
       ("value", LONG),
@@ -355,7 +355,7 @@ object PureContext {
   def fractionIntRounds(roundTypes: UNION): BaseFunction[NoContext] =
     UserFunction(
       "fraction",
-      17,
+      Map(V5 -> 17L, V6 -> 4L),
       LONG,
       ("@value", LONG),
       ("@numerator", LONG),
@@ -377,7 +377,7 @@ object PureContext {
   val fractionBigInt: BaseFunction[NoContext] =
     NativeFunction(
       "fraction",
-      128,
+      Map(V5 -> 128L, V6 -> 3L),
       FRACTION_BIGINT,
       BIGINT,
       ("value", BIGINT),
@@ -397,7 +397,7 @@ object PureContext {
   def fractionBigIntRounds(roundTypes: UNION): BaseFunction[NoContext] =
     NativeFunction(
       "fraction",
-      128,
+      Map(V5 -> 128L, V6 -> 4L),
       FRACTION_BIGINT_ROUNDS,
       BIGINT,
       ("value", BIGINT),
@@ -973,7 +973,7 @@ object PureContext {
     }
 
   lazy val splitStr: BaseFunction[NoContext] =
-    NativeFunction("split", Map(V3 -> 100L, V4 -> 75L), SPLIT, listString, ("str", STRING), ("separator", STRING)) {
+    NativeFunction("split", Map(V3 -> 100L, V4 -> 75L, V5 -> 75L, V6 -> 51L), SPLIT, listString, ("str", STRING), ("separator", STRING)) {
       case CONST_STRING(str) :: CONST_STRING(sep) :: Nil =>
         ARR(split(str, sep, unicode = false).toIndexedSeq, limited = true)
       case xs =>
@@ -981,7 +981,7 @@ object PureContext {
     }
 
   lazy val splitStrFixed: BaseFunction[NoContext] =
-    NativeFunction("split", Map(V3 -> 100L, V4 -> 75L), SPLIT, listString, ("str", STRING), ("separator", STRING)) {
+    NativeFunction("split", Map(V3 -> 100L, V4 -> 75L, V5 -> 75L, V6 -> 51L), SPLIT, listString, ("str", STRING), ("separator", STRING)) {
       case CONST_STRING(str) :: CONST_STRING(sep) :: Nil =>
         ARR(split(str, sep, unicode = true).toIndexedSeq, limited = true)
       case xs =>
@@ -1021,7 +1021,7 @@ object PureContext {
   }
 
   lazy val makeString: BaseFunction[NoContext] =
-    NativeFunction("makeString", 30, MAKESTRING, STRING, ("list", LIST(STRING)), ("separator", STRING)) {
+    NativeFunction("makeString", Map(V4 -> 30L, V5 -> 30L, V6 -> 11L), MAKESTRING, STRING, ("list", LIST(STRING)), ("separator", STRING)) {
       case (arr: ARR) :: CONST_STRING(separator) :: Nil =>
         val separatorStringSize =
           if (arr.xs.length > 1) (arr.xs.length - 1) * separator.length
@@ -1311,7 +1311,7 @@ object PureContext {
     }
 
   def pow(roundTypes: UNION): BaseFunction[NoContext] = {
-    NativeFunction("pow", 100, POW, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", roundTypes)) {
+    NativeFunction("pow", Map(V3 -> 100L, V4 -> 100L, V5 -> 100L, V6 -> 28L), POW, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", roundTypes)) {
       case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
         if (bp < 0
             || bp > 8
@@ -1347,7 +1347,7 @@ object PureContext {
   def powBigInt(roundTypes: UNION): BaseFunction[NoContext] =
     NativeFunction(
       "pow",
-      200,
+      Map(V5 -> 200L, V6 -> 270L),
       POW_BIGINT,
       BIGINT,
       ("base", BIGINT),

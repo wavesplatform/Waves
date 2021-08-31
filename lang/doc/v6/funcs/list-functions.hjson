@@ -89,7 +89,7 @@
       params: [ "List[String]", "String" ]
       doc: "Returns all the elements of the list in a string using the separator string."
       paramsDoc: [ "The list of strings.", "The separator" ]
-      complexity: 30
+      complexity: 11
     }
 	{
       name: "removeByIndex"
