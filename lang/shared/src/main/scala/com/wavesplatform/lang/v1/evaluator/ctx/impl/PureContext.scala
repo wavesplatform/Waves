@@ -980,13 +980,27 @@ object PureContext {
         notImplemented[Id, EVALUATED]("split(str: String, separator: String)", xs)
     }
 
-  lazy val splitStrFixed: BaseFunction[NoContext] =
-    NativeFunction("split", Map(V3 -> 100L, V4 -> 75L, V5 -> 75L, V6 -> 51L), SPLIT, listString, ("str", STRING), ("separator", STRING)) {
-      case CONST_STRING(str) :: CONST_STRING(sep) :: Nil =>
-        ARR(split(str, sep, unicode = true).toIndexedSeq, limited = true)
+  def splitStrFixedF(id: Short, inputLimit: Int, outputLimit: Int, v6Complexity: Long): BaseFunction[NoContext] = {
+    val name = if (id == SPLIT) "split" else s"split_${v6Complexity}C"
+    NativeFunction(name, Map(V3 -> 100L, V4 -> 75L, V5 -> 75L, V6 -> v6Complexity), id, listString, ("str", STRING), ("separator", STRING)) {
+      case (s @ CONST_STRING(str)) :: CONST_STRING(sep) :: Nil =>
+        if (s.weight > inputLimit)
+          Left(s"Input string size = ${s.weight} bytes exceeds limit = $inputLimit for $name")
+        else {
+          val result = split(str, sep, unicode = true).toIndexedSeq
+          if (result.size > outputLimit)
+            Left(s"Output list size = ${result.size} exceeds limit = $outputLimit for $name")
+          else
+            ARR(result, limited = true)
+        }
       case xs =>
-        notImplemented[Id, EVALUATED]("split(str: String, separator: String)", xs)
+        notImplemented[Id, EVALUATED](s"$name(str: String, separator: String)", xs)
     }
+  }
+
+  val splitStrFixed = splitStrFixedF(SPLIT, DataEntryValueMax, MaxListLengthV4, 51)
+  val splitStr1C    = splitStrFixedF(SPLIT1C, 500, 20, 1)
+  val splitStr4C    = splitStrFixedF(SPLIT4C, 6000, 100, 4)
 
   private def split(str: String, sep: String, unicode: Boolean): Iterable[CONST_STRING] = {
     if (str == "") listWithEmptyStr
@@ -1686,7 +1700,7 @@ object PureContext {
       )
 
   private val v6Functions =
-    v5Functions ++ Array(makeString1C, makeString2C)
+    v5Functions ++ Array(makeString1C, makeString2C, splitStr1C, splitStr4C)
 
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =
     CTX[NoContext](
