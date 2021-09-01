@@ -82,6 +82,9 @@ object FunctionIds {
   val LASTINDEXOFN: Short = 1208
   val MAKESTRING: Short   = 1209
 
+  val MAKESTRING1C: Short   = 1210
+  val MAKESTRING2C: Short   = 1211
+
   val CREATE_TUPLE: Short = 1300 // Reserved 22 id for tuple constructors
 
   // Crypto

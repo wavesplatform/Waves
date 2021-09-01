@@ -92,6 +92,20 @@
       complexity: 11
     }
 	{
+      name: "makeString_1C"
+      params: [ "List[String]", "String" ]
+      doc: "Returns all the elements of the list in a string using the separator string. Input list size limit = 70. Output string size limit = 500 bytes."
+      paramsDoc: [ "The list of strings.", "The separator" ]
+      complexity: 1
+    }
+	{
+      name: "makeString_2C"
+      params: [ "List[String]", "String" ]
+      doc: "Returns all the elements of the list in a string using the separator string. Input list size limit = 100. Output string size limit = 6000 bytes."
+      paramsDoc: [ "The list of strings.", "The separator" ]
+      complexity: 2
+    }
+	{
       name: "removeByIndex"
       params: [ "List[T]", "Int" ]
       doc: "Removes the element at given index from the list and returns new list."

@@ -1020,20 +1020,30 @@ object PureContext {
       )
   }
 
-  lazy val makeString: BaseFunction[NoContext] =
-    NativeFunction("makeString", Map(V4 -> 30L, V5 -> 30L, V6 -> 11L), MAKESTRING, STRING, ("list", LIST(STRING)), ("separator", STRING)) {
+  def makeStringF(id: Short, complexityV6: Long, inputLimit: Int, outputLimit: Int): BaseFunction[NoContext] = {
+    val name = if (inputLimit == MaxListLengthV4) "makeString" else s"makeString_${complexityV6}C"
+    NativeFunction(name, Map(V4 -> 30L, V5 -> 30L, V6 -> complexityV6), id, STRING, ("list", LIST(STRING)), ("separator", STRING)) {
       case (arr: ARR) :: CONST_STRING(separator) :: Nil =>
-        val separatorStringSize =
-          if (arr.xs.length > 1) (arr.xs.length - 1) * separator.length
-          else 0
-        val expectedStringSize = arr.elementsWeightSum + separatorStringSize
-        if (expectedStringSize <= DataEntryValueMax)
-          CONST_STRING(arr.xs.mkString(separator))
-        else
-          Left(s"Constructing string size = $expectedStringSize bytes will exceed $DataEntryValueMax")
+        if (arr.xs.length > inputLimit)
+          Left(s"Input list size = ${arr.xs.length} for $name should not exceed $inputLimit")
+        else {
+          val separatorStringSize =
+            if (arr.xs.length > 1) (arr.xs.length - 1) * separator.length
+            else 0
+          val expectedStringSize = arr.elementsWeightSum + separatorStringSize
+          if (expectedStringSize <= outputLimit)
+            CONST_STRING(arr.xs.mkString(separator))
+          else
+            Left(s"Constructing string size = $expectedStringSize bytes will exceed $outputLimit")
+        }
       case xs =>
-        notImplemented[Id, EVALUATED]("makeString(list: List[String], separator: String)", xs)
+        notImplemented[Id, EVALUATED](s"$name(list: List[String], separator: String)", xs)
     }
+  }
+
+  val makeString: BaseFunction[NoContext]   = makeStringF(MAKESTRING, 11, MaxListLengthV4, DataEntryValueMax)
+  val makeString1C: BaseFunction[NoContext] = makeStringF(MAKESTRING1C, 1, 70, 500)
+  val makeString2C: BaseFunction[NoContext] = makeStringF(MAKESTRING2C, 2, 100, 6000)
 
   lazy val contains: BaseFunction[NoContext] =
     UserFunction(
@@ -1311,7 +1321,16 @@ object PureContext {
     }
 
   def pow(roundTypes: UNION): BaseFunction[NoContext] = {
-    NativeFunction("pow", Map(V3 -> 100L, V4 -> 100L, V5 -> 100L, V6 -> 28L), POW, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", roundTypes)) {
+    NativeFunction("pow",
+                   Map(V3 -> 100L, V4 -> 100L, V5 -> 100L, V6 -> 28L),
+                   POW,
+                   LONG,
+                   ("base", LONG),
+                   ("bp", LONG),
+                   ("exponent", LONG),
+                   ("ep", LONG),
+                   ("rp", LONG),
+                   ("round", roundTypes)) {
       case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
         if (bp < 0
             || bp > 8
@@ -1666,6 +1685,9 @@ object PureContext {
         fraction(fixLimitCheck = true)
       )
 
+  private val v6Functions =
+    v5Functions ++ Array(makeString1C, makeString2C)
+
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =
     CTX[NoContext](
       v1v2v3v4Types,
@@ -1702,6 +1724,13 @@ object PureContext {
       v5Functions
     )
 
+  private val v6Ctx =
+    CTX[NoContext](
+      v5Types,
+      v5Vars,
+      v6Functions
+    )
+
   def build(version: StdLibVersion, fixUnicodeFunctions: Boolean): CTX[NoContext] =
     version match {
       case V1 | V2 if fixUnicodeFunctions => v1V2CtxFixed
@@ -1711,6 +1740,6 @@ object PureContext {
       case V3                             => v3CtxUnfixed
       case V4                             => v4CtxUnfixed
       case V5                             => v5Ctx
-      case V6                             => v5Ctx
+      case V6                             => v6Ctx
     }
 }
