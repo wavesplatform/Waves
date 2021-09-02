@@ -75,7 +75,7 @@ object PureContext {
         if (sumWeight <= Terms.DataEntryValueMax) {
           CONST_STRING(a + b, bytesLength = Some(sumWeight))
         } else {
-          Left(s"String length = ${a.length + b.length} exceeds ${Terms.DataEntryValueMax}")
+          Left(s"String size = $sumWeight exceeds ${Terms.DataEntryValueMax} bytes")
         }
       case args =>
         Left(s"Unexpected args $args for string concatenation operator")
