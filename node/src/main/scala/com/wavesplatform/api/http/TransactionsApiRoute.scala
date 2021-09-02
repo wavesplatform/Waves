@@ -74,9 +74,9 @@ case class TransactionsApiRoute(
       complete(commonApi.transactionById(id).toRight(ApiError.TransactionDoesNotExist))
     } ~ (pathEndOrSingleSlash & anyParam("id")) { ids =>
       val result = for {
-        _        <- Either.cond(ids.nonEmpty, (), InvalidTransactionId("Transaction ID was not specified"))
-        statuses <- ids.map(readTransactionMeta).toList.sequence
-      } yield statuses
+        _    <- Either.cond(ids.nonEmpty, (), InvalidTransactionId("Transaction ID was not specified"))
+        meta <- ids.map(readTransactionMeta).toList.sequence
+      } yield meta
 
       complete(result)
     }
@@ -292,6 +292,8 @@ object TransactionsApiRoute {
 
         case leaseCancel: LeaseCancelTransaction =>
           Json.obj("lease" -> leaseIdToLeaseRef(leaseCancel.leaseId))
+
+        case et: EthereumTransaction => et.payload.json(et, blockchain)
 
         case _ => JsObject.empty
       }

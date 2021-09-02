@@ -810,14 +810,14 @@ abstract class LevelDBWriter private[database] (
 
   protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction, Boolean)] =
     for {
-      tm      <- db.get(Keys.transactionMetaById(TransactionId(id)))
+      tm      <- transactionMeta(id, db)
       (tx, _) <- db.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)))
     } yield (tm.height, tx, !tm.failed)
 
-  override def transactionMeta(id: ByteStr): Option[(Int, Boolean)] = readOnly { db =>
-    db.get(Keys.transactionMetaById(TransactionId(id))).map { tm =>
-      (tm.height, !tm.failed)
-    }
+  private def transactionMeta(id: ByteStr, db: ReadOnlyDB) = db.get(Keys.transactionMetaById(TransactionId(id)))
+
+  override def transactionMeta(id: ByteStr): Option[(Int, Boolean)] = readOnly(transactionMeta(id, _)).map { tm =>
+    (tm.height, !tm.failed)
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>

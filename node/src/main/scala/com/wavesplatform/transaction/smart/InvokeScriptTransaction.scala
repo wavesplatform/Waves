@@ -1,7 +1,5 @@
 package com.wavesplatform.transaction.smart
 
-import scala.util.Try
-
 import com.wavesplatform.account._
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -15,7 +13,9 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import monix.eval.Coeval
-import play.api.libs.json.JsObject
+import play.api.libs.json._
+
+import scala.util.Try
 
 case class InvokeScriptTransaction(
     version: TxVersion,
@@ -43,7 +43,7 @@ case class InvokeScriptTransaction(
   val json: Coeval[JsObject]         = Coeval.evalOnce(InvokeScriptTxSerializer.toJson(this))
 
   override def root: InvokeScriptTransaction = this
-  def senderAddress: Address                         = sender.toAddress
+  def senderAddress: Address                 = sender.toAddress
 }
 
 object InvokeScriptTransaction extends TransactionParser {
@@ -57,14 +57,11 @@ object InvokeScriptTransaction extends TransactionParser {
   implicit def sign(tx: InvokeScriptTransaction, privateKey: PrivateKey): InvokeScriptTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-  val serializer = InvokeScriptTxSerializer
-
   override def parseBytes(bytes: Array[Byte]): Try[InvokeScriptTransaction] =
-    serializer.parseBytes(bytes)
+    InvokeScriptTxSerializer.parseBytes(bytes)
 
   case class Payment(amount: TxAmount, assetId: Asset)
   object Payment {
-    import play.api.libs.json._
     implicit val jsonFormat: Format[Payment] = Json.format
   }
 

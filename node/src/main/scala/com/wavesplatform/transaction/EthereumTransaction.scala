@@ -2,8 +2,6 @@ package com.wavesplatform.transaction
 
 import java.math.BigInteger
 
-import scala.reflect.ClassTag
-
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.EthereumKeyLength
@@ -11,14 +9,17 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.serialization.impl.BaseTxJson
 import com.wavesplatform.utils.EthEncoding
 import monix.eval.Coeval
 import org.web3j.abi.TypeDecoder
-import org.web3j.abi.datatypes.{Address => EthAddress}
 import org.web3j.abi.datatypes.generated.Uint256
-import org.web3j.crypto._
+import org.web3j.abi.datatypes.{Address => EthAddress}
 import org.web3j.crypto.Sign.SignatureData
+import org.web3j.crypto._
 import play.api.libs.json._
+
+import scala.reflect.ClassTag
 
 final case class EthereumTransaction(
     payload: EthereumTransaction.Payload,
@@ -56,16 +57,13 @@ final case class EthereumTransaction(
 
   val senderAddress: Coeval[Address] = Coeval.evalOnce(signerPublicKey().toAddress(chainId))
 
-  val baseJson: Coeval[JsObject] = for {
-    idValue <- id
-  } yield Json.obj(
-    "id"    -> idValue.toString,
-    "type"  -> tpe.id,
-    "bytes" -> EthEncoding.toHexString(bytes()),
-    "from"  -> EthEncoding.toHexString(senderAddress().publicKeyHash)
+  override val json: Coeval[JsObject] = Coeval.evalOnce(
+    BaseTxJson.toJson(this) ++ Json.obj(
+      "bytes"           -> EthEncoding.toHexString(bytes()),
+      "sender"          -> senderAddress().toString,
+      "senderPublicKey" -> signerPublicKey()
+    )
   )
-
-  override val json: Coeval[JsObject] = Coeval.evalOnce(baseJson())
 
   override def smartAssets(blockchain: Blockchain): Seq[IssuedAsset] = payload.smartAssets(blockchain)
 }
@@ -73,6 +71,7 @@ final case class EthereumTransaction(
 object EthereumTransaction {
   sealed trait Payload {
     def smartAssets(blockchain: Blockchain): Seq[IssuedAsset]
+    def json(tx: EthereumTransaction, blockchain: Blockchain): JsObject
   }
 
   case class Transfer(asset: Either[Asset.Waves.type, ERC20Address], amount: Long, recipient: Address) extends Payload {
@@ -81,15 +80,14 @@ object EthereumTransaction {
       case _            => Seq.empty
     }
 
-    def json(senderAddress: Address): JsObject =
+    def json(tx: EthereumTransaction, blockchain: Blockchain): JsObject =
       Json.obj(
         "transfer" -> Json.obj(
-          "sender"    -> senderAddress.toString,
           "recipient" -> recipient.toString,
           "amount"    -> amount,
           "asset" -> (asset match {
             case Left(_)      => JsNull
-            case Right(erc20) => EthEncoding.toHexString(erc20.arr)
+            case Right(erc20) => blockchain.resolveERC20Address(erc20).fold[JsValue](JsNull)(id => JsString(id.toString))
           })
         )
       )
@@ -110,8 +108,8 @@ object EthereumTransaction {
       override def smartAssets(blockchain: Blockchain): Seq[IssuedAsset] = Invocation.this.smartAssets(blockchain)
     }
 
-    def json(senderAddress: Address): JsObject =
-      Json.obj("invokeScript" -> Json.obj("sender" -> senderAddress.toString, "dApp" -> dApp.toString))
+    def json(tx: EthereumTransaction, blockchain: Blockchain): JsObject =
+      Json.obj("invokeScript" -> blockchain.accountScript(dApp).map(asi => toInvokeScriptLike(tx, asi.script).toJson()))
   }
 
   val AmountMultiplier = 10000000000L

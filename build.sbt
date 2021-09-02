@@ -7,8 +7,6 @@
  */
 
 import sbt.Keys._
-import sbt.{**, Compile, CrossVersion, File, IO, Project, compilerPlugin, inConfig, _}
-import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
@@ -61,7 +59,7 @@ lazy val `lang-doc` = project
   .dependsOn(`lang-jvm`)
   .settings(
     Compile / sourceGenerators += Tasks.docSource,
-    libraryDependencies ++= Seq("com.github.spullara.mustache.java" % "compiler" % "0.9.5") ++ Dependencies.test
+    libraryDependencies ++= Seq("com.github.spullara.mustache.java" % "compiler" % "0.9.10") ++ Dependencies.test
   )
 
 lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test")
@@ -109,7 +107,9 @@ lazy val root = (project in file("."))
     node,
     `node-it`,
     `node-generator`,
-    benchmark
+    benchmark,
+    `repl-js`,
+    `repl-jvm`
   )
 
 inScope(Global)(

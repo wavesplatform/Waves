@@ -1,7 +1,3 @@
-import CommonSettings.autoImport.network
-import com.typesafe.sbt.SbtNativePackager.Universal
-import sbtassembly.MergeStrategy
-
 name := "waves"
 maintainer := "com.wavesplatform"
 
@@ -134,7 +130,7 @@ inConfig(Debian)(
     packageSource := sourceDirectory.value / "package",
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
     debianPackageDependencies += "java8-runtime-headless",
-    maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("postinst", "postrm", "prerm")),
+    maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("postinst", "postrm", "prerm"))
   )
 )
 

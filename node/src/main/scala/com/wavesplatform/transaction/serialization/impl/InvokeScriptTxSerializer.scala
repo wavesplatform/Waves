@@ -21,7 +21,7 @@ import scala.util.Try
 object InvokeScriptTxSerializer {
   def functionCallToJson(fc: Terms.FUNCTION_CALL): JsObject = {
     Json.obj(
-      "function" -> JsString(fc.function.asInstanceOf[com.wavesplatform.lang.v1.FunctionHeader.User].internalName),
+      "function" -> JsString(fc.function.funcName),
       "args" -> JsArray(
         fc.args.map {
           case Terms.ARR(elements) => Json.obj("type" -> "list", "value" -> elements.map(mapSingleArg))
@@ -40,16 +40,7 @@ object InvokeScriptTxSerializer {
       case arg                        => throw new NotImplementedError(s"Not supported: $arg")
     }
 
-  def toJson(tx: InvokeScriptTransaction): JsObject = {
-    import tx._
-    BaseTxJson.toJson(tx) ++ Json.obj(
-      "dApp"    -> dApp.toString,
-      "payment" -> payments
-    ) ++ (funcCallOpt match {
-      case Some(fc) => Json.obj("call" -> this.functionCallToJson(fc))
-      case None     => JsObject.empty
-    })
-  }
+  def toJson(tx: InvokeScriptTransaction): JsObject = BaseTxJson.toJson(tx) ++ tx.toJson()
 
   def bodyBytes(tx: InvokeScriptTransaction): Array[Byte] = {
     import tx._
