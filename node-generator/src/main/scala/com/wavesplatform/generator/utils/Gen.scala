@@ -1,11 +1,10 @@
 package com.wavesplatform.generator.utils
 
 import java.util.concurrent.ThreadLocalRandom
-
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.crypto.Curve25519.KeyLength
+import com.wavesplatform.crypto.Curve25519._
 import com.wavesplatform.generator.utils.Implicits._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
@@ -53,7 +52,7 @@ object Gen {
         case BooleanDataEntry(key, _)     => s"""extract(getBoolean(oracle, "$key"))"""
         case BinaryDataEntry(key, value)  => s"""(extract(getBinary(oracle, "$key")) == $value)"""
         case StringDataEntry(key, value)  => s"""(extract(getString(oracle, "$key")) == "$value")"""
-        case EmptyDataEntry(_)            => ???
+        case EmptyDataEntry(_) => ???
       } reduce [String] { case (l, r) => s"$l && $r " }
 
     val src =
@@ -85,12 +84,10 @@ object Gen {
           s"let accountSigned$i = if(sigVerify(tx.bodyBytes, tx.proofs[$i], accountPK$i)) then 1 else 0"
       } mkString "\n"
 
-    val proofSum = accountsWithIndexes
-      .map {
-        case (_, ind) =>
-          s"accountSigned$ind"
-      }
-      .mkString("let proofSum = ", " + ", "")
+    val proofSum = accountsWithIndexes map {
+      case (_, ind) =>
+        s"accountSigned$ind"
+    } mkString ("let proofSum = ", " + ", "")
 
     val finalStatement = s"proofSum >= $requiredProofsCount"
 

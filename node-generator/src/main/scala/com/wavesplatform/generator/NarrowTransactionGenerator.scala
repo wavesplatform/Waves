@@ -98,13 +98,13 @@ class NarrowTransactionGenerator(
                 tx <- logOption(
                   TransferTransaction
                     .selfSigned(
-                      correctVersion(TxVersion.V2),
+                      correctVersion(5.toByte),
                       sender,
                       recipient,
                       Asset.fromCompatId(asset),
-                      500,
+                      5L,
                       Waves,
-                      500000L,
+                      2_00000000L,
                       createAttachment(),
                       timestamp
                     )
@@ -205,7 +205,7 @@ class NarrowTransactionGenerator(
               for {
                 lease  <- activeLeaseTransactions.headOption
                 sender <- accountByAddress(lease.sender.toAddress.toString)
-                tx     <- logOption(LeaseCancelTransaction.selfSigned(2.toByte, sender, lease.id(), 500000L, timestamp))
+                tx     <- logOption(LeaseCancelTransaction.signed(2.toByte, sender.publicKey, lease.id(), 500000L, timestamp, sender.privateKey))
               } yield tx
             ).logNone("There is no active lease transactions, may be you need to increase lease transaction's probability")
 
@@ -289,7 +289,10 @@ class NarrowTransactionGenerator(
               ScriptSettings.Function.Arg(argType, value) <- function.args
             } yield argType.toLowerCase match {
               case "integer" => Terms.CONST_LONG(value.toLong)
-              case "string"  => Terms.CONST_STRING(value).explicitGet()
+              case "string"  => if (value.equals("random")) {
+                Terms.CONST_STRING(random.nextString(20)).explicitGet()}
+              else
+                Terms.CONST_STRING(value).explicitGet()
               case "boolean" => Terms.CONST_BOOLEAN(value.toBoolean)
               case "binary"  => Terms.CONST_BYTESTR(ByteStr.decodeBase58(value).get).explicitGet()
             }
@@ -307,7 +310,7 @@ class NarrowTransactionGenerator(
                 sender,
                 GeneratorSettings.toKeyPair(script.dappAccount).toAddress,
                 maybeFunctionCall,
-                Seq(InvokeScriptTransaction.Payment(random.nextInt(5000), asset)),
+                Seq(InvokeScriptTransaction.Payment(random.nextInt(10)+1, asset)),
                 5300000L,
                 Waves,
                 timestamp
@@ -374,8 +377,7 @@ class NarrowTransactionGenerator(
   }
 
   private def createAttachment(): ByteStr = {
-    if (random.nextBoolean()) ByteStr.empty
-    else ByteStr(Array.fill(random.nextInt(100))(random.nextInt().toByte))
+     ByteStr(Array.fill(random.nextInt(140))(random.nextInt().toByte))
   }
 
   private[this] def logOption[T <: Transaction](txE: Either[ValidationError, T])(implicit m: Manifest[T]): Option[T] = {
@@ -393,12 +395,10 @@ class NarrowTransactionGenerator(
       .orElse(Universe.Accounts.map(_.keyPair).find(_.toAddress.toString == address))
 
   private[this] def randomSenderAndAsset(issueTxs: Seq[IssueTransaction]): Option[(KeyPair, Option[ByteStr])] =
-    if (random.nextBoolean()) {
-      (randomFrom(issueTxs) orElse randomFrom(Universe.IssuedAssets)).map { issue =>
-        val pk = (accounts ++ Universe.Accounts.map(_.keyPair)).find(_.publicKey == issue.sender).get
-        (pk, Some(issue.id()))
-      }
-    } else randomFrom(accounts).map((_, None))
+    (randomFrom(issueTxs) orElse randomFrom(Universe.IssuedAssets)).map { issue =>
+      val pk = (accounts ++ Universe.Accounts.map(_.keyPair)).find(_.publicKey == issue.sender).get
+      (pk, Some(issue.id()))
+    } orElse randomFrom(accounts).map((_, None))
 
   private implicit class OptionExt[A](opt: Option[A]) {
     def logNone(msg: => String): Option[A] =
@@ -560,7 +560,7 @@ object NarrowTransactionGenerator {
               IssuedAsset(tradeAsset.id()),
               tradeAsset.quantity / Universe.Accounts.size,
               Waves,
-              900000,
+              900000L,
               ByteStr(Array.fill(random.nextInt(100))(random.nextInt().toByte)),
               System.currentTimeMillis()
             )

@@ -203,7 +203,7 @@ object Worker {
                 val mayBeNextCnt = math.min(cnt + warmUp.step, warmUp.end)
                 val nextCnt      = math.min(mayBeNextCnt, utxToSendCnt)
                 val nextRaised   = nextCnt == warmUp.end && warmUp.once
-                WorkState(nextCnt, nextRaised, endAfter, warmUp)
+                WorkState(nextCnt, false, endAfter, warmUp)
             }
           }
       }
