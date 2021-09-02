@@ -58,6 +58,9 @@ class WalletSpecification extends FunSuite {
     w2.privateKeyAccounts.nonEmpty shouldBe true
     w2.privateKeyAccounts shouldEqual w1PrivateKeys
     w2.nonce shouldBe w1nonce
+
+    val seedError = intercept[IllegalArgumentException](Wallet(WalletSettings(walletFile, "cookies".some, ByteStr.decodeBase58("fake").toOption)))
+    seedError.getMessage should include("Seed from config doesn't match the actual seed")
   }
 
   test("reopen with incorrect password") {
