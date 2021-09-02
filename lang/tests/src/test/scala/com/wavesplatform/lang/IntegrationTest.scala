@@ -1412,8 +1412,8 @@ class IntegrationTest extends PropSpec with Inside {
     eval(constructingMaxStringAndBytes, version = V3) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
     eval(constructingMaxStringAndBytes, version = V4) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
 
-    eval(constructingTooBigString, version = V3) should produce("String length = 32768 exceeds 32767")
-    eval(constructingTooBigString, version = V4) should produce("String length = 32768 exceeds 32767")
+    eval(constructingTooBigString, version = V3) should produce("String size = 32768 exceeds 32767 bytes")
+    eval(constructingTooBigString, version = V4) should produce("String size = 32768 exceeds 32767 bytes")
   }
 
   property("bytes limit") {
