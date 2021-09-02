@@ -1422,6 +1422,30 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED]("pow(base: BigInt, bp: Int, exponent:Big Int, ep: Int, rp: Int, round: Rounds)", xs)
     }
 
+  val sqrtBigInt: BaseFunction[NoContext] =
+    UserFunction(
+      "sqrt",
+      "sqrtBigInt",
+      6,
+      BIGINT,
+      ("@number", BIGINT),
+      ("@precision", LONG),
+      ("@resultPrecision", LONG),
+      ("@round", UNION(fromV5RoundTypes))
+    ) {
+      FUNCTION_CALL(
+        Native(POW_BIGINT),
+        List(
+          REF("@number"),
+          REF("@precision"),
+          CONST_BIGINT(5),
+          CONST_LONG(1),
+          REF("@resultPrecision"),
+          REF("@round")
+        )
+      )
+    }
+
   def logBigInt(roundTypes: UNION): BaseFunction[NoContext] =
     NativeFunction(
       "log",
@@ -1715,7 +1739,7 @@ object PureContext {
       )
 
   private val v6Functions =
-    v5Functions ++ Array(makeString1C, makeString2C, splitStr1C, splitStr4C, sqrtInt)
+    v5Functions ++ Array(makeString1C, makeString2C, splitStr1C, splitStr4C, sqrtInt, sqrtBigInt)
 
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =
     CTX[NoContext](

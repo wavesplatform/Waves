@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.evaluator
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V5}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V5, V6}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BIGINT, CONST_BOOLEAN, CONST_LONG, CONST_STRING}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, unit}
 import com.wavesplatform.test.produce
@@ -267,5 +267,7 @@ class BigIntTest extends EvaluatorSpec {
   property("sqrt") {
     eval(s"pow($max, 0, toBigInt(5), 1, 18, DOWN)") shouldBe Right(CONST_BIGINT(BigInt("81877371507464127617551201542979628307507432471243237061821853600756754782485292915524036944801")))
     eval(s"pow($max, 18, toBigInt(5), 1, 18, DOWN)") shouldBe Right(CONST_BIGINT(BigInt("81877371507464127617551201542979628307507432471243237061821853600756754782485292915524")))
+    eval(s"sqrt($max, 0, 18, DOWN)")(V6) shouldBe Right(CONST_BIGINT(BigInt("81877371507464127617551201542979628307507432471243237061821853600756754782485292915524036944801")))
+    eval(s"sqrt($max, 18, 18, DOWN)")(V6) shouldBe Right(CONST_BIGINT(BigInt("81877371507464127617551201542979628307507432471243237061821853600756754782485292915524")))
   }
 }

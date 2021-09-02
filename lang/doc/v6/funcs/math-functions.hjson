@@ -58,6 +58,18 @@
       complexity: 270
     }
     {
+      name: "sqrt"
+      params: [ "BigInt", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
+      doc: "Returns a square root."
+      paramsDoc: [
+        "The base."
+        "The number of decimals of the base."
+        "The number of decimals of the resulting value."
+        "One of the rounding functions."
+      ]
+      complexity: 6
+    }
+    {
       name: "log"
       params: [ "BigInt", "Int", "BigInt", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Returns the logarithm of a number."
