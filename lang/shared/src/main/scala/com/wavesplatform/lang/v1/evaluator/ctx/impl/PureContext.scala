@@ -1360,6 +1360,21 @@ object PureContext {
     }
   }
 
+  val sqrtInt: BaseFunction[NoContext] =
+    UserFunction("sqrt", 2, LONG, ("@number", LONG), ("@precision", LONG), ("@resultPrecision", LONG), ("@round", UNION(fromV5RoundTypes))) {
+      FUNCTION_CALL(
+        Native(POW),
+        List(
+          REF("@number"),
+          REF("@precision"),
+          CONST_LONG(5),
+          CONST_LONG(1),
+          REF("@resultPrecision"),
+          REF("@round")
+        )
+      )
+    }
+
   def log(roundTypes: UNION): BaseFunction[NoContext] = {
     NativeFunction("log", 100, LOG, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", roundTypes)) {
       case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
@@ -1487,8 +1502,8 @@ object PureContext {
       STRING
     )
 
-  private val allRoundTypes: List[CASETYPEREF]    = Rounding.all.map(_.`type`)
-  private val fromV5RoundTypes: List[CASETYPEREF] = Rounding.fromV5.map(_.`type`)
+  private val allRoundTypes: List[CASETYPEREF]         = Rounding.all.map(_.`type`)
+  private lazy val fromV5RoundTypes: List[CASETYPEREF] = Rounding.fromV5.map(_.`type`)
 
   private val v1v2v3v4Types: Seq[REAL] = commonTypes ++ allRoundTypes
   private val v5Types: Seq[REAL]       = commonTypes ++ fromV5RoundTypes ++ Seq(BIGINT)
@@ -1700,7 +1715,7 @@ object PureContext {
       )
 
   private val v6Functions =
-    v5Functions ++ Array(makeString1C, makeString2C, splitStr1C, splitStr4C)
+    v5Functions ++ Array(makeString1C, makeString2C, splitStr1C, splitStr4C, sqrtInt)
 
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =
     CTX[NoContext](

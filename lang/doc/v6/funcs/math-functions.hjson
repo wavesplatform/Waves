@@ -10,9 +10,21 @@
         "The exponent."
         "The number of decimals of the exponent."
         "The number of decimals of the resulting value."
-        "One of the rounding functions. The HalfUp() function may be used as the default value."
+        "One of the rounding functions."
       ]
       complexity: 28
+    }
+    {
+      name: "sqrt"
+      params: [ "Int", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
+      doc: "Returns a square root."
+      paramsDoc: [
+        "The number"
+        "The number of decimals of the number."
+        "The number of decimals of the resulting value."
+        "One of the rounding functions."
+      ]
+      complexity: 2
     }
     {
       name: "log"
