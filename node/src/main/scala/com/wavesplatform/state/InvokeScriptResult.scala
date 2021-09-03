@@ -181,7 +181,7 @@ object InvokeScriptResult {
       case ScriptResultV3(ds, ts, _) =>
         InvokeScriptResult(data = ds.map(DataEntry.fromLangDataOp), transfers = ts.map(langTransferToPayment))
 
-      case ScriptResultV4(actions, _, ret) =>
+      case ScriptResultV4(actions, _, _) =>
         // XXX need return value processing
         val issues       = actions.collect { case i: lang.Issue         => i }
         val reissues     = actions.collect { case ri: lang.Reissue      => ri }
@@ -196,13 +196,13 @@ object InvokeScriptResult {
             Invocation(
               langAddressToAddress(dApp),
               Call(fname, args),
-              (payments.map {
-                case CaseObj(t, fields) =>
+              payments.map {
+                case CaseObj(_, fields) =>
                   ((fields("assetId"), fields("amount")): @unchecked) match {
                     case (CONST_BYTESTR(b), CONST_LONG(a)) => InvokeScriptResult.AttachedPayment(IssuedAsset(b), a)
                     case (_, CONST_LONG(a))                => InvokeScriptResult.AttachedPayment(Waves, a)
                   }
-              }),
+              },
               fromLangResult(invokeId, r)
             )
         }

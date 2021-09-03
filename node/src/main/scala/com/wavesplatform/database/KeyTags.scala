@@ -58,7 +58,7 @@ object KeyTags extends Enumeration {
   UpdatedAssets,
   SponsoredAssets,
   StateHash,
-  ERC20ToWavesAssetId = Value
+  EthereumTransactionMeta = Value
 
   final implicit class KeyTagExt(val t: KeyTag) extends AnyVal {
     @inline def prefixBytes: Array[Byte] = Shorts.toByteArray(t.id.toShort)

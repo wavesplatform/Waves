@@ -12,19 +12,24 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
+import com.wavesplatform.api.common.TransactionMeta
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, _}
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.network.TransactionPublisher
+import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{Blockchain, InvokeScriptResult}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
@@ -293,14 +298,27 @@ object TransactionsApiRoute {
         case leaseCancel: LeaseCancelTransaction =>
           Json.obj("lease" -> leaseIdToLeaseRef(leaseCancel.leaseId))
 
-        case et: EthereumTransaction => et.payload.json(et, blockchain)
-
         case _ => JsObject.empty
       }
 
       val stateChanges = meta match {
         case i: TransactionMeta.Invoke => Json.obj("stateChanges" -> i.invokeScriptResult)
-        case _                         => JsObject.empty
+        case e: TransactionMeta.Ethereum =>
+          e.meta.fold(JsObject.empty) { m =>
+            m.payload.invocation.fold(JsObject.empty) { i =>
+              Json.obj(
+                "call" -> InvokeScriptTxSerializer
+                  .functionCallToJson(Serde.deserialize(i.functionCall.toByteArray).explicitGet()._1.asInstanceOf[FUNCTION_CALL]),
+                "payment" -> i.payments.map(p => InvokeScriptTransaction.Payment(p.amount, PBAmounts.toVanillaAssetId(p.assetId)))
+              )
+            } ++
+              m.payload.transfer.fold(JsObject.empty) { t =>
+                val (asset, amount) = PBAmounts.toAssetAndAmount(t.getAmount)
+                Json.obj("asset" -> asset, "amount" -> amount)
+              }
+          } ++
+            Json.obj("stateChanges" -> e.invokeScriptResult)
+        case _ => JsObject.empty
       }
 
       Seq(

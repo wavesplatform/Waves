@@ -7,36 +7,36 @@ import cats.syntax.either._
 import cats.syntax.semigroup._
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, ScriptCompilerError, TooBigArrayAllocation}
-import com.wavesplatform.api.http.requests.{byteStrFormat, ScriptWithImportsRequest}
+import com.wavesplatform.api.http.requests.{ScriptWithImportsRequest, byteStrFormat}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
+import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
+import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
-import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment, InvokeScriptTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment, InvokeScriptTransaction}
 import com.wavesplatform.utils.Time
 import monix.eval.Coeval
 import monix.execution.Scheduler
@@ -54,7 +54,7 @@ case class UtilsApiRoute(
 
   import UtilsApiRoute._
 
-  private def seed(length: Int) = {
+  private def seed(length: Int): JsObject = {
     val seed = new Array[Byte](length)
     new SecureRandom().nextBytes(seed) //seed mutated here!
     Json.obj("seed" -> Base58.encode(seed))
@@ -340,7 +340,7 @@ object UtilsApiRoute {
 
                 override def id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr.empty)
 
-                override def smartAssets(blockchain: Blockchain): Seq[Asset.IssuedAsset] = Seq.empty
+                override def checkedAssets: Seq[Asset.IssuedAsset] = Seq.empty
               },
               address,
               PublicKey(ByteStr.fill(KeyLength)(1)),

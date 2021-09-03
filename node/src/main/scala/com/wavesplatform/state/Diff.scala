@@ -1,7 +1,5 @@
 package com.wavesplatform.state
 
-import scala.collection.immutable.VectorMap
-
 import cats.data.Ior
 import cats.instances.map._
 import cats.kernel.{Monoid, Semigroup}
@@ -9,12 +7,15 @@ import cats.syntax.semigroup._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.{Asset, Transaction}
+
+import scala.collection.immutable.VectorMap
 
 case class LeaseBalance(in: Long, out: Long)
 
@@ -157,7 +158,8 @@ case class Diff(
     sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
     scriptsRun: Int = 0,
     scriptsComplexity: Long = 0,
-    scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
+    scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
+    ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map.empty
 )
 
 object Diff {
@@ -169,19 +171,20 @@ object Diff {
     override def combine(older: Diff, newer: Diff): Diff =
       Diff(
         transactions = older.transactions ++ newer.transactions,
-        portfolios = older.portfolios.combine(newer.portfolios),
+        portfolios = older.portfolios |+| newer.portfolios,
         issuedAssets = older.issuedAssets ++ newer.issuedAssets,
         updatedAssets = older.updatedAssets |+| newer.updatedAssets,
         aliases = older.aliases ++ newer.aliases,
-        orderFills = older.orderFills.combine(newer.orderFills),
+        orderFills = older.orderFills |+| newer.orderFills,
         leaseState = older.leaseState ++ newer.leaseState,
         scripts = older.scripts ++ newer.scripts,
         assetScripts = older.assetScripts ++ newer.assetScripts,
-        accountData = older.accountData.combine(newer.accountData),
-        sponsorship = older.sponsorship.combine(newer.sponsorship),
+        accountData = older.accountData |+| newer.accountData,
+        sponsorship = older.sponsorship |+| newer.sponsorship,
         scriptsRun = older.scriptsRun + newer.scriptsRun,
-        scriptResults = older.scriptResults.combine(newer.scriptResults),
-        scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity
+        scriptResults = older.scriptResults |+| newer.scriptResults,
+        scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity,
+        ethereumTransactionMeta = older.ethereumTransactionMeta ++ newer.ethereumTransactionMeta
       )
   }
 

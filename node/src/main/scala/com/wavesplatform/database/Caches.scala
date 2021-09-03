@@ -9,6 +9,7 @@ import com.google.common.cache._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state._
@@ -170,7 +171,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
-      stateHash: StateHashBuilder.Result
+      stateHash: StateHashBuilder.Result,
+      ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta]
   ): Unit
 
   override def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
@@ -293,7 +295,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       hitSource,
       diff.scriptResults,
       failedTransactionIds,
-      stateHash.result()
+      stateHash.result(),
+      diff.ethereumTransactionMeta
     )
 
     val emptyData = Map.empty[(Address, String), Option[DataEntry[_]]]

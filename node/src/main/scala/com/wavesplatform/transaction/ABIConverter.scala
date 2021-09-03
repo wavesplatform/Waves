@@ -7,11 +7,11 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.{Terms, Types}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.{Terms, Types}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import org.web3j.abi.datatypes.Type
 import org.web3j.abi.TypeReference
+import org.web3j.abi.datatypes.Type
 import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
 import scala.jdk.CollectionConverters._
@@ -64,7 +64,7 @@ object ABIConverter {
           "components" -> types.map(t => Json.obj("name" -> t.name) ++ ethTypeObj(t))
         )
 
-      case _ => ???
+      case other => throw new IllegalArgumentException(s"ethTypeObj: Unexpected type: $other")
     }
   }
 
@@ -75,13 +75,12 @@ object ABIConverter {
       case Types.BYTESTR         => "bytes"
       case Types.STRING          => "string"
       case Types.LIST(innerType) => s"${ethFuncSignatureTypeName(innerType)}[]"
-      case Types.UNION(typeList, _) => {
+      case Types.UNION(typeList, _) =>
         val unionElementIdxType = "uint8"
         val typeNameList        = unionElementIdxType :: typeList.map(ethFuncSignatureTypeName)
         s"(${typeNameList.mkString(",")})"
-      }
       case Types.TUPLE(types) => s"(${types.map(ethFuncSignatureTypeName).mkString(",")})"
-      case _                  => ???
+      case other              => throw new IllegalArgumentException(s"ethFuncSignatureTypeName: Unexpected type: $other")
     }
   }
 
@@ -163,9 +162,9 @@ final case class ABIConverter(script: Script) {
                     case assetId       => Asset.IssuedAsset(assetId)
                   })
 
-                case _ => ???
+                case other => throw new IllegalArgumentException(s"decodeArgs: unexpected term in payment: $other")
               }
-            case _ => ???
+            case other => throw new IllegalArgumentException(s"decodeArgs: unexpected term in payment: $other")
           }
 
         case _ => Nil

@@ -1,8 +1,8 @@
 package com.wavesplatform.api.common
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.database.{DBExt, DBResource, Keys}
 import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, NewTransactionInfo, TransactionId, TxNum}
 import com.wavesplatform.transaction.{Authorized, EthereumTransaction, GenesisTransaction, Transaction, TransactionType}
@@ -22,14 +22,11 @@ trait AddressTransactions {
       fromId: Option[ByteStr]
   ): Observable[TransactionMeta] =
     Observable
-      .fromIterator(Task(allAddressTransactions(db, maybeDiff, subject, sender, types, fromId).map {
-        case (height, transaction, succeeded) =>
-          TransactionMeta.create(height, transaction, succeeded) { ist =>
-            maybeDiff
-              .flatMap { case (_, diff) => diff.scriptResults.get(ist.id()) }
-              .orElse(loadInvokeScriptResult(db, ist.id()))
-          }
-      }))
+      .fromIterator(
+        Task(
+          allAddressTransactions(db, maybeDiff, subject, sender, types, fromId).map(loadTransactionMeta(db, maybeDiff))
+        )
+      )
 }
 
 object AddressTransactions {
@@ -49,6 +46,13 @@ object AddressTransactions {
 
   def loadInvokeScriptResult(db: DB, txId: ByteStr): Option[InvokeScriptResult] =
     db.withResource(r => loadInvokeScriptResult(r, txId))
+
+  def loadEthereumMetadata(db: DB, txId: ByteStr): Option[EthereumTransactionMeta] = db.withResource { resource =>
+    for {
+      tm <- resource.get(Keys.transactionMetaById(TransactionId(txId)))
+      m  <- resource.get(Keys.ethereumTransactionMeta(Height(tm.height), TxNum(tm.num.toShort)))
+    } yield m
+  }
 
   def allAddressTransactions(
       db: DB,

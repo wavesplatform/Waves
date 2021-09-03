@@ -4,6 +4,7 @@ option java_package = "com.wavesplatform.database.protobuf";
 
 import "waves/block.proto";
 import "waves/transaction.proto";
+import "waves/amount.proto";
 import "waves/recipient.proto";
 import "google/protobuf/empty.proto";
 
@@ -32,6 +33,21 @@ message TransactionMeta {
     int32 num = 2;
     int32 type = 3;
     bool failed = 4;
+}
+
+message EthereumTransactionMeta {
+    message Invocation {
+        bytes function_call = 1;
+        repeated Amount payments = 2;
+    }
+    message Transfer {
+        bytes public_key_hash = 1;
+        Amount amount = 2;
+    }
+    oneof payload {
+        Invocation invocation = 1;
+        Transfer transfer = 2;
+    }
 }
 
 message TransactionData {

@@ -69,7 +69,7 @@ package object http extends ApiMarshallers with ScorexLogging {
               case TransactionType.SetAssetScript  => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], senderPk)
               case TransactionType.SponsorFee      => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderPk)
               case TransactionType.UpdateAssetInfo => txJson.as[UpdateAssetInfoRequest].toTxFrom(senderPk)
-              case _ => ???
+              case other => throw new IllegalArgumentException(s"Unsupported transaction type: $other")
             }
           }
           .fold(ApiError.fromValidationError, txToResponse)

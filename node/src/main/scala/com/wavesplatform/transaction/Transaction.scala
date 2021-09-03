@@ -12,17 +12,18 @@ trait TransactionBase {
   def timestamp: Long
   def chainId: Byte
   def id: Coeval[ByteStr]
-  def smartAssets(blockchain: Blockchain): Seq[IssuedAsset]
+  def checkedAssets: Seq[IssuedAsset]
 }
 
 object TransactionBase {
   implicit class TBExt(val t: TransactionBase) extends AnyVal {
     def fee: Long = t.assetFee._2
     def feeAssetId: Asset = t.assetFee._1
+    def smartAssets(blockchain: Blockchain): Seq[IssuedAsset] = t.checkedAssets.filter(blockchain.hasAssetScript)
   }
 }
 
-abstract class Transaction(val tpe: TransactionType.TransactionType, protected val checkedAssets: Seq[IssuedAsset] = Nil) extends TransactionBase {
+abstract class Transaction(val tpe: TransactionType.TransactionType, val checkedAssets: Seq[IssuedAsset] = Nil) extends TransactionBase {
   def bytesSize: Int         = bytes().length
   lazy val protoSize: Coeval[Int] = Coeval(PBTransactions.protobuf(this).serializedSize)
   val bodyBytes: Coeval[Array[Byte]]
@@ -37,8 +38,6 @@ abstract class Transaction(val tpe: TransactionType.TransactionType, protected v
   }
 
   override def hashCode(): Int = id().hashCode()
-
-  override def smartAssets(blockchain: Blockchain): Seq[IssuedAsset] = checkedAssets.filter(blockchain.hasAssetScript)
 }
 
 object Transaction {

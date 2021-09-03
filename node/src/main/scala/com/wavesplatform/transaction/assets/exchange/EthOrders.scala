@@ -70,7 +70,7 @@ object EthOrders extends App {
     val paramSize = buffer.remaining() match {
       case 129 => 64
       case 65  => 32
-      case _   => ???
+      case other   => throw new IllegalArgumentException(s"Unexpected signature length: $other")
     }
     val R = new Array[Byte](paramSize)
     val S = new Array[Byte](paramSize)

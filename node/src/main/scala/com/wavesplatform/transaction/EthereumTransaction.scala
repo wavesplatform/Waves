@@ -5,11 +5,13 @@ import java.math.BigInteger
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.EthereumKeyLength
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.serialization.impl.BaseTxJson
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.EthEncoding
 import monix.eval.Coeval
 import org.web3j.abi.TypeDecoder
@@ -64,52 +66,30 @@ final case class EthereumTransaction(
       "senderPublicKey" -> signerPublicKey()
     )
   )
-
-  override def smartAssets(blockchain: Blockchain): Seq[IssuedAsset] = payload.smartAssets(blockchain)
 }
 
 object EthereumTransaction {
-  sealed trait Payload {
-    def smartAssets(blockchain: Blockchain): Seq[IssuedAsset]
-    def json(tx: EthereumTransaction, blockchain: Blockchain): JsObject
-  }
+  sealed trait Payload
 
-  case class Transfer(asset: Either[Asset.Waves.type, ERC20Address], amount: Long, recipient: Address) extends Payload {
-    override def smartAssets(blockchain: Blockchain): Seq[IssuedAsset] = asset match {
-      case Right(erc20) => blockchain.resolveERC20Address(erc20).filter(blockchain.hasAssetScript).toSeq
-      case _            => Seq.empty
-    }
-
-    def json(tx: EthereumTransaction, blockchain: Blockchain): JsObject =
-      Json.obj(
-        "transfer" -> Json.obj(
-          "recipient" -> recipient.toString,
-          "amount"    -> amount,
-          "asset" -> (asset match {
-            case Left(_)      => JsNull
-            case Right(erc20) => blockchain.resolveERC20Address(erc20).fold[JsValue](JsNull)(id => JsString(id.toString))
-          })
-        )
-      )
-  }
+  case class Transfer(tokenAddress: Option[ERC20Address], amount: Long, recipient: Address) extends Payload
 
   case class Invocation(dApp: Address, hexCallData: String) extends Payload {
-    override def smartAssets(blockchain: Blockchain): Seq[IssuedAsset] = Seq.empty
-
-    def toInvokeScriptLike(tx: EthereumTransaction, script: Script): InvokeScriptTransactionLike = new InvokeScriptTransactionLike {
-      lazy val (funcCall, payments)                                      = ABIConverter(script).decodeFunctionCall(hexCallData)
-      override def id: Coeval[ByteStr]                                   = tx.id
-      override def dApp: AddressOrAlias                                  = Invocation.this.dApp
-      override def sender: PublicKey                                     = tx.signerPublicKey()
-      override def root: InvokeScriptTransactionLike                     = this
-      override def assetFee: (Asset, TxTimestamp)                        = tx.assetFee
-      override def timestamp: TxTimestamp                                = tx.timestamp
-      override def chainId: TxVersion                                    = tx.chainId
-      override def smartAssets(blockchain: Blockchain): Seq[IssuedAsset] = Invocation.this.smartAssets(blockchain)
-    }
-
-    def json(tx: EthereumTransaction, blockchain: Blockchain): JsObject =
-      Json.obj("invokeScript" -> blockchain.accountScript(dApp).map(asi => toInvokeScriptLike(tx, asi.script).toJson()))
+    def toInvokeScriptLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, InvokeScriptTransactionLike] =
+      for {
+        scriptInfo <- blockchain.accountScript(dApp).toRight(GenericError(s"No script at address $dApp"))
+        (extractedCall, extractedPayments) = ABIConverter(scriptInfo.script).decodeFunctionCall(hexCallData)
+      } yield new InvokeScriptTransactionLike {
+        override def funcCall: Terms.FUNCTION_CALL                  = extractedCall
+        override def payments: Seq[InvokeScriptTransaction.Payment] = extractedPayments
+        override def id: Coeval[ByteStr]                            = tx.id
+        override def dApp: AddressOrAlias                           = Invocation.this.dApp
+        override def sender: PublicKey                              = tx.signerPublicKey()
+        override def root: InvokeScriptTransactionLike              = this
+        override def assetFee: (Asset, TxTimestamp)                 = tx.assetFee
+        override def timestamp: TxTimestamp                         = tx.timestamp
+        override def chainId: TxVersion                             = tx.chainId
+        override def checkedAssets: Seq[Asset.IssuedAsset]          = this.paymentAssets
+      }
   }
 
   val AmountMultiplier = 10000000000L
@@ -137,12 +117,12 @@ object EthereumTransaction {
 
   val ERC20TransferPrefix: String = "a9059cbb"
 
-  private def extractPayload(underlying: RawTransaction): Payload = {
+  def extractPayload(underlying: RawTransaction): Payload = {
     val hexData          = EthEncoding.cleanHexPrefix(underlying.getData)
     val recipientAddress = ByteStr(EthEncoding.toBytes(underlying.getTo))
     if (hexData.isEmpty) {
       Transfer(
-        Left(Asset.Waves),
+        None,
         underlying.getValue.divide(BigInt(AmountMultiplier).bigInteger).longValueExact(),
         Address(recipientAddress.arr)
       )
@@ -150,7 +130,7 @@ object EthereumTransaction {
       val recipient = decode[EthAddress](hexData, 8)
       val amount    = decode[Uint256](hexData, 72)
       Transfer(
-        Right(ERC20Address(recipientAddress)),
+        Some(ERC20Address(recipientAddress)),
         amount.getValue.longValueExact(),
         Address(EthEncoding.toBytes(recipient.toString))
       )

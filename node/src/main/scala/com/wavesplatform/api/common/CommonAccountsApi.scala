@@ -2,7 +2,6 @@ package com.wavesplatform.api.common
 
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
-import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
@@ -163,7 +162,7 @@ object CommonAccountsApi extends ScorexLogging {
               result.invokes.flatMap(i => extractLeases(i.dApp, i.stateChanges))
             }
 
-          extractLeases(blockchain.resolveAlias(inv.dApp).explicitGet(), scriptResult)
+          extractLeases(blockchain.resolveAlias(inv.transaction.dApp).explicitGet(), scriptResult)
         case _ => Seq()
       }
 

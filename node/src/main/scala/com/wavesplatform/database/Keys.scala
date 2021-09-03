@@ -5,17 +5,23 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.protobuf.TransactionMeta
+import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, TransactionMeta}
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{ERC20Address, Transaction}
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils._
 
 object Keys {
   import KeyHelpers._
-  import KeyTags.{AddressId => AddressIdTag, InvokeScriptResult => InvokeScriptResultTag, LeaseDetails => LeaseDetailsTag, _}
+  import KeyTags.{
+    AddressId => AddressIdTag,
+    EthereumTransactionMeta => EthereumTransactionMetaTag,
+    InvokeScriptResult => InvokeScriptResultTag,
+    LeaseDetails => LeaseDetailsTag,
+    _
+  }
 
   val version: Key[Int]               = intKey(Version, default = 1)
   val height: Key[Int]                = intKey(Height)
@@ -180,6 +186,6 @@ object Keys {
   def stateHash(height: Int): Key[Option[StateHash]] =
     Key.opt(StateHash, h(height), readStateHash, writeStateHash)
 
-  def erc20toWavesAssetId(erc20Address: ERC20Address): Key[Option[IssuedAsset]] =
-    Key.opt(ERC20ToWavesAssetId, erc20Address.arr, prefix => IssuedAsset(ByteStr(prefix ++ erc20Address.arr)), _.id.arr.take(12))
+  def ethereumTransactionMeta(height: Height, txNum: TxNum): Key[Option[EthereumTransactionMeta]] =
+    Key.opt(EthereumTransactionMetaTag, hNum(height, txNum), EthereumTransactionMeta.parseFrom, _.toByteArray)
 }

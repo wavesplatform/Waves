@@ -4,7 +4,6 @@ import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
-
 import cats.data.Ior
 import cats.syntax.option._
 import cats.syntax.semigroup._
@@ -19,7 +18,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
-import com.wavesplatform.database.protobuf.TransactionMeta
+import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, TransactionMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, WavesSettings}
@@ -379,7 +378,8 @@ abstract class LevelDBWriter private[database] (
       hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
-      stateHash: StateHashBuilder.Result
+      stateHash: StateHashBuilder.Result,
+      ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta]
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
     readWrite { rw =>
@@ -568,6 +568,10 @@ abstract class LevelDBWriter private[database] (
           }
       }
 
+      for ((id, meta) <- ethereumTransactionMeta) {
+        rw.put(Keys.ethereumTransactionMeta(Height(height), transactions(TransactionId(id))._2), Some(meta))
+      }
+
       expiredKeys.foreach(rw.delete(_, "expired-keys"))
 
       if (DisableHijackedAliases.height == height) {
@@ -712,13 +716,14 @@ abstract class LevelDBWriter private[database] (
               case _: DataTransaction => // see changed data keys removal
 
               case _: InvokeScriptTransaction =>
-                val k = Keys.invokeScriptResult(h, num)
-                rw.delete(k)
+                rw.delete(Keys.invokeScriptResult(h, num))
 
               case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
               case tx: ExchangeTransaction =>
                 ordersToInvalidate += rollbackOrderFill(rw, tx.buyOrder.id(), currentHeight)
                 ordersToInvalidate += rollbackOrderFill(rw, tx.sellOrder.id(), currentHeight)
+              case _: EthereumTransaction =>
+                rw.delete(Keys.ethereumTransactionMeta(h, num))
             }
 
             if (tx.tpe != TransactionType.Genesis) {
