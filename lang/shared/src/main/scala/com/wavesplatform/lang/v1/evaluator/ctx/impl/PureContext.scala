@@ -468,6 +468,14 @@ object PureContext {
         Right(FALSE)
     }
 
+  lazy val _getType: BaseFunction[NoContext] =
+    NativeFunction("_getType", 1, GET_TYPE, BOOLEAN, ("obj", TYPEPARAM('T'))) {
+      case (value: EVALUATED) :: Nil =>
+        CONST_STRING(value.getType.name)
+      case xs =>
+        notImplemented[Id, EVALUATED]("_getType(obj: T)", xs)
+    }
+
   lazy val sizeBytes: BaseFunction[NoContext] = NativeFunction("size", 1, SIZE_BYTES, LONG, ("byteVector", BYTESTR)) {
     case CONST_BYTESTR(bv) :: Nil => Right(CONST_LONG(bv.arr.length))
     case xs                       => notImplemented[Id, EVALUATED]("size(byteVector: ByteVector)", xs)
@@ -1729,7 +1737,7 @@ object PureContext {
       )
 
   private val v6Functions =
-    v5Functions ++ Array(sizeTuple)
+    v5Functions ++ Array(sizeTuple, _getType)
 
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =
     CTX[NoContext](
