@@ -19,7 +19,7 @@ object JsAPI {
   private def asJs(repl: Repl): js.Dynamic =
     jObj(
       "evaluate"    -> (repl.execute _ andThen mapResult),
-      "info"        -> repl.info` _,
+      "info"        -> repl.info _,
       "totalInfo"   -> (() => repl.totalInfo),
       "clear"       -> repl.clear _,
       "reconfigure" -> (repl.reconfigure _ andThen asJs)
