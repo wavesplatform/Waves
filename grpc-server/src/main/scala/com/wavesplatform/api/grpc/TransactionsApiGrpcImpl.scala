@@ -3,8 +3,7 @@ package com.wavesplatform.api.grpc
 import scala.concurrent.Future
 
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
+import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
@@ -15,7 +14,8 @@ import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
 import monix.reactive.Observable
 
-class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransactionsApi)(implicit sc: Scheduler) extends TransactionsApiGrpc.TransactionsApi {
+class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransactionsApi)(implicit sc: Scheduler)
+    extends TransactionsApiGrpc.TransactionsApi {
 
   override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit =
     responseObserver.interceptErrors {
@@ -84,7 +84,7 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
       val result = Observable(request.transactionIds: _*)
         .flatMap(txId => Observable.fromIterable(commonApi.transactionById(txId.toByteStr)))
         .collect {
-          case CommonTransactionsApi.TransactionMeta.Invoke(_, transaction, _, invokeScriptResult) =>
+          case TransactionMeta.Invoke(_, transaction, _, invokeScriptResult) =>
             InvokeScriptResultResponse.of(Some(PBTransactions.protobuf(transaction)), invokeScriptResult.map(VISR.toPB))
         }
 

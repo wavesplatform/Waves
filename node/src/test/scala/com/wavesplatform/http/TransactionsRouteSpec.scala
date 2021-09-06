@@ -1,9 +1,11 @@
 package com.wavesplatform.http
 
+import scala.util.Random
+
 import akka.http.scaladsl.model._
+import com.wavesplatform.{BlockchainStubHelpers, BlockGen, TestValues, TestWallet}
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
+import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.TransactionsApiRoute
@@ -18,26 +20,24 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNC
 import com.wavesplatform.lang.v1.traits.domain.LeaseCancel
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
-import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
+import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.test.TestTime
+import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
-import com.wavesplatform.{BlockGen, BlockchainStubHelpers, TestValues, TestWallet}
 import monix.reactive.Observable
-import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
-import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
-
-import scala.util.Random
+import play.api.libs.json.Json.JsValueWrapper
 
 class TransactionsRouteSpec
     extends RouteSpec("/transactions")
@@ -1020,7 +1020,7 @@ class TransactionsRouteSpec
       val funcName          = "func"
       val funcWithoutArgs   = Json.obj("function" -> funcName)
       val funcWithEmptyArgs = Json.obj("function" -> funcName, "args" -> JsArray.empty)
-      val funcWithArgs = InvokeScriptTransaction.serializer.functionCallToJson(
+      val funcWithArgs = InvokeScriptTxSerializer.functionCallToJson(
         FUNCTION_CALL(
           FunctionHeader.User(funcName),
           List(CONST_LONG(1), CONST_BOOLEAN(true))

@@ -17,19 +17,7 @@ import com.wavesplatform.events.protobuf.TransactionMetadata.{EthereumMetadata, 
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
-import com.wavesplatform.state.{
-  AccountDataInfo,
-  AssetDescription,
-  AssetScriptInfo,
-  Blockchain,
-  DataEntry,
-  Diff,
-  DiffToStateApplier,
-  EmptyDataEntry,
-  Height,
-  InvokeScriptResult,
-  LeaseBalance
-}
+import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetScriptInfo, Blockchain, DataEntry, Diff, DiffToStateApplier, EmptyDataEntry, Height, InvokeScriptResult, LeaseBalance}
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
@@ -457,8 +445,7 @@ object StateUpdate {
 
               case inv @ EthereumTransaction.Invocation(dApp, _) =>
                 for {
-                  script <- blockchain.accountScript(dApp)
-                  invoke = inv.toInvokeScriptLike(et, script.script)
+                  invoke <- inv.toInvokeScriptLike(et, blockchain).toOption
                 } yield EthereumMetadata(et.senderAddress().toByteString, EthereumMetadata.Action.Invoke(invokeScriptLikeToMetadata(invoke)))
             }
             metadataOpt
