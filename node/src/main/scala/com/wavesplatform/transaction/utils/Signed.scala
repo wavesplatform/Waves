@@ -1,10 +1,10 @@
-package com.wavesplatform.test
+package com.wavesplatform.transaction.utils
 
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Asset, Proofs, TxAmount, TxTimestamp}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 
 object Signed {
   def invokeScript(

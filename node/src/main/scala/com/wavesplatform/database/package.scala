@@ -4,38 +4,38 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util.{Map => JMap}
 
+import scala.collection.mutable
+
 import com.google.common.base.Charsets.UTF_8
-import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
+import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
+import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.protobuf.TransactionData.{Transaction => TD}
-import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
-import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state._
+import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction.{EthereumTransaction, GenesisTransaction, PaymentTransaction, PBSince, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils._
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb._
 import supertagged.TaggedType
-
-import scala.collection.mutable
 
 //noinspection UnstableApiUsage
 package object database extends ScorexLogging {
@@ -247,12 +247,6 @@ package object database extends ScorexLogging {
     (Ints.fromByteArray(data), TransactionParsers.parseBytes(data.drop(4)).get)
 
   def readTransactionHeight(data: Array[Byte]): Int = Ints.fromByteArray(data)
-
-  def writeTransactionInfo(txInfo: (Int, Transaction)): Array[Byte] = {
-    val (h, tx) = txInfo
-    val txBytes = tx.bytes()
-    ByteBuffer.allocate(4 + txBytes.length).putInt(h).put(txBytes).array()
-  }
 
   def readTransactionIds(data: Array[Byte]): Seq[(Int, ByteStr)] = Option(data).fold(Seq.empty[(Int, ByteStr)]) { d =>
     val b   = ByteBuffer.wrap(d)

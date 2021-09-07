@@ -1,26 +1,26 @@
 package com.wavesplatform.api.common
 
+import scala.concurrent.Future
+
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.{BlockMeta, common}
+import com.wavesplatform.api.{common, BlockMeta}
 import com.wavesplatform.block
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.state.{Blockchain, Diff, Height}
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.state.{Blockchain, Diff, Height}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
-
-import scala.concurrent.Future
 
 trait CommonTransactionsApi {
 

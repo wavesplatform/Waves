@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs.ci
 
+import scala.util.Random
+
 import cats.instances.list._
 import cats.syntax.traverse._
 import com.wavesplatform.account.{Address, Alias}
@@ -14,17 +16,16 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
+import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test._
+import com.wavesplatform.transaction.{Authorized, GenesisTransaction, Transaction}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{Authorized, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.utils.Signed
 import org.scalacheck.Gen
 import org.scalatest.exceptions.TestFailedException
-
-import scala.util.Random
 
 class LeaseActionDiffTest extends PropSpec with WithDomain {
   private val time = new TestTime

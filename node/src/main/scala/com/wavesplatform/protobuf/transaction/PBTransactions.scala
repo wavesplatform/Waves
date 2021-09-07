@@ -1,6 +1,9 @@
 package com.wavesplatform.protobuf.transaction
 
+import scala.util.Try
+
 import com.google.protobuf.ByteString
+import com.wavesplatform.{transaction => vt}
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -13,6 +16,7 @@ import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.transaction.{EthereumTransaction, Proofs, TxValidationError}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
@@ -20,12 +24,8 @@ import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{EthereumTransaction, Proofs, TxValidationError}
 import com.wavesplatform.utils.StringBytes
-import com.wavesplatform.{transaction => vt}
 import scalapb.UnknownFieldSet.empty
-
-import scala.util.Try
 
 object PBTransactions {
 
@@ -666,8 +666,12 @@ object PBTransactions {
     case None     => ByteString.EMPTY
   }
 
-  def toByteArray(tx: VanillaTransaction): Array[Byte] = tx match {
+  // Stores Ethereum txs as-is
+  def toByteArrayMerkle(tx: VanillaTransaction): Array[Byte] = tx match {
     case et: EthereumTransaction => et.bytes()
-    case vt                      => PBTransactionSerializer.bytes(vt)
+    case vt                      => toByteArray(vt)
   }
+
+  def toByteArray(tx: VanillaTransaction): Array[Byte] =
+    PBTransactionSerializer.bytes(tx)
 }

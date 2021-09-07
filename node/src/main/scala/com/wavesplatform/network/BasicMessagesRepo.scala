@@ -3,22 +3,22 @@ package com.wavesplatform.network
 import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
+import scala.util.Try
+
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.block.serialization.MicroBlockSerializer
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.serialization.MicroBlockSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.mining.MiningConstraints
-import com.wavesplatform.network.message.Message._
 import com.wavesplatform.network.message._
+import com.wavesplatform.network.message.Message._
 import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks, PBMicroBlocks, SignedMicroBlock}
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
-import com.wavesplatform.transaction.{DataTransaction, Transaction, TransactionParsers}
-
-import scala.util.Try
+import com.wavesplatform.transaction.{DataTransaction, EthereumTransaction, Transaction, TransactionParsers}
 
 object GetPeersSpec extends MessageSpec[GetPeers.type] {
   override val messageCode: Message.MessageCode = 1: Byte
@@ -210,7 +210,8 @@ object TransactionSpec extends MessageSpec[Transaction] {
   override def deserializeData(bytes: Array[Byte]): Try[Transaction] =
     TransactionParsers.parseBytes(bytes)
 
-  override def serializeData(tx: Transaction): Array[Byte] = tx.bytes()
+  override def serializeData(tx: Transaction): Array[Byte] =
+    tx.bytes().ensuring(!tx.isInstanceOf[EthereumTransaction])
 }
 
 object MicroBlockInvSpec extends MessageSpec[MicroBlockInv] {

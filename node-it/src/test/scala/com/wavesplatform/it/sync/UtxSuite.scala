@@ -1,21 +1,20 @@
 package com.wavesplatform.it.sync
 
+import scala.util.{Random, Try}
+
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.it.{BaseFunSuite, Node}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
-import com.wavesplatform.it.{BaseFunSuite, Node}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
-import com.wavesplatform.test._
+import com.wavesplatform.transaction.{utils, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
-
-import scala.util.{Random, Try}
 
 class UtxSuite extends BaseFunSuite {
   private var whitelistedAccount: KeyPair     = _
@@ -156,7 +155,7 @@ class UtxSuite extends BaseFunSuite {
           .explicitGet()
       }
       val byDApp = Seq.fill(5)(
-        Signed.invokeScript(TxVersion.V1, invokeAccount, whitelistedDAppAccount.toAddress, None, Seq.empty, minInvokeFee, Waves, time)
+        utils.Signed.invokeScript(TxVersion.V1, invokeAccount, whitelistedDAppAccount.toAddress, None, Seq.empty, minInvokeFee, Waves, time)
       )
       Random.shuffle(bySender ++ byDApp)
     }

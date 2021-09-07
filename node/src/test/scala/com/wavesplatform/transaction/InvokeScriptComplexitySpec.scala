@@ -15,6 +15,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.utx.UtxPoolImpl
 import monix.reactive.Observer
 

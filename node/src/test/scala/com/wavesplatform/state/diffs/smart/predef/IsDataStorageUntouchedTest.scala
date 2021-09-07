@@ -5,13 +5,14 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.{BooleanDataEntry, EmptyDataEntry}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.state.{BooleanDataEntry, EmptyDataEntry}
 import com.wavesplatform.test._
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.utils.Signed
 
 class IsDataStorageUntouchedTest extends PropSpec with WithDomain {
 

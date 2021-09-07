@@ -32,7 +32,7 @@ object MetamaskBootstrap extends App {
 
   val ethAddressString = args(0)
   val ethAddress       = Address(EthEncoding.toBytes(ethAddressString))
-  val wallet           = Wallet(WalletSettings(None, Some("123"), ByteStr.decodeBase58("a3cM").toOption))
+  val wallet           = Wallet(WalletSettings(None, Some("123"), ByteStr.decodeBase58("bQbp").toOption))
   val firstKP          = wallet.generateNewAccount().get
 
   val transferWavesToEthAddress = TransferTransaction
@@ -102,9 +102,10 @@ object MetamaskBootstrap extends App {
     .explicitGet()
   val setDAppScript = SetScriptTransaction.selfSigned(1.toByte, dAppAccount, Some(script), 500000L, System.currentTimeMillis()).explicitGet()
 
-  println(s"""Primary account: $ethAddress / $ethAddressString
+  println(s"""Rich account: ${firstKP.toAddress} / ${EthEncoding.toHexString(firstKP.toAddress.publicKeyHash)} (seed = ${ByteStr(firstKP.seed)})
+       |Primary account: $ethAddress / $ethAddressString
        |Asset ID: ${assetId.id} / ${EthEncoding.toHexString(assetId.id.arr.dropRight(12))}
-       |DApp: ${dAppAccount.toAddress} / ${EthEncoding.toHexString(dAppAccount.toAddress.publicKeyHash)}""".stripMargin)
+       |DApp: ${dAppAccount.toAddress} / ${EthEncoding.toHexString(dAppAccount.toAddress.publicKeyHash)} (seed = ${ByteStr(dAppAccount.seed)})""".stripMargin)
 
   println(Json.prettyPrint(ABIConverter(script).jsonABI))
   println(ABIConverter(script).funcByMethodId)
@@ -132,8 +133,8 @@ object MetamaskBootstrap extends App {
   }
 
   println("Funding primary acc: " + broadcast(transferWavesToEthAddress))
-  // if (assetId == issue.asset) println(broadcast(issue))
-  // println(broadcast(transferAsset))
+  if (assetId == issue.asset) println(broadcast(issue))
+  println(broadcast(transferAsset))
 
   println("Funding DAPP: " + broadcast(fundDApp))
   println("Setting DAPP script: " + broadcast(setDAppScript))

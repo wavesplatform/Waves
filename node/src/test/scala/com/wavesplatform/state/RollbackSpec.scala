@@ -28,6 +28,7 @@ import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransactio
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.utils.StringBytes
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalacheck.Gen.alphaLowerChar

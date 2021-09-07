@@ -1,33 +1,34 @@
 package com.wavesplatform.generator
 
+import java.io.File
 import java.net.InetSocketAddress
 import java.util.concurrent.Executors
+
+import scala.concurrent._
+import scala.concurrent.duration._
+import scala.util.{Failure, Random, Success}
 
 import cats.implicits.showInterpolator
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.generator.GeneratorSettings.NodeAddress
 import com.wavesplatform.generator.Preconditions.{PGenSettings, UniverseHolder}
 import com.wavesplatform.generator.cli.ScoptImplicits
 import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.generator.utils.Universe
 import com.wavesplatform.network.client.NetworkSender
-import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.utils.{LoggerFacade, NTP}
+import com.wavesplatform.Application
 import monix.execution.Scheduler
 import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper, ValueReader}
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import org.asynchttpclient.AsyncHttpClient
 import org.asynchttpclient.Dsl.asyncHttpClient
 import org.slf4j.LoggerFactory
 import scopt.OptionParser
-
-import scala.concurrent._
-import scala.concurrent.duration._
-import scala.util.{Failure, Random, Success}
 
 object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplicits with EnumerationReader {
 
@@ -142,12 +143,12 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       )
   }
 
-  val defaultConfig =
-    ConfigFactory
-      .load()
-      .as[GeneratorSettings]("generator")
+  val externalConf = new File("generator.local.conf")
+  val wavesSettings = Application.loadApplicationConfig(if (externalConf.isFile) Some(externalConf) else None)
 
-  val wavesSettings = WavesSettings.default()
+  val defaultConfig =
+    wavesSettings.config
+      .as[GeneratorSettings]("waves.generator")
 
   parser.parse(args, defaultConfig) match {
     case None => parser.failure("Failed to parse command line parameters")
@@ -181,6 +182,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         case Mode.MULTISIG => new MultisigTransactionGenerator(finalConfig.multisig, finalConfig.privateKeyAccounts, estimator)
         case Mode.ORACLE   => new OracleTransactionGenerator(finalConfig.oracle, finalConfig.privateKeyAccounts, estimator)
         case Mode.SWARM    => new SmartGenerator(finalConfig.swarm, finalConfig.privateKeyAccounts, estimator)
+        case _ => ???
       }
 
       val threadPool                            = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))

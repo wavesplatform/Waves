@@ -11,6 +11,7 @@ import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.utils.Signed
 import org.scalatest.EitherValues
 
 class GenericRideActivationTest extends PropSpec with WithDomain with EitherValues {

@@ -12,10 +12,11 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test._
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, Transaction, TransactionType, TxWithFee}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, Transaction, TransactionType, TxWithFee}
+import com.wavesplatform.transaction.utils.Signed
 
 class SmartAccountFeeTest extends PropSpec with WithDomain {
 

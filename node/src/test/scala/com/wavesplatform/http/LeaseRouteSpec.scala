@@ -1,7 +1,10 @@
 package com.wavesplatform.http
 
+import scala.concurrent.Future
+
 import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity}
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.{NTPTime, TestWallet, TransactionGen}
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
 import com.wavesplatform.api.http.ApiMarshallers._
@@ -16,21 +19,19 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Diff}
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.test._
+import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.utils.SystemTime
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{NTPTime, TestWallet, TransactionGen}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.{JsArray, JsObject, Json}
-
-import scala.concurrent.Future
 
 class LeaseRouteSpec
     extends RouteSpec("/leasing")

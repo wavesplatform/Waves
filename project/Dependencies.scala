@@ -1,6 +1,6 @@
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
-import sbt.Keys._
 import sbt._
+import sbt.Keys._
 
 //noinspection TypeAnnotation
 object Dependencies {
@@ -132,7 +132,7 @@ object Dependencies {
   private def leveldbJava(module: String = "") = "org.iq80.leveldb" % s"leveldb${if (module.nonEmpty) "-" else ""}$module" % "0.12"
 
   private[this] val levelDBJNA = {
-    val levelDbVersion = "1.23.0"
+    val levelDbVersion = "1.22.3"
     Seq(
       "com.wavesplatform.leveldb-jna" % "leveldb-jna-core"   % levelDbVersion,
       "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion,

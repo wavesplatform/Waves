@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs.ci
 
+import scala.util.Try
+
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures
@@ -7,19 +9,18 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test._
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.utils.Signed
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
-
-import scala.util.Try
 
 class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettings with MockFactory with WithDomain with EitherValues {
 

@@ -19,6 +19,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.utils.Signed
 
 object TxHelpers {
   def signer(i: Int): KeyPair  = KeyPair(Ints.toByteArray(i))

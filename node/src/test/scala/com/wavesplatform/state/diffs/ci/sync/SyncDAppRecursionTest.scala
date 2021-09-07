@@ -12,11 +12,12 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart._
-import com.wavesplatform.state.diffs.ci.ciFee
+import com.wavesplatform.transaction.utils.Signed
 
 class SyncDAppRecursionTest extends PropSpec with WithDomain {
 

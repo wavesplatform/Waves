@@ -10,10 +10,11 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test._
+import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.utils.Signed
 import org.scalacheck.Gen
 
 class ScriptTransferByAliasTest extends PropSpec with WithDomain {

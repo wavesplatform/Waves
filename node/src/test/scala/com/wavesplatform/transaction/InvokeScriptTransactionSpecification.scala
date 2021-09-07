@@ -18,6 +18,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.NonPositiveAmount
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.utils.Signed
 import play.api.libs.json.{JsObject, Json}
 
 class InvokeScriptTransactionSpecification extends PropSpec {

@@ -19,6 +19,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.utils.Signed
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
 
