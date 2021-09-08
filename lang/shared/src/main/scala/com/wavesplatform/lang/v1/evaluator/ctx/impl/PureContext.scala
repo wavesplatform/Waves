@@ -1521,6 +1521,18 @@ object PureContext {
       .zipWithIndex
       .map { case ((limit, complexity), index) => (limit, fold(index, limit, complexity)) }
 
+  val sizeTuple: BaseFunction[NoContext] = {
+    val genericTupleType =
+      (MinTupleSize to MaxTupleSize)
+        .map(('A' to 'Z').take)
+        .map(t => PARAMETERIZEDTUPLE(t.map(b => TYPEPARAM(b.toByte)).toList))
+        .toList
+    NativeFunction("size", 1, SIZE_TUPLE, LONG, ("tuple", PARAMETERIZEDUNION(genericTupleType))) {
+      case CaseObj(`runtimeTupleType`, fields) :: Nil => Right(CONST_LONG(fields.size))
+      case xs                                         => notImplemented[Id, EVALUATED](s"size(t: Tuple)", xs)
+    }
+  }
+
   val unitVarName = "unit"
 
   private val nil: (String, (LIST, ContextfulVal[NoContext])) =
@@ -1757,7 +1769,7 @@ object PureContext {
       )
 
   private val v6Functions =
-    v5Functions ++ folds.map(_._2)
+    v5Functions ++ folds.map(_._2) ++ Array(sizeTuple)
 
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =
     CTX[NoContext](

@@ -85,6 +85,7 @@ object FunctionIds {
   val MAKESTRING: Short   = 1209
 
   val CREATE_TUPLE: Short = 1300 // Reserved 22 id for tuple constructors
+  val SIZE_TUPLE: Short   = 1350
 
   // Crypto
   val SIGVERIFY: Short = 500
