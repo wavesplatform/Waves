@@ -30,7 +30,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   )
 
   private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("waves.blockchain-updates")
-  private[this] val repo     = new Repo(context.settings.dbSettings.directory + "/blockchain-updates", context.blocksApi)
+  private[this] val repo     = new Repo(context.settings.directory + "/blockchain-updates", context.blocksApi)
 
   private[this] val grpcServer: Server = NettyServerBuilder
     .forAddress(new InetSocketAddress("0.0.0.0", settings.grpcPort))
