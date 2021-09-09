@@ -6,6 +6,8 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.contract
+import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
@@ -60,7 +62,7 @@ class BigIntInvokeTest
     def dApp(action: EXPR => FUNCTION_CALL): Script = {
       ContractScriptImpl(
         V5,
-        DApp(
+        contract.DApp(
           DAppMeta(),
           Nil,
           List(

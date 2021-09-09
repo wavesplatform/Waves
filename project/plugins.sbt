@@ -17,7 +17,7 @@ Seq(
   "org.scala-js"       % "sbt-scalajs"              % "1.5.1",
   "org.portable-scala" % "sbt-scalajs-crossproject" % "1.0.0",
   "org.scalameta"      % "sbt-scalafmt"             % "2.2.1",
-  "pl.project13.scala" % "sbt-jmh"                  % "0.3.7",
+  "pl.project13.scala" % "sbt-jmh"                  % "0.4.3",
   "com.jsuereth"       % "sbt-pgp"                  % "1.1.1"
 ).map(addSbtPlugin)
 

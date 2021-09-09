@@ -90,6 +90,7 @@ object Common {
     override def txId: ByteStr                                                                                   = ???
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
     override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
+    override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]                               = ???
     def accountScript(addressOrAlias: Recipient): Option[Script]                                                 = ???
     override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], remainingComplexity: Int, reentrant: Boolean): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
     }

@@ -6,6 +6,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Global
@@ -38,7 +39,7 @@ import com.wavesplatform.utils._
 import org.scalacheck.Gen
 import shapeless.Coproduct
 
-class ContextFunctionsTest extends PropSpec with WithDomain {
+class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
   import DomainPresets._
 
   def compactDataTransactionGen(sender: KeyPair): Gen[DataTransaction] =
@@ -512,15 +513,15 @@ class ContextFunctionsTest extends PropSpec with WithDomain {
           val fc = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)
 
           val ci = Signed.invokeScript(
-              1.toByte,
-              masterAcc,
-              masterAcc.toAddress,
-              Some(fc),
-              Seq.empty,
-              FeeValidation.FeeUnit * (FeeValidation.FeeConstants(TransactionType.InvokeScript) + FeeValidation.ScriptExtraFee),
-              Waves,
-              System.currentTimeMillis()
-            )
+            1.toByte,
+            masterAcc,
+            masterAcc.toAddress,
+            Some(fc),
+            Seq.empty,
+            FeeValidation.FeeUnit * (FeeValidation.FeeConstants(TransactionType.InvokeScript) + FeeValidation.ScriptExtraFee),
+            Waves,
+            System.currentTimeMillis()
+          )
 
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(ci)).explicitGet()
@@ -777,6 +778,32 @@ class ContextFunctionsTest extends PropSpec with WithDomain {
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(ci)).explicitGet()
         }
+    }
+  }
+
+  property("addressFromPublicKey native") {
+    val (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) = preconditionsAndPayments.sample.get
+    val fs                                                                                    = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (BlockchainFeatures.RideV6.id -> 0))
+
+    assertDiffAndState(fs) { append =>
+      append(genesis).explicitGet()
+      append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+      append(Seq(transferTx)).explicitGet()
+
+      val script = TestCompiler(V6)
+        .compileExpression(
+          s"""
+             | addressFromPublicKey(base58'${transferTx.sender}') == Address(base58'${transferTx.sender.toAddress}') &&
+             | addressFromPublicKey(base58'$TestEthPublicKey') == Address(base58'${TestEthPublicKey.toAddress}')
+           """.stripMargin
+        )
+
+      val setScriptTx = SetScriptTransaction
+        .selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5)
+        .explicitGet()
+
+      append(Seq(setScriptTx)).explicitGet()
+      append(Seq(transfer2)).explicitGet()
     }
   }
 }

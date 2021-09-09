@@ -78,9 +78,12 @@ object Functions {
   val getStringFromStateF: BaseFunction[Environment]  = getDataFromStateF("getString", DATA_STRING_FROM_STATE, DataType.String, selfCall = false)
 
   val getIntegerFromStateSelfF: BaseFunction[Environment] = getDataFromStateF("getInteger", DATA_LONG_FROM_STATE_SELF, DataType.Long, selfCall = true)
-  val getBooleanFromStateSelfF: BaseFunction[Environment] = getDataFromStateF("getBoolean", DATA_BOOLEAN_FROM_STATE_SELF, DataType.Boolean, selfCall = true)
-  val getBinaryFromStateSelfF: BaseFunction[Environment]  = getDataFromStateF("getBinary", DATA_BYTES_FROM_STATE_SELF, DataType.ByteArray, selfCall = true)
-  val getStringFromStateSelfF: BaseFunction[Environment]  = getDataFromStateF("getString", DATA_STRING_FROM_STATE_SELF, DataType.String, selfCall = true)
+  val getBooleanFromStateSelfF: BaseFunction[Environment] =
+    getDataFromStateF("getBoolean", DATA_BOOLEAN_FROM_STATE_SELF, DataType.Boolean, selfCall = true)
+  val getBinaryFromStateSelfF: BaseFunction[Environment] =
+    getDataFromStateF("getBinary", DATA_BYTES_FROM_STATE_SELF, DataType.ByteArray, selfCall = true)
+  val getStringFromStateSelfF: BaseFunction[Environment] =
+    getDataFromStateF("getString", DATA_STRING_FROM_STATE_SELF, DataType.String, selfCall = true)
 
   val isDataStorageUntouchedF: BaseFunction[Environment] = {
     val name       = "isDataStorageUntouched"
@@ -225,6 +228,28 @@ object Functions {
           )
       }
     )
+
+  val addressFromPublicKeyNative: BaseFunction[Environment] =
+    NativeFunction.withEnvironment[Environment](
+      "addressFromPublicKey",
+      Map[StdLibVersion, Long](V6 -> 1L),
+      ADDRESSFROMPUBLICKEY_NATIVE,
+      addressType,
+      ("publicKey", BYTESTR)
+    ) {
+      new ContextfulNativeFunction[Environment]("addressFromPublicKey", addressType, Seq(("AddressOrAlias", addressOrAliasType))) {
+        override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] = {
+          input match {
+            case (env, CONST_BYTESTR(publicKey) :: Nil) =>
+              env
+                .addressFromPublicKey(publicKey)
+                .map(address => CaseObj(addressType, Map("bytes" -> CONST_BYTESTR(address.bytes).explicitGet())): EVALUATED)
+                .pure[F]
+            case (_, xs) => notImplemented[F, EVALUATED](s"addressFromPublicKey(publicKey: ByteVector)", xs)
+          }
+        }
+      }
+    }
 
   private def removePrefixExpr(str: EXPR, prefix: String): EXPR = IF(
     FUNCTION_CALL(
@@ -449,7 +474,7 @@ object Functions {
                           "generating" -> CONST_LONG(b.generating),
                           "effective"  -> CONST_LONG(b.effective)
                         )
-                      )
+                    )
                   )
                 )
 
@@ -529,7 +554,7 @@ object Functions {
     }
 
   def callDAppF(reentrant: Boolean): BaseFunction[Environment] = {
-    val (id, name) =  if (reentrant) (CALLDAPPREENTRANT, "reentrantInvoke") else (CALLDAPP, "invoke")
+    val (id, name) = if (reentrant) (CALLDAPPREENTRANT, "reentrantInvoke") else (CALLDAPP, "invoke")
     NativeFunction.withEnvironment[Environment](
       name,
       Map[StdLibVersion, Long](V5 -> 75L),
@@ -588,7 +613,7 @@ object Functions {
                   availableComplexity,
                   reentrant
                 )
-                .map(_.map { case (result, complexity) => (result.leftMap(_.toString), complexity)})
+                .map(_.map { case (result, complexity) => (result.leftMap(_.toString), complexity) })
             case xs =>
               val err = notImplemented[F, EVALUATED](s"invoke(dApp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
               Coeval.now(err.map((_, 0)))

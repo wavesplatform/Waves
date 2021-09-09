@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.smart
 import cats.kernel.Monoid
 import cats.syntax.either._
 import com.wavesplatform.account
-import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -32,6 +32,8 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, TransactionBase}
 import monix.eval.Coeval
 import shapeless._
+
+import scala.util.Try
 
 object WavesEnvironment {
   type In = TransactionBase :+: Order :+: PseudoTx :+: CNil
@@ -215,6 +217,14 @@ class WavesEnvironment(
       .bimap(
         _.toString,
         address => Address(ByteStr(address.bytes))
+      )
+
+  override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address] =
+    Try(PublicKey(publicKey))
+      .toEither
+      .bimap(
+        _.getMessage,
+        pk => Address(ByteStr(pk.toAddress.bytes))
       )
 
   override def accountScript(addressOrAlias: Recipient): Option[Script] = {
