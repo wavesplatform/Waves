@@ -16,9 +16,9 @@ import io.grpc.{Metadata, Server, ServerStreamTracer, Status}
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
 import net.ceedubs.ficus.Ficus._
-
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.util.Try
 
 class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging with BlockchainUpdateTriggers {
   private[this] implicit val scheduler: SchedulerService = Schedulers.fixedPool(
@@ -67,7 +67,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       repo.rollbackData(nodeHeight)
     }
 
-    val lastUpdateId = repo.getBlockUpdate(nodeHeight).update.map(bu => ByteStr(bu.id.toByteArray))
+    val lastUpdateId = Try(ByteStr(repo.getBlockUpdate(nodeHeight).getUpdate.id.toByteArray)).toOption
     val lastBlockId  = context.blockchain.blockHeader(nodeHeight).map(_.id())
 
     if (lastUpdateId != lastBlockId)
