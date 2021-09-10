@@ -12,8 +12,8 @@ import scala.util.Random
 class BigIntTest extends EvaluatorSpec {
   implicit val startVersion: StdLibVersion = V5
 
-  private val maxValue = s"""parseBigIntValue("${PureContext.BigIntMax}")"""
-  private val minValue = s"""parseBigIntValue("${PureContext.BigIntMin}")"""
+  private val max = s"""parseBigIntValue("${PureContext.BigIntMax}")"""
+  private val min = s"""parseBigIntValue("${PureContext.BigIntMin}")"""
 
   property("BigInt") {
     eval("toBigInt(fraction(9223372036854775807, -2, -4)) == (toBigInt(9223372036854775807) * toBigInt(-2)) / toBigInt(-4)") shouldBe Right(
@@ -53,8 +53,8 @@ class BigIntTest extends EvaluatorSpec {
         "52785833603464895924505196455835395749861094195642486808108138863402869537852026544579466671752822414281401856143643660416162921950916138504990605852480"
       ).explicitGet()
     )
-    eval(maxValue) shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
-    eval(minValue) shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
+    eval(max) shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
+    eval(min) shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
     eval(
       """parseBigIntValue("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")"""
     ) should produce("too big")
@@ -94,10 +94,10 @@ class BigIntTest extends EvaluatorSpec {
   }
 
   property("BigInt fraction returning limits") {
-    eval(s"""fraction($maxValue, $maxValue, $maxValue)""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
-    eval(s"""fraction($minValue, $minValue, $minValue)""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
-    eval(s"""fraction($maxValue, $maxValue, $maxValue, CEILING)""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
-    eval(s"""fraction($minValue, $minValue, $minValue, CEILING)""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
+    eval(s"""fraction($max, $max, $max)""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
+    eval(s"""fraction($min, $min, $min)""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
+    eval(s"""fraction($max, $max, $max, CEILING)""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
+    eval(s"""fraction($min, $min, $min, CEILING)""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
   }
 
   property("BigInt comparison") {
@@ -140,61 +140,61 @@ class BigIntTest extends EvaluatorSpec {
   }
 
   property("BigInt plus") {
-    eval(s"$minValue + toBigInt(1)") shouldBe Right(CONST_BIGINT((BigInt(-2) pow 511) + 1))
-    eval(s"$maxValue + toBigInt(1)") should produce("is out of range")
-    eval(s"$minValue + toBigInt(-1)") should produce("is out of range")
-    eval(s"$maxValue + toBigInt(-1)") shouldBe Right(CONST_BIGINT((BigInt(2) pow 511) - 2))
-    eval(s"$maxValue + toBigInt(0)") shouldBe eval(maxValue)
-    eval(s"$minValue + toBigInt(0)") shouldBe eval(minValue)
-    eval(s"toBigInt(0) + $maxValue") shouldBe eval(maxValue)
-    eval(s"toBigInt(0) + $minValue") shouldBe eval(minValue)
-    eval(s"$maxValue + $minValue") shouldBe Right(CONST_BIGINT(-1))
+    eval(s"$min + toBigInt(1)") shouldBe Right(CONST_BIGINT((BigInt(-2) pow 511) + 1))
+    eval(s"$max + toBigInt(1)") should produce("is out of range")
+    eval(s"$min + toBigInt(-1)") should produce("is out of range")
+    eval(s"$max + toBigInt(-1)") shouldBe Right(CONST_BIGINT((BigInt(2) pow 511) - 2))
+    eval(s"$max + toBigInt(0)") shouldBe eval(max)
+    eval(s"$min + toBigInt(0)") shouldBe eval(min)
+    eval(s"toBigInt(0) + $max") shouldBe eval(max)
+    eval(s"toBigInt(0) + $min") shouldBe eval(min)
+    eval(s"$max + $min") shouldBe Right(CONST_BIGINT(-1))
   }
 
   property("BigInt minus") {
-    eval(s"$minValue - toBigInt(1)") should produce("is out of range")
-    eval(s"$maxValue - toBigInt(1)") shouldBe Right(CONST_BIGINT((BigInt(2) pow 511) - 2))
-    eval(s"$minValue - toBigInt(-1)") shouldBe Right(CONST_BIGINT((BigInt(-2) pow 511) + 1))
-    eval(s"$maxValue - toBigInt(-1)") should produce("is out of range")
-    eval(s"$minValue - toBigInt(0)") shouldBe eval(minValue)
-    eval(s"$maxValue - toBigInt(0)") shouldBe eval(maxValue)
-    eval(s"$minValue - $minValue") shouldBe Right(CONST_BIGINT(0))
-    eval(s"$maxValue - $maxValue") shouldBe Right(CONST_BIGINT(0))
+    eval(s"$min - toBigInt(1)") should produce("is out of range")
+    eval(s"$max - toBigInt(1)") shouldBe Right(CONST_BIGINT((BigInt(2) pow 511) - 2))
+    eval(s"$min - toBigInt(-1)") shouldBe Right(CONST_BIGINT((BigInt(-2) pow 511) + 1))
+    eval(s"$max - toBigInt(-1)") should produce("is out of range")
+    eval(s"$min - toBigInt(0)") shouldBe eval(min)
+    eval(s"$max - toBigInt(0)") shouldBe eval(max)
+    eval(s"$min - $min") shouldBe Right(CONST_BIGINT(0))
+    eval(s"$max - $max") shouldBe Right(CONST_BIGINT(0))
   }
 
   property("BigInt multiplication") {
     val maxValueHalf = s"""parseBigIntValue("${BigInt(2) pow 510}")"""
     val minValueHalf = s"""parseBigIntValue("${-(BigInt(2) pow 510)}")"""
-    eval(s"($maxValueHalf - toBigInt(1)) * toBigInt(2) + toBigInt(1)") shouldBe eval(maxValue)
+    eval(s"($maxValueHalf - toBigInt(1)) * toBigInt(2) + toBigInt(1)") shouldBe eval(max)
     eval(s"$maxValueHalf * toBigInt(2)") should produce("is out of range")
-    eval(s"$maxValueHalf * toBigInt(-2)") shouldBe eval(minValue)
-    eval(s"$minValueHalf * toBigInt(2)") shouldBe eval(minValue)
+    eval(s"$maxValueHalf * toBigInt(-2)") shouldBe eval(min)
+    eval(s"$minValueHalf * toBigInt(2)") shouldBe eval(min)
     eval(s"$minValueHalf * toBigInt(-2)") should produce("is out of range")
-    eval(s"$maxValue * toBigInt(0)") shouldBe Right(CONST_BIGINT(0))
-    eval(s"$minValue * toBigInt(0)") shouldBe Right(CONST_BIGINT(0))
-    eval(s"toBigInt(1) * $maxValue") shouldBe eval(maxValue)
-    eval(s"toBigInt(1) * $minValue") shouldBe eval(minValue)
+    eval(s"$max * toBigInt(0)") shouldBe Right(CONST_BIGINT(0))
+    eval(s"$min * toBigInt(0)") shouldBe Right(CONST_BIGINT(0))
+    eval(s"toBigInt(1) * $max") shouldBe eval(max)
+    eval(s"toBigInt(1) * $min") shouldBe eval(min)
   }
 
   property("BigInt division") {
-    eval(s"$maxValue / toBigInt(2)") shouldBe Right(CONST_BIGINT((BigInt(2) pow 510) - 1))
-    eval(s"$minValue / toBigInt(2)") shouldBe Right(CONST_BIGINT(-(BigInt(2) pow 510)))
-    eval(s"$minValue / toBigInt(0)") should produce("BigInteger divide by zero")
-    eval(s"$maxValue / toBigInt(0)") should produce("BigInteger divide by zero")
-    eval(s"$maxValue / $maxValue") shouldBe Right(CONST_BIGINT(1))
-    eval(s"$maxValue / $minValue") shouldBe Right(CONST_BIGINT(0))
-    eval(s"$minValue / $maxValue") shouldBe Right(CONST_BIGINT(-1))
+    eval(s"$max / toBigInt(2)") shouldBe Right(CONST_BIGINT((BigInt(2) pow 510) - 1))
+    eval(s"$min / toBigInt(2)") shouldBe Right(CONST_BIGINT(-(BigInt(2) pow 510)))
+    eval(s"$min / toBigInt(0)") should produce("BigInteger divide by zero")
+    eval(s"$max / toBigInt(0)") should produce("BigInteger divide by zero")
+    eval(s"$max / $max") shouldBe Right(CONST_BIGINT(1))
+    eval(s"$max / $min") shouldBe Right(CONST_BIGINT(0))
+    eval(s"$min / $max") shouldBe Right(CONST_BIGINT(-1))
   }
 
   property("BigInt modulo") {
-    eval(s"$maxValue % $maxValue") shouldBe Right(CONST_BIGINT(0))
-    eval(s"$minValue % $minValue") shouldBe Right(CONST_BIGINT(0))
-    eval(s"$maxValue % $minValue") shouldBe eval(maxValue)
-    eval(s"$minValue % $maxValue") shouldBe Right(CONST_BIGINT(-1))
-    eval(s"$maxValue % ($maxValue - toBigInt(1))") shouldBe Right(CONST_BIGINT(1))
-    eval(s"$maxValue % toBigInt(2)") shouldBe Right(CONST_BIGINT(1))
-    eval(s"$maxValue % toBigInt(1)") shouldBe Right(CONST_BIGINT(0))
-    eval(s"$maxValue % toBigInt(0)") should produce("BigInteger divide by zero")
+    eval(s"$max % $max") shouldBe Right(CONST_BIGINT(0))
+    eval(s"$min % $min") shouldBe Right(CONST_BIGINT(0))
+    eval(s"$max % $min") shouldBe eval(max)
+    eval(s"$min % $max") shouldBe Right(CONST_BIGINT(-1))
+    eval(s"$max % ($max - toBigInt(1))") shouldBe Right(CONST_BIGINT(1))
+    eval(s"$max % toBigInt(2)") shouldBe Right(CONST_BIGINT(1))
+    eval(s"$max % toBigInt(1)") shouldBe Right(CONST_BIGINT(0))
+    eval(s"$max % toBigInt(0)") should produce("BigInteger divide by zero")
   }
 
   property("BigInt match") {
@@ -223,13 +223,13 @@ class BigIntTest extends EvaluatorSpec {
 
   property("List[BigInt] median - 1 elements") {
     eval(s"[toBigInt(0)].median()") shouldBe Right(CONST_BIGINT(BigInt(0)))
-    eval(s"""[$maxValue].median()""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
-    eval(s"""[$minValue].median()""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
+    eval(s"""[$max].median()""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
+    eval(s"""[$min].median()""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
   }
 
   property("List[BigInt] median - 1000 elements - success") {
-    eval(s"""[${(1 to 1000).map(_ => maxValue).mkString(",")}].median()""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
-    eval(s"""[${(1 to 1000).map(_ => minValue).mkString(",")}].median()""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
+    eval(s"""[${(1 to 1000).map(_ => max).mkString(",")}].median()""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMax))
+    eval(s"""[${(1 to 1000).map(_ => min).mkString(",")}].median()""") shouldBe Right(CONST_BIGINT(PureContext.BigIntMin))
   }
 
   property("List[BigInt] median - negative rounding down") {
@@ -238,5 +238,34 @@ class BigIntTest extends EvaluatorSpec {
 
   property("List[BigInt] median - empty list - error") {
     eval(s"[toBigInt(1)].removeByIndex(0).median()") should produce("Can't find median for empty list of BigInt")
+  }
+
+  property("on the limit") {
+    val one = "toBigInt(1)"
+    val d18 = """parseBigIntValue("987654321012345678")"""
+    val d19 = """parseBigIntValue("1987654321012345678")"""
+
+    val e1  = """parseBigIntValue("3259987654320123456789")"""
+    val e2  = """parseBigIntValue("515598765432101234567")"""
+    val e3  = s"""$max / (${List.fill(7)(s"""toBigInt(${Long.MaxValue})""").mkString(" * ")} / toBigInt(4))"""
+
+    val r = BigInt(
+      "6670795527762621906375444802568692078004471712158714717165576501880318489264376534028344582079701518666593922923767238664173166263805614917588045354008642")
+
+    eval(s"pow($max, 0, $max, 18, 18, DOWN)") shouldBe Left("Overflow on BigInt pow calculation")
+    eval(s"pow($max, 0, $max, 0, 0, DOWN)") shouldBe Left("Overflow on BigInt pow calculation")
+    eval(s"pow($min, 0, $max, 0, 0, DOWN)") shouldBe Left("Overflow on BigInt pow calculation")
+    eval(s"pow($max, 0, $min, 0, 18, DOWN)") shouldBe Left("Overflow on BigInt pow calculation")
+    eval(s"pow($one, 18, $min, 0, 18, DOWN)") shouldBe Left("Underflow on BigInt pow calculation")
+    eval(s"pow($d18, 18, $min, 0, 18, DOWN)") shouldBe Left("Underflow on BigInt pow calculation")
+    eval(s"pow($d18, 18, $max, 0, 18, DOWN)") shouldBe Left("Underflow on BigInt pow calculation")
+    eval(s"pow($d18, 18, $e3, 18, 18, DOWN)") shouldBe Right(CONST_BIGINT(BigInt(0)))
+    eval(s"pow($d18, 18, $e1, 18, 18, HALFUP)") shouldBe Right(CONST_BIGINT(BigInt(3)))
+    eval(s"pow($d19, 18, $e2, 18, 0, DOWN)") shouldBe Right(CONST_BIGINT(r))
+  }
+
+  property("sqrt") {
+    eval(s"pow($max, 0, toBigInt(5), 1, 18, DOWN)") shouldBe Right(CONST_BIGINT(BigInt("81877371507464127617551201542979628307507432471243237061821853600756754782485292915524036944801")))
+    eval(s"pow($max, 18, toBigInt(5), 1, 18, DOWN)") shouldBe Right(CONST_BIGINT(BigInt("81877371507464127617551201542979628307507432471243237061821853600756754782485292915524")))
   }
 }

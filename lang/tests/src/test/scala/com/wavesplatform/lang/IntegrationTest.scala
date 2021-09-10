@@ -908,35 +908,6 @@ class IntegrationTest extends PropSpec with Inside {
     eval[EVALUATED]("MD5 == if true then SHA1 else MD5", None) shouldBe Right(CONST_BOOLEAN(false))
   }
 
-  property("math functions") {
-    eval[EVALUATED]("pow(12, 1, 3456, 3, 2, DOWN)", None) shouldBe Right(CONST_LONG(187))
-    eval[EVALUATED]("pow(12, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(188))
-    eval[EVALUATED]("pow(0, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(0))
-    eval[EVALUATED]("pow(20, 1, -1, 0, 4, DOWN)", None) shouldBe Right(CONST_LONG(5000))
-    eval[EVALUATED]("pow(-20, 1, -1, 0, 4, DOWN)", None) shouldBe Right(CONST_LONG(-5000))
-    eval[EVALUATED]("pow(0, 1, -1, 0, 4, DOWN)", None) shouldBe Symbol("left")
-    eval[EVALUATED]("log(16, 0, 2, 0, 0, CEILING)", None) shouldBe Right(CONST_LONG(4))
-    eval[EVALUATED]("log(16, 0, -2, 0, 0, CEILING)", None) shouldBe Symbol("left")
-    eval[EVALUATED]("log(-16, 0, 2, 0, 0, CEILING)", None) shouldBe Symbol("left")
-  }
-
-  property("math functions scale limits") {
-    eval("pow(2,  0, 2, 9, 0, UP)") should produce("out of range 0-8")
-    eval("log(2,  0, 2, 9, 0, UP)") should produce("out of range 0-8")
-    eval("pow(2, -2, 2, 0, 5, UP)") should produce("out of range 0-8")
-    eval("log(2, -2, 2, 0, 5, UP)") should produce("out of range 0-8")
-  }
-
-  property("pow result size max") {
-    eval("pow(2, 0, 62, 0, 0, UP)") shouldBe Right(CONST_LONG(Math.pow(2, 62).toLong))
-    eval("pow(2, 0, 63, 0, 0, UP)") should produce("out of long range")
-  }
-
-  property("pow result size abs min") {
-    eval("pow(10, 0, -8, 0, 8, HALFUP)") shouldBe Right(CONST_LONG(1))
-    eval("pow(10, 0, -9, 0, 8, HALFUP)") shouldBe Right(CONST_LONG(0))
-  }
-
   property("HalfUp is type") {
     eval("let r = if true then HALFUP else HALFDOWN ; match r { case _:HalfUp => 1 case _ => 0 }") shouldBe Right(CONST_LONG(1))
   }
