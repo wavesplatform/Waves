@@ -1,8 +1,11 @@
 package com.wavesplatform.state.diffs.smart.predef
 
+import java.math.BigInteger
+
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing.evaluated
@@ -17,40 +20,53 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.test._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.{WavesEnvironment, buildThisValue}
-import com.wavesplatform.transaction.{DataTransaction, Proofs, ProvenTransaction, Transaction, TxVersion, VersionedTransaction}
+import com.wavesplatform.transaction.{
+  DataTransaction,
+  ERC20Address,
+  EthereumTransaction,
+  Proofs,
+  ProvenTransaction,
+  Transaction,
+  TxVersion,
+  VersionedTransaction
+}
 import com.wavesplatform.utils.EmptyBlockchain
-import com.wavesplatform.crypto
-import com.wavesplatform.test._
 import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.EitherValues
+import org.web3j.crypto.RawTransaction
+import org.web3j.crypto.Sign.SignatureData
+import org.web3j.utils.Numeric
 import play.api.libs.json.Json
 import shapeless.Coproduct
 
-class TransactionBindingsTest
-    extends PropSpec
-    with PathMockFactory
-    with EitherValues {
+class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherValues {
   private val T = 'T'.toByte
 
   def letProof(p: Proofs, prefix: String)(i: Int) =
     s"let ${prefix.replace(".", "")}proof$i = $prefix.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).toString}'"
 
-  def provenPart(t: Transaction with ProvenTransaction): String = {
+  def provenPart(t: Transaction with ProvenTransaction, emptyBodyBytes: Boolean = false): String = {
     val version = t match {
       case v: VersionedTransaction => v.version
       case _                       => 1
     }
+    val bodyBytesCheck =
+      if (emptyBodyBytes)
+        "t.bodyBytes.size() == 0"
+      else
+        s""" blake2b256(t.bodyBytes) == base64'${ByteStr(crypto.fastHash(t.bodyBytes.apply().array)).base64}' """
     s"""
        |   let id = t.id == base58'${t.id().toString}'
        |   let fee = t.fee == ${t.fee}
        |   let timestamp = t.timestamp == ${t.timestamp}
-       |   let bodyBytes = blake2b256(t.bodyBytes) == base64'${ByteStr(crypto.fastHash(t.bodyBytes.apply().array)).base64}'
+       |   let bodyBytes = $bodyBytesCheck
        |   let sender = t.sender == addressFromPublicKey(base58'${t.sender}')
        |   let senderPublicKey = t.senderPublicKey == base58'${t.sender}'
        |   let version = t.version == $version
@@ -94,6 +110,52 @@ class TransactionBindingsTest
       )
       result shouldBe evaluated(true)
     }
+  }
+
+  property("Ethereum TransferTransaction binding") {
+    val amount     = 12345
+    val recipient  = accountGen.sample.get.toAddress
+    val assetErc20 = ERC20Address(ByteStr.fill(20)(1))
+    val asset      = IssuedAsset(ByteStr.fromBytes(1, 2, 3))
+    val transfer   = EthereumTransaction.Transfer(Some(assetErc20), amount, recipient)
+    val underlying = RawTransaction.createTransaction(BigInteger.ZERO, BigInteger.ZERO, BigInteger.ZERO, "", "")
+    val signature = new SignatureData(
+      28.toByte,
+      Numeric.hexStringToByteArray("0x0464eee9e2fe1a10ffe48c78b80de1ed8dcf996f3f60955cb2e03cb21903d930"),
+      Numeric.hexStringToByteArray("0x06624da478b3f862582e85b31c6a21c6cae2eee2bd50f55c93c4faad9d9c8d7f")
+    )
+    val tx = EthereumTransaction(transfer, underlying, signature, T)
+
+    val blockchain = stub[Blockchain]
+    (blockchain.resolveERC20Address _).when(assetErc20).returning(Some(asset))
+    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0))
+
+    runScript(
+      s"""
+         |match tx {
+         |  case t: TransferTransaction =>
+         |    ${provenPart(tx, emptyBodyBytes = true)}
+         |    let amount = t.amount == $amount
+         |    let feeAssetId = t.feeAssetId == unit
+         |    let recipient = match (t.recipient) {
+         |      case a: Address => a.bytes == base58'$recipient'
+         |      case a: Alias   => throw("unexpected")
+         |    }
+         |    let assetId =
+         |      if (${transfer.tryResolveAsset(blockchain).explicitGet() != Waves})
+         |      then t.assetId == base58'${asset.maybeBase58Repr.get}'
+         |      else t.assetId == unit
+         |    let attachment = t.attachment == base58'${ByteStr.empty}'
+         |    ${assertProvenPart("t")} && amount && assetId && feeAssetId && recipient && attachment
+         |  case _ =>
+         |     throw()
+         |}
+       """.stripMargin,
+      V6,
+      Coproduct(tx),
+      blockchain,
+      T
+    ) shouldBe evaluated(true)
   }
 
   property("IssueTransaction binding") {

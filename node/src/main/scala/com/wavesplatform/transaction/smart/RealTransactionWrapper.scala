@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient, _}
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
+import com.wavesplatform.transaction.EthereumTransaction.Transfer
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
@@ -26,11 +27,11 @@ object RealTransactionWrapper {
     }
     Header(txIdOpt.getOrElse(ByteStr(tx.id().arr)), tx.fee, tx.timestamp, v)
   }
-  private def proven(tx: Transaction with ProvenTransaction, txIdOpt: Option[ByteStr] = None): Proven =
+  private def proven(tx: Transaction with ProvenTransaction, txIdOpt: Option[ByteStr] = None, emptyBodyBytes: Boolean = false): Proven =
     Proven(
       header(tx, txIdOpt),
       RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes)),
-      ByteStr(tx.bodyBytes()),
+      if (emptyBodyBytes) ByteStr.empty else ByteStr(tx.bodyBytes()),
       tx.sender,
       tx.proofs.proofs.map(_.arr).map(ByteStr(_)).toIndexedSeq
     )
@@ -136,7 +137,23 @@ object RealTransactionWrapper {
             )
           }
 
-      case _: EthereumTransaction => Left("No mapping for Ethereum transfers")
+      case eth @ EthereumTransaction(t: Transfer, _, _, _) =>
+        t.tryResolveAsset(blockchain)
+          .bimap(
+            _.toString,
+            asset =>
+              Tx.Transfer(
+                proven(eth, emptyBodyBytes = true),
+                eth.feeAssetId.compatId,
+                asset.compatId,
+                t.amount,
+                RideRecipient.Address(ByteStr(t.recipient.bytes)),
+                ByteStr.empty
+            )
+          )
+
+      case eth: EthereumTransaction =>
+        Left(s"No mapping for Ethereum transaction $eth")
 
       case u: UpdateAssetInfoTransaction =>
         Tx.UpdateAssetInfo(proven(u), u.assetId.id, u.name, u.description).asRight
