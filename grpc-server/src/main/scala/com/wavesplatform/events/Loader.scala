@@ -68,6 +68,6 @@ object Loader {
       )
 
   def loadUpdate(res: DBResource, blocksApi: CommonBlocksApi, height: Int): PBBlockchainUpdated =
-    parseUpdate(res.get(Ints.toByteArray(height)), blocksApi, height)
+    parseUpdate(res.get(Repo.keyForHeight(height)), blocksApi, height)
 
 }

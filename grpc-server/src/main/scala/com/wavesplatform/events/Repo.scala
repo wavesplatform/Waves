@@ -1,5 +1,7 @@
 package com.wavesplatform.events
 
+import java.nio.{ByteBuffer, ByteOrder}
+
 import cats.syntax.semigroup._
 import com.google.common.primitives.Ints
 import com.wavesplatform.api.common.CommonBlocksApi
@@ -7,6 +9,7 @@ import com.wavesplatform.api.grpc._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, openDB}
+import com.wavesplatform.events.Repo.keyForHeight
 import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc.BlockchainUpdatesApi
 import com.wavesplatform.events.api.grpc.protobuf._
 import com.wavesplatform.events.protobuf.serde._
@@ -22,6 +25,8 @@ import monix.reactive.Observable
 import monix.reactive.subjects.PublishToOneSubject
 
 import scala.concurrent.Future
+import scala.util.Using
+import scala.util.control.Exception
 
 class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
     extends BlockchainUpdatesApi
@@ -39,19 +44,14 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
 
   def height: Int =
     liquidState.fold(db.readOnly { ro =>
-      val iter = ro.newIterator
-      try if (iter.hasNext) try {
-        iter.seekToLast()
-        Ints.fromByteArray(iter.next().getKey)
-      } catch {
-        case _: UnsupportedOperationException =>
-          var last = 0
-          do {
-            last = Ints.fromByteArray(iter.next().getKey)
-          } while (iter.hasNext)
-          last
-      } else 0
-      finally iter.close()
+      var lastHeight = 0
+      Using(ro.newIterator) { iter =>
+        Exception.ignoring(classOf[UnsupportedOperationException])(iter.seekToLast())
+        while (iter.hasNext) {
+          lastHeight = Ints.fromByteArray(iter.next().getKey)
+        }
+      }
+      lastHeight
     })(_.keyBlock.height)
 
   override def onProcessBlock(
@@ -66,8 +66,7 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
     )
 
     liquidState.foreach(
-      ls =>
-        db.put(Ints.toByteArray(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.update(_.block.modify(_.copy(block = None)))).toByteArray)
+      ls => db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.update(_.block.modify(_.copy(block = None)))).toByteArray)
     )
 
     val ba = BlockAppended.from(block, diff, blockchainBeforeWithMinerReward)
@@ -98,8 +97,7 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
     db.readWrite { rw =>
       log.debug(s"Rolling back to $toHeight")
       var buf: List[BlockAppended] = Nil
-      val iter                     = rw.newIterator
-      try {
+      Using(rw.newIterator) { iter =>
         iter.seek(Ints.toByteArray(toHeight + 1))
         while (iter.hasNext) {
           val e           = iter.next()
@@ -107,7 +105,7 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
           val stateUpdate = Loader.parseUpdate(e.getValue, blocksApi, height).vanillaAppend
           buf = stateUpdate :: buf
         }
-      } finally iter.close()
+      }
 
       (1 to buf.size).foreach { offset =>
         val height = toHeight + offset
@@ -256,4 +254,8 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
       )
     )
   }
+}
+
+object Repo {
+  def keyForHeight(height: Int): Array[Byte] = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN).putInt(height).array()
 }
