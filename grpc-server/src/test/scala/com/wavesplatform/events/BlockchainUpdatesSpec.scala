@@ -42,7 +42,6 @@ import io.grpc.stub.{CallStreamObserver, StreamObserver}
 import monix.execution.CancelableFuture
 import monix.execution.Scheduler.Implicits.global
 import org.scalactic.source.Position
-import com.wavesplatform.events.protobuf.serde._
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.ScalaFutures
 
