@@ -7,8 +7,6 @@
  */
 
 import sbt.Keys._
-import sbt.{**, Compile, CrossVersion, File, IO, Project, compilerPlugin, inConfig, _}
-import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
