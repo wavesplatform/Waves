@@ -33,7 +33,7 @@ lazy val `lang-jvm` = lang.jvm
     name := "RIDE Compiler",
     normalizedName := "lang",
     description := "The RIDE smart contract language compiler",
-    libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "1.0.0" % Provided
+    libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided
   )
 
 lazy val `lang-js` = lang.js
@@ -91,7 +91,7 @@ lazy val `repl-jvm` = repl.jvm
   .dependsOn(`lang-jvm`)
   .settings(
     libraryDependencies ++= Dependencies.circe.value ++ Seq(
-      "org.scala-js" %% "scalajs-stubs" % "1.0.0" % Provided,
+      "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided,
       Dependencies.sttp3
     )
   )
@@ -136,7 +136,6 @@ inScope(Global)(
       "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
     ),
     crossPaths := false,
-    scalafmtOnCompile := false,
     dependencyOverrides ++= Dependencies.enforcedVersions.value,
     cancelable := true,
     parallelExecution := false,
