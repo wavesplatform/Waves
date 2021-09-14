@@ -1,10 +1,12 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.{V3, V5}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.compiler.Terms.{BLOCK, FUNCTION_CALL, LET}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.transaction.Asset.Waves
@@ -12,8 +14,6 @@ import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import org.scalacheck.Gen
-import com.wavesplatform.common.utils.EitherExt2
-
 
 package object ci {
   private def invokeFee(freeCall: Boolean) =
@@ -46,8 +46,22 @@ package object ci {
        """.stripMargin
     )
 
-  def toInvokeExpression(setScript: SetScriptTransaction, invoker: KeyPair, fee: Option[Long] = None): InvokeExpressionTransaction = {
-    val expression = setScript.script.get.asInstanceOf[ContractScriptImpl].expr.callableFuncs.head.u.body
+  def toInvokeExpression(
+      setScript: SetScriptTransaction,
+      invoker: KeyPair,
+      fee: Option[Long] = None,
+      call: Option[FUNCTION_CALL] = None
+  ): InvokeExpressionTransaction = {
+    val callables = setScript.script.get.asInstanceOf[ContractScriptImpl].expr.callableFuncs
+    val expression =
+      call.fold(
+        callables.head.u.body
+      ) { c =>
+        val callable = callables.find(_.u.name == c.function.funcName).get.u
+        (callable.args zip c.args).foldLeft(callable.body) {
+          case (resultExpr, (argName, arg)) => BLOCK(LET(argName, arg), resultExpr)
+        }
+      }
     InvokeExpressionTransaction
       .selfSigned(
         TxVersion.V1,
