@@ -1,11 +1,11 @@
 package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.test.FlatSpec
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
-import org.scalatest.{FlatSpec, Matchers}
 
-class RestAPISettingsSpecification extends FlatSpec with Matchers {
+class RestAPISettingsSpecification extends FlatSpec {
   "RestAPISettings" should "read values" in {
     val config   = ConfigFactory.parseString("""waves {
                                                |  rest-api {
@@ -19,6 +19,8 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
                                                |    distribution-address-limit = 10000
                                                |    evaluate-script-complexity-limit = 4000
                                                |    limited-pool-threads = 2
+                                               |    heavy-request-processor-pool-threads = 7
+                                               |    minimum-peers = 2
                                                |  }
                                                |}
       """.stripMargin)
@@ -34,5 +36,7 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
     settings.distributionAddressLimit shouldBe 10000
     settings.evaluateScriptComplexityLimit shouldBe 4000
     settings.limitedPoolThreads shouldBe 2
+    settings.heavyRequestProcessorPoolThreads shouldBe Some(7)
+    settings.minimumPeers shouldBe 2
   }
 }

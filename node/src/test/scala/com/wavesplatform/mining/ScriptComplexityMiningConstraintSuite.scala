@@ -8,21 +8,13 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, LeaseBalance}
+import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{DataTransaction, Transaction, TxVersion}
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{FlatSpec, Matchers}
-import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
-class ScriptComplexityMiningConstraintSuite
-    extends FlatSpec
-    with Matchers
-    with ScalaCheckDrivenPropertyChecks
-    with PathMockFactory
-    with TransactionGen
-    with NoShrink {
+class ScriptComplexityMiningConstraintSuite extends FlatSpec with PathMockFactory {
   private val settings = WavesSettings.fromRootConfig(ConfigFactory.load())
 
   private val complexity = OneDimensionalMiningConstraint(1000, TxEstimators.scriptsComplexity, "MaxScriptsComplexityInBlock")

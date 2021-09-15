@@ -1,11 +1,11 @@
 package com.wavesplatform.lang
 
 import cats.Id
-import cats.implicits._
+import cats.syntax.semigroup._
+import cats.syntax.either._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common.{NoShrink, sampleTypes}
+import com.wavesplatform.lang.Common.sampleTypes
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -15,15 +15,13 @@ import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Bindings, WavesContext}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
-import com.wavesplatform.lang.Global
-import org.scalatest.{Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.test._
+import org.scalatest.Inside
 
-class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
+class ContractIntegrationTest extends PropSpec with Inside {
 
   private val ctx: CTX[Environment] =
       PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment] |+|

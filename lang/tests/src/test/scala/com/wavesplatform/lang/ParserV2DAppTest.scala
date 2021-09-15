@@ -1,15 +1,12 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser, ParserV2}
-import com.wavesplatform.lang.v1.testing.ScriptGenParser
+import com.wavesplatform.test._
 import org.scalatest.exceptions.TestFailedException
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
+class ParserV2DAppTest extends PropSpec {
 
   private def parse(x: String): DAPP = ParserV2.parseDAPP(x) match {
     case Right((parsedScript, _)) => parsedScript

@@ -9,9 +9,8 @@ import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync.grpc.GrpcBaseTransactionSuite
 import com.wavesplatform.protobuf.block._
 import com.wavesplatform.protobuf.transaction.PBRecipients
-import org.scalatest.Matchers
 
-class BlocksApiSuite extends GrpcBaseTransactionSuite with Matchers {
+class BlocksApiSuite extends GrpcBaseTransactionSuite {
   private val BlockV4Height = 3
   private val BlockV5Height = 5
   override protected def nodeConfigs: Seq[Config] =

@@ -3,42 +3,44 @@ package com.wavesplatform.api.http
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
 
-import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration._
-import scala.util.{Failure, Success}
-import scala.util.control.NonFatal
-
 import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Source
-import cats.implicits._
 import cats.kernel.Monoid
+import cats.syntax.either._
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi}
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
+import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi}
 import com.wavesplatform.api.http.TransactionsApiRoute.TransactionJsonSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
-import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, Portfolio, StateHash}
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction._
+import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, StateHash}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
-import play.api.libs.json._
 import play.api.libs.json.Json.JsValueWrapper
+import play.api.libs.json._
+
+import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success}
 
 case class DebugApiRoute(
     ws: WavesSettings,
@@ -106,7 +108,7 @@ case class DebugApiRoute(
     }))
   }
 
-  private def distribution(height: Int): Route = optionalHeaderValueByType[Accept](()) { accept =>
+  private def distribution(height: Int): Route = optionalHeaderValueByType(Accept) { accept =>
     extractScheduler { implicit s =>
       complete(
         assetsApi
@@ -241,18 +243,36 @@ case class DebugApiRoute(
         case Left(err)         => Some(err)
       }
 
-      val transactionJson = parsedTransaction match {
-        case Right(tx) => tx.json()
-        case Left(_)   => jsv
-      }
+      val transactionJson = parsedTransaction.fold(_ => jsv, _.json())
+
+      val serializer = tracedDiff.resultE
+        .fold(_ => this.serializer, { case (_, diff) =>
+          val compositeBlockchain = CompositeBlockchain(blockchain, diff)
+          this.serializer.copy(blockchain = compositeBlockchain)
+        })
+
+      val extendedJson = tracedDiff.resultE
+        .fold(_ => jsv, { case (tx, diff) =>
+          val meta = tx match {
+            case ist: InvokeScriptTransaction =>
+              val result = diff.scriptResults.get(ist.id())
+              TransactionMeta.Invoke(Height(blockchain.height), ist, succeeded = true, result)
+            case tx => TransactionMeta.Default(Height(blockchain.height), tx, succeeded = true)
+          }
+          serializer.transactionWithMetaJson(meta)
+        })
 
       val response = Json.obj(
         "valid"          -> error.isEmpty,
         "validationTime" -> (System.nanoTime() - startTime).nanos.toMillis,
-        "trace"          -> tracedDiff.trace.map(_.loggedJson)
+        "trace" -> tracedDiff.trace.map {
+          case ist: InvokeScriptTrace => ist.maybeLoggedJson(logged = true)(serializer.invokeScriptResultWrites)
+          case trace                  => trace.loggedJson
+        },
+        "height" -> blockchain.height
       )
 
-      error.fold(response ++ transactionJson)(
+      error.fold(response ++ extendedJson)(
         err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)) + ("transaction" -> transactionJson)
       )
     })

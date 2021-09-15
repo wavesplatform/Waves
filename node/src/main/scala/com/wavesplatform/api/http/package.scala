@@ -61,7 +61,7 @@ package object http extends ApiMarshallers with ScorexLogging {
             TransactionParsers.by(typeId, version) match {
               case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
               case Some(x) =>
-                x match {
+                (x: @unchecked) match {
                   case TransferTransaction        => txJson.as[TransferRequest].toTxFrom(senderPk)
                   case CreateAliasTransaction     => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
                   case LeaseTransaction           => txJson.as[LeaseRequest].toTxFrom(senderPk)
@@ -147,7 +147,7 @@ package object http extends ApiMarshallers with ScorexLogging {
     jsonPostD[A].apply(obj => complete(f(obj))) ~ get(complete(StatusCodes.MethodNotAllowed))
 
   def jsonPostD[A: Reads]: Directive1[A] =
-    (post & handleExceptions(jsonExceptionHandler) & handleRejections(jsonRejectionHandler) & entity(as[A]))
+    post & handleExceptions(jsonExceptionHandler) & handleRejections(jsonRejectionHandler) & entity(as[A])
 
   def extractScheduler: Directive1[Scheduler] = extractExecutionContext.map(ec => Scheduler(ec))
 

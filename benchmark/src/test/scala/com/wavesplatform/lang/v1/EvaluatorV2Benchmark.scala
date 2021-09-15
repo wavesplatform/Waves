@@ -17,7 +17,7 @@ import org.openjdk.jmh.infra.Blackhole
 import java.util.concurrent.TimeUnit
 
 object EvaluatorV2Benchmark {
-  val pureContext: CTX[Environment]                       = PureContext.build(V1).withEnvironment[Environment]
+  val pureContext: CTX[Environment]                       = PureContext.build(V1, fixUnicodeFunctions = true).withEnvironment[Environment]
   val pureEvalContext: EvaluationContext[Environment, Id] = pureContext.evaluationContext(Common.emptyBlockchainEnvironment())
   val evaluatorV2: EvaluatorV2                            = new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), pureEvalContext), V1)
 }
@@ -57,7 +57,7 @@ class Funcs {
       """.stripMargin
 
   val parsed = Parser.parseExpr(script).get.value
-  val expr = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
+  val expr   = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
 }
 
 @State(Scope.Benchmark)

@@ -1,13 +1,11 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.transfer._
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class TransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class TransactionSpecification extends PropSpec {
 
   property("transaction fields should be constructed in a right way") {
     forAll(bytes32gen, bytes32gen, timestampGen, positiveLongGen, positiveLongGen) {

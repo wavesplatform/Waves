@@ -1,6 +1,5 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.{EitherMatchers, TransactionGen}
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -8,19 +7,12 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
 import org.scalacheck.Gen
-import org.scalatest._
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class BlockchainUpdaterMicroblockSunnyDayTest
-    extends PropSpec
-    with PropertyChecks
-    with DomainScenarioDrivenPropertyCheck
-    with Matchers
-    with EitherMatchers
-    with TransactionGen {
+class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with DomainScenarioDrivenPropertyCheck {
 
   type Setup = (GenesisTransaction, TransferTransaction, TransferTransaction, TransferTransaction)
   val preconditionsAndPayments: Gen[Setup] = for {
@@ -135,7 +127,8 @@ class BlockchainUpdaterMicroblockSunnyDayTest
         val block0                 = buildBlockOfTxs(randomSig, Seq(genesis))
         val (block1, microBlocks1) = chainBaseAndMicro(block0.id(), masterToAlice, Seq(Seq(aliceToBob)))
         val otherSigner            = KeyPair(ByteStr(Array.fill(KeyLength)(1: Byte)))
-        val block2                 = customBuildBlockOfTxs(block0.id(), Seq(masterToAlice, aliceToBob2), otherSigner, 1, masterToAlice.timestamp, DefaultBaseTarget / 2)
+        val block2 =
+          customBuildBlockOfTxs(block0.id(), Seq(masterToAlice, aliceToBob2), otherSigner, 1, masterToAlice.timestamp, DefaultBaseTarget / 2)
         domain.blockchainUpdater.processBlock(block0) should beRight
         domain.blockchainUpdater.processBlock(block1) should beRight
         domain.blockchainUpdater.processMicroBlock(microBlocks1(0)) should beRight

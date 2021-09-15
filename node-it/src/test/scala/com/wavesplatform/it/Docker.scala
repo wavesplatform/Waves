@@ -5,19 +5,27 @@ import java.net.{InetAddress, InetSocketAddress, URL}
 import java.nio.file.{Files, Path, Paths}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.{Properties, List => JList, Map => JMap}
 import java.util.Collections._
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.{Properties, List => JList, Map => JMap}
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
+
+import scala.annotation.tailrec
+import scala.concurrent.{blocking, Await, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
+import scala.util.{Random, Try}
+import scala.util.control.NonFatal
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.primitives.Ints._
-import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
-import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
-import com.typesafe.config.ConfigFactory._
+import com.spotify.docker.client.messages._
+import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
+import com.typesafe.config.ConfigFactory._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -33,15 +41,13 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.io.IOUtils
 import org.asynchttpclient.Dsl._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future, blocking}
-import scala.jdk.CollectionConverters._
-import scala.util.control.NonFatal
-import scala.util.{Random, Try}
-
-class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boolean = false, imageName: String = Docker.NodeImageName)
-    extends AutoCloseable
+class Docker(
+    suiteConfig: Config = empty,
+    tag: String = "",
+    enableProfiling: Boolean = false,
+    enableDebugger: Boolean = false,
+    imageName: String = Docker.NodeImageName
+) extends AutoCloseable
     with ScorexLogging {
 
   import Docker._
@@ -217,7 +223,8 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
         .withFallback(defaultReference())
         .resolve()
 
-      val networkPort = actualConfig.getString("waves.network.port")
+      val networkPort          = actualConfig.getString("waves.network.port")
+      val internalDebuggerPort = 5005
 
       val nodeNumber = nodeName.replace("node", "").toInt
       val ip         = ipForNode(nodeNumber)
@@ -230,23 +237,30 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
         var config = s"$javaOptions ${renderProperties(asProperties(overrides))} " +
           s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dwaves.network.declared-address=$ip:$networkPort $ntpServer $maxCacheSize"
 
+        // Debugger
+        if (enableDebugger) config += s"-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:$internalDebuggerPort "
+
         if (enableProfiling) {
           // https://www.yourkit.com/docs/java/help/startup_options.jsp
-          config += s"-agentpath:/usr/local/YourKit-JavaProfiler-2019.8/bin/linux-x86-64/libyjpagent.so=port=$ProfilerPort,listen=all," +
+          config += s"-agentpath:/usr/local/YourKit-JavaProfiler-2021.3/bin/linux-x86-64/libyjpagent.so=port=$ProfilerPort,listen=all," +
             s"sampling,monitors,sessionname=WavesNode,dir=$ContainerRoot/profiler,logdir=$ContainerRoot,onexit=snapshot "
         }
 
         config
       }
 
+      val debuggerPort = if (enableDebugger) Docker.freeDebuggerPort() else 0
+
       val hostConfig = HostConfig
         .builder()
+        .portBindings(if (enableDebugger) Map(s"$internalDebuggerPort" -> Seq(PortBinding.of("0.0.0.0", debuggerPort)).asJava).asJava else null)
         .publishAllPorts(true)
         .build()
 
       val containerConfig = ContainerConfig
         .builder()
         .image(imageName)
+        .exposedPorts(s"$internalDebuggerPort")
         .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(wavesNetwork.name() -> endpointConfigFor(nodeName)).asJava))
         .hostConfig(hostConfig)
         .env(s"JAVA_OPTS=$configOverrides")
@@ -270,7 +284,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
       val node = new DockerNode(actualConfig, containerId, getNodeInfo(containerId, WavesSettings.fromRootConfig(actualConfig)))
       nodes.add(node)
-      log.debug(s"Started $containerId -> ${node.name}: ${node.nodeInfo}")
+      log.debug(s"Started $containerId -> ${node.name}: ${node.nodeInfo}${if (enableDebugger) s", debugger port = $debuggerPort" else ""}")
       node
     } catch {
       case NonFatal(e) =>
@@ -289,6 +303,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     NodeInfo(restApiPort, networkPort, wavesIpAddress, containerInfo.networkSettings().ports())
   }
 
+  @tailrec
   private def inspectContainer(containerId: String): ContainerInfo = {
     val containerInfo = client.inspectContainer(containerId)
     if (containerInfo.networkSettings().networks().asScala.contains(wavesNetwork.name())) containerInfo
@@ -366,22 +381,32 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
       log.info("Stopping containers")
 
       nodes.asScala.foreach { node =>
-        client.stopContainer(node.containerId, if (enableProfiling) 60 else 0)
-        log.debug(s"Container ${node.name} stopped with exit status: ${client.waitContainer(node.containerId).statusCode()}")
+        try {
+          client.stopContainer(node.containerId, if (enableProfiling) 60 else 0)
+          log.debug(s"Container ${node.name} stopped with exit status: ${client.waitContainer(node.containerId).statusCode()}")
+        } catch {
+          case NonFatal(e) =>
+            log.warn(s"Can't stop the container of ${node.name}", e)
+        }
 
-        saveProfile(node)
-        saveLog(node)
-        val containerInfo = client.inspectContainer(node.containerId)
-        log.debug(s"""Container information for ${node.name}:
-             |Exit code: ${containerInfo.state().exitCode()}
-             |Error: ${containerInfo.state().error()}
-             |Status: ${containerInfo.state().status()}
-             |OOM killed: ${containerInfo.state().oomKilled()}""".stripMargin)
+        try {
+          saveLog(node)
+          saveProfile(node)
+
+          val containerInfo = client.inspectContainer(node.containerId)
+          log.debug(s"""Container information for ${node.name}:
+                       |Exit code: ${containerInfo.state().exitCode()}
+                       |Error: ${containerInfo.state().error()}
+                       |Status: ${containerInfo.state().status()}
+                       |OOM killed: ${containerInfo.state().oomKilled()}""".stripMargin)
+        } catch {
+          case NonFatal(e) => log.warn(s"Can't save node logs: ${node.name}", e)
+        }
 
         try {
           client.removeContainer(node.containerId)
         } catch {
-          case NonFatal(e) => log.warn(s"Can't remove a container of ${node.name}", e)
+          case NonFatal(e) => log.warn(s"Can't remove the container of ${node.name}", e)
         }
       }
 
@@ -592,4 +617,6 @@ object Docker {
     def getConfig: Config = config
   }
 
+  private[this] val debuggerPort      = new AtomicInteger(11000)
+  private def freeDebuggerPort(): Int = debuggerPort.getAndIncrement()
 }

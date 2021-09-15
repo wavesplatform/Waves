@@ -1,11 +1,10 @@
 package com.wavesplatform.utils
 
 import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class Base64Test extends PropSpec with PropertyChecks with Matchers {
+class Base64Test extends PropSpec {
 
   private val Base64Chars  = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/"
   private val IllegalChars = "!@#$%^&*()_-?/.,<>|\';:`~"

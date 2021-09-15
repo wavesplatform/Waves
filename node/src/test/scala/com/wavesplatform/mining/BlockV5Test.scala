@@ -19,13 +19,14 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WalletSettings, WavesSettings}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG, diffs}
+import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{BlocksTransactionsHelpers, EitherMatchers, NoShrink, TestTime, TransactionGen, crypto, protobuf}
+import com.wavesplatform.{BlocksTransactionsHelpers, TestTime, crypto, protobuf}
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
@@ -34,19 +35,13 @@ import monix.reactive.Observer
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.enablers.Length
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class BlockV5Test
     extends FlatSpec
-    with ScalaCheckPropertyChecks
     with WithDomain
-    with Matchers
-    with EitherMatchers
-    with TransactionGen
-    with NoShrink
     with OptionValues
     with EitherValues
     with BlocksTransactionsHelpers {
@@ -471,7 +466,7 @@ class BlockV5Test
   private def withMiner(blockchain: Blockchain with BlockchainUpdater with NG, time: Time, settings: WavesSettings = testSettings)(
       f: (MinerImpl, Appender, Scheduler) => Unit
   ): Unit = {
-    val pos               = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTargetOpt)
+    val pos               = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
     val allChannels       = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val wallet            = Wallet(WalletSettings(None, Some("123"), None))
     val utxPool           = new UtxPoolImpl(time, blockchain, Observer.stopped, settings.utxSettings)

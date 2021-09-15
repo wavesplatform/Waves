@@ -35,7 +35,7 @@ class DataMetaMapper(mapper: TypeBitMapper, version: MetaVersion) {
     meta.funcs.toList.traverse(protoToFunc)
 
   private def protoToFunc(funcs: CallableFuncSignature): Either[String, List[FINAL]] =
-    funcs.types.toByteArray.toList
+    funcs.types.toByteArray().toList
       .traverse(b => mapper.fromIndex(b.toInt))
 
 }

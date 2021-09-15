@@ -8,12 +8,12 @@ import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.{NoShrink, crypto}
+import com.wavesplatform.crypto
+import com.wavesplatform.test.PropSpec
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import org.scalatest.{EitherValues, Inside}
 
-class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with TypedScriptGen with Inside with NoShrink with EitherValues {
+class ScriptReaderTest extends PropSpec with TypedScriptGen with Inside with EitherValues {
   val checksumLength = 4
 
   property("should parse all bytes for V1") {

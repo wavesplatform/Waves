@@ -41,10 +41,11 @@ import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{EitherValues, FreeSpec, Matchers}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-
+import org.scalatest.EitherValues
 import java.nio.file.{Files, Path}
+
+import com.wavesplatform.test.FreeSpec
+
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.util.Random
@@ -66,12 +67,7 @@ private object UtxPoolSpecification {
 
 class UtxPoolSpecification
     extends FreeSpec
-    with Matchers
-    with EitherMatchers
     with MockFactory
-    with PropertyChecks
-    with TransactionGen
-    with NoShrink
     with BlocksTransactionsHelpers
     with WithDomain
     with EitherValues
@@ -180,7 +176,7 @@ class UtxPoolSpecification
     (sender3, senderBalance3) <- accountsGen
   } yield {
     val bcu = mkBlockchain(Map(sender1.toAddress -> senderBalance1, sender2.toAddress -> senderBalance2, sender3.toAddress -> senderBalance3))
-    (Seq((sender1, senderBalance1), (sender2, senderBalance2), (sender3, senderBalance3)), bcu)
+    (((sender1, senderBalance1), (sender2, senderBalance2), (sender3, senderBalance3)), bcu)
   }
 
   private val twoOutOfManyValidPayments = (for {
@@ -499,7 +495,7 @@ class UtxPoolSpecification
 
     "adds new transactions when transaction is whitelisted" in {
       forAll(stateWithThreeAccounts) {
-        case (Seq((sender1, senderBalance1), (sender2, senderBalance2), (sender3, _)), bcu) =>
+        case (((sender1, senderBalance1), (sender2, senderBalance2), (sender3, _)), bcu) =>
           val time = new TestTime()
 
           val precondition = TestBlock.create(
@@ -571,7 +567,7 @@ class UtxPoolSpecification
     }
 
     "packUnconfirmed takes whitelisted first of all" in forAll(stateWithThreeAccounts) {
-      case (Seq((sender1, senderBalance1), (sender2, senderBalance2), (sender3, _)), bcu) =>
+      case (((sender1, senderBalance1), (sender2, senderBalance2), (sender3, _)), bcu) =>
         val time = new TestTime()
 
         val precondition = TestBlock.create(
@@ -1002,7 +998,7 @@ class UtxPoolSpecification
               val utxPool =
                 new UtxPoolImpl(time, d.blockchainUpdater, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, events += _)
 
-              def assertEvents(f: Seq[UtxEvent] => Unit): Unit = {
+              def assertEvents(f: PartialFunction[Seq[UtxEvent], Unit]): Unit = {
                 val currentEvents = events.toVector
                 f(currentEvents)
                 events.clear()

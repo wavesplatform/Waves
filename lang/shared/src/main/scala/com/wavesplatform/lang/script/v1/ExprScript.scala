@@ -1,6 +1,8 @@
 package com.wavesplatform.lang.script.v1
 
-import cats.implicits._
+import cats.instances.either._
+import cats.syntax.either._
+import cats.syntax.flatMap._
 import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values._

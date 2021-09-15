@@ -1,15 +1,13 @@
 package com.wavesplatform.it.sync.network
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
-import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 
-class DetectBrokenConnectionsTestSuite extends FreeSpec with Matchers with ReportingTestName with NodesFromDocker {
+class DetectBrokenConnectionsTestSuite extends BaseFreeSpec {
 
   override protected def nodeConfigs: Seq[Config] = {
     val highPriorityConfig = ConfigFactory.parseString("waves.network.break-idle-connections-timeout = 20s")

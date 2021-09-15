@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.validation.impl
 
-import cats.implicits._
+import cats.syntax.either._
 import com.wavesplatform.transaction.TxAmount
 import com.wavesplatform.transaction.TxValidationError.NegativeMinFee
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction

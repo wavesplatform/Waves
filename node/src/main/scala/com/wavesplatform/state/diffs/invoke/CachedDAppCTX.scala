@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.invoke
 
-import cats.implicits.catsSyntaxSemigroup
+import cats.syntax.semigroup._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Global

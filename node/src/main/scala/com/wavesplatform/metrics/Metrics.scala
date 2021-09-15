@@ -3,18 +3,18 @@ package com.wavesplatform.metrics
 import java.net.URI
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
-import monix.eval.Task
-import monix.execution.schedulers.SchedulerService
-import org.influxdb.dto.Point
-import org.influxdb.{InfluxDB, InfluxDBFactory}
-
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
 import scala.util.control.NonFatal
 
-object Metrics extends ScorexLogging {
+import com.wavesplatform.ResponsivenessLogs
+import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
+import monix.eval.Task
+import monix.execution.schedulers.SchedulerService
+import org.influxdb.{InfluxDB, InfluxDBFactory}
+import org.influxdb.dto.Point
 
+object Metrics extends ScorexLogging {
   case class InfluxDbSettings(
       uri: URI,
       db: String,
@@ -25,7 +25,14 @@ object Metrics extends ScorexLogging {
       batchFlashDuration: FiniteDuration
   )
 
-  case class Settings(enable: Boolean, nodeId: Int, influxDb: InfluxDbSettings)
+  case class Settings(
+      enable: Boolean,
+      nodeId: Int,
+      influxDb: InfluxDbSettings,
+      collectResponsivenessMetrics: Boolean,
+      createResponsivenessCsv: Boolean,
+      responsivenessMetricsRetentionPolicy: String
+  )
 
   private[this] implicit val scheduler: SchedulerService = Schedulers.singleThread("metrics")
 
@@ -37,18 +44,28 @@ object Metrics extends ScorexLogging {
     if (time == null) System.currentTimeMillis()
     else time.getTimestamp()
 
-  def write(b: Point.Builder, ts: Long = currentTimestamp): Unit = {
+  def withRetentionPolicy(retentionPolicy: String)(f: => Unit): Unit =
+    db.synchronized(db.foreach { db =>
+      db.setRetentionPolicy(retentionPolicy)
+      try f
+      finally db.setRetentionPolicy("")
+    })
+
+  def write(b: Point.Builder, ts: Long = currentTimestamp): Unit = db.synchronized {
     db.foreach { db =>
       Task {
         try {
-          val point = b
-            .addField("node", settings.nodeId) // Should be a tag, but tags are the strings now: https://docs.influxdata.com/influxdb/v1.3/concepts/glossary/#tag-value
-            .tag("node", settings.nodeId.toString)
-            .time(ts, TimeUnit.MILLISECONDS)
-            .build()
-          db.write(point)
+          db.write(
+            b
+            // Should be a tag, but tags are the strings now
+            // https://docs.influxdata.com/influxdb/v1.3/concepts/glossary/#tag-value
+              .addField("node", settings.nodeId)
+              .tag("node", settings.nodeId.toString)
+              .time(ts, TimeUnit.MILLISECONDS)
+              .build()
+          )
         } catch {
-          case NonFatal(e) => log.warn(s"Failed to send data to InfluxDB (${e.getMessage})")
+          case e: Throwable => log.warn(s"Failed to send data to InfluxDB (${e.getMessage})")
         }
       }.runAsyncLogErr
     }
@@ -75,8 +92,8 @@ object Metrics extends ScorexLogging {
           InfluxDBFactory.connect(dbSettings.uri.toString)
         }
         x.setDatabase(dbSettings.db)
-        x.setRetentionPolicy(dbSettings.retentionPolicy)
         x.enableBatch(dbSettings.batchActions, dbSettings.batchFlashDuration.toSeconds.toInt, TimeUnit.SECONDS)
+        x.setRetentionPolicy("")
 
         try {
           val pong = x.ping()
@@ -90,6 +107,10 @@ object Metrics extends ScorexLogging {
         case NonFatal(e) => log.warn(s"Failed to connect to InfluxDB (${e.getMessage})")
       }
     }
+
+    ResponsivenessLogs.enableMetrics = config.collectResponsivenessMetrics
+    ResponsivenessLogs.enableCsv = config.createResponsivenessCsv
+    ResponsivenessLogs.retentionPolicy = config.responsivenessMetricsRetentionPolicy
 
     db.nonEmpty
   }

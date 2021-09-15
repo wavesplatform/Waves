@@ -6,14 +6,14 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{IssueInfoResponse, SponsorFeeResponse, StateChangesDetails}
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.grpc.GrpcBaseTransactionSuiteLike
-import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.Sponsorship
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.FreeSpec
+import org.scalatest.freespec.AnyFreeSpec
 
-class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLike {
+class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuiteLike {
   private val initialWavesBalance = 100.waves
 
   private val minSponsoredAssetFee      = 100

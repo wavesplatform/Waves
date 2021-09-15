@@ -6,7 +6,6 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.LevelDBFactory
 import com.wavesplatform.db.DBCacheSettings
@@ -16,18 +15,17 @@ import com.wavesplatform.settings.{WavesSettings, _}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils.TestLevelDB
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.{EitherMatchers, TestHelpers, TransactionGen, WithDB, crypto}
+import com.wavesplatform.{TestHelpers, WithDB, crypto}
 import org.iq80.leveldb.Options
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{FreeSpec, Matchers}
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.duration._
 import scala.util.Random
 
-class FPPoSSelectorTest extends FreeSpec with Matchers with EitherMatchers with WithDB with TransactionGen with DBCacheSettings with ScalaCheckPropertyChecks {
+class FPPoSSelectorTest extends FreeSpec with WithDB with DBCacheSettings {
   import FPPoSSelectorTest._
 
   private val generationSignatureMethods = Table(
@@ -257,7 +255,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with EitherMatchers with 
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu =
       new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
-    val pos = PoSSelector(bcu, settings.synchronizationSettings.maxBaseTargetOpt)
+    val pos = PoSSelector(bcu, settings.synchronizationSettings.maxBaseTarget)
     try {
       val (accounts, blocks) = gen(ntpTime).sample.get
 

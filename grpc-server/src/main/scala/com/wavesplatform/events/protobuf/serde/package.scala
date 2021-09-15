@@ -2,10 +2,8 @@ package com.wavesplatform.events.protobuf
 
 import cats.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.events.RollbackResult
 import com.wavesplatform.events.StateUpdate.AssetInfo
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
-import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append, Rollback, Update}
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
@@ -123,63 +121,27 @@ package object serde {
   }
 
   implicit class BlockchainUpdatedVanilla(val self: BlockchainUpdated) extends AnyVal {
-    def vanilla: Try[ve.BlockchainUpdated] =
-      Try {
-        self.update match {
-          case Update.Append(append) =>
-            append.body match {
-              case Body.Block(body) =>
-                ve.BlockAppended(
-                  id = self.id.toByteStr,
-                  height = self.height,
-                  block = body.block.map(PBBlocks.vanilla(_, unsafe = true).get).orNull,
-                  updatedWavesAmount = body.updatedWavesAmount,
-                  blockStateUpdate = append.stateUpdate.fold(Monoid[ve.StateUpdate].empty)(_.vanilla.get),
-                  transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get),
-                  transactionMetadata = append.transactionsMetadata,
-                  referencedAssets = self.referencedAssets.map(AssetInfo.fromPB)
-                )
-              case Body.MicroBlock(body) =>
-                ve.MicroBlockAppended(
-                  id = self.id.toByteStr,
-                  height = self.height,
-                  microBlock = PBMicroBlocks.vanilla(body.microBlock.get, unsafe = true).get.microblock,
-                  microBlockStateUpdate = append.stateUpdate.fold(Monoid[ve.StateUpdate].empty)(_.vanilla.get),
-                  transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get),
-                  totalTransactionsRoot = body.updatedTransactionsRoot.toByteStr,
-                  transactionMetadata = append.transactionsMetadata,
-                  referencedAssets = self.referencedAssets.map(AssetInfo.fromPB)
-                )
-              case Body.Empty => throw new IllegalArgumentException("Empty append body")
-            }
+    def vanillaAppend: ve.BlockAppended =
+      self.update match {
+        case Update.Append(append) =>
+          append.body match {
+            case Body.Block(body) =>
+              ve.BlockAppended(
+                id = self.id.toByteStr,
+                height = self.height,
+                block = body.block.map(PBBlocks.vanilla(_, unsafe = true).get).orNull,
+                updatedWavesAmount = body.updatedWavesAmount,
+                blockStateUpdate = append.stateUpdate.fold(Monoid[ve.StateUpdate].empty)(_.vanilla.get),
+                transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get),
+                transactionMetadata = append.transactionsMetadata,
+                referencedAssets = self.referencedAssets.map(AssetInfo.fromPB)
+              )
+            case _: Body.MicroBlock => throw new IllegalArgumentException("Encountered microblock append body")
+            case Body.Empty         => throw new IllegalArgumentException("Empty append body")
+          }
 
-          case Update.Rollback(rollback) =>
-            rollback.`type` match {
-              case RollbackType.BLOCK =>
-                ve.RollbackCompleted(
-                  self.id.toByteStr,
-                  self.height,
-                  RollbackResult(
-                    rollback.removedBlocks.map(PBBlocks.vanilla(_).get),
-                    rollback.removedTransactionIds.map(_.toByteStr),
-                    rollback.getRollbackStateUpdate.vanilla.get
-                  ),
-                  referencedAssets = self.referencedAssets.map(AssetInfo.fromPB)
-                )
-              case RollbackType.MICROBLOCK =>
-                ve.MicroBlockRollbackCompleted(
-                  id = self.id.toByteStr,
-                  height = self.height,
-                  RollbackResult.micro(rollback.removedTransactionIds.map(_.toByteStr), rollback.getRollbackStateUpdate.vanilla.get),
-                  referencedAssets = self.referencedAssets.map(AssetInfo.fromPB)
-                )
-              case RollbackType.Unrecognized(v) => throw new IllegalArgumentException(s"Unrecognized rollback type $v")
-            }
-          case Update.Empty => throw new IllegalArgumentException("Update body is empty")
-        }
-      } recoverWith {
-        case err: Throwable =>
-          Failure(new IllegalArgumentException(s"Invalid protobuf BlockchainUpdated at height ${self.height}, id ${self.id.toByteStr}", err))
+        case _: Update.Rollback => throw new IllegalArgumentException("Encountered rollback")
+        case Update.Empty       => throw new IllegalArgumentException("Update body is empty")
       }
   }
 

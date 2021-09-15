@@ -1,7 +1,6 @@
 package com.wavesplatform.utx
 
-import scala.concurrent.duration._
-
+import com.wavesplatform.TestValues
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
@@ -12,17 +11,18 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.TestValues
 import monix.reactive.subjects.PublishSubject
-import org.scalatest.{FlatSpec, Matchers}
 import org.scalatest.concurrent.Eventually
 
+import scala.concurrent.duration._
+
 //noinspection RedundantDefaultArgument
-class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Eventually {
+class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
   val dApp = TxHelpers.secondSigner
 
   "UTX pool" should s"drop failed Invoke with complexity <= ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
