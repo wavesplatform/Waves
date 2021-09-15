@@ -9,6 +9,7 @@ import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshal
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Source
+import cats.data.Validated
 import cats.instances.either._
 import cats.instances.list._
 import cats.syntax.alternative._
@@ -90,14 +91,18 @@ case class AssetsApiRoute(
     pathPrefix("assets") {
       pathPrefix("balance" / AddrSegment) { address =>
         anyParam("assetid") { assetIds =>
-          val balanceObjs: List[Either[GenericError, JsObject]] = assetIds.toList.map(
-            assetId =>
-              for {
-                asset <- ByteStr.decodeBase58(assetId).fold(_ => Left(GenericError(s"Invalid assetId: $assetId")), bs => Right(IssuedAsset(bs)))
-                balance = blockchain.balance(address, asset)
-              } yield Json.obj("assetId" -> assetId, "balance" -> balance) // TODO: Add asset details
-          )
-          complete(balanceObjs.sequence.map(objs => JsArray(objs)))
+          val assetIdsValidated = assetIds.toList
+            .map(assetId => ByteStr.decodeBase58(assetId).fold(_ => Left(assetId), bs => Right(IssuedAsset(bs))).toValidatedNel)
+            .sequence
+
+          assetIdsValidated match {
+            case Validated.Valid(assets) =>
+              val balanceObjs = assets.map(asset => Json.obj("assetId" -> asset, "balance" -> blockchain.balance(address, asset))) // TODO: Add asset details
+              complete(balanceObjs)
+
+            case Validated.Invalid(invalidAssets) =>
+              complete(InvalidIds(invalidAssets.toList))
+          }
         } ~ get(pathEndOrSingleSlash {
           balances(address)
         } ~ path(AssetId) { assetId =>

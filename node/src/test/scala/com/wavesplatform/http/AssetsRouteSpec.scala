@@ -24,7 +24,7 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.{JsArray, JsObject, Json, Writes}
+import play.api.libs.json.{JsObject, Json, JsValue, Writes}
 
 class AssetsRouteSpec
     extends RouteSpec("/assets")
@@ -63,13 +63,25 @@ class AssetsRouteSpec
 
       route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "assetid")("aaa", "bbb") {
         status shouldBe StatusCodes.OK
-        responseAs[JsArray] should matchJson("""[ {
+        responseAs[JsValue] should matchJson("""[ {
             |  "assetId" : "aaa",
             |  "balance" : 100
             |}, {
             |  "assetId" : "bbb",
             |  "balance" : 100
             |} ]""".stripMargin)
+      }
+
+      route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "assetid")("____", "----") {
+        status shouldBe StatusCodes.BadRequest
+        responseAs[JsValue] should matchJson("""{
+                                               |    "error": 116,
+                                               |    "message": "Request contains invalid IDs. ____, ----",
+                                               |    "ids": [
+                                               |        "____",
+                                               |        "----"
+                                               |    ]
+                                               |}""".stripMargin)
       }
     }
   }
