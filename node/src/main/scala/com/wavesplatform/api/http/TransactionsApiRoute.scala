@@ -1,7 +1,5 @@
 package com.wavesplatform.api.http
 
-import scala.concurrent.Future
-import scala.util.Success
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import cats.instances.either._
@@ -11,8 +9,7 @@ import cats.syntax.alternative._
 import cats.syntax.either._
 import cats.syntax.traverse._
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.common.TransactionMeta
+import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
@@ -22,10 +19,10 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
+import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{Blockchain, InvokeScriptResult}
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.{Blockchain, InvokeScriptResult}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
@@ -35,6 +32,9 @@ import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json._
+
+import scala.concurrent.Future
+import scala.util.Success
 
 case class TransactionsApiRoute(
     settings: RestAPISettings,
