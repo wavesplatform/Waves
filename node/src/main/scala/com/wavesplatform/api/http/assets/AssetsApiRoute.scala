@@ -90,7 +90,7 @@ case class AssetsApiRoute(
   override lazy val route: Route =
     pathPrefix("assets") {
       pathPrefix("balance" / AddrSegment) { address =>
-        anyParam("assetid") { assetIds =>
+        anyParam("id").filter(_.nonEmpty) { assetIds =>
           val assetIdsValidated = assetIds.toList
             .map(assetId => ByteStr.decodeBase58(assetId).fold(_ => Left(assetId), bs => Right(IssuedAsset(bs))).toValidatedNel)
             .sequence

@@ -2,9 +2,11 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.google.protobuf.ByteString
 import com.wavesplatform.{RequestGen, TestTime, TestValues}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
+import com.wavesplatform.api.common.CommonAssetsApi.AssetInfo
 import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request}
@@ -44,6 +46,7 @@ class AssetsRouteSpec
   (wallet.privateKeyAccount _).when(senderPrivateKey.toAddress).onCall((_: Address) => Right(senderPrivateKey)).anyNumberOfTimes()
 
   private val assetsApi: CommonAssetsApi = stub[CommonAssetsApi]
+  private val accountsApi: CommonAccountsApi = stub[CommonAccountsApi]
 
   private val MaxDistributionDepth = 1
   private val route: Route = AssetsApiRoute(
@@ -52,7 +55,7 @@ class AssetsRouteSpec
     DummyTransactionPublisher.accepting,
     blockchain,
     new TestTime(),
-    mock[CommonAccountsApi],
+    accountsApi,
     assetsApi,
     MaxDistributionDepth
   ).route
@@ -60,8 +63,13 @@ class AssetsRouteSpec
   "/balance/{address}" - {
     "multiple ids" in {
       (blockchain.balance _).when(TxHelpers.defaultAddress, *).returning(100)
+      (accountsApi.portfolio _).when(TxHelpers.defaultAddress).returning(Observable(IssuedAsset(ByteStr.decodeBase58("xxx").get) -> 999L))
+      (assetsApi.fullInfo _).when(*).returning {
+        val desc = AssetDescription(ByteStr.empty, TxHelpers.defaultSigner.publicKey, ByteString.EMPTY, ByteString.EMPTY, 0, false, BigInt(123), Height(123), None, 0L, nft = false)
+        Some(AssetInfo(desc, None, None))
+      }
 
-      route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "assetid")("aaa", "bbb") {
+      route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "id")("aaa", "bbb") {
         status shouldBe StatusCodes.OK
         responseAs[JsValue] should matchJson("""[ {
             |  "assetId" : "aaa",
@@ -72,7 +80,7 @@ class AssetsRouteSpec
             |} ]""".stripMargin)
       }
 
-      route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "assetid")("____", "----") {
+      route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "id")("____", "----") {
         status shouldBe StatusCodes.BadRequest
         responseAs[JsValue] should matchJson("""{
                                                |    "error": 116,
@@ -83,6 +91,22 @@ class AssetsRouteSpec
                                                |    ]
                                                |}""".stripMargin)
       }
+
+      withClue("GET portfolio")(Get(routePath(s"/balance/${TxHelpers.defaultAddress}")) ~> route ~> check { // portfolio
+        status shouldBe StatusCodes.OK
+        responseAs[JsValue] should matchJson("""{
+                                               |  "address" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                               |  "balances" : [ {
+                                               |    "assetId" : "xxx",
+                                               |    "balance" : 999,
+                                               |    "reissuable" : false,
+                                               |    "minSponsoredAssetFee" : null,
+                                               |    "sponsorBalance" : null,
+                                               |    "quantity" : 123,
+                                               |    "issueTransaction" : null
+                                               |  } ]
+                                               |}""".stripMargin)
+      })
     }
   }
 
