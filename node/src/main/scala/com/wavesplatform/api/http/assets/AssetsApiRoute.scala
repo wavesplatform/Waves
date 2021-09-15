@@ -13,6 +13,7 @@ import cats.instances.either._
 import cats.instances.list._
 import cats.syntax.alternative._
 import cats.syntax.either._
+import cats.syntax.traverse._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http._
@@ -87,17 +88,23 @@ case class AssetsApiRoute(
 
   override lazy val route: Route =
     pathPrefix("assets") {
-      get {
-        pathPrefix("balance") {
-          pathPrefix(AddrSegment) { address =>
-            pathEndOrSingleSlash {
-              balances(address)
-            } ~
-              path(AssetId) { assetId =>
-                balance(address, assetId)
-              }
-          }
-        } ~ pathPrefix("details") {
+      pathPrefix("balance" / AddrSegment) { address =>
+        anyParam("assetid") { assetIds =>
+          val balanceObjs: List[Either[GenericError, JsObject]] = assetIds.toList.map(
+            assetId =>
+              for {
+                asset <- ByteStr.decodeBase58(assetId).fold(_ => Left(GenericError(s"Invalid assetId: $assetId")), bs => Right(IssuedAsset(bs)))
+                balance = blockchain.balance(address, asset)
+              } yield Json.obj("assetId" -> assetId, "balance" -> balance) // TODO: Add asset details
+          )
+          complete(balanceObjs.sequence.map(objs => JsArray(objs)))
+        } ~ get(pathEndOrSingleSlash {
+          balances(address)
+        } ~ path(AssetId) { assetId =>
+          balance(address, assetId)
+        })
+      } ~ get {
+        pathPrefix("details") {
           (pathEndOrSingleSlash & parameters("id".as[String].*, "full".as[Boolean] ? false)) { (ids, full) =>
             multipleDetailsGet(ids.toSeq.reverse, full)
           } ~ (path(AssetId) & parameter("full".as[Boolean] ? false)) { (assetId, full) =>

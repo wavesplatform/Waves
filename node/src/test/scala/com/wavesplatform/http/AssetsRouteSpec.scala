@@ -2,6 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.{RequestGen, TestTime, TestValues}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiMarshallers._
@@ -16,14 +17,14 @@ import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{RequestGen, TestTime, TestValues}
 import monix.reactive.Observable
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.{JsObject, Json, Writes}
+import play.api.libs.json.{JsArray, JsObject, Json, Writes}
 
 class AssetsRouteSpec
     extends RouteSpec("/assets")
@@ -55,6 +56,23 @@ class AssetsRouteSpec
     assetsApi,
     MaxDistributionDepth
   ).route
+
+  "/balance/{address}" - {
+    "multiple ids" in {
+      (blockchain.balance _).when(TxHelpers.defaultAddress, *).returning(100)
+
+      route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "assetid")("aaa", "bbb") {
+        status shouldBe StatusCodes.OK
+        responseAs[JsArray] should matchJson("""[ {
+            |  "assetId" : "aaa",
+            |  "balance" : 100
+            |}, {
+            |  "assetId" : "bbb",
+            |  "balance" : 100
+            |} ]""".stripMargin)
+      }
+    }
+  }
 
   "/transfer" - {
     def posting[A: Writes](v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(ApiKeyHeader) ~> route
