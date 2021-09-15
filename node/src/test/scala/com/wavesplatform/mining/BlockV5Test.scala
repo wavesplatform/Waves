@@ -466,7 +466,7 @@ class BlockV5Test
   private def withMiner(blockchain: Blockchain with BlockchainUpdater with NG, time: Time, settings: WavesSettings = testSettings)(
       f: (MinerImpl, Appender, Scheduler) => Unit
   ): Unit = {
-    val pos               = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTargetOpt)
+    val pos               = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
     val allChannels       = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val wallet            = Wallet(WalletSettings(None, Some("123"), None))
     val utxPool           = new UtxPoolImpl(time, blockchain, Observer.stopped, settings.utxSettings)
