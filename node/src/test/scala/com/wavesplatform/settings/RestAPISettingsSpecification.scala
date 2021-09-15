@@ -19,6 +19,7 @@ class RestAPISettingsSpecification extends FlatSpec {
                                                |    distribution-address-limit = 10000
                                                |    evaluate-script-complexity-limit = 4000
                                                |    limited-pool-threads = 2
+                                               |    heavy-request-processor-pool-threads = 7
                                                |    minimum-peers = 2
                                                |  }
                                                |}
@@ -35,6 +36,7 @@ class RestAPISettingsSpecification extends FlatSpec {
     settings.distributionAddressLimit shouldBe 10000
     settings.evaluateScriptComplexityLimit shouldBe 4000
     settings.limitedPoolThreads shouldBe 2
+    settings.heavyRequestProcessorPoolThreads shouldBe Some(7)
     settings.minimumPeers shouldBe 2
   }
 }
