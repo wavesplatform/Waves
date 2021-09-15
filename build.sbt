@@ -7,8 +7,8 @@
  */
 
 import sbt.Keys._
-import sbt.{**, Compile, CrossVersion, File, IO, Project, compilerPlugin, inConfig, _}
-import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
+
+Global / onChangedBuildSource := ReloadOnSourceChanges
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
@@ -131,7 +131,9 @@ inScope(Global)(
       "-Xlint",
       "-opt:l:inline",
       "-opt-inline-from:**",
-      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s" // Ignore gRPC warnings
+      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s", // Ignore gRPC warnings
+      "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
+      "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
     ),
     crossPaths := false,
     dependencyOverrides ++= Dependencies.enforcedVersions.value,
