@@ -39,11 +39,11 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
   private[utx] def setPriorityDiffs(discDiffs: Seq[Diff]): Set[Transaction] =
     if (discDiffs.isEmpty) Set.empty
     else {
-      val transactions = updateDiffs(_ => discDiffs.map(PriorityData(_)))
+      val removedTxs = updateDiffs(_ => discDiffs.map(PriorityData(_)))
       log.trace(
         s"Priority pool updated with diffs: [${discDiffs.map(_.hashString).mkString(", ")}], transactions order: [${priorityTransactionIds.mkString(", ")}]"
       )
-      transactions
+      removedTxs
     }
 
   private[utx] def invalidateTxs(removed: Set[ByteStr]): Unit =

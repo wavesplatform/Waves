@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentHashMap
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
-import scala.util.{Left, Right}
+import scala.util.{Left, Right, Try}
 
 import cats.Monoid
 import cats.syntax.monoid._
@@ -40,7 +40,9 @@ import kamon.metric.MeasurementUnit
 import monix.execution.ExecutionModel
 import monix.execution.atomic.AtomicBoolean
 import monix.execution.schedulers.SchedulerService
+import monix.execution.Scheduler.Implicits.global
 import monix.reactive.Observer
+import monix.reactive.subjects.{ConcurrentSubject, Subject}
 import org.slf4j.LoggerFactory
 
 //noinspection ScalaStyle
@@ -49,7 +51,7 @@ class UtxPoolImpl(
     blockchain: Blockchain,
     spendableBalanceChanged: Observer[(Address, Asset)],
     utxSettings: UtxSettings,
-    onEvent: UtxEvent => Unit = _ => (),
+    eventStream: Subject[UtxEvent, UtxEvent] = ConcurrentSubject.publish,
     nanoTimeSource: () => TxTimestamp = () => System.nanoTime()
 ) extends ScorexLogging
     with AutoCloseable
@@ -71,17 +73,11 @@ class UtxPoolImpl(
 
   // Synchronization
   private[this] object NewTransactionMonitor {
-    private[this] val monitor = new Object
-
-    def waitForNewTransaction(timeout: Long): Unit = concurrent.blocking {
-      monitor.wait(timeout)
-    }
-
-    def notifyOfNewTransaction(): Unit = {
-      monitor.notifyAll()
+    def waitForNewTransaction(timeout: FiniteDuration): Unit = {
+      val task = eventStream.collect { case UtxEvent.TxAdded(_, _) => () }.headL
+      Try(task.runSyncUnsafe(timeout))
     }
   }
-
 
   override def putIfNew(tx: Transaction, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id()) || priorityPool.contains(tx.id())) TracedResult.wrapValue(false)
@@ -220,7 +216,7 @@ class UtxPoolImpl(
     val factRemoved     = priorityRemoved ++ removed.flatMap(id => removeFromOrdPool(id))
     factRemoved.foreach { tx =>
       ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Mined)
-      onEvent(UtxEvent.TxRemoved(tx, None))
+      eventStream.onNext(UtxEvent.TxRemoved(tx, None))
     }
   }
 
@@ -244,17 +240,18 @@ class UtxPoolImpl(
 
     def addPortfolio(): Unit = diffEi.map { diff =>
       pessimisticPortfolios.add(tx.id(), diff)
-      onEvent(UtxEvent.TxAdded(tx, diff))
+      eventStream.onNext(UtxEvent.TxAdded(tx, diff))
     }
 
     if (!verify || diffEi.resultE.isRight) {
-      transactions.computeIfAbsent(tx.id(), { _ =>
-        PoolMetrics.addTransaction(tx)
-        ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Received)
-        addPortfolio()
-        NewTransactionMonitor.notifyOfNewTransaction()
-        tx
-      })
+      transactions.computeIfAbsent(
+        tx.id(), { _ =>
+          PoolMetrics.addTransaction(tx)
+          ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Received)
+          addPortfolio()
+          tx
+        }
+      )
     }
 
     diffEi.map(_ => true)
@@ -363,7 +360,7 @@ class UtxPoolImpl(
                 log.debug(s"Transaction ${tx.id()} expired")
                 ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Expired)
                 this.removeFromOrdPool(tx.id())
-                onEvent(UtxEvent.TxRemoved(tx, Some(GenericError("Expired"))))
+                eventStream.onNext(UtxEvent.TxRemoved(tx, Some(GenericError("Expired"))))
                 r.copy(iterations = r.iterations + 1, removedTransactions = r.removedTransactions + tx.id())
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
@@ -371,8 +368,8 @@ class UtxPoolImpl(
                 else {
                   val updatedBlockchain   = CompositeBlockchain(blockchain, r.totalDiff)
                   val newCheckedAddresses = newScriptedAddresses ++ r.checkedAddresses
-                  val e = differ(updatedBlockchain, tx).resultE
-                  e match {
+                  val resultEi            = differ(updatedBlockchain, tx).resultE
+                  resultEi match {
                     case Right(newDiff) =>
                       val updatedConstraint = r.constraint.put(updatedBlockchain, tx, newDiff)
                       if (updatedConstraint.isOverfilled) {
@@ -416,7 +413,7 @@ class UtxPoolImpl(
                       log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
                       traceLogger.trace(error.toString)
                       this.removeFromOrdPool(tx.id())
-                      onEvent(UtxEvent.TxRemoved(tx, Some(error)))
+                      eventStream.onNext(UtxEvent.TxRemoved(tx, Some(error)))
                       r.copy(
                         iterations = r.iterations + 1,
                         validatedTransactions = r.validatedTransactions + tx.id(),
@@ -446,9 +443,9 @@ class UtxPoolImpl(
             newSeed
           } else {
             val continue = try {
-              while (!cancelled() && !isTimeEstimateReached && allValidated(newSeed))
-                NewTransactionMonitor.waitForNewTransaction(timeEstimateRemaining.toMillis)
-
+              while (!cancelled() && !isTimeEstimateReached && allValidated(newSeed)) NewTransactionMonitor.waitForNewTransaction(
+                timeEstimateRemaining min 200.millis
+              )
               !cancelled() && (!isTimeEstimateReached || isUnlimited)
             } catch {
               case _: InterruptedException =>
