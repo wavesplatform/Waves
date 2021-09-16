@@ -5,6 +5,7 @@ import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 
 import scala.annotation.tailrec
+import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.util.{Left, Right}
 
@@ -67,6 +68,20 @@ class UtxPoolImpl(
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionMeta(_).isDefined) // TODO delete in the future
 
   private[this] val inUTXPoolOrdering = TransactionsOrdering.InUTXPool(utxSettings.fastLaneAddresses)
+
+  // Synchronization
+  private[this] object NewTransactionMonitor {
+    private[this] val monitor = new Object
+
+    def waitForNewTransaction(timeout: Long): Unit = concurrent.blocking {
+      monitor.wait(timeout)
+    }
+
+    def notifyOfNewTransaction(): Unit = {
+      monitor.notifyAll()
+    }
+  }
+
 
   override def putIfNew(tx: Transaction, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id()) || priorityPool.contains(tx.id())) TracedResult.wrapValue(false)
@@ -237,6 +252,7 @@ class UtxPoolImpl(
         PoolMetrics.addTransaction(tx)
         ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Received)
         addPortfolio()
+        NewTransactionMonitor.notifyOfNewTransaction()
         tx
       })
     }
@@ -324,6 +340,11 @@ class UtxPoolImpl(
       def isTimeEstimateReached: Boolean = strategy match {
         case PackStrategy.Estimate(time) => (nanoTimeSource() - startTime) >= time.toNanos
         case _                           => true
+      }
+
+      def timeEstimateRemaining: FiniteDuration = strategy match {
+        case PackStrategy.Estimate(time) => math.max(0L, time.toNanos - (nanoTimeSource() - startTime)).nanos
+        case _                           => 0.nanos
       }
 
       def isUnlimited: Boolean = strategy == PackStrategy.Unlimited
@@ -425,7 +446,9 @@ class UtxPoolImpl(
             newSeed
           } else {
             val continue = try {
-              while (!cancelled() && !isTimeEstimateReached && allValidated(newSeed)) Thread.sleep(200)
+              while (!cancelled() && !isTimeEstimateReached && allValidated(newSeed))
+                NewTransactionMonitor.waitForNewTransaction(timeEstimateRemaining.toMillis)
+
               !cancelled() && (!isTimeEstimateReached || isUnlimited)
             } catch {
               case _: InterruptedException =>
