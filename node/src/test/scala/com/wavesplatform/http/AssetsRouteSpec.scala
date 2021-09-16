@@ -71,13 +71,29 @@ class AssetsRouteSpec
 
       route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "id")("aaa", "bbb") {
         status shouldBe StatusCodes.OK
-        responseAs[JsValue] should matchJson("""[ {
-            |  "assetId" : "aaa",
-            |  "balance" : 100
-            |}, {
-            |  "assetId" : "bbb",
-            |  "balance" : 100
-            |} ]""".stripMargin)
+        responseAs[JsValue] should matchJson(
+          """
+            |{
+            |  "address" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+            |  "balances" : [ {
+            |    "assetId" : "aaa",
+            |    "reissuable" : false,
+            |    "minSponsoredAssetFee" : null,
+            |    "sponsorBalance" : null,
+            |    "quantity" : 123,
+            |    "issueTransaction" : null,
+            |    "balance" : 100
+            |  }, {
+            |    "assetId" : "bbb",
+            |    "reissuable" : false,
+            |    "minSponsoredAssetFee" : null,
+            |    "sponsorBalance" : null,
+            |    "quantity" : 123,
+            |    "issueTransaction" : null,
+            |    "balance" : 100
+            |  } ]
+            |}
+            |""".stripMargin)
       }
 
       route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "id")("____", "----") {
@@ -92,7 +108,15 @@ class AssetsRouteSpec
                                                |}""".stripMargin)
       }
 
-      withClue("GET portfolio")(Get(routePath(s"/balance/${TxHelpers.defaultAddress}")) ~> route ~> check { // portfolio
+      withClue("over limit")(route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "id")(Seq.fill(101)("aaa"):_*) {
+        status shouldBe StatusCodes.BadRequest
+        responseAs[JsValue] should matchJson("""{
+                                               |  "error" : 10,
+                                               |  "message" : "Too big sequence requested: max limit is 100 entries"
+                                               |}""".stripMargin)
+      })
+
+      withClue("old GET portfolio")(Get(routePath(s"/balance/${TxHelpers.defaultAddress}")) ~> route ~> check { // portfolio
         status shouldBe StatusCodes.OK
         responseAs[JsValue] should matchJson("""{
                                                |  "address" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",

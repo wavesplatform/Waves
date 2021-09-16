@@ -90,15 +90,15 @@ case class AssetsApiRoute(
   override lazy val route: Route =
     pathPrefix("assets") {
       pathPrefix("balance" / AddrSegment) { address =>
-        anyParam("id").filter(_.nonEmpty) { assetIds =>
+        anyParam("id", nonEmpty = true, limit = 100) { assetIds =>
           val assetIdsValidated = assetIds.toList
             .map(assetId => ByteStr.decodeBase58(assetId).fold(_ => Left(assetId), bs => Right(IssuedAsset(bs))).toValidatedNel)
             .sequence
 
           assetIdsValidated match {
             case Validated.Valid(assets) =>
-              val balanceObjs = assets.map(asset => Json.obj("assetId" -> asset, "balance" -> blockchain.balance(address, asset))) // TODO: Add asset details
-              complete(balanceObjs)
+              val balanceObjs = assets.map(asset => fullAssetInfoJson(asset) ++ Json.obj("balance" -> blockchain.balance(address, asset)))
+              complete(Json.obj("address" -> address, "balances" -> balanceObjs))
 
             case Validated.Invalid(invalidAssets) =>
               complete(InvalidIds(invalidAssets.toList))
@@ -140,6 +140,25 @@ case class AssetsApiRoute(
       }
     }
 
+
+  def fullAssetInfoJson(asset: IssuedAsset): JsObject = commonAssetsApi.fullInfo(asset) match {
+    case Some(CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance)) =>
+      Json.obj(
+        "assetId"    -> asset,
+        "reissuable" -> assetInfo.reissuable,
+        "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
+          case 0           => JsNull
+          case sponsorship => JsNumber(sponsorship)
+        }),
+        "sponsorBalance"   -> sponsorBalance,
+        "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
+        "issueTransaction" -> issueTransaction.map(_.json())
+      )
+
+    case None =>
+      Json.obj("assetId"    -> asset)
+  }
+
   def balances(address: Address): Route = extractScheduler { implicit s =>
     implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsObject, NotUsed]] =
       jsonStreamMarshaller(s"""{"address":"$address","balances":[""", ",", "]}")
@@ -147,23 +166,9 @@ case class AssetsApiRoute(
     complete(commonAccountApi.portfolio(address).toListL.runToFuture.map { balances =>
       Source.fromIterator(
         () =>
-          balances.iterator.flatMap {
+          balances.iterator.map {
             case (assetId, balance) =>
-              commonAssetsApi.fullInfo(assetId).map {
-                case CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance) =>
-                  Json.obj(
-                    "assetId"    -> assetId.id.toString,
-                    "balance"    -> balance,
-                    "reissuable" -> assetInfo.reissuable,
-                    "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
-                      case 0           => JsNull
-                      case sponsorship => JsNumber(sponsorship)
-                    }),
-                    "sponsorBalance"   -> sponsorBalance,
-                    "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
-                    "issueTransaction" -> issueTransaction.map(_.json())
-                  )
-              }
+              fullAssetInfoJson(assetId) ++ Json.obj("balance" -> balance)
           }
       )
     })
