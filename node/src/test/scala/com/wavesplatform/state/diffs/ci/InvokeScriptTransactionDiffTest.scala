@@ -561,17 +561,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
     }
   }
 
-  property("can't more than 5kb of data") {
-    forAll(for {
-      r <- preconditionsAndSetContract(s => dataContractGen(s, bigData = true))
-    } yield (r._1, r._2, r._3)) {
-      case (genesis, setScript, ci) =>
-        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fsWithV5) {
-          _ should produce("WriteSet size can't exceed")
-        }
-    }
-  }
-
   property("can't use empty keys in v2") {
     forAll(for {
       r <- preconditionsAndSetContract(s => dataContractGen(s, emptyData = true), txVersion = TxVersion.V1)

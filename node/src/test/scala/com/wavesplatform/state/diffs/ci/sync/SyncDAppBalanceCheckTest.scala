@@ -10,11 +10,11 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.{TestTime, TransactionGenBase}
-import org.scalatest.PropSpec
 
 class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with TransactionGenBase {
 

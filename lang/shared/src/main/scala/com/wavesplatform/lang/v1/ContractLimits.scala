@@ -41,6 +41,8 @@ object ContractLimits {
   val MaxWriteSetSizeInBytes     = 5 * 1024
   def MaxWriteSetSize(v: StdLibVersion) = 100
 
+  val MaxTotalWriteSetSizeInBytes = 15 * 1024
+
   // should conform DataEntry limits
   val MaxKeySizeInBytesByVersion: StdLibVersion => Int =
     v => if (v >= V4) 400 else 100
