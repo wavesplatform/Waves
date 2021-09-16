@@ -1,11 +1,13 @@
 package com.wavesplatform.mining.microblocks
 
+import scala.concurrent.duration._
+
 import cats.syntax.applicativeError._
 import cats.syntax.bifunctor._
 import cats.syntax.either._
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining._
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl._
@@ -22,8 +24,6 @@ import kamon.Kamon
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 
-import scala.concurrent.duration._
-
 class MicroBlockMinerImpl(
     setDebugState: MinerDebugInfo.State => Unit,
     allChannels: ChannelGroup,
@@ -32,10 +32,15 @@ class MicroBlockMinerImpl(
     settings: MinerSettings,
     minerScheduler: SchedulerService,
     appenderScheduler: SchedulerService,
-    waitForUtxNonEmpty: Task[Unit],
+    waitForUtxFillUp: Task[Unit],
     nextMicroBlockSize: Int => Int
 ) extends MicroBlockMiner
     with ScorexLogging {
+
+  private[this] val waitForUtxNonEmpty = Task.defer {
+    if (utx.size > 0) Task.unit
+    else waitForUtxFillUp
+  }
 
   private[this] val microBlockBuildTimeStats = Kamon.timer("miner.forge-microblock-time").withoutTags()
 
@@ -45,12 +50,13 @@ class MicroBlockMinerImpl(
       restTotalConstraint: MiningConstraint,
       lastMicroBlock: Long
   ): Task[Unit] =
-    generateOneMicroBlockTask(account, accumulatedBlock, restTotalConstraint, lastMicroBlock)
-      .flatMap {
+    waitForUtxNonEmpty
+      .flatMap(_ => generateOneMicroBlockTask(account, accumulatedBlock, restTotalConstraint, lastMicroBlock))
+      .flatMap { // Next micros
         case res @ Success(newBlock, newConstraint) =>
           Task.defer(generateMicroBlockSequence(account, newBlock, newConstraint, res.nanoTime))
         case Retry =>
-          waitForUtxNonEmpty
+          waitForUtxFillUp
             .flatMap(_ => generateMicroBlockSequence(account, accumulatedBlock, restTotalConstraint, lastMicroBlock))
         case Stop =>
           setDebugState(MinerDebugInfo.MiningBlocks)

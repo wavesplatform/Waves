@@ -278,7 +278,7 @@ class UtxPoolImpl(
   override def all: Seq[Transaction] =
     (priorityPool.priorityTransactions ++ nonPriorityTransactions).distinct
 
-  override def size: Int = transactions.size
+  override def size: Int = priorityPool.priorityTransactions.size + transactions.size
 
   override def transactionById(transactionId: ByteStr): Option[Transaction] =
     Option(transactions.get(transactionId))
