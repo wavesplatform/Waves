@@ -90,24 +90,21 @@ case class AssetsApiRoute(
   override lazy val route: Route =
     pathPrefix("assets") {
       pathPrefix("balance" / AddrSegment) { address =>
-        anyParam("id", nonEmpty = true, limit = 100) { assetIds =>
+        anyParam("id", limit = 100) { assetIds =>
           val assetIdsValidated = assetIds.toList
             .map(assetId => ByteStr.decodeBase58(assetId).fold(_ => Left(assetId), bs => Right(IssuedAsset(bs))).toValidatedNel)
             .sequence
 
           assetIdsValidated match {
             case Validated.Valid(assets) =>
-              val balanceObjs = assets.map(asset => fullAssetInfoJson(asset) ++ Json.obj("balance" -> blockchain.balance(address, asset)))
-              complete(Json.obj("address" -> address, "balances" -> balanceObjs))
+              balances(address, Some(assets).filter(_.nonEmpty))
 
             case Validated.Invalid(invalidAssets) =>
               complete(InvalidIds(invalidAssets.toList))
           }
-        } ~ get(pathEndOrSingleSlash {
-          balances(address)
-        } ~ path(AssetId) { assetId =>
+        } ~ (get & path(AssetId)) { assetId =>
           balance(address, assetId)
-        })
+        }
       } ~ get {
         pathPrefix("details") {
           (pathEndOrSingleSlash & parameters("id".as[String].*, "full".as[Boolean] ? false)) { (ids, full) =>
@@ -140,7 +137,6 @@ case class AssetsApiRoute(
       }
     }
 
-
   def fullAssetInfoJson(asset: IssuedAsset): JsObject = commonAssetsApi.fullInfo(asset) match {
     case Some(CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance)) =>
       Json.obj(
@@ -156,22 +152,33 @@ case class AssetsApiRoute(
       )
 
     case None =>
-      Json.obj("assetId"    -> asset)
+      Json.obj("assetId" -> asset)
   }
 
-  def balances(address: Address): Route = extractScheduler { implicit s =>
+  /**
+    * @param assets Some(assets) for specific asset balances, None for a full portfolio
+    */
+  def balances(address: Address, assets: Option[Seq[IssuedAsset]] = None): Route = extractScheduler { implicit s =>
     implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsObject, NotUsed]] =
       jsonStreamMarshaller(s"""{"address":"$address","balances":[""", ",", "]}")
 
-    complete(commonAccountApi.portfolio(address).toListL.runToFuture.map { balances =>
-      Source.fromIterator(
-        () =>
-          balances.iterator.map {
-            case (assetId, balance) =>
-              fullAssetInfoJson(assetId) ++ Json.obj("balance" -> balance)
-          }
-      )
-    })
+    val assetBalances = assets match {
+      case Some(assets) =>
+        Source(assets)
+          .map(asset => asset -> blockchain.balance(address, asset))
+
+      case None =>
+        Source
+          .future(commonAccountApi.portfolio(address).toListL.runToFuture) // FIXME: Strict loading because of segfault in leveldb
+          .mapConcat(identity)
+    }
+
+    val jsonStream = assetBalances.map {
+      case (assetId, balance) =>
+        fullAssetInfoJson(assetId) ++ Json.obj("balance" -> balance)
+    }
+
+    complete(jsonStream)
   }
 
   def balance(address: Address, assetId: IssuedAsset): Route = complete(balanceJson(address, assetId))

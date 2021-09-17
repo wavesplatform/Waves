@@ -7,7 +7,7 @@ import play.api.libs.json.JsObject
 
 trait CustomDirectives extends Directives with ApiMarshallers with ScorexLogging {
   def anyParam(paramName: String, nonEmpty: Boolean = false, limit: Int = Int.MaxValue): Directive1[Iterable[String]] = {
-    val baseDirective = (get & parameter(paramName.as[String].*).map(_.toSeq.reverse)) |
+    val baseDirective = (get & pathEndOrSingleSlash & parameter(paramName.as[String].*).map(_.toSeq.reverse)) |
       post & (formField(paramName.as[String].*) |
         entity(as[JsObject]).map { jso =>
           (jso \ s"${paramName}s").as[Iterable[String]]
