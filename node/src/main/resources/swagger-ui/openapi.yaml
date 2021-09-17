@@ -1927,71 +1927,68 @@ paths:
     get:
       tags:
         - assets
-      summary: Account balances in all assets
+      summary: Asset balances
       description: >-
-        Get account balances in all assets (excluding WAVES and NFTs) at a given
-        address
-      operationId: getAllAssetBalancesByAddress
+        Get account balances in all or specified assets (excluding WAVES and NFTs) at a given address
+      operationId: getAssetBalances
       parameters:
         - $ref: '#/components/parameters/address'
+        - name: id
+          in: query
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/AssetId'
+            minItems: 1
+            maxItems: 100
       responses:
         '200':
           description: successful operation
           content:
             application/json:
               schema:
-                required:
-                  - address
-                  - balances
-                type: object
-                properties:
-                  address:
-                    type: string
-                  balances:
-                    type: array
-                    items:
-                      required:
-                        - assetId
-                        - balance
-                        - issueTransaction
-                        - minSponsoredAssetFee
-                        - quantity
-                        - reissuable
-                        - sponsorBalance
-                      type: object
-                      properties:
-                        assetId:
-                          type: string
-                          description: Asset ID base58 encoded
-                        balance:
-                          type: integer
-                          format: int64
-                          description: Account balance in the asset
-                        reissuable:
-                          type: boolean
-                          description: Indicates if the asset is reissuable
-                        minSponsoredAssetFee:
-                          type: integer
-                          format: int64
-                          nullable: true
-                          description: >-
-                            For [sponsored
-                            asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee)
-                            only: the equivalent of 0.001 WAVES
-                        sponsorBalance:
-                          type: integer
-                          format: int64
-                          nullable: true
-                          description: >-
-                            For [sponsored
-                            asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee)
-                            only: the sponsor balance in WAVES
-                        quantity:
-                          type: integer
-                          format: int64
-                          description: Total supply of the asset
-                        issueTransaction:
-                          $ref: '#/components/schemas/IssueTransaction'
+                $ref: '#/components/schemas/AssetBalancesResponse'
+    post:
+      tags:
+        - assets
+      summary: Asset balances
+      description: >-
+        Get account balances in specified assets (excluding WAVES and NFTs) at a given address
+      operationId: getAssetBalancesViaPost
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                ids:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AssetId'
+                  minItems: 1
+                  maxItems: 100
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AssetId'
+            encoding:
+              id:
+                style: form
+                explode: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetBalancesResponse'
+      x-codegen-request-body-name: ids
   '/assets/details/{assetId}':
     get:
       tags:
@@ -3125,6 +3122,61 @@ components:
                   format: byte
                 scriptText:
                   type: string
+    AssetBalanceAndDetails:
+      required:
+        - assetId
+        - balance
+        - issueTransaction
+        - minSponsoredAssetFee
+        - quantity
+        - reissuable
+        - sponsorBalance
+      type: object
+      properties:
+        assetId:
+          type: string
+          description: Asset ID base58 encoded
+        balance:
+          type: integer
+          format: int64
+          description: Account balance in the asset
+        reissuable:
+          type: boolean
+          description: Indicates if the asset is reissuable
+        minSponsoredAssetFee:
+          type: integer
+          format: int64
+          nullable: true
+          description: >-
+            For [sponsored
+            asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee)
+            only: the equivalent of 0.001 WAVES
+        sponsorBalance:
+          type: integer
+          format: int64
+          nullable: true
+          description: >-
+            For [sponsored
+            asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee)
+            only: the sponsor balance in WAVES
+        quantity:
+          type: integer
+          format: int64
+          description: Total supply of the asset
+        issueTransaction:
+          $ref: '#/components/schemas/IssueTransaction'
+    AssetBalancesResponse:
+      required:
+        - address
+        - balances
+      type: object
+      properties:
+        address:
+          type: string
+        balances:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetBalanceAndDetails'
     Balance:
       required:
         - address
