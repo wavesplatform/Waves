@@ -1929,7 +1929,8 @@ paths:
         - assets
       summary: Asset balances
       description: >-
-        Get account balances in all or specified assets (excluding WAVES and NFTs) at a given address
+        Get account balances in all or specified assets (excluding WAVES) at a given address
+        Note: Full portfolio also excludes NFTs
       operationId: getAssetBalances
       parameters:
         - $ref: '#/components/parameters/address'
@@ -1956,8 +1957,10 @@ paths:
         - assets
       summary: Asset balances
       description: >-
-        Get account balances in specified assets (excluding WAVES and NFTs) at a given address
+        Get account balances in specified assets (excluding WAVES) at a given address
       operationId: getAssetBalancesViaPost
+      parameters:
+        - $ref: '#/components/parameters/address'
       requestBody:
         content:
           application/json:
