@@ -173,7 +173,7 @@ final case class ABIConverter(script: Script) {
     }
 
     lazy val ethSignature: String = {
-      val argTypes = (args.map(_.rideType).map(ABIConverter.ethFuncSignatureTypeName)) :+ ABIConverter.PaymentArgSignature
+      val argTypes = args.map(_.rideType).map(ABIConverter.ethFuncSignatureTypeName) :+ ABIConverter.PaymentArgSignature
       s"$name(${argTypes.mkString(",")})"
     }
 

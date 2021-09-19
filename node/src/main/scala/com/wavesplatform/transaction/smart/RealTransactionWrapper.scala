@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient, _}
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
-import com.wavesplatform.transaction.EthereumTransaction.Transfer
+import com.wavesplatform.transaction.EthereumTransaction.{Invocation, Transfer}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
@@ -27,6 +27,7 @@ object RealTransactionWrapper {
     }
     Header(txIdOpt.getOrElse(ByteStr(tx.id().arr)), tx.fee, tx.timestamp, v)
   }
+
   private def proven(tx: AuthorizedTransaction, txIdOpt: Option[ByteStr] = None, emptyBodyBytes: Boolean = false): Proven = {
     val proofs = tx match {
       case p: ProvenTransaction => p.proofs.map(_.arr).map(ByteStr(_)).toIndexedSeq
@@ -157,8 +158,19 @@ object RealTransactionWrapper {
             )
           )
 
-      case eth: EthereumTransaction =>
-        Left(s"No mapping for Ethereum transaction $eth")
+      case eth @ EthereumTransaction(i: Invocation, _, _, _) =>
+        for {
+          invoke   <- i.toInvokeScriptLike(eth, blockchain).leftMap(_.toString)
+          payments <- AttachedPaymentExtractor.extractPayments(invoke, stdLibVersion, blockchain, target)
+        } yield
+          Tx.CI(
+            proven(eth, emptyBodyBytes = true),
+            toRide(invoke.dApp),
+            payments,
+            invoke.feeAssetId.compatId,
+            Some(invoke.funcCall.function.funcName),
+            invoke.funcCall.args.map(arg => arg.asInstanceOf[EVALUATED])
+          )
 
       case u: UpdateAssetInfoTransaction =>
         Tx.UpdateAssetInfo(proven(u), u.assetId.id, u.name, u.description).asRight

@@ -11,7 +11,7 @@ import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing.evaluated
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
@@ -49,6 +49,13 @@ import shapeless.Coproduct
 
 class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherValues {
   private val T = 'T'.toByte
+
+  private val ethUnderlying = RawTransaction.createTransaction(BigInteger.ZERO, BigInteger.ZERO, BigInteger.ZERO, "", "")
+  private val ethSignature = new SignatureData(
+    28.toByte,
+    Numeric.hexStringToByteArray("0x0464eee9e2fe1a10ffe48c78b80de1ed8dcf996f3f60955cb2e03cb21903d930"),
+    Numeric.hexStringToByteArray("0x06624da478b3f862582e85b31c6a21c6cae2eee2bd50f55c93c4faad9d9c8d7f")
+  )
 
   def letProof(p: Proofs, prefix: String)(i: Int) =
     s"let ${prefix.replace(".", "")}proof$i = $prefix.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).toString}'"
@@ -122,20 +129,13 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     val recipient  = accountGen.sample.get.toAddress
     val assetErc20 = ERC20Address(ByteStr.fill(20)(1))
     val asset      = IssuedAsset(ByteStr.fromBytes(1, 2, 3))
-    val underlying = RawTransaction.createTransaction(BigInteger.ZERO, BigInteger.ZERO, BigInteger.ZERO, "", "")
-    val signature = new SignatureData(
-      28.toByte,
-      Numeric.hexStringToByteArray("0x0464eee9e2fe1a10ffe48c78b80de1ed8dcf996f3f60955cb2e03cb21903d930"),
-      Numeric.hexStringToByteArray("0x06624da478b3f862582e85b31c6a21c6cae2eee2bd50f55c93c4faad9d9c8d7f")
-    )
-
     val blockchain = stub[Blockchain]
     (blockchain.resolveERC20Address _).when(assetErc20).returning(Some(asset))
     (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0))
 
     def createTx(asset: Option[ERC20Address]): EthereumTransaction = {
       val transfer = EthereumTransaction.Transfer(asset, amount, recipient)
-      EthereumTransaction(transfer, underlying, signature, T)
+      EthereumTransaction(transfer, ethUnderlying, ethSignature, T)
     }
 
     Seq(Some(assetErc20), None)
@@ -165,7 +165,50 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
           T
         ) shouldBe evaluated(true)
       }
+  }
 
+  property("Ethereum InvokeScriptTransaction binding") {
+    val blockchain   = stub[Blockchain]
+    val dApp         = accountGen.sample.get
+    val callableName = "call"
+    val script = TestCompiler(V6).compileContract(
+      s"""
+         | @Callable(i)
+         | func $callableName(arg: Int) = []
+       """.stripMargin
+    )
+    val scriptInfo = AccountScriptInfo(dApp.publicKey, script, 0, Map(3 -> Map("call" -> 0)))
+    (blockchain.accountScript _).when(dApp.toAddress).returning(Some(scriptInfo))
+    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0))
+
+    val passedArg = "7"
+    val data =
+      s"36895e01000000000000000000000000000000000000000000000000000000000000000${passedArg}00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000"
+    val invocation = EthereumTransaction.Invocation(dApp.toAddress, data)
+    val tx = EthereumTransaction(invocation, ethUnderlying, ethSignature, T)
+    runScript(
+      s"""
+             |match tx {
+             |  case t: InvokeScriptTransaction =>
+             |    ${provenPart(tx, emptyBodyBytes = true)}
+             |    let dAppAddress = match t.dApp {
+             |      case a: Address => a.bytes == base58'${dApp.toAddress}'
+             |      case _: Alias   => throw()
+             |    }
+             |    let feeAssetId = t.feeAssetId == unit
+             |    let checkFunc  = t.function == "$callableName"
+             |    let checkArgs  = t.args == [$passedArg]
+             |    let payments   = t.payments == []
+             |    ${assertProvenPart("t")} && dAppAddress && feeAssetId && checkFunc && checkArgs && payments
+             |  case _ =>
+             |    throw()
+             |}
+           """.stripMargin,
+      V6,
+      Coproduct(tx),
+      blockchain,
+      T
+    ) shouldBe evaluated(true)
   }
 
   property("IssueTransaction binding") {
@@ -776,6 +819,94 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       runScript[EVALUATED](src1, Coproduct[In](in)) shouldBe Right(CONST_BOOLEAN(true))
       runScript[EVALUATED](src2, Coproduct[In](in)) shouldBe Right(CONST_LONG(1))
     }
+  }
+
+  property("Ethereum TransferTransaction binding") {
+    val amount     = 12345
+    val recipient  = accountGen.sample.get.toAddress
+    val assetErc20 = ERC20Address(ByteStr.fill(20)(1))
+    val asset      = IssuedAsset(ByteStr.fromBytes(1, 2, 3))
+    val blockchain = stub[Blockchain]
+    (blockchain.resolveERC20Address _).when(assetErc20).returning(Some(asset))
+    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0))
+
+    def createTx(asset: Option[ERC20Address]): EthereumTransaction = {
+      val transfer = EthereumTransaction.Transfer(asset, amount, recipient)
+      EthereumTransaction(transfer, ethUnderlying, ethSignature, T)
+    }
+
+    Seq(Some(assetErc20), None)
+      .foreach { asset =>
+        val tx = createTx(asset)
+        runScript(
+          s"""
+             |match tx {
+             |  case t: TransferTransaction =>
+             |    ${provenPart(tx, emptyBodyBytes = true)}
+             |    let amount = t.amount == $amount
+             |    let feeAssetId = t.feeAssetId == unit
+             |    let recipient = match (t.recipient) {
+             |      case a: Address => a.bytes == base58'$recipient'
+             |      case a: Alias   => throw("unexpected")
+             |    }
+             |    let assetId = t.assetId == ${asset.fold("unit")(a => s"base58'${blockchain.resolveERC20Address(a).get}'")}
+             |    let attachment = t.attachment == base58'${ByteStr.empty}'
+             |    ${assertProvenPart("t")} && amount && assetId && feeAssetId && recipient && attachment
+             |  case _ =>
+             |     throw()
+             |}
+           """.stripMargin,
+          V6,
+          Coproduct(tx),
+          blockchain,
+          T
+        ) shouldBe evaluated(true)
+      }
+  }
+
+  property("Ethereum InvokeScriptTransaction binding") {
+    val blockchain   = stub[Blockchain]
+    val dApp         = accountGen.sample.get
+    val callableName = "call"
+    val script = TestCompiler(V6).compileContract(
+      s"""
+         | @Callable(i)
+         | func $callableName(arg: Int) = []
+       """.stripMargin
+    )
+    val scriptInfo = AccountScriptInfo(dApp.publicKey, script, 0, Map(3 -> Map("call" -> 0)))
+    (blockchain.accountScript _).when(dApp.toAddress).returning(Some(scriptInfo))
+    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0))
+
+    val passedArg = "7"
+    val data =
+      s"36895e01000000000000000000000000000000000000000000000000000000000000000${passedArg}00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000"
+    val invocation = EthereumTransaction.Invocation(dApp.toAddress, data)
+    val tx = EthereumTransaction(invocation, ethUnderlying, ethSignature, T)
+
+    runScript(
+      s"""
+         |match tx {
+         |  case t: InvokeScriptTransaction =>
+         |    ${provenPart(tx, emptyBodyBytes = true)}
+         |    let dAppAddress = match t.dApp {
+         |      case a: Address => a.bytes == base58'${dApp.toAddress}'
+         |      case _: Alias   => throw()
+         |    }
+         |    let feeAssetId = t.feeAssetId == unit
+         |    let checkFunc  = t.function == "$callableName"
+         |    let checkArgs  = t.args == [$passedArg]
+         |    let payments   = t.payments == []
+         |    ${assertProvenPart("t")} && dAppAddress && feeAssetId && checkFunc && checkArgs && payments
+         |  case _ =>
+         |    throw()
+         |}
+           """.stripMargin,
+      V6,
+      Coproduct(tx),
+      blockchain,
+      T
+    ) shouldBe evaluated(true)
   }
 
   def runForAsset(script: String): Either[String, EVALUATED] = {
