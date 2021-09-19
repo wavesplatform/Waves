@@ -25,7 +25,17 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.{WavesEnvironment, buildThisValue}
-import com.wavesplatform.transaction.{Authorized, DataTransaction, ERC20Address, EthereumTransaction, Proofs, ProvenTransaction, Transaction, TxVersion, VersionedTransaction}
+import com.wavesplatform.transaction.{
+  Authorized,
+  DataTransaction,
+  ERC20Address,
+  EthereumTransaction,
+  Proofs,
+  ProvenTransaction,
+  Transaction,
+  TxVersion,
+  VersionedTransaction
+}
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 import org.scalacheck.Gen
@@ -112,45 +122,50 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     val recipient  = accountGen.sample.get.toAddress
     val assetErc20 = ERC20Address(ByteStr.fill(20)(1))
     val asset      = IssuedAsset(ByteStr.fromBytes(1, 2, 3))
-    val transfer   = EthereumTransaction.Transfer(Some(assetErc20), amount, recipient)
     val underlying = RawTransaction.createTransaction(BigInteger.ZERO, BigInteger.ZERO, BigInteger.ZERO, "", "")
     val signature = new SignatureData(
       28.toByte,
       Numeric.hexStringToByteArray("0x0464eee9e2fe1a10ffe48c78b80de1ed8dcf996f3f60955cb2e03cb21903d930"),
       Numeric.hexStringToByteArray("0x06624da478b3f862582e85b31c6a21c6cae2eee2bd50f55c93c4faad9d9c8d7f")
     )
-    val tx = EthereumTransaction(transfer, underlying, signature, T)
 
     val blockchain = stub[Blockchain]
     (blockchain.resolveERC20Address _).when(assetErc20).returning(Some(asset))
     (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0))
 
-    runScript(
-      s"""
-         |match tx {
-         |  case t: TransferTransaction =>
-         |    ${provenPart(tx, emptyBodyBytes = true)}
-         |    let amount = t.amount == $amount
-         |    let feeAssetId = t.feeAssetId == unit
-         |    let recipient = match (t.recipient) {
-         |      case a: Address => a.bytes == base58'$recipient'
-         |      case a: Alias   => throw("unexpected")
-         |    }
-         |    let assetId =
-         |      if (${transfer.tryResolveAsset(blockchain).explicitGet() != Waves})
-         |      then t.assetId == base58'${asset.maybeBase58Repr.get}'
-         |      else t.assetId == unit
-         |    let attachment = t.attachment == base58'${ByteStr.empty}'
-         |    ${assertProvenPart("t")} && amount && assetId && feeAssetId && recipient && attachment
-         |  case _ =>
-         |     throw()
-         |}
-       """.stripMargin,
-      V6,
-      Coproduct(tx),
-      blockchain,
-      T
-    ) shouldBe evaluated(true)
+    def createTx(asset: Option[ERC20Address]): EthereumTransaction = {
+      val transfer = EthereumTransaction.Transfer(asset, amount, recipient)
+      EthereumTransaction(transfer, underlying, signature, T)
+    }
+
+    Seq(Some(assetErc20), None)
+      .foreach { asset =>
+        val tx = createTx(asset)
+        runScript(
+          s"""
+             |match tx {
+             |  case t: TransferTransaction =>
+             |    ${provenPart(tx, emptyBodyBytes = true)}
+             |    let amount = t.amount == $amount
+             |    let feeAssetId = t.feeAssetId == unit
+             |    let recipient = match (t.recipient) {
+             |      case a: Address => a.bytes == base58'$recipient'
+             |      case a: Alias   => throw("unexpected")
+             |    }
+             |    let assetId = t.assetId == ${asset.fold("unit")(a => s"base58'${blockchain.resolveERC20Address(a).get}'")}
+             |    let attachment = t.attachment == base58'${ByteStr.empty}'
+             |    ${assertProvenPart("t")} && amount && assetId && feeAssetId && recipient && attachment
+             |  case _ =>
+             |     throw()
+             |}
+           """.stripMargin,
+          V6,
+          Coproduct(tx),
+          blockchain,
+          T
+        ) shouldBe evaluated(true)
+      }
+
   }
 
   property("IssueTransaction binding") {
