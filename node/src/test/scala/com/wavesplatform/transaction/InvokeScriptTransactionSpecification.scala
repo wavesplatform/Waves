@@ -6,20 +6,20 @@ import com.wavesplatform.api.http.requests.{InvokeScriptRequest, SignedInvokeScr
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, _}
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj, CONST_BIGINT, CONST_LONG}
+import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BIGINT, CONST_LONG, CaseObj}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
-import com.wavesplatform.protobuf.{transaction, Amount}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
 import com.wavesplatform.protobuf.transaction._
+import com.wavesplatform.protobuf.{Amount, transaction}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.NonPositiveAmount
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
 import com.wavesplatform.transaction.utils.Signed
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
 class InvokeScriptTransactionSpecification extends PropSpec {
 
@@ -61,7 +61,11 @@ class InvokeScriptTransactionSpecification extends PropSpec {
 
       val proof = crypto.sign(
         caller.privateKey,
-        PBTransactions.vanilla(PBSignedTransaction(PBSignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = false).explicitGet().asInstanceOf[ProvenTransaction].bodyBytes()
+        PBTransactions
+          .vanilla(PBSignedTransaction(PBSignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = false)
+          .explicitGet()
+          .asInstanceOf[ProvenTransaction]
+          .bodyBytes()
       )
       val signed       = PBSignedTransaction(PBSignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proof.arr)))
       val convTx       = PBTransactions.vanilla(signed, unsafe = false).explicitGet()
@@ -196,7 +200,8 @@ class InvokeScriptTransactionSpecification extends PropSpec {
       1526910778245L
     )
 
-    (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
+    (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs" +
+      ("call" -> JsObject(Map("function" -> JsString("default"), "args" -> JsArray()))))
 
     TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
     AddressScheme.current = DefaultAddressScheme
