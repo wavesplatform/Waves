@@ -25,16 +25,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.{WavesEnvironment, buildThisValue}
-import com.wavesplatform.transaction.{
-  DataTransaction,
-  ERC20Address,
-  EthereumTransaction,
-  Proofs,
-  ProvenTransaction,
-  Transaction,
-  TxVersion,
-  VersionedTransaction
-}
+import com.wavesplatform.transaction.{Authorized, DataTransaction, ERC20Address, EthereumTransaction, Proofs, ProvenTransaction, Transaction, TxVersion, VersionedTransaction}
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 import org.scalacheck.Gen
@@ -52,10 +43,14 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
   def letProof(p: Proofs, prefix: String)(i: Int) =
     s"let ${prefix.replace(".", "")}proof$i = $prefix.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).toString}'"
 
-  def provenPart(t: Transaction with ProvenTransaction, emptyBodyBytes: Boolean = false): String = {
+  def provenPart(t: Transaction with Authorized, emptyBodyBytes: Boolean = false): String = {
     val version = t match {
       case v: VersionedTransaction => v.version
       case _                       => 1
+    }
+    val proofs = t match {
+      case p: ProvenTransaction => p.proofs
+      case _                    => Proofs(Seq())
     }
     val bodyBytesCheck =
       if (emptyBodyBytes)
@@ -70,7 +65,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
        |   let sender = t.sender == addressFromPublicKey(base58'${t.sender}')
        |   let senderPublicKey = t.senderPublicKey == base58'${t.sender}'
        |   let version = t.version == $version
-       |   ${Range(0, 8).map(letProof(t.proofs, "t")).mkString("\n")}
+       |   ${Range(0, 8).map(letProof(proofs, "t")).mkString("\n")}
      """.stripMargin
   }
 

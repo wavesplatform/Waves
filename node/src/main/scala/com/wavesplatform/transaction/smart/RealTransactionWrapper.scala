@@ -27,14 +27,19 @@ object RealTransactionWrapper {
     }
     Header(txIdOpt.getOrElse(ByteStr(tx.id().arr)), tx.fee, tx.timestamp, v)
   }
-  private def proven(tx: Transaction with ProvenTransaction, txIdOpt: Option[ByteStr] = None, emptyBodyBytes: Boolean = false): Proven =
+  private def proven(tx: AuthorizedTransaction, txIdOpt: Option[ByteStr] = None, emptyBodyBytes: Boolean = false): Proven = {
+    val proofs = tx match {
+      case p: ProvenTransaction => p.proofs.map(_.arr).map(ByteStr(_)).toIndexedSeq
+      case _                    => Vector()
+    }
     Proven(
       header(tx, txIdOpt),
       RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes)),
       if (emptyBodyBytes) ByteStr.empty else ByteStr(tx.bodyBytes()),
       tx.sender,
-      tx.proofs.proofs.map(_.arr).map(ByteStr(_)).toIndexedSeq
+      proofs
     )
+  }
 
   implicit def assetPair(a: AssetPair): APair = APair(a.amountAsset.compatId, a.priceAsset.compatId)
   implicit def ord(o: Order): Ord =
