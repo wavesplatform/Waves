@@ -1,9 +1,9 @@
 package com.wavesplatform.lang.evaluator
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V5}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V6}
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 
 class NestedPatternsTest extends EvaluatorSpec {
-  implicit val v: StdLibVersion = V5
+  implicit val v: StdLibVersion = V6
 
   property("typed tuples") {
     eval(
@@ -109,7 +109,7 @@ class NestedPatternsTest extends EvaluatorSpec {
     ) shouldBe Right(CONST_BOOLEAN(true))
   }
 
-  ignore("multi-sized tuples with untyped gaps") {
+  property("multi-sized tuples with untyped gaps") {
     eval(
       s"""
          | func f(arg: Any) =
