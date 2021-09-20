@@ -13,7 +13,7 @@ import com.wavesplatform.state.patch._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.{ActivationError, _}
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.ScorexLogging
 
@@ -152,7 +152,7 @@ object BlockDiffer extends ScorexLogging {
     val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify) _
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
-    txs
+    val result = txs
       .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil)).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _, _), _) => acc
         case (TracedResult(Right(Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs))), _, _), tx) =>
@@ -189,6 +189,11 @@ object BlockDiffer extends ScorexLogging {
             }
           }
       }
+
+    for {
+      result <- result
+      _      <- CommonValidation.disallowNegativeBalances(blockchain, result.diff)
+    } yield result
   }
 
   private def patchesDiff(blockchain: Blockchain): Diff = {

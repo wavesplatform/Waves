@@ -1,5 +1,7 @@
 package com.wavesplatform.consensus
 
+import scala.util.Try
+
 import com.wavesplatform.account.{PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSCalculator.HitSize
@@ -20,8 +22,8 @@ trait PoSCalculator {
 }
 
 object PoSCalculator {
-  private[consensus] val HitSize: Int        = 8
-  val MinBaseTarget: Long = 9
+  private[consensus] val HitSize: Int = 8
+  val MinBaseTarget: Long             = 9
 
   def generationSignature(signature: ByteStr, publicKey: PublicKey): Array[Byte] = {
     val s = new Array[Byte](crypto.DigestLength * 2)
@@ -121,11 +123,12 @@ case class FairPoSCalculator(minBlockTime: Int, delayDelta: Int) extends PoSCalc
     maybeGreatGrandParentTimestamp match {
       case None =>
         prevBaseTarget
+        
       case Some(ts) =>
-        val avg = (timestamp - ts) / 3 / 1000
+        val avg                = (timestamp - ts) / 3 / 1000
         val prevBaseTarget1pct = (prevBaseTarget / 100) max 1
-        if (avg > maxDelay) prevBaseTarget + prevBaseTarget1pct
-        else if (avg < minDelay) (prevBaseTarget - prevBaseTarget1pct) max 1
+        if (avg > maxDelay) Try(math.addExact(prevBaseTarget, prevBaseTarget1pct)).getOrElse(Long.MaxValue)
+        else if (avg < minDelay) math.subtractExact(prevBaseTarget, prevBaseTarget1pct) max 1
         else prevBaseTarget
     }
   }

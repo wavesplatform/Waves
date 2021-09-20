@@ -1,30 +1,34 @@
 package com.wavesplatform.state.diffs
 
+import scala.util.{Left, Right}
+
 import cats._
+import cats.data.Validated
+import cats.instances.lazyList._
+import cats.syntax.traverse._
 import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.features.OverdraftValidationProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures, RideVersionProvider}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 
-import scala.util.{Left, Right}
-
 object CommonValidation {
-
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= blockchain.settings.functionalitySettings.allowTemporaryNegativeUntil) {
       def checkTransfer(
@@ -105,6 +109,22 @@ object CommonValidation {
         case _ => Right(tx)
       }
     } else Right(tx)
+
+  def disallowNegativeBalances(blockchain: Blockchain, diff: Diff): Either[ValidationError, Diff] = {
+    val resultBalances = for {
+      (address, pf)  <- diff.portfolios.to(LazyList)
+      (asset, delta) <- pf.assets ++ Map(Waves -> pf.balance)
+      newBalance = safeSum(blockchain.balance(address, asset), delta)
+    } yield (address, asset, newBalance)
+
+    resultBalances.collect {
+      case tuple @ (_, _, balance) if balance < 0 => Validated.invalidNel(tuple)
+      case _                                      => Validated.validNel(())
+    }.sequence match {
+      case Validated.Valid(_)        => Right(diff)
+      case Validated.Invalid(tuples) => Left(GenericError(s"Diff contains negative applied balances: ${tuples.toList.mkString("[", ", ", "]")}"))
+    }
+  }
 
   def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = tx match {
     case _: PaymentTransaction => Right(tx)
