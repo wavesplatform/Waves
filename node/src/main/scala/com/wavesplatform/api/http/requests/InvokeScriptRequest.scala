@@ -107,7 +107,7 @@ case class SignedInvokeScriptRequest(
         version.getOrElse(2.toByte),
         _sender,
         _dappAddress,
-        call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)),
+        call.map(InvokeScriptRequest.buildFunctionCall).filterNot(_ == InvokeScriptTransaction.DefaultFuncCall),
         payment.getOrElse(Seq()),
         fee,
         _feeAssetId,

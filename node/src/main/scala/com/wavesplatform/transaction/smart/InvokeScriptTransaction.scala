@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
 import com.wavesplatform.state.diffs.invoke.{InvokeScriptLike, InvokeScriptTransactionLike}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.{DefaultFuncCall, Payment}
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import monix.eval.Coeval
@@ -36,7 +36,7 @@ case class InvokeScriptTransaction(
     with PBSince.V2
     with InvokeScriptTransactionLike {
 
-  val funcCall = funcCallOpt.getOrElse(FUNCTION_CALL(FunctionHeader.User(ContractEvaluator.DEFAULT_FUNC_NAME), List.empty))
+  val funcCall = funcCallOpt.getOrElse(DefaultFuncCall)
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(InvokeScriptTxSerializer.bodyBytes(this))
   val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(InvokeScriptTxSerializer.toBytes(this))
@@ -64,6 +64,8 @@ object InvokeScriptTransaction extends TransactionParser {
   object Payment {
     implicit val jsonFormat: Format[Payment] = Json.format
   }
+
+  val DefaultFuncCall: FUNCTION_CALL = FUNCTION_CALL(FunctionHeader.User(ContractEvaluator.DEFAULT_FUNC_NAME), Nil)
 
   def create(
       version: TxVersion,
