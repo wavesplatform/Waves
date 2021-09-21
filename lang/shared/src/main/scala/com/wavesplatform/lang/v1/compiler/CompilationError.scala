@@ -129,5 +129,14 @@ object CompilationError {
   final case class FieldNotFound(start: Int, end: Int, name: String, typeName: String) extends CompilationError {
     val message = s"Undefined field `$name` of variable of type `$typeName`"
   }
+
+  final case class TypeCastAllowedOnlyForGenericList(start: Int, end: Int) extends CompilationError {
+    val message = s"Type cast to List is allowed only if expecting type is List[Any]"
+  }
+
+  final case class GenericFunctionNotFound(start: Int, end: Int, name: String) extends CompilationError {
+    val message = s"Can't find a generic function $name[T]"
+  }
+
   final case class Generic(start: Int, end: Int, message: String) extends CompilationError
 }
