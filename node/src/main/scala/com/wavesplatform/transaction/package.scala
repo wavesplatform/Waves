@@ -7,7 +7,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Diff
 import com.wavesplatform.transaction.validation.TxValidator
-import com.wavesplatform.utils.base58Length
+import com.wavesplatform.utils.{base58Length, EthEncoding}
+import play.api.libs.json.{Format, Reads, Writes}
 import supertagged._
 import supertagged.postfix._
 
@@ -45,6 +46,11 @@ package object transaction {
       require(bs.arr.length == 20, "ERC20 token address length must be 20 bytes")
       bs @@ this
     }
+
+    implicit val jsonFormat: Format[ERC20Address] = Format(
+      implicitly[Reads[String]].map(str => ERC20Address(ByteStr(EthEncoding.toBytes(str)))),
+      implicitly[Writes[String]].contramap((addr: ERC20Address) => EthEncoding.toHexString(addr.arr))
+    )
   }
   type ERC20Address = ERC20Address.Type
 }

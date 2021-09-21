@@ -259,13 +259,12 @@ object PBTransactions {
         import cats.instances.option._
         import cats.syntax.traverse._
         import com.wavesplatform.lang.v1.Serde
-        import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
         for {
           dApp <- PBRecipients.toAddressOrAlias(dappAddress, chainId)
 
           fcOpt <- Deser
-            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
+            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserializeFunctionCall)
             .sequence
             .left
             .map(e => GenericError(s"Invalid InvokeScript function call: $e"))
@@ -279,7 +278,7 @@ object PBTransactions {
             version.toByte,
             sender,
             dApp,
-            fcOpt.map(_.asInstanceOf[FUNCTION_CALL]),
+            fcOpt,
             payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
             feeAmount,
             feeAssetId,
@@ -479,15 +478,14 @@ object PBTransactions {
 
       case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments, `empty`)) =>
         import com.wavesplatform.lang.v1.Serde
-        import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
         vt.smart.InvokeScriptTransaction(
           version.toByte,
           sender,
           PBRecipients.toAddressOrAlias(dappAddress, chainId).explicitGet(),
           Deser
-            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
-            .map(_.explicitGet().asInstanceOf[FUNCTION_CALL]),
+            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserializeFunctionCall)
+            .map(_.explicitGet()),
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
           feeAmount,
           feeAssetId,

@@ -32,7 +32,7 @@ object InvokeScriptLike {
     def txId: ByteStr          = isl.root.id()
     def timestamp: TxTimestamp = isl.root.timestamp
 
-    def toJson(): JsObject =
+    def toJson: JsObject =
       Json.obj(
         "dApp"             -> isl.dApp.toString,
         "payment"          -> isl.payments

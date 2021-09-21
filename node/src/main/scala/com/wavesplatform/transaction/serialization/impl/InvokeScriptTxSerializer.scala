@@ -2,21 +2,21 @@ package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
 
+import scala.util.Try
+
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.serialization._
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.{Asset, TxVersion}
-import play.api.libs.json.{JsArray, JsObject, JsString, Json}
-
-import scala.util.Try
+import play.api.libs.json.{JsArray, JsObject, Json, JsString}
 
 object InvokeScriptTxSerializer {
   def functionCallToJson(fc: Terms.FUNCTION_CALL): JsObject = {
@@ -40,7 +40,7 @@ object InvokeScriptTxSerializer {
       case arg                        => throw new NotImplementedError(s"Not supported: $arg")
     }
 
-  def toJson(tx: InvokeScriptTransaction): JsObject = BaseTxJson.toJson(tx) ++ tx.toJson()
+  def toJson(tx: InvokeScriptTransaction): JsObject = BaseTxJson.toJson(tx) ++ tx.toJson
 
   def bodyBytes(tx: InvokeScriptTransaction): Array[Byte] = {
     import tx._
@@ -81,7 +81,7 @@ object InvokeScriptTxSerializer {
 
     val sender       = buf.getPublicKey
     val dApp         = buf.getAddressOrAlias
-    val functionCall = Deser.parseOption(buf)(Serde.deserialize(_).explicitGet().asInstanceOf[FUNCTION_CALL])
+    val functionCall = Deser.parseOption(buf)(Serde.deserializeFunctionCall(_).explicitGet())
     val payments     = Deser.parseArrays(buf).map(parsePayment)
     val fee          = buf.getLong
     val feeAssetId   = buf.getAsset

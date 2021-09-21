@@ -65,15 +65,25 @@ final case class EthereumTransaction(
     BaseTxJson.toJson(this) ++ Json.obj(
       "bytes"           -> EthEncoding.toHexString(bytes()),
       "sender"          -> senderAddress().toString,
-      "senderPublicKey" -> signerPublicKey()
+      "senderPublicKey" -> signerPublicKey(),
+      "payload" -> payload.json()
     )
   )
 }
 
 object EthereumTransaction {
-  sealed trait Payload
+  sealed trait Payload {
+    val json: Coeval[JsObject]
+  }
 
-  case class Transfer(tokenAddress: Option[ERC20Address], amount: Long, recipient: Address) extends Payload
+  case class Transfer(tokenAddress: Option[ERC20Address], amount: Long, recipient: Address) extends Payload {
+    val json: Coeval[JsObject] = Coeval.evalOnce(Json.obj(
+      "type" -> "transfer",
+      "erc20Token" -> tokenAddress,
+      "amount" -> amount,
+      "recipient" -> recipient
+    ))
+  }
 
   case class Invocation(dApp: Address, hexCallData: String) extends Payload {
     def toInvokeScriptLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, InvokeScriptTransactionLike] =
@@ -92,6 +102,12 @@ object EthereumTransaction {
         override def chainId: TxVersion                             = tx.chainId
         override def checkedAssets: Seq[Asset.IssuedAsset]          = this.paymentAssets
       }
+
+    val json: Coeval[JsObject] = Coeval.evalOnce(Json.obj(
+      "type" -> "invocation",
+      "dApp" -> dApp,
+      "callData" -> hexCallData
+    ))
   }
 
   val AmountMultiplier = 10000000000L

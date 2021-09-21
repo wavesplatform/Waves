@@ -17,7 +17,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, _}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.Serde
-import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.RestAPISettings
@@ -32,9 +31,10 @@ import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json._
-
 import scala.concurrent.Future
 import scala.util.Success
+
+import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
 
 case class TransactionsApiRoute(
     settings: RestAPISettings,
@@ -302,22 +302,30 @@ object TransactionsApiRoute {
       }
 
       val stateChanges = meta match {
-        case i: TransactionMeta.Invoke => Json.obj("stateChanges" -> i.invokeScriptResult)
+        case i: TransactionMeta.Invoke =>
+          Json.obj("stateChanges" -> i.invokeScriptResult)
+
         case e: TransactionMeta.Ethereum =>
-          e.meta.fold(JsObject.empty) { m =>
-            m.payload.invocation.fold(JsObject.empty) { i =>
-              Json.obj(
-                "call" -> InvokeScriptTxSerializer
-                  .functionCallToJson(Serde.deserialize(i.functionCall.toByteArray).explicitGet()._1.asInstanceOf[FUNCTION_CALL]),
-                "payment" -> i.payments.map(p => InvokeScriptTransaction.Payment(p.amount, PBAmounts.toVanillaAssetId(p.assetId)))
-              )
-            } ++
-              m.payload.transfer.fold(JsObject.empty) { t =>
+          val payloadJson = e.meta
+            .map(_.payload)
+            .collect {
+              case Payload.Invocation(i) =>
+                val functionCallEi = Serde.deserializeFunctionCall(i.functionCall.toByteArray).map(InvokeScriptTxSerializer.functionCallToJson)
+                val payments       = i.payments.map(p => InvokeScriptTransaction.Payment(p.amount, PBAmounts.toVanillaAssetId(p.assetId)))
+                Json.obj(
+                  "call"    -> functionCallEi.toOption,
+                  "payment" -> payments
+                )
+
+              case Payload.Transfer(t) =>
                 val (asset, amount) = PBAmounts.toAssetAndAmount(t.getAmount)
                 Json.obj("asset" -> asset, "amount" -> amount)
-              }
-          } ++
-            Json.obj("stateChanges" -> e.invokeScriptResult)
+            }
+            .getOrElse(JsObject.empty)
+
+          val stateChangesJson = Json.obj("stateChanges" -> e.invokeScriptResult)
+          payloadJson ++ stateChangesJson
+
         case _ => JsObject.empty
       }
 
