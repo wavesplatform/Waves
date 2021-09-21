@@ -107,7 +107,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   test("can set contract and invoke script before precheck activation") {
     sender.setScript(smartAcc, Some(accScript), setScriptFee + smartFee, waitForTx = true).id
-    sender.invokeScript(callerAcc, smartAcc.toAddress.toString, None, Nil, Nil, smartMinFee, None, waitForTx = true)._1.id
+    sender.invokeScript(callerAcc, smartAcc.toAddress.toString, waitForTx = true)._1.id
     sender.setScript(smartAcc, Some(accScript), setScriptFee + smartFee, waitForTx = true).id
   }
 
@@ -151,21 +151,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   }
 
   test("can still invoke account and asset scripts after estimator v1 precheck activation") {
-    sender
-      .invokeScript(
-        callerAcc,
-        smartAcc.toAddress.toString,
-        Some("default"),
-        List.empty,
-        Seq.empty,
-        smartMinFee,
-        None,
-        waitForTx = true
-      )
-      ._1
-      .id
-
+    sender.invokeScript(callerAcc, smartAcc.toAddress.toString, waitForTx = true)._1.id
     sender.transfer(smartAcc, callerAcc.toAddress.toString, 1, minFee + 2 * smartFee, Some(issuedAssetId), None, waitForTx = true)
   }
-
 }
