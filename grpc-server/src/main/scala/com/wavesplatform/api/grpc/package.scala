@@ -8,12 +8,12 @@ import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactio
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.{block => vb}
-import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
-import monix.execution.{Ack, AsyncQueue, Scheduler}
+import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
+import monix.execution.atomic.AtomicAny
+import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observable
 
-import scala.annotation.tailrec
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
 
 package object grpc extends ScorexLogging {
@@ -30,14 +30,18 @@ package object grpc extends ScorexLogging {
   }
 
   implicit class StreamObserverMonixOps[T](val streamObserver: StreamObserver[T]) extends AnyVal {
-    private[grpc] def id: String =
+    def id: String =
       Integer.toHexString(System.identityHashCode(streamObserver))
 
     def completeWith(obs: Observable[T])(implicit sc: Scheduler): Unit =
-      wrapObservable(obs, streamObserver)(identity)
+      wrapObservable(obs, streamObserver)
 
     def failWith(error: Throwable): Unit = {
-      log.error(s"[${streamObserver.id}] gRPC call completed with error", error)
+      error match {
+        case _: IllegalArgumentException => log.warn(s"[${streamObserver.id}] gRPC call completed with error", error)
+        case _                           => log.error(s"[${streamObserver.id}] gRPC call completed with error", error)
+      }
+
       streamObserver.onError(GRPCErrors.toStatusException(error))
     }
 
@@ -65,65 +69,50 @@ package object grpc extends ScorexLogging {
     }
   }
 
-  private[this] def wrapObservable[A, B](source: Observable[A], dest: StreamObserver[B])(f: A => B)(implicit s: Scheduler): Unit = dest match {
-    case cso: CallStreamObserver[B] @unchecked =>
-      sealed trait QueueV {}
-      case class Element(e: B)       extends QueueV
-      case class Fail(ex: Throwable) extends QueueV
-      case object Complete           extends QueueV
+  private[this] def wrapObservable[A](source: Observable[A], dest: StreamObserver[A])(implicit s: Scheduler): Unit = dest match {
+    case cso: ServerCallStreamObserver[A] @unchecked =>
+      val nextItem = AtomicAny(Option.empty[(Promise[Ack], A)])
 
-      val queue = AsyncQueue.bounded[QueueV](32)
+      def sendNextItem(): Unit =
+        for ((p, elem) <- nextItem.getAndSet(None)) try {
+          cso.onNext(elem)
+          p.trySuccess(Ack.Continue)
+        } catch {
+          case NonFatal(t) =>
+            cso.onError(t)
+            p.tryFailure(t)
+        }
 
-      cso.setOnReadyHandler(() => drainQueue())
-
-      def drainQueue(): Unit = {
-        @tailrec
-        def pushNext(): Unit =
-          if (cso.isReady) queue.tryPoll() match {
-            case None => // queue is empty
-            case Some(Element(elem)) =>
-              cso.onNext(elem)
-              pushNext()
-
-            case Some(Complete) =>
-              cso.onCompleted()
-
-            case Some(Fail(ex)) =>
-              cso.failWith(ex)
-          }
-
-        cso.synchronized(pushNext())
-      }
+      cso.setOnReadyHandler(() => sendNextItem())
 
       val cancelable = source.subscribe(
         (elem: A) =>
-          queue
-            .offer(Element(f(elem)))
-            .flatMap { _ =>
-              drainQueue()
-              Ack.Continue
-            },
-        err =>
-          queue
-            .offer(Fail(err))
-            .map(_ => drainQueue()),
-        () =>
-          queue
-            .offer(Complete)
-            .map(_ => drainQueue())
+          if (cso.isCancelled) {
+            Ack.Stop
+          } else {
+            val p = Promise[Ack]()
+            if (nextItem.compareAndSet(None, Some(p -> elem))) {
+              if (cso.isReady)
+                sendNextItem()
+
+              p.future
+            } else Future.failed(new IllegalStateException(s"An element ${nextItem()} is pending"))
+          },
+        err => cso.onError(err), { () =>
+          log.debug("Source observer completed")
+          cso.onCompleted()
+        }
       )
-
-      cso match {
-        case scso: ServerCallStreamObserver[_] =>
-          scso.setOnCancelHandler(cancelable.cancel _)
-
-        case _ =>
+      cso.setOnCancelHandler { () =>
+        log.warn("Stream cancelled")
+        cancelable.cancel()
       }
 
     case _ =>
+      log.warn(s"Unsupported StreamObserver type: $dest")
       source.subscribe(
         { (elem: A) =>
-          dest.onNext(f(elem))
+          dest.onNext(elem)
           Ack.Continue
         },
         dest.failWith,

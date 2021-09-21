@@ -6,7 +6,7 @@ import scala.collection.mutable.ArrayBuffer
 import cats.Monoid
 import cats.syntax.monoid._
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
@@ -23,6 +23,7 @@ import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.{Asset, EthereumTransaction, GenesisTransaction, TxAmount}
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxAmount}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -350,6 +351,9 @@ object StateUpdate {
     }
   }
 
+  private lazy val WavesAlias   = Alias.fromString("alias:W:waves").explicitGet()
+  private lazy val WavesAddress = Address.fromString("3PGd1eQR8EhLkSogpmu9Ne7hSH1rQ5ALihd").explicitGet()
+
   def atomic(blockchainBeforeWithMinerReward: Blockchain, diff: Diff): StateUpdate = {
     val blockchain      = blockchainBeforeWithMinerReward
     val blockchainAfter = CompositeBlockchain(blockchain, diff)
@@ -388,7 +392,10 @@ object StateUpdate {
           if (newState.isActive) LeaseStatus.Active else LeaseStatus.Inactive,
           newState.amount,
           newState.sender,
-          blockchainAfter.resolveAlias(newState.recipient).explicitGet(),
+          newState.recipient match {
+            case `WavesAlias` => WavesAddress
+            case other        => blockchainAfter.resolveAlias(other).explicitGet()
+          },
           newState.sourceId
         )
     }.toVector
@@ -511,6 +518,16 @@ object BlockchainUpdated {
       case b: BlockAppended       => b.block.header.reference == other.id
       case mb: MicroBlockAppended => mb.microBlock.reference == other.id
       case _                      => false
+    }
+
+    def ref: String = {
+      val eventType = bu match {
+        case _: BlockAppended               => "block"
+        case _: MicroBlockAppended          => "micro"
+        case _: RollbackCompleted           => "rollback"
+        case _: MicroBlockRollbackCompleted => "micro_rollback"
+      }
+      s"$eventType/${bu.height}/${bu.id}"
     }
   }
 }

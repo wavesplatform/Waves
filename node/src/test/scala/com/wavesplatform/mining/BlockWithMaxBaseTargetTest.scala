@@ -124,7 +124,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
         preActivatedFeatures = Map(BlockchainFeatures.FairPoS.id -> 1)
       )
     )
-    val synchronizationSettings0 = settings0.synchronizationSettings.copy(maxBaseTargetOpt = Some(1L))
+    val synchronizationSettings0 = settings0.synchronizationSettings.copy(maxBaseTarget = Some(1L))
     val settings = settings0.copy(
       blockchainSettings = blockchainSettings0,
       minerSettings = minerSettings,
@@ -133,7 +133,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
     )
 
     val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
-    val pos = PoSSelector(bcu, settings.synchronizationSettings.maxBaseTargetOpt)
+    val pos = PoSSelector(bcu, settings.synchronizationSettings.maxBaseTarget)
 
     val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, ignoreSpendableBalanceChanged, settings0.utxSettings)
     val schedulerService: SchedulerService = Scheduler.singleThread("appender")

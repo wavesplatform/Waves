@@ -8,16 +8,17 @@ object Dependencies {
   private[this] val protoSchemasLib =
     "com.wavesplatform" % "protobuf-schemas" % "1.4.0-47-SNAPSHOT" classifier "protobuf-src" intransitive ()
 
-  def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.14"
+  def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.16"
 
-  private def akkaHttpModule(module: String)               = "com.typesafe.akka"             %% module            % "10.2.4"
-  private def nettyModule(module: String)                  = "io.netty"                      % s"netty-$module"   % "4.1.65.Final"
-  private def kamonModule(module: String)                  = "io.kamon"                      %% s"kamon-$module"  % "2.2.0"
+  private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.6"
+
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.2.3"
+
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.12.3"
-  private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.68"
 
-  private def catsModule(module: String, version: String = "2.6.1") = Def.setting("org.typelevel" %%% s"cats-$module"  % version)
-  def monixModule(module: String)                                   = Def.setting("io.monix"      %%% s"monix-$module" % "3.4.0")
+  private def catsModule(module: String, version: String = "2.6.1") = Def.setting("org.typelevel" %%% s"cats-$module" % version)
+
+  def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.0")
 
   val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.13.0" cross CrossVersion.full)
 
@@ -26,11 +27,11 @@ object Dependencies {
   val googleGuava        = "com.google.guava" % "guava" % "30.1.1-jre"
   val kamonCore          = kamonModule("core")
   val machinist          = "org.typelevel" %% "machinist" % "0.6.8"
-  val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
-  val janino             = "org.codehaus.janino" % "janino" % "3.1.4"
+  val logback            = "ch.qos.logback" % "logback-classic" % "1.2.5"
+  val janino             = "org.codehaus.janino" % "janino" % "3.1.6"
   val asyncHttpClient    = "org.asynchttpclient" % "async-http-client" % "2.12.3"
   val curve25519         = "com.wavesplatform" % "curve25519-java" % "0.6.4"
-  val nettyHandler       = nettyModule("handler")
+  val nettyHandler       = "io.netty" % "netty-handler" % "4.1.67.Final"
 
   val catsEffect = catsModule("effect", "2.1.3")
   val catsCore   = catsModule("core")
@@ -38,7 +39,9 @@ object Dependencies {
 
   val scalaTest = "org.scalatest" %% "scalatest" % "3.2.9" % Test
 
-  val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.2.3"
+  val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.3.13"
+
+  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk15on" % "1.69"
 
   val enforcedVersions = Def.setting(
     Seq(
@@ -48,7 +51,7 @@ object Dependencies {
       jacksonModuleScala,
       scalaTest,
       googleGuava,
-      "org.slf4j" % "slf4j-api" % "1.7.25",
+      "org.slf4j" % "slf4j-api" % "1.7.32",
       jacksonModule("core", "core"),
       jacksonModule("core", "annotations"),
       jacksonModule("core", "databind"),
@@ -57,16 +60,16 @@ object Dependencies {
       jacksonModule("jaxrs", "jaxrs-base"),
       jacksonModule("jaxrs", "jaxrs-json-provider"),
       kamonCore,
-      "com.typesafe" % "config" % "1.3.3",
+      "com.typesafe" % "config" % "1.4.1",
       machinist,
-      "com.squareup.okhttp3" % "okhttp"      % "3.11.0",
-      "com.squareup.okio"    % "okio"        % "1.14.0",
-      "com.lihaoyi"          %% "sourcecode" % "0.2.1",
+      "com.squareup.okhttp3" % "okhttp"      % "4.9.1",
+      "com.squareup.okio"    % "okio"        % "2.10.0",
+      "com.lihaoyi"          %% "sourcecode" % "0.2.7",
       nettyHandler,
-      bouncyCastle("bcprov"),
-      "org.apache.httpcomponents" % "httpcore"         % "4.4.5",
+      bouncyCastleProvider,
+      "org.apache.httpcomponents" % "httpcore"         % "4.4.14",
       "org.javassist"             % "javassist"        % "3.21.0-GA",
-      "org.reactivestreams"       % "reactive-streams" % "1.0.2",
+      "org.reactivestreams"       % "reactive-streams" % "1.0.3",
       "org.scala-lang"            % "scala-library"    % scalaVersion.value,
       "org.scala-lang"            % "scala-reflect"    % scalaVersion.value,
       catsEffect.value,
@@ -98,7 +101,7 @@ object Dependencies {
       ("org.typelevel" %% "cats-mtl-core" % "0.7.1").exclude("org.scalacheck", "scalacheck_2.13"),
       "ch.obermuhlner" % "big-math" % "2.3.0",
       curve25519,
-      bouncyCastle("bcprov"),
+      bouncyCastleProvider,
       "com.wavesplatform" % "zwaves"       % "0.1.0-SNAPSHOT",
       "com.wavesplatform" % "zwaves-bn256" % "0.1.5-SNAPSHOT",
       "org.web3j"         % "crypto"       % "4.8.6",
@@ -161,7 +164,7 @@ object Dependencies {
       kindProjector,
       monixModule("reactive").value,
       nettyHandler,
-      "com.typesafe.scala-logging"                       %% "scala-logging" % "3.9.3",
+      "com.typesafe.scala-logging"                       %% "scala-logging" % "3.9.4",
       akkaModule("testkit")                              % Test,
       akkaHttpModule("akka-http-testkit")                % Test,
       leveldbJava().exclude("com.google.guava", "guava") % Test
@@ -181,7 +184,7 @@ object Dependencies {
   }
 
   lazy val grpc: Seq[ModuleID] = Seq(
-    "io.grpc"              % "grpc-netty" % "1.35.0" /* scalapb.compiler.Version.grpcJavaVersion */,
+    "io.grpc"              % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion,
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
     protoSchemasLib        % "protobuf"
   )

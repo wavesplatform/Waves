@@ -2,6 +2,10 @@ package com.wavesplatform.wallet
 
 import java.io.File
 
+import scala.collection.concurrent.TrieMap
+import scala.util.{Failure, Success, Try}
+import scala.util.control.NonFatal
+
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
@@ -9,12 +13,8 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.transaction.TxValidationError.MissingSenderPrivateKey
-import com.wavesplatform.utils.{JsonFileStorage, randomBytes, _}
+import com.wavesplatform.utils.{randomBytes, JsonFileStorage, _}
 import play.api.libs.json._
-
-import scala.collection.concurrent.TrieMap
-import scala.util.control.NonFatal
-import scala.util.{Failure, Success, Try}
 
 trait Wallet {
   def seed: Array[Byte]
@@ -93,7 +93,9 @@ object Wallet extends ScorexLogging {
                 s"Failed to open existing wallet file '${maybeFile.get}' maybe provided password is incorrect",
                 exception
               )
-            case Success(value) => value
+            case Success(walletData) =>
+              require(maybeSeedFromConfig.forall(_ == walletData.seed), "Seed from config doesn't match the actual seed")
+              walletData
           }
         } else {
           WalletData(actualSeed, Set.empty, 0)

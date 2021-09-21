@@ -72,7 +72,9 @@ case class FunctionalitySettings(
     estimatorPreCheckHeight: Int = 0,
     minAssetInfoUpdateInterval: Int = 100000,
     minBlockTime: FiniteDuration = 15.seconds,
-    delayDelta: Int = 8
+    delayDelta: Int = 8,
+    syncDAppCheckPaymentsHeight: Int = 0,
+    checkTotalDataEntriesBytesHeight: Int = 0
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int        = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil                       = lastTimeBasedForkParameter
@@ -114,7 +116,9 @@ object FunctionalitySettings {
     lastTimeBasedForkParameter = 1530161445559L,
     blockVersion3AfterHeight = 795000,
     doubleFeaturesPeriodsAfterHeight = 810000,
-    estimatorPreCheckHeight = 1847610
+    estimatorPreCheckHeight = 1847610,
+    syncDAppCheckPaymentsHeight = 2746200,
+    checkTotalDataEntriesBytesHeight = 2771954
   )
 
   val TESTNET = apply(
@@ -123,7 +127,9 @@ object FunctionalitySettings {
     blockVersion3AfterHeight = 161700,
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     lastTimeBasedForkParameter = 1492560000000L,
-    estimatorPreCheckHeight = 817380
+    estimatorPreCheckHeight = 817380,
+    syncDAppCheckPaymentsHeight = 1682350,
+    checkTotalDataEntriesBytesHeight = 1711600
   )
 
   val STAGENET = apply(
@@ -131,7 +137,9 @@ object FunctionalitySettings {
     blocksForFeatureActivation = 40,
     doubleFeaturesPeriodsAfterHeight = 1000000000,
     preActivatedFeatures = (1 to 13).map(_.toShort -> 0).toMap,
-    minAssetInfoUpdateInterval = 10
+    minAssetInfoUpdateInterval = 10,
+    syncDAppCheckPaymentsHeight = 967300,
+    checkTotalDataEntriesBytesHeight = 991912
   )
 
   val configPath = "waves.blockchain.custom.functionality"
