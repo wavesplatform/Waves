@@ -405,54 +405,10 @@ object PureContext {
       case CONST_BIGINT(v) :: CONST_BIGINT(n) :: CONST_BIGINT(d) :: (r: CaseObj) :: Nil =>
         for {
           _ <- Either.cond(d != 0, (), "Fraction: division by zero")
-          p       = v * n
-          s       = p.sign * d.sign
-          rm      = p.abs /% d.abs
-          presult = rm._1
-          m       = rm._2
-          result <- r.caseType match {
-            case RoundDown => Right(presult * s)
-            case RoundUp   => Right((presult + m.sign) * s)
-            case RoundHalfUp =>
-              val x = d.abs - m * 2
-              if (x <= 0) {
-                Right((presult + 1) * s)
-              } else {
-                Right(presult * s)
-              }
-            case RoundHalfDown =>
-              val x = d.abs - m * 2
-              if (x < 0) {
-                Right((presult + 1) * s)
-              } else {
-                Right(presult * s)
-              }
-            case RoundCeiling =>
-              Right((if (s > 0) {
-                       presult + m.sign
-                     } else {
-                       presult
-                     }) * s)
-            case RoundFloor =>
-              Right((if (s < 0) {
-                       presult + m.sign
-                     } else {
-                       presult
-                     }) * s)
-            case RoundHalfEven =>
-              val x = d.abs - m * 2
-              if (x < 0) {
-                Right((presult + 1) * s)
-              } else if (x > 0) {
-                Right(presult * s)
-              } else {
-                Right((presult + presult % 2) * s)
-              }
-            case _ => Left(s"unsupported rounding $r")
-          }
-          _ <- Either.cond(result <= BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
-          _ <- Either.cond(result >= BigIntMin, (), s"Long overflow: value `$result` less than -2^511")
-        } yield CONST_BIGINT(result)
+          r <- global.divide(v * n, d, Rounding.byValue(r))
+          _ <- Either.cond(r <= BigIntMax, (), s"Long overflow: value `$r` greater than 2^511-1")
+          _ <- Either.cond(r >= BigIntMin, (), s"Long overflow: value `$r` less than -2^511")
+        } yield CONST_BIGINT(r)
       case xs =>
         notImplemented[Id, EVALUATED](
           "fraction(value: BigInt, numerator: BigInt, denominator: BigInt, round: Ceiling|Down|Floor|HalfEven|HalfUp)",

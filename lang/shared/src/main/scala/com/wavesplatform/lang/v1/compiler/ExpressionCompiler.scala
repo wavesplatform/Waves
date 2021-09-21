@@ -100,11 +100,9 @@ object ExpressionCompiler {
   private def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL, Expressions.EXPR)] =
     compileExprWithCtx(expr, allowIllFormedStrings = false).map(r => (r.expr, r.t, r.parseNodeExpr))
 
-  private def compileExprWithCtx(
-      expr: Expressions.EXPR,
-      saveExprContext: Boolean = false,
-      allowIllFormedStrings: Boolean
-  ): CompileM[CompilationStepResultExpr] = {
+  private def compileExprWithCtx(expr: Expressions.EXPR,
+                                 saveExprContext: Boolean = false,
+                                 allowIllFormedStrings: Boolean): CompileM[CompilationStepResultExpr] = {
     get[Id, CompilerContext, CompilationError].flatMap { ctx =>
       def adjustByteStr(expr: Expressions.CONST_BYTESTR, b: ByteStr) =
         CONST_BYTESTR(b)
@@ -142,6 +140,8 @@ object ExpressionCompiler {
         case Expressions.FUNCTION_CALL(p, name, args, _, _) => compileFunctionCall(p, name, args, saveExprContext, allowIllFormedStrings)
         case Expressions.MATCH(p, ex, cases, _, _)          => compileMatch(p, ex, cases.toList, saveExprContext, allowIllFormedStrings)
         case Expressions.FOLD(p, limit, list, acc, f, _, _) => compileFold(p, limit, list, acc, f.key)
+        case Expressions.GENERIC_FUNCTION_CALL(p, e, name, t, _, _) =>
+          compileGenericFunctionCall(p, e, name, t, saveExprContext, allowIllFormedStrings)
         case Expressions.BINARY_OP(p, a, op, b, _, _) =>
           op match {
             case AND_OP => compileIf(p, a, b, Expressions.FALSE(p), saveExprContext, allowIllFormedStrings)
@@ -616,6 +616,21 @@ object ExpressionCompiler {
       }
     } yield result
 
+  private def compileGenericFunctionCall(
+      p: Pos,
+      e: Expressions.EXPR,
+      namePart: PART[String],
+      rawType: Expressions.Type,
+      saveExprContext: Boolean,
+      allowIllFormedStrings: Boolean
+  ): CompileM[CompilationStepResultExpr] =
+    for {
+      ctx         <- get[Id, CompilerContext, CompilationError]
+      name        <- handlePart(namePart)
+      handledType <- handleCompositeType(p, rawType, None, None)
+      handledExpr <- compileExprWithCtx(e, saveExprContext, allowIllFormedStrings)
+    } yield TypeCast(p, name, handledExpr, handledType)
+
   private def compileRef(p: Pos, keyPart: PART[String], saveExprContext: Boolean): CompileM[CompilationStepResultExpr] =
     for {
       keyWithErr <- handlePart(keyPart).handleError()
@@ -845,9 +860,9 @@ object ExpressionCompiler {
                 ),
                 blockWithNewVar,
                 further
-              )
+
             )
-        }
+          )}
       }
     }
 
