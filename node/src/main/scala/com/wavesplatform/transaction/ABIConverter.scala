@@ -189,7 +189,7 @@ final case class ABIConverter(script: Script) {
     }
   }
 
-  lazy val funcByMethodId: Map[String, FunctionRef] = {
+  lazy val funcByMethodId: Map[String, FunctionRef] =
     functionsWithArgs
       .map {
         case (funcName, args) =>
@@ -197,26 +197,25 @@ final case class ABIConverter(script: Script) {
       }
       .map(func => func.ethMethodId -> func)
       .toMap
-  }
 
   def jsonABI: JsArray =
     JsArray(functionsWithArgs.map {
       case (funcName, args) =>
-        val paymentsArg = Json.obj("name" -> "payments", "type" -> ABIConverter.ethTypeObj(ABIConverter.PaymentListType))
+        val paymentsArg = Json.obj("name" -> "payments") ++ ABIConverter.ethTypeObj(ABIConverter.PaymentListType)
 
         val inputs = args.map {
           case (argName, argType) =>
-            Json.obj("name" -> argName, "type" -> ABIConverter.ethTypeObj(argType))
+            Json.obj("name" -> argName) ++ ABIConverter.ethTypeObj(argType)
         } :+ paymentsArg
 
         Json.obj(
           "name"            -> funcName,
           "type"            -> "function",
           "constant"        -> false,
-          "payable"         -> true,
-          "stateMutability" -> "payable",
+          "payable"         -> false,
+          "stateMutability" -> "nonpayable",
           "inputs"          -> inputs,
-          "outputs"         -> Json.arr(Json.obj("name" -> "", "type" -> "bool"))
+          "outputs"         -> JsArray.empty
         )
     })
 
