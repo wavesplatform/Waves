@@ -851,6 +851,11 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       .returning(DefaultBlockchainSettings)
       .anyNumberOfTimes()
 
+    (utilsApi.blockchain.balance _)
+      .when(*, *)
+      .returning(1000)
+      .anyNumberOfTimes()
+
     evalScript(""" testSyncinvoke() """) ~> route ~> check {
       responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":99,"expr":" testSyncinvoke() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
     }
