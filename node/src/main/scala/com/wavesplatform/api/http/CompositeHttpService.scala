@@ -18,11 +18,12 @@ import scala.io.Source
 
 case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings) extends ScorexLogging {
   // Only affects extractScheduler { implicit sc => ... } routes
-  private[this] val corePoolSize = (Runtime.getRuntime.availableProcessors() * 2).min(4)
+  private val heavyRequestProcessorPoolThreads =
+    settings.heavyRequestProcessorPoolThreads.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
   val scheduler: ExecutionContextExecutorService = ExecutionContext.fromExecutorService(
     new ThreadPoolExecutor(
-      corePoolSize,
-      corePoolSize,
+      heavyRequestProcessorPoolThreads,
+      heavyRequestProcessorPoolThreads,
       60,
       TimeUnit.SECONDS,
       new LinkedBlockingQueue[Runnable],

@@ -69,6 +69,7 @@ object InvokeScriptTransactionDiff {
           log: Log[Id],
           availableActions: Int,
           availableData: Int,
+          availableDataSize: Int,
           limit: Int
       )
 
@@ -102,14 +103,16 @@ object InvokeScriptTransactionDiff {
               paymentsComplexity,
               blockchain
             )
-          } yield MainScriptResult(
-            environment.currentDiff,
-            result,
-            log,
-            environment.availableActions,
-            environment.availableData,
-            fullLimit - paymentsComplexity
-          )
+          } yield
+            MainScriptResult(
+              environment.currentDiff,
+              result,
+              log,
+              environment.availableActions,
+              environment.availableData,
+              environment.availableDataSize,
+              fullLimit - paymentsComplexity
+            )
         }
 
         TracedResult(
@@ -128,7 +131,7 @@ object InvokeScriptTransactionDiff {
       }
 
       for {
-        MainScriptResult(invocationDiff, scriptResult, log, availableActions, availableData, limit) <- executeMainScript()
+        MainScriptResult(invocationDiff, scriptResult, log, availableActions, availableData, availableDataSize, limit) <- executeMainScript()
         otherIssues = invocationDiff.scriptResults.get(tx.id()).fold(Seq.empty[Issue])(allIssues)
 
         doProcessActions = InvokeDiffsCommon.processActions(
@@ -148,17 +151,26 @@ object InvokeScriptTransactionDiff {
 
         process = (actions: List[CallableAction], unusedComplexity: Long) => {
           val storingComplexity = if (blockchain.storeEvaluatedComplexity) limit - unusedComplexity else fixedInvocationComplexity
-          val dataCount         = actions.count(_.isInstanceOf[DataOp])
-          if (dataCount > availableData) {
-            TracedResult(Left(FailedTransactionError.dAppExecution("Stored data count limit is exceeded", storingComplexity, log)))
-          } else {
-            val actionsCount = actions.length - dataCount
-            if (actionsCount > availableActions) {
-              TracedResult(Left(FailedTransactionError.dAppExecution("Actions count limit is exceeded", storingComplexity, log)))
-            } else {
-              doProcessActions(actions, storingComplexity.toInt)
-            }
-          }
+
+          val dataItems    = actions.collect { case d: DataOp => InvokeDiffsCommon.dataItemToEntry(d) }
+          val dataCount    = dataItems.length
+          val dataSize     = dataItems.map(_.toBytes.length).sum
+          val actionsCount = actions.length - dataCount
+
+          for {
+            _ <- InvokeDiffsCommon.checkCallResultLimits(
+              blockchain,
+              storingComplexity,
+              log,
+              actionsCount,
+              dataCount,
+              dataSize,
+              availableActions,
+              availableData,
+              availableDataSize
+            )
+            diff <- doProcessActions(actions, storingComplexity.toInt)
+          } yield diff
         }
 
         resultDiff <- scriptResult match {
@@ -247,6 +259,7 @@ object InvokeScriptTransactionDiff {
             ContractLimits.MaxSyncDAppCalls(version),
             ContractLimits.MaxCallableActionsAmount(version),
             ContractLimits.MaxWriteSetSize(version),
+            ContractLimits.MaxTotalWriteSetSizeInBytes,
             if (version < V5) Diff.empty else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()),
             invocationTracker
           )

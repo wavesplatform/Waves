@@ -319,6 +319,7 @@ class DAppEnvironment(
     var remainingCalls: Int,
     var availableActions: Int,
     var availableData: Int,
+    var availableDataSize: Int,
     var currentDiff: Diff,
     val invocationRoot: DAppEnvironment.InvocationTreeTracker
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
@@ -369,7 +370,7 @@ class DAppEnvironment(
         val invocation = DAppEnvironment.DAppInvocation(invoke.dApp, invoke.funcCall, invoke.payments)
         invocationRoot.record(invocation)
       }
-      (diff, evaluated, remainingActions, remainingData) <- InvokeScriptDiff( // This is a recursive call
+      (diff, evaluated, remainingActions, remainingData, remainingDataSize) <- InvokeScriptDiff( // This is a recursive call
         mutableBlockchain,
         blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
         limitedExecution,
@@ -378,6 +379,7 @@ class DAppEnvironment(
         remainingCalls,
         availableActions,
         availableData,
+        availableDataSize,
         if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
         invocationTracker
       )(invoke)
@@ -391,6 +393,7 @@ class DAppEnvironment(
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions
       availableData = remainingData
+      availableDataSize = remainingDataSize
       (evaluated, diff.scriptsComplexity.toInt)
     }
 
