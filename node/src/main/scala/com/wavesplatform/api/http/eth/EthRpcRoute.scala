@@ -73,15 +73,18 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           val str = params.get.head.as[String]
           log.info(str)
 
-          val et = extractTransaction(str)
+          extractTransaction(str) match {
+            case Left(value) => resp(id, ApiError.fromValidationError(value).json)
+            case Right(et) =>
+              resp(
+                id,
+                transactionsApi.broadcastTransaction(et).map[JsValueWrapper] { result =>
+                  log.info(s"Validation result from ${toHexString(et.senderAddress().publicKeyHash)}: $result")
+                  toHexString(et.id().arr)
+                }
+              )
+          }
 
-          resp(
-            id,
-            transactionsApi.broadcastTransaction(et).map[JsValueWrapper] { result =>
-              log.info(s"Validation result from ${toHexString(et.senderAddress().publicKeyHash)}: $result")
-              toHexString(et.id().arr)
-            }
-          )
         case "eth_getTransactionReceipt" =>
           val transactionHex = params.get.head.as[String]
           val txId           = ByteStr(toBytes(transactionHex))
@@ -135,20 +138,30 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           val txParams = params.get.head.as[JsObject]
           val tx = RawTransaction.createTransaction(
             BigInteger.valueOf(System.currentTimeMillis()),
-            BigInteger.ZERO,
-            BigInteger.ZERO,
+            EthereumTransaction.GasPrice,
+            BigInteger.ONE,
             (txParams \ "to").as[String],
             (txParams \ "value").asOpt[String].fold(BigInteger.ZERO)(s => new BigInteger(cleanHexPrefix(s), 16)),
             (txParams \ "data").asOpt[String].getOrElse("0x")
           )
 
-          val (_, txFee, _) = transactionsApi.calculateFee(EthereumTransaction(tx)).explicitGet()
+          val errorOrLong = for {
+            et <- EthereumTransaction(tx)
+            (_, txFee, _) <- transactionsApi.calculateFee(et)
+          } yield txFee
 
-          resp(id, toHexString(BigInteger.valueOf(txFee)))
+          log.info(s"Fee: $errorOrLong")
+
+          resp(
+            id,
+            errorOrLong
+              .fold[JsValueWrapper](e => ApiError.fromValidationError(e).json, fee => toHexString(BigInteger.valueOf(fee)))
+          )
+
         case "net_version" =>
           resp(id, "1")
         case "eth_gasPrice" =>
-          resp(id, "0x1")
+          resp(id, toHexString(EthereumTransaction.GasPrice))
         case "eth_getCode" =>
           resp(id, if (blockchain.hasDApp(Address.fromHexString(params.get.head.as[String]))) "0xff" else "0x")
         case _ =>

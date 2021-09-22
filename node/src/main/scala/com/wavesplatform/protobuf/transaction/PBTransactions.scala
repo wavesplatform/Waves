@@ -62,7 +62,7 @@ object PBTransactions {
   def vanilla(signedTx: PBSignedTransaction, unsafe: Boolean): Either[ValidationError, VanillaTransaction] =
     signedTx.transaction match {
       case SignedTransaction.Transaction.Empty                      => Left(GenericError("Transaction must be specified"))
-      case SignedTransaction.Transaction.EthereumTransaction(value) => Right(EthereumTransaction(value.toByteArray))
+      case SignedTransaction.Transaction.EthereumTransaction(value) => EthereumTransaction(value.toByteArray)
       case SignedTransaction.Transaction.WavesTransaction(parsedTx) =>
         val (feeAsset, feeAmount) = PBAmounts.toAssetAndAmount(parsedTx.fee.getOrElse(Amount.defaultInstance))
         val sender = Option(parsedTx.senderPublicKey)

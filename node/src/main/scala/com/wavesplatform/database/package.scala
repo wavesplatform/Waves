@@ -544,7 +544,7 @@ package object database extends ScorexLogging {
     data.transaction match {
       case tx: TD.LegacyBytes         => (TransactionParsers.parseBytes(tx.value.toByteArray).get, !data.failed)
       case tx: TD.WavesTransaction    => (PBTransactions.vanilla(tx.value, unsafe = false).explicitGet(), !data.failed)
-      case tx: TD.EthereumTransaction => (EthereumTransaction(tx.value.toByteArray), !data.failed)
+      case tx: TD.EthereumTransaction => (EthereumTransaction(tx.value.toByteArray).explicitGet(), !data.failed)
       case _                          => throw new IllegalArgumentException("Illegal transaction data")
     }
   }

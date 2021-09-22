@@ -2,8 +2,6 @@ package com.wavesplatform.transaction
 
 import java.math.BigInteger
 
-import scala.reflect.ClassTag
-
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.EthereumKeyLength
@@ -14,14 +12,18 @@ import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.serialization.impl.BaseTxJson
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.validation.{TxConstraints, TxValidator, ValidatedV}
 import com.wavesplatform.utils.EthEncoding
 import monix.eval.Coeval
 import org.web3j.abi.TypeDecoder
-import org.web3j.abi.datatypes.{Address => EthAddress}
 import org.web3j.abi.datatypes.generated.Uint256
-import org.web3j.crypto._
+import org.web3j.abi.datatypes.{Address => EthAddress}
 import org.web3j.crypto.Sign.SignatureData
+import org.web3j.crypto._
+import org.web3j.utils.Convert
 import play.api.libs.json._
+
+import scala.reflect.ClassTag
 
 final case class EthereumTransaction(
     payload: EthereumTransaction.Payload,
@@ -94,6 +96,20 @@ object EthereumTransaction {
       }
   }
 
+  implicit object RawTransactionValidator extends TxValidator[EthereumTransaction] {
+    override def validate(tx: EthereumTransaction): ValidatedV[EthereumTransaction] = TxConstraints.seq(tx)(
+      TxConstraints.fee(tx.underlying.getGasLimit.longValueExact()),
+      TxConstraints.positiveOrZeroAmount(tx.underlying.getValue.longValueExact(), "waves"),
+      TxConstraints.cond(tx.underlying.getGasPrice == GasPrice, GenericError("Gas price must be 10 Gwei")),
+      TxConstraints.cond(
+        tx.underlying.getValue != BigInteger.ZERO || EthEncoding.cleanHexPrefix(tx.underlying.getData).nonEmpty,
+        GenericError("Transaction cancellation is not supported")
+      )
+    )
+  }
+
+  val GasPrice: BigInteger = Convert.toWei("10", Convert.Unit.GWEI).toBigInteger
+
   val AmountMultiplier = 10000000000L
 
   private val decodeMethod = {
@@ -114,7 +130,7 @@ object EthereumTransaction {
   private def encodeTransaction(tx: RawTransaction, signatureData: SignatureData): Array[Byte] =
     encodeMethod.invoke(null, tx, signatureData).asInstanceOf[Array[Byte]]
 
-  def apply(bytes: Array[Byte]): EthereumTransaction =
+  def apply(bytes: Array[Byte]): Either[ValidationError, EthereumTransaction] =
     apply(TransactionDecoder.decode(EthEncoding.toHexString(bytes)).asInstanceOf[SignedRawTransaction])
 
   val ERC20TransferPrefix: String = "a9059cbb"
@@ -139,20 +155,19 @@ object EthereumTransaction {
     } else Invocation(Address(recipientAddress.arr), hexData)
   }
 
-  def apply(underlying: RawTransaction): EthereumTransaction =
+  def apply(underlying: RawTransaction): Either[ValidationError, EthereumTransaction] =
     new EthereumTransaction(
       extractPayload(underlying),
       underlying,
       new SignatureData(Array.emptyByteArray, Array.emptyByteArray, Array.emptyByteArray),
       AddressScheme.current.chainId
-    )
+    ).validatedEither
 
-  def apply(underlying: SignedRawTransaction): EthereumTransaction = {
+  def apply(underlying: SignedRawTransaction): Either[ValidationError, EthereumTransaction] =
     new EthereumTransaction(
       extractPayload(underlying),
       underlying,
       underlying.getSignatureData,
       Option(underlying.getChainId).fold(AddressScheme.current.chainId)(_.toByte)
-    )
-  }
+    ).validatedEither
 }
