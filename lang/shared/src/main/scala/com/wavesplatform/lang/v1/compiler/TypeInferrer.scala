@@ -1,8 +1,6 @@
 package com.wavesplatform.lang.v1.compiler
 
-import cats.instances.either._
-import cats.instances.list._
-import cats.syntax.traverse._
+import cats.implicits._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.compiler.Types._
 
@@ -75,11 +73,17 @@ object TypeInferrer {
       case (list, acc) => (list zip acc).map { case (element, p) => element :: p }
     }
 
-  private def matchTypes(argType: FINAL, placeholder: TYPE, knownTypes: Map[String, FINAL], argTypeStr: String, matchingTypeStr: String): Either[String, Option[MatchResult]] = {
+  private def matchTypes(
+      argType: FINAL,
+      placeholder: TYPE,
+      knownTypes: Map[String, FINAL],
+      argTypeStr: String,
+      matchingTypeStr: String
+  ): Either[String, Option[MatchResult]] = {
     lazy val err = s"Non-matching types: expected: $matchingTypeStr, actual: $argTypeStr"
 
     (placeholder, argType) match {
-      case (tp @ TYPEPARAM(_), _)                         => Right(Some(MatchResult(argType, tp)))
+      case (tp @ TYPEPARAM(_), _)                       => Right(Some(MatchResult(argType, tp)))
       case (PARAMETERIZEDLIST(innerTypeParam), LIST(t)) => matchTypes(t, innerTypeParam, knownTypes, argTypeStr, matchingTypeStr)
       case (PARAMETERIZEDLIST(innerTypeParam), UNION(l, _)) =>
         l.foldLeft(Right(UNION(List(), None)): Either[String, FINAL]) { (u, tl) =>
@@ -107,18 +111,28 @@ object TypeInferrer {
           .filter(_.isInstanceOf[PARAMETERIZED])
           .map(_.asInstanceOf[PARAMETERIZED])
         if (concretes >= UNION.create(argType.typeList)) Right(None)
-        else
-          parameterized match {
-            case singlePlaceholder :: Nil =>
-              val nonMatchedArgTypes = argType match {
-                case NOTHING            => ???
-                case UNION(argTypes, _) => UNION(argTypes.filterNot(concretes.typeList.contains))
-                case ANY                => ANY
-                case s: SINGLE          => s
-              }
-              matchTypes(nonMatchedArgTypes, singlePlaceholder, knownTypes, argTypeStr, matchingTypeStr)
-            case _ => Left(s"Can't resolve correct type for parameterized $placeholder, actual: $argType")
-          }
+        else {
+          val error = s"Can't resolve correct type for parameterized $placeholder, actual: $argType".asLeft[Option[MatchResult]]
+          parameterized
+            .foldLeft(error) {
+              case (result, nextParameter) =>
+                val nonMatchedArgTypes = argType match {
+                  case NOTHING            => ???
+                  case UNION(argTypes, _) => UNION(argTypes.filterNot(concretes.typeList.contains))
+                  case ANY                => ANY
+                  case s: SINGLE          => s
+                }
+                if (result.isLeft)
+                  matchTypes(nonMatchedArgTypes, nextParameter, knownTypes, argTypeStr, matchingTypeStr)
+                else {
+                  val nextResult = matchTypes(nonMatchedArgTypes, nextParameter, knownTypes, argTypeStr, matchingTypeStr)
+                  if (nextResult.isLeft)
+                    result
+                  else
+                    error
+                }
+            }
+        }
 
       case (_: REAL, UNION(types, _)) =>
         types.foldLeft(Right(None): Either[String, Option[MatchResult]]) { (acc, t) =>

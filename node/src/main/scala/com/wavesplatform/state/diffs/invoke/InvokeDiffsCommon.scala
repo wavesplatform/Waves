@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.invoke
 
 import cats.instances.map._
 import cats.syntax.either._
+import cats.Id
 import cats.syntax.semigroup._
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
@@ -18,6 +19,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, _}
+import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, _}
@@ -295,7 +297,7 @@ object InvokeDiffsCommon {
         .foldLeft(Map[Address, Portfolio]())(_ |+| _)
     )
 
-  private def dataItemToEntry(item: DataOp): DataEntry[_] =
+  def dataItemToEntry(item: DataOp): DataEntry[_] =
     item match {
       case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
       case DataItem.Str(k, b)  => StringDataEntry(k, b)
@@ -630,9 +632,30 @@ object InvokeDiffsCommon {
       case Success(s) => s
     }
 
-  case class StepInfo(
-      feeInWaves: Long,
-      feeInAttachedAsset: Long,
-      scriptsRun: Int
-  )
+  def checkCallResultLimits(
+      blockchain: Blockchain,
+      usedComplexity: Long,
+      log: Log[Id],
+      actionsCount: Int,
+      dataCount: Int,
+      dataSize: Int,
+      availableActions: Int,
+      availableData: Int,
+      availableDataSize: Int
+  ): TracedResult[ValidationError, Unit] = {
+    def error(message: String) = TracedResult(Left(FailedTransactionError.dAppExecution(message, usedComplexity, log)))
+    val checkSizeHeight        = blockchain.settings.functionalitySettings.checkTotalDataEntriesBytesHeight
+
+    if (dataCount > availableData)
+      error("Stored data count limit is exceeded")
+    else if (dataSize > availableDataSize && blockchain.height >= checkSizeHeight) {
+      val limit = ContractLimits.MaxTotalWriteSetSizeInBytes
+      val actual = limit + dataSize - availableDataSize
+      error(s"Storing data size should not exceed $limit, actual: $actual bytes")
+    }
+    else if (actionsCount > availableActions)
+      error("Actions count limit is exceeded")
+    else
+      TracedResult(Right(()))
+  }
 }

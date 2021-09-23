@@ -19,6 +19,8 @@ class SynchronizationSettingsSpecification extends FlatSpec {
         |    synchronization-timeout = 30s
         |    score-ttl = 90s
         |
+        |    max-base-target = 130
+        |
         |    invalid-blocks-storage {
         |      max-size = 40000
         |      timeout = 2d
@@ -62,6 +64,8 @@ class SynchronizationSettingsSpecification extends FlatSpec {
       maxMicroBlockCacheSize = 5,
       maxBlockCacheSize = 2
     )
+
+    settings.maxBaseTarget shouldBe Some(130)
 
     settings.utxSynchronizer shouldBe UtxSynchronizerSettings(7000000, 2, 7777, false)
   }
