@@ -2,10 +2,11 @@ package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.test.{FlatSpec, TestTime}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.common.utils._
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.state.diffs.produceE
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.utils.EthConverters._
@@ -193,6 +194,44 @@ class EthTransactionSpec
                                                                    |  "leaseCancels" : [ ],
                                                                    |  "invokes" : [ ]
                                                                    |}""".stripMargin)
+  }
+
+  it should "fail with max+1 payments" in {
+    val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
+    val dAppAccount    = TxHelpers.secondSigner
+    val blockchain = createBlockchainStub { blockchain =>
+      val sh = StubHelpers(blockchain)
+      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls)
+      sh.creditBalance(invokerAccount.toWavesAddress, *)
+      sh.creditBalance(dAppAccount.toAddress, *)
+      sh.issueAsset(ByteStr(EthStubBytes32))
+
+      val script = TxHelpers.script(
+        """{-# STDLIB_VERSION 5 #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |
+          |@Callable (i)
+          |func deposit() = {
+          |  [
+          |    ScriptTransfer(i.caller, 123, unit)
+          |  ]
+          |}
+          |""".stripMargin
+      )
+      sh.setScript(dAppAccount.toAddress, script)
+    }
+
+    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
+    val transaction = EthTxGenerator.generateEthInvoke(
+      invokerAccount,
+      dAppAccount.toAddress,
+      'E'.toByte,
+      "deposit",
+      Seq(),
+      (1 to com.wavesplatform.lang.v1.ContractLimits.MaxAttachedPaymentAmountV5 + 1).map(InvokeScriptTransaction.Payment(_, Waves))
+    )
+    differ(transaction).resultE should produceE("Script payment amount=11 should not exceed 10")
   }
 
   it should "work with default function" in {
