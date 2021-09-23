@@ -73,7 +73,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     if (lastUpdateId != lastBlockId)
       throw new IllegalStateException(s"Last update ID $lastUpdateId does not match last block ID $lastBlockId at height $nodeHeight")
 
-    log.info(s"BlockchainUpdates startup check successful at height $extensionHeight")
+    log.info(s"BlockchainUpdates startup check successful at height $nodeHeight")
 
     grpcServer.start()
     log.info(s"BlockchainUpdates extension started gRPC API on port ${settings.grpcPort}")
