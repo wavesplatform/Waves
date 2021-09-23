@@ -1,9 +1,7 @@
 ${{header}}
 ${{loader-functions}}
-${{detect-loader}}
 
 config_file=/etc/${{app_name}}/waves.conf
-
 
 if [ "$1" = configure ]; then
     # make sure the user exists
@@ -41,21 +39,12 @@ if [ "$1" = configure ]; then
         chown ${{app_name}}:${{app_name}} "$config_file"
     fi
 
-    if is_systemd; then
-        echo Installing systemd service ...
-        addService ${{app_name}}
-    elif is_upstart; then
-        echo Installing upstart service ...
-        initctl reload-configuration
-    fi
+
+    echo Installing systemd service ...
+    addService ${{app_name}} || true
 fi
 
-if is_systemd; then
-    echo Restarting systemd service ...
-    restartService ${{app_name}} || true
-elif is_upstart; then
-    echo Restarting upstart service ...
-    service ${{app_name}} restart || true
-fi
+echo Restarting systemd service ...
+restartService ${{app_name}} || true
 
 exit 0

@@ -1,6 +1,5 @@
 import CommonSettings.autoImport.network
 import com.typesafe.sbt.SbtNativePackager.Universal
-import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbtassembly.MergeStrategy
 
 name := "waves"
@@ -71,6 +70,10 @@ bashScriptExtraDefines +=
     |}
     |""".stripMargin
 
+bashScriptExtraDefines += bashScriptEnvConfigLocation.value.fold("")(envFile => s"[[ -f $envFile ]] && . $envFile")
+
+linuxScriptReplacements += ("network" -> network.value.toString)
+
 inConfig(Universal)(
   Seq(
     mappings += (baseDirectory.value / s"waves-sample.conf" -> "doc/waves.conf.sample"),
@@ -92,7 +95,8 @@ inConfig(Linux)(
   Seq(
     packageSummary := "Waves node",
     packageDescription := "Waves node",
-    normalizedName := s"${name.value}${network.value.packageSuffix}",
+    name := s"${name.value}${network.value.packageSuffix}",
+    normalizedName := name.value,
     packageName := normalizedName.value
   )
 )
@@ -101,11 +105,21 @@ def fixScriptName(path: String, name: String, packageName: String): String =
   path.replace(s"/bin/$name", s"/bin/$packageName")
 
 linuxPackageMappings := linuxPackageMappings.value.map { lpm =>
-  val altered = lpm.mappings.map {
+  lpm.copy(mappings = lpm.mappings.map {
     case (file, path) if path.endsWith(s"/bin/${name.value}") => file -> fixScriptName(path, name.value, (Linux / packageName).value)
-    case other                                                => other
-  }
-  lpm.copy(mappings = altered)
+    case (file, path) if path.endsWith("/conf/application.ini") =>
+      val dest = (Debian / target).value / path
+      IO.write(
+        dest,
+        s"""-J-Dwaves.defaults.blockchain.type=${network.value}
+           |-J-Dwaves.defaults.directory=/var/lib/${(Linux / packageName).value}
+           |-J-Dwaves.defaults.config.directory=/etc/${(Linux / packageName).value}
+           |""".stripMargin
+      )
+      IO.append(dest, IO.readBytes(file))
+      dest -> path
+    case other => other
+  })
 }
 
 linuxPackageSymlinks := linuxPackageSymlinks.value.map { lsl =>
@@ -122,27 +136,7 @@ inConfig(Debian)(
     packageSource := sourceDirectory.value / "package",
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
     debianPackageDependencies += "java8-runtime-headless",
-    maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm")),
-    linuxPackageMappings ++= {
-      val upstartScript = {
-        val src    = packageSource.value / "upstart.conf"
-        val dest   = (Debian / target).value / "upstart" / s"${packageName.value}.conf"
-        val result = TemplateWriter.generateScript(src.toURI.toURL, linuxScriptReplacements.value)
-        IO.write(dest, result)
-        dest
-      }
-
-      Seq(upstartScript -> s"/etc/init/${packageName.value}.conf").map(packageMapping(_).withConfig().withPerms("644"))
-    },
-    linuxScriptReplacements += "detect-loader" ->
-      """is_systemd() {
-        |    which systemctl >/dev/null 2>&1 && \
-        |    systemctl | grep -- -\.mount >/dev/null 2>&1
-        |}
-        |is_upstart() {
-        |    /sbin/init --version | grep upstart >/dev/null 2>&1
-        |}
-        |""".stripMargin
+    maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("postinst", "postrm", "prerm"))
   )
 )
 
