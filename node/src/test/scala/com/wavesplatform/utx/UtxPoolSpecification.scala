@@ -18,7 +18,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.mining._
@@ -44,6 +44,7 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.EitherValues
 import java.nio.file.{Files, Path}
 
+import com.wavesplatform.lang.directives.values.StdLibVersion.V6
 import com.wavesplatform.test.FreeSpec
 
 import scala.collection.mutable.ListBuffer
@@ -926,6 +927,27 @@ class UtxPoolSpecification
         utx.removeAll(Seq(invoke))
         utx.putIfNew(invoke, forceValidate = false).resultE.explicitGet() shouldBe true
         utx.close()
+      }
+
+      "invoke expression" in withDomain(
+        settingsWithFeatures(
+          BlockchainFeatures.Ride4DApps,
+          BlockchainFeatures.BlockV5,
+          BlockchainFeatures.RideV6
+        )
+      ) {
+        d =>
+          d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, ENOUGH_AMT))
+
+          val expr   = TestCompiler(V6).compileFreeCall(""" [ BooleanEntry("check", true) ] """)
+          val invoke = TxHelpers.invokeExpression(expr)
+          val utx    = new UtxPoolImpl(ntpTime, d.blockchainUpdater, PublishSubject(), DefaultWavesSettings.utxSettings)
+
+          utx.putIfNew(invoke).resultE.explicitGet() shouldBe true
+          utx.all shouldBe Seq(invoke)
+
+          val (result, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Estimate(3 seconds))
+          result shouldBe Some(Seq(invoke))
       }
     }
 

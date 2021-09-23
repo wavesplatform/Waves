@@ -33,12 +33,7 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     )
 
   test("successful applying to the state") {
-    val id = sender.invokeExpression(firstKeyPair, expr)._1.id
-
-    val txFromUnconfirmed = sender.utx().find(_.id == id).get
-    checkTx(txFromUnconfirmed, checkStatus = false)
-
-    sender.waitForTransaction(id)
+    val id        = sender.invokeExpression(firstKeyPair, expr, waitForTx = true)._1.id
     val lastBlock = sender.lastBlock()
 
     val txFromLastBlock         = lastBlock.transactions.find(_.id == id).get
