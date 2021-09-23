@@ -92,21 +92,26 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
 
           resp(
             id,
-            blockchain.transactionInfo(txId).fold[JsValue](JsNull) {
-              case (height, tx, _) =>
-                Json.obj(
-                  "transactionHash"   -> toHexString(tx.id().arr),
-                  "transactionIndex"  -> "0x01",
-                  "blockHash"         -> toHexString(blockchain.lastBlockId.get.arr),
-                  "blockNumber"       -> toHexString(BigInteger.valueOf(height)),
-                  "from"              -> toHexString(new Array[Byte](20)),
-                  "to"                -> toHexString(new Array[Byte](20)),
-                  "cumulativeGasUsed" -> toHexString(BigInteger.ZERO),
-                  "gasUsed"           -> toHexString(BigInteger.ZERO),
-                  "contractAddress"   -> JsNull,
-                  "logs"              -> Json.arr(),
-                  "logsBloom"         -> toHexString(new Array[Byte](32))
-                )
+            transactionsApi.transactionById(txId).fold[JsValue](JsNull) { tm =>
+                tm.transaction match {
+                  case tx: EthereumTransaction =>
+                    Json.obj(
+                      "transactionHash"   -> toHexString(tm.transaction.id().arr),
+                      "transactionIndex"  -> "0x01",
+                      "blockHash"         -> toHexString(blockchain.lastBlockId.get.arr),
+                      "blockNumber"       -> toHexString(BigInteger.valueOf(tm.height)),
+                      "from"              -> toHexString(tx.senderAddress().publicKeyHash),
+                      "to"                -> tx.underlying.getTo,
+                      "cumulativeGasUsed" -> toHexString(tx.fee),
+                      "gasUsed"           -> toHexString(tx.fee),
+                      "contractAddress"   -> JsNull,
+                      "logs"              -> Json.arr(),
+                      "logsBloom"         -> toHexString(new Array[Byte](32)),
+                      "status" -> (if (tm.succeeded) "0x1" else "0x0")
+                    )
+                  case _ => JsNull
+                }
+
             }
           )
         case "eth_call" =>

@@ -18,7 +18,11 @@ import scala.jdk.CollectionConverters._
 
 object ABIConverter {
   val PaymentListType: Types.LIST = Types.LIST(Types.TUPLE(List(Types.BYTESTR, Types.LONG)))
-  val PaymentArgSignature: String = "(bytes,int64)[]"
+  val PaymentArgSignature: String = "(bytes32,int64)[]"
+  val PaymentArgJson: JsObject = Json.obj("name" -> "payments", "type" -> "tuple[]", "components" -> Json.arr(
+    Json.obj("name" -> "assetId", "type" -> "bytes32"),
+    Json.obj("name" -> "amount", "type" -> "int64")
+  ))
 
   private def buildMethodId(str: String): String = {
     val cls    = Class.forName("org.web3j.abi.FunctionEncoder")
@@ -68,71 +72,65 @@ object ABIConverter {
     }
   }
 
-  def ethFuncSignatureTypeName(argType: Types.FINAL): String = {
-    argType match {
-      case Types.BOOLEAN         => "bool"
-      case Types.LONG            => "int64"
-      case Types.BYTESTR         => "bytes"
-      case Types.STRING          => "string"
-      case Types.LIST(innerType) => s"${ethFuncSignatureTypeName(innerType)}[]"
-      case Types.UNION(typeList, _) =>
-        val unionElementIdxType = "uint8"
-        val typeNameList        = unionElementIdxType :: typeList.map(ethFuncSignatureTypeName)
-        s"(${typeNameList.mkString(",")})"
-      case Types.TUPLE(types) => s"(${types.map(ethFuncSignatureTypeName).mkString(",")})"
-      case other              => throw new IllegalArgumentException(s"ethFuncSignatureTypeName: Unexpected type: $other")
-    }
+  def ethFuncSignatureTypeName(argType: Types.FINAL): String = argType match {
+    case Types.BOOLEAN         => "bool"
+    case Types.LONG            => "int64"
+    case Types.BYTESTR         => "bytes"
+    case Types.STRING          => "string"
+    case Types.LIST(innerType) => s"${ethFuncSignatureTypeName(innerType)}[]"
+    case Types.UNION(typeList, _) =>
+      val unionElementIdxType = "uint8"
+      val typeNameList        = unionElementIdxType :: typeList.map(ethFuncSignatureTypeName)
+      s"(${typeNameList.mkString(",")})"
+    case Types.TUPLE(types) => s"(${types.map(ethFuncSignatureTypeName).mkString(",")})"
+    case other              => throw new IllegalArgumentException(s"ethFuncSignatureTypeName: Unexpected type: $other")
   }
 
-  def toRideValue(ethArg: Any, rideType: Types.FINAL): EVALUATED = {
+  def toRideValue(ethArg: Any, rideType: Types.FINAL): EVALUATED = ethArg match {
+    case bool: Boolean        => Terms.CONST_BOOLEAN(bool)
+    case i: Int               => Terms.CONST_LONG(i)
+    case l: Long              => Terms.CONST_LONG(l)
+    case byteArr: Array[Byte] => Terms.CONST_BYTESTR(ByteStr(byteArr)).explicitGet() //FastHex.encodeToString(byteArr, 0, byteArr.length)
+    case str: String          => Terms.CONST_STRING(str).explicitGet()
 
-    ethArg match {
-      case bool: Boolean        => Terms.CONST_BOOLEAN(bool)
-      case i: Int               => Terms.CONST_LONG(i)
-      case l: Long              => Terms.CONST_LONG(l)
-      case byteArr: Array[Byte] => Terms.CONST_BYTESTR(ByteStr(byteArr)).explicitGet() //FastHex.encodeToString(byteArr, 0, byteArr.length)
-      case str: String          => Terms.CONST_STRING(str).explicitGet()
-
-      case arr: Array[_] => {
-        val innerType = rideType match {
-          case list: Types.LIST =>
-            list.innerType
-          case _ =>
-            Types.ANY
-        }
-        Terms
-          .ARR(
-            arr.toVector.map(el => toRideValue(el, innerType)),
-            limited = true
-          )
-          .explicitGet()
+    case arr: Array[_] => {
+      val innerType = rideType match {
+        case list: Types.LIST =>
+          list.innerType
+        case _ =>
+          Types.ANY
       }
-
-      case t: Tuple if rideType.isInstanceOf[Types.UNION] => {
-        val tupleValList = t.asScala.toVector
-        if (tupleValList.nonEmpty) {
-          val unionSubtypeIdx: Int = tupleValList.head.asInstanceOf[Int]
-          if (unionSubtypeIdx < tupleValList.length) {
-            toRideValue(tupleValList(unionSubtypeIdx + 1), rideType.asInstanceOf[Types.UNION].typeList(unionSubtypeIdx))
-          } else {
-            throw new UnsupportedOperationException(s"Incorrect tuple size for Union type.")
-          }
-        } else {
-          throw new UnsupportedOperationException(s"Incorrect tuple size for Union type. Empty tuple.")
-        }
-      }
-
-      case t: Tuple => {
-        Terms
-          .ARR(
-            t.asScala.toVector.map(el => toRideValue(el, Types.ANY)),
-            limited = true
-          )
-          .explicitGet()
-      }
-
-      case _ => throw new UnsupportedOperationException(s"Type not supported: $ethArg")
+      Terms
+        .ARR(
+          arr.toVector.map(el => toRideValue(el, innerType)),
+          limited = true
+        )
+        .explicitGet()
     }
+
+    case t: Tuple if rideType.isInstanceOf[Types.UNION] => {
+      val tupleValList = t.asScala.toVector
+      if (tupleValList.nonEmpty) {
+        val unionSubtypeIdx: Int = tupleValList.head.asInstanceOf[Int]
+        if (unionSubtypeIdx < tupleValList.length) {
+          toRideValue(tupleValList(unionSubtypeIdx + 1), rideType.asInstanceOf[Types.UNION].typeList(unionSubtypeIdx))
+        } else {
+          throw new UnsupportedOperationException(s"Incorrect tuple size for Union type.")
+        }
+      } else {
+        throw new UnsupportedOperationException(s"Incorrect tuple size for Union type. Empty tuple.")
+      }
+    }
+
+    case t: Tuple =>
+      Terms
+        .ARR(
+          t.asScala.toVector.map(el => toRideValue(el, Types.ANY)),
+          limited = true
+        )
+        .explicitGet()
+
+    case _ => throw new UnsupportedOperationException(s"Type not supported: $ethArg")
   }
 }
 
@@ -173,7 +171,7 @@ final case class ABIConverter(script: Script) {
     }
 
     lazy val ethSignature: String = {
-      val argTypes = (args.map(_.rideType).map(ABIConverter.ethFuncSignatureTypeName)) :+ ABIConverter.PaymentArgSignature
+      val argTypes = args.map(_.rideType).map(ABIConverter.ethFuncSignatureTypeName) :+ ABIConverter.PaymentArgSignature
       s"$name(${argTypes.mkString(",")})"
     }
 
@@ -201,12 +199,10 @@ final case class ABIConverter(script: Script) {
   def jsonABI: JsArray =
     JsArray(functionsWithArgs.map {
       case (funcName, args) =>
-        val paymentsArg = Json.obj("name" -> "payments") ++ ABIConverter.ethTypeObj(ABIConverter.PaymentListType)
-
         val inputs = args.map {
           case (argName, argType) =>
             Json.obj("name" -> argName) ++ ABIConverter.ethTypeObj(argType)
-        } :+ paymentsArg
+        } :+ ABIConverter.PaymentArgJson
 
         Json.obj(
           "name"            -> funcName,

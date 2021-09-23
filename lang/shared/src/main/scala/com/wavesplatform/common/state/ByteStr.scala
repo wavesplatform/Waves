@@ -2,6 +2,7 @@ package com.wavesplatform.common.state
 
 import scala.util.Try
 
+import com.wavesplatform.common._
 import com.wavesplatform.common.utils.{Base58, Base64}
 
 case class ByteStr(arr: Array[Byte]) {
