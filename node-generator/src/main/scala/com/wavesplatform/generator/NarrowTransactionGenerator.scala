@@ -28,7 +28,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
 import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.utils.{LoggerFacade, NTP}
 import org.slf4j.LoggerFactory
@@ -330,20 +330,19 @@ class NarrowTransactionGenerator(
             )
 
           case TransactionType.Ethereum =>
+            import EthTxGenerator.Arg
+
             val script   = randomFrom(settings.scripts).get
             val function = randomFrom(script.functions).get
             val sender   = randomFrom(accounts).get
-            val data = for {
+            val ethArgs = for {
               ScriptSettings.Function.Arg(argType, value) <- function.args
             } yield argType.toLowerCase match {
-              case "integer" | "int" | "long" | "int64" => Terms.CONST_LONG(value.toLong)
-              case "bigint" | "int256"                  => Terms.CONST_BIGINT(BigInt(Base58.decode(value)))
-              case "string"                             => Terms.CONST_STRING(value).explicitGet()
-              case "boolean" | "bool"                   => Terms.CONST_BOOLEAN(value.toBoolean)
-              case "binary"                             => Terms.CONST_BYTESTR(ByteStr(Base58.decode(value))).explicitGet()
-              /* case "address" =>
-                val bytes = Terms.CONST_BYTESTR(ByteStr.decodeBase58(value).get).explicitGet()
-                Terms.CaseObj(Types.addressType, Map("bytes" -> bytes)) */
+              case "integer" | "int" | "long" | "int64" | "uint64" => Arg.Integer(value.toLong)
+              case "bigint" | "int256" | "uint256"                 => Arg.BigInteger(BigInt(Base58.decode(value)))
+              case "string"                                        => Arg.Str(value)
+              case "boolean" | "bool"                              => Arg.Bool(value.toBoolean)
+              case "binary"                                        => Arg.Bytes(ByteStr(Base58.decode(value)))
             }
 
             val asset = randomFrom(Universe.IssuedAssets.filter(a => script.paymentAssets.contains(a.name.toStringUtf8)))
@@ -356,7 +355,7 @@ class NarrowTransactionGenerator(
                   GeneratorSettings.toKeyPair(script.dappAccount).toAddress,
                   AddressScheme.current.chainId,
                   function.name,
-                  data,
+                  ethArgs,
                   Seq(InvokeScriptTransaction.Payment(random.nextInt(5000), asset))
                 )
               )

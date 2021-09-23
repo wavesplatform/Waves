@@ -1,36 +1,78 @@
-package com.wavesplatform.generator
-
-import scala.collection.immutable.TreeMap
+package com.wavesplatform.transaction.utils
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj}
 import com.wavesplatform.transaction.{Asset, EthereumTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.utils.EthEncoding
 import org.web3j.abi.FunctionEncoder
+import org.web3j.abi.datatypes.{AbiTypes, StructType}
 import org.web3j.crypto._
 
+// TODO: Move to separate package available to node-generator and node:test
 object EthTxGenerator {
+  sealed trait Arg
+  object Arg {
+    case class Integer(v: Long, typeStr: String = "int64")        extends Arg
+    case class Bytes(v: ByteStr)                                  extends Arg
+    case class Str(v: String)                                     extends Arg
+    case class BigInteger(bi: BigInt, typeStr: String = "int256") extends Arg
+    case class Bool(b: Boolean)                                   extends Arg
+    case class List(listType: Arg, elements: Seq[Arg])            extends Arg
+    case class Union(index: Int, fields: Seq[Arg])                extends Arg
+    case class Struct(values: Arg*)                               extends Arg
+  }
+
   import org.web3j.abi.{datatypes => ethTypes}
   // import com.esaulpaugh.headlong.{abi => hl}
   // import scala.jdk.CollectionConverters._
 
   //noinspection ScalaDeprecation
-  def toEthType(value: Terms.EVALUATED): ethTypes.Type[_] = value match {
+  /* def toEthType(value: Terms.EVALUATED): ethTypes.Type[_] = value match { // TODO remove
     case Terms.CONST_LONG(t)     => new ethTypes.generated.Int64(t)
     case Terms.CONST_BIGINT(t)   => new ethTypes.generated.Int256(t.bigInteger)
     case bs: Terms.CONST_BYTESTR => new ethTypes.DynamicBytes(bs.bs.arr)
     case s: Terms.CONST_STRING   => new ethTypes.Utf8String(s.s)
     case Terms.CONST_BOOLEAN(b)  => new ethTypes.Bool(b)
-    case ARR(xs)                 => new ethTypes.DynamicArray(xs.map(toEthType): _*)
-    /* case CaseObj(CASETYPEREF("Address", _, _), fields) =>
-      val wavesAddress = Address.fromBytes(fields.head._2.asInstanceOf[Terms.CONST_BYTESTR].bs.arr).explicitGet()
-      new ethTypes.Address(wavesAddress.toEthAddress) */
+    case ARR(xs) =>
+      val ethTypedXs = xs.map(toEthType)
+      val arrayClass = (ethTypedXs.headOption match {
+        case Some(value) =>
+          if (classOf[StructType].isAssignableFrom(value.getClass)) value.getClass
+          else ethTypes.AbiTypes.getType(value.getTypeAsString)
+
+        case None => classOf[ethTypes.BytesType]
+      }).asInstanceOf[Class[ethTypes.Type[_]]]
+
+      new ethTypes.DynamicArray(arrayClass, ethTypedXs: _*) {
+        override def getTypeAsString: String = {
+          val head = ethTypedXs.headOption.getOrElse(ethTypes.generated.Bytes32.DEFAULT)
+          (if (classOf[StructType].isAssignableFrom(head.getClass)) head.getTypeAsString else AbiTypes.getTypeAString(getComponentType)) + "[]"
+        }
+      }
+
     case CaseObj(_, fields) => new ethTypes.DynamicStruct(fields.values.toSeq.map(toEthType): _*)
     case _                  => ???
+  } */
+
+  def toEthType(value: Arg): ethTypes.Type[_] = value match {
+    case Arg.Integer(v, typeStr)     => ethTypes.AbiTypes.getType(typeStr).getConstructor(classOf[Long]).newInstance(v)
+    case Arg.BigInteger(bi, typeStr) => ethTypes.AbiTypes.getType(typeStr).getConstructor(classOf[java.math.BigInteger]).newInstance(bi.bigInteger)
+    case Arg.Str(v)                  => new ethTypes.Utf8String(v)
+    case Arg.Bytes(v)                => new ethTypes.DynamicBytes(v.arr)
+    case Arg.Bool(b)                 => new ethTypes.Bool(b)
+    case Arg.List(listType, elements) =>
+      val ethTypedXs = elements.map(toEthType)
+      val arrayClass = toEthType(listType)
+      new ethTypes.DynamicArray(arrayClass.getClass.asInstanceOf[Class[ethTypes.Type[_]]], ethTypedXs: _*) {
+        override def getTypeAsString: String =
+          (if (classOf[StructType].isAssignableFrom(arrayClass.getClass)) arrayClass.getTypeAsString else AbiTypes.getTypeAString(getComponentType)) + "[]"
+      }
+    case Arg.Union(index, fields) =>
+      new ethTypes.DynamicStruct(toEthType(Arg.Integer(index, "uint8")) +: fields.map(toEthType): _*)
+
+    case Arg.Struct(values @ _*) => new ethTypes.DynamicStruct(values.map(toEthType): _*)
   }
 
   /* def toHLEthType(value: Terms.EVALUATED): hl.ABIType[_] = value match {
@@ -61,27 +103,19 @@ object EthTxGenerator {
       address: Address,
       chainId: Byte,
       funcName: String,
-      args: Seq[Terms.EVALUATED],
+      args: Seq[Arg],
       payments: Seq[Payment]
   ): EthereumTransaction = {
     import scala.jdk.CollectionConverters._
     val paymentsArg = {
-      val tuples = payments.toVector.map(
-        p =>
-          CaseObj(
-            Terms.runtimeTupleType,
-            TreeMap(
-              "_1" -> Terms
-                .CONST_BYTESTR(p.assetId match {
-                  case Asset.IssuedAsset(id) => id
-                  case Asset.Waves           => ByteStr.empty // ByteStr(new Array[Byte](32))
-                })
-                .explicitGet(),
-              "_2" -> Terms.CONST_LONG(p.amount)
-            )
-          )
-      )
-      Terms.ARR(tuples, limited = false).explicitGet()
+      val tuples = payments.toVector.map { p =>
+        val assetId = p.assetId match {
+          case Asset.IssuedAsset(id) => id
+          case Asset.Waves => ByteStr.empty // ByteStr(new Array[Byte](32))
+        }
+        Arg.Struct(Arg.Bytes(assetId), Arg.Integer(p.amount))
+      }
+      Arg.List(Arg.Struct(Arg.Bytes(ByteStr.empty), Arg.Integer(0)), tuples)
     }
 
     val fullArgs = (args :+ paymentsArg)
@@ -105,13 +139,13 @@ object EthTxGenerator {
 
     val raw = RawTransaction.createTransaction(
       BigInt(System.currentTimeMillis()).bigInteger,
-      BigInt(1).bigInteger,
+      EthereumTransaction.GasPrice,
       BigInt(500000).bigInteger, // fee
       EthEncoding.toHexString(address.publicKeyHash),
       FunctionEncoder.encode(function)
     )
 
     val signedTx = new SignedRawTransaction(raw.getTransaction, Sign.signMessage(TransactionEncoder.encode(raw, chainId.toLong), keyPair, true))
-    EthereumTransaction(signedTx)
+    EthereumTransaction(signedTx).explicitGet()
   }
 }

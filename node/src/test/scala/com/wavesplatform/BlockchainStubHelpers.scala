@@ -6,7 +6,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.ValidationError
@@ -62,6 +62,10 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
   }
 
   case class StubHelpers(blockchain: Blockchain) {
+    def activateFeatures(features: BlockchainFeature*): Unit = {
+      (() => blockchain.activatedFeatures).when().returns(features.map(_.id -> 0).toMap)
+    }
+    
     def creditBalance(address: MockParameter[Address], asset: MockParameter[Asset], amount: Long = Long.MaxValue / 3): Unit = {
       (blockchain.balance _).when(address, asset).returns(amount)
     }
@@ -92,7 +96,17 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
     def setScript(address: Address, script: Script): Unit = {
       (blockchain.accountScript _)
         .when(address)
-        .returns(Some(AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 1L, Map.empty.withDefaultValue(Map.empty.withDefaultValue(1L)))))
+        .returns(Some(AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 1L, new Map[Int, Map[String, Long]] {
+          def removed(key: Int): Map[Int, Map[String, Long]] = ???
+          def updated[V1 >: Map[String, Long]](key: Int, value: V1): Map[Int, V1] = ???
+          def get(key: Int): Option[Map[String, Long]] = Some(new Map[String, Long] {
+            def removed(key: String): Map[String, Long] = ???
+            def updated[V1 >: Long](key: String, value: V1): Map[String, V1] = ???
+            def get(key: String): Option[Long] = Some(1L)
+            def iterator: Iterator[(String, Long)] = ???
+          })
+          def iterator: Iterator[(Int, Map[String, Long])] = ???
+        })))
     }
 
     def transactionDiffer(time: Time = SystemTime, withFailed: Boolean = false): Transaction => TracedResult[ValidationError, Diff] = {
