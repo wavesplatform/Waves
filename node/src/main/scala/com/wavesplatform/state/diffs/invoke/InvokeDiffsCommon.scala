@@ -1,9 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
-import cats.instances.map._
-import cats.syntax.either._
+import cats.implicits._
 import cats.Id
-import cats.syntax.semigroup._
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
