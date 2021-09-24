@@ -9,10 +9,12 @@ import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshal
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Source
+import cats.data.Validated
 import cats.instances.either._
 import cats.instances.list._
 import cats.syntax.alternative._
 import cats.syntax.either._
+import cats.syntax.traverse._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http._
@@ -87,17 +89,24 @@ case class AssetsApiRoute(
 
   override lazy val route: Route =
     pathPrefix("assets") {
-      get {
-        pathPrefix("balance") {
-          pathPrefix(AddrSegment) { address =>
-            pathEndOrSingleSlash {
-              balances(address)
-            } ~
-              path(AssetId) { assetId =>
-                balance(address, assetId)
-              }
+      pathPrefix("balance" / AddrSegment) { address =>
+        anyParam("id", limit = 100) { assetIds =>
+          val assetIdsValidated = assetIds.toList
+            .map(assetId => ByteStr.decodeBase58(assetId).fold(_ => Left(assetId), bs => Right(IssuedAsset(bs))).toValidatedNel)
+            .sequence
+
+          assetIdsValidated match {
+            case Validated.Valid(assets) =>
+              balances(address, Some(assets).filter(_.nonEmpty))
+
+            case Validated.Invalid(invalidAssets) =>
+              complete(InvalidIds(invalidAssets.toList))
           }
-        } ~ pathPrefix("details") {
+        } ~ (get & path(AssetId)) { assetId =>
+          balance(address, assetId)
+        }
+      } ~ get {
+        pathPrefix("details") {
           (pathEndOrSingleSlash & parameters("id".as[String].*, "full".as[Boolean] ? false)) { (ids, full) =>
             multipleDetailsGet(ids.toSeq.reverse, full)
           } ~ (path(AssetId) & parameter("full".as[Boolean] ? false)) { (assetId, full) =>
@@ -128,33 +137,48 @@ case class AssetsApiRoute(
       }
     }
 
-  def balances(address: Address): Route = extractScheduler { implicit s =>
+  def fullAssetInfoJson(asset: IssuedAsset): JsObject = commonAssetsApi.fullInfo(asset) match {
+    case Some(CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance)) =>
+      Json.obj(
+        "assetId"    -> asset,
+        "reissuable" -> assetInfo.reissuable,
+        "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
+          case 0           => JsNull
+          case sponsorship => JsNumber(sponsorship)
+        }),
+        "sponsorBalance"   -> sponsorBalance,
+        "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
+        "issueTransaction" -> issueTransaction.map(_.json())
+      )
+
+    case None =>
+      Json.obj("assetId" -> asset)
+  }
+
+  /**
+    * @param assets Some(assets) for specific asset balances, None for a full portfolio
+    */
+  def balances(address: Address, assets: Option[Seq[IssuedAsset]] = None): Route = extractScheduler { implicit s =>
     implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsObject, NotUsed]] =
       jsonStreamMarshaller(s"""{"address":"$address","balances":[""", ",", "]}")
 
-    complete(commonAccountApi.portfolio(address).toListL.runToFuture.map { balances =>
-      Source.fromIterator(
-        () =>
-          balances.iterator.flatMap {
-            case (assetId, balance) =>
-              commonAssetsApi.fullInfo(assetId).map {
-                case CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance) =>
-                  Json.obj(
-                    "assetId"    -> assetId.id.toString,
-                    "balance"    -> balance,
-                    "reissuable" -> assetInfo.reissuable,
-                    "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
-                      case 0           => JsNull
-                      case sponsorship => JsNumber(sponsorship)
-                    }),
-                    "sponsorBalance"   -> sponsorBalance,
-                    "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
-                    "issueTransaction" -> issueTransaction.map(_.json())
-                  )
-              }
-          }
-      )
-    })
+    val assetBalances = assets match {
+      case Some(assets) =>
+        Source(assets)
+          .map(asset => asset -> blockchain.balance(address, asset))
+
+      case None =>
+        Source
+          .future(commonAccountApi.portfolio(address).toListL.runToFuture) // FIXME: Strict loading because of segfault in leveldb
+          .mapConcat(identity)
+    }
+
+    val jsonStream = assetBalances.map {
+      case (assetId, balance) =>
+        fullAssetInfoJson(assetId) ++ Json.obj("balance" -> balance)
+    }
+
+    complete(jsonStream)
   }
 
   def balance(address: Address, assetId: IssuedAsset): Route = complete(balanceJson(address, assetId))
