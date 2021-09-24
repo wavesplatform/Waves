@@ -17,10 +17,10 @@ import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, Co
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding._
 
 import scala.annotation.tailrec
 import scala.util.Random

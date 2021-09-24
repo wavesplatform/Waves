@@ -109,14 +109,16 @@ linuxPackageMappings := linuxPackageMappings.value.map { lpm =>
     case (file, path) if path.endsWith(s"/bin/${name.value}") => file -> fixScriptName(path, name.value, (Linux / packageName).value)
     case (file, path) if path.endsWith("/conf/application.ini") =>
       val dest = (Debian / target).value / path
-      IO.write(dest,
+      IO.write(
+        dest,
         s"""-J-Dwaves.defaults.blockchain.type=${network.value}
            |-J-Dwaves.defaults.directory=/var/lib/${(Linux / packageName).value}
-           |-J-Dwaves.defaults.config.directory=/var/lib/${(Linux / packageName).value}
-           |""".stripMargin)
+           |-J-Dwaves.defaults.config.directory=/etc/${(Linux / packageName).value}
+           |""".stripMargin
+      )
       IO.append(dest, IO.readBytes(file))
       dest -> path
-    case other                                                => other
+    case other => other
   })
 }
 
@@ -134,7 +136,7 @@ inConfig(Debian)(
     packageSource := sourceDirectory.value / "package",
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
     debianPackageDependencies += "java8-runtime-headless",
-    maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("postinst", "postrm", "prerm")),
+    maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("postinst", "postrm", "prerm"))
   )
 )
 

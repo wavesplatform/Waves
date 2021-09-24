@@ -3,8 +3,8 @@ package com.wavesplatform.api.http
 import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
 
 import akka.http.scaladsl.model.HttpMethods._
-import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.RouteResult.Complete
 import akka.http.scaladsl.server._
@@ -18,11 +18,12 @@ import scala.io.Source
 
 case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings) extends ScorexLogging {
   // Only affects extractScheduler { implicit sc => ... } routes
-  private[this] val corePoolSize = (Runtime.getRuntime.availableProcessors() * 2).min(4)
+  private val heavyRequestProcessorPoolThreads =
+    settings.heavyRequestProcessorPoolThreads.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
   val scheduler: ExecutionContextExecutorService = ExecutionContext.fromExecutorService(
     new ThreadPoolExecutor(
-      corePoolSize,
-      corePoolSize,
+      heavyRequestProcessorPoolThreads,
+      heavyRequestProcessorPoolThreads,
       60,
       TimeUnit.SECONDS,
       new LinkedBlockingQueue[Runnable],

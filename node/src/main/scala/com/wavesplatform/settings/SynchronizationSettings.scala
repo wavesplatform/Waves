@@ -8,7 +8,7 @@ import scala.concurrent.duration.FiniteDuration
 case class SynchronizationSettings(maxRollback: Int,
                                    synchronizationTimeout: FiniteDuration,
                                    scoreTTL: FiniteDuration,
-                                   maxBaseTargetOpt: Option[Long],
+                                   maxBaseTarget: Option[Long],
                                    invalidBlocksStorage: InvalidBlockStorageSettings,
                                    microBlockSynchronizer: MicroblockSynchronizerSettings,
                                    historyReplier: HistoryReplierSettings,
