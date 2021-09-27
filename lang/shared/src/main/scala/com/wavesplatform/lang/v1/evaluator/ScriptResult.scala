@@ -7,6 +7,7 @@ import cats.syntax.traverse._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
+import com.wavesplatform.lang.v1.compiler.ScriptResultSource.CallableFunction
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
@@ -39,7 +40,7 @@ object ScriptResult {
       .flatMap(
         t =>
           Left(
-            callableResultError(t, actual) + (if (expected.isEmpty) "" else s" instead of $expected")
+            callableResultError(t, actual, CallableFunction) + (if (expected.isEmpty) "" else s" instead of $expected")
           )
       )
 

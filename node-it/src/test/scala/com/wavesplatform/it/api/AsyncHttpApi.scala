@@ -4,7 +4,6 @@ import java.io.IOException
 import java.net.{InetSocketAddress, URLEncoder}
 import java.util.concurrent.TimeoutException
 import java.util.{NoSuchElementException, UUID}
-
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.api.http.DebugMessage._
@@ -15,9 +14,11 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.it.Node
+import com.wavesplatform.it.sync.invokeExpressionFee
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.ScriptReader
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -27,7 +28,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{Order, ExchangeTransaction => ExchangeTx}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, TxVersion}
@@ -477,6 +478,26 @@ object AsyncHttpApi extends Assertions {
           AddressOrAlias.fromString(dappAddress).explicitGet(),
           func.map(fn => FUNCTION_CALL(FunctionHeader.User(fn), args)),
           payment,
+          fee,
+          feeAssetId.map(aid => IssuedAsset(ByteStr.decodeBase58(aid).get)).getOrElse(Asset.Waves),
+          System.currentTimeMillis(),
+          Proofs.empty,
+          AddressScheme.current.chainId
+        ).signWith(caller.privateKey).json()
+      )
+
+    def invokeExpression(
+        caller: KeyPair,
+        expression: ExprScript,
+        fee: Long = invokeExpressionFee,
+        feeAssetId: Option[String] = None,
+        version: TxVersion = TxVersion.V1
+    ): Future[(Transaction, JsValue)] =
+      signedTraceBroadcast(
+        InvokeExpressionTransaction(
+          version,
+          caller.publicKey,
+          expression,
           fee,
           feeAssetId.map(aid => IssuedAsset(ByteStr.decodeBase58(aid).get)).getOrElse(Asset.Waves),
           System.currentTimeMillis(),

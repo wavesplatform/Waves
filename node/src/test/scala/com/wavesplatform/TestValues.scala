@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
+import com.wavesplatform.state.{AssetDescription, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -51,4 +52,18 @@ object TestValues {
       ScriptEstimatorV1
     )
     .explicitGet()
+
+  val assetDescription: AssetDescription = AssetDescription(
+    asset.id,
+    TxHelpers.defaultSigner.publicKey,
+    null,
+    null,
+    0,
+    reissuable = true,
+    BigInt(1),
+    Height(1),
+    None,
+    0,
+    nft = false
+  )
 }

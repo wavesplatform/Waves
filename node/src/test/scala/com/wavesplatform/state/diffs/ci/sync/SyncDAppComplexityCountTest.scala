@@ -8,40 +8,28 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithState
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.Portfolio
+import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, ci, produce}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, InvokeTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
 import org.scalacheck.Gen
 
-class SyncDAppComplexityCountTest extends PropSpec with WithState {
-
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
-      BlockchainFeatures.SmartAccounts.id    -> 0,
-      BlockchainFeatures.SmartAssets.id      -> 0,
-      BlockchainFeatures.Ride4DApps.id       -> 0,
-      BlockchainFeatures.FeeSponsorship.id   -> 0,
-      BlockchainFeatures.DataTransaction.id  -> 0,
-      BlockchainFeatures.BlockV5.id          -> 0,
-      BlockchainFeatures.SynchronousCalls.id -> 0
-    )
-  )
+class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
+  import DomainPresets._
 
   private def dApp(otherDApps: List[Address], paymentAsset: Option[IssuedAsset], transferAsset: Option[IssuedAsset], condition: String): Script =
     TestCompiler(V5).compileContract(s"""
@@ -67,7 +55,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
   // ~1900 complexity
   private val verifierScript: Script = {
     val script = s"""
-                    | {-# STDLIB_VERSION 5        #-}
+                    | {-# STDLIB_VERSION 6        #-}
                     | {-# SCRIPT_TYPE ACCOUNT     #-}
                     | {-# CONTENT_TYPE EXPRESSION #-}
                     |
@@ -112,13 +100,17 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
       withThroughTransfer: Boolean,
       withVerifier: Boolean,
       raiseError: Boolean,
-      sequentialCalls: Boolean
-  ): Gen[(Seq[Transaction], InvokeScriptTransaction, IssuedAsset, Address)] =
+      sequentialCalls: Boolean,
+      invokeExpression: Boolean
+  ): Gen[(Seq[Transaction], InvokeTransaction, IssuedAsset, Address)] =
     for {
       invoker  <- accountGen
       dAppAccs <- Gen.listOfN(dAppCount, accountGen)
       ts       <- timestampGen
-      fee      <- ciFee(sc = (if (withVerifier) 1 else 0) + (if (withPayment) 1 else 0) + (if (withThroughTransfer) 1 else 0))
+      fee <- ciFee(
+        sc = (if (withVerifier) 1 else 0) + (if (withPayment) 1 else 0) + (if (withThroughTransfer) 1 else 0),
+        freeCall = invokeExpression
+      )
       assetIssue = IssueTransaction
         .selfSigned(
           2.toByte,
@@ -134,25 +126,26 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
         )
         .explicitGet()
       asset   = IssuedAsset(assetIssue.id())
-      payment = List(Payment(1, asset))
+      payment = List(Payment(1L, asset))
 
       dAppGenesisTxs = dAppAccs.flatMap(
         a =>
           List(
             GenesisTransaction.create(a.toAddress, ENOUGH_AMT, ts).explicitGet(),
             TransferTransaction.selfSigned(TxVersion.V2, invoker, a.toAddress, asset, 10, Waves, fee, ByteStr.empty, ts).explicitGet()
-          )
+        )
       )
       invokerGenesis = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
       setScriptTxs = dAppAccs.foldLeft(List.empty[SetScriptTransaction]) {
         case (txs, currentAcc) =>
+          val isLast      = txs.size == dAppAccs.size - 1
           val callPayment = if (withThroughPayment) Some(asset) else None
           val transfer    = if (withThroughTransfer) Some(asset) else None
           val condition   = if (raiseError) if (txs.nonEmpty) "true" else "false" else groth
           val script =
             if (sequentialCalls)
-              if (txs.size == dAppAccs.size - 1)
+              if (isLast)
                 Some(dApp(txs.map(_.sender.toAddress), callPayment, transfer, condition))
               else
                 Some(dApp(Nil, callPayment, transfer, condition))
@@ -168,7 +161,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
       else
         Nil
 
-      invokeTx = InvokeScriptTransaction
+      invokeScriptTx = InvokeScriptTransaction
         .selfSigned(
           TxVersion.V3,
           invoker,
@@ -180,12 +173,15 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
           ts + 10
         )
         .explicitGet()
-    } yield (
-      Seq(invokerGenesis, assetIssue) ++ setVerifier ++ dAppGenesisTxs ++ setScriptTxs,
-      invokeTx,
-      asset,
-      dAppAccs.head.toAddress
-    )
+
+      invokeExpressionTx = ci.toInvokeExpression(setScriptTxs.head, invoker, Some(fee))
+    } yield
+      (
+        Seq(invokerGenesis, assetIssue) ++ setVerifier ++ dAppGenesisTxs ++ setScriptTxs,
+        if (invokeExpression) invokeExpressionTx else invokeScriptTx,
+        asset,
+        dAppAccs.head.toAddress
+      )
 
   private def assert(
       dAppCount: Int,
@@ -197,11 +193,16 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
       exceeding: Boolean = false,
       raiseError: Boolean = false,
       reject: Boolean = false,
-      sequentialCalls: Boolean = false
+      sequentialCalls: Boolean = false,
+      invokeExpression: Boolean = false
   ): Unit = {
     val (preparingTxs, invokeTx, asset, lastCallingDApp) =
-      scenario(dAppCount, withPayment, withThroughPayment, withThroughTransfer, withVerifier, raiseError, sequentialCalls).sample.get
-    assertDiffEi(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { diffE =>
+      scenario(dAppCount, withPayment, withThroughPayment, withThroughTransfer, withVerifier, raiseError, sequentialCalls, invokeExpression).sample.get
+    assertDiffEi(
+      Seq(TestBlock.create(preparingTxs)),
+      TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion),
+      RideV6.blockchainSettings.functionalitySettings
+    ) { diffE =>
       if (reject) {
         diffE shouldBe Symbol("left")
         diffE should produce("Error raised")
@@ -217,7 +218,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
 
         val dAppAddress = invokeTx.dAppAddressOrAlias.asInstanceOf[Address]
         val basePortfolios = Map(
-          TestBlock.defaultSigner.toAddress -> Portfolio(invokeTx.fee),
+          TestBlock.defaultSigner.toAddress -> Portfolio(CurrentBlockFeePart(invokeTx.fee)),
           invokeTx.senderAddress            -> Portfolio(-invokeTx.fee)
         )
         val paymentsPortfolios = Map(
@@ -248,11 +249,23 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
   }
 
   property("complexity border") {
-    assert(1, 2706)
-    assert(2, 5494)
-    assert(9, 25010)
-    assert(10, 25041, exceeding = true)
-    assert(100, 25041, exceeding = true)
+    Seq(true, false).foreach { b =>
+      assert(1, 2706, invokeExpression = b)
+      assert(2, 5494, invokeExpression = b)
+      assert(9, 25010, invokeExpression = b)
+      assert(10, 25041, exceeding = true, invokeExpression = b)
+      assert(100, 25041, exceeding = true, invokeExpression = b)
+
+      assert(2, 8201, withThroughPayment = true, invokeExpression = b)
+      assert(5, 24686, withThroughPayment = true, invokeExpression = b)
+      assert(6, 24733, withThroughPayment = true, exceeding = true, invokeExpression = b)
+      assert(100, 24733, withThroughPayment = true, exceeding = true, invokeExpression = b)
+
+      assert(1, 4609, withVerifier = true, invokeExpression = b)
+      assert(9, 26913, withVerifier = true, invokeExpression = b)
+      assert(10, 26944, withVerifier = true, exceeding = true, invokeExpression = b)
+      assert(100, 26944, withVerifier = true, exceeding = true, invokeExpression = b)
+    }
 
     assert(1, 5409, withPayment = true)
     assert(2, 8197, withPayment = true)
@@ -260,37 +273,29 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
     assert(9, 24965, withPayment = true, exceeding = true)
     assert(100, 24965, withPayment = true, exceeding = true)
 
-    assert(2, 8201, withThroughPayment = true)
-    assert(5, 24686, withThroughPayment = true)
-    assert(6, 24733, withThroughPayment = true, exceeding = true)
-    assert(100, 24733, withThroughPayment = true, exceeding = true)
-
     assert(1, 5412, withThroughTransfer = true)
     assert(2, 10906, withThroughTransfer = true)
     assert(4, 21894, withThroughTransfer = true)
     assert(5, 24685, withThroughTransfer = true, exceeding = true)
     assert(100, 25041, withThroughTransfer = true, exceeding = true)
 
-    assert(1, 4609, withVerifier = true)
-    assert(9, 26913, withVerifier = true)
-    assert(10, 26944, withVerifier = true, exceeding = true)
-    assert(100, 26944, withVerifier = true, exceeding = true)
-
     assert(1, 10018, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true)
     assert(100, 26556, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true, exceeding = true)
   }
 
   property("fail-free complexity border") {
-    assert(13, 0, raiseError = true, reject = true)
-    assert(14, 1029, raiseError = true)
+    Seq(true, false).foreach { b =>
+      assert(13, 0, raiseError = true, reject = true, invokeExpression = b)
+      assert(14, 1029, raiseError = true, invokeExpression = b)
 
-    assert(12, 0, raiseError = true, sequentialCalls = true, reject = true)
-    assert(13, 1005, raiseError = true, sequentialCalls = true)
+      assert(12, 0, raiseError = true, sequentialCalls = true, reject = true, invokeExpression = b)
+      assert(13, 1005, raiseError = true, sequentialCalls = true, invokeExpression = b)
 
-    assert(7, 0, raiseError = true, withThroughPayment = true, reject = true)
-    assert(8, 1066, raiseError = true, withThroughPayment = true)
+      assert(7, 0, raiseError = true, withThroughPayment = true, reject = true, invokeExpression = b)
+      assert(8, 1066, raiseError = true, withThroughPayment = true, invokeExpression = b)
 
-    assert(13, 0, raiseError = true, withThroughTransfer = true, reject = true)
-    assert(14, 1029, raiseError = true, withThroughTransfer = true)
+      assert(13, 0, raiseError = true, withThroughTransfer = true, reject = true, invokeExpression = b)
+      assert(14, 1029, raiseError = true, withThroughTransfer = true, invokeExpression = b)
+    }
   }
 }
