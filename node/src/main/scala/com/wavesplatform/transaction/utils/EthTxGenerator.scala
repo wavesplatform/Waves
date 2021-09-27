@@ -98,20 +98,50 @@ object EthTxGenerator {
     case _                       => ???
   } */
 
-  def generateEthInvoke(
-      keyPair: ECKeyPair,
-      address: Address,
-      chainId: Byte,
-      funcName: String,
-      args: Seq[Arg],
-      payments: Seq[Payment]
-  ): EthereumTransaction = {
+  def signRawTransaction(keyPair: ECKeyPair, chainId: Byte)(raw: RawTransaction): EthereumTransaction = {
+    val signedTx =
+      new SignedRawTransaction(raw.getTransaction, Sign.signMessage(TransactionEncoder.encode(raw, chainId.toLong), keyPair, true))
+    EthereumTransaction(signedTx).explicitGet()
+  }
+
+  def generateEthTransfer(keyPair: ECKeyPair, recipient: Address, amount: Long, asset: Asset): EthereumTransaction = asset match {
+    case Asset.Waves =>
+      signRawTransaction(keyPair, recipient.chainId)(RawTransaction.createTransaction(
+        BigInt(System.currentTimeMillis()).bigInteger,
+        EthereumTransaction.GasPrice,
+        BigInt(100000).bigInteger, // fee
+        EthEncoding.toHexString(recipient.publicKeyHash),
+        (BigInt(amount) * EthereumTransaction.AmountMultiplier).bigInteger,
+        ""
+      ))
+
+    case Asset.IssuedAsset(assetId) =>
+      import scala.jdk.CollectionConverters._
+      val function = new org.web3j.abi.datatypes.Function(
+        "transfer",
+        Seq[ethTypes.Type[_]](
+          new ethTypes.Address(EthEncoding.toHexString(recipient.publicKeyHash)),
+          new ethTypes.generated.Uint256(amount)
+        ).asJava,
+        Nil.asJava
+      )
+
+      signRawTransaction(keyPair, recipient.chainId)(RawTransaction.createTransaction(
+        BigInt(System.currentTimeMillis()).bigInteger,
+        EthereumTransaction.GasPrice,
+        BigInt(100000).bigInteger, // fee
+        EthEncoding.toHexString(assetId.arr.take(20)), // asset erc20 "contract" address
+        FunctionEncoder.encode(function)
+      ))
+  }
+
+  def generateEthInvoke(keyPair: ECKeyPair, address: Address, funcName: String, args: Seq[Arg], payments: Seq[Payment]): EthereumTransaction = {
     import scala.jdk.CollectionConverters._
     val paymentsArg = {
       val tuples = payments.toVector.map { p =>
         val assetId = p.assetId match {
           case Asset.IssuedAsset(id) => id
-          case Asset.Waves => ByteStr.empty // ByteStr(new Array[Byte](32))
+          case Asset.Waves           => ByteStr.empty // ByteStr(new Array[Byte](32))
         }
         Arg.Struct(Arg.Bytes(assetId), Arg.Integer(p.amount))
       }
@@ -137,15 +167,12 @@ object EthTxGenerator {
       Nil.asJava
     )
 
-    val raw = RawTransaction.createTransaction(
+    signRawTransaction(keyPair, address.chainId)(RawTransaction.createTransaction(
       BigInt(System.currentTimeMillis()).bigInteger,
       EthereumTransaction.GasPrice,
       BigInt(500000).bigInteger, // fee
       EthEncoding.toHexString(address.publicKeyHash),
       FunctionEncoder.encode(function)
-    )
-
-    val signedTx = new SignedRawTransaction(raw.getTransaction, Sign.signMessage(TransactionEncoder.encode(raw, chainId.toLong), keyPair, true))
-    EthereumTransaction(signedTx).explicitGet()
+    ))
   }
 }

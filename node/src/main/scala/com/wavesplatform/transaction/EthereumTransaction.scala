@@ -2,6 +2,8 @@ package com.wavesplatform.transaction
 
 import java.math.BigInteger
 
+import scala.reflect.ClassTag
+
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.EthereumKeyLength
@@ -16,14 +18,12 @@ import com.wavesplatform.transaction.validation.{TxConstraints, TxValidator, Val
 import com.wavesplatform.utils.EthEncoding
 import monix.eval.Coeval
 import org.web3j.abi.TypeDecoder
-import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.abi.datatypes.{Address => EthAddress}
-import org.web3j.crypto.Sign.SignatureData
+import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto._
+import org.web3j.crypto.Sign.SignatureData
 import org.web3j.utils.Convert
 import play.api.libs.json._
-
-import scala.reflect.ClassTag
 
 final case class EthereumTransaction(
     payload: EthereumTransaction.Payload,
@@ -96,15 +96,20 @@ object EthereumTransaction {
       }
   }
 
-  implicit object RawTransactionValidator extends TxValidator[EthereumTransaction] {
+  implicit object EthereumTransactionValidator extends TxValidator[EthereumTransaction] {
     override def validate(tx: EthereumTransaction): ValidatedV[EthereumTransaction] = TxConstraints.seq(tx)(
       TxConstraints.fee(tx.underlying.getGasLimit.longValueExact()),
-      TxConstraints.positiveOrZeroAmount(tx.underlying.getValue.longValueExact(), "waves"),
+      TxConstraints.positiveOrZeroAmount((BigInt(tx.underlying.getValue) / AmountMultiplier).bigInteger.longValueExact(), "waves"), // TODO should value be prohibited for invokes?
       TxConstraints.cond(tx.underlying.getGasPrice == GasPrice, GenericError("Gas price must be 10 Gwei")),
       TxConstraints.cond(
         tx.underlying.getValue != BigInteger.ZERO || EthEncoding.cleanHexPrefix(tx.underlying.getData).nonEmpty,
         GenericError("Transaction cancellation is not supported")
-      )
+      ),
+      tx.payload match {
+        case Transfer(tokenAddress, amount, _) =>
+          TxConstraints.positiveAmount(amount, tokenAddress.fold("waves")(erc20 => EthEncoding.toHexString(erc20.arr)))
+        case Invocation(_, _) => TxConstraints.seq(tx)()
+      },
     )
   }
 
@@ -141,7 +146,7 @@ object EthereumTransaction {
     if (hexData.isEmpty) {
       Transfer(
         None,
-        underlying.getValue.divide(BigInt(AmountMultiplier).bigInteger).longValueExact(),
+        (BigInt(underlying.getValue) / AmountMultiplier).bigInteger.longValueExact(),
         Address(recipientAddress.arr)
       )
     } else if (hexData.startsWith(ERC20TransferPrefix)) {

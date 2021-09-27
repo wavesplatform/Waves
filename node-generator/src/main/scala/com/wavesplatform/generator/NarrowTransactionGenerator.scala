@@ -9,7 +9,7 @@ import scala.util.Random
 import scala.util.Random._
 
 import cats.Show
-import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
+import com.wavesplatform.account.{Alias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.generator.utils.{Gen, Universe}
@@ -350,14 +350,7 @@ class NarrowTransactionGenerator(
 
             logOption(
               Right(
-                EthTxGenerator.generateEthInvoke(
-                  Bip32ECKeyPair.generateKeyPair(sender.seed),
-                  GeneratorSettings.toKeyPair(script.dappAccount).toAddress,
-                  AddressScheme.current.chainId,
-                  function.name,
-                  ethArgs,
-                  Seq(InvokeScriptTransaction.Payment(random.nextInt(5000), asset))
-                )
+                EthTxGenerator.generateEthInvoke(Bip32ECKeyPair.generateKeyPair(sender.seed), GeneratorSettings.toKeyPair(script.dappAccount).toAddress, function.name, ethArgs, Seq(InvokeScriptTransaction.Payment(random.nextInt(5000), asset)))
               )
             )
 
