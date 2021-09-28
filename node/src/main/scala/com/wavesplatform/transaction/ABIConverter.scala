@@ -9,6 +9,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.{Terms, Types}
+import com.wavesplatform.transaction.ABIConverter.WavesByteRepr
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.Type
@@ -17,12 +18,17 @@ import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 import scala.jdk.CollectionConverters._
 
 object ABIConverter {
+  val WavesByteRepr: ByteStr      = ByteStr(new Array[Byte](32))
   val PaymentListType: Types.LIST = Types.LIST(Types.TUPLE(List(Types.BYTESTR, Types.LONG)))
   val PaymentArgSignature: String = "(bytes32,int64)[]"
-  val PaymentArgJson: JsObject = Json.obj("name" -> "payments", "type" -> "tuple[]", "components" -> Json.arr(
-    Json.obj("name" -> "assetId", "type" -> "bytes32"),
-    Json.obj("name" -> "amount", "type" -> "int64")
-  ))
+  val PaymentArgJson: JsObject = Json.obj(
+    "name" -> "payments",
+    "type" -> "tuple[]",
+    "components" -> Json.arr(
+      Json.obj("name" -> "assetId", "type" -> "bytes32"),
+      Json.obj("name" -> "amount", "type"  -> "int64")
+    )
+  )
 
   private def buildMethodId(str: String): String = {
     val cls    = Class.forName("org.web3j.abi.FunctionEncoder")
@@ -156,8 +162,8 @@ final case class ABIConverter(script: Script) {
               fields match {
                 case Seq(Terms.CONST_BYTESTR(assetId), Terms.CONST_LONG(amount)) =>
                   InvokeScriptTransaction.Payment(amount, assetId match {
-                    case ByteStr.empty => Asset.Waves
-                    case assetId       => Asset.IssuedAsset(assetId)
+                    case `WavesByteRepr` => Asset.Waves
+                    case assetId         => Asset.IssuedAsset(assetId)
                   })
 
                 case other => throw new IllegalArgumentException(s"decodeArgs: unexpected term in payment: $other")

@@ -70,17 +70,16 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
             )
           )
         case "eth_sendRawTransaction" =>
-          val str = params.get.head.as[String]
-          log.info(str)
-
-          extractTransaction(str) match {
+          extractTransaction(params.get.head.as[String]) match {
             case Left(value) => resp(id, ApiError.fromValidationError(value).json)
             case Right(et) =>
               resp(
                 id,
                 transactionsApi.broadcastTransaction(et).map[JsValueWrapper] { result =>
-                  log.info(s"Validation result from ${toHexString(et.senderAddress().publicKeyHash)}: $result")
-                  toHexString(et.id().arr)
+                  result.resultE match {
+                    case Left(error) => ApiError.fromValidationError(error).json
+                    case Right(_)    => toHexString(et.id().arr)
+                  }
                 }
               )
           }
@@ -93,24 +92,24 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           resp(
             id,
             transactionsApi.transactionById(txId).fold[JsValue](JsNull) { tm =>
-                tm.transaction match {
-                  case tx: EthereumTransaction =>
-                    Json.obj(
-                      "transactionHash"   -> toHexString(tm.transaction.id().arr),
-                      "transactionIndex"  -> "0x01",
-                      "blockHash"         -> toHexString(blockchain.lastBlockId.get.arr),
-                      "blockNumber"       -> toHexString(BigInteger.valueOf(tm.height)),
-                      "from"              -> toHexString(tx.senderAddress().publicKeyHash),
-                      "to"                -> tx.underlying.getTo,
-                      "cumulativeGasUsed" -> toHexString(tx.fee),
-                      "gasUsed"           -> toHexString(tx.fee),
-                      "contractAddress"   -> JsNull,
-                      "logs"              -> Json.arr(),
-                      "logsBloom"         -> toHexString(new Array[Byte](32)),
-                      "status" -> (if (tm.succeeded) "0x1" else "0x0")
-                    )
-                  case _ => JsNull
-                }
+              tm.transaction match {
+                case tx: EthereumTransaction =>
+                  Json.obj(
+                    "transactionHash"   -> toHexString(tm.transaction.id().arr),
+                    "transactionIndex"  -> "0x01",
+                    "blockHash"         -> toHexString(blockchain.lastBlockId.get.arr),
+                    "blockNumber"       -> toHexString(BigInteger.valueOf(tm.height)),
+                    "from"              -> toHexString(tx.senderAddress().publicKeyHash),
+                    "to"                -> tx.underlying.getTo,
+                    "cumulativeGasUsed" -> toHexString(tx.fee),
+                    "gasUsed"           -> toHexString(tx.fee),
+                    "contractAddress"   -> JsNull,
+                    "logs"              -> Json.arr(),
+                    "logsBloom"         -> toHexString(new Array[Byte](32)),
+                    "status"            -> (if (tm.succeeded) "0x1" else "0x0")
+                  )
+                case _ => JsNull
+              }
 
             }
           )
@@ -151,7 +150,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           )
 
           val errorOrLong = for {
-            et <- EthereumTransaction(tx)
+            et            <- EthereumTransaction(tx)
             (_, txFee, _) <- transactionsApi.calculateFee(et)
           } yield txFee
 
