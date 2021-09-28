@@ -98,7 +98,7 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
       log.debug(s"Rolling back to $toHeight")
       var buf: List[BlockAppended] = Nil
       Using(rw.newIterator) { iter =>
-        iter.seek(Ints.toByteArray(toHeight + 1))
+        iter.seek(keyForHeight(toHeight + 1))
         while (iter.hasNext) {
           val e           = iter.next()
           val height      = Ints.fromByteArray(e.getKey)
@@ -110,7 +110,7 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
       (1 to buf.size).foreach { offset =>
         val height = toHeight + offset
         log.debug(s"Deleting update at $height")
-        rw.delete(Ints.toByteArray(height))
+        rw.delete(keyForHeight(height))
       }
 
       buf
