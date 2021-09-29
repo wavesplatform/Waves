@@ -10,7 +10,6 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test._
@@ -99,9 +98,8 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
             .selfSigned(1.toByte, dApp1, dApp(dApp2.toAddress, invokeExpression = invokeExpression).asInstanceOf[ExprScript], fee, Waves, ts)
             .explicitGet()
         else
-          InvokeScriptTransaction
-            .selfSigned(1.toByte, dApp1, dApp1.toAddress, fc, Nil, fee, Waves, ts)
-            .explicitGet()
+          Signed
+            .invokeScript(1.toByte, dApp1, dApp1.toAddress, fc, Nil, fee, Waves, ts)
       } yield (List(genesis1, genesis2, setDApp1, setDApp2), invoke)
 
     Seq(true, false).foreach { invokeExpression =>
@@ -137,9 +135,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
             .selfSigned(1.toByte, dApp1, dApp(dApp2.toAddress, invokeExpression = invokeExpression).asInstanceOf[ExprScript], fee, Waves, ts)
             .explicitGet()
         else
-          InvokeScriptTransaction
-            .selfSigned(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
-            .explicitGet()
+          Signed.invokeScript(1.toByte, dApp1, dApp2.toAddress, fc, Nil, fee, Waves, ts)
       } yield (List(genesis1, genesis2, genesis3, setDApp1, setDApp2, setDApp3), invoke)
 
     Seq(true, false).foreach { invokeExpression =>
@@ -151,7 +147,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       )(
         _ should produce(
           s"The invocation stack contains multiple invocations " +
-            s"of the dApp at address ${invoke.senderAddress} with " +
+            s"of the dApp at address ${invoke.sender.toAddress} with " +
             s"invocations of another dApp between them"
         )
       )

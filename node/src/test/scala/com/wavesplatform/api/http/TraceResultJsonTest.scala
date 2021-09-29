@@ -7,13 +7,13 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.ScriptResultV3
-import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, Recipient}
 import com.wavesplatform.lang.v1.traits.domain.DataItem.Lng
+import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, Recipient}
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.utils.JsonMatchers
 
 class TraceResultJsonTest extends PropSpec with JsonMatchers {
@@ -26,7 +26,7 @@ class TraceResultJsonTest extends PropSpec with JsonMatchers {
         1.toByte,
         sender = publicKey,
         dappAddress = address,
-        expr = Some(FUNCTION_CALL(User("func"), List(CONST_STRING("param").explicitGet(), CONST_LONG(1)))),
+        fc = Some(FUNCTION_CALL(User("func"), List(CONST_STRING("param").explicitGet(), CONST_LONG(1)))),
         p = List(InvokeScriptTransaction.Payment(1L, Waves)),
         fee = 10000000L,
         feeAssetId = Waves,

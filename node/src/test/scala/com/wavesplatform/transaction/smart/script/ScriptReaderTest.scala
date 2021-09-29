@@ -9,7 +9,6 @@ import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.test._
-import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.test.PropSpec
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{EitherValues, Inside}

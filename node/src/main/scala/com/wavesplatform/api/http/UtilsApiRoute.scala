@@ -36,7 +36,8 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.{Blockchain, Diff}
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, TransactionType}
+import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment, InvokeScriptTransaction}
@@ -344,6 +345,8 @@ object UtilsApiRoute {
                 override def id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr.empty)
 
                 override def checkedAssets: Seq[Asset.IssuedAsset] = Seq.empty
+
+                override val tpe: TransactionType = TransactionType.InvokeScript
               },
               address,
               PublicKey(ByteStr.fill(KeyLength)(1)),

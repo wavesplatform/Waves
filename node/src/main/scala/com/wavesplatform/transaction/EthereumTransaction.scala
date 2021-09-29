@@ -3,7 +3,6 @@ package com.wavesplatform.transaction
 import java.math.BigInteger
 
 import scala.reflect.ClassTag
-
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.EthereumKeyLength
@@ -11,6 +10,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
+import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.serialization.impl.BaseTxJson
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -101,6 +101,7 @@ object EthereumTransaction {
         override def timestamp: TxTimestamp                         = tx.timestamp
         override def chainId: TxVersion                             = tx.chainId
         override def checkedAssets: Seq[Asset.IssuedAsset]          = this.paymentAssets
+        override val tpe: TransactionType                           = TransactionType.InvokeScript
       }
 
     val json: Coeval[JsObject] = Coeval.evalOnce(Json.obj(

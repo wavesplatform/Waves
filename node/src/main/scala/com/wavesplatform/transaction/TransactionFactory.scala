@@ -404,7 +404,7 @@ object TransactionFactory {
       case TransactionType.SponsorFee       => jsv.as[SignedSponsorFeeRequest].toTx
       case TransactionType.Exchange         => jsv.as[ExchangeRequest].toTx
       case TransactionType.UpdateAssetInfo  => jsv.as[SignedUpdateAssetInfoRequest].toTx
-      case InvokeExpressionTransaction => jsv.as[SignedInvokeExpressionRequest].toTx
+      case TransactionType.InvokeExpression => jsv.as[SignedInvokeExpressionRequest].toTx
     }
 
     if (chainId.exists(_ != AddressScheme.current.chainId)) {

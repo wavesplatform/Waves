@@ -19,7 +19,7 @@ object TransactionType extends Enumeration(1) {
   SetAssetScript,
   InvokeScript,
   UpdateAssetInfo,
-  InvokeExpression, //FIXME: not implemented in this branch
+  InvokeExpression,
   Ethereum = Value
 
   implicit class ValueExt(val tpe: TransactionType) extends AnyVal {

@@ -1,9 +1,6 @@
 package com.wavesplatform.http
 
-import scala.util.Random
-
 import akka.http.scaladsl.model._
-import com.wavesplatform.{BlockchainStubHelpers, BlockGen, TestValues, TestWallet}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError._
@@ -18,30 +15,31 @@ import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL, TRUE}
-import com.wavesplatform.lang.v1.traits.domain.LeaseCancel
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.lang.v1.traits.domain.{Lease, LeaseCancel, Recipient}
+import com.wavesplatform.lang.v1.traits.domain.LeaseCancel
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
 import com.wavesplatform.test.TestTime
-import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
+import com.wavesplatform.{BlockGen, BlockchainStubHelpers, TestValues, TestWallet}
 import monix.reactive.Observable
-import org.scalacheck.{Arbitrary, Gen}
 import org.scalacheck.Gen._
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
-import play.api.libs.json._
 import play.api.libs.json.Json.JsValueWrapper
+import play.api.libs.json._
+
+import scala.util.Random
 
 class TransactionsRouteSpec
     extends RouteSpec("/transactions")

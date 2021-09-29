@@ -9,7 +9,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, InvokeTransaction}
 import play.api.libs.json._
 
 object InvokeScriptRequest {
@@ -107,7 +107,7 @@ case class SignedInvokeScriptRequest(
         version.getOrElse(2.toByte),
         _sender,
         _dappAddress,
-        call.map(InvokeScriptRequest.buildFunctionCall).filterNot(_ == InvokeScriptTransaction.DefaultFuncCall),
+        call.map(InvokeScriptRequest.buildFunctionCall).filterNot(_ == InvokeTransaction.DefaultCall),
         payment.getOrElse(Seq()),
         fee,
         _feeAssetId,

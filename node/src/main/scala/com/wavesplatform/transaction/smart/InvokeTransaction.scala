@@ -12,9 +12,9 @@ trait InvokeTransaction
     with TxWithFee.InCustomAsset
     with FastHashId
     with VersionedTransaction {
-  override val checkedAssets: Seq[Asset.IssuedAsset] = super[InvokeScriptLike].checkedAssets
+  override val checkedAssets: Seq[Asset.IssuedAsset] = super[InvokeScriptTransactionLike].checkedAssets
 }
 
 object InvokeTransaction {
-  val defaultCall: FUNCTION_CALL = FUNCTION_CALL(User(ContractEvaluator.DEFAULT_FUNC_NAME), Nil)
+  val DefaultCall: FUNCTION_CALL = FUNCTION_CALL(User(ContractEvaluator.DEFAULT_FUNC_NAME), Nil)
 }

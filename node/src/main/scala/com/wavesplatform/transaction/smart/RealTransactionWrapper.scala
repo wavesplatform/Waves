@@ -109,6 +109,10 @@ object RealTransactionWrapper {
             }.toIndexedSeq
           )
           .asRight
+
+      case ie: InvokeExpressionTransaction =>
+        Tx.InvokeExpression(proven(ie), ie.expressionBytes, ie.feeAssetId.compatId).asRight
+
       case ci: InvokeScriptTransactionLike =>
         val (version, bodyBytes, proofs) = ci match {
           case ist: InvokeScriptTransaction =>
@@ -135,8 +139,6 @@ object RealTransactionWrapper {
               ci.funcCall.args.map(arg => arg.asInstanceOf[EVALUATED])
             )
           }
-      case ie: InvokeExpressionTransaction =>
-        Tx.InvokeExpression(proven(ie), ie.expressionBytes, ie.feeAssetId.compatId).asRight
 
       case _: EthereumTransaction => Left("No mapping for Ethereum transfers")
 

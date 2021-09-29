@@ -24,20 +24,17 @@ case class InvokeExpressionTransaction(
     override val timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends InvokeTransaction
+) extends Transaction(TransactionType.InvokeExpression, Nil)
+    with InvokeTransaction
     with PBSince.V1 {
 
   lazy val expressionBytes: ByteStr = expression.bytes.value()
 
-  override def root                = this
-  override def senderAddress: Address                         = sender.toAddress
-  override val dAppAddressOrAlias: AddressOrAlias             = sender.toAddress
-  override val funcCall: Terms.FUNCTION_CALL                  = InvokeTransaction.defaultCall
+  override def dApp: AddressOrAlias                           = sender.toAddress
+  override def root: InvokeExpressionTransaction              = this
+  override val funcCall: Terms.FUNCTION_CALL                  = InvokeTransaction.DefaultCall
   override def payments: Seq[InvokeScriptTransaction.Payment] = Nil
-  override def checkedAssets: Seq[Asset.IssuedAsset]          = Nil
-  override val enableEmptyKeys: Boolean                       = false
-
-  override val builder = InvokeExpressionTransaction
+  override val checkedAssets: Seq[Asset.IssuedAsset]          = Nil
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBTransactionSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(PBTransactionSerializer.bytes(this))
@@ -66,7 +63,7 @@ object InvokeExpressionTransaction extends TransactionParser {
       .parseBytes(bytes)
       .flatMap {
         case tx: InvokeExpressionTransaction => Success(tx)
-        case tx: Transaction                 => Failure(UnexpectedTransaction(typeId, tx.typeId))
+        case tx: Transaction                 => Failure(UnexpectedTransaction(typeId, tx.tpe.id.toByte))
       }
 
   def create(

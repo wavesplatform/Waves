@@ -24,9 +24,7 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
-import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
-import com.wavesplatform.transaction.smart._
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier, _}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json
 
@@ -249,7 +247,7 @@ object TransactionDiffer {
   // failed transactions related
   private def transactionMayFail(tx: Transaction): Boolean =
     tx.tpe == TransactionType.InvokeScript ||
-      tx.typeId == InvokeExpressionTransaction.typeId ||
+      tx.tpe == TransactionType.InvokeExpression ||
       tx.tpe == TransactionType.Exchange
 
   private def acceptFailed(blockchain: Blockchain): Boolean = blockchain.isFeatureActivated(BlockV5)

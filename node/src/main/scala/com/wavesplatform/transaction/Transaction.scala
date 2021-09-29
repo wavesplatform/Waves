@@ -13,6 +13,7 @@ trait TransactionBase {
   def chainId: Byte
   def id: Coeval[ByteStr]
   def checkedAssets: Seq[IssuedAsset]
+  val tpe: TransactionType.TransactionType
 }
 
 object TransactionBase {

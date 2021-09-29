@@ -9,17 +9,15 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.{BLOCK, FUNCTION_CALL, LET}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.FeeValidation._
-import com.wavesplatform.transaction.TransactionType
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxVersion
-import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.{TransactionType, TxVersion}
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, SetScriptTransaction}
 import org.scalacheck.Gen
 
 package object ci {
   private def invokeFee(freeCall: Boolean) =
     if (freeCall)
-      FeeUnit * FeeConstants(InvokeExpressionTransaction.typeId)
+      FeeUnit * FeeConstants(TransactionType.InvokeExpression)
     else
       FeeUnit * FeeConstants(TransactionType.InvokeScript)
 

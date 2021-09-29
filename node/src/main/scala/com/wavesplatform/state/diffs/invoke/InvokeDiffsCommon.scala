@@ -37,7 +37,7 @@ import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.Asset
 import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.validation.impl.{LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
-import com.wavesplatform.transaction.{Asset, AssetIdLength, TransactionType}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, PBSince, TransactionType}
 import com.wavesplatform.utils._
 import shapeless.Coproduct
 
@@ -68,14 +68,14 @@ object InvokeDiffsCommon {
   }
 
   private def calculateMinFee(
-      tx: InvokeTransaction,
+      tx: InvokeScriptTransactionLike,
       blockchain: Blockchain,
       issueList: List[Issue],
       additionalScriptsInvoked: Int,
       stepsNumber: Long
   ): Long = {
-    val dAppFee    = FeeConstants(tx.typeId) * FeeUnit * stepsNumber
-    val issuesFee  = issueList.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
+    val dAppFee    = FeeConstants(tx.tpe) * FeeUnit * stepsNumber
+    val issuesFee  = issueList.count(!blockchain.isNFT(_)) * FeeConstants(TransactionType.Issue) * FeeUnit
     val actionsFee = additionalScriptsInvoked * ScriptExtraFee
     dAppFee + issuesFee + actionsFee
   }
@@ -120,7 +120,7 @@ object InvokeDiffsCommon {
               ""
 
           val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
-          val txName    = Constants.TransactionNames(tx.typeId)
+          val txName    = tx.tpe.transactionName
 
           s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
             s"$stepsInfo$totalScriptsInvokedInfo$issuesInfo " +
@@ -353,9 +353,9 @@ object InvokeDiffsCommon {
       _ <- Either.cond(
         !tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
         (), {
-          val versionInfo = tx.root.get match {
-            case s: LegacyPBSwitch => s" in tx version >= ${s.protobufVersion}"
-            case _                 => ""
+          val versionInfo = tx.root match {
+            case s: PBSince => s" in tx version >= ${s.protobufVersion}"
+            case _          => ""
           }
           s"Empty keys aren't allowed$versionInfo"
         }
