@@ -351,7 +351,7 @@ object InvokeDiffsCommon {
         s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize(stdLibVersion)} entries"
       )
       _ <- Either.cond(
-        !tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
+        tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
         (), {
           val versionInfo = tx.root match {
             case s: PBSince => s" in tx version >= ${s.protobufVersion}"
