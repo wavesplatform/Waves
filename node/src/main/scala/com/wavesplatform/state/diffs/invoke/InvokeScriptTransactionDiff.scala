@@ -300,6 +300,7 @@ object InvokeScriptTransactionDiff {
           } else
             ScriptExecutionError.dAppExecution(error, log)
       }
+      .map { r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1); r }
   }
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {

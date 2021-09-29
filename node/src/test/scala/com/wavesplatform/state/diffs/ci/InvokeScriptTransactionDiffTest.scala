@@ -71,7 +71,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
       BlockchainFeatures.DataTransaction.id  -> 0,
       BlockchainFeatures.BlockV5.id          -> 0,
       BlockchainFeatures.SynchronousCalls.id -> 0
-    )
+    ),
+    syncDAppCheckTransfersHeight = 999
   )
 
   val assetAllowed: Script = ExprScript(
@@ -1864,7 +1865,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
       case (invoke, genesisTxs) =>
         tempDb { _ =>
           val features = fs.copy(
-            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
+            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0),
+            syncDAppCheckTransfersHeight = 999
           )
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
             inside(ei) {
