@@ -62,6 +62,18 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
               "number" -> quantity(Integer.parseInt(params.get.head.as[String].drop(2), 16))
             )
           )
+
+        case "eth_getBlockByHash" =>
+          val blockId = ByteStr(toBytes(params.get.head.as[String]))
+
+          resp(
+            id,
+            blockchain.heightOf(blockId).flatMap(blockchain.blockHeader).fold[JsValue](JsNull) { header =>
+              Json.obj(
+                "baseFeePerGas" -> "0x0"
+              )
+            }
+          )
         case "eth_getBalance" =>
           resp(
             id,
