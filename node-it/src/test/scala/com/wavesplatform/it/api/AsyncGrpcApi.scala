@@ -424,8 +424,8 @@ object AsyncGrpcApi {
         version,
         PBTransaction.Data.InvokeExpression(InvokeExpressionTransactionData(ByteString.copyFrom(expression.bytes.value().arr)))
       )
-      val proofs = crypto.sign(caller.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
-      transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
+      val proofs = crypto.sign(caller.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
     }
 
     def broadcastLease(source: KeyPair, recipient: Recipient, amount: Long, fee: Long, version: Int = 2): Future[PBSignedTransaction] = {
