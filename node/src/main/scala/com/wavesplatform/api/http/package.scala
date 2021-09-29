@@ -22,6 +22,11 @@ import com.wavesplatform.crypto
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, InvokeExpressionTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Scheduler
 import play.api.libs.json._
@@ -69,6 +74,7 @@ package object http extends ApiMarshallers with ScorexLogging {
               case TransactionType.SetAssetScript  => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], senderPk)
               case TransactionType.SponsorFee      => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderPk)
               case TransactionType.UpdateAssetInfo => txJson.as[UpdateAssetInfoRequest].toTxFrom(senderPk)
+              case TransactionType.InvokeExpression => TransactionFactory.invokeExpression(txJson.as[InvokeExpressionRequest], senderPk)
               case other => throw new IllegalArgumentException(s"Unsupported transaction type: $other")
             }
           }

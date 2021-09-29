@@ -30,7 +30,7 @@ import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, Alias
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import monix.reactive.Observer
@@ -715,7 +715,7 @@ abstract class LevelDBWriter private[database] (
 
               case _: DataTransaction => // see changed data keys removal
 
-              case _: InvokeScriptTransaction =>
+              case _: InvokeScriptTransaction | _: InvokeExpressionTransaction =>
                 rw.delete(Keys.invokeScriptResult(h, num))
 
               case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))

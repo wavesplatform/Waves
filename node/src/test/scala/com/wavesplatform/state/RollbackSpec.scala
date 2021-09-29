@@ -1,6 +1,6 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -27,6 +27,7 @@ import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, InvokeTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.utils.StringBytes
@@ -437,77 +438,82 @@ class RollbackSpec extends FreeSpec with WithDomain {
           description    <- Gen.listOfN(descriptionLen, alphaLowerChar).map(_.mkString)
           quantity       <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
           decimals       <- Gen.choose(0: Byte, 8: Byte)
-        } yield (
-          quantity,
-          Terms.FUNCTION_CALL(
-            FunctionHeader.User("issue"),
-            List(
-              Terms.CONST_STRING(name).explicitGet(),
-              Terms.CONST_STRING((description)).explicitGet(),
-              Terms.CONST_LONG(quantity),
-              Terms.CONST_LONG(decimals),
-              Terms.CONST_BOOLEAN(true)
+        } yield
+          (
+            quantity,
+            Terms.FUNCTION_CALL(
+              FunctionHeader.User("issue"),
+              List(
+                Terms.CONST_STRING(name).explicitGet(),
+                Terms.CONST_STRING(description).explicitGet(),
+                Terms.CONST_LONG(quantity),
+                Terms.CONST_LONG(decimals),
+                Terms.CONST_BOOLEAN(true)
+              )
             )
           )
-        )
 
       def reissueFunctionCallGen(assetId: ByteStr): Gen[(Long, Terms.FUNCTION_CALL)] =
         for {
           reissuable <- Arbitrary.arbBool.arbitrary
           quantity   <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
-        } yield (
-          quantity,
-          Terms.FUNCTION_CALL(
-            FunctionHeader.User("reissue"),
-            List(
-              Terms.CONST_BYTESTR(assetId).explicitGet(),
-              Terms.CONST_BOOLEAN(reissuable),
-              Terms.CONST_LONG(quantity)
+        } yield
+          (
+            quantity,
+            Terms.FUNCTION_CALL(
+              FunctionHeader.User("reissue"),
+              List(
+                Terms.CONST_BYTESTR(assetId).explicitGet(),
+                Terms.CONST_BOOLEAN(reissuable),
+                Terms.CONST_LONG(quantity)
+              )
             )
           )
-        )
 
       def burnFunctionCallGen(assetId: ByteStr, quantity: Long): Gen[(Long, Terms.FUNCTION_CALL)] =
         for {
           burnt <- Gen.choose(1, quantity)
-        } yield (
-          burnt,
-          Terms.FUNCTION_CALL(
-            FunctionHeader.User("burn"),
-            List(
-              Terms.CONST_BYTESTR(assetId).explicitGet(),
-              Terms.CONST_LONG(burnt)
+        } yield
+          (
+            burnt,
+            Terms.FUNCTION_CALL(
+              FunctionHeader.User("burn"),
+              List(
+                Terms.CONST_BYTESTR(assetId).explicitGet(),
+                Terms.CONST_LONG(burnt)
+              )
             )
           )
-        )
 
       def sponsorFunctionCallGen(assetId: ByteStr): Gen[(Long, Terms.FUNCTION_CALL)] =
         for {
           minSponsoredAssetFee <- Gen.choose(1L, 100000L)
-        } yield (
-          minSponsoredAssetFee,
-          Terms.FUNCTION_CALL(
-            FunctionHeader.User("sponsor"),
-            List(
-              Terms.CONST_BYTESTR(assetId).explicitGet(),
-              Terms.CONST_LONG(minSponsoredAssetFee)
+        } yield
+          (
+            minSponsoredAssetFee,
+            Terms.FUNCTION_CALL(
+              FunctionHeader.User("sponsor"),
+              List(
+                Terms.CONST_BYTESTR(assetId).explicitGet(),
+                Terms.CONST_LONG(minSponsoredAssetFee)
+              )
             )
           )
-        )
 
       def leaseFunctionCallGen(address: Address): Gen[(Long, Terms.FUNCTION_CALL)] =
         for {
           leaseAmount <- Gen.choose(1L, 100000L)
-        } yield (
-          leaseAmount,
-          Terms.FUNCTION_CALL(
-            FunctionHeader.User("lease"),
-            List(
-              Terms.CONST_BYTESTR(ByteStr(address.bytes)).explicitGet(),
-              Terms.CONST_LONG(leaseAmount)
+        } yield
+          (
+            leaseAmount,
+            Terms.FUNCTION_CALL(
+              FunctionHeader.User("lease"),
+              List(
+                Terms.CONST_BYTESTR(ByteStr(address.bytes)).explicitGet(),
+                Terms.CONST_LONG(leaseAmount)
+              )
             )
           )
-        )
 
       def leaseCancelFunctionCall(leaseId: ByteStr): Terms.FUNCTION_CALL =
         Terms.FUNCTION_CALL(
@@ -525,19 +531,29 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
       val scenario =
         for {
-          dApp                 <- accountGen
-          initialDAppBalance   <- positiveLongGen
-          sender               <- accountGen
-          initialSenderBalance <- positiveLongGen
-          fee                  <- smallFeeGen
-          _                    <- issueParamGen
+          useInvokeExpression   <- Gen.oneOf(true, false)
+          dApp                  <- accountGen
+          initialDAppBalance    <- positiveLongGen
+          sender                <- accountGen
+          initialSenderBalance  <- positiveLongGen
+          fee                   <- smallFeeGen
+          _                     <- issueParamGen
+          leaseRecipientAddress <- accountGen
           genesis     = genesisBlock(nextTs, Map(dApp.toAddress -> initialDAppBalance, sender.toAddress -> initialSenderBalance))
           setScriptTx = SetScriptTransaction.selfSigned(1.toByte, dApp, Some(RollbackSpec.issueReissueBurnScript), fee, nextTs).explicitGet()
-        } yield (dApp, sender, genesis, setScriptTx)
+        } yield (dApp, sender, genesis, setScriptTx, useInvokeExpression, leaseRecipientAddress.toAddress)
 
-      def appendBlock(d: Domain, invoker: KeyPair, dApp: KeyPair)(parentBlockId: ByteStr, fc: Terms.FUNCTION_CALL): ByteStr = {
-        val fee    = 150000000L
-        val invoke = Signed.invokeScript(2.toByte, invoker, dApp.toAddress, Some(fc), Seq.empty, fee, Waves, nextTs)
+      def appendBlock(d: Domain, invoker: KeyPair, dApp: KeyPair, ss: Option[SetScriptTransaction])(parentBlockId: ByteStr,
+                                                                                                    fc: Terms.FUNCTION_CALL): ByteStr = {
+        val fee = 150000000L
+        val invoke =
+          ss.fold[InvokeTransaction](
+            InvokeScriptTransaction
+              .selfSigned(2.toByte, invoker, dApp.toAddress, Some(fc), Seq.empty, fee, Waves, nextTs)
+              .explicitGet()
+          )(
+            setScript => diffs.ci.toInvokeExpression(setScript, invoker, Some(fee), Some(fc))
+          )
 
         d.appendBlock(
           TestBlock.create(
@@ -550,9 +566,10 @@ class RollbackSpec extends FreeSpec with WithDomain {
       }
 
       "issue" in forAll(scenario) {
-        case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0)) { d =>
-            val append = appendBlock(d, invoker, dApp) _
+        case (dApp, invoker, genesis, setScript, useInvokeExpression, _) =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0, RideV6 -> 0)) { d =>
+            val (setScriptToConvert, checkAddress) = if (useInvokeExpression) (Some(setScript), invoker.toAddress) else (None, dApp.toAddress)
+            val append                             = appendBlock(d, invoker, dApp, setScriptToConvert) _
 
             d.appendBlock(genesis)
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
@@ -564,26 +581,27 @@ class RollbackSpec extends FreeSpec with WithDomain {
             /// liquid block rollback
             val liquidIssueTxId = append(startBlockId, issueFc)
             val liquidAsset     = getAsset(d, liquidIssueTxId)
-            d.balance(dApp.toAddress, liquidAsset) shouldBe quantity
+            d.balance(checkAddress, liquidAsset) shouldBe quantity
             d.blockchainUpdater.removeAfter(startBlockId).explicitGet()
-            d.balance(dApp.toAddress, liquidAsset) shouldBe 0L
+            d.balance(checkAddress, liquidAsset) shouldBe 0L
             d.blockchainUpdater.assetDescription(liquidAsset) shouldBe None
 
             // hardened block rollback
             val issueTxId = append(startBlockId, issueFc)
             val asset     = getAsset(d, issueTxId)
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
-            d.balance(dApp.toAddress, asset) shouldBe quantity
+            d.balance(checkAddress, asset) shouldBe quantity
             d.blockchainUpdater.removeAfter(startBlockId).explicitGet()
-            d.balance(dApp.toAddress, asset) shouldBe 0L
+            d.balance(checkAddress, asset) shouldBe 0L
             d.blockchainUpdater.assetDescription(asset) shouldBe None
           }
       }
 
       "reissue" in forAll(scenario) {
-        case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0)) { d =>
-            val append = appendBlock(d, invoker, dApp) _
+        case (dApp, invoker, genesis, setScript, useInvokeExpression, _) =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0, RideV6 -> 0)) { d =>
+            val (setScriptToConvert, checkAddress) = if (useInvokeExpression) (Some(setScript), invoker.toAddress) else (None, dApp.toAddress)
+            val append                             = appendBlock(d, invoker, dApp, setScriptToConvert) _
 
             d.appendBlock(genesis)
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
@@ -603,25 +621,26 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
             // liquid block rollback
             append(issueBlockId, reissueFc)
-            d.balance(dApp.toAddress, asset) shouldBe reissued + quantity
+            d.balance(checkAddress, asset) shouldBe reissued + quantity
             d.blockchainUpdater.removeAfter(issueBlockId).explicitGet()
-            d.balance(dApp.toAddress, asset) shouldBe quantity
+            d.balance(checkAddress, asset) shouldBe quantity
             d.blockchainUpdater.assetDescription(asset) shouldBe issueDescription
 
             // hardened block rollback
             append(issueBlockId, reissueFc)
-            d.balance(dApp.toAddress, asset) shouldBe reissued + quantity
+            d.balance(checkAddress, asset) shouldBe reissued + quantity
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
             d.blockchainUpdater.removeAfter(issueBlockId).explicitGet()
-            d.balance(dApp.toAddress, asset) shouldBe quantity
+            d.balance(checkAddress, asset) shouldBe quantity
             d.blockchainUpdater.assetDescription(asset) shouldBe issueDescription
           }
       }
 
       "burn" in forAll(scenario) {
-        case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0)) { d =>
-            val append = appendBlock(d, invoker, dApp) _
+        case (dApp, invoker, genesis, setScript, useInvokeExpression, _) =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0, RideV6 -> 0)) { d =>
+            val (setScriptToConvert, checkAddress) = if (useInvokeExpression) (Some(setScript), invoker.toAddress) else (None, dApp.toAddress)
+            val append                             = appendBlock(d, invoker, dApp, setScriptToConvert) _
 
             d.appendBlock(genesis)
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
@@ -641,25 +660,26 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
             // liquid block rollback
             append(issueBlockId, burntFc)
-            d.balance(dApp.toAddress, asset) shouldBe quantity - burnt
+            d.balance(checkAddress, asset) shouldBe quantity - burnt
             d.blockchainUpdater.removeAfter(issueBlockId).explicitGet()
-            d.balance(dApp.toAddress, asset) shouldBe quantity
+            d.balance(checkAddress, asset) shouldBe quantity
             d.blockchainUpdater.assetDescription(asset) shouldBe issueDescription
 
             // hardened block rollback
             append(issueBlockId, burntFc)
-            d.balance(dApp.toAddress, asset) shouldBe quantity - burnt
+            d.balance(checkAddress, asset) shouldBe quantity - burnt
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
             d.blockchainUpdater.removeAfter(issueBlockId).explicitGet()
-            d.balance(dApp.toAddress, asset) shouldBe quantity
+            d.balance(checkAddress, asset) shouldBe quantity
             d.blockchainUpdater.assetDescription(asset) shouldBe issueDescription
           }
       }
 
       "sponsorFee" in forAll(scenario) {
-        case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0)) { d =>
-            val append = appendBlock(d, invoker, dApp) _
+        case (dApp, invoker, genesis, setScript, useInvokeExpression, _) =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0, RideV6 -> 0)) { d =>
+            val setScriptToConvert = if (useInvokeExpression) Some(setScript) else None
+            val append             = appendBlock(d, invoker, dApp, setScriptToConvert) _
 
             d.appendBlock(genesis)
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
@@ -694,24 +714,26 @@ class RollbackSpec extends FreeSpec with WithDomain {
       }
 
       "lease" in forAll(scenario) {
-        case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0)) { d =>
-            val append = appendBlock(d, invoker, dApp) _
+        case (dApp, invoker, genesis, setScript, useInvokeExpression, leaseRecipientAddress) =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0, RideV6 -> 0)) { d =>
+            val (setScriptToConvert, checkAddress, checkPk) =
+              if (useInvokeExpression) (Some(setScript), invoker.toAddress, invoker.publicKey) else (None, dApp.toAddress, dApp.publicKey)
+            val append = appendBlock(d, invoker, dApp, setScriptToConvert) _
 
             d.appendBlock(genesis)
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
             val beforeInvoke1 = d.lastBlockId
 
-            val (leaseAmount, leaseFc) = leaseFunctionCallGen(invoker.toAddress).sample.get
+            val (leaseAmount, leaseFc) = leaseFunctionCallGen(leaseRecipientAddress).sample.get
             def leaseDetails(invokeId: ByteStr) =
-              Some(LeaseDetails(dApp.publicKey, invoker.toAddress, leaseAmount, LeaseDetails.Status.Active, invokeId, 3))
+              Some(LeaseDetails(checkPk, leaseRecipientAddress, leaseAmount, LeaseDetails.Status.Active, invokeId, 3))
 
             // liquid block rollback
             val invokeId1 = append(d.lastBlockId, leaseFc)
-            val leaseId1  = Lease.calculateId(Lease(invoker.toAddress.toRide, leaseAmount, 0), invokeId1)
+            val leaseId1  = Lease.calculateId(Lease(leaseRecipientAddress.toRide, leaseAmount, 0), invokeId1)
 
-            d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance(in = leaseAmount, out = 0)
-            d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance(in = 0, out = leaseAmount)
+            d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance(in = leaseAmount, out = 0)
+            d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance(in = 0, out = leaseAmount)
             d.blockchain.leaseDetails(leaseId1) shouldBe leaseDetails(invokeId1)
             d.levelDBWriter.leaseDetails(leaseId1) shouldBe None
             d.appendBlock()
@@ -719,18 +741,18 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
             d.blockchain.removeAfter(beforeInvoke1).explicitGet()
 
-            d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance.empty
-            d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance.empty
+            d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance.empty
+            d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance.empty
             d.blockchain.leaseDetails(leaseId1) shouldBe None
             d.levelDBWriter.leaseDetails(leaseId1) shouldBe None
 
             // hardened block rollback
             val beforeInvoke2 = d.lastBlockId
             val invokeId2     = append(d.lastBlockId, leaseFc)
-            val leaseId2      = Lease.calculateId(Lease(invoker.toAddress.toRide, leaseAmount, 0), invokeId2)
+            val leaseId2      = Lease.calculateId(Lease(leaseRecipientAddress.toRide, leaseAmount, 0), invokeId2)
 
-            d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance(in = leaseAmount, out = 0)
-            d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance(in = 0, out = leaseAmount)
+            d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance(in = leaseAmount, out = 0)
+            d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance(in = 0, out = leaseAmount)
             d.blockchain.leaseDetails(leaseId2) shouldBe leaseDetails(invokeId2)
             d.levelDBWriter.leaseDetails(leaseId2) shouldBe None
             d.appendBlock()
@@ -739,15 +761,26 @@ class RollbackSpec extends FreeSpec with WithDomain {
             d.appendBlock()
             d.blockchain.removeAfter(beforeInvoke2).explicitGet()
 
-            d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance.empty
-            d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance.empty
+            d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance.empty
+            d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance.empty
             d.blockchain.leaseDetails(leaseId2) shouldBe None
             d.levelDBWriter.leaseDetails(leaseId2) shouldBe None
           }
       }
 
-      def assertLeaseCancel(dApp: KeyPair, invoker: KeyPair, d: Domain, leaseAmount: Long, leaseId: ByteStr, sourceId: ByteStr): Assertion = {
-        val append        = appendBlock(d, invoker, dApp) _
+      def assertLeaseCancel(
+          dApp: KeyPair,
+          invoker: KeyPair,
+          d: Domain,
+          leaseAmount: Long,
+          leaseId: ByteStr,
+          sourceId: ByteStr,
+          setScriptToConvert: Option[SetScriptTransaction],
+          checkAddress: Address,
+          checkPk: PublicKey,
+          leaseRecipientAddress: Address
+      ): Assertion = {
+        val append        = appendBlock(d, invoker, dApp, setScriptToConvert) _
         val beforeInvoke1 = d.lastBlockId
 
         val call = leaseCancelFunctionCall(leaseId)
@@ -755,8 +788,8 @@ class RollbackSpec extends FreeSpec with WithDomain {
         def leaseDetails(cancelHeight: Int = 0, cancelId: ByteStr = ByteStr.empty) =
           Some(
             LeaseDetails(
-              dApp.publicKey,
-              invoker.toAddress,
+              checkPk,
+              leaseRecipientAddress,
               leaseAmount,
               if (cancelId.isEmpty) LeaseDetails.Status.Active
               else LeaseDetails.Status.Cancelled(cancelHeight, Some(cancelId)),
@@ -769,8 +802,8 @@ class RollbackSpec extends FreeSpec with WithDomain {
         val leaseCancelId     = append(d.lastBlockId, call)
         val (cancelHeight, _) = d.blockchain.transactionMeta(leaseCancelId).get
 
-        d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance.empty
-        d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance.empty
+        d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance.empty
+        d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(cancelHeight, leaseCancelId)
         d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails()
         d.appendBlock()
@@ -778,8 +811,8 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
         d.blockchain.removeAfter(beforeInvoke1).explicitGet()
 
-        d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance(in = leaseAmount, 0)
-        d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance(0, out = leaseAmount)
+        d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance(in = leaseAmount, 0)
+        d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance(0, out = leaseAmount)
         d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails()
         d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails()
 
@@ -787,8 +820,8 @@ class RollbackSpec extends FreeSpec with WithDomain {
         val beforeInvoke2  = d.lastBlockId
         val leaseCancelId1 = append(d.lastBlockId, call)
 
-        d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance.empty
-        d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance.empty
+        d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance.empty
+        d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(cancelHeight, leaseCancelId1)
         d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails()
         d.appendBlock()
@@ -797,36 +830,66 @@ class RollbackSpec extends FreeSpec with WithDomain {
         d.appendBlock()
         d.blockchain.removeAfter(beforeInvoke2).explicitGet()
 
-        d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance(in = leaseAmount, 0)
-        d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance(0, out = leaseAmount)
+        d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance(in = leaseAmount, 0)
+        d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance(0, out = leaseAmount)
         d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails()
         d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails()
       }
 
       "leaseCancel with lease tx" in forAll(scenario) {
-        case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SmartAccounts -> 0, SynchronousCalls -> 0)) { d =>
+        case (dApp, invoker, genesis, setScript, useInvokeExpression, leaseRecipientAddress) =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SmartAccounts -> 0, SynchronousCalls -> 0, RideV6 -> 0)) { d =>
+            val (setScriptToConvert, leaseSender) =
+              if (useInvokeExpression)
+                (Some(setScript), invoker)
+              else
+                (None, dApp)
+
             val leaseAmount = smallFeeGen.sample.get
-            val leaseTx     = LeaseTransaction.selfSigned(2.toByte, dApp, invoker.toAddress, leaseAmount, setScript.fee, nextTs).explicitGet()
+            val leaseTx     = LeaseTransaction.selfSigned(2.toByte, leaseSender, leaseRecipientAddress, leaseAmount, setScript.fee, nextTs).explicitGet()
             val leaseId     = leaseTx.id()
 
             d.appendBlock(genesis)
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript, leaseTx)))
 
-            assertLeaseCancel(dApp, invoker, d, leaseAmount, leaseId, leaseId)
+            assertLeaseCancel(dApp,
+                              invoker,
+                              d,
+                              leaseAmount,
+                              leaseId,
+                              leaseId,
+                              setScriptToConvert,
+                              leaseSender.toAddress,
+                              leaseSender.publicKey,
+                              leaseRecipientAddress)
           }
       }
 
       "leaseCancel with lease action" in forAll(scenario) {
-        case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SmartAccounts -> 0, SynchronousCalls -> 0)) { d =>
+        case (dApp, invoker, genesis, setScript, useInvokeExpression, leaseRecipientAddress) =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SmartAccounts -> 0, SynchronousCalls -> 0, RideV6 -> 0)) { d =>
             d.appendBlock(genesis.transactionData :+ setScript: _*)
 
-            val (leaseAmount, leaseFc) = leaseFunctionCallGen(invoker.toAddress).sample.get
-            val leaseInvokeId          = appendBlock(d, invoker, dApp)(d.lastBlockId, leaseFc)
-            val leaseId                = Lease.calculateId(Lease(invoker.toAddress.toRide, leaseAmount, 0), leaseInvokeId)
+            val (setScriptToConvert, leaseSender) =
+              if (useInvokeExpression)
+                (Some(setScript), invoker)
+              else
+                (None, dApp)
 
-            assertLeaseCancel(dApp, invoker, d, leaseAmount, leaseId, leaseInvokeId)
+            val (leaseAmount, leaseFc) = leaseFunctionCallGen(leaseRecipientAddress).sample.get
+            val leaseInvokeId          = appendBlock(d, invoker, dApp, setScriptToConvert)(d.lastBlockId, leaseFc)
+            val leaseId                = Lease.calculateId(Lease(leaseRecipientAddress.toRide, leaseAmount, 0), leaseInvokeId)
+
+            assertLeaseCancel(dApp,
+                              invoker,
+                              d,
+                              leaseAmount,
+                              leaseId,
+                              leaseInvokeId,
+                              setScriptToConvert,
+                              leaseSender.toAddress,
+                              leaseSender.publicKey,
+                              leaseRecipientAddress)
           }
       }
     }

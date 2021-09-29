@@ -135,6 +135,8 @@ object RealTransactionWrapper {
               ci.funcCall.args.map(arg => arg.asInstanceOf[EVALUATED])
             )
           }
+      case ie: InvokeExpressionTransaction =>
+        Tx.InvokeExpression(proven(ie), ie.expressionBytes, ie.feeAssetId.compatId).asRight
 
       case _: EthereumTransaction => Left("No mapping for Ethereum transfers")
 

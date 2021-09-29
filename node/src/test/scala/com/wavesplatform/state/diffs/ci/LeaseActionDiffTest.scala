@@ -899,12 +899,13 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"10 multiple actions") {
+  property(s"30 multiple actions") {
     val recipient        = accountGen.sample.get.toAddress
     val amount           = positiveLongGen.sample.get
-    val leaseCount       = Random.nextInt(10) + 1
-    val leaseCancelCount = Random.nextInt(leaseCount).min(10 - leaseCount)
-    val transfersCount   = 10 - leaseCancelCount - leaseCount
+    val actionsCount     = 30
+    val leaseCount       = Random.nextInt(actionsCount) + 1
+    val leaseCancelCount = Random.nextInt(leaseCount).min(actionsCount - leaseCount)
+    val transfersCount   = actionsCount - leaseCancelCount - leaseCount
     val dApp             = multipleActionsDApp(recipient.toRide, amount, leaseCount, leaseCancelCount, transfersCount)
     val leaseAmount      = (leaseCount - leaseCancelCount) * amount
     forAll(leasePreconditions(customDApp = Some(dApp))) {

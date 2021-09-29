@@ -157,7 +157,6 @@ class ContractIntegrationTest extends PropSpec with Inside {
 
     ContractEvaluator.applyV2Coeval(
       ctx.evaluationContext(environment),
-      Map(),
       compiled,
       Invocation(
         Terms.FUNCTION_CALL(FunctionHeader.User(func), args),

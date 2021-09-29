@@ -67,14 +67,20 @@ object InvokeDiffsCommon {
     }
   }
 
-  def calculateMinFee(blockchain: Blockchain, issueList: List[Issue], additionalScriptsInvoked: Int, stepsNumber: Long): Long = {
-    val dAppFee    = FeeConstants(TransactionType.InvokeScript) * FeeUnit * stepsNumber
-    val issuesFee  = issueList.count(!blockchain.isNFT(_)) * FeeConstants(TransactionType.Issue) * FeeUnit
+  private def calculateMinFee(
+      tx: InvokeTransaction,
+      blockchain: Blockchain,
+      issueList: List[Issue],
+      additionalScriptsInvoked: Int,
+      stepsNumber: Long
+  ): Long = {
+    val dAppFee    = FeeConstants(tx.typeId) * FeeUnit * stepsNumber
+    val issuesFee  = issueList.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
     val actionsFee = additionalScriptsInvoked * ScriptExtraFee
     dAppFee + issuesFee + actionsFee
   }
 
-  def calcAndCheckFee[E <: ValidationError](
+  private[invoke] def calcAndCheckFee[E <: ValidationError](
       makeError: (String, Long) => E,
       tx: InvokeScriptTransactionLike,
       blockchain: Blockchain,
@@ -89,7 +95,7 @@ object InvokeDiffsCommon {
       else
         invocationComplexity / stepLimit + 1
 
-    val minFee = calculateMinFee(blockchain, issueList, additionalScriptsInvoked, stepsNumber)
+    val minFee = calculateMinFee(tx, blockchain, issueList, additionalScriptsInvoked, stepsNumber)
 
     val resultE = for {
       (attachedFeeInWaves, portfolioDiff) <- txFeeDiff(blockchain, tx)
@@ -113,8 +119,10 @@ object InvokeDiffsCommon {
             else
               ""
 
-          val assetName = tx.feeAssetId.fold("WAVES")(_.id.toString)
-          s"Fee in $assetName for ${TransactionType.InvokeScript.transactionName} (${tx.fee} in $assetName)" +
+          val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
+          val txName    = Constants.TransactionNames(tx.typeId)
+
+          s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
             s"$stepsInfo$totalScriptsInvokedInfo$issuesInfo " +
             s"does not exceed minimal value of $minFee WAVES."
         }
@@ -343,9 +351,14 @@ object InvokeDiffsCommon {
         s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize(stdLibVersion)} entries"
       )
       _ <- Either.cond(
-        tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
-        (),
-        s"Empty keys aren't allowed in tx version >= 2"
+        !tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
+        (), {
+          val versionInfo = tx.root.get match {
+            case s: LegacyPBSwitch => s" in tx version >= ${s.protobufVersion}"
+            case _                 => ""
+          }
+          s"Empty keys aren't allowed$versionInfo"
+        }
       )
 
       maxKeySize = ContractLimits.MaxKeySizeInBytesByVersion(stdLibVersion)
@@ -399,7 +412,7 @@ object InvokeDiffsCommon {
             else remainingLimit
 
           val blockchain   = CompositeBlockchain(sblockchain, curDiff)
-          val actionSender = Recipient.Address(ByteStr(tx.dApp.bytes)) // XXX Is it correct for aliases&
+          val actionSender = Recipient.Address(ByteStr(dAppAddress.bytes))
 
           def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
             val AssetTransfer(addressRepr, recipient, amount, asset) = transfer

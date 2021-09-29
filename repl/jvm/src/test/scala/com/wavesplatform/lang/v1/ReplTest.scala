@@ -1,16 +1,16 @@
 package com.wavesplatform.lang.v1
 
-import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.BlockchainUnavailableException
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
-import com.wavesplatform.lang.v1.testing.ScriptGen
-import org.scalatest.{Matchers, PropSpec}
+import com.wavesplatform.test.produce
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.propspec.AnyPropSpec
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
+class ReplTest extends AnyPropSpec with Matchers {
   def await[A](f: Future[A]): A = Await.result(f, 2 seconds)
 
   property("variable memorization") {

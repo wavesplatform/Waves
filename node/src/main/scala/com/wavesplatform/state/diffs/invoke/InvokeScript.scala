@@ -6,15 +6,18 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.TxTimestamp
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.{TransactionBase, TxTimestamp}
 import play.api.libs.json.{JsObject, Json}
+import com.wavesplatform.transaction.smart.InvokeTransaction
 
 trait InvokeScriptLike {
   def dApp: AddressOrAlias
   def funcCall: FUNCTION_CALL
   def payments: Seq[Payment]
   def root: InvokeScriptTransactionLike
+  def checkedAssets: Seq[IssuedAsset] = payments collect { case Payment(_, assetId: IssuedAsset) => assetId }
   def sender: PublicKey
 }
 
