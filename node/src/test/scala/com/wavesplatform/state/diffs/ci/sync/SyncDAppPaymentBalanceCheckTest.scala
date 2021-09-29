@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.{TestTime, TransactionGenBase}
 
-class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with TransactionGenBase {
+class SyncDAppPaymentBalanceCheckTest extends PropSpec with WithDomain with TransactionGenBase {
 
   private val time = new TestTime
   private def ts   = time.getTimestamp()
@@ -57,7 +57,7 @@ class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with Transaction
       invokeTx = () => InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts).explicitGet()
     } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx2), invokeTx)
 
-  property("temporary negative balance of sync call produce error only after set height") {
+  property("temporary negative balance of sync call payments produce error only after set height") {
     val (preparingTxs, invoke) = scenario.sample.get
     val settings =
       TestFunctionalitySettings
@@ -75,6 +75,22 @@ class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with Transaction
       d.appendBlock()
       (the[RuntimeException] thrownBy d.appendBlock(invoke2)).getMessage should include(
         s"Sync call leads to temporary negative balance = -100 for address ${invoke2.dAppAddressOrAlias}"
+      )
+    }
+  }
+
+  property("fix works correctly after reaching syncDAppCheckTransfersHeight") {
+    val (preparingTxs, invoke) = scenario.sample.get
+    val settings =
+      TestFunctionalitySettings
+        .withFeatures(BlockV5, SynchronousCalls)
+        .copy(syncDAppCheckPaymentsHeight = 0, syncDAppCheckTransfersHeight = 0)
+
+    withDomain(domainSettingsWithFS(settings)) { d =>
+      d.appendBlock(preparingTxs: _*)
+      val i = invoke()
+      (the[RuntimeException] thrownBy d.appendBlock(i)).getMessage should include(
+        s"Sync call leads to temporary negative balance = -100 for address ${i.dAppAddressOrAlias}"
       )
     }
   }

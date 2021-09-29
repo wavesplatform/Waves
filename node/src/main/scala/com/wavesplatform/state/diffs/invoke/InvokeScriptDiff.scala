@@ -214,7 +214,7 @@ object InvokeScriptDiff {
               Either.cond(
                 blockchain.height < blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight || newBalance >= 0,
                 (),
-                GenericError(s"Sync call leads to temporary negative balance = $newBalance for address $invoker"),
+                balanceError(invoker, newBalance),
               )
             }
 
@@ -277,6 +277,22 @@ object InvokeScriptDiff {
                 traced(error.asLeft[(Diff, EVALUATED, Int, Int, Int)])
             }
             resultDiff = diff.copy(scriptsComplexity = 0) |+| actionsDiff |+| Diff.empty.copy(scriptsComplexity = paymentsComplexity)
+
+            newBlockchain = CompositeBlockchain(blockchain, resultDiff)
+            newInvokerBalance = newBlockchain.balance(invoker)
+            newDAppBalance    = newBlockchain.balance(dAppAddress)
+            _ <- traced {
+              if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
+                if (newInvokerBalance < 0)
+                  Left(balanceError(invoker, newInvokerBalance))
+                else if (newDAppBalance < 0)
+                  Left(balanceError(dAppAddress, newDAppBalance))
+                else
+                  Right(())
+              else
+                Right(())
+            }
+
             _          = invocationRoot.setResult(scriptResult)
           } yield (resultDiff, evaluated, remainingActions1, remainingData1, remainingDataSize1)
         } yield result
@@ -289,6 +305,9 @@ object InvokeScriptDiff {
       err
     }
   }
+
+  private def balanceError(address: Address, balance: Long) =
+    GenericError(s"Sync call leads to temporary negative balance = $balance for address $address")
 
   private def evaluateV2(
       version: StdLibVersion,
