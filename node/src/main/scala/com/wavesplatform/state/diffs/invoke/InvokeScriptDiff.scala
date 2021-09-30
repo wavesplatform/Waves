@@ -23,10 +23,9 @@ import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.invoke.InvokeScriptDiff.balanceError
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.{Transaction, TxValidationError}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.{Asset, Transaction, TxValidationError}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
@@ -208,17 +207,17 @@ object InvokeScriptDiff {
             }
             _ = invocationRoot.setLog(log)
 
-            newBlockchain = CompositeBlockchain(blockchain, diff)
-            newBalance    = newBlockchain.balance(invoker)
+            _ = if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
+              checkDiffBalances(diff, blockchain)
 
-            _ = if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight && newBalance < 0)
-                throw RejectException(balanceError(invoker, newBalance))
+            newBlockchain = CompositeBlockchain(blockchain, diff)
 
             _ <- traced {
+              val newBalance    = newBlockchain.balance(invoker)
               Either.cond(
                 blockchain.height < blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight || newBalance >= 0,
                 (),
-                GenericError(balanceError(invoker, newBalance)),
+                GenericError(balanceError(invoker, newBalance, Waves)),
               )
             }
 
@@ -246,17 +245,19 @@ object InvokeScriptDiff {
 
             process = { (actions: List[CallableAction], unusedComplexity: Int, actionsCount: Int, dataCount: Int, dataSize: Int, ret: EVALUATED) =>
               for {
-                _ <- CoevalR(Coeval(InvokeDiffsCommon.checkCallResultLimits(
-                  blockchain,
-                  remainingComplexity - unusedComplexity,
-                  log,
-                  actionsCount,
-                  dataCount,
-                  dataSize,
-                  availableActions,
-                  availableData,
-                  availableDataSize
-                )))
+                _ <- CoevalR(
+                  Coeval(
+                    InvokeDiffsCommon.checkCallResultLimits(
+                      blockchain,
+                      remainingComplexity - unusedComplexity,
+                      log,
+                      actionsCount,
+                      dataCount,
+                      dataSize,
+                      availableActions,
+                      availableData,
+                      availableDataSize
+                    )))
                 diff <- doProcessActions(actions, unusedComplexity)
               } yield (diff, ret, availableActions - actionsCount, availableData - dataCount, availableDataSize - dataSize)
             }
@@ -282,14 +283,8 @@ object InvokeScriptDiff {
             }
             resultDiff = diff.copy(scriptsComplexity = 0) |+| actionsDiff |+| Diff.empty.copy(scriptsComplexity = paymentsComplexity)
 
-            newBlockchain     = CompositeBlockchain(blockchain, resultDiff)
-            newInvokerBalance = newBlockchain.balance(invoker)
-            newDAppBalance    = newBlockchain.balance(dAppAddress)
             _ = if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
-              if (newInvokerBalance < 0)
-                throw RejectException(balanceError(invoker, newInvokerBalance))
-              else if (newDAppBalance < 0)
-                throw RejectException(balanceError(dAppAddress, newDAppBalance))
+              checkDiffBalances(resultDiff, blockchain)
 
             _ = invocationRoot.setResult(scriptResult)
           } yield (resultDiff, evaluated, remainingActions1, remainingData1, remainingDataSize1)
@@ -304,8 +299,33 @@ object InvokeScriptDiff {
     }
   }
 
-  private def balanceError(address: Address, balance: Long) =
-    s"Sync call leads to temporary negative balance = $balance for address $address"
+  private def checkDiffBalances(diff: Diff, blockchain: Blockchain): Unit = {
+    val newBlockchain = CompositeBlockchain(blockchain, diff)
+    diff.portfolios.toList.foreach {
+      case (address, portfolio) =>
+        if (portfolio.balance < 0) {
+          val newBalance = newBlockchain.balance(address)
+          if (newBalance < 0)
+            throw RejectException(balanceError(address, newBalance, Waves))
+        }
+        portfolio.assets.foreach {
+          case (asset, amount) =>
+            if (amount < 0) {
+              val newBalance = newBlockchain.balance(address, asset)
+              if (newBalance < 0)
+                throw RejectException(balanceError(address, newBalance, asset))
+            }
+        }
+    }
+  }
+
+  private def balanceError(address: Address, balance: Long, asset: Asset) = {
+    val assetInfo = asset match {
+      case IssuedAsset(id) => s" asset $id"
+      case Waves           => ""
+    }
+    s"Sync call leads to temporary negative$assetInfo balance = $balance for address $address"
+  }
 
   private def evaluateV2(
       version: StdLibVersion,
