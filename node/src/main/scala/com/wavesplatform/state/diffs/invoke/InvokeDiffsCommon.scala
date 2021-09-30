@@ -19,7 +19,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, _}
-import com.wavesplatform.lang.v1.evaluator.Log
+import com.wavesplatform.lang.v1.evaluator.{Log, RejectException}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, _}
@@ -634,15 +634,21 @@ object InvokeDiffsCommon {
   ): TracedResult[ValidationError, Unit] = {
     def error(message: String) = TracedResult(Left(FailedTransactionError.dAppExecution(message, usedComplexity, log)))
     val checkSizeHeight        = blockchain.settings.functionalitySettings.checkTotalDataEntriesBytesHeight
+    val checkSizeRejectHeight  = blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight
 
     if (dataCount > availableData)
       error("Stored data count limit is exceeded")
-    else if (dataSize > availableDataSize && blockchain.height >= checkSizeHeight) {
-      val limit = ContractLimits.MaxTotalWriteSetSizeInBytes
-      val actual = limit + dataSize - availableDataSize
-      error(s"Storing data size should not exceed $limit, actual: $actual bytes")
-    }
-    else if (actionsCount > availableActions)
+    else if (dataSize > availableDataSize) {
+      val limit   = ContractLimits.MaxTotalWriteSetSizeInBytes
+      val actual  = limit + dataSize - availableDataSize
+      val message = s"Storing data size should not exceed $limit, actual: $actual bytes"
+      if (blockchain.height >= checkSizeRejectHeight) {
+        throw RejectException(message)
+      } else if (blockchain.height >= checkSizeHeight)
+        error(message)
+      else
+        TracedResult(Right(()))
+    } else if (actionsCount > availableActions)
       error("Actions count limit is exceeded")
     else
       TracedResult(Right(()))
