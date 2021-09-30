@@ -21,29 +21,35 @@ class SyncDAppPaymentBalanceCheckTest extends PropSpec with WithDomain with Tran
   private val time = new TestTime
   private def ts   = time.getTimestamp()
 
-  private def dApp1Script(dApp2: Address): Script =
+  private def sigVerify(c: Boolean) =
+    s""" strict c = ${if (c) (1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ") else "true"} """
+
+  private def dApp1Script(dApp2: Address, bigComplexity: Boolean): Script =
     TestCompiler(V5).compileContract(
       s"""
          | @Callable(i)
          | func default() = {
+         |    ${sigVerify(bigComplexity)}
          |    strict r = Address(base58'$dApp2').invoke("default", [], [AttachedPayment(unit, 100)])
          |    []
          | }
        """.stripMargin
     )
 
-  private val dApp2Script: Script =
+  private def dApp2Script(bigComplexity: Boolean): Script =
     TestCompiler(V5).compileContract(
       s"""
          | @Callable(i)
-         | func default() =
+         | func default() = {
+         |   ${sigVerify(bigComplexity)}
          |   [
          |     ScriptTransfer(i.caller, 100, unit)
          |   ]
+         | }
        """.stripMargin
     )
 
-  private val scenario =
+  private def scenario(bigComplexityDApp1: Boolean, bigComplexityDApp2: Boolean) =
     for {
       invoker <- accountGen
       dApp1   <- accountGen
@@ -52,46 +58,45 @@ class SyncDAppPaymentBalanceCheckTest extends PropSpec with WithDomain with Tran
       gTx1     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
       gTx2     = GenesisTransaction.create(dApp1.toAddress, fee, ts).explicitGet()
       gTx3     = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
-      ssTx1    = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script(dApp2.toAddress)), fee, ts).explicitGet()
-      ssTx2    = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp2Script), fee, ts).explicitGet()
+      ssTx1    = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script(dApp2.toAddress, bigComplexityDApp1)), fee, ts).explicitGet()
+      ssTx2    = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp2Script(bigComplexityDApp2)), fee, ts).explicitGet()
       invokeTx = () => InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts).explicitGet()
     } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx2), invokeTx)
 
-  property("temporary negative balance of sync call payments produce error only after set height") {
-    val (preparingTxs, invoke) = scenario.sample.get
-    val settings =
-      TestFunctionalitySettings
-        .withFeatures(BlockV5, SynchronousCalls)
-        .copy(syncDAppCheckPaymentsHeight = 4)
+  private val settings =
+    TestFunctionalitySettings
+      .withFeatures(BlockV5, SynchronousCalls)
+      .copy(syncDAppCheckPaymentsHeight = 4, syncDAppCheckTransfersHeight = 5)
 
-    withDomain(domainSettingsWithFS(settings)) { d =>
-      d.appendBlock(preparingTxs: _*)
+  property("negative balance produces error after syncDAppCheckPaymentsHeight and always rejects tx after syncDAppCheckTransfersHeight") {
+    for {
+      bigComplexityDApp1 <- Seq(false, true)
+      bigComplexityDApp2 <- Seq(false, true)
+    } {
+      val (preparingTxs, invoke) = scenario(bigComplexityDApp1, bigComplexityDApp2).sample.get
 
-      val invoke1 = invoke()
-      d.appendBlock(invoke1)
-      d.blockchain.transactionInfo(invoke1.id.value()).get._3 shouldBe true
+      withDomain(domainSettingsWithFS(settings)) { d =>
+        d.appendBlock(preparingTxs: _*)
 
-      val invoke2 = invoke()
-      d.appendBlock()
-      (the[RuntimeException] thrownBy d.appendBlock(invoke2)).getMessage should include(
-        s"Sync call leads to temporary negative balance = -100 for address ${invoke2.dAppAddressOrAlias}"
-      )
-    }
-  }
+        val invoke1 = invoke()
+        val error   = s"Sync call leads to temporary negative balance = -100 for address ${invoke1.dAppAddressOrAlias}"
+        d.appendBlock(invoke1)
+        d.blockchain.transactionInfo(invoke1.id.value()).get._3 shouldBe true
 
-  property("fix works correctly after reaching syncDAppCheckTransfersHeight") {
-    val (preparingTxs, invoke) = scenario.sample.get
-    val settings =
-      TestFunctionalitySettings
-        .withFeatures(BlockV5, SynchronousCalls)
-        .copy(syncDAppCheckPaymentsHeight = 0, syncDAppCheckTransfersHeight = 0)
+        d.appendBlock()
 
-    withDomain(domainSettingsWithFS(settings)) { d =>
-      d.appendBlock(preparingTxs: _*)
-      val i = invoke()
-      (the[RuntimeException] thrownBy d.appendBlock(i)).getMessage should include(
-        s"Sync call leads to temporary negative balance = -100 for address ${i.dAppAddressOrAlias}"
-      )
+        val invoke2 = invoke()
+        if (bigComplexityDApp1) {
+          d.appendBlock(invoke2)
+          d.liquidDiff.errorMessage(invoke2.txId).get.text should include(error)
+        } else {
+          (the[RuntimeException] thrownBy d.appendBlock(invoke2)).getMessage should include(error)
+          d.appendBlock()
+        }
+
+        val invoke3 = invoke()
+        (the[RuntimeException] thrownBy d.appendBlock(invoke3)).getMessage should include(error)
+      }
     }
   }
 }

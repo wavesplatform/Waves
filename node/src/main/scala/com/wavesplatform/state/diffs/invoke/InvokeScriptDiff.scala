@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs.invoke
 
 import scala.util.Right
-
 import cats.Id
 import cats.instances.list._
 import cats.syntax.either._
@@ -17,13 +16,14 @@ import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, RejectException, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.invoke.InvokeScriptDiff.balanceError
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.{Transaction, TxValidationError}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -210,11 +210,15 @@ object InvokeScriptDiff {
 
             newBlockchain = CompositeBlockchain(blockchain, diff)
             newBalance    = newBlockchain.balance(invoker)
+
+            _ = if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight && newBalance < 0)
+                throw RejectException(balanceError(invoker, newBalance))
+
             _ <- traced {
               Either.cond(
                 blockchain.height < blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight || newBalance >= 0,
                 (),
-                balanceError(invoker, newBalance),
+                GenericError(balanceError(invoker, newBalance)),
               )
             }
 
@@ -278,22 +282,16 @@ object InvokeScriptDiff {
             }
             resultDiff = diff.copy(scriptsComplexity = 0) |+| actionsDiff |+| Diff.empty.copy(scriptsComplexity = paymentsComplexity)
 
-            newBlockchain = CompositeBlockchain(blockchain, resultDiff)
+            newBlockchain     = CompositeBlockchain(blockchain, resultDiff)
             newInvokerBalance = newBlockchain.balance(invoker)
             newDAppBalance    = newBlockchain.balance(dAppAddress)
-            _ <- traced {
-              if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
-                if (newInvokerBalance < 0)
-                  Left(balanceError(invoker, newInvokerBalance))
-                else if (newDAppBalance < 0)
-                  Left(balanceError(dAppAddress, newDAppBalance))
-                else
-                  Right(())
-              else
-                Right(())
-            }
+            _ = if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
+              if (newInvokerBalance < 0)
+                throw RejectException(balanceError(invoker, newInvokerBalance))
+              else if (newDAppBalance < 0)
+                throw RejectException(balanceError(dAppAddress, newDAppBalance))
 
-            _          = invocationRoot.setResult(scriptResult)
+            _ = invocationRoot.setResult(scriptResult)
           } yield (resultDiff, evaluated, remainingActions1, remainingData1, remainingDataSize1)
         } yield result
 
@@ -307,7 +305,7 @@ object InvokeScriptDiff {
   }
 
   private def balanceError(address: Address, balance: Long) =
-    GenericError(s"Sync call leads to temporary negative balance = $balance for address $address")
+    s"Sync call leads to temporary negative balance = $balance for address $address"
 
   private def evaluateV2(
       version: StdLibVersion,

@@ -22,4 +22,6 @@ package object evaluator {
   type Log[F[_]]            = List[LogItem[F]]
   type LogCallback[F[_]]    = LetExecResult[F] => Unit
   type LetLogCallback[F[_]] = String => LogCallback[F]
+
+  case class RejectException(error: String) extends RuntimeException(error)
 }
