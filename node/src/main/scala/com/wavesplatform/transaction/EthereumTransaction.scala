@@ -100,17 +100,20 @@ object EthereumTransaction {
   implicit object EthereumTransactionValidator extends TxValidator[EthereumTransaction] {
     override def validate(tx: EthereumTransaction): ValidatedV[EthereumTransaction] = TxConstraints.seq(tx)(
       TxConstraints.fee(tx.underlying.getGasLimit.longValueExact()),
-      TxConstraints.positiveOrZeroAmount((BigInt(tx.underlying.getValue) / AmountMultiplier).bigInteger.longValueExact(), "waves"), // TODO should value be prohibited for invokes?
+      TxConstraints
+        .positiveOrZeroAmount((BigInt(tx.underlying.getValue) / AmountMultiplier).bigInteger.longValueExact(), "waves"), // TODO should value be prohibited for invokes?
       TxConstraints.cond(tx.underlying.getGasPrice == GasPrice, GenericError("Gas price must be 10 Gwei")),
       TxConstraints.cond(
         tx.underlying.getValue != BigInteger.ZERO || EthEncoding.cleanHexPrefix(tx.underlying.getData).nonEmpty,
         GenericError("Transaction cancellation is not supported")
       ),
+      TxConstraints
+        .cond(tx.underlying.getData.isEmpty || BigInt(tx.underlying.getValue) == 0, GenericError("Transaction should have either data or value")),
       tx.payload match {
         case Transfer(tokenAddress, amount, _) =>
           TxConstraints.positiveAmount(amount, tokenAddress.fold("waves")(erc20 => EthEncoding.toHexString(erc20.arr)))
         case Invocation(_, _) => TxConstraints.seq(tx)()
-      },
+      }
     )
   }
 

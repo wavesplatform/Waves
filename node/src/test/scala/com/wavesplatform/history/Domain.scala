@@ -225,6 +225,14 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
     CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
   }
+
+  //noinspection ScalaStyle
+  object helpers {
+    def creditWavesToDefaultSigner(amount: Long = 10_0000_0000): Unit = {
+      import com.wavesplatform.transaction.utils.EthConverters._
+      appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress, amount), TxHelpers.genesis(TxHelpers.defaultSigner.toEthWavesAddress, amount))
+    }
+  }
 }
 
 object Domain {

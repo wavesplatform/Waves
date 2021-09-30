@@ -14,7 +14,7 @@ import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Diff, Height, LeaseBalance, NG, VolumeAndFee}
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.{SystemTime, Time}
@@ -44,7 +44,7 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
     (blockchain.leaseBalance _).when(*).returns(LeaseBalance.empty)
     (() => blockchain.height).when().returns(1)
     (blockchain.blockHeader _).when(*).returns {
-      val block = TestBlock.create(Nil)
+      val block = TestBlock.create(System.currentTimeMillis(), Nil)
       Some(SignedBlockHeader(block.header, block.signature))
     }
     (blockchain.filledVolumeAndFee _).when(*).returns(VolumeAndFee.empty)
@@ -64,6 +64,10 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
   case class StubHelpers(blockchain: Blockchain) {
     def activateFeatures(features: BlockchainFeature*): Unit = {
       (() => blockchain.activatedFeatures).when().returns(features.map(_.id -> 0).toMap)
+    }
+
+    def activateAllFeatures(): Unit = {
+      this.activateFeatures(BlockchainFeatures.implemented.flatMap(BlockchainFeatures.feature).toSeq: _*)
     }
 
     def creditBalance(address: MockParameter[Address], asset: MockParameter[Asset], amount: Long = Long.MaxValue / 3): Unit = {
@@ -91,9 +95,12 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
           )
         )
       (blockchain.assetScript _).when(IssuedAsset(id)).returns(script.map(script => AssetScriptInfo(script, 1L)))
+      (blockchain.resolveERC20Address _).when(ERC20Address(id.take(20))).returns(Some(IssuedAsset(id)))
     }
 
     def setScript(address: Address, script: Script): Unit = {
+      (blockchain.hasAccountScript _).when(address).returns(true)
+
       (blockchain.accountScript _)
         .when(address)
         .returns(

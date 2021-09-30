@@ -42,7 +42,14 @@ object TxHelpers {
   def genesis(address: Address, amount: Long = 100000000.waves): GenesisTransaction =
     GenesisTransaction.create(address, amount, timestamp).explicitGet()
 
-  def transfer(from: KeyPair = defaultSigner, to: AddressOrAlias = secondAddress, amount: Long = 1.waves, asset: Asset = Waves, fee: Long = TestValues.fee, version: Byte = TxVersion.V1): TransferTransaction =
+  def transfer(
+      from: KeyPair = defaultSigner,
+      to: AddressOrAlias = secondAddress,
+      amount: Long = 1.waves,
+      asset: Asset = Waves,
+      fee: Long = TestValues.fee,
+      version: Byte = TxVersion.V1
+  ): TransferTransaction =
     TransferTransaction.selfSigned(version, from, to, asset, amount, Waves, fee, ByteStr.empty, timestamp).explicitGet()
 
   def issue(amount: Long = 1000, script: Script = null): IssueTransaction =
@@ -102,6 +109,13 @@ object TxHelpers {
     val (script, _) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()
     script
   }
+
+  def scriptV5(scriptText: String): Script = script(s"""
+       |{-# STDLIB_VERSION 5 #-}
+       |{-# CONTENT_TYPE DAPP #-}
+       |
+       |$scriptText
+       |""".stripMargin)
 
   def setScript(acc: KeyPair, script: Script): SetScriptTransaction = {
     SetScriptTransaction.selfSigned(TxVersion.V1, acc, Some(script), TestValues.fee, timestamp).explicitGet()

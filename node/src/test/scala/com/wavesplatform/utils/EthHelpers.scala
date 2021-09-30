@@ -1,8 +1,10 @@
 package com.wavesplatform.utils
 
-import com.wavesplatform.account.{AddressScheme, PublicKey}
+import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.{BeforeAndAfterAll, Suite}
+import org.web3j.crypto.Bip32ECKeyPair
 
 trait EthHelpers {
   val EthStubBytes32: Array[Byte] = Array.fill(32)(EthChainId.byte)
@@ -36,8 +38,15 @@ trait EthHelpers {
 
     def withEChainId[T](f: => T): T = {
       this.set()
-      try f finally this.unset()
+      try f
+      finally this.unset()
     }
+  }
+
+  implicit class TxHelpersEthExt(helpers: TxHelpers.type) {
+    import com.wavesplatform.transaction.utils.EthConverters._
+    def defaultEthSigner: Bip32ECKeyPair = helpers.defaultSigner.toEthKeyPair
+    def defaultEthAddress: Address = helpers.defaultSigner.toEthWavesAddress
   }
 }
 
