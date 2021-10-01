@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxVersion}
 import com.wavesplatform.{TestTime, TransactionGenBase}
 
-class SyncDAppNegativeBalanceCheckTest extends PropSpec with WithDomain with TransactionGenBase {
+class SyncDAppBurnBalanceCheckTest extends PropSpec with WithDomain with TransactionGenBase {
 
   private val time = new TestTime
   private def ts   = time.getTimestamp()
