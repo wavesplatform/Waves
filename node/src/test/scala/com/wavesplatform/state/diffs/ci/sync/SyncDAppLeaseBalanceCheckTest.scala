@@ -88,7 +88,6 @@ class SyncDAppLeaseBalanceCheckTest extends PropSpec with WithDomain with Transa
           d.liquidDiff.errorMessage(invoke.txId).get.text should include("Cannot lease more than own: Balance: 0")
         } else {
           (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include("Cannot lease more than own: Balance: 0")
-          d.appendBlock()
         }
       }
     }
