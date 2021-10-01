@@ -1,15 +1,23 @@
+import sbt._
+import complete.DefaultParsers._
+import sbt.complete._
+
 sealed abstract class Network(val suffix: String) {
-  lazy val packageSuffix = if (suffix == Mainnet.suffix) "" else "-" + suffix
-  override val toString  = suffix
+  lazy val packageSuffix: String = if (suffix == Mainnet.suffix) "" else "-" + suffix
+  override val toString: String  = suffix
 }
 
 object Network {
-  def apply(v: Option[String]): Network = v match {
-    case Some(Testnet.suffix)  => Testnet
-    case Some(Devnet.suffix)   => Devnet
-    case Some(Stagenet.suffix) => Stagenet
-    case _                     => Mainnet
+  private val oneNetwork: Parser[String]  = (Mainnet.suffix: Parser[String]) | Testnet.suffix | Stagenet.suffix | Devnet.suffix
+  val networkParser: Parser[Seq[Network]] = (Space ~> oneNetwork.map(apply)).+
+  def apply(v: String): Network = v match {
+    case Testnet.suffix  => Testnet
+    case Devnet.suffix   => Devnet
+    case Stagenet.suffix => Stagenet
+    case _               => Mainnet
   }
+
+  def default(): Network = sys.props.get("network").fold[Network](Mainnet)(apply)
 }
 
 object Mainnet  extends Network("mainnet")
