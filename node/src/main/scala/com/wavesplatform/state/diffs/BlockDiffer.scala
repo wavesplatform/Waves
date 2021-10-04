@@ -159,6 +159,7 @@ object BlockDiffer extends ScorexLogging {
           val currBlockchain = CompositeBlockchain(blockchain, currDiff)
           txDiffer(currBlockchain, tx).flatMap { thisTxDiff =>
             val updatedConstraint = updateConstraint(currConstraint, currBlockchain, tx, thisTxDiff)
+            log.info(s"New constraint:: $updatedConstraint, ${thisTxDiff.scriptsComplexity}")
             if (updatedConstraint.isOverfilled)
               TracedResult(Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint")))
             else {

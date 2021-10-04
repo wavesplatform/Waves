@@ -1,7 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import scala.collection.mutable
-
 import cats.instances.either._
 import cats.instances.map._
 import cats.kernel.Monoid
@@ -16,21 +14,24 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.transaction._
+import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
-import com.wavesplatform.transaction.smart.script.trace.{TracedResult, TraceStep}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.utils.ScorexLogging
 import play.api.libs.json.Json
 
-object TransactionDiffer {
+import scala.collection.immutable.VectorMap
+
+object TransactionDiffer extends ScorexLogging {
   def apply(prevBlockTs: Option[Long], currentBlockTs: Long, verify: Boolean = true)(
       blockchain: Blockchain,
       tx: Transaction
@@ -136,6 +137,7 @@ object TransactionDiffer {
       initDiff: Diff,
       remainingComplexity: Int
   ): TracedResult[ValidationError, Diff] = {
+    log.info(s"Running asset scripts for ${tx.id()}")
     val diff = if (verify) {
       Verifier.assets(blockchain, remainingComplexity)(tx).leftMap {
         case (spentComplexity, ScriptExecutionError(error, log, Some(assetId))) if transactionMayFail(tx) && acceptFailed(blockchain) =>
@@ -179,9 +181,15 @@ object TransactionDiffer {
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
-      .map(d => initDiff |+| d.bindTransaction(tx))
+      .map { d =>
+        val res = d.bindTransaction(tx)
+        log.info(s"${tx.id()}: res complexity: ${res.scriptsComplexity}, init comp: ${initDiff.scriptsComplexity}")
+        initDiff |+| res
+      }
       .leftMap {
-        case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
+        case fte: FailedTransactionError =>
+          log.info(s"${tx.id()}: FAILED, failed=${fte.spentComplexity}, init=${initDiff.scriptsComplexity}")
+          fte.addComplexity(initDiff.scriptsComplexity)
         case ve                          => ve
       }
 
@@ -266,7 +274,7 @@ object TransactionDiffer {
     } yield {
       val affectedAddresses = portfolios.keySet ++ maybeDApp ++ calledAddresses
       Diff.empty.copy(
-        transactions = mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, affectedAddresses, applied = false))),
+        transactions = VectorMap((tx.id(), NewTransactionInfo(tx, affectedAddresses, applied = false, spentComplexity))),
         portfolios = portfolios,
         scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
         scriptsComplexity = spentComplexity

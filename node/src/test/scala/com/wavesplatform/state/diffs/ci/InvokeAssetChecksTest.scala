@@ -22,6 +22,8 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
 
+import scala.collection.immutable.VectorMap
+
 class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBCacheSettings with MockFactory with WithDomain with EitherValues {
 
   private val time = new TestTime
@@ -74,7 +76,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
       val miner       = TestBlock.defaultSigner.toAddress
       val dAppAddress = invoke.dAppAddressOrAlias.asInstanceOf[Address]
       def invokeInfo(succeeded: Boolean) =
-        Map(invoke.id() -> NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded))
+        VectorMap(invoke.id() -> NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L))
 
       val expectedResult =
         if (activated) {
