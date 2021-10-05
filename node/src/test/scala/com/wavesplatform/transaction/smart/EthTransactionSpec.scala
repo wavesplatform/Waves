@@ -175,7 +175,6 @@ class EthTransactionSpec
     )
   }
 
-
   "Ethereum invoke" should "work with all types of arguments" in {
     val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
     val dAppAccount    = TxHelpers.secondSigner

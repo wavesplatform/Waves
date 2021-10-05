@@ -1,7 +1,13 @@
 package com.wavesplatform.api.http
 
+import scala.util.Try
+
 import akka.http.scaladsl.server._
-import com.wavesplatform.utils.ScorexLogging
+import cats.data.{Validated, ValidatedNel}
+import cats.instances.vector._
+import cats.syntax.traverse._
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.utils.{EthEncoding, ScorexLogging}
 import monix.execution.{Scheduler, UncaughtExceptionReporter}
 import play.api.libs.json.JsObject
 
@@ -16,8 +22,28 @@ trait CustomDirectives extends Directives with ApiMarshallers with ScorexLogging
     baseDirective
       .flatMap {
         case list if nonEmpty && list.isEmpty => reject(MissingQueryParamRejection(paramName))
-        case list if list.size > limit      => complete(ApiError.TooBigArrayAllocation(limit))
+        case list if list.size > limit        => complete(ApiError.TooBigArrayAllocation(limit))
         case list                             => provide(list)
+      }
+  }
+
+  implicit class SeqDirectiveValidationExt[Source](dir: Directive1[Iterable[Source]]) {
+    def massValidate[Result](f: Source => Validated[Source, Result]): Directive1[ValidatedNel[Source, Vector[Result]]] = {
+      dir.map(vs => vs.map(f(_).toValidatedNel).toVector.sequence)
+    }
+  }
+
+  implicit class AnyParamStrDirectiveValidationExt(dir: Directive1[Iterable[String]]) {
+    def massValidateIds: Directive1[Vector[ByteStr]] =
+      dir.massValidate(str => Validated.fromTry(ByteStr.decodeBase58(str)).leftMap(_ => str)).flatMap {
+        case Validated.Valid(a)   => provide(a)
+        case Validated.Invalid(e) => complete(ApiError.InvalidIds(e.toList))
+      }
+
+    def massValidateEthereumIds: Directive1[Vector[ByteStr]] =
+      dir.massValidate(str => Validated.fromTry(Try(ByteStr(EthEncoding.toBytes(str)))).leftMap(_ => str)).flatMap {
+        case Validated.Valid(a)   => provide(a)
+        case Validated.Invalid(e) => complete(ApiError.InvalidIds(e.toList))
       }
   }
 

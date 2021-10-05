@@ -8,6 +8,8 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.EthHelpers
 
 class EthereumTransactionRollbackSpec extends FlatSpec with WithDomain with EthHelpers {
+  // KeyTags.values.foreach(v => println(v.toString + " " + v.id.toHexString))
+
   "Ethereum transfer" should "rollback" in withDomain(DomainPresets.RideV6) { d =>
     val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 1, Waves)
 
@@ -17,6 +19,10 @@ class EthereumTransactionRollbackSpec extends FlatSpec with WithDomain with EthH
       d.balance(TxHelpers.secondAddress) shouldBe 0
     }
 
+    d.appendBlock()
+    val preTransactionHeight   = d.hardStateHeight
+    val preTransactionSnapshot = d.hardStateSnapshot()
+
     withClue("after transaction") {
       d.appendBlock(transaction)
       d.balance(TxHelpers.defaultEthAddress) shouldBe 0
@@ -24,9 +30,48 @@ class EthereumTransactionRollbackSpec extends FlatSpec with WithDomain with EthH
     }
 
     withClue("after rollback") {
-      d.rollbackTo(1)
+      d.rollbackTo(preTransactionHeight)
       d.balance(TxHelpers.defaultEthAddress) shouldBe (1 + 100000)
       d.balance(TxHelpers.secondAddress) shouldBe 0
+      d.hardStateSnapshot() shouldBe preTransactionSnapshot
+      d.liquidState shouldBe None
     }
+  }
+
+  "Ethereum invoke" should "rollback" in withDomain(DomainPresets.RideV6) { d =>
+    d.helpers.creditWavesToDefaultSigner()
+    d.helpers.creditWavesFromDefaultSigner(TxHelpers.secondAddress)
+
+    val asset  = d.helpers.issueAsset()
+    val script = TxHelpers.scriptV5(s"""
+        | @Callable(i)
+        | func foo() = {
+        |   [
+        |     IntegerEntry("key", 1),
+        |     BooleanEntry("key", true),
+        |     StringEntry("key", "str"),
+        |     BinaryEntry("key", base58''),
+        |     DeleteEntry("key"),
+        |     ScriptTransfer(i.caller, 1, unit),
+        |     ScriptTransfer(i.caller, 1, base58'$asset'),
+        |     Issue("name", "description", 1000, 4, true, unit, 0),
+        |     Reissue(base58'$asset', 1, false),
+        |     Burn(base58'$asset', 1),
+        |     SponsorFee(base58'$asset', 1)
+        |   ]
+        | }
+        |""".stripMargin)
+    d.helpers.setScript(TxHelpers.defaultSigner, script)
+    d.appendBlock()
+
+    val initHeight        = d.hardStateHeight
+    val initStateSnapshot = d.hardStateSnapshot()
+
+    val invoke = TxHelpers.invoke(TxHelpers.defaultAddress, "foo", fee = 1_0000_0000)
+    d.appendBlock(invoke)
+
+    d.rollbackTo(initHeight)
+    d.hardStateSnapshot() shouldBe initStateSnapshot
+    d.liquidState shouldBe None
   }
 }

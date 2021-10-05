@@ -16,9 +16,11 @@ import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScript
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.{SystemTime, Time}
 import io.netty.channel.Channel
+import com.wavesplatform.common.utils._
 import org.scalamock.MockFactoryBase
 import org.scalamock.matchers.MockParameter
 
@@ -96,6 +98,19 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
         )
       (blockchain.assetScript _).when(IssuedAsset(id)).returns(script.map(script => AssetScriptInfo(script, 1L)))
       (blockchain.resolveERC20Address _).when(ERC20Address(id.take(20))).returns(Some(IssuedAsset(id)))
+      (blockchain.transactionInfo _)
+        .when(id)
+        .returns(
+          Some(
+            (
+              1, // height
+              IssueTransaction
+                .selfSigned(1.toByte, TestValues.keyPair, "test", "test", 10000, 8, reissuable = true, script, 500000L, 123L)
+                .explicitGet(),
+              true // applied
+            )
+          )
+        )
     }
 
     def setScript(address: Address, script: Script): Unit = {

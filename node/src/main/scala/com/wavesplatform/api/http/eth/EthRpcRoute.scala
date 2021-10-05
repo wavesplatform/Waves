@@ -17,29 +17,58 @@ import org.web3j.abi.datatypes.generated.{Uint256, Uint8}
 import org.web3j.crypto._
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
-
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters._
 
+import cats.syntax.traverse._
+import cats.syntax.either._
+import cats.instances.vector._
+import cats.data.Validated
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidIds}
+import com.wavesplatform.api.http.assets.AssetsApiRoute
+import com.wavesplatform.utils.EthEncoding
+
 class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi) extends ApiRoute {
   val route: Route = pathPrefix("eth") {
-    (get & path("abi" / AddrSegment)) { addr =>
+    (path("assets") & anyParam("id", nonEmpty = true, limit = 100).massValidateEthereumIds) { erc20Ids =>
+      val results = erc20Ids
+        .map(
+          id =>
+            id -> (for {
+              wavesId   <- blockchain.resolveERC20Address(ERC20Address(id))
+              assetDesc <- blockchain.assetDescription(wavesId)
+            } yield (wavesId, assetDesc))
+        )
+        .map { case (id, assetOpt) => Validated.fromOption(assetOpt, EthEncoding.toHexString(id.arr)).toValidatedNel }
+        .sequence
+
+      results match {
+        case Validated.Invalid(ids) =>
+          complete(InvalidIds(ids.toList)) // TODO: Something more obvious like "assets does not exist" ?
+
+        case Validated.Valid(assets) =>
+          val jsons = for {
+            (assetId, desc) <- assets
+          } yield AssetsApiRoute.jsonDetails(blockchain)(assetId, desc, full = false)
+          complete(jsons.sequence.leftMap(CustomValidationError(_)).map(JsArray(_))) // TODO: Only first error is displayed
+      }
+    } ~ (get & path("abi" / AddrSegment)) { addr =>
       complete(blockchain.accountScript(addr).map(as => ABIConverter(as.script).jsonABI))
     } ~ (pathEndOrSingleSlash & post & entity(as[JsObject])) { jso =>
-      val id     = (jso \ "id").get
-      val params = (jso \ "params").asOpt[IndexedSeq[JsValue]].getOrElse(Nil)
-      lazy val param1 = params.head
+      val id             = (jso \ "id").get
+      val params         = (jso \ "params").asOpt[IndexedSeq[JsValue]].getOrElse(Nil)
+      lazy val param1    = params.head
       lazy val param1Str = param1.as[String]
-      
+
       (jso \ "method").as[String] match {
         case "eth_chainId" =>
           resp(id, quantity(AddressScheme.current.chainId.toInt))
         case "eth_blockNumber" =>
           resp(id, quantity(blockchain.height))
-        case "eth_getTransactionCount" =>  // FIXME: Not implementd
+        case "eth_getTransactionCount" =>
           resp(id, quantity(System.currentTimeMillis()))
-        case "eth_getBlockByNumber" =>  // FIXME: Not implementd
+        case "eth_getBlockByNumber" =>
           resp(
             id,
             Json.obj(
@@ -48,7 +77,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           )
 
         case "eth_getBlockByHash" =>
-          val blockId = ByteStr(toBytes(params.get.head.as[String]))
+          val blockId = ByteStr(toBytes(param1Str))
 
           resp(
             id,
@@ -84,7 +113,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
         case "eth_getTransactionReceipt" =>
           val transactionHex = param1Str
           val txId           = ByteStr(toBytes(transactionHex))
-          log.info(s"Get receipt for $transactionHex/$txId")  // TODO remove logging
+          log.info(s"Get receipt for $transactionHex/$txId") // TODO remove logging
 
           resp(
             id,
@@ -115,7 +144,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           val dataString      = (call \ "data").as[String]
           val contractAddress = (call \ "to").as[String]
 
-          log.info(s"balance: contract address = $contractAddress, assetId = ${assetId(contractAddress)}")  // TODO remove logging
+          log.info(s"balance: contract address = $contractAddress, assetId = ${assetId(contractAddress)}") // TODO remove logging
 
           cleanHexPrefix(dataString).take(8) match {
             case "95d89b41" =>
@@ -167,7 +196,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           val address = Address.fromHexString(param1Str)
           resp(id, if (blockchain.hasDApp(address)) "0xff" else "0x")
         case _ =>
-          log.info(Json.stringify(jso))   // TODO remove logging
+          log.info(Json.stringify(jso)) // TODO remove logging
           complete(Json.obj())
       }
     }

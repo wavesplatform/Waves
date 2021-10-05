@@ -11,7 +11,7 @@ import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers, EthSetChainId}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.matchers.should.Matchers
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsArray, JsObject, Json}
 import play.api.libs.json.Json.JsValueWrapper
 import com.wavesplatform.api.http.CustomJsonMarshallerSpec
 import com.wavesplatform.api.http.ApiMarshallers._
@@ -19,7 +19,7 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.transaction.utils.EthConverters._
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.{ERC20Address, TxHelpers}
 import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -136,6 +136,45 @@ class EthRpcRouteSpec
     testRpc("eth_sendRawTransaction", EthEncoding.toHexString(transaction.bytes()))(
       result shouldBe transaction.id().toHexString
     )
+  }
+
+  "eth/assets" in {
+    val testAsset1 = ByteStr(Array.fill(32)(1.toByte))
+    val testAsset2 = ByteStr(Array.fill(32)(2.toByte))
+    blockchain.stub.issueAsset(testAsset1)
+    blockchain.stub.issueAsset(testAsset2)
+
+    route.route.anyParamTest(routePath("/assets"), "id")(EthEncoding.toHexString(testAsset1.take(20).arr), EthEncoding.toHexString(testAsset2.take(20).arr)) {
+      responseAs[JsArray] should matchJson("""[ {
+                                             |  "assetId" : "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi",
+                                             |  "issueHeight" : 1,
+                                             |  "issueTimestamp" : 123,
+                                             |  "issuer" : "3FrCwv8uFRxQazhX6Lno45aZ68Bof6ScaeF",
+                                             |  "issuerPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                             |  "name" : "test",
+                                             |  "description" : "test",
+                                             |  "decimals" : 8,
+                                             |  "reissuable" : false,
+                                             |  "quantity" : 10000,
+                                             |  "scripted" : false,
+                                             |  "minSponsoredAssetFee" : null,
+                                             |  "originTransactionId" : "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
+                                             |}, {
+                                             |  "assetId" : "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
+                                             |  "issueHeight" : 1,
+                                             |  "issueTimestamp" : 123,
+                                             |  "issuer" : "3FrCwv8uFRxQazhX6Lno45aZ68Bof6ScaeF",
+                                             |  "issuerPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                             |  "name" : "test",
+                                             |  "description" : "test",
+                                             |  "decimals" : 8,
+                                             |  "reissuable" : false,
+                                             |  "quantity" : 10000,
+                                             |  "scripted" : false,
+                                             |  "minSponsoredAssetFee" : null,
+                                             |  "originTransactionId" : "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR"
+                                             |} ]""".stripMargin)
+    }
   }
 
   // Helpers

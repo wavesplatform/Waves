@@ -37,10 +37,9 @@ import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.Asset
 import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.validation.impl.{LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
-import com.wavesplatform.transaction.{Asset, AssetIdLength, PBSince, TransactionType}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, ERC20Address, PBSince, TransactionType}
 import com.wavesplatform.utils._
 import shapeless.Coproduct
-
 import scala.util.{Failure, Right, Success, Try}
 
 object InvokeDiffsCommon {
@@ -475,21 +474,20 @@ object InvokeDiffsCommon {
             TracedResult.wrapValue(Diff(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item))))))
 
           def applyIssue(itx: InvokeScriptLike, pk: PublicKey, issue: Issue): TracedResult[FailedTransactionError, Diff] = {
+            val asset = IssuedAsset(issue.id)
+
             if (issue.name
                   .getBytes("UTF-8")
                   .length < IssueTransaction.MinAssetNameLength || issue.name.getBytes("UTF-8").length > IssueTransaction.MaxAssetNameLength) {
               TracedResult(Left(FailedTransactionError.dAppExecution("Invalid asset name", 0L)), List())
             } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
               TracedResult(Left(FailedTransactionError.dAppExecution("Invalid asset description", 0L)), List())
-            } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined) {
-              TracedResult(Left(FailedTransactionError.dAppExecution(s"Asset ${issue.id} is already issued", 0L)), List())
+            } else if (blockchain.assetDescription(asset).isDefined || blockchain.resolveERC20Address(ERC20Address(asset)).isDefined) {
+              TracedResult(Left(FailedTransactionError.dAppExecution(s"Asset $asset is already issued", 0L)), List())
             } else {
               val staticInfo = AssetStaticInfo(TransactionId @@ itx.txId, pk, issue.decimals, blockchain.isNFT(issue))
               val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
               val info       = AssetInfo(ByteString.copyFromUtf8(issue.name), ByteString.copyFromUtf8(issue.description), Height @@ blockchain.height)
-
-              val asset = IssuedAsset(issue.id)
-
               DiffsCommon
                 .countVerifierComplexity(None /*issue.compiledScript*/, blockchain, isAsset = true)
                 .map { script =>
