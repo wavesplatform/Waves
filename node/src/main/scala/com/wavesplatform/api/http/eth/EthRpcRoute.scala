@@ -180,23 +180,19 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
             (_, txFee, _) <- transactionsApi.calculateFee(et)
           } yield txFee
 
-          log.info(s"Fee: $errorOrLong") // TODO remove logging
-
           resp(
             id,
             errorOrLong
               .fold[JsValueWrapper](e => ApiError.fromValidationError(e).json, fee => toHexString(BigInteger.valueOf(fee)))
           )
 
-        case "net_version" =>
-          resp(id, "1")
         case "eth_gasPrice" =>
           resp(id, toHexString(EthereumTransaction.GasPrice))
         case "eth_getCode" =>
           val address = Address.fromHexString(param1Str)
           resp(id, if (blockchain.hasDApp(address)) "0xff" else "0x")
         case _ =>
-          log.info(Json.stringify(jso)) // TODO remove logging
+          log.trace(s"Unexpected call: ${Json.stringify(jso)}")
           complete(Json.obj())
       }
     }
