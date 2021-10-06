@@ -41,7 +41,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with T
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, version).withEnvironment[Environment],
           WavesContext.build(
             Global,

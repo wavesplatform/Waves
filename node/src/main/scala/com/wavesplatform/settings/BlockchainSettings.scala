@@ -130,7 +130,7 @@ object FunctionalitySettings {
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     lastTimeBasedForkParameter = 1492560000000L,
     estimatorPreCheckHeight = 817380,
-    syncDAppCheckPaymentsHeight = 1682350,
+    syncDAppCheckPaymentsHeight = 1698800,
     checkTotalDataEntriesBytesHeight = 1711600,
     syncDAppCheckTransfersHeight = 1727461
   )

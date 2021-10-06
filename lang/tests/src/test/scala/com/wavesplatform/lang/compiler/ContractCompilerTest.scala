@@ -29,7 +29,7 @@ class ContractCompilerTest extends PropSpec {
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -43,7 +43,7 @@ class ContractCompilerTest extends PropSpec {
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -380,7 +380,7 @@ class ContractCompilerTest extends PropSpec {
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -517,7 +517,7 @@ class ContractCompilerTest extends PropSpec {
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -951,7 +951,7 @@ class ContractCompilerTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("right")
@@ -961,7 +961,7 @@ class ContractCompilerTest extends PropSpec {
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -1043,7 +1043,7 @@ class ContractCompilerTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V5, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V5) shouldBe Symbol("right")
@@ -1081,7 +1081,7 @@ class ContractCompilerTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("left")
@@ -1104,7 +1104,7 @@ class ContractCompilerTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
 
     val result = compiler.ContractCompiler(ctx.compilerContext, expr, V4)

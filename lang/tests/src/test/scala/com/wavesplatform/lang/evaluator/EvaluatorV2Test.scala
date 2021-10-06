@@ -25,7 +25,7 @@ import scala.util.Random
 class EvaluatorV2Test extends PropSpec with Inside {
   private val version = V4
   private val ctx =
-    PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+    PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
     WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet())
 
   private val environment = Common.emptyBlockchainEnvironment()

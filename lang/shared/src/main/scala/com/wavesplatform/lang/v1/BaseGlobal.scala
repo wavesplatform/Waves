@@ -251,9 +251,9 @@ trait BaseGlobal {
 
   // Math functions
 
-  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long]
+  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding, useNewPrecision: Boolean): Either[String, Long]
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long]
-  def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt]
+  def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding, useNewPrecision: Boolean): Either[String, BigInt]
   def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt]
 
   def divide(a: BigInt, b: BigInt, rounding: Rounding): Either[String, BigInt] = {
