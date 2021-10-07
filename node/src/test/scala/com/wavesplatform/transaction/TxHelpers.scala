@@ -6,6 +6,7 @@ import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
@@ -15,9 +16,9 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
 
@@ -29,7 +30,7 @@ object TxHelpers {
   def defaultAddress: Address = defaultSigner.toAddress
   val secondSigner: KeyPair   = signer(1)
   def secondAddress: Address  = secondSigner.toAddress
-  
+
   val matcher: KeyPair = defaultSigner
 
   private[this] var lastTimestamp = System.currentTimeMillis()
@@ -38,7 +39,7 @@ object TxHelpers {
     lastTimestamp
   }
 
-  def genesis(address: Address, amount: Long = 100_000_000.waves): GenesisTransaction =
+  def genesis(address: Address, amount: Long = 100000000.waves): GenesisTransaction =
     GenesisTransaction.create(address, amount, timestamp).explicitGet()
 
   def transfer(from: KeyPair = defaultSigner, to: AddressOrAlias = secondAddress, amount: Long = 1.waves, asset: Asset = Waves, fee: Long = TestValues.fee, version: Byte = TxVersion.V1): TransferTransaction =
@@ -117,6 +118,13 @@ object TxHelpers {
     val fc = FUNCTION_CALL(FunctionHeader.User(func), args.toList)
     Signed.invokeScript(TxVersion.V1, defaultSigner, dApp, Some(fc), payments, fee, feeAssetId, timestamp)
   }
+
+  def invokeExpression(
+      expression: ExprScript,
+      fee: Long = TestValues.fee,
+      feeAssetId: Asset = Waves
+  ): InvokeExpressionTransaction =
+    InvokeExpressionTransaction.selfSigned(TxVersion.V1, defaultSigner, expression, fee, feeAssetId, timestamp).explicitGet()
 
   def lease(recipient: AddressOrAlias = secondAddress, amount: TxAmount = 10.waves): LeaseTransaction = {
     LeaseTransaction.selfSigned(TxVersion.V2, defaultSigner, recipient, amount, TestValues.fee, timestamp).explicitGet()

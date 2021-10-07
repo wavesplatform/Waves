@@ -1,7 +1,5 @@
 package com.wavesplatform.it.api
 
-import java.util.NoSuchElementException
-
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
@@ -10,8 +8,10 @@ import com.wavesplatform.api.grpc.{TransactionStatus => PBTransactionStatus, _}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
+import com.wavesplatform.it.sync.invokeExpressionFee
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{Script => Scr}
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -27,6 +27,7 @@ import monix.execution.Scheduler
 import monix.reactive.subjects.ConcurrentSubject
 import play.api.libs.json.Json
 
+import java.util.NoSuchElementException
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -403,6 +404,25 @@ object AsyncGrpcApi {
             payments
           )
         )
+      )
+      val proofs = crypto.sign(caller.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
+    }
+
+    def broadcastInvokeExpression(
+        caller: KeyPair,
+        expression: ExprScript,
+        fee: Long = invokeExpressionFee,
+        version: Int = 1,
+        feeAssetId: ByteString = ByteString.EMPTY
+    ): Future[PBSignedTransaction] = {
+      val unsigned = PBTransaction(
+        chainId,
+        ByteString.copyFrom(caller.publicKey.arr),
+        Some(Amount.of(feeAssetId, fee)),
+        System.currentTimeMillis,
+        version,
+        PBTransaction.Data.InvokeExpression(InvokeExpressionTransactionData(ByteString.copyFrom(expression.bytes.value().arr)))
       )
       val proofs = crypto.sign(caller.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes())
       transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr))))

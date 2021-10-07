@@ -3,13 +3,11 @@ package com.wavesplatform.transaction.smart
 import com.wavesplatform.account._
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
-import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
 import com.wavesplatform.state.diffs.invoke.{InvokeScriptLike, InvokeScriptTransactionLike}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.{DefaultFuncCall, Payment}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import monix.eval.Coeval
@@ -29,21 +27,17 @@ case class InvokeScriptTransaction(
     proofs: Proofs,
     chainId: Byte
 ) extends Transaction(TransactionType.InvokeScript, payments.collect(InvokeScriptLike.IssuedAssets))
-    with ProvenTransaction
-    with VersionedTransaction
-    with TxWithFee.InCustomAsset
-    with FastHashId
-    with PBSince.V2
-    with InvokeScriptTransactionLike {
+    with InvokeTransaction
+    with PBSince.V2 {
 
-  val funcCall = funcCallOpt.getOrElse(DefaultFuncCall)
+  override def root: InvokeScriptTransactionLike = this
+  override val funcCall: FUNCTION_CALL           = funcCallOpt.getOrElse(InvokeTransaction.DefaultCall)
+  def senderAddress: Address                     = sender.toAddress
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(InvokeScriptTxSerializer.bodyBytes(this))
   val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(InvokeScriptTxSerializer.toBytes(this))
   val json: Coeval[JsObject]         = Coeval.evalOnce(InvokeScriptTxSerializer.toJson(this))
 
-  override def root: InvokeScriptTransaction = this
-  def senderAddress: Address                 = sender.toAddress
 }
 
 object InvokeScriptTransaction extends TransactionParser {
@@ -64,8 +58,6 @@ object InvokeScriptTransaction extends TransactionParser {
   object Payment {
     implicit val jsonFormat: Format[Payment] = Json.format
   }
-
-  val DefaultFuncCall: FUNCTION_CALL = FUNCTION_CALL(FunctionHeader.User(ContractEvaluator.DEFAULT_FUNC_NAME), Nil)
 
   def create(
       version: TxVersion,

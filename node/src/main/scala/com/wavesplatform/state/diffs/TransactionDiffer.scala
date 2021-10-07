@@ -24,7 +24,7 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier, _}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json
 
@@ -161,7 +161,7 @@ object TransactionDiffer {
         tx match {
           case gtx: GenesisTransaction           => GenesisTransactionDiff(blockchain.height)(gtx).traced
           case ptx: PaymentTransaction           => PaymentTransactionDiff(blockchain)(ptx).traced
-          case ci: InvokeScriptTransaction       => InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(ci)
+          case ci: InvokeTransaction             => InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(ci)
           case etx: ExchangeTransaction          => ExchangeTransactionDiff(blockchain)(etx).traced
           case itx: IssueTransaction             => AssetTransactionsDiff.issue(blockchain)(itx).traced
           case rtx: ReissueTransaction           => AssetTransactionsDiff.reissue(blockchain, currentBlockTs)(rtx).traced
@@ -245,7 +245,10 @@ object TransactionDiffer {
     } yield ()
 
   // failed transactions related
-  private def transactionMayFail(tx: Transaction): Boolean = tx.tpe == TransactionType.InvokeScript || tx.tpe == TransactionType.Exchange
+  private def transactionMayFail(tx: Transaction): Boolean =
+    tx.tpe == TransactionType.InvokeScript ||
+      tx.tpe == TransactionType.InvokeExpression ||
+      tx.tpe == TransactionType.Exchange
 
   private def acceptFailed(blockchain: Blockchain): Boolean = blockchain.isFeatureActivated(BlockV5)
 
@@ -256,8 +259,8 @@ object TransactionDiffer {
       scriptResult: Option[InvokeScriptResult]
   ): Either[ValidationError, Diff] = {
     val extractDAppAddress = tx match {
-      case ist: InvokeScriptTransaction => blockchain.resolveAlias(ist.dApp).map(Some(_))
-      case _                            => Right(None)
+      case it: InvokeTransaction => blockchain.resolveAlias(it.dApp).map(Some(_))
+      case _                     => Right(None)
     }
 
     for {

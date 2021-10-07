@@ -3,17 +3,19 @@ package com.wavesplatform.transaction
 import com.wavesplatform.account._
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.api.http.requests.DataRequest._
+import com.wavesplatform.api.http.requests.InvokeExpressionRequest._
 import com.wavesplatform.api.http.requests.SponsorFeeRequest._
 import com.wavesplatform.api.http.versionReads
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, UnsupportedTransactionType, UnsupportedTypeAndVersion, WrongChain}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
@@ -320,6 +322,23 @@ object TransactionFactory {
 
     } yield tx
 
+  def invokeExpression(request: InvokeExpressionRequest, sender: PublicKey): Either[ValidationError, InvokeExpressionTransaction] =
+    for {
+      expression <- Script.fromBase64String(request.expression).flatMap {
+        case e: ExprScript => Right(e)
+        case _             => Left(GenericError("Unexpected expression type for InvokeExpression"))
+      }
+      tx <- InvokeExpressionTransaction.create(
+        request.version.getOrElse(1.toByte),
+        sender,
+        expression,
+        request.fee,
+        Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
+        request.timestamp.getOrElse(0),
+        Proofs.empty
+      )
+    } yield tx
+
   def sponsor(request: SponsorFeeRequest, wallet: Wallet, time: Time): Either[ValidationError, SponsorFeeTransaction] =
     sponsor(request, wallet, request.sender, time)
 
@@ -370,21 +389,22 @@ object TransactionFactory {
     val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
 
     val pf: PartialFunction[TransactionType.TransactionType, Either[ValidationError, Transaction]] = {
-      case TransactionType.Transfer        => jsv.as[TransferRequest].toTx
-      case TransactionType.CreateAlias     => jsv.as[CreateAliasRequest].toTx
-      case TransactionType.Lease           => jsv.as[LeaseRequest].toTx
-      case TransactionType.LeaseCancel     => jsv.as[LeaseCancelRequest].toTx
-      case TransactionType.Issue           => jsv.as[IssueRequest].toTx
-      case TransactionType.Reissue         => jsv.as[ReissueRequest].toTx
-      case TransactionType.Burn            => jsv.as[BurnRequest].toTx
-      case TransactionType.MassTransfer    => jsv.as[SignedMassTransferRequest].toTx
-      case TransactionType.Data            => jsv.as[SignedDataRequest].toTx
-      case TransactionType.InvokeScript    => jsv.as[SignedInvokeScriptRequest].toTx
-      case TransactionType.SetScript       => jsv.as[SignedSetScriptRequest].toTx
-      case TransactionType.SetAssetScript  => jsv.as[SignedSetAssetScriptRequest].toTx
-      case TransactionType.SponsorFee      => jsv.as[SignedSponsorFeeRequest].toTx
-      case TransactionType.Exchange        => jsv.as[ExchangeRequest].toTx
-      case TransactionType.UpdateAssetInfo => jsv.as[SignedUpdateAssetInfoRequest].toTx
+      case TransactionType.Transfer         => jsv.as[TransferRequest].toTx
+      case TransactionType.CreateAlias      => jsv.as[CreateAliasRequest].toTx
+      case TransactionType.Lease            => jsv.as[LeaseRequest].toTx
+      case TransactionType.LeaseCancel      => jsv.as[LeaseCancelRequest].toTx
+      case TransactionType.Issue            => jsv.as[IssueRequest].toTx
+      case TransactionType.Reissue          => jsv.as[ReissueRequest].toTx
+      case TransactionType.Burn             => jsv.as[BurnRequest].toTx
+      case TransactionType.MassTransfer     => jsv.as[SignedMassTransferRequest].toTx
+      case TransactionType.Data             => jsv.as[SignedDataRequest].toTx
+      case TransactionType.InvokeScript     => jsv.as[SignedInvokeScriptRequest].toTx
+      case TransactionType.SetScript        => jsv.as[SignedSetScriptRequest].toTx
+      case TransactionType.SetAssetScript   => jsv.as[SignedSetAssetScriptRequest].toTx
+      case TransactionType.SponsorFee       => jsv.as[SignedSponsorFeeRequest].toTx
+      case TransactionType.Exchange         => jsv.as[ExchangeRequest].toTx
+      case TransactionType.UpdateAssetInfo  => jsv.as[SignedUpdateAssetInfoRequest].toTx
+      case TransactionType.InvokeExpression => jsv.as[SignedInvokeExpressionRequest].toTx
     }
 
     if (chainId.exists(_ != AddressScheme.current.chainId)) {

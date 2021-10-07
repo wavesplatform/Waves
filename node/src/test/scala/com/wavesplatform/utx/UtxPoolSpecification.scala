@@ -2,10 +2,6 @@ package com.wavesplatform.utx
 
 import java.nio.file.{Files, Path}
 
-import scala.collection.mutable.ListBuffer
-import scala.concurrent.duration._
-import scala.util.Random
-
 import cats.data.NonEmptyList
 import com.wavesplatform
 import com.wavesplatform._
@@ -14,17 +10,18 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.database.{openDB, LevelDBWriter, TestStorageFactory}
+import com.wavesplatform.database.{LevelDBWriter, TestStorageFactory, openDB}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.{randomSig, settingsWithFeatures, DefaultWavesSettings}
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
+import com.wavesplatform.history.{DefaultWavesSettings, randomSig, settingsWithFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.directives.values.StdLibVersion.V6
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.mining._
@@ -33,23 +30,27 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.test.{FreeSpec, _}
-import com.wavesplatform.transaction.{Asset, Transaction, _}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{Asset, Transaction, _}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool.PackStrategy
 import monix.reactive.subjects.PublishSubject
 import org.iq80.leveldb.DB
-import org.scalacheck.{Arbitrary, Gen}
 import org.scalacheck.Gen._
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatest.concurrent.Eventually
+
+import scala.collection.mutable.ListBuffer
+import scala.concurrent.duration._
+import scala.util.Random
 
 private object UtxPoolSpecification {
   private val ignoreSpendableBalanceChanged = PublishSubject[(Address, Asset)]()
@@ -927,6 +928,27 @@ class UtxPoolSpecification
         utx.removeAll(Seq(invoke))
         utx.putIfNew(invoke, forceValidate = false).resultE.explicitGet() shouldBe true
         utx.close()
+      }
+
+      "invoke expression" in withDomain(
+        settingsWithFeatures(
+          BlockchainFeatures.Ride4DApps,
+          BlockchainFeatures.BlockV5,
+          BlockchainFeatures.RideV6
+        )
+      ) {
+        d =>
+          d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, ENOUGH_AMT))
+
+          val expr   = TestCompiler(V6).compileFreeCall(""" [ BooleanEntry("check", true) ] """)
+          val invoke = TxHelpers.invokeExpression(expr)
+          val utx    = new UtxPoolImpl(ntpTime, d.blockchainUpdater, PublishSubject(), DefaultWavesSettings.utxSettings)
+
+          utx.putIfNew(invoke).resultE.explicitGet() shouldBe true
+          utx.all shouldBe Seq(invoke)
+
+          val (result, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Estimate(3 seconds))
+          result shouldBe Some(Seq(invoke))
       }
     }
 

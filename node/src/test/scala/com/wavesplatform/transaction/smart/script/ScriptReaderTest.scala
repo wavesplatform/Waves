@@ -9,6 +9,7 @@ import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.test._
+import com.wavesplatform.test.PropSpec
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{EitherValues, Inside}
 
@@ -102,7 +103,7 @@ object ScriptReaderTest {
   // invalid version byte and unknown length of remaining bytes
   val invalidPrefix: Gen[Array[Byte]] =
     for {
-      v  <- Gen.negNum[Byte]
+      v  <- Gen.negNum[Byte].suchThat(_ != ScriptReader.FreeCallHeader)
       n  <- Gen.choose(0, 5)
       bs <- Gen.listOfN(n, Arbitrary.arbitrary[Byte])
     } yield v +: bs.toArray

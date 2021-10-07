@@ -2,15 +2,15 @@ package com.wavesplatform.transaction.validation
 
 import scala.util.Try
 
-import cats.data.Validated
+import cats.data.{NonEmptyList, Validated}
 import cats.data.Validated.{Invalid, Valid}
-import cats.syntax.validated._
+import cats.implicits._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.{Asset, TxValidationError, TxVersion, VersionedTransaction}
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.{GenericError, TooBigArray}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
@@ -120,4 +120,11 @@ object TxConstraints {
         description,
         TxValidationError.TooBigArray
       )
+
+  def invokeLength(checkLength: => Boolean): ValidatedV[Boolean] =
+    Try(checkLength)
+      .toValidated
+      .leftMap(err => GenericError(err.getMessage))
+      .ensure(TooBigArray)(identity)
+      .leftMap(NonEmptyList(_, Nil))
 }

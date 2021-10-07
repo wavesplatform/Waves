@@ -24,6 +24,9 @@ import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, WavesEnvironment, buildThisValue}
+import com.wavesplatform.transaction.{DataTransaction, Proofs, ProvenTransaction, Transaction, TxVersion, VersionedTransaction}
+import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.transaction.smart.{WavesEnvironment, buildThisValue}
 import com.wavesplatform.transaction.{Asset, DataTransaction, ERC20Address, EthereumTransaction, Proofs, TxVersion}
 import com.wavesplatform.utils.{EmptyBlockchain, EthHelpers}
@@ -36,6 +39,9 @@ import org.web3j.crypto.Sign.SignatureData
 import org.web3j.utils.Numeric
 import play.api.libs.json.Json
 import shapeless.Coproduct
+import com.wavesplatform.state.diffs.ci._
+
+import scala.util.Random
 
 class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherValues with EthHelpers {
   private val T = 'T'.toByte
@@ -319,7 +325,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
            | case _ => throw()
            | }
            |""".stripMargin
-      val result = runScriptWithCustomContext(script, Coproduct(t), T, V3)
+      val result = runScriptWithCustomContext(script, t, V3)
       result shouldBe evaluated(true)
     }
   }
@@ -355,9 +361,33 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       val blockchain = stub[Blockchain]
       (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
 
-      val result = runScriptWithCustomContext(script, Coproduct(t), T, V4, blockchain)
+      val result = runScriptWithCustomContext(script, t, V4, blockchain)
       result shouldBe evaluated(true)
     }
+  }
+
+  property("InvokeExpressionTransaction binding") {
+    val expression = TestCompiler(V6).compileFreeCall("[]")
+    def script(tx: InvokeExpressionTransaction) =
+      s"""
+         | match tx {
+         |   case t: InvokeExpressionTransaction  =>
+         |     ${provenPart(tx)}
+         |     let checkFeeAssetId = t.feeAssetId == ${tx.feeAssetId.fold("unit")(a => s"base58'${a.id.toString}'")}
+         |     let checkExpression = t.expression == base58'${expression.bytes()}'
+         |     ${assertProvenPart("t")} && checkFeeAssetId && checkExpression
+         |   case _ => throw()
+         | }
+       """.stripMargin
+
+    val fee     = ciFee(freeCall = true).sample.get
+    val account = accountGen.sample.get
+    val asset   = IssuedAsset(ByteStr.fromBytes(1, 2, 3))
+    val tx1     = InvokeExpressionTransaction.selfSigned(TxVersion.V1, account, expression, fee, Waves, Random.nextLong()).explicitGet()
+    val tx2     = InvokeExpressionTransaction.selfSigned(TxVersion.V1, account, expression, fee, asset, Random.nextLong()).explicitGet()
+
+    runScriptWithCustomContext(script(tx1), tx1, V6) shouldBe evaluated(true)
+    runScriptWithCustomContext(script(tx2), tx2, V6) shouldBe evaluated(true)
   }
 
   property("SetAssetScriptTransaction binding") {

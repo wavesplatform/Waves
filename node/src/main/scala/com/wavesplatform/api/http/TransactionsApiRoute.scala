@@ -306,25 +306,29 @@ object TransactionsApiRoute {
           Json.obj("stateChanges" -> i.invokeScriptResult)
 
         case e: TransactionMeta.Ethereum =>
-          val payloadJson = e.meta
+          val payloadJson: JsObject = e.meta
             .map(_.payload)
             .collect {
               case Payload.Invocation(i) =>
                 val functionCallEi = Serde.deserializeFunctionCall(i.functionCall.toByteArray).map(InvokeScriptTxSerializer.functionCallToJson)
                 val payments       = i.payments.map(p => InvokeScriptTransaction.Payment(p.amount, PBAmounts.toVanillaAssetId(p.assetId)))
                 Json.obj(
+                  "type"    -> "invocation",
                   "call"    -> functionCallEi.toOption,
                   "payment" -> payments
                 )
 
               case Payload.Transfer(t) =>
                 val (asset, amount) = PBAmounts.toAssetAndAmount(t.getAmount)
-                Json.obj("asset" -> asset, "amount" -> amount)
+                Json.obj(
+                  "type"      -> "transfer",
+                  "recipient" -> Address(t.publicKeyHash.toByteArray),
+                  "asset"     -> asset,
+                  "amount"    -> amount
+                )
             }
             .getOrElse(JsObject.empty)
-
-          val stateChangesJson = Json.obj("stateChanges" -> e.invokeScriptResult)
-          payloadJson ++ stateChangesJson
+          Json.obj("stateChanges" -> e.invokeScriptResult, "payload" -> payloadJson)
 
         case _ => JsObject.empty
       }

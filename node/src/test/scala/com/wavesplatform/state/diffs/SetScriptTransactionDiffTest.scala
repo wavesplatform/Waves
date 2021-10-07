@@ -1,7 +1,8 @@
 package com.wavesplatform.state.diffs
 
+import com.wavesplatform.test.TestTime
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithState
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
@@ -16,10 +17,14 @@ import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import org.scalacheck.Gen
 
-class SetScriptTransactionDiffTest extends PropSpec with WithState {
+class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
+
+  private val time = new TestTime
+  private def ts   = time.getTimestamp()
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.Ride4DApps.id -> 0)
@@ -227,14 +232,21 @@ class SetScriptTransactionDiffTest extends PropSpec with WithState {
       }
     }
 
-    assertSuccess(exprV3WithComplexityBetween2000And3000,     rideV3Activated)
+    assertSuccess(exprV3WithComplexityBetween2000And3000, rideV3Activated)
     assertSuccess(contractV3WithComplexityBetween2000And3000, rideV3Activated)
 
-    assertFailure(exprV3WithComplexityBetween2000And3000,     rideV4Activated, "Script is too complex: 2134 > 2000")
-    assertFailure(exprV4WithComplexityBetween2000And3000,     rideV4Activated, "Script is too complex: 2807 > 2000")
+    assertFailure(exprV3WithComplexityBetween2000And3000, rideV4Activated, "Script is too complex: 2134 > 2000")
+    assertFailure(exprV4WithComplexityBetween2000And3000, rideV4Activated, "Script is too complex: 2807 > 2000")
     assertFailure(contractV3WithComplexityBetween2000And3000, rideV4Activated, "Contract verifier is too complex: 2134 > 2000")
     assertFailure(contractV4WithComplexityBetween2000And3000, rideV4Activated, "Contract verifier is too complex: 2807 > 2000")
 
     assertSuccess(contractV4WithCallableComplexityBetween3000And4000, rideV4Activated)
+  }
+
+  property("free call is prohibited") {
+    val freeCall = TestCompiler(V6).compileFreeCall("[]")
+    val account  = accountGen.sample.get
+    SetScriptTransaction.selfSigned(1.toByte, account, Some(freeCall), MinIssueFee, ts) shouldBe Left(
+      GenericError("Script type for Set Script Transaction should not be CALL"))
   }
 }

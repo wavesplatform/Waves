@@ -117,6 +117,10 @@ object RealTransactionWrapper {
             }.toIndexedSeq
           )
           .asRight
+
+      case ie: InvokeExpressionTransaction =>
+        Tx.InvokeExpression(proven(ie), ie.expressionBytes, ie.feeAssetId.compatId).asRight
+
       case ci: InvokeScriptTransactionLike =>
         val (version, bodyBytes, proofs) = ci match {
           case ist: InvokeScriptTransaction =>
