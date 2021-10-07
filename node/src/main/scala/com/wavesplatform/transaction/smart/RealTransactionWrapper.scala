@@ -22,6 +22,7 @@ import com.wavesplatform.transaction.{EthereumTransaction, _}
 object RealTransactionWrapper {
   private def header(tx: Transaction, txIdOpt: Option[ByteStr] = None): Header = {
     val v = tx match {
+      case _: EthereumTransaction   => 0.toByte
       case vt: VersionedTransaction => vt.version
       case _                        => TxVersion.V1
     }

@@ -26,20 +26,22 @@ case class TransferTransaction(
     attachment: ByteStr,
     timestamp: TxTimestamp,
     proofs: Proofs,
-    chainId: Byte
+    chainId: Byte,
+    ethWrappingId: Option[Coeval[ByteStr]] = None
 ) extends Transaction(TransactionType.Transfer, assetId match {
       case Waves          => Seq()
       case a: IssuedAsset => Seq(a)
     })
     with VersionedTransaction
     with SigProofsSwitch
-    with FastHashId
     with TxWithFee.InCustomAsset
     with PBSince.V3 {
 
-  val bodyBytes: Coeval[TxByteArray] = Coeval.evalOnce(TransferTxSerializer.bodyBytes(this))
+  val bodyBytes: Coeval[TxByteArray] = Coeval.evalOnce(ethWrappingId.fold(TransferTxSerializer.bodyBytes(this))(_ => Array()))
   val bytes: Coeval[TxByteArray]     = Coeval.evalOnce(TransferTxSerializer.toBytes(this))
   final val json: Coeval[JsObject]   = Coeval.evalOnce(TransferTxSerializer.toJson(this))
+
+  override val id: Coeval[ByteStr] = ethWrappingId.getOrElse(FastHashId(this))
 }
 
 object TransferTransaction extends TransactionParser {

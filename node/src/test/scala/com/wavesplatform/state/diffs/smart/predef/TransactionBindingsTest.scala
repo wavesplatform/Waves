@@ -9,10 +9,10 @@ import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing.evaluated
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.{Asset => AssetType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -25,18 +25,8 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.{WavesEnvironment, buildThisValue}
-import com.wavesplatform.transaction.{
-  Authorized,
-  DataTransaction,
-  ERC20Address,
-  EthereumTransaction,
-  Proofs,
-  ProvenTransaction,
-  Transaction,
-  TxVersion,
-  VersionedTransaction
-}
-import com.wavesplatform.utils.EmptyBlockchain
+import com.wavesplatform.transaction.{Asset, DataTransaction, ERC20Address, EthereumTransaction, Proofs, TxVersion}
+import com.wavesplatform.utils.{EmptyBlockchain, EthHelpers}
 import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
@@ -47,7 +37,7 @@ import org.web3j.utils.Numeric
 import play.api.libs.json.Json
 import shapeless.Coproduct
 
-class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherValues {
+class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherValues with EthHelpers {
   private val T = 'T'.toByte
 
   private val ethUnderlying = RawTransaction.createTransaction(BigInteger.ZERO, BigInteger.ZERO, BigInteger.ZERO, "", "")
@@ -56,42 +46,6 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     Numeric.hexStringToByteArray("0x0464eee9e2fe1a10ffe48c78b80de1ed8dcf996f3f60955cb2e03cb21903d930"),
     Numeric.hexStringToByteArray("0x06624da478b3f862582e85b31c6a21c6cae2eee2bd50f55c93c4faad9d9c8d7f")
   )
-
-  def letProof(p: Proofs, prefix: String)(i: Int) =
-    s"let ${prefix.replace(".", "")}proof$i = $prefix.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).toString}'"
-
-  def provenPart(t: Transaction with Authorized, emptyBodyBytes: Boolean = false): String = {
-    val version = t match {
-      case v: VersionedTransaction => v.version
-      case _                       => 1
-    }
-    val proofs = t match {
-      case p: ProvenTransaction => p.proofs
-      case _                    => Proofs(Seq())
-    }
-    val bodyBytesCheck =
-      if (emptyBodyBytes)
-        "t.bodyBytes.size() == 0"
-      else
-        s""" blake2b256(t.bodyBytes) == base64'${ByteStr(crypto.fastHash(t.bodyBytes.apply().array)).base64}' """
-    s"""
-       |   let id = t.id == base58'${t.id().toString}'
-       |   let fee = t.fee == ${t.fee}
-       |   let timestamp = t.timestamp == ${t.timestamp}
-       |   let bodyBytes = $bodyBytesCheck
-       |   let sender = t.sender == addressFromPublicKey(base58'${t.sender}')
-       |   let senderPublicKey = t.senderPublicKey == base58'${t.sender}'
-       |   let version = t.version == $version
-       |   ${Range(0, 8).map(letProof(proofs, "t")).mkString("\n")}
-     """.stripMargin
-  }
-
-  def assertProofs(p: String): String = {
-    val prefix = p.replace(".", "")
-    s"${prefix}proof0 && ${prefix}proof1 && ${prefix}proof2 && ${prefix}proof3 && ${prefix}proof4 && ${prefix}proof5 && ${prefix}proof6 && ${prefix}proof7"
-  }
-  def assertProvenPart(prefix: String) =
-    s"id && fee && timestamp && sender && senderPublicKey && ${assertProofs(prefix)} && bodyBytes && version"
 
   property("TransferTransaction binding") {
     forAll(Gen.oneOf(transferV1Gen, transferV2Gen)) { t =>
@@ -751,23 +705,13 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     Seq(Some(assetErc20), None)
       .foreach { asset =>
         val tx = createTx(asset)
+        val check = checkEthTransfer(tx, amount, asset.fold[Asset](Waves)(blockchain.resolveERC20Address(_).get), recipient)
         runScript(
           s"""
-             |match tx {
-             |  case t: TransferTransaction =>
-             |    ${provenPart(tx, emptyBodyBytes = true)}
-             |    let amount = t.amount == $amount
-             |    let feeAssetId = t.feeAssetId == unit
-             |    let recipient = match (t.recipient) {
-             |      case a: Address => a.bytes == base58'$recipient'
-             |      case a: Alias   => throw("unexpected")
-             |    }
-             |    let assetId = t.assetId == ${asset.fold("unit")(a => s"base58'${blockchain.resolveERC20Address(a).get}'")}
-             |    let attachment = t.attachment == base58'${ByteStr.empty}'
-             |    ${assertProvenPart("t")} && amount && assetId && feeAssetId && recipient && attachment
-             |  case _ =>
-             |     throw()
-             |}
+             | match tx {
+             |   case t: TransferTransaction => $check
+             |   case _                      => throw()
+             | }
            """.stripMargin,
           V6,
           Coproduct(tx),
@@ -827,11 +771,11 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     import com.wavesplatform.lang.v1.CTX._
 
     val expr       = Parser.parseExpr(script).get.value
-    val directives = DirectiveSet(V2, Asset, Expression).explicitGet()
+    val directives = DirectiveSet(V2, AssetType, Expression).explicitGet()
     val ctx =
       PureContext.build(V2, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(V2, Asset, Expression).explicitGet())
+        WavesContext.build(Global, DirectiveSet(V2, AssetType, Expression).explicitGet())
 
     val environment = new WavesEnvironment(
       chainId,

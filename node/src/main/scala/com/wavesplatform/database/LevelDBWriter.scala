@@ -10,7 +10,7 @@ import cats.syntax.semigroup._
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.Ints
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, AddressScheme, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.block.Block.BlockId
@@ -21,11 +21,13 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, TransactionMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, WavesSettings}
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.EthereumTransaction.Transfer
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -806,8 +808,20 @@ abstract class LevelDBWriter private[database] (
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
       tm <- db.get(Keys.transactionMetaById(TransactionId @@ id))
-      if tm.`type` == TransferTransaction.typeId
-      tx <- db.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort))).collect { case (t: TransferTransaction, true) => t }
+      if tm.`type` == TransferTransaction.typeId || tm.`type` == TransactionType.Ethereum.id
+      tx <- db
+        .get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)))
+        .collect {
+          case (t: TransferTransaction, true) => t
+          case (e @ EthereumTransaction(_: Transfer, _, _, _), true) =>
+            val meta      = db.get(Keys.ethereumTransactionMeta(Height @@ tm.height, TxNum @@ tm.num.toShort)).get
+            val transfer  = meta.payload.transfer.get
+            val amount    = transfer.amount.get
+            val asset     = PBAmounts.toVanillaAssetId(amount.assetId)
+            val recipient = Address(transfer.publicKeyHash.toByteArray)
+            val chainId   = AddressScheme.current.chainId
+            TransferTransaction(0, e.sender, recipient, asset, amount.amount, e.feeAssetId, e.fee, ByteStr.empty, e.timestamp, Proofs.empty, chainId, Some(e.id))
+        }
     } yield (height, tx)
   }
 
