@@ -6,7 +6,7 @@ import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.test.TestTime
-import com.wavesplatform.transaction.TransactionType
+import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import org.web3j.crypto.RawTransaction
 import org.web3j.crypto.Sign.SignatureData
@@ -30,9 +30,8 @@ trait EthHelpers {
   private val time = new TestTime
   private def ts   = time.getTimestamp()
 
-  val TestEthFee = FeeUnit * FeeConstants(TransactionType.Transfer)
-
-  val TestEthUnderlying = RawTransaction.createTransaction(BigInteger.valueOf(ts), BigInteger.ZERO, BigInteger.valueOf(TestEthFee), "", "")
+  val TestEthUnderlying: RawTransaction =
+    RawTransaction.createTransaction(BigInteger.valueOf(ts), EthereumTransaction.GasPrice, EthereumTransaction.GasPrice, "", BigInteger.ONE, "")
 
   val TestEthSignature = new SignatureData(
     28.toByte,

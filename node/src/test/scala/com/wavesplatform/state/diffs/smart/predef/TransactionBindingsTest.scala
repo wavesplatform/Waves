@@ -1,7 +1,5 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import java.math.BigInteger
-
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -20,38 +18,25 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.ci._
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, WavesEnvironment, buildThisValue}
-import com.wavesplatform.transaction.{DataTransaction, Proofs, ProvenTransaction, Transaction, TxVersion, VersionedTransaction}
-import com.wavesplatform.utils.EmptyBlockchain
-import com.wavesplatform.transaction.smart.{WavesEnvironment, buildThisValue}
 import com.wavesplatform.transaction.{Asset, DataTransaction, ERC20Address, EthereumTransaction, Proofs, TxVersion}
 import com.wavesplatform.utils.{EmptyBlockchain, EthHelpers}
 import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.EitherValues
-import org.web3j.crypto.RawTransaction
-import org.web3j.crypto.Sign.SignatureData
-import org.web3j.utils.Numeric
 import play.api.libs.json.Json
 import shapeless.Coproduct
-import com.wavesplatform.state.diffs.ci._
 
 import scala.util.Random
 
 class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherValues with EthHelpers {
   private val T = 'T'.toByte
-
-  private val ethUnderlying = RawTransaction.createTransaction(BigInteger.ZERO, BigInteger.ZERO, BigInteger.ZERO, "", "")
-  private val ethSignature = new SignatureData(
-    28.toByte,
-    Numeric.hexStringToByteArray("0x0464eee9e2fe1a10ffe48c78b80de1ed8dcf996f3f60955cb2e03cb21903d930"),
-    Numeric.hexStringToByteArray("0x06624da478b3f862582e85b31c6a21c6cae2eee2bd50f55c93c4faad9d9c8d7f")
-  )
 
   property("TransferTransaction binding") {
     forAll(Gen.oneOf(transferV1Gen, transferV2Gen)) { t =>
@@ -729,7 +714,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
 
     def createTx(asset: Option[ERC20Address]): EthereumTransaction = {
       val transfer = EthereumTransaction.Transfer(asset, amount, recipient)
-      EthereumTransaction(transfer, ethUnderlying, ethSignature, T)
+      EthereumTransaction(transfer, TestEthUnderlying, TestEthSignature, T)
     }
 
     Seq(Some(assetErc20), None)
@@ -767,9 +752,9 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
 
     val passedArg = "7"
     val data =
-      s"36895e01000000000000000000000000000000000000000000000000000000000000000${passedArg}00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000"
+      s"9bfbd457000000000000000000000000000000000000000000000000000000000000000${passedArg}00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000"
     val invocation = EthereumTransaction.Invocation(dApp.toAddress, data)
-    val tx = EthereumTransaction(invocation, ethUnderlying, ethSignature, T)
+    val tx = EthereumTransaction(invocation, TestEthUnderlying, TestEthSignature, T)
 
     runScript(
       s"""

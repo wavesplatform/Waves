@@ -30,7 +30,7 @@ class EthereumSmartDiffTest extends PropSpec with WithDomain with EthHelpers {
      """.stripMargin
   )
 
-  private def scenario(waves: Boolean) =
+  private val scenario =
     for {
       fee       <- ciFee()
       recipient <- accountGen
@@ -43,13 +43,13 @@ class EthereumSmartDiffTest extends PropSpec with WithDomain with EthHelpers {
     } yield (Seq(gTx1, gTx2, setVerifier()), ethTransfer, setVerifier(), recipient.toAddress)
 
   property("transferTransactionById") {
-    val (preparingTxs, ethTransfer, checkTx, recipient) = scenario(true).sample.get
+    val (preparingTxs, ethTransfer, checkTx, recipient) = scenario.sample.get
     withDomain(RideV6) { d =>
       d.appendBlock(preparingTxs: _*)
       d.appendBlock(ethTransfer)
 
       d.liquidDiff.portfolios(recipient) shouldBe Portfolio.waves(transferAmount)
-      d.liquidDiff.portfolios(ethTransfer.senderAddress()) shouldBe Portfolio.waves(-TestEthFee - transferAmount)
+      d.liquidDiff.portfolios(ethTransfer.senderAddress()) shouldBe Portfolio.waves(-ethTransfer.underlying.getGasPrice.longValue() - transferAmount)
 
       d.appendBlock()
       d.appendBlock(checkTx)
