@@ -198,9 +198,9 @@ package object predef {
        | let crypto = bks && sig && str58 && str64
        | crypto""".stripMargin
 
-  def checkEthTransfer(tx: EthereumTransaction, amount: Int, asset: Asset, recipient: Address): String =
+  def checkEthTransfer(tx: EthereumTransaction, amount: Int, asset: Asset, recipient: Address, proofs: Boolean): String =
     s"""
-       | ${provenPart(tx, emptyBodyBytes = true)}
+       | ${provenPart(tx, emptyBodyBytes = true, proofs)}
        | let amount = t.amount == $amount
        | let feeAssetId = t.feeAssetId == unit
        | let recipient = match (t.recipient) {
@@ -209,7 +209,7 @@ package object predef {
        | }
        | let assetId = t.assetId == ${asset.fold("unit")(_ => s"base58'$asset'")}
        | let attachment = t.attachment == base58'${ByteStr.empty}'
-       | ${assertProvenPart("t")} && amount && assetId && feeAssetId && recipient && attachment
+       | ${assertProvenPart("t", proofs)} && amount && assetId && feeAssetId && recipient && attachment
      """.stripMargin
 
   def checkEthInvoke(tx: EthereumTransaction, dApp: Address, callable: String, passedArg: Long, proofs: Boolean, payments: String): String =

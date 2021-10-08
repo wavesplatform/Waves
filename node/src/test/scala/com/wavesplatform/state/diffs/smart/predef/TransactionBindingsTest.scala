@@ -720,7 +720,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     Seq(Some(assetErc20), None)
       .foreach { asset =>
         val tx = createTx(asset)
-        val check = checkEthTransfer(tx, amount, asset.fold[Asset](Waves)(blockchain.resolveERC20Address(_).get), recipient)
+        val check = checkEthTransfer(tx, amount, asset.fold[Asset](Waves)(blockchain.resolveERC20Address(_).get), recipient, proofs = true)
         runScript(
           s"""
              | match tx {
