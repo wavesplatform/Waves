@@ -26,11 +26,12 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import com.wavesplatform.utils.Time
+import com.wavesplatform.utils.{EthEncoding, Time}
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json._
+
 import scala.concurrent.Future
 import scala.util.Success
 
@@ -313,9 +314,11 @@ object TransactionsApiRoute {
                 val functionCallEi = Serde.deserializeFunctionCall(i.functionCall.toByteArray).map(InvokeScriptTxSerializer.functionCallToJson)
                 val payments       = i.payments.map(p => InvokeScriptTransaction.Payment(p.amount, PBAmounts.toVanillaAssetId(p.assetId)))
                 Json.obj(
-                  "type"    -> "invocation",
-                  "call"    -> functionCallEi.toOption,
-                  "payment" -> payments
+                  "type"         -> "invocation",
+                  "dApp"         -> Address(EthEncoding.toBytes(e.transaction.underlying.getTo)),
+                  "call"         -> functionCallEi.toOption,
+                  "payment"      -> payments,
+                  "stateChanges" -> e.invokeScriptResult
                 )
 
               case Payload.Transfer(t) =>
@@ -328,7 +331,7 @@ object TransactionsApiRoute {
                 )
             }
             .getOrElse(JsObject.empty)
-          Json.obj("stateChanges" -> e.invokeScriptResult, "payload" -> payloadJson)
+          Json.obj("payload" -> payloadJson)
 
         case _ => JsObject.empty
       }

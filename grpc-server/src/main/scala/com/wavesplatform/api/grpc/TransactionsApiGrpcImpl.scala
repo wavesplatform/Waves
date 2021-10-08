@@ -8,7 +8,8 @@ import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
 import com.wavesplatform.state.{Blockchain, InvokeScriptResult => VISR}
-import com.wavesplatform.transaction.Authorized
+import com.wavesplatform.transaction.{Authorized, EthereumTransaction}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import io.grpc.{Status, StatusRuntimeException}
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
@@ -114,10 +115,10 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
 
   override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] =
     (for {
-      maybeTx <- Future(tx.toVanilla)
-      vtx     <- maybeTx.toFuture
-      result  <- commonApi.broadcastTransaction(vtx)
-      _       <- result.resultE.toFuture
+      vtx    <- tx.toVanilla.toFuture
+      _      <- Either.cond(!vtx.isInstanceOf[EthereumTransaction], (), GenericError("ETH transactions should not be broadcasted over gRPC")).toFuture
+      result <- commonApi.broadcastTransaction(vtx)
+      _      <- result.resultE.toFuture
     } yield tx).wrapErrors
 }
 

@@ -10,14 +10,14 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue, SponsorFee}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, ERC20Address}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.utils.ScorexLogging
 
 object AssetTransactionsDiff extends ScorexLogging {
-  def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = {
+  def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = { // TODO: unify with InvokeScript action diff?
     def requireValidUtf(): Boolean = {
       def isValid(str: ByteString): Boolean = {
         val convertible = ByteString.copyFromUtf8(str.toStringUtf8) == str
@@ -28,6 +28,9 @@ object AssetTransactionsDiff extends ScorexLogging {
       !activated || (isValid(tx.name) && isValid(tx.description))
     }
 
+    // First 20 bytes of id should be unique
+    def requireUnique(): Boolean = blockchain.resolveERC20Address(ERC20Address(tx.asset)).isEmpty
+
     val staticInfo = AssetStaticInfo(TransactionId @@ tx.id(), tx.sender, tx.decimals, blockchain.isNFT(tx))
     val volumeInfo = AssetVolumeInfo(tx.reissuable, BigInt(tx.quantity))
     val info       = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
@@ -36,6 +39,7 @@ object AssetTransactionsDiff extends ScorexLogging {
 
     for {
       _ <- Either.cond(requireValidUtf(), (), GenericError("Valid UTF-8 strings required"))
+      _ <- Either.cond(requireUnique(), (), GenericError(s"Asset ${tx.asset} is already issued"))
       result <- DiffsCommon
         .countVerifierComplexity(tx.script, blockchain, isAsset = true)
         .map(

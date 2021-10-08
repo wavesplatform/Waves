@@ -14,11 +14,13 @@ import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Diff, Height, LeaseBalance, NG, VolumeAndFee}
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.{SystemTime, Time}
 import io.netty.channel.Channel
+import com.wavesplatform.common.utils._
 import org.scalamock.MockFactoryBase
 import org.scalamock.matchers.MockParameter
 
@@ -44,7 +46,7 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
     (blockchain.leaseBalance _).when(*).returns(LeaseBalance.empty)
     (() => blockchain.height).when().returns(1)
     (blockchain.blockHeader _).when(*).returns {
-      val block = TestBlock.create(Nil)
+      val block = TestBlock.create(System.currentTimeMillis(), Nil)
       Some(SignedBlockHeader(block.header, block.signature))
     }
     (blockchain.filledVolumeAndFee _).when(*).returns(VolumeAndFee.empty)
@@ -64,6 +66,10 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
   case class StubHelpers(blockchain: Blockchain) {
     def activateFeatures(features: BlockchainFeature*): Unit = {
       (() => blockchain.activatedFeatures).when().returns(features.map(_.id -> 0).toMap)
+    }
+
+    def activateAllFeatures(): Unit = {
+      this.activateFeatures(BlockchainFeatures.implemented.flatMap(BlockchainFeatures.feature).toSeq: _*)
     }
 
     def creditBalance(address: MockParameter[Address], asset: MockParameter[Asset], amount: Long = Long.MaxValue / 3): Unit = {
@@ -91,9 +97,25 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
           )
         )
       (blockchain.assetScript _).when(IssuedAsset(id)).returns(script.map(script => AssetScriptInfo(script, 1L)))
+      (blockchain.resolveERC20Address _).when(ERC20Address(id.take(20))).returns(Some(IssuedAsset(id)))
+      (blockchain.transactionInfo _)
+        .when(id)
+        .returns(
+          Some(
+            (
+              1, // height
+              IssueTransaction
+                .selfSigned(2.toByte, TestValues.keyPair, "test", "test", 10000, 8, reissuable = true, script, 500000L, 123L)
+                .explicitGet(),
+              true // applied
+            )
+          )
+        )
     }
 
     def setScript(address: Address, script: Script): Unit = {
+      (blockchain.hasAccountScript _).when(address).returns(true)
+
       (blockchain.accountScript _)
         .when(address)
         .returns(
@@ -120,8 +142,8 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
     }
 
     def transactionDiffer(time: Time = SystemTime, withFailed: Boolean = false): Transaction => TracedResult[ValidationError, Diff] = {
-      if (withFailed) TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, _)
-      else TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, _)
+      if (withFailed) TransactionDiffer(Some(time.correctedTime()), time.correctedTime())(blockchain, _)
+      else TransactionDiffer.forceValidate(Some(time.correctedTime()), time.correctedTime())(blockchain, _)
     }
 
     def transactionPublisher(time: Time = SystemTime): TransactionPublisher = (tx: Transaction, _: Option[Channel]) => {

@@ -626,6 +626,7 @@ object NarrowTransactionGenerator {
     val leaseRecipient = GeneratorSettings.toKeyPair("lease recipient")
 
     val fundEthereumAddresses = accounts.map { kp =>
+      import com.wavesplatform.transaction.utils.EthConverters._
       val ethAccount = kp.toEthWavesAddress
       TransferTransaction
         .selfSigned(TxVersion.V1, accounts.head, ethAccount, Waves, 100_0000_0000L, Waves, 500000L, ByteStr.empty, System.currentTimeMillis())

@@ -2,15 +2,17 @@ package com.wavesplatform.utils
 
 import java.math.BigInteger
 
-import com.wavesplatform.account.{AddressScheme, PublicKey}
+import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.test.TestTime
 import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
+import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import org.web3j.crypto.RawTransaction
 import org.web3j.crypto.Sign.SignatureData
 import org.web3j.utils.Numeric
+import org.web3j.crypto.Bip32ECKeyPair
 
 trait EthHelpers {
   val EthStubBytes32: Array[Byte] = Array.fill(32)(EthChainId.byte)
@@ -59,6 +61,12 @@ trait EthHelpers {
       try f
       finally this.unset()
     }
+  }
+
+  implicit class TxHelpersEthExt(helpers: TxHelpers.type) {
+    import com.wavesplatform.transaction.utils.EthConverters._
+    def defaultEthSigner: Bip32ECKeyPair = helpers.defaultSigner.toEthKeyPair
+    def defaultEthAddress: Address = helpers.defaultSigner.toEthWavesAddress
   }
 }
 

@@ -41,7 +41,7 @@ object FeeValidation {
     TransactionType.SetAssetScript  -> (1000 - 4),
     TransactionType.InvokeScript    -> 5,
     TransactionType.UpdateAssetInfo -> 1,
-    TransactionType.Ethereum        -> 0,
+    TransactionType.Ethereum        -> 1,
     TransactionType.InvokeExpression -> 10
   )
 
@@ -66,7 +66,7 @@ object FeeValidation {
 
     val errorMessage = s"Fee for ${txType.transactionName} ($actualFee) does not exceed minimal value of $requiredFee."
 
-    GenericError((feeDetails.requirements mkString_ " ") ++ ". " ++ errorMessage)
+    GenericError((if (feeDetails.requirements.nonEmpty) (feeDetails.requirements mkString_ " ") ++ ". " else "") ++ errorMessage)
   }
 
   private case class FeeInfo(assetInfo: Option[(IssuedAsset, AssetDescription)], requirements: Chain[String], wavesFee: Long)

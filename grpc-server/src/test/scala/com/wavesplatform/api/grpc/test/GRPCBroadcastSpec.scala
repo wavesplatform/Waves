@@ -11,6 +11,7 @@ import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.grpc.TransactionsApiGrpcImpl
 import com.wavesplatform.block.Block
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.{Blockchain, Height}
@@ -18,12 +19,14 @@ import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.TransactionType.TransactionType
+import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.utils.{DiffMatchers, EthHelpers, EthSetChainId}
 import io.grpc.StatusException
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
+import com.wavesplatform.transaction.utils.EthConverters._
 
 class GRPCBroadcastSpec
     extends FlatSpec
@@ -33,33 +36,8 @@ class GRPCBroadcastSpec
     with EthHelpers
     with EthSetChainId
     with DiffMatchers {
-
-  implicit class BlockchainBroadcastExt(blockchain: Blockchain) {
-    def grpcTxApi: TransactionsApiGrpcImpl =
-      new TransactionsApiGrpcImpl(blockchain, new CommonTransactionsApi {
-        def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)] = ???
-        def transactionById(txId: ByteStr): Option[TransactionMeta]                          = ???
-        def unconfirmedTransactions: Seq[Transaction]                                        = ???
-        def unconfirmedTransactionById(txId: ByteStr): Option[Transaction]                   = ???
-        def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)]      = ???
-        def transactionsByAddress(
-            subject: Address,
-            sender: Option[Address],
-            transactionTypes: Set[TransactionType],
-            fromId: Option[ByteStr]
-        ): Observable[TransactionMeta]                                                     = ???
-        def transactionProofs(transactionIds: List[ByteStr]): List[Block.TransactionProof] = ???
-        def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]] = {
-          val differ = blockchain.stub.transactionDiffer(TestTime(100))
-          Future.successful(differ(tx).map(_ => true))
-        }
-      })(Scheduler.global)
-
-    @throws[StatusException]("on failed broadcast")
-    def assertBroadcast(tx: Transaction): Unit = {
-      Await.result(grpcTxApi.broadcast(PBTransactions.protobuf(tx)), Duration.Inf)
-    }
-  }
+  // Fake NTP time
+  val FakeTime: TestTime = TestTime(100)
 
   "GRPC broadcast" should "accept Exchange with ETH orders" in {
     val ethBuyOrder = Order(
@@ -104,6 +82,47 @@ class GRPCBroadcastSpec
     }
 
     val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, TxVersion.V3, 100)
+    FakeTime.setTime(transaction.timestamp)
     blockchain.assertBroadcast(transaction)
+  }
+
+  it should "reject eth transactions" in {
+    val blockchain = createBlockchainStub { blockchain =>
+      val sh = StubHelpers(blockchain)
+      sh.creditBalance(TxHelpers.defaultEthAddress, Waves)
+      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls)
+    }
+
+    val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 10, Waves)
+    FakeTime.setTime(transaction.timestamp)
+    intercept[Exception](blockchain.assertBroadcast(transaction)).toString should include("ETH transactions should not be broadcasted over gRPC")
+  }
+
+  //noinspection NotImplementedCode
+  implicit class BlockchainBroadcastExt(blockchain: Blockchain) {
+    def grpcTxApi: TransactionsApiGrpcImpl =
+      new TransactionsApiGrpcImpl(blockchain, new CommonTransactionsApi {
+        def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)] = ???
+        def transactionById(txId: ByteStr): Option[TransactionMeta]                          = ???
+        def unconfirmedTransactions: Seq[Transaction]                                        = ???
+        def unconfirmedTransactionById(txId: ByteStr): Option[Transaction]                   = ???
+        def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)]      = ???
+        def transactionsByAddress(
+            subject: Address,
+            sender: Option[Address],
+            transactionTypes: Set[TransactionType],
+            fromId: Option[ByteStr]
+        ): Observable[TransactionMeta]                                                     = ???
+        def transactionProofs(transactionIds: List[ByteStr]): List[Block.TransactionProof] = ???
+        def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]] = {
+          val differ = blockchain.stub.transactionDiffer(FakeTime)
+          Future.successful(differ(tx).map(_ => true))
+        }
+      })(Scheduler.global)
+
+    @throws[StatusException]("on failed broadcast")
+    def assertBroadcast(tx: Transaction): Unit = {
+      Await.result(grpcTxApi.broadcast(PBTransactions.protobuf(tx)), Duration.Inf)
+    }
   }
 }
