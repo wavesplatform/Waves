@@ -95,6 +95,7 @@ class UtxPriorityPoolSpecification
       val tb = TestBlock.create(Nil)
       (blockchain.blockHeader _).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
       (blockchain.transactionMeta _).when(*).returning(None)
+      (blockchain.resolveERC20Address _).when(*).returning(None)
       blockchain
     }
 

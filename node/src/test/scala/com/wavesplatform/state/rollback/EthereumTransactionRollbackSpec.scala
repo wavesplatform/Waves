@@ -19,10 +19,7 @@ class EthereumTransactionRollbackSpec extends FlatSpec with WithDomain with EthH
       d.balance(TxHelpers.secondAddress) shouldBe 0
     }
 
-    d.appendBlock()
-    val preTransactionHeight   = d.hardStateHeight
-    val preTransactionSnapshot = d.hardStateSnapshot()
-
+    val (initHeight, initStateSnapshot) = d.makeStateHard()
     withClue("after transaction") {
       d.appendBlock(transaction)
       d.balance(TxHelpers.defaultEthAddress) shouldBe 0
@@ -30,10 +27,10 @@ class EthereumTransactionRollbackSpec extends FlatSpec with WithDomain with EthH
     }
 
     withClue("after rollback") {
-      d.rollbackTo(preTransactionHeight)
+      d.rollbackTo(initHeight)
       d.balance(TxHelpers.defaultEthAddress) shouldBe (1 + 100000)
       d.balance(TxHelpers.secondAddress) shouldBe 0
-      d.hardStateSnapshot() shouldBe preTransactionSnapshot
+      d.hardStateSnapshot() shouldBe initStateSnapshot
       d.liquidState shouldBe None
     }
   }
@@ -62,11 +59,8 @@ class EthereumTransactionRollbackSpec extends FlatSpec with WithDomain with EthH
         | }
         |""".stripMargin)
     d.helpers.setScript(TxHelpers.defaultSigner, script)
-    d.appendBlock()
 
-    val initHeight        = d.hardStateHeight
-    val initStateSnapshot = d.hardStateSnapshot()
-
+    val (initHeight, initStateSnapshot) = d.makeStateHard()
     val invoke = TxHelpers.invoke(TxHelpers.defaultAddress, "foo", fee = 1_0000_0000)
     d.appendBlock(invoke)
 

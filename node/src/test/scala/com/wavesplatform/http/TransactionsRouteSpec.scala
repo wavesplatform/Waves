@@ -1,6 +1,9 @@
 package com.wavesplatform.http
 
+import scala.util.Random
+
 import akka.http.scaladsl.model._
+import com.wavesplatform.{BlockchainStubHelpers, BlockGen, TestValues, TestWallet}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError._
@@ -19,27 +22,26 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.LeaseCancel
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
-import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
+import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.test.TestTime
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
-import com.wavesplatform.{BlockGen, BlockchainStubHelpers, TestValues, TestWallet}
+import com.wavesplatform.transaction.utils.EthTxGenerator
+import com.wavesplatform.utils.{EthEncoding, EthHelpers}
 import monix.reactive.Observable
-import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
-import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
-
-import scala.util.Random
+import play.api.libs.json.Json.JsValueWrapper
 
 class TransactionsRouteSpec
     extends RouteSpec("/transactions")
@@ -48,7 +50,8 @@ class TransactionsRouteSpec
     with BlockGen
     with OptionValues
     with TestWallet
-    with BlockchainStubHelpers {
+    with BlockchainStubHelpers
+    with EthHelpers {
 
   private val blockchain          = mock[Blockchain]
   private val utxPoolSynchronizer = mock[TransactionPublisher]
@@ -237,7 +240,7 @@ class TransactionsRouteSpec
                 .map {
                   case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
                     (asset, feeInAsset, feeInWaves)
-              }
+                }
           )
           .anyNumberOfTimes()
 
@@ -285,18 +288,18 @@ class TransactionsRouteSpec
       val setScript = TxHelpers.setScript(
         dAppSigner,
         TxHelpers.script("""
-          |{-# STDLIB_VERSION 5 #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |
-          |@Callable(i)
-          |func issue() = {
-          |  [
-          |    Issue("name", "description", 1000, 4, true, unit, 0),
-          |    Issue("name", "description", 1000, 4, true, unit, 1)
-          |  ]
-          |}
-          |""".stripMargin)
+                           |{-# STDLIB_VERSION 5 #-}
+                           |{-# SCRIPT_TYPE ACCOUNT #-}
+                           |{-# CONTENT_TYPE DAPP #-}
+                           |
+                           |@Callable(i)
+                           |func issue() = {
+                           |  [
+                           |    Issue("name", "description", 1000, 4, true, unit, 0),
+                           |    Issue("name", "description", 1000, 4, true, unit, 1)
+                           |  ]
+                           |}
+                           |""".stripMargin)
       )
 
       val invokeScript = TxHelpers.invoke(dAppAddress, "issue")
@@ -382,31 +385,31 @@ class TransactionsRouteSpec
       Get(routePath(s"/address/${TxHelpers.secondAddress}/limit/10")) ~> route ~> check {
         val json = (responseAs[JsArray] \ 0 \ 0).as[JsObject]
         json shouldBe Json.parse(s"""{
-                                   |  "type" : 9,
-                                   |  "id" : "${leaseCancel.id()}",
-                                   |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-                                   |  "fee" : 1000000,
-                                   |  "feeAssetId" : null,
-                                   |  "timestamp" : ${leaseCancel.timestamp},
-                                   |  "proofs" : [ "${leaseCancel.signature}" ],
-                                   |  "version" : 2,
-                                   |  "leaseId" : "${lease.id()}",
-                                   |  "chainId" : 84,
-                                   |  "height" : 1,
-                                   |  "applicationStatus" : "succeeded",
-                                   |  "lease" : {
-                                   |    "id" : "${lease.id()}",
-                                   |    "originTransactionId" : "${lease.id()}",
-                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
-                                   |    "amount" : 1000000000,
-                                   |    "height" : 1,
-                                   |    "status" : "canceled",
-                                   |    "cancelHeight" : 2,
-                                   |    "cancelTransactionId" : "${leaseCancel.id()}"
-                                   |  }
-                                   |}""".stripMargin)
+                                    |  "type" : 9,
+                                    |  "id" : "${leaseCancel.id()}",
+                                    |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                    |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                    |  "fee" : 1000000,
+                                    |  "feeAssetId" : null,
+                                    |  "timestamp" : ${leaseCancel.timestamp},
+                                    |  "proofs" : [ "${leaseCancel.signature}" ],
+                                    |  "version" : 2,
+                                    |  "leaseId" : "${lease.id()}",
+                                    |  "chainId" : 84,
+                                    |  "height" : 1,
+                                    |  "applicationStatus" : "succeeded",
+                                    |  "lease" : {
+                                    |    "id" : "${lease.id()}",
+                                    |    "originTransactionId" : "${lease.id()}",
+                                    |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                    |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                                    |    "amount" : 1000000000,
+                                    |    "height" : 1,
+                                    |    "status" : "canceled",
+                                    |    "cancelHeight" : 2,
+                                    |    "cancelTransactionId" : "${leaseCancel.id()}"
+                                    |  }
+                                    |}""".stripMargin)
       }
     }
 
@@ -528,56 +531,171 @@ class TransactionsRouteSpec
         status shouldEqual StatusCodes.OK
         val json = (responseAs[JsArray] \ 0 \ 0 \ "stateChanges").as[JsObject]
         json should matchJson(s"""{
-                                    |  "data": [],
-                                    |  "transfers": [],
-                                    |  "issues": [],
-                                    |  "reissues": [],
-                                    |  "burns": [],
-                                    |  "sponsorFees": [],
-                                    |  "leases": [
-                                    |    {
-                                    |      "id": "$leaseId1",
-                                    |      "originTransactionId": "$leaseId1",
-                                    |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                    |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                    |      "amount": 123,
-                                    |      "height": 1,
-                                    |      "status":"active",
-                                    |      "cancelHeight" : null,
-                                    |      "cancelTransactionId" : null
-                                    |    },
-                                    |    {
-                                    |      "id": "$leaseId2",
-                                    |      "originTransactionId": "$leaseId2",
-                                    |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                    |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                    |      "amount": 123,
-                                    |      "height": 1,
-                                    |      "status":"active",
-                                    |      "cancelHeight" : null,
-                                    |      "cancelTransactionId" : null
-                                    |    }
-                                    |  ],
-                                    |  "leaseCancels": [
-                                    |    {
-                                    |      "id": "$leaseCancelId",
-                                    |      "originTransactionId": "$leaseCancelId",
-                                    |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                    |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                    |      "amount": 123,
-                                    |      "height": 1,
-                                    |      "status":"canceled",
-                                    |      "cancelHeight" : 2,
-                                    |      "cancelTransactionId" : "$leaseCancelId"
-                                    |    }
-                                    |  ],
-                                    |  "invokes": []
-                                    |}""".stripMargin)
+                                 |  "data": [],
+                                 |  "transfers": [],
+                                 |  "issues": [],
+                                 |  "reissues": [],
+                                 |  "burns": [],
+                                 |  "sponsorFees": [],
+                                 |  "leases": [
+                                 |    {
+                                 |      "id": "$leaseId1",
+                                 |      "originTransactionId": "$leaseId1",
+                                 |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |      "amount": 123,
+                                 |      "height": 1,
+                                 |      "status":"active",
+                                 |      "cancelHeight" : null,
+                                 |      "cancelTransactionId" : null
+                                 |    },
+                                 |    {
+                                 |      "id": "$leaseId2",
+                                 |      "originTransactionId": "$leaseId2",
+                                 |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |      "amount": 123,
+                                 |      "height": 1,
+                                 |      "status":"active",
+                                 |      "cancelHeight" : null,
+                                 |      "cancelTransactionId" : null
+                                 |    }
+                                 |  ],
+                                 |  "leaseCancels": [
+                                 |    {
+                                 |      "id": "$leaseCancelId",
+                                 |      "originTransactionId": "$leaseCancelId",
+                                 |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |      "amount": 123,
+                                 |      "height": 1,
+                                 |      "status":"canceled",
+                                 |      "cancelHeight" : 2,
+                                 |      "cancelTransactionId" : "$leaseCancelId"
+                                 |    }
+                                 |  ],
+                                 |  "invokes": []
+                                 |}""".stripMargin)
       }
     }
   }
 
   routePath("/info/{id}") - {
+    "returns meta for eth transfer" in {
+      val blockchain = createBlockchainStub { blockchain =>
+        blockchain.stub.creditBalance(TxHelpers.defaultEthAddress, Waves)
+        blockchain.stub.activateAllFeatures()
+      }
+
+      val differ          = blockchain.stub.transactionDiffer().andThen(_.resultE.explicitGet())
+      val transaction     = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 10, Waves)
+      val diff            = differ(transaction)
+      val transactionsApi = stub[CommonTransactionsApi]
+      (transactionsApi.transactionById _)
+        .when(transaction.id())
+        .returning(
+          Some(
+            TransactionMeta.Ethereum(
+              Height(1),
+              transaction,
+              succeeded = true,
+              diff.ethereumTransactionMeta.values.headOption,
+              diff.scriptResults.values.headOption
+            )
+          )
+        )
+
+      val route = seal(transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route)
+      Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
+        responseAs[JsObject] should matchJson(s"""{
+                                                 |  "type" : 19,
+                                                 |  "id" : "${transaction.id()}",
+                                                 |  "fee" : 100000,
+                                                 |  "feeAssetId" : null,
+                                                 |  "timestamp" : ${transaction.timestamp},
+                                                 |  "version" : 1,
+                                                 |  "chainId" : 84,
+                                                 |  "bytes" : "${EthEncoding.toHexString(transaction.bytes())}",
+                                                 |  "sender" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                 |  "senderPublicKey" : "5vwTDMooR7Hp57MekN7qHz7fHNVrkn2Nx4CiWdq4cyBR4LNnZWYAr7UfBbzhmSvtNkv6e45aJ4Q4aKCSinyHVw33",
+                                                 |  "height" : 1,
+                                                 |  "applicationStatus" : "succeeded",
+                                                 |  "payload" : {
+                                                 |    "type" : "transfer",
+                                                 |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                                                 |    "asset" : null,
+                                                 |    "amount" : 10
+                                                 |  }
+                                                 |}""".stripMargin)
+      }
+    }
+
+    "returns meta and state changes for eth invoke" in {
+      val blockchain = createBlockchainStub { blockchain =>
+        blockchain.stub.creditBalance(TxHelpers.defaultEthAddress, Waves)
+        blockchain.stub.setScript(TxHelpers.secondAddress, TxHelpers.scriptV5("""@Callable(i)
+            |func test() = []
+            |""".stripMargin))
+        blockchain.stub.activateAllFeatures()
+      }
+
+      val differ          = blockchain.stub.transactionDiffer().andThen(_.resultE.explicitGet())
+      val transaction     = EthTxGenerator.generateEthInvoke(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, "test", Nil, Nil)
+      val diff            = differ(transaction)
+      val transactionsApi = stub[CommonTransactionsApi]
+      (transactionsApi.transactionById _)
+        .when(transaction.id())
+        .returning(
+          Some(
+            TransactionMeta.Ethereum(
+              Height(1),
+              transaction,
+              succeeded = true,
+              diff.ethereumTransactionMeta.values.headOption,
+              diff.scriptResults.values.headOption
+            )
+          )
+        )
+
+      val route = seal(transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route)
+      Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
+        responseAs[JsObject] should matchJson(s"""{
+                                                 |  "type" : 19,
+                                                 |  "id" : "${transaction.id()}",
+                                                 |  "fee" : 500000,
+                                                 |  "feeAssetId" : null,
+                                                 |  "timestamp" : ${transaction.timestamp},
+                                                 |  "version" : 1,
+                                                 |  "chainId" : 84,
+                                                 |  "bytes" : "${EthEncoding.toHexString(transaction.bytes())}",
+                                                 |  "sender" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                 |  "senderPublicKey" : "5vwTDMooR7Hp57MekN7qHz7fHNVrkn2Nx4CiWdq4cyBR4LNnZWYAr7UfBbzhmSvtNkv6e45aJ4Q4aKCSinyHVw33",
+                                                 |  "height" : 1,
+                                                 |  "applicationStatus" : "succeeded",
+                                                 |  "payload" : {
+                                                 |    "type" : "invocation",
+                                                 |    "dApp" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                                                 |    "call" : {
+                                                 |      "function" : "test",
+                                                 |      "args" : [ ]
+                                                 |    },
+                                                 |    "payment" : [ ],
+                                                 |    "stateChanges" : {
+                                                 |      "data" : [ ],
+                                                 |      "transfers" : [ ],
+                                                 |      "issues" : [ ],
+                                                 |      "reissues" : [ ],
+                                                 |      "burns" : [ ],
+                                                 |      "sponsorFees" : [ ],
+                                                 |      "leases" : [ ],
+                                                 |      "leaseCancels" : [ ],
+                                                 |      "invokes" : [ ]
+                                                 |    }
+                                                 |  }
+                                                 |}""".stripMargin)
+      }
+    }
+
     "returns lease tx for lease cancel tx" in {
       val lease       = TxHelpers.lease()
       val leaseCancel = TxHelpers.leaseCancel(lease.id())
@@ -601,31 +719,31 @@ class TransactionsRouteSpec
       Get(routePath(s"/info/${leaseCancel.id()}")) ~> route ~> check {
         val json = responseAs[JsObject]
         json shouldBe Json.parse(s"""{
-                                   |  "type" : 9,
-                                   |  "id" : "${leaseCancel.id()}",
-                                   |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-                                   |  "fee" : 1000000,
-                                   |  "feeAssetId" : null,
-                                   |  "timestamp" : ${leaseCancel.timestamp},
-                                   |  "proofs" : [ "${leaseCancel.signature}" ],
-                                   |  "version" : 2,
-                                   |  "leaseId" : "${lease.id()}",
-                                   |  "chainId" : 84,
-                                   |  "height" : 1,
-                                   |  "applicationStatus" : "succeeded",
-                                   |  "lease" : {
-                                   |    "id" : "${lease.id()}",
-                                   |    "originTransactionId" : "${lease.id()}",
-                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
-                                   |    "amount" : 1000000000,
-                                   |    "height" : 1,
-                                   |    "status" : "canceled",
-                                   |    "cancelHeight" : 2,
-                                   |    "cancelTransactionId" : "${leaseCancel.id()}"
-                                   |  }
-                                   |}""".stripMargin)
+                                    |  "type" : 9,
+                                    |  "id" : "${leaseCancel.id()}",
+                                    |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                    |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                    |  "fee" : 1000000,
+                                    |  "feeAssetId" : null,
+                                    |  "timestamp" : ${leaseCancel.timestamp},
+                                    |  "proofs" : [ "${leaseCancel.signature}" ],
+                                    |  "version" : 2,
+                                    |  "leaseId" : "${lease.id()}",
+                                    |  "chainId" : 84,
+                                    |  "height" : 1,
+                                    |  "applicationStatus" : "succeeded",
+                                    |  "lease" : {
+                                    |    "id" : "${lease.id()}",
+                                    |    "originTransactionId" : "${lease.id()}",
+                                    |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                    |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                                    |    "amount" : 1000000000,
+                                    |    "height" : 1,
+                                    |    "status" : "canceled",
+                                    |    "cancelHeight" : 2,
+                                    |    "cancelTransactionId" : "${leaseCancel.id()}"
+                                    |  }
+                                    |}""".stripMargin)
       }
     }
 
@@ -772,85 +890,85 @@ class TransactionsRouteSpec
         status shouldEqual StatusCodes.OK
         val json = (responseAs[JsObject] \ "stateChanges").as[JsObject]
         json should matchJson(s"""{
-                                   |  "data" : [ ],
-                                   |  "transfers" : [ ],
-                                   |  "issues" : [ ],
-                                   |  "reissues" : [ ],
-                                   |  "burns" : [ ],
-                                   |  "sponsorFees" : [ ],
-                                   |  "leases" : [ {
-                                   |    "id" : "$leaseId1",
-                                   |    "originTransactionId" : "$leaseId1",
-                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "amount" : 123,
-                                   |    "height" : 1,
-                                   |    "status":"active",
-                                   |    "cancelHeight" : null,
-                                   |    "cancelTransactionId" : null
-                                   |  }, {
-                                   |    "id" : "$leaseId2",
-                                   |    "originTransactionId" : "$leaseId2",
-                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "amount" : 123,
-                                   |    "height" : 1,
-                                   |    "status":"active",
-                                   |    "cancelHeight" : null,
-                                   |    "cancelTransactionId" : null
-                                   |  } ],
-                                   |  "leaseCancels" : [ {
-                                   |    "id" : "$leaseCancelId",
-                                   |    "originTransactionId" : "$leaseCancelId",
-                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "amount" : 123,
-                                   |    "height" : 1,
-                                   |    "status" : "canceled",
-                                   |    "cancelHeight" : 2,
-                                   |    "cancelTransactionId" : "$leaseCancelId"
-                                   |  } ],
-                                   |  "invokes" : [ {
-                                   |    "dApp" : "$nestedInvokeAddress",
-                                   |    "call" : {
-                                   |      "function" : "nested",
-                                   |      "args" : [ ]
-                                   |    },
-                                   |    "payment" : [ ],
-                                   |    "stateChanges" : {
-                                   |      "data" : [ ],
-                                   |      "transfers" : [ ],
-                                   |      "issues" : [ ],
-                                   |      "reissues" : [ ],
-                                   |      "burns" : [ ],
-                                   |      "sponsorFees" : [ ],
-                                   |      "leases" : [ {
-                                   |        "id" : "$nestedLeaseId",
-                                   |        "originTransactionId" : "$nestedLeaseId",
-                                   |        "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |        "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |        "amount" : 123,
-                                   |        "height" : 1,
-                                   |        "status":"active",
-                                   |        "cancelHeight" : null,
-                                   |        "cancelTransactionId" : null
-                                   |      } ],
-                                   |      "leaseCancels" : [ {
-                                   |        "id" : "$nestedLeaseCancelId",
-                                   |        "originTransactionId" : "$nestedLeaseCancelId",
-                                   |        "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |        "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |        "amount" : 123,
-                                   |        "height" : 1,
-                                   |        "status" : "canceled",
-                                   |        "cancelHeight" : 2,
-                                   |        "cancelTransactionId" : "$nestedLeaseCancelId"
-                                   |      } ],
-                                   |      "invokes" : [ ]
-                                   |    }
-                                   |  } ]
-                                   |}
-                                   |""".stripMargin)
+                                 |  "data" : [ ],
+                                 |  "transfers" : [ ],
+                                 |  "issues" : [ ],
+                                 |  "reissues" : [ ],
+                                 |  "burns" : [ ],
+                                 |  "sponsorFees" : [ ],
+                                 |  "leases" : [ {
+                                 |    "id" : "$leaseId1",
+                                 |    "originTransactionId" : "$leaseId1",
+                                 |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |    "amount" : 123,
+                                 |    "height" : 1,
+                                 |    "status":"active",
+                                 |    "cancelHeight" : null,
+                                 |    "cancelTransactionId" : null
+                                 |  }, {
+                                 |    "id" : "$leaseId2",
+                                 |    "originTransactionId" : "$leaseId2",
+                                 |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |    "amount" : 123,
+                                 |    "height" : 1,
+                                 |    "status":"active",
+                                 |    "cancelHeight" : null,
+                                 |    "cancelTransactionId" : null
+                                 |  } ],
+                                 |  "leaseCancels" : [ {
+                                 |    "id" : "$leaseCancelId",
+                                 |    "originTransactionId" : "$leaseCancelId",
+                                 |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |    "amount" : 123,
+                                 |    "height" : 1,
+                                 |    "status" : "canceled",
+                                 |    "cancelHeight" : 2,
+                                 |    "cancelTransactionId" : "$leaseCancelId"
+                                 |  } ],
+                                 |  "invokes" : [ {
+                                 |    "dApp" : "$nestedInvokeAddress",
+                                 |    "call" : {
+                                 |      "function" : "nested",
+                                 |      "args" : [ ]
+                                 |    },
+                                 |    "payment" : [ ],
+                                 |    "stateChanges" : {
+                                 |      "data" : [ ],
+                                 |      "transfers" : [ ],
+                                 |      "issues" : [ ],
+                                 |      "reissues" : [ ],
+                                 |      "burns" : [ ],
+                                 |      "sponsorFees" : [ ],
+                                 |      "leases" : [ {
+                                 |        "id" : "$nestedLeaseId",
+                                 |        "originTransactionId" : "$nestedLeaseId",
+                                 |        "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |        "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |        "amount" : 123,
+                                 |        "height" : 1,
+                                 |        "status":"active",
+                                 |        "cancelHeight" : null,
+                                 |        "cancelTransactionId" : null
+                                 |      } ],
+                                 |      "leaseCancels" : [ {
+                                 |        "id" : "$nestedLeaseCancelId",
+                                 |        "originTransactionId" : "$nestedLeaseCancelId",
+                                 |        "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |        "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |        "amount" : 123,
+                                 |        "height" : 1,
+                                 |        "status" : "canceled",
+                                 |        "cancelHeight" : 2,
+                                 |        "cancelTransactionId" : "$nestedLeaseCancelId"
+                                 |      } ],
+                                 |      "invokes" : [ ]
+                                 |    }
+                                 |  } ]
+                                 |}
+                                 |""".stripMargin)
       }
     }
 

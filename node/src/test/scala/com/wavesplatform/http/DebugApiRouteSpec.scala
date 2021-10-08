@@ -28,7 +28,7 @@ import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.test._
-import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{ERC20Address, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -231,6 +231,9 @@ class DebugApiRouteSpec
               )
             )
           )
+
+        (blockchain.resolveERC20Address _).when(ERC20Address(TestValues.asset)).returns(Some(TestValues.asset))
+        (blockchain.resolveERC20Address _).when(*).returns(None)
 
         val (dAppScript, _) = ScriptCompiler
           .compile(

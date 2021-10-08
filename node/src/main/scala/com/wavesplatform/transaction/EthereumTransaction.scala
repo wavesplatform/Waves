@@ -101,7 +101,7 @@ object EthereumTransaction {
     override def validate(tx: EthereumTransaction): ValidatedV[EthereumTransaction] = TxConstraints.seq(tx)(
       TxConstraints.fee(tx.underlying.getGasLimit.longValueExact()),
       TxConstraints
-        .positiveOrZeroAmount((BigInt(tx.underlying.getValue) / AmountMultiplier).bigInteger.longValueExact(), "waves"), // TODO should value be prohibited for invokes?
+        .positiveOrZeroAmount((BigInt(tx.underlying.getValue) / AmountMultiplier).bigInteger.longValueExact(), "waves"),
       TxConstraints.cond(tx.underlying.getGasPrice == GasPrice, GenericError("Gas price must be 10 Gwei")),
       TxConstraints.cond(
         tx.underlying.getValue != BigInteger.ZERO || EthEncoding.cleanHexPrefix(tx.underlying.getData).nonEmpty,

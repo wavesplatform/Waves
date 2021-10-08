@@ -165,9 +165,10 @@ object EthTxGenerator {
     val values      = fullArgs.map(toHLEthValue)
     val ethCallData = EthEncoding.toHexString(ethFunc.encodeCallWithArgs(values:_*).array()) */
 
+    val argsAsEth = fullArgs.map(toEthType)
     val function = new org.web3j.abi.datatypes.Function(
       funcName,
-      fullArgs.map(toEthType).asJava,
+      argsAsEth.asJava,
       Nil.asJava
     )
 

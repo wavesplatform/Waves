@@ -74,6 +74,11 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     field.get(blockchain).asInstanceOf[Option[NgState]]
   }
 
+  def makeStateHard(): (Int, SortedMap[String, String]) = {
+    if (liquidState.isDefined) appendBlock() // Just append empty block
+    (hardStateHeight, hardStateSnapshot())
+  }
+
   def hardStateHeight: Int = {
     db.get(Keys.height)
   }

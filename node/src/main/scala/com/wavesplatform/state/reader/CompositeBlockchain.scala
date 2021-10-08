@@ -156,13 +156,7 @@ final class CompositeBlockchain private (
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     inner
       .resolveERC20Address(address)
-      .orElse(
-        diff.issuedAssets.keys.find(
-          _.id.arr.view
-            .drop(12)
-            .sameElements(address.arr)
-        )
-      )
+      .orElse(diff.issuedAssets.keys.find(id => ERC20Address(id) == address))
 }
 
 object CompositeBlockchain {

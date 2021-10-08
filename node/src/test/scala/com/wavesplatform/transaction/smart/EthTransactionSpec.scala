@@ -1,5 +1,7 @@
 package com.wavesplatform.transaction.smart
 
+import scala.concurrent.duration._
+
 import cats.syntax.monoid._
 import com.wavesplatform.{BlockchainStubHelpers, TestValues}
 import com.wavesplatform.common.state.ByteStr
@@ -13,13 +15,12 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.utils.EthConverters._
 import com.wavesplatform.transaction.utils.EthTxGenerator
-import com.wavesplatform.transaction.utils.EthTxGenerator.{signRawTransaction, Arg}
+import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, EthSetChainId, JsonMatchers}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
 import org.web3j.crypto.RawTransaction
 import play.api.libs.json.Json
-import scala.concurrent.duration._
 
 class EthTransactionSpec
     extends FlatSpec
@@ -40,6 +41,7 @@ class EthTransactionSpec
 
     val blockchain = createBlockchainStub { b =>
       b.stub.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls, BlockchainFeatures.Ride4DApps)
+      b.stub.issueAsset(TestAsset.id)
       b.stub.creditBalance(senderAddress, Waves, Long.MaxValue)
       b.stub.creditBalance(senderAddress, TestAsset, Long.MaxValue)
       (b.resolveERC20Address _).when(ERC20Address(TestAsset.id.take(20))).returning(Some(TestAsset))

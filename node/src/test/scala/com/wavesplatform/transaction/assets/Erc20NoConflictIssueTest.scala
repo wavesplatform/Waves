@@ -1,9 +1,8 @@
 package com.wavesplatform.transaction.assets
 
-import com.wavesplatform.test.{FlatSpec, FreeSpec}
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.lang.v1.traits.domain.Issue
-import com.wavesplatform.state.diffs
 import com.wavesplatform.state.diffs.produceE
 import com.wavesplatform.transaction.{ERC20Address, TxHelpers}
 import com.wavesplatform.transaction.Asset.IssuedAsset

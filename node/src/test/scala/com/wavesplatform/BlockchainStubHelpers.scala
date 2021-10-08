@@ -105,7 +105,7 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
             (
               1, // height
               IssueTransaction
-                .selfSigned(1.toByte, TestValues.keyPair, "test", "test", 10000, 8, reissuable = true, script, 500000L, 123L)
+                .selfSigned(2.toByte, TestValues.keyPair, "test", "test", 10000, 8, reissuable = true, script, 500000L, 123L)
                 .explicitGet(),
               true // applied
             )
@@ -142,8 +142,8 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
     }
 
     def transactionDiffer(time: Time = SystemTime, withFailed: Boolean = false): Transaction => TracedResult[ValidationError, Diff] = {
-      if (withFailed) TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, _)
-      else TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, _)
+      if (withFailed) TransactionDiffer(Some(time.correctedTime()), time.correctedTime())(blockchain, _)
+      else TransactionDiffer.forceValidate(Some(time.correctedTime()), time.correctedTime())(blockchain, _)
     }
 
     def transactionPublisher(time: Time = SystemTime): TransactionPublisher = (tx: Transaction, _: Option[Channel]) => {

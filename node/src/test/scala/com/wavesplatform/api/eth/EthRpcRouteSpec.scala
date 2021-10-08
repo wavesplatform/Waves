@@ -7,24 +7,22 @@ import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.eth.EthRpcRoute
-import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.utils.{EthEncoding, EthHelpers, EthSetChainId}
-import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.matchers.should.Matchers
-import play.api.libs.json.{JsArray, JsObject, Json}
-import play.api.libs.json.Json.JsValueWrapper
-import com.wavesplatform.api.http.CustomJsonMarshallerSpec
 import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.utils.EthConverters._
-import com.wavesplatform.transaction.{ERC20Address, TxHelpers}
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.utils.{EthEncoding, EthHelpers, EthSetChainId}
+import org.scalamock.scalatest.PathMockFactory
+import org.scalatest.matchers.should.Matchers
 import org.scalatest.BeforeAndAfterEach
-import org.web3j.crypto.{SignedRawTransaction, TransactionEncoder}
+import play.api.libs.json.{JsArray, JsObject, Json}
+import play.api.libs.json.Json.JsValueWrapper
 
 class EthRpcRouteSpec
     extends RouteSpec("/eth")
@@ -41,8 +39,6 @@ class EthRpcRouteSpec
   "eth_chainId" in testRpc("eth_chainId")(resultInt shouldBe 'E'.toLong)
 
   "eth_gasPrice" in testRpc("eth_gasPrice")(resultInt shouldBe 10000000000L)
-
-  "net_version" in testRpc("net_version")(result shouldBe "1")
 
   "eth_blockNumber" in {
     (() => blockchain.height).when().returning(123)
@@ -144,8 +140,9 @@ class EthRpcRouteSpec
     blockchain.stub.issueAsset(testAsset1)
     blockchain.stub.issueAsset(testAsset2)
 
-    route.route.anyParamTest(routePath("/assets"), "id")(EthEncoding.toHexString(testAsset1.take(20).arr), EthEncoding.toHexString(testAsset2.take(20).arr)) {
-      responseAs[JsArray] should matchJson("""[ {
+    route.route
+      .anyParamTest(routePath("/assets"), "id")(EthEncoding.toHexString(testAsset1.take(20).arr), EthEncoding.toHexString(testAsset2.take(20).arr)) {
+        responseAs[JsArray] should matchJson("""[ {
                                              |  "assetId" : "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi",
                                              |  "issueHeight" : 1,
                                              |  "issueTimestamp" : 123,
@@ -174,7 +171,7 @@ class EthRpcRouteSpec
                                              |  "minSponsoredAssetFee" : null,
                                              |  "originTransactionId" : "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR"
                                              |} ]""".stripMargin)
-    }
+      }
   }
 
   // Helpers
