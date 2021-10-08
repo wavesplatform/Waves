@@ -7,7 +7,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.{TransactionBase, TxTimestamp}
+import com.wavesplatform.transaction.{Authorized, TransactionBase, TxTimestamp}
 import play.api.libs.json.{JsObject, Json}
 
 trait InvokeScriptLike {
@@ -16,10 +16,10 @@ trait InvokeScriptLike {
   def payments: Seq[Payment]
   def root: InvokeScriptTransactionLike
   def checkedAssets: Seq[IssuedAsset] = payments collect { case Payment(_, assetId: IssuedAsset) => assetId }
-  def sender: PublicKey
+  val sender: PublicKey
 }
 
-trait InvokeScriptTransactionLike extends TransactionBase with InvokeScriptLike
+trait InvokeScriptTransactionLike extends TransactionBase with InvokeScriptLike with Authorized
 
 object InvokeScriptLike {
   implicit class ISLExt(val isl: InvokeScriptLike) extends AnyVal {

@@ -212,10 +212,24 @@ package object predef {
        | ${assertProvenPart("t")} && amount && assetId && feeAssetId && recipient && attachment
      """.stripMargin
 
+  def checkEthInvoke(tx: EthereumTransaction, dApp: Address, callable: String, passedArg: Long, proofs: Boolean, payments: String): String =
+    s"""
+       | ${provenPart(tx, emptyBodyBytes = true, proofs)}
+       | let dAppAddress = match t.dApp {
+       |   case a: Address => a.bytes == base58'$dApp'
+       |      case _: Alias   => throw()
+       |    }
+       |    let feeAssetId = t.feeAssetId == unit
+       |    let checkFunc  = t.function == "$callable"
+       |    let checkArgs  = t.args == [$passedArg]
+       |    let payments   = t.payments == $payments
+       |    ${assertProvenPart("t", proofs)} && dAppAddress && feeAssetId && checkFunc && checkArgs && payments
+     """.stripMargin
+
   def letProof(p: Proofs, prefix: String)(i: Int): String =
     s"let ${prefix.replace(".", "")}proof$i = $prefix.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).toString}'"
 
-  def provenPart(t: Transaction with Authorized, emptyBodyBytes: Boolean = false): String = {
+  def provenPart(t: Transaction with Authorized, emptyBodyBytes: Boolean = false, checkProofs: Boolean = true): String = {
     val version = t match {
       case _: EthereumTransaction  => 0
       case v: VersionedTransaction => v.version
@@ -239,7 +253,7 @@ package object predef {
        | let sender = t.sender == addressFromPublicKey(base58'${t.sender}')
        | let senderPublicKey = t.senderPublicKey == base58'${t.sender}'
        | let version = t.version == $version
-       | ${Range(0, 8).map(letProof(proofs, "t")).mkString("\n")}
+       | ${ if (checkProofs) Range(0, 8).map(letProof(proofs, "t")).mkString("\n") else ""}
      """.stripMargin
   }
 
@@ -248,6 +262,6 @@ package object predef {
     s"${prefix}proof0 && ${prefix}proof1 && ${prefix}proof2 && ${prefix}proof3 && ${prefix}proof4 && ${prefix}proof5 && ${prefix}proof6 && ${prefix}proof7"
   }
 
-  def assertProvenPart(prefix: String): String =
-    s"id && fee && timestamp && sender && senderPublicKey && ${assertProofs(prefix)} && bodyBytes && version"
+  def assertProvenPart(prefix: String, proofs: Boolean = true): String =
+    s"id && fee && timestamp && sender && senderPublicKey && ${if (proofs) assertProofs(prefix) + " &&" else ""} bodyBytes && version"
 }

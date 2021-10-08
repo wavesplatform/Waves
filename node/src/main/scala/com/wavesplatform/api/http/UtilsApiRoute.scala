@@ -334,7 +334,7 @@ object UtilsApiRoute {
 
                 override def root: InvokeScriptTransactionLike = this
 
-                override def sender: PublicKey = PublicKey(ByteStr(new Array[Byte](32)))
+                override val sender: PublicKey = PublicKey(ByteStr(new Array[Byte](32)))
 
                 override def assetFee: (Asset, Long) = Asset.Waves -> 0L
 

@@ -98,31 +98,32 @@ object EthereumTransaction {
           override def payments: Seq[InvokeScriptTransaction.Payment] = extractedPayments
           override def id: Coeval[ByteStr]                            = tx.id
           override def dApp: AddressOrAlias                           = Invocation.this.dApp
-          override def sender: PublicKey                              = tx.signerPublicKey()
+          override val sender: PublicKey                              = tx.signerPublicKey()
           override def root: InvokeScriptTransactionLike              = this
           override def assetFee: (Asset, TxTimestamp)                 = tx.assetFee
           override def timestamp: TxTimestamp                         = tx.timestamp
           override def chainId: TxVersion                             = tx.chainId
           override def checkedAssets: Seq[Asset.IssuedAsset]          = this.paymentAssets
-        override val tpe: TransactionType                           = TransactionType.InvokeScript
-      }
+          override val tpe: TransactionType                           = TransactionType.InvokeScript
+        }
   }
 
   implicit object EthereumTransactionValidator extends TxValidator[EthereumTransaction] {
     override def validate(tx: EthereumTransaction): ValidatedV[EthereumTransaction] = TxConstraints.seq(tx)(
       TxConstraints.fee(tx.underlying.getGasLimit.longValueExact()),
-      TxConstraints.positiveOrZeroAmount((BigInt(tx.underlying.getValue) / AmountMultiplier).bigInteger.longValueExact(), "waves"), // TODO should value be prohibited for invokes?
+      TxConstraints
+        .positiveOrZeroAmount((BigInt(tx.underlying.getValue) / AmountMultiplier).bigInteger.longValueExact(), "waves"), // TODO should value be prohibited for invokes?
       TxConstraints.cond(tx.underlying.getGasPrice == GasPrice, GenericError("Gas price must be 10 Gwei")),
       TxConstraints.cond(
         tx.underlying.getValue != BigInteger.ZERO || EthEncoding.cleanHexPrefix(tx.underlying.getData).nonEmpty,
         GenericError("Transaction cancellation is not supported")
-        ),
-        tx.payload match {
-        case Transfer(tokenAddress, amount, _) =>
-          TxConstraints.positiveAmount(amount, tokenAddress.fold("waves")(erc20 => EthEncoding.toHexString(erc20.arr)))
-        case Invocation(_, _) => TxConstraints.seq(tx)()
-      },
-      )
+      ),
+//      tx.payload match {
+//        case Transfer(tokenAddress, amount, _) =>
+//          TxConstraints.positiveAmount(amount, tokenAddress.fold("waves")(erc20 => EthEncoding.toHexString(erc20.arr)))
+//        case Invocation(_, _) => TxConstraints.seq(tx)()
+//      }
+    )
   }
 
   val GasPrice: BigInteger = Convert.toWei("10", Convert.Unit.GWEI).toBigInteger

@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs
 
+import cats.syntax.semigroup._
 import com.google.protobuf.ByteString
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
@@ -33,10 +34,11 @@ object EthereumTransactionDiff {
 
       case ei: EthereumTransaction.Invocation =>
         for {
-          invocation <- TracedResult(ei.toInvokeScriptLike(e, blockchain))
-          diff       <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution = true)(invocation)
+          invocation   <- TracedResult(ei.toInvokeScriptLike(e, blockchain))
+          paymentsDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, invocation, verify = true, Diff(), Int.MaxValue)
+          diff         <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution = true)(invocation)
         } yield
-          diff.copy(
+          paymentsDiff |+| diff.copy(
             ethereumTransactionMeta = Map(
               e.id() -> EthereumTransactionMeta(
                 EthereumTransactionMeta.Payload.Invocation(

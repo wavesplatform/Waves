@@ -750,30 +750,20 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     (blockchain.accountScript _).when(dApp.toAddress).returning(Some(scriptInfo))
     (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0))
 
-    val passedArg = "7"
+    val passedArg = 7
     val data =
       s"9bfbd457000000000000000000000000000000000000000000000000000000000000000${passedArg}00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000"
     val invocation = EthereumTransaction.Invocation(dApp.toAddress, data)
     val tx = EthereumTransaction(invocation, TestEthUnderlying, TestEthSignature, T)
 
+    val check = checkEthInvoke(tx, dApp.toAddress, callableName, passedArg, proofs = true, payments = "[]")
     runScript(
       s"""
          |match tx {
-         |  case t: InvokeScriptTransaction =>
-         |    ${provenPart(tx, emptyBodyBytes = true)}
-         |    let dAppAddress = match t.dApp {
-         |      case a: Address => a.bytes == base58'${dApp.toAddress}'
-         |      case _: Alias   => throw()
-         |    }
-         |    let feeAssetId = t.feeAssetId == unit
-         |    let checkFunc  = t.function == "$callableName"
-         |    let checkArgs  = t.args == [$passedArg]
-         |    let payments   = t.payments == []
-         |    ${assertProvenPart("t")} && dAppAddress && feeAssetId && checkFunc && checkArgs && payments
-         |  case _ =>
-         |    throw()
+         |  case t: InvokeScriptTransaction => $check
+         |  case _                          => throw()
          |}
-           """.stripMargin,
+       """.stripMargin,
       V6,
       Coproduct(tx),
       blockchain,
