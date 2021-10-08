@@ -118,11 +118,11 @@ object EthereumTransaction {
         tx.underlying.getValue != BigInteger.ZERO || EthEncoding.cleanHexPrefix(tx.underlying.getData).nonEmpty,
         GenericError("Transaction cancellation is not supported")
       ),
-//      tx.payload match {
-//        case Transfer(tokenAddress, amount, _) =>
-//          TxConstraints.positiveAmount(amount, tokenAddress.fold("waves")(erc20 => EthEncoding.toHexString(erc20.arr)))
-//        case Invocation(_, _) => TxConstraints.seq(tx)()
-//      }
+      tx.payload match {
+        case Transfer(tokenAddress, amount, _) =>
+          TxConstraints.positiveAmount(amount, tokenAddress.fold("waves")(erc20 => EthEncoding.toHexString(erc20.arr)))
+        case Invocation(_, _) => TxConstraints.seq(tx)()
+      }
     )
   }
 
