@@ -25,6 +25,8 @@ trait Script {
 
   val containsArray: Boolean
 
+  val isFreeCall: Boolean
+
   override def equals(obj: scala.Any): Boolean = obj match {
     case that: Script => stdLibVersion == that.stdLibVersion && expr == that.expr
     case _            => false
@@ -54,6 +56,7 @@ object Script {
     }
     val ctx = getDecompilerContext(s.stdLibVersion, cType)
     val (scriptText, directives) = (s: @unchecked) match {
+      case e: ExprScript if e.isFreeCall   => (Decompiler(e.expr, ctx), List(s.stdLibVersion, Expression, Call))
       case e: ExprScript                   => (Decompiler(e.expr, ctx), List(s.stdLibVersion, Expression))
       case ContractScriptImpl(_, contract) => (Decompiler(contract, ctx), List(s.stdLibVersion, Account, DAppType))
     }
@@ -74,8 +77,11 @@ object Script {
     (script: @unchecked) match {
       case script: ExprScript =>
         ExprScript
-          .estimate(script.expr, script.stdLibVersion, estimator, useContractVerifierLimit)
-          .map(complexity => ComplexityInfo(complexity, Map(), complexity))
+          .estimate(script.expr, script.stdLibVersion, script.isFreeCall, estimator, useContractVerifierLimit)
+          .map { complexity =>
+            val verifierComplexity = if (script.isFreeCall) 0 else complexity
+            ComplexityInfo(verifierComplexity, Map(), complexity)
+          }
       case ContractScriptImpl(version, contract @ DApp(_, _, _, verifierFuncOpt)) =>
         for {
           (maxComplexity, callableComplexities) <- ContractScript.estimateComplexity(

@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.invoke
 
 import cats.instances.map._
 import cats.syntax.either._
+import cats.Id
 import cats.syntax.semigroup._
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
@@ -18,6 +19,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, _}
+import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, _}
@@ -36,14 +38,14 @@ import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.Asset
 import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.validation.impl.{LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
-import com.wavesplatform.transaction.{Asset, AssetIdLength}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, LegacyPBSwitch}
 import com.wavesplatform.utils._
 import shapeless.Coproduct
 
 import scala.util.{Failure, Right, Success, Try}
 
 object InvokeDiffsCommon {
-  def txFeeDiff(blockchain: Blockchain, tx: InvokeScriptTransaction): Either[GenericError, (Long, Map[Address, Portfolio])] = {
+  def txFeeDiff(blockchain: Blockchain, tx: InvokeTransaction): Either[GenericError, (Long, Map[Address, Portfolio])] = {
     val attachedFee = tx.fee
     tx.assetFee._1 match {
       case Waves => Right((attachedFee, Map(tx.sender.toAddress -> Portfolio(-attachedFee))))
@@ -66,16 +68,22 @@ object InvokeDiffsCommon {
     }
   }
 
-  def calculateMinFee(blockchain: Blockchain, issueList: List[Issue], additionalScriptsInvoked: Int, stepsNumber: Long): Long = {
-    val dAppFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
+  private def calculateMinFee(
+      tx: InvokeTransaction,
+      blockchain: Blockchain,
+      issueList: List[Issue],
+      additionalScriptsInvoked: Int,
+      stepsNumber: Long
+  ): Long = {
+    val dAppFee    = FeeConstants(tx.typeId) * FeeUnit * stepsNumber
     val issuesFee  = issueList.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
     val actionsFee = additionalScriptsInvoked * ScriptExtraFee
     dAppFee + issuesFee + actionsFee
   }
 
-  def calcAndCheckFee[E <: ValidationError](
+  private[invoke] def calcAndCheckFee[E <: ValidationError](
       makeError: (String, Long) => E,
-      tx: InvokeScriptTransaction,
+      tx: InvokeTransaction,
       blockchain: Blockchain,
       stepLimit: Long,
       invocationComplexity: Long,
@@ -88,7 +96,7 @@ object InvokeDiffsCommon {
       else
         invocationComplexity / stepLimit + 1
 
-    val minFee = calculateMinFee(blockchain, issueList, additionalScriptsInvoked, stepsNumber)
+    val minFee = calculateMinFee(tx, blockchain, issueList, additionalScriptsInvoked, stepsNumber)
 
     val resultE = for {
       (attachedFeeInWaves, portfolioDiff) <- txFeeDiff(blockchain, tx)
@@ -113,7 +121,7 @@ object InvokeDiffsCommon {
               ""
 
           val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
-          val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+          val txName    = Constants.TransactionNames(tx.typeId)
 
           s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
             s"$stepsInfo$totalScriptsInvokedInfo$issuesInfo " +
@@ -289,7 +297,7 @@ object InvokeDiffsCommon {
         .foldLeft(Map[Address, Portfolio]())(_ |+| _)
     )
 
-  private def dataItemToEntry(item: DataOp): DataEntry[_] =
+  def dataItemToEntry(item: DataOp): DataEntry[_] =
     item match {
       case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
       case DataItem.Str(k, b)  => StringDataEntry(k, b)
@@ -347,8 +355,13 @@ object InvokeDiffsCommon {
       )
       _ <- Either.cond(
         !tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
-        (),
-        s"Empty keys aren't allowed in tx version >= ${tx.root.get.protobufVersion}"
+        (), {
+          val versionInfo = tx.root.get match {
+            case s: LegacyPBSwitch => s" in tx version >= ${s.protobufVersion}"
+            case _                 => ""
+          }
+          s"Empty keys aren't allowed$versionInfo"
+        }
       )
 
       maxKeySize = ContractLimits.MaxKeySizeInBytesByVersion(stdLibVersion)
@@ -402,7 +415,7 @@ object InvokeDiffsCommon {
             else remainingLimit
 
           val blockchain   = CompositeBlockchain(sblockchain, curDiff)
-          val actionSender = Recipient.Address(ByteStr(tx.dAppAddressOrAlias.bytes)) // XXX Is it correct for aliases&
+          val actionSender = Recipient.Address(ByteStr(dAppAddress.bytes))
 
           def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
             val AssetTransfer(addressRepr, recipient, amount, asset) = transfer
@@ -619,9 +632,30 @@ object InvokeDiffsCommon {
       case Success(s) => s
     }
 
-  case class StepInfo(
-      feeInWaves: Long,
-      feeInAttachedAsset: Long,
-      scriptsRun: Int
-  )
+  def checkCallResultLimits(
+      blockchain: Blockchain,
+      usedComplexity: Long,
+      log: Log[Id],
+      actionsCount: Int,
+      dataCount: Int,
+      dataSize: Int,
+      availableActions: Int,
+      availableData: Int,
+      availableDataSize: Int
+  ): TracedResult[ValidationError, Unit] = {
+    def error(message: String) = TracedResult(Left(FailedTransactionError.dAppExecution(message, usedComplexity, log)))
+    val checkSizeHeight        = blockchain.settings.functionalitySettings.checkTotalDataEntriesBytesHeight
+
+    if (dataCount > availableData)
+      error("Stored data count limit is exceeded")
+    else if (dataSize > availableDataSize && blockchain.height >= checkSizeHeight) {
+      val limit = ContractLimits.MaxTotalWriteSetSizeInBytes
+      val actual = limit + dataSize - availableDataSize
+      error(s"Storing data size should not exceed $limit, actual: $actual bytes")
+    }
+    else if (actionsCount > availableActions)
+      error("Actions count limit is exceeded")
+    else
+      TracedResult(Right(()))
+  }
 }

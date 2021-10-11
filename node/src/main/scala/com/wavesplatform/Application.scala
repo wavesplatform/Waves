@@ -139,7 +139,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
 
-    val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTargetOpt)
+    val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
 
     if (settings.minerSettings.enable)
       miner = new MinerImpl(allChannels, blockchainUpdater, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler)
