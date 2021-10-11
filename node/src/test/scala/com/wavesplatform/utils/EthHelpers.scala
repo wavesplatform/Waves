@@ -30,7 +30,14 @@ trait EthHelpers {
   private def ts   = time.getTimestamp()
 
   val TestEthUnderlying: RawTransaction =
-    RawTransaction.createTransaction(BigInteger.valueOf(ts), EthereumTransaction.GasPrice, EthereumTransaction.GasPrice, "", BigInteger.ONE, "")
+    RawTransaction.createTransaction(
+      BigInteger.valueOf(ts),
+      EthereumTransaction.GasPrice,
+      EthereumTransaction.GasPrice,
+      "",
+      (BigInt(123) * EthereumTransaction.AmountMultiplier).bigInteger,
+      ""
+    )
 
   val TestEthSignature = new SignatureData(
     28.toByte,

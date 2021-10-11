@@ -15,7 +15,8 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, GenesisTransaction}
+import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, GenesisTransaction, TxHelpers}
+import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.utils.EthHelpers
 
 class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers {
