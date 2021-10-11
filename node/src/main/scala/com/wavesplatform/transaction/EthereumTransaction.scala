@@ -35,7 +35,7 @@ final case class EthereumTransaction(
 ) extends Transaction(TransactionType.Ethereum)
     with Authorized
     with VersionedTransaction.ConstV1
-    with PBSince.V1 {
+    with PBSince.V1 { self =>
   import EthereumTransaction._
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(encodeTransaction(underlying, signatureData))
@@ -75,6 +75,23 @@ final case class EthereumTransaction(
   )
 
   override val sender: PublicKey = signerPublicKey()
+
+  def toTransferLike(a: TxAmount, r: AddressOrAlias, asset: Asset): TransferTransactionLike = new TransferTransactionLike {
+    override val amount: TxAmount               = a
+    override val recipient: AddressOrAlias      = r
+    override val sender: PublicKey              = signerPublicKey()
+    override val assetId: Asset                 = asset
+    override val attachment: ByteStr            = ByteStr.empty
+    override def timestamp: TxTimestamp         = self.timestamp
+    override def chainId: TxType                = self.chainId
+    override def id: Coeval[ByteStr]            = self.id
+    override val tpe: TransactionType           = TransactionType.Transfer
+    override def assetFee: (Asset, TxTimestamp) = self.assetFee
+    override def checkedAssets: Seq[IssuedAsset] = asset match {
+      case i: IssuedAsset => Seq(i)
+      case Asset.Waves    => Nil
+    }
+  }
 }
 
 object EthereumTransaction {
@@ -88,28 +105,7 @@ object EthereumTransaction {
         )(a => blockchain.resolveERC20Address(a).toRight(GenericError(s"Can't resolve ERC20 address $a")))
 
     def toTransferLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, TransferTransactionLike] =
-      for {
-        asset <- tryResolveAsset(blockchain)
-        issuedAssets = asset match {
-          case i: IssuedAsset => Seq(i)
-          case Asset.Waves    => Nil
-        }
-        a = amount
-        r = recipient
-      } yield
-        new TransferTransactionLike {
-          override val amount: TxAmount                = a
-          override val recipient: AddressOrAlias       = r
-          override val sender: PublicKey               = tx.signerPublicKey()
-          override val assetId: Asset                  = asset
-          override val attachment: ByteStr             = ByteStr.empty
-          override def timestamp: TxTimestamp          = tx.timestamp
-          override def chainId: TxType                 = tx.chainId
-          override def id: Coeval[ByteStr]             = tx.id
-          override val tpe: TransactionType            = TransactionType.Transfer
-          override def assetFee: (Asset, TxTimestamp)  = tx.assetFee
-          override def checkedAssets: Seq[IssuedAsset] = issuedAssets
-        }
+      tryResolveAsset(blockchain).map(tx.toTransferLike(amount, recipient, _))
   }
 
   case class Invocation(dApp: Address, hexCallData: String) extends Payload {

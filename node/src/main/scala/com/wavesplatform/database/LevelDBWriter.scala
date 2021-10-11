@@ -6,7 +6,7 @@ import cats.syntax.semigroup._
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
@@ -23,7 +23,6 @@ import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.EthereumTransaction.Transfer
-import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -32,7 +31,6 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
-import monix.eval.Coeval
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
@@ -817,27 +815,11 @@ abstract class LevelDBWriter private[database] (
         .collect {
           case (t: TransferTransaction, true) => t
           case (e @ EthereumTransaction(_: Transfer, _, _, _), true) =>
-            val meta      = db.get(Keys.ethereumTransactionMeta(Height @@ tm.height, TxNum @@ tm.num.toShort)).get
-            val transfer  = meta.payload.transfer.get
-            val tAmount    = transfer.amount.get
-            val asset     = PBAmounts.toVanillaAssetId(tAmount.assetId)
-            val issuedAssets = asset match {
-              case i: IssuedAsset => Seq(i)
-              case Asset.Waves    => Nil
-            }
-            new TransferTransactionLike {
-              override val amount: TxAmount = tAmount.amount
-              override val recipient: AddressOrAlias = Address(transfer.publicKeyHash.toByteArray)
-              override val sender: PublicKey = e.sender
-              override val assetId: Asset = asset
-              override val attachment: BlockId = ByteStr.empty
-              override def assetFee: (Asset, TxTimestamp) = e.assetFee
-              override def timestamp: TxTimestamp = e.timestamp
-              override def chainId: TxVersion = e.chainId
-              override def id: Coeval[ByteStr] = e.id
-              override def checkedAssets: Seq[IssuedAsset] = issuedAssets
-              override val tpe: TransactionType = TransactionType.Transfer
-            }
+            val meta     = db.get(Keys.ethereumTransactionMeta(Height @@ tm.height, TxNum @@ tm.num.toShort)).get
+            val transfer = meta.payload.transfer.get
+            val tAmount  = transfer.amount.get
+            val asset    = PBAmounts.toVanillaAssetId(tAmount.assetId)
+            e.toTransferLike(tAmount.amount, Address(transfer.publicKeyHash.toByteArray), asset)
         }
     } yield (height, tx)
   }
