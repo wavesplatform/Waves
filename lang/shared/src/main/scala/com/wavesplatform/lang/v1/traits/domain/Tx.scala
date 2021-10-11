@@ -70,6 +70,8 @@ object Tx {
       funcArgs: List[EVALUATED]
   ) extends Tx
 
+  case class InvokeExpression(p: Proven, expression: ByteStr, feeAssetId: Option[ByteStr]) extends Tx
+
   case class Lease(p: Proven, amount: Long, recipient: Recipient) extends Tx
 
   case class LeaseCancel(p: Proven, leaseId: ByteStr) extends Tx

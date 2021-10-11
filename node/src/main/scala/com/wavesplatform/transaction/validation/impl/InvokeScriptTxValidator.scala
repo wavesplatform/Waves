@@ -2,17 +2,14 @@ package com.wavesplatform.transaction.validation.impl
 
 import cats.data.NonEmptyList
 import cats.data.Validated.{Invalid, Valid}
-import cats.syntax.either._
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.transaction.TxValidationError.{GenericError, NonPositiveAmount, TooBigArray}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, NonPositiveAmount}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.validation.{TxValidator, ValidatedNV, ValidatedV}
 import com.wavesplatform.utils._
-
-import scala.util.Try
 
 object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
   override def validate(tx: InvokeScriptTransaction): ValidatedV[InvokeScriptTransaction] = {
@@ -51,12 +48,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       ),
       checkAmounts(payments),
       V.fee(fee),
-      Try(checkLength)
-        .toEither
-        .leftMap(err => GenericError(err.getMessage))
-        .filterOrElse(identity, TooBigArray)
-        .toValidatedNel
-        .map(_ => ())
+      V.invokeLength(checkLength)
     )
   }
 }

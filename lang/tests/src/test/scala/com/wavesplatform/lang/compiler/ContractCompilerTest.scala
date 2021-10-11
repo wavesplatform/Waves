@@ -12,7 +12,7 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms, TestCompiler}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ScriptResultSource, Terms, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types, WavesContext}
@@ -297,11 +297,11 @@ class ContractCompilerTest extends PropSpec {
     }
 
     compiler.ContractCompiler(ctx, expr, V3) should produce(
-      callableResultError(Types.callableReturnType(V3).explicitGet(), "ByteVector")
+      callableResultError(Types.callableReturnType(V3).explicitGet(), "ByteVector", ScriptResultSource.CallableFunction)
     )
 
     compiler.ContractCompiler(ctx, expr, V4) should produce(
-      callableResultError(Types.callableReturnType(V4).explicitGet(), "ByteVector")
+      callableResultError(Types.callableReturnType(V4).explicitGet(), "ByteVector", ScriptResultSource.CallableFunction)
     )
   }
 

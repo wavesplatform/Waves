@@ -1,7 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import scala.collection.mutable
-
 import cats.instances.either._
 import cats.instances.map._
 import cats.kernel.Monoid
@@ -16,19 +14,21 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.transaction._
+import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
-import com.wavesplatform.transaction.smart.script.trace.{TracedResult, TraceStep}
+import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
+import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json
+
+import scala.collection.mutable
 
 object TransactionDiffer {
   def apply(prevBlockTs: Option[Long], currentBlockTs: Long, verify: Boolean = true)(
@@ -161,7 +161,7 @@ object TransactionDiffer {
         tx match {
           case gtx: GenesisTransaction           => GenesisTransactionDiff(blockchain.height)(gtx).traced
           case ptx: PaymentTransaction           => PaymentTransactionDiff(blockchain)(ptx).traced
-          case ci: InvokeScriptTransaction       => InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(ci)
+          case ci: InvokeTransaction             => InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(ci)
           case etx: ExchangeTransaction          => ExchangeTransactionDiff(blockchain)(etx).traced
           case itx: IssueTransaction             => AssetTransactionsDiff.issue(blockchain)(itx).traced
           case rtx: ReissueTransaction           => AssetTransactionsDiff.reissue(blockchain, currentBlockTs)(rtx).traced
@@ -244,7 +244,10 @@ object TransactionDiffer {
     } yield ()
 
   // failed transactions related
-  private def transactionMayFail(tx: Transaction): Boolean = tx.typeId == InvokeScriptTransaction.typeId || tx.typeId == ExchangeTransaction.typeId
+  private def transactionMayFail(tx: Transaction): Boolean =
+    tx.typeId == InvokeScriptTransaction.typeId ||
+      tx.typeId == InvokeExpressionTransaction.typeId ||
+      tx.typeId == ExchangeTransaction.typeId
 
   private def acceptFailed(blockchain: Blockchain): Boolean = blockchain.isFeatureActivated(BlockV5)
 
@@ -255,8 +258,8 @@ object TransactionDiffer {
       scriptResult: Option[InvokeScriptResult]
   ): Either[ValidationError, Diff] = {
     val extractDAppAddress = tx match {
-      case ist: InvokeScriptTransaction => blockchain.resolveAlias(ist.dAppAddressOrAlias).map(Some(_))
-      case _                            => Right(None)
+      case it: InvokeTransaction => blockchain.resolveAlias(it.dAppAddressOrAlias).map(Some(_))
+      case _                     => Right(None)
     }
 
     for {

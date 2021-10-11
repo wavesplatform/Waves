@@ -31,6 +31,7 @@ object Constants extends ScorexLogging {
       (14: Byte) -> "SponsorFeeTransaction",
       (15: Byte) -> "SetAssetScriptTransaction",
       (16: Byte) -> "InvokeScriptTransaction",
-      (17: Byte) -> "UpdateAssetInfoTransaction"
+      (17: Byte) -> "UpdateAssetInfoTransaction",
+      (18: Byte) -> "InvokeExpressionTransaction"
     )
 }

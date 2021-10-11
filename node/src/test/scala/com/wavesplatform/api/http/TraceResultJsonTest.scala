@@ -26,7 +26,7 @@ class TraceResultJsonTest extends PropSpec with JsonMatchers {
         1.toByte,
         sender = publicKey,
         dappAddress = address,
-        fc = Some(FUNCTION_CALL(User("func"), List(CONST_STRING("param").explicitGet(), CONST_LONG(1)))),
+        expr = Some(FUNCTION_CALL(User("func"), List(CONST_STRING("param").explicitGet(), CONST_LONG(1)))),
         p = List(InvokeScriptTransaction.Payment(1L, Waves)),
         fee = 10000000L,
         feeAssetId = Waves,
