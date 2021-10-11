@@ -3,7 +3,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, InvokeExpressionTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 
 import scala.util.{Failure, Try}
@@ -40,6 +40,7 @@ object TransactionParsers {
     InvokeScriptTransaction,
     TransferTransaction,
     UpdateAssetInfoTransaction,
+    InvokeExpressionTransaction
   ).flatMap { x =>
     x.supportedVersions.map { version =>
       ((x.typeId, version), x)

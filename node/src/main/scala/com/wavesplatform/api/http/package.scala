@@ -25,7 +25,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, InvokeExpressionTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Scheduler
@@ -62,21 +62,22 @@ package object http extends ApiMarshallers with ScorexLogging {
               case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
               case Some(x) =>
                 (x: @unchecked) match {
-                  case TransferTransaction        => txJson.as[TransferRequest].toTxFrom(senderPk)
-                  case CreateAliasTransaction     => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
-                  case LeaseTransaction           => txJson.as[LeaseRequest].toTxFrom(senderPk)
-                  case LeaseCancelTransaction     => txJson.as[LeaseCancelRequest].toTxFrom(senderPk)
-                  case ExchangeTransaction        => txJson.as[ExchangeRequest].toTxFrom(senderPk)
-                  case IssueTransaction           => txJson.as[IssueRequest].toTxFrom(senderPk)
-                  case ReissueTransaction         => txJson.as[ReissueRequest].toTxFrom(senderPk)
-                  case BurnTransaction            => txJson.as[BurnRequest].toTxFrom(senderPk)
-                  case MassTransferTransaction    => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], senderPk)
-                  case DataTransaction            => TransactionFactory.data(txJson.as[DataRequest], senderPk)
-                  case InvokeScriptTransaction    => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], senderPk)
-                  case SetScriptTransaction       => TransactionFactory.setScript(txJson.as[SetScriptRequest], senderPk)
-                  case SetAssetScriptTransaction  => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], senderPk)
-                  case SponsorFeeTransaction      => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderPk)
-                  case UpdateAssetInfoTransaction => txJson.as[UpdateAssetInfoRequest].toTxFrom(senderPk)
+                  case TransferTransaction         => txJson.as[TransferRequest].toTxFrom(senderPk)
+                  case CreateAliasTransaction      => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
+                  case LeaseTransaction            => txJson.as[LeaseRequest].toTxFrom(senderPk)
+                  case LeaseCancelTransaction      => txJson.as[LeaseCancelRequest].toTxFrom(senderPk)
+                  case ExchangeTransaction         => txJson.as[ExchangeRequest].toTxFrom(senderPk)
+                  case IssueTransaction            => txJson.as[IssueRequest].toTxFrom(senderPk)
+                  case ReissueTransaction          => txJson.as[ReissueRequest].toTxFrom(senderPk)
+                  case BurnTransaction             => txJson.as[BurnRequest].toTxFrom(senderPk)
+                  case MassTransferTransaction     => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], senderPk)
+                  case DataTransaction             => TransactionFactory.data(txJson.as[DataRequest], senderPk)
+                  case InvokeScriptTransaction     => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], senderPk)
+                  case SetScriptTransaction        => TransactionFactory.setScript(txJson.as[SetScriptRequest], senderPk)
+                  case SetAssetScriptTransaction   => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], senderPk)
+                  case SponsorFeeTransaction       => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderPk)
+                  case UpdateAssetInfoTransaction  => txJson.as[UpdateAssetInfoRequest].toTxFrom(senderPk)
+                  case InvokeExpressionTransaction => TransactionFactory.invokeExpression(txJson.as[InvokeExpressionRequest], senderPk)
                 }
             }
           }

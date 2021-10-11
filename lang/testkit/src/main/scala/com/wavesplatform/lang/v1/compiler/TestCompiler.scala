@@ -46,6 +46,11 @@ class TestCompiler(version: StdLibVersion) {
 
   def compileAsset(script: String): Script =
     ExprScript(version, ExpressionCompiler.compile(script, assetCompilerContext).explicitGet()._1).explicitGet()
+
+  def compileFreeCall(script: String): ExprScript = {
+    val expr = ContractCompiler.compileFreeCall(script, compilerContext, version).explicitGet()
+    ExprScript(version, expr, isFreeCall = true).explicitGet()
+  }
 }
 
 object TestCompiler {
