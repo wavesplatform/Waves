@@ -29,7 +29,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
   private def script(tx: EthereumTransaction, recipient: Address) = TestCompiler(V6).compileExpression(
     s"""
        | let t = transferTransactionById(base58'${tx.id()}').value()
-       | ${checkEthTransfer(tx, transferAmount, Waves, recipient, proofs = true)}
+       | ${checkEthTransfer(tx, transferAmount, "unit", recipient, proofs = true)}
      """.stripMargin
   )
 
@@ -39,7 +39,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
        |   case t: TransferTransaction =>
        |    if (t.version == 0)
        |      then {
-       |        ${checkEthTransfer(tx, transferAmount, Waves, recipient, proofs = false)}
+       |        ${checkEthTransfer(tx, transferAmount, "this.id", recipient, proofs = false)}
        |      } else {
        |        t.amount == $ENOUGH_AMT
        |      }
@@ -99,7 +99,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
       d.liquidDiff.portfolios(ethTransfer.senderAddress()) shouldBe Portfolio(-ethTransfer.underlying.getGasPrice.longValue(),
                                                                               assets = Map(asset -> -transferAmount))
 
-      d.liquidDiff.scriptsRun shouldBe 1
+      d.liquidDiff.scriptsComplexity should be > 0L
     }
   }
 }

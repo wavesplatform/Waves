@@ -15,7 +15,7 @@ import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 trait Blockchain {
@@ -42,7 +42,7 @@ trait Blockchain {
 
   def wavesAmount(height: Int): BigInt
 
-  def transferById(id: ByteStr): Option[(Int, TransferTransaction)]
+  def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)]
   def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)]
   def transactionMeta(id: ByteStr): Option[(Int, Boolean)]
 

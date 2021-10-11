@@ -1,20 +1,15 @@
 package com.wavesplatform.database
 
-import scala.annotation.tailrec
-import scala.collection.mutable.ArrayBuffer
-import scala.jdk.CollectionConverters._
-import scala.util.control.NonFatal
-
 import cats.data.Ior
 import cats.syntax.option._
 import cats.syntax.semigroup._
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.account.{Address, AddressScheme, Alias}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.database
@@ -24,21 +19,28 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, WavesSettings}
-import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction._
+import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.EthereumTransaction.Transfer
+import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
+import monix.eval.Coeval
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
+
+import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
+import scala.jdk.CollectionConverters._
+import scala.util.control.NonFatal
 
 object LevelDBWriter extends ScorexLogging {
 
@@ -806,7 +808,7 @@ abstract class LevelDBWriter private[database] (
     rw.filterHistory(Keys.leaseDetailsHistory(leaseId), currentHeight)
   }
 
-  override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
+  override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] = readOnly { db =>
     for {
       tm <- db.get(Keys.transactionMetaById(TransactionId @@ id))
       if tm.`type` == TransferTransaction.typeId || tm.`type` == TransactionType.Ethereum.id
@@ -817,11 +819,25 @@ abstract class LevelDBWriter private[database] (
           case (e @ EthereumTransaction(_: Transfer, _, _, _), true) =>
             val meta      = db.get(Keys.ethereumTransactionMeta(Height @@ tm.height, TxNum @@ tm.num.toShort)).get
             val transfer  = meta.payload.transfer.get
-            val amount    = transfer.amount.get
-            val asset     = PBAmounts.toVanillaAssetId(amount.assetId)
-            val recipient = Address(transfer.publicKeyHash.toByteArray)
-            val chainId   = AddressScheme.current.chainId
-            TransferTransaction(0, e.sender, recipient, asset, amount.amount, e.feeAssetId, e.fee, ByteStr.empty, e.timestamp, Proofs.empty, chainId, Some(e.id))
+            val tAmount    = transfer.amount.get
+            val asset     = PBAmounts.toVanillaAssetId(tAmount.assetId)
+            val issuedAssets = asset match {
+              case i: IssuedAsset => Seq(i)
+              case Asset.Waves    => Nil
+            }
+            new TransferTransactionLike {
+              override val amount: TxAmount = tAmount.amount
+              override val recipient: AddressOrAlias = Address(transfer.publicKeyHash.toByteArray)
+              override val sender: PublicKey = e.sender
+              override val assetId: Asset = asset
+              override val attachment: BlockId = ByteStr.empty
+              override def assetFee: (Asset, TxTimestamp) = e.assetFee
+              override def timestamp: TxTimestamp = e.timestamp
+              override def chainId: TxVersion = e.chainId
+              override def id: Coeval[ByteStr] = e.id
+              override def checkedAssets: Seq[IssuedAsset] = issuedAssets
+              override val tpe: TransactionType = TransactionType.Transfer
+            }
         }
     } yield (height, tx)
   }

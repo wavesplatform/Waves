@@ -16,10 +16,12 @@ object EthereumTransactionDiff {
     e.payload match {
       case et: EthereumTransaction.Transfer =>
         for {
-          asset <- et.tryResolveAsset(blockchain)
-          diff  <- TransferDiff(blockchain)(e.senderAddress(), et.recipient, et.amount, asset, e.fee, e.feeAssetId)
+          asset     <- TracedResult(et.tryResolveAsset(blockchain))
+          transfer  <- TracedResult(et.toTransferLike(e, blockchain))
+          assetDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, transfer, verify = true, Diff(), Int.MaxValue)
+          diff      <- TransferDiff(blockchain)(e.senderAddress(), et.recipient, et.amount, asset, e.fee, e.feeAssetId)
         } yield
-          diff.copy(
+          assetDiff |+| diff.copy(
             ethereumTransactionMeta = Map(
               e.id() -> EthereumTransactionMeta(
                 EthereumTransactionMeta.Payload.Transfer(

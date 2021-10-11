@@ -5,17 +5,17 @@ import cats.syntax.option._
 import cats.syntax.semigroup._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 final class CompositeBlockchain private (
     inner: Blockchain,
@@ -49,7 +49,7 @@ final class CompositeBlockchain private (
       .orElse(diff.leaseState.get(leaseId))
   }
 
-  override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] =
+  override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
     diff.transactions
       .get(id)
       .collect {

@@ -16,7 +16,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.{BlockchainContext, buildThisValue}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Authorized, DataTransaction, EthereumTransaction, Proofs, ProvenTransaction, Transaction, VersionedTransaction}
+import com.wavesplatform.transaction.{Authorized, DataTransaction, EthereumTransaction, Proofs, ProvenTransaction, Transaction, VersionedTransaction}
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 import shapeless.Coproduct
@@ -198,7 +198,7 @@ package object predef {
        | let crypto = bks && sig && str58 && str64
        | crypto""".stripMargin
 
-  def checkEthTransfer(tx: EthereumTransaction, amount: Int, asset: Asset, recipient: Address, proofs: Boolean): String =
+  def checkEthTransfer(tx: EthereumTransaction, amount: Int, asset: String, recipient: Address, proofs: Boolean): String =
     s"""
        | ${provenPart(tx, emptyBodyBytes = true, proofs)}
        | let amount = t.amount == $amount
@@ -207,7 +207,7 @@ package object predef {
        |   case a: Address => a.bytes == base58'$recipient'
        |   case a: Alias   => throw("unexpected")
        | }
-       | let assetId = t.assetId == ${asset.fold("unit")(_ => s"base58'$asset'")}
+       | let assetId = t.assetId == $asset
        | let attachment = t.attachment == base58'${ByteStr.empty}'
        | ${assertProvenPart("t", proofs)} && amount && assetId && feeAssetId && recipient && attachment
      """.stripMargin

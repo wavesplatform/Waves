@@ -72,8 +72,8 @@ object RealTransactionWrapper {
       target: AttachedPaymentTarget
   ): Either[ExecutionError, Tx] =
     (tx: @unchecked) match {
-      case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, toRide(g.recipient)).asRight
-      case t: TransferTransaction => mapTransferTx(t).asRight
+      case g: GenesisTransaction      => Tx.Genesis(header(g), g.amount, toRide(g.recipient)).asRight
+      case t: TransferTransactionLike => mapTransferTx(t).asRight
       case i: IssueTransaction =>
         Tx.Issue(
             proven(i),
@@ -181,15 +181,28 @@ object RealTransactionWrapper {
         Tx.UpdateAssetInfo(proven(u), u.assetId.id, u.name, u.description).asRight
     }
 
-  def mapTransferTx(t: TransferTransaction): Tx.Transfer =
+  def mapTransferTx(t: TransferTransactionLike): Tx.Transfer = {
+    val (version, bodyBytes, proofs) = t match {
+      case tt: TransferTransaction =>
+        (tt.version, tt.bodyBytes(), tt.proofs)
+      case _ =>
+        (0.toByte, Array.emptyByteArray, Proofs.empty)
+    }
     Tx.Transfer(
-      proven(t),
+      Proven(
+        Header(t.id(), t.fee, t.timestamp, version),
+        RideRecipient.Address(ByteStr(t.sender.toAddress.bytes)),
+        ByteStr(bodyBytes),
+        t.sender,
+        proofs.toIndexedSeq
+      ),
       feeAssetId = t.feeAssetId.compatId,
       assetId = t.assetId.compatId,
       amount = t.amount,
       recipient = toRide(t.recipient),
       attachment = t.attachment
     )
+  }
 
   def toRide(recipient: AddressOrAlias): RideRecipient = recipient match {
     case address: Address => RideRecipient.Address(ByteStr(address.bytes))

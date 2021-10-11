@@ -24,7 +24,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, WavesEnvironment, buildThisValue}
-import com.wavesplatform.transaction.{Asset, DataTransaction, ERC20Address, EthereumTransaction, Proofs, TxVersion}
+import com.wavesplatform.transaction.{DataTransaction, ERC20Address, EthereumTransaction, Proofs, TxVersion}
 import com.wavesplatform.utils.{EmptyBlockchain, EthHelpers}
 import monix.eval.Coeval
 import org.scalacheck.Gen
@@ -720,7 +720,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     Seq(Some(assetErc20), None)
       .foreach { asset =>
         val tx = createTx(asset)
-        val check = checkEthTransfer(tx, amount, asset.fold[Asset](Waves)(blockchain.resolveERC20Address(_).get), recipient, proofs = true)
+        val check = checkEthTransfer(tx, amount, asset.fold("unit")(a => s"base58'${blockchain.resolveERC20Address(a).get}'"), recipient, proofs = true)
         runScript(
           s"""
              | match tx {

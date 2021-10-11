@@ -8,8 +8,8 @@ import cats.syntax.either._
 import cats.syntax.option._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.Storage
 import com.wavesplatform.events.BlockchainUpdateTriggers
@@ -20,15 +20,15 @@ import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.utils.{forceStopApplication, ScorexLogging, Time, UnsupportedFeature}
+import com.wavesplatform.transaction.transfer.TransferTransactionLike
+import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
-import monix.reactive.{Observable, Observer}
 import monix.reactive.subjects.ReplaySubject
+import monix.reactive.{Observable, Observer}
 
 class BlockchainUpdaterImpl(
     leveldb: Blockchain with Storage,
@@ -642,7 +642,7 @@ class BlockchainUpdaterImpl(
     } else leveldb.blockHeader(height)
   }
 
-  override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = readLock {
+  override def transferById(id: BlockId): Option[(Int, TransferTransactionLike)] = readLock {
     compositeBlockchain.transferById(id)
   }
 
