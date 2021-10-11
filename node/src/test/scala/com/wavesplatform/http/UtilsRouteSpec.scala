@@ -27,6 +27,7 @@ import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, IntegerDataEntry}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.{Schedulers, Time}
@@ -956,6 +957,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
     (blockchain.hasAccountScript _).when(dAppAddress2).returning(true).anyNumberOfTimes()
     (blockchain.accountScript _).when(dAppAddress2).returning(Some(testScript2)).anyNumberOfTimes()
+    (blockchain.balance _).when(dAppAddress2, Waves).returning(Int.MaxValue).anyNumberOfTimes()
 
     evalScript(""" callable() """, dAppAddress2) ~> route ~> check {
       responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":297,"expr":" callable() ","address":"3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"}"""
