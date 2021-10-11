@@ -12,9 +12,8 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.DefaultBlockchainSettings
-import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
-import com.wavesplatform.lang.directives.values.{V2, V3, V5}
+import com.wavesplatform.lang.directives.values.{V2, V3, V5, V6}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -265,6 +264,24 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       |func verify() = sigVerify(base58'', base58'', base58'') && sigVerify(base58'', base58'', base58'')
     """.stripMargin
 
+  val freeCall =
+    """
+      |let a = this
+      |func f () = throw()
+      |
+      |[BooleanEntry("check", (i.caller == a)), BinaryEntry("transactionId", i.transactionId)]
+    """.stripMargin.trim
+
+  val freeCallDirectives =
+    s"""
+       |{-# STDLIB_VERSION 6 #-}
+       |{-# CONTENT_TYPE EXPRESSION #-}
+       |{-# SCRIPT_TYPE CALL #-}
+     """.stripMargin.trim + "\n"
+
+  val freeCallExpr =
+    ByteStr(Global.serializeExpression(TestCompiler(V6).compileFreeCall(freeCall).expr, V6, isFreeCall = true)).base64
+
   routePath("/script/decompile") in {
     val base64 = ExprScript(script).explicitGet().bytes().base64
     Post(routePath("/script/decompile"), base64) ~> route ~> check {
@@ -326,6 +343,10 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
     testdAppDirective(dappVerBytesStr)
     testdAppDirective("\t\t \n\n" + dappVerBytesStr + " \t \n \t")
+
+    Post(routePath("/script/decompile"), freeCallExpr) ~> route ~> check {
+      (responseAs[JsValue] \ "script").as[String].trim shouldBe freeCallDirectives + freeCall
+    }
   }
 
   routePath("/script/meta") ignore {
@@ -577,6 +598,26 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("callable" -> 27)
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
+
+    Post(routePath("/script/compileCode"), freeCallDirectives + freeCall) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "error").as[Int] shouldBe 305
+      (json \ "message").as[String] shouldBe "Invoke Expression Transaction is not activated yet"
+    }
+  }
+
+  routePath(s"/script/compileCode after ${BlockchainFeatures.RideV6}") in {
+    val blockchain = stub[Blockchain]("blockchain")
+    val route      = seal(utilsApi.copy(blockchain = blockchain).route)
+    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0, BlockchainFeatures.RideV6.id -> 0))
+
+    Post(routePath("/script/compileCode"), freeCallDirectives + freeCall) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "complexity").as[Long] shouldBe 39
+      (json \ "verifierComplexity").as[Long] shouldBe 0
+      (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map()
+      (json \ "extraFee").as[Long] shouldBe 0
+    }
   }
 
   routePath("/script/compileWithImports") in {
@@ -682,6 +723,26 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       val json = responseAs[JsValue]
       (json \ "error").as[Int] shouldBe 305
       (json \ "message").as[String] shouldBe "Script estimation was interrupted"
+    }
+
+    Post(routePath("/script/estimate"), freeCallExpr) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "error").as[Int] shouldBe 305
+      (json \ "message").as[String] shouldBe "Invoke Expression Transaction is not activated yet"
+    }
+  }
+
+  routePath(s"/script/estimate after ${BlockchainFeatures.RideV6}") in {
+    val blockchain = stub[Blockchain]("blockchain")
+    val route      = seal(utilsApi.copy(blockchain = blockchain).route)
+    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0, BlockchainFeatures.RideV6.id -> 0))
+
+    Post(routePath("/script/estimate"), freeCallExpr) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "complexity").as[Long] shouldBe 39
+      (json \ "verifierComplexity").as[Long] shouldBe 0
+      (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map()
+      (json \ "extraFee").as[Long] shouldBe 0
     }
   }
 

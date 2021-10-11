@@ -1,7 +1,6 @@
 package com.wavesplatform.it.api
 
 import java.net.InetSocketAddress
-
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
@@ -13,6 +12,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync._
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -696,6 +696,18 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
         case (tx, js) => maybeWaitForTransaction(tx, waitForTx) -> js
       }
     }
+
+    def invokeExpression(
+        caller: KeyPair,
+        expression: ExprScript,
+        fee: Long = invokeExpressionFee,
+        feeAssetId: Option[String] = None,
+        version: TxVersion = TxVersion.V1,
+        waitForTx: Boolean = false
+    ): (Transaction, JsValue) =
+      sync(async(n).invokeExpression(caller, expression, fee, feeAssetId, version)) match {
+        case (tx, js) => maybeWaitForTransaction(tx, waitForTx) -> js
+      }
 
     def validateInvokeScript(
         caller: KeyPair,

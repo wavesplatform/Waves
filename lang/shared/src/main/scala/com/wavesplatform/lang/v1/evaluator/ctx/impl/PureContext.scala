@@ -405,54 +405,10 @@ object PureContext {
       case CONST_BIGINT(v) :: CONST_BIGINT(n) :: CONST_BIGINT(d) :: (r: CaseObj) :: Nil =>
         for {
           _ <- Either.cond(d != 0, (), "Fraction: division by zero")
-          p       = v * n
-          s       = p.sign * d.sign
-          rm      = p.abs /% d.abs
-          presult = rm._1
-          m       = rm._2
-          result <- r.caseType match {
-            case RoundDown => Right(presult * s)
-            case RoundUp   => Right((presult + m.sign) * s)
-            case RoundHalfUp =>
-              val x = d.abs - m * 2
-              if (x <= 0) {
-                Right((presult + 1) * s)
-              } else {
-                Right(presult * s)
-              }
-            case RoundHalfDown =>
-              val x = d.abs - m * 2
-              if (x < 0) {
-                Right((presult + 1) * s)
-              } else {
-                Right(presult * s)
-              }
-            case RoundCeiling =>
-              Right((if (s > 0) {
-                       presult + m.sign
-                     } else {
-                       presult
-                     }) * s)
-            case RoundFloor =>
-              Right((if (s < 0) {
-                       presult + m.sign
-                     } else {
-                       presult
-                     }) * s)
-            case RoundHalfEven =>
-              val x = d.abs - m * 2
-              if (x < 0) {
-                Right((presult + 1) * s)
-              } else if (x > 0) {
-                Right(presult * s)
-              } else {
-                Right((presult + presult % 2) * s)
-              }
-            case _ => Left(s"unsupported rounding $r")
-          }
-          _ <- Either.cond(result <= BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
-          _ <- Either.cond(result >= BigIntMin, (), s"Long overflow: value `$result` less than -2^511")
-        } yield CONST_BIGINT(result)
+          r <- global.divide(v * n, d, Rounding.byValue(r))
+          _ <- Either.cond(r <= BigIntMax, (), s"Long overflow: value `$r` greater than 2^511-1")
+          _ <- Either.cond(r >= BigIntMin, (), s"Long overflow: value `$r` less than -2^511")
+        } yield CONST_BIGINT(r)
       case xs =>
         notImplemented[Id, EVALUATED](
           "fraction(value: BigInt, numerator: BigInt, denominator: BigInt, round: Ceiling|Down|Floor|HalfEven|HalfUp)",
@@ -1360,23 +1316,6 @@ object PureContext {
   val RoundHalfDown = CASETYPEREF("HalfDown", List.empty, true)
   val rounds        = UNION(RoundDown, RoundUp, RoundHalfUp, RoundHalfDown, RoundCeiling, RoundFloor, RoundHalfEven)
 
-//  private def roundMode(m: EVALUATED): BaseGlobal.Rounds = {
-//    m match {
-//      case (p: CaseObj) =>
-//        p.caseType.name match {
-//          case "Down"     => BaseGlobal.RoundDown()
-//          case "Up"       => BaseGlobal.RoundUp()
-//          case "HalfUp"   => BaseGlobal.RoundHalfUp()
-//          case "HalfDown" => BaseGlobal.RoundHalfDown()
-//          case "HalfEven" => BaseGlobal.RoundHalfEven()
-//          case "Ceiling"  => BaseGlobal.RoundCeiling()
-//          case "Floor"    => BaseGlobal.RoundFloor()
-//          case v          => throw new Exception(s"Type error: $v isn't in $rounds")
-//        }
-//      case v => throw new Exception(s"Type error: $v isn't rounds CaseObj")
-//    }
-//  }
-
   def pow(roundTypes: UNION): BaseFunction[NoContext] = {
     NativeFunction("pow", 100, POW, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", roundTypes)) {
       case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
@@ -1497,6 +1436,18 @@ object PureContext {
         }
       case xs => notImplemented[Id, EVALUATED](s"median(arr: List[BigInt])", xs)
     }
+
+  val sizeTuple: BaseFunction[NoContext] = {
+    val genericTupleType =
+      (MinTupleSize to MaxTupleSize)
+        .map(('A' to 'Z').take)
+        .map(t => PARAMETERIZEDTUPLE(t.map(b => TYPEPARAM(b.toByte)).toList))
+        .toList
+    NativeFunction("size", 1, SIZE_TUPLE, LONG, ("tuple", PARAMETERIZEDUNION(genericTupleType))) {
+      case CaseObj(`runtimeTupleType`, fields) :: Nil => Right(CONST_LONG(fields.size))
+      case xs                                         => notImplemented[Id, EVALUATED](s"size(t: Tuple)", xs)
+    }
+  }
 
   val unitVarName = "unit"
 
@@ -1733,6 +1684,9 @@ object PureContext {
         fraction(fixLimitCheck = true)
       )
 
+  private val v6Functions =
+    v5Functions ++ Array(sizeTuple)
+
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =
     CTX[NoContext](
       v1v2v3v4Types,
@@ -1769,6 +1723,13 @@ object PureContext {
       v5Functions
     )
 
+  private val v6Ctx =
+    CTX[NoContext](
+      v5Types,
+      v5Vars,
+      v6Functions
+    )
+
   def build(version: StdLibVersion, fixUnicodeFunctions: Boolean): CTX[NoContext] =
     version match {
       case V1 | V2 if fixUnicodeFunctions => v1V2CtxFixed
@@ -1778,6 +1739,6 @@ object PureContext {
       case V3                             => v3CtxUnfixed
       case V4                             => v4CtxUnfixed
       case V5                             => v5Ctx
-      case V6                             => v5Ctx
+      case V6                             => v6Ctx
     }
 }

@@ -1,8 +1,5 @@
 package com.wavesplatform.transaction.smart
 
-import scala.annotation.tailrec
-import scala.util.{Failure, Success, Try}
-
 import cats.Id
 import cats.syntax.either._
 import cats.syntax.functor._
@@ -11,7 +8,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.directives.values.V6
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TermPrinter
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
@@ -20,17 +20,20 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TracedResult, TraceStep}
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
+import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TraceStep, TracedResult}
 import com.wavesplatform.utils.ScorexLogging
 import org.msgpack.core.annotations.VisibleForTesting
 import shapeless.Coproduct
+
+import scala.annotation.tailrec
+import scala.util.{Failure, Success, Try}
 
 object Verifier extends ScorexLogging {
 
@@ -54,6 +57,9 @@ object Verifier extends ScorexLogging {
           Left(GenericError("Can't process transaction with signature from scripted account"))
         case (_: SignedTransaction, Some(_)) =>
           Left(GenericError("Can't process transaction with signature from scripted account"))
+        case (_: InvokeExpressionTransaction, Some(script)) if forbidInvokeExpressionDueToVerifier(script.script) =>
+          Left(
+            GenericError(s"Can't process InvokeExpressionTransaction from RIDE ${script.script.stdLibVersion} verifier, it might be used from $V6"))
         case (_, Some(script)) =>
           stats.accountScriptExecution
             .measureForType(pt.typeId)(verifyTx(blockchain, script.script, script.verifierComplexity.toInt, pt, None))
@@ -63,6 +69,13 @@ object Verifier extends ScorexLogging {
             .as(0)
       }
   }
+
+  private def forbidInvokeExpressionDueToVerifier(s: Script): Boolean =
+    s match {
+      case e: ExprScript if e.stdLibVersion < V6                                             => true
+      case c: ContractScriptImpl if c.stdLibVersion < V6 && c.expr.verifierFuncOpt.isDefined => true
+      case _                                                                                 => false
+    }
 
   /** Verifies asset scripts and returns diff with complexity. In case of error returns spent complexity */
   def assets(blockchain: Blockchain, remainingComplexity: Int)(tx: Transaction): TracedResult[(Long, ValidationError), Diff] = {

@@ -7,8 +7,8 @@
  */
 
 import sbt.Keys._
-import sbt.{**, Compile, CrossVersion, File, IO, Project, compilerPlugin, inConfig, _}
-import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
+
+Global / onChangedBuildSource := ReloadOnSourceChanges
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
@@ -33,7 +33,7 @@ lazy val `lang-jvm` = lang.jvm
     name := "RIDE Compiler",
     normalizedName := "lang",
     description := "The RIDE smart contract language compiler",
-    libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "1.0.0" % Provided
+    libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided
   )
 
 lazy val `lang-js` = lang.js
@@ -88,10 +88,10 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
   )
 
 lazy val `repl-jvm` = repl.jvm
-  .dependsOn(`lang-jvm`)
+  .dependsOn(`lang-jvm`, `lang-testkit` % "test")
   .settings(
     libraryDependencies ++= Dependencies.circe.value ++ Seq(
-      "org.scala-js" %% "scalajs-stubs" % "1.0.0" % Provided,
+      "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided,
       Dependencies.sttp3
     )
   )
@@ -106,6 +106,8 @@ lazy val root = (project in file("."))
     `lang-jvm`,
     `lang-tests`,
     `lang-testkit`,
+    `repl-js`,
+    `repl-jvm`,
     node,
     `node-it`,
     `node-generator`,
@@ -117,7 +119,7 @@ inScope(Global)(
     scalaVersion := "2.13.6",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 3, 6),
+    V.fallback := (1, 3, 7),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     scalacOptions ++= Seq(
@@ -131,10 +133,11 @@ inScope(Global)(
       "-Xlint",
       "-opt:l:inline",
       "-opt-inline-from:**",
-      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s" // Ignore gRPC warnings
+      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s", // Ignore gRPC warnings
+      "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
+      "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
     ),
     crossPaths := false,
-    scalafmtOnCompile := false,
     dependencyOverrides ++= Dependencies.enforcedVersions.value,
     cancelable := true,
     parallelExecution := false,
@@ -176,6 +179,7 @@ checkPRRaw := Def
     Def.task {
       (Test / compile).value
       (`lang-tests` / Test / test).value
+      (`repl-jvm` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
       (`grpc-server` / Test / test).value
       (node / Test / test).value

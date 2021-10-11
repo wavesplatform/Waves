@@ -1,25 +1,24 @@
 package com.wavesplatform.api.common
 
-import scala.concurrent.Future
-
 import com.wavesplatform.account.{Address, AddressOrAlias}
-import com.wavesplatform.api.{common, BlockMeta}
+import com.wavesplatform.api.{BlockMeta, common}
 import com.wavesplatform.block
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult}
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
-import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult}
+import com.wavesplatform.transaction.smart.InvokeTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
+
+import scala.concurrent.Future
 
 trait CommonTransactionsApi {
   import CommonTransactionsApi._
@@ -56,17 +55,17 @@ object CommonTransactionsApi {
   object TransactionMeta {
     final case class Default(height: Height, transaction: Transaction, succeeded: Boolean) extends TransactionMeta
 
-    final case class Invoke(height: Height, transaction: InvokeScriptTransaction, succeeded: Boolean, invokeScriptResult: Option[InvokeScriptResult])
+    final case class Invoke(height: Height, transaction: InvokeTransaction, succeeded: Boolean, invokeScriptResult: Option[InvokeScriptResult])
         extends TransactionMeta
 
     def unapply(tm: TransactionMeta): Option[(Height, Transaction, Boolean)] =
       Some((tm.height, tm.transaction, tm.succeeded))
 
     def create(height: Height, transaction: Transaction, succeeded: Boolean)(
-        result: InvokeScriptTransaction => Option[InvokeScriptResult]
+        result: InvokeTransaction => Option[InvokeScriptResult]
     ): TransactionMeta =
       transaction match {
-        case ist: InvokeScriptTransaction =>
+        case ist: InvokeTransaction =>
           Invoke(height, ist, succeeded, result(ist))
 
         case _ =>
@@ -114,12 +113,8 @@ object CommonTransactionsApi {
     override def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
       val defaultFee = FeeValidation.getMinFee(blockchain, tx)
       (tx match {
-        case ist: InvokeScriptTransaction =>
-          InvokeScriptTransactionDiff.calculateFee(blockchain, ist) match {
-            case Some(wavesFee) => Right(FeeValidation.calculateAssetFee(blockchain, ist.feeAssetId, wavesFee))
-            case None           => defaultFee
-          }
-        case _ => defaultFee
+        case ist: InvokeTransaction => FeeValidation.calculateInvokeFee(blockchain, ist).fold(defaultFee)(Right(_))
+        case _                      => defaultFee
       }).map {
         case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
           (asset, feeInAsset, feeInWaves)

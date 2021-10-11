@@ -12,9 +12,11 @@ import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, _}
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL, TRUE}
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.{Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.TransactionPublisher
@@ -239,7 +241,7 @@ class TransactionsRouteSpec
                 .map {
                   case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
                     (asset, feeInAsset, feeInWaves)
-                }
+              }
           )
           .anyNumberOfTimes()
 
@@ -319,6 +321,34 @@ class TransactionsRouteSpec
           Json.obj(
             "feeAssetId" -> JsNull,
             "feeAmount"  -> 200500000
+          )
+        )
+      }
+    }
+
+    "InvokeExpression" in {
+      val blockchain = createBlockchainStub(_ => ())
+      val api        = CommonTransactionsApi(None, null, blockchain, null, null, _ => null, _ => null)
+      val route      = transactionsApiRoute.copy(blockchain = blockchain, commonApi = api).route
+
+      val expression       = TestCompiler(V6).compileFreeCall("[]")
+      val invokeExpression = TxHelpers.invokeExpression(expression)
+      Post(routePath("/calculateFee"), invokeExpression.json()) ~> route ~> check {
+        responseAs[JsObject] should matchJson(
+          Json.obj(
+            "feeAssetId" -> JsNull,
+            "feeAmount"  -> 1000000
+          )
+        )
+      }
+
+      val issuingExpression       = TestCompiler(V6).compileFreeCall("""[ Issue("name", "description", 1000, 4, true, unit, 0) ]""")
+      val issuingInvokeExpression = TxHelpers.invokeExpression(issuingExpression)
+      Post(routePath("/calculateFee"), issuingInvokeExpression.json()) ~> route ~> check {
+        responseAs[JsObject] should matchJson(
+          Json.obj(
+            "feeAssetId" -> JsNull,
+            "feeAmount"  -> 101000000
           )
         )
       }
