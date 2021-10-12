@@ -115,10 +115,11 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
 
   override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] =
     (for {
-      vtx    <- tx.toVanilla.toFuture
-      _      <- Either.cond(!vtx.isInstanceOf[EthereumTransaction], (), GenericError("ETH transactions should not be broadcasted over gRPC")).toFuture
-      result <- commonApi.broadcastTransaction(vtx)
-      _      <- result.resultE.toFuture
+      vtxEither <- Future(tx.toVanilla) // Intercept runtime errors
+      vtx       <- vtxEither.toFuture
+      _         <- Either.cond(!vtx.isInstanceOf[EthereumTransaction], (), GenericError("ETH transactions should not be broadcasted over gRPC")).toFuture
+      result    <- commonApi.broadcastTransaction(vtx)
+      _         <- result.resultE.toFuture // Check for success
     } yield tx).wrapErrors
 }
 

@@ -57,11 +57,19 @@ object EthTxGenerator {
   } */
 
   def toEthType(value: Arg): ethTypes.Type[_] = value match {
-    case Arg.Integer(v, typeStr)     => ethTypes.AbiTypes.getType(typeStr).getConstructor(classOf[Long]).newInstance(v)
-    case Arg.BigInteger(bi, typeStr) => ethTypes.AbiTypes.getType(typeStr).getConstructor(classOf[java.math.BigInteger]).newInstance(bi.bigInteger)
-    case Arg.Str(v)                  => new ethTypes.Utf8String(v)
-    case Arg.Bytes(v, typeStr)       => ethTypes.AbiTypes.getType(typeStr).getConstructor(classOf[Array[Byte]]).newInstance(v.arr)
-    case Arg.Bool(b)                 => new ethTypes.Bool(b)
+    case Arg.Integer(v, typeStr) =>
+      val typeClass = ethTypes.AbiTypes.getType(typeStr)
+      typeClass.getConstructor(classOf[Long]).newInstance(v)
+    case Arg.BigInteger(bi, typeStr) =>
+      val typeClass = ethTypes.AbiTypes.getType(typeStr)
+      typeClass.getConstructor(classOf[java.math.BigInteger]).newInstance(bi.bigInteger)
+    case Arg.Str(v) =>
+      new ethTypes.Utf8String(v)
+    case Arg.Bytes(v, typeStr) =>
+      val typeClass = ethTypes.AbiTypes.getType(typeStr)
+      typeClass.getConstructor(classOf[Array[Byte]]).newInstance(v.arr)
+    case Arg.Bool(b) =>
+      new ethTypes.Bool(b)
     case Arg.List(listType, elements) =>
       val ethTypedXs = elements.map(toEthType)
       val arrayClass = toEthType(listType)
@@ -72,7 +80,7 @@ object EthTxGenerator {
     case Arg.Union(index, fields) =>
       new ethTypes.DynamicStruct(toEthType(Arg.Integer(index, "uint8")) +: fields.map(toEthType): _*)
 
-    case Arg.Struct(values @ _*) => new ethTypes.DynamicStruct(values.map(toEthType): _*)
+    case Arg.Struct(values @ _*) => new ethTypes.StaticStruct(values.map(toEthType): _*)
   }
 
   /* def toHLEthType(value: Terms.EVALUATED): hl.ABIType[_] = value match {
@@ -139,7 +147,14 @@ object EthTxGenerator {
       )
   }
 
-  def generateEthInvoke(keyPair: ECKeyPair, address: Address, funcName: String, args: Seq[Arg], payments: Seq[Payment], fee: Long = 500000): EthereumTransaction = {
+  def generateEthInvoke(
+      keyPair: ECKeyPair,
+      address: Address,
+      funcName: String,
+      args: Seq[Arg],
+      payments: Seq[Payment],
+      fee: Long = 500000
+  ): EthereumTransaction = {
     import scala.jdk.CollectionConverters._
     val paymentsArg = {
       val tuples = payments.toVector.map { p =>
