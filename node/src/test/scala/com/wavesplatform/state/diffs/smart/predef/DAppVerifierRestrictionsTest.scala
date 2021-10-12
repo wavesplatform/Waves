@@ -20,7 +20,7 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
   private val time = new TestTime
   private def ts   = time.getTimestamp()
 
-  private def verifierContract1(call: String) = TestCompiler(V5).compileContract(
+  private def verifierContract1(syncCall: String) = TestCompiler(V5).compileContract(
     s"""
        | {-# STDLIB_VERSION 5       #-}
        | {-# CONTENT_TYPE   DAPP    #-}
@@ -28,20 +28,20 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
        |
        | @Verifier(tx)
        | func verifier() = {
-       |   strict r = $call(Address(base58''), "default", [], [])
+       |   strict r = $syncCall(Address(base58''), "default", [], [])
        |   true
        | }
      """.stripMargin
   )
 
-  private def verifierContract2(call: String) = TestCompiler(V5).compileContract(
+  private def verifierContract2(syncCall: String) = TestCompiler(V5).compileContract(
     s"""
        | {-# STDLIB_VERSION 5       #-}
        | {-# CONTENT_TYPE   DAPP    #-}
        | {-# SCRIPT_TYPE    ACCOUNT #-}
        |
        | func call() = {
-       |   let foo = addressFromStringValue("").$call("", [], [])
+       |   let foo = addressFromStringValue("").$syncCall("", [], [])
        |   foo
        | }
        |
@@ -50,14 +50,14 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
      """.stripMargin
   )
 
-  private def verifierContract3(call: String) = TestCompiler(V5).compileContract(
+  private def verifierContract3(syncCall: String) = TestCompiler(V5).compileContract(
     s"""
        | {-# STDLIB_VERSION 5       #-}
        | {-# CONTENT_TYPE   DAPP    #-}
        | {-# SCRIPT_TYPE    ACCOUNT #-}
        |
        | let x = {
-       |   let foo = addressFromStringValue("").$call("", [], [])
+       |   let foo = addressFromStringValue("").$syncCall("", [], [])
        |   foo
        | }
        |
@@ -66,7 +66,7 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
      """.stripMargin
   )
 
-  private def verifierContract4(call: String) = TestCompiler(V5).compileContract(
+  private def verifierContract4(syncCall: String) = TestCompiler(V5).compileContract(
     s"""
        | {-# STDLIB_VERSION 5       #-}
        | {-# CONTENT_TYPE   DAPP    #-}
@@ -75,7 +75,7 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
        | @Verifier(tx)
        | func verifier() = {
        |   let x = {
-       |     let y = addressFromStringValue("").$call("", [], [])
+       |     let y = addressFromStringValue("").$syncCall("", [], [])
        |     y == y
        |   }
        |   x == x
@@ -83,7 +83,7 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
      """.stripMargin
   )
 
-  private def verifierContract5(call: String) = TestCompiler(V5).compileContract(
+  private def verifierContract5(syncCall: String) = TestCompiler(V5).compileContract(
     s"""
        | {-# STDLIB_VERSION 5       #-}
        | {-# CONTENT_TYPE   DAPP    #-}
@@ -92,7 +92,7 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
        | @Verifier(tx)
        | func verifier() = {
        |   func f() = {
-       |     func g() = addressFromStringValue("").$call("", [], [])
+       |     func g() = addressFromStringValue("").$syncCall("", [], [])
        |     g() == g()
        |   }
        |   f() == f()
@@ -100,19 +100,19 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
      """.stripMargin
   )
 
-  private def declarationsContract(call: String) = TestCompiler(V5).compileContract(
+  private def declarationsContract(syncCall: String) = TestCompiler(V5).compileContract(
     s"""
        | {-# STDLIB_VERSION 5       #-}
        | {-# CONTENT_TYPE   DAPP    #-}
        | {-# SCRIPT_TYPE    ACCOUNT #-}
        |
        | func call() = {
-       |   let foo = addressFromStringValue("").$call("", [], [])
+       |   let foo = addressFromStringValue("").$syncCall("", [], [])
        |   foo
        | }
        |
        | let x = {
-       |   let foo = addressFromStringValue("").$call("", [], [])
+       |   let foo = addressFromStringValue("").$syncCall("", [], [])
        |   foo
        | }
        |
