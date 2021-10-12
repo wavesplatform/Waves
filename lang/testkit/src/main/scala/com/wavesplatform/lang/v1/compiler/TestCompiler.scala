@@ -41,7 +41,7 @@ class TestCompiler(version: StdLibVersion) {
     ExprScript(
       version,
       ExpressionCompiler.compile(script, expressionCompilerContext, allowIllFormedStrings).explicitGet()._1,
-      checkSize
+      checkSize = checkSize
     ).explicitGet()
 
   def compileAsset(script: String): Script =
