@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.smart
 
-import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.crypto
@@ -197,34 +196,6 @@ package object predef {
        |
        | let crypto = bks && sig && str58 && str64
        | crypto""".stripMargin
-
-  def checkEthTransfer(tx: EthereumTransaction, amount: Int, asset: String, recipient: Address, proofs: Boolean): String =
-    s"""
-       | ${provenPart(tx, emptyBodyBytes = true, proofs)}
-       | let amount = t.amount == $amount
-       | let feeAssetId = t.feeAssetId == unit
-       | let recipient = match (t.recipient) {
-       |   case a: Address => a.bytes == base58'$recipient'
-       |   case a: Alias   => throw("unexpected")
-       | }
-       | let assetId = t.assetId == $asset
-       | let attachment = t.attachment == base58'${ByteStr.empty}'
-       | ${assertProvenPart("t", proofs)} && amount && assetId && feeAssetId && recipient && attachment
-     """.stripMargin
-
-  def checkEthInvoke(tx: EthereumTransaction, dApp: Address, callable: String, passedArg: Long, proofs: Boolean, payments: String): String =
-    s"""
-       | ${provenPart(tx, emptyBodyBytes = true, proofs)}
-       | let dAppAddress = match t.dApp {
-       |   case a: Address => a.bytes == base58'$dApp'
-       |      case _: Alias   => throw()
-       |    }
-       |    let feeAssetId = t.feeAssetId == unit
-       |    let checkFunc  = t.function == "$callable"
-       |    let checkArgs  = t.args == [$passedArg]
-       |    let payments   = t.payments == $payments
-       |    ${assertProvenPart("t", proofs)} && dAppAddress && feeAssetId && checkFunc && checkArgs && payments
-     """.stripMargin
 
   def letProof(p: Proofs, prefix: String)(i: Int): String =
     s"let ${prefix.replace(".", "")}proof$i = $prefix.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).toString}'"

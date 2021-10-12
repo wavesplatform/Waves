@@ -148,37 +148,11 @@ object RealTransactionWrapper {
             )
           }
 
-      case eth @ EthereumTransaction(t: Transfer, _, _, _) =>
-        t.tryResolveAsset(blockchain)
-          .bimap(
-            _.toString,
-            asset =>
-              Tx.Transfer(
-                proven(eth, emptyBodyBytes = true),
-                eth.feeAssetId.compatId,
-                asset.compatId,
-                t.amount,
-                RideRecipient.Address(ByteStr(t.recipient.bytes)),
-                ByteStr.empty
-            )
-          )
-
-      case eth @ EthereumTransaction(i: Invocation, _, _, _) =>
-        for {
-          invoke   <- i.toInvokeScriptLike(eth, blockchain).leftMap(_.toString)
-          payments <- AttachedPaymentExtractor.extractPayments(invoke, stdLibVersion, blockchain, target)
-        } yield
-          Tx.CI(
-            proven(eth, emptyBodyBytes = true),
-            toRide(invoke.dApp),
-            payments,
-            invoke.feeAssetId.compatId,
-            Some(invoke.funcCall.function.funcName),
-            invoke.funcCall.args.map(arg => arg.asInstanceOf[EVALUATED])
-          )
-
       case u: UpdateAssetInfoTransaction =>
         Tx.UpdateAssetInfo(proven(u), u.assetId.id, u.name, u.description).asRight
+
+      case eth: EthereumTransaction =>
+        Left(s"Unexpected $eth")
     }
 
   def mapTransferTx(t: TransferTransactionLike): Tx.Transfer = {

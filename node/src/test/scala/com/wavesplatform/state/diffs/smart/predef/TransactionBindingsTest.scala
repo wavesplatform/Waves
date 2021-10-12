@@ -24,8 +24,8 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, WavesEnvironment, buildThisValue}
-import com.wavesplatform.transaction.{DataTransaction, ERC20Address, EthereumTransaction, Proofs, TxVersion}
-import com.wavesplatform.utils.{EmptyBlockchain, EthHelpers}
+import com.wavesplatform.transaction.{DataTransaction, Proofs, TxVersion}
+import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
@@ -35,7 +35,7 @@ import shapeless.Coproduct
 
 import scala.util.Random
 
-class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherValues with EthHelpers {
+class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherValues {
   private val T = 'T'.toByte
 
   property("TransferTransaction binding") {
@@ -701,74 +701,6 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       runScript[EVALUATED](src1, Coproduct[In](in)) shouldBe Right(CONST_BOOLEAN(true))
       runScript[EVALUATED](src2, Coproduct[In](in)) shouldBe Right(CONST_LONG(1))
     }
-  }
-
-  property("Ethereum TransferTransaction binding") {
-    val amount     = 12345
-    val recipient  = accountGen.sample.get.toAddress
-    val assetErc20 = ERC20Address(ByteStr.fill(20)(1))
-    val asset      = IssuedAsset(ByteStr.fromBytes(1, 2, 3))
-    val blockchain = stub[Blockchain]
-    (blockchain.resolveERC20Address _).when(assetErc20).returning(Some(asset))
-    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0))
-
-    def createTx(asset: Option[ERC20Address]): EthereumTransaction = {
-      val transfer = EthereumTransaction.Transfer(asset, amount, recipient)
-      EthereumTransaction(transfer, TestEthUnderlying, TestEthSignature, T)
-    }
-
-    Seq(Some(assetErc20), None)
-      .foreach { asset =>
-        val tx = createTx(asset)
-        val check = checkEthTransfer(tx, amount, asset.fold("unit")(a => s"base58'${blockchain.resolveERC20Address(a).get}'"), recipient, proofs = true)
-        runScript(
-          s"""
-             | match tx {
-             |   case t: TransferTransaction => $check
-             |   case _                      => throw()
-             | }
-           """.stripMargin,
-          V6,
-          Coproduct(tx),
-          blockchain,
-          T
-        ) shouldBe evaluated(true)
-      }
-  }
-
-  property("Ethereum InvokeScriptTransaction binding") {
-    val blockchain   = stub[Blockchain]
-    val dApp         = accountGen.sample.get
-    val callableName = "call"
-    val script = TestCompiler(V6).compileContract(
-      s"""
-         | @Callable(i)
-         | func $callableName(arg: Int) = []
-       """.stripMargin
-    )
-    val scriptInfo = AccountScriptInfo(dApp.publicKey, script, 0, Map(3 -> Map("call" -> 0)))
-    (blockchain.accountScript _).when(dApp.toAddress).returning(Some(scriptInfo))
-    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0))
-
-    val passedArg = 7
-    val data =
-      s"9bfbd457000000000000000000000000000000000000000000000000000000000000000${passedArg}00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000"
-    val invocation = EthereumTransaction.Invocation(dApp.toAddress, data)
-    val tx = EthereumTransaction(invocation, TestEthUnderlying, TestEthSignature, T)
-
-    val check = checkEthInvoke(tx, dApp.toAddress, callableName, passedArg, proofs = true, payments = "[]")
-    runScript(
-      s"""
-         |match tx {
-         |  case t: InvokeScriptTransaction => $check
-         |  case _                          => throw()
-         |}
-       """.stripMargin,
-      V6,
-      Coproduct(tx),
-      blockchain,
-      T
-    ) shouldBe evaluated(true)
   }
 
   def runForAsset(script: String): Either[String, EVALUATED] = {

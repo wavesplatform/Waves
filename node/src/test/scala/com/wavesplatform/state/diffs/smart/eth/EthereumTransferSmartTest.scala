@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.state.diffs.smart.predef.checkEthTransfer
+import com.wavesplatform.state.diffs.smart.predef.{assertProvenPart, provenPart}
 import com.wavesplatform.test.{PropSpec, TestTime}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -29,7 +29,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
   private def script(tx: EthereumTransaction, recipient: Address) = TestCompiler(V6).compileExpression(
     s"""
        | let t = transferTransactionById(base58'${tx.id()}').value()
-       | ${checkEthTransfer(tx, transferAmount, "unit", recipient, proofs = true)}
+       | ${checkEthTransfer(tx, "unit", recipient)}
      """.stripMargin
   )
 
@@ -39,7 +39,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
        |   case t: TransferTransaction =>
        |    if (t.version == 0)
        |      then {
-       |        ${checkEthTransfer(tx, transferAmount, "this.id", recipient, proofs = false)}
+       |        ${checkEthTransfer(tx, "this.id", recipient)}
        |      } else {
        |        t.amount == $ENOUGH_AMT
        |      }
@@ -48,6 +48,20 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
        | }
      """.stripMargin
   }
+
+  private def checkEthTransfer(tx: EthereumTransaction, asset: String, recipient: Address): String =
+    s"""
+       | ${provenPart(tx, emptyBodyBytes = true, checkProofs = false)}
+       | let amount     = t.amount == $transferAmount
+       | let feeAssetId = t.feeAssetId == unit
+       | let assetId    = t.assetId == $asset
+       | let attachment = t.attachment == base58'${ByteStr.empty}'
+       | let recipient = match (t.recipient) {
+       |   case a: Address => a.bytes == base58'$recipient'
+       |   case a: Alias   => throw("unexpected")
+       | }
+       | ${assertProvenPart("t", proofs = false)} && amount && assetId && feeAssetId && recipient && attachment
+     """.stripMargin
 
   property("transferTransactionById") {
     val fee         = ciFee().sample.get

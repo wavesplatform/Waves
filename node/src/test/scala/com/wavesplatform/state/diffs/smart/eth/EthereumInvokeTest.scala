@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.state.diffs.smart.predef.checkEthInvoke
+import com.wavesplatform.state.diffs.smart.predef.{assertProvenPart, provenPart}
 import com.wavesplatform.test.{PropSpec, TestTime}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -31,14 +31,27 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
   private val paymentAmount = 456L
 
   private def assetScript(tx: EthereumTransaction, dApp: Address) = TestCompiler(V6).compileAsset {
-    val check = checkEthInvoke(tx, dApp, "default", passingArg, proofs = false, s"[ AttachedPayment(this.id, $paymentAmount) ]")
     s"""
        | match tx {
-       |   case t: InvokeScriptTransaction => $check
+       |   case t: InvokeScriptTransaction => ${checkEthInvoke(tx, dApp)}
        |   case _                          => true
        | }
      """.stripMargin
   }
+
+  private def checkEthInvoke(tx: EthereumTransaction, dApp: Address): String =
+    s"""
+       | ${provenPart(tx, emptyBodyBytes = true, checkProofs = false)}
+       | let dAppAddress = match t.dApp {
+       |   case a: Address => a.bytes == base58'$dApp'
+       |   case _: Alias   => throw()
+       | }
+       | let feeAssetId = t.feeAssetId == unit
+       | let checkFunc  = t.function == "default"
+       | let checkArgs  = t.args == [$passingArg]
+       | let payments   = t.payments == [ AttachedPayment(this.id, $paymentAmount) ]
+       | ${assertProvenPart("t", proofs = false)} && dAppAddress && feeAssetId && checkFunc && checkArgs && payments
+     """.stripMargin
 
   private def dAppScript(asset: Asset) = TestCompiler(V6).compileContract(
     s"""
