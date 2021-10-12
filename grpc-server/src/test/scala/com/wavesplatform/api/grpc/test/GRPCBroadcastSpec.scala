@@ -26,7 +26,6 @@ import monix.execution.Scheduler
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
-import com.wavesplatform.transaction.utils.EthConverters._
 
 class GRPCBroadcastSpec
     extends FlatSpec
