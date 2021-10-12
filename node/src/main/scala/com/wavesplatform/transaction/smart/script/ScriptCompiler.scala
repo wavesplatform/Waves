@@ -66,7 +66,7 @@ object ScriptCompiler extends ScorexLogging {
   ): Either[String, (Script, C)] =
     for {
       script     <- tryCompile(scriptText, directiveSet)
-      complexity <- estimate(script, estimator, directiveSet.scriptType != Asset, fixEstimateOfVerifier)
+      complexity <- estimate(script, estimator, fixEstimateOfVerifier, directiveSet.scriptType != Asset)
     } yield (script, complexity)
 
   private def tryCompile(src: String, directiveSet: DirectiveSet): Either[String, Script] = {
