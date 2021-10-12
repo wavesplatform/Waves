@@ -74,7 +74,7 @@ final case class EthereumTransaction(
     )
   )
 
-  override val sender: PublicKey = signerPublicKey()
+  override lazy val sender: PublicKey = signerPublicKey()
 
   def toTransferLike(a: TxAmount, r: AddressOrAlias, asset: Asset): TransferTransactionLike = new TransferTransactionLike {
     override val amount: TxAmount               = a
