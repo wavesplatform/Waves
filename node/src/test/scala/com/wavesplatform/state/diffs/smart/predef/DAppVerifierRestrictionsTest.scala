@@ -100,7 +100,7 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
      """.stripMargin
   )
 
-  private def declarationsContract(syncCall: String) = TestCompiler(V5).compileContract(
+  private def declarationsContract(syncCall: String, callFromCallable: Boolean) = TestCompiler(V5).compileContract(
     s"""
        | {-# STDLIB_VERSION 5       #-}
        | {-# CONTENT_TYPE   DAPP    #-}
@@ -117,7 +117,7 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
        | }
        |
        | @Callable(i)
-       | func call1() = if (call() == call()) then [] else []
+       | func call1() = ${if (callFromCallable) "if (call() == call()) then [] else []" else "[]"}
        |
        | @Callable(i)
        | func call2() = if (x == x) then [] else []
@@ -158,24 +158,28 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
   }
 
   property("sync calls are prohibited from declarations before fix") {
-    val (genesis, setInvoke, setReentrantInvoke) = scenario(declarationsContract).sample.get
-    withDomain(RideV5) { d =>
-      d.appendBlock(genesis: _*)
-      (the[RuntimeException] thrownBy d.appendBlock(setInvoke)).getMessage should include(s"DApp-to-dApp invocations are not allowed from verifier")
-      (the[RuntimeException] thrownBy d.appendBlock(setReentrantInvoke)).getMessage should include(
-        s"DApp-to-dApp invocations are not allowed from verifier"
-      )
+    List(true, false).foreach { callFromCallable =>
+      val (genesis, setInvoke, setReentrantInvoke) = scenario(declarationsContract(_, callFromCallable)).sample.get
+      withDomain(RideV5) { d =>
+        d.appendBlock(genesis: _*)
+        (the[RuntimeException] thrownBy d.appendBlock(setInvoke)).getMessage should include(s"DApp-to-dApp invocations are not allowed from verifier")
+        (the[RuntimeException] thrownBy d.appendBlock(setReentrantInvoke)).getMessage should include(
+          s"DApp-to-dApp invocations are not allowed from verifier"
+        )
+      }
     }
   }
 
   property("sync calls are NOT prohibited from declarations after fix") {
-    val (genesis, setInvoke, setReentrantInvoke) = scenario(declarationsContract).sample.get
-    withDomain(RideV6) { d =>
-      d.appendBlock(genesis: _*)
-      d.appendBlock(setInvoke)
-      d.appendBlock(setReentrantInvoke)
-      d.blockchain.transactionMeta(setInvoke.id.value()).get._2 shouldBe true
-      d.blockchain.transactionMeta(setReentrantInvoke.id.value()).get._2 shouldBe true
+    List(true, false).foreach { callFromCallable =>
+      val (genesis, setInvoke, setReentrantInvoke) = scenario(declarationsContract(_, callFromCallable)).sample.get
+      withDomain(RideV6) { d =>
+        d.appendBlock(genesis: _*)
+        d.appendBlock(setInvoke)
+        d.appendBlock(setReentrantInvoke)
+        d.blockchain.transactionMeta(setInvoke.id.value()).get._2 shouldBe true
+        d.blockchain.transactionMeta(setReentrantInvoke.id.value()).get._2 shouldBe true
+      }
     }
   }
 }
