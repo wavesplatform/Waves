@@ -130,7 +130,7 @@ object PureContext {
     }
 
   lazy val bigIntToString: BaseFunction[NoContext] =
-    NativeFunction("toString", Map(V5 -> 65L, V6 -> 2L), BIGINT_TO_STRING, STRING, ("n", BIGINT)) {
+    NativeFunction("toString", Map(V5 -> 65L, V6 -> 1L), BIGINT_TO_STRING, STRING, ("n", BIGINT)) {
       case CONST_BIGINT(n) :: Nil => CONST_STRING(n.toString)
       case xs                     => notImplemented[Id, EVALUATED]("toString(n: BigInt)", xs)
     }
@@ -377,7 +377,7 @@ object PureContext {
   val fractionBigInt: BaseFunction[NoContext] =
     NativeFunction(
       "fraction",
-      Map(V5 -> 128L, V6 -> 3L),
+      Map(V5 -> 128L, V6 -> 1L),
       FRACTION_BIGINT,
       BIGINT,
       ("value", BIGINT),
@@ -397,7 +397,7 @@ object PureContext {
   def fractionBigIntRounds(roundTypes: UNION): BaseFunction[NoContext] =
     NativeFunction(
       "fraction",
-      Map(V5 -> 128L, V6 -> 4L),
+      Map(V5 -> 128L, V6 -> 1L),
       FRACTION_BIGINT_ROUNDS,
       BIGINT,
       ("value", BIGINT),
@@ -1426,7 +1426,7 @@ object PureContext {
     UserFunction(
       "sqrt",
       "sqrtBigInt",
-      6,
+      5,
       BIGINT,
       ("@number", BIGINT),
       ("@precision", LONG),

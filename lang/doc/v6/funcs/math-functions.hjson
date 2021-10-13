@@ -67,7 +67,7 @@
         "The number of decimals of the resulting value."
         "One of the rounding functions."
       ]
-      complexity: 6
+      complexity: 5
     }
     {
       name: "log"
@@ -105,14 +105,14 @@
       params: [ "BigInt", "BigInt", "BigInt" ]
       doc: "Multiply and division with unlimited intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]
-      complexity: 3
+      complexity: 1
     }
     {
       name: "fraction"
       params: [ "BigInt", "BigInt", "BigInt", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Multiply and division with unlimited intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor", "Rounding mode" ]
-      complexity: 4
+      complexity: 1
     }
   ]
 }

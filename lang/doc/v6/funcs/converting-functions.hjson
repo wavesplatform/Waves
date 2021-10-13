@@ -142,7 +142,7 @@
       params: [ "BigInt" ]
       doc: "Convert BigInt to string"
       paramsDoc: [ "The BigInt to convert" ]
-      complexity: 2
+      complexity: 1
     }
     {
       name: "toUtf8String"
