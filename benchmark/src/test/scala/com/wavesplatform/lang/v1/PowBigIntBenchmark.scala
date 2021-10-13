@@ -6,10 +6,11 @@ import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Expression, V5}
 import com.wavesplatform.lang.utils.lazyContexts
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BIGINT, CONST_LONG, EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.POW_BIGINT
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, Rounding}
 import org.openjdk.jmh.annotations.{State, _}
 import org.openjdk.jmh.infra.Blackhole
 
@@ -56,28 +57,25 @@ class PowBigIntSt {
   val ds  = DirectiveSet(V5, Account, Expression).fold(null, identity)
   val ctx = lazyContexts(ds).value().evaluationContext(Common.emptyBlockchainEnvironment())
 
-  val max = s"""parseBigIntValue("${PureContext.BigIntMax}")"""
-  val min = s"""parseBigIntValue("${PureContext.BigIntMin}")"""
-  val one = s"""toBigInt(1)"""
+  val max = PureContext.BigIntMax
+  val min = PureContext.BigIntMin
+  val one = BigInt(1)
 
-  val d18 = """parseBigIntValue("987654321012345678")"""
-  val d19 = """parseBigIntValue("1987654321012345678")"""
+  val d18 = BigInt(987654321012345678L)
+  val d19 = BigInt(1987654321012345678L)
 
-  val e1 = """parseBigIntValue("3259987654320123456789")"""
-  val e2 = """parseBigIntValue("515598765432101234567")"""
-  val e3 = s"""$max / (${List.fill(7)(s"""toBigInt(${Long.MaxValue})""").mkString(" * ")} / toBigInt(4))"""
+  val e1 = BigInt("3259987654320123456789")
+  val e2 = BigInt("515598765432101234567")
+  val e3 = max / (BigInt(Long.MaxValue).pow(7) / BigInt(4))
 
-  val expr1  = compile(s"pow($max, 0, $max, 18, 18, DOWN)") // ERROR
-  val expr2  = compile(s"pow($max, 0, $max, 0, 0, DOWN)")   // ERROR
-  val expr3  = compile(s"pow($min, 0, $max, 0, 0, DOWN)")   // ERROR
-  val expr4  = compile(s"pow($max, 0, $min, 0, 18, DOWN)")  // ERROR
-  val expr5  = compile(s"pow($one, 18, $min, 0, 18, DOWN)") // ERROR
-  val expr6  = compile(s"pow($d18, 18, $min, 0, 18, DOWN)") // ERROR
-  val expr7  = compile(s"pow($d18, 18, $max, 0, 18, DOWN)") // ERROR
-  val expr8  = compile(s"pow($d18, 18, $e3, 18, 18, DOWN)") // 0
-  val expr9  = compile(s"pow($d18, 18, $e1, 18, 18, DOWN)") // 2
-  val expr10 = compile(s"pow($d19, 18, $e2, 18, 0, DOWN)")  // ≈ max
-
-  private def compile(e: String): EXPR =
-    TestCompiler(V5).compileExpression(e).expr.asInstanceOf[EXPR]
+  val expr1  = pow(max, 0, max, 18, 18) // ERROR
+  val expr2  = pow(max, 0, max, 0, 0)   // ERROR
+  val expr3  = pow(min, 0, max, 0, 0)   // ERROR
+  val expr4  = pow(max, 0, min, 0, 18)  // ERROR
+  val expr5  = pow(one, 18, min, 0, 18) // ERROR
+  val expr6  = pow(d18, 18, min, 0, 18) // ERROR
+  val expr7  = pow(d18, 18, max, 0, 18) // ERROR
+  val expr8  = pow(d18, 18, e3, 18, 18) // 0
+  val expr9  = pow(d18, 18, e1, 18, 18) // 2
+  val expr10 = pow(d19, 18, e2, 18, 0)  // ≈ max
 }

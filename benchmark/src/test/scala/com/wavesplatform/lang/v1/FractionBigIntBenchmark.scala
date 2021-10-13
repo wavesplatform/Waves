@@ -6,10 +6,11 @@ import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Expression, V5}
 import com.wavesplatform.lang.utils.lazyContexts
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BIGINT, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FRACTION_BIGINT, FRACTION_BIGINT_ROUNDS}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, Rounding}
 import org.openjdk.jmh.annotations.{State, _}
 import org.openjdk.jmh.infra.Blackhole
 
@@ -44,17 +45,39 @@ class FractionBigIntSt {
   val ds  = DirectiveSet(V5, Account, Expression).fold(null, identity)
   val ctx = lazyContexts(ds).value().evaluationContext(Common.emptyBlockchainEnvironment())
 
-  val max     = s"""parseBigIntValue("${PureContext.BigIntMax}")"""
-  val halfMax = s"""parseBigIntValue("${PureContext.BigIntMax}") / toBigInt(2)"""
-  val min     = s"""parseBigIntValue("${PureContext.BigIntMin}")"""
-  val maxSqrt = s"""parseBigIntValue("57896044618658097711785492504343953926634992332820282019728792003956564819968")"""
-  val three   = "toBigInt(3)"
+  val max     = CONST_BIGINT(PureContext.BigIntMax)
+  val halfMax = CONST_BIGINT(PureContext.BigIntMax / 2)
+  val min     = CONST_BIGINT(PureContext.BigIntMin)
+  val maxSqrt = CONST_BIGINT(BigInt("57896044618658097711785492504343953926634992332820282019728792003956564819968"))
+  val three   = CONST_BIGINT(3)
 
-  val expr1 = TestCompiler(V5).compileExpression(s"fraction($halfMax, $three, $three)").expr.asInstanceOf[EXPR]
-  val expr2 = TestCompiler(V5).compileExpression(s"fraction($max, $min, $min)").expr.asInstanceOf[EXPR]
-  val expr3 = TestCompiler(V5).compileExpression(s"fraction($maxSqrt, $maxSqrt, $maxSqrt)").expr.asInstanceOf[EXPR]
+  val expr1 = FUNCTION_CALL(
+    Native(FRACTION_BIGINT),
+    List(halfMax, three, three)
+  )
 
-  val expr1Round = TestCompiler(V5).compileExpression(s"fraction($halfMax, $three, $three, HALFEVEN)").expr.asInstanceOf[EXPR]
-  val expr2Round = TestCompiler(V5).compileExpression(s"fraction($max, $min, $min, HALFEVEN)").expr.asInstanceOf[EXPR]
-  val expr3Round = TestCompiler(V5).compileExpression(s"fraction($maxSqrt, $maxSqrt, $maxSqrt, HALFEVEN)").expr.asInstanceOf[EXPR]
+  val expr2 = FUNCTION_CALL(
+    Native(FRACTION_BIGINT),
+    List(max, min, min)
+  )
+
+  val expr3 = FUNCTION_CALL(
+    Native(FRACTION_BIGINT),
+    List(maxSqrt, maxSqrt, maxSqrt)
+  )
+
+  val expr1Round = FUNCTION_CALL(
+    Native(FRACTION_BIGINT_ROUNDS),
+    List(halfMax, three, three, Rounding.HalfEven.value)
+  )
+
+  val expr2Round = FUNCTION_CALL(
+    Native(FRACTION_BIGINT_ROUNDS),
+    List(max, min, min, Rounding.HalfEven.value)
+  )
+
+  val expr3Round = FUNCTION_CALL(
+    Native(FRACTION_BIGINT_ROUNDS),
+    List(maxSqrt, maxSqrt, maxSqrt, Rounding.HalfEven.value)
+  )
 }

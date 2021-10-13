@@ -6,9 +6,10 @@ import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Expression, V5}
 import com.wavesplatform.lang.utils.lazyContexts
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BIGINT, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.BIGINT_TO_STRING
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import org.openjdk.jmh.annotations.{State, _}
 import org.openjdk.jmh.infra.Blackhole
@@ -29,7 +30,8 @@ class BigIntToStringSt {
   val ds  = DirectiveSet(V5, Account, Expression).fold(null, identity)
   val ctx = lazyContexts(ds).value().evaluationContext(Common.emptyBlockchainEnvironment())
 
-  val max  = s"""parseBigIntValue("${PureContext.BigIntMax}")"""
-  val min = s"""parseBigIntValue("${PureContext.BigIntMin}")"""
-  val expr = TestCompiler(V5).compileExpression(s"$min.toString()").expr.asInstanceOf[EXPR]
+  val expr = FUNCTION_CALL(
+    Native(BIGINT_TO_STRING),
+    List(CONST_BIGINT(PureContext.BigIntMin))
+  )
 }

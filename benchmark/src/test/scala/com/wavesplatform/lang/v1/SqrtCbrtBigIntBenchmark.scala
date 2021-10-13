@@ -6,8 +6,6 @@ import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Expression, V5}
 import com.wavesplatform.lang.utils.lazyContexts
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import org.openjdk.jmh.annotations.{State, _}
@@ -38,17 +36,14 @@ class SqrtBigIntSt {
   val ds  = DirectiveSet(V5, Account, Expression).fold(null, identity)
   val ctx = lazyContexts(ds).value().evaluationContext(Common.emptyBlockchainEnvironment())
 
-  val max = s"""parseBigIntValue("${PureContext.BigIntMax}")"""
-  val min = s"""parseBigIntValue("${PureContext.BigIntMin}")"""
+  val max = PureContext.BigIntMax
+  val min = PureContext.BigIntMin
 
-  val e1 = "toBigInt(5)"
-  val e2 = "toBigInt(3333333333333333)"
+  val e1 = BigInt(5)
+  val e2 = BigInt(3333333333333333L)
 
-  val expr1 = compile(s"pow($max, 0, $e1, 1, 18, DOWN)")
-  val expr2 = compile(s"pow($max, 18, $e1, 1, 18, DOWN)")
-  val expr3 = compile(s"pow($max, 0, $e2, 16, 18, DOWN)")
-  val expr4 = compile(s"pow($min, 18, $e2, 16, 18, DOWN)")
-
-  private def compile(e: String): EXPR =
-    TestCompiler(V5).compileExpression(e).expr.asInstanceOf[EXPR]
+  val expr1 = pow(max, 0, e1, 1, 18)
+  val expr2 = pow(max, 18, e1, 1, 18)
+  val expr3 = pow(max, 0, e2, 16, 18)
+  val expr4 = pow(min, 18, e2, 16, 18)
 }
