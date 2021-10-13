@@ -182,6 +182,11 @@ object Parser {
           FOLD(Pos(start, end), limit.toInt, list, acc, f)
       }
 
+  def unusedFoldMacroP[_:P]: P[EXPR] = (Index ~~ P("FOLD<") ~~ digit.repX(1).! ~~ ">(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ refP ~ ")" ~~ Index)
+    .map { case (start, _, _, _, _, end) =>
+      INVALID(Pos(start, end), s"The FOLD<> macro is no longer supported, use fold_N function family instead")
+    }
+
   def list[_: P]: P[EXPR] = (Index ~~ P("[") ~ functionCallArgs ~ P("]") ~~ Index).map {
     case (s, e, f) =>
       val pos = Pos(s, f)
@@ -502,7 +507,7 @@ object Parser {
 
   def baseAtom[_: P](epn: fastparse.P[Any] => P[EXPR]) = {
     def ep[_: P](implicit c: fastparse.P[Any]) = epn(c)
-    comment ~ P(foldP | ifP | matchP | ep | maybeAccessP) ~ comment
+    comment ~ P(foldP | unusedFoldMacroP | ifP | matchP | ep | maybeAccessP) ~ comment
   }
 
   def baseExpr[_: P] = P(strictLetBlockP | binaryOp(baseAtom(block(_))(_), opsByPriority))
@@ -512,7 +517,7 @@ object Parser {
 
   def singleBaseAtom[_: P] =
     comment ~
-      P(foldP | ifP | matchP | maybeAccessP) ~
+      P(foldP | unusedFoldMacroP | ifP | matchP | maybeAccessP) ~
       comment
 
   def singleBaseExpr[_: P] = P(binaryOp(singleBaseAtom(_), opsByPriority))
