@@ -5,8 +5,8 @@ import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{PutDataResponse, StateChangesDetails, Transaction, TransactionInfo}
+import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.invokeExpressionFee
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.directives.values.StdLibVersion.V6
@@ -58,7 +58,7 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     val unsupportedVersion = InvokeExpressionTransaction.supportedVersions.max + 1
     assertApiError(
       sender.invokeExpression(firstKeyPair, expr, version = unsupportedVersion.toByte),
-      AssertiveApiError(CustomValidationError.Id, s"Bad transaction type (18) and version ($unsupportedVersion)")
+      AssertiveApiError(CustomValidationError.Id, s"Bad transaction type (18) and version ($unsupportedVersion)", matchMessage = true)
     )
 
     val illegalExpression = TestCompiler(V6).compileExpression("true").asInstanceOf[ExprScript]

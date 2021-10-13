@@ -1,27 +1,27 @@
 package com.wavesplatform.state.diffs
 
+import scala.util.{Left, Right}
+
 import cats._
 import com.wavesplatform.account.{Address, AddressScheme}
-import com.wavesplatform.features.OverdraftValidationProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures, RideVersionProvider}
+import com.wavesplatform.features.OverdraftValidationProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer._
-
-import scala.util.{Left, Right}
 
 object CommonValidation {
 
@@ -163,8 +163,8 @@ object CommonValidation {
       case p: PBSince if p.isProtobufVersion =>
         activationBarrier(BlockchainFeatures.BlockV5)
 
-//      case v: VersionedTransaction =>
-//        Left(GenericError(s"Invalid tx version: $v"))
+      case v: VersionedTransaction if !TransactionParsers.all.contains((v.tpe.id.toByte, v.version)) =>
+        Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
 
       case _ =>
         Right(tx)
