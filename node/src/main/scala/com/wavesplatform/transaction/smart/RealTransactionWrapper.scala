@@ -21,19 +21,26 @@ import com.wavesplatform.transaction.{EthereumTransaction, _}
 object RealTransactionWrapper {
   private def header(tx: Transaction, txIdOpt: Option[ByteStr] = None): Header = {
     val v = tx match {
+      case _: EthereumTransaction   => 0.toByte
       case vt: VersionedTransaction => vt.version
       case _                        => TxVersion.V1
     }
     Header(txIdOpt.getOrElse(ByteStr(tx.id().arr)), tx.fee, tx.timestamp, v)
   }
-  private def proven(tx: Transaction with ProvenTransaction, txIdOpt: Option[ByteStr] = None): Proven =
+
+  private def proven(tx: AuthorizedTransaction, txIdOpt: Option[ByteStr] = None, emptyBodyBytes: Boolean = false): Proven = {
+    val proofs = tx match {
+      case p: ProvenTransaction => p.proofs.map(_.arr).map(ByteStr(_)).toIndexedSeq
+      case _                    => Vector()
+    }
     Proven(
       header(tx, txIdOpt),
       RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes)),
-      ByteStr(tx.bodyBytes()),
+      if (emptyBodyBytes) ByteStr.empty else ByteStr(tx.bodyBytes()),
       tx.sender,
-      tx.proofs.proofs.map(_.arr).map(ByteStr(_)).toIndexedSeq
+      proofs
     )
+  }
 
   implicit def assetPair(a: AssetPair): APair = APair(a.amountAsset.compatId, a.priceAsset.compatId)
   implicit def ord(o: Order): Ord =
@@ -64,8 +71,8 @@ object RealTransactionWrapper {
       target: AttachedPaymentTarget
   ): Either[ExecutionError, Tx] =
     (tx: @unchecked) match {
-      case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, toRide(g.recipient)).asRight
-      case t: TransferTransaction => mapTransferTx(t).asRight
+      case g: GenesisTransaction      => Tx.Genesis(header(g), g.amount, toRide(g.recipient)).asRight
+      case t: TransferTransactionLike => mapTransferTx(t).asRight
       case i: IssueTransaction =>
         Tx.Issue(
             proven(i),
@@ -140,21 +147,35 @@ object RealTransactionWrapper {
             )
           }
 
-      case _: EthereumTransaction => Left("No mapping for Ethereum transfers")
-
       case u: UpdateAssetInfoTransaction =>
         Tx.UpdateAssetInfo(proven(u), u.assetId.id, u.name, u.description).asRight
+
+      case eth: EthereumTransaction =>
+        Left(s"Unexpected $eth")
     }
 
-  def mapTransferTx(t: TransferTransaction): Tx.Transfer =
+  def mapTransferTx(t: TransferTransactionLike): Tx.Transfer = {
+    val (version, bodyBytes, proofs) = t match {
+      case tt: TransferTransaction =>
+        (tt.version, tt.bodyBytes(), tt.proofs)
+      case _ =>
+        (0.toByte, Array.emptyByteArray, Proofs.empty)
+    }
     Tx.Transfer(
-      proven(t),
+      Proven(
+        Header(t.id(), t.fee, t.timestamp, version),
+        RideRecipient.Address(ByteStr(t.sender.toAddress.bytes)),
+        ByteStr(bodyBytes),
+        t.sender,
+        proofs.toIndexedSeq
+      ),
       feeAssetId = t.feeAssetId.compatId,
       assetId = t.assetId.compatId,
       amount = t.amount,
       recipient = toRide(t.recipient),
       attachment = t.attachment
     )
+  }
 
   def toRide(recipient: AddressOrAlias): RideRecipient = recipient match {
     case address: Address => RideRecipient.Address(ByteStr(address.bytes))

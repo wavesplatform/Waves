@@ -79,7 +79,7 @@ object Verifier extends ScorexLogging {
     }
 
   /** Verifies asset scripts and returns diff with complexity. In case of error returns spent complexity */
-  def assets(blockchain: Blockchain, remainingComplexity: Int)(tx: Transaction): TracedResult[(Long, ValidationError), Diff] = {
+  def assets(blockchain: Blockchain, remainingComplexity: Int)(tx: TransactionBase): TracedResult[(Long, ValidationError), Diff] = {
     case class AssetForCheck(asset: IssuedAsset, script: AssetScriptInfo, assetType: AssetContext)
 
     @tailrec
@@ -150,7 +150,7 @@ object Verifier extends ScorexLogging {
       blockchain: Blockchain,
       script: Script,
       estimatedComplexity: Int,
-      transaction: Transaction,
+      transaction: TransactionBase,
       assetIdOpt: Option[ByteStr],
       complexityLimit: Int = Int.MaxValue,
       assetContext: AssetContext.Value = AssetContext.Unknown

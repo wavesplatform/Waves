@@ -1,19 +1,19 @@
 package com.wavesplatform.transaction.transfer
 
-import scala.util.Try
-
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.TransferTxSerializer
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.transaction.validation.impl.TransferTxValidator
 import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
+
+import scala.util.Try
 
 case class TransferTransaction(
     version: TxVersion,
@@ -31,15 +31,24 @@ case class TransferTransaction(
       case Waves          => Seq()
       case a: IssuedAsset => Seq(a)
     })
+    with TransferTransactionLike
     with VersionedTransaction
-    with SigProofsSwitch
     with FastHashId
+    with SigProofsSwitch
     with TxWithFee.InCustomAsset
     with PBSince.V3 {
 
   val bodyBytes: Coeval[TxByteArray] = Coeval.evalOnce(TransferTxSerializer.bodyBytes(this))
   val bytes: Coeval[TxByteArray]     = Coeval.evalOnce(TransferTxSerializer.toBytes(this))
   final val json: Coeval[JsObject]   = Coeval.evalOnce(TransferTxSerializer.toJson(this))
+}
+
+trait TransferTransactionLike extends TransactionBase with Authorized {
+  val sender: PublicKey
+  val recipient: AddressOrAlias
+  val assetId: Asset
+  val amount: TxAmount
+  val attachment: ByteStr
 }
 
 object TransferTransaction extends TransactionParser {

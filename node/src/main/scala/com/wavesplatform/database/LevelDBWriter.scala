@@ -1,10 +1,5 @@
 package com.wavesplatform.database
 
-import scala.annotation.tailrec
-import scala.collection.mutable.ArrayBuffer
-import scala.jdk.CollectionConverters._
-import scala.util.control.NonFatal
-
 import cats.data.Ior
 import cats.syntax.option._
 import cats.syntax.semigroup._
@@ -13,8 +8,8 @@ import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.database
@@ -22,12 +17,14 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, TransactionMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, WavesSettings}
-import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction._
+import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.EthereumTransaction.Transfer
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -37,6 +34,11 @@ import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
+
+import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
+import scala.jdk.CollectionConverters._
+import scala.util.control.NonFatal
 
 object LevelDBWriter extends ScorexLogging {
 
@@ -804,11 +806,21 @@ abstract class LevelDBWriter private[database] (
     rw.filterHistory(Keys.leaseDetailsHistory(leaseId), currentHeight)
   }
 
-  override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
+  override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] = readOnly { db =>
     for {
       tm <- db.get(Keys.transactionMetaById(TransactionId @@ id))
-      if tm.`type` == TransferTransaction.typeId
-      tx <- db.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort))).collect { case (t: TransferTransaction, true) => t }
+      if tm.`type` == TransferTransaction.typeId || tm.`type` == TransactionType.Ethereum.id
+      tx <- db
+        .get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)))
+        .collect {
+          case (t: TransferTransaction, true) => t
+          case (e @ EthereumTransaction(_: Transfer, _, _, _), true) =>
+            val meta     = db.get(Keys.ethereumTransactionMeta(Height @@ tm.height, TxNum @@ tm.num.toShort)).get
+            val transfer = meta.payload.transfer.get
+            val tAmount  = transfer.amount.get
+            val asset    = PBAmounts.toVanillaAssetId(tAmount.assetId)
+            e.toTransferLike(tAmount.amount, Address(transfer.publicKeyHash.toByteArray), asset)
+        }
     } yield (height, tx)
   }
 

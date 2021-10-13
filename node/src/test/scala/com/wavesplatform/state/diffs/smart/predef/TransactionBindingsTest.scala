@@ -7,7 +7,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing.evaluated
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.{Asset => AssetType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
@@ -18,12 +18,13 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.ci._
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, WavesEnvironment, buildThisValue}
-import com.wavesplatform.transaction.{DataTransaction, Proofs, ProvenTransaction, Transaction, TxVersion, VersionedTransaction}
+import com.wavesplatform.transaction.{DataTransaction, Proofs, TxVersion}
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 import org.scalacheck.Gen
@@ -31,39 +32,11 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.EitherValues
 import play.api.libs.json.Json
 import shapeless.Coproduct
-import com.wavesplatform.state.diffs.ci._
 
 import scala.util.Random
 
 class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherValues {
   private val T = 'T'.toByte
-
-  def letProof(p: Proofs, prefix: String)(i: Int) =
-    s"let ${prefix.replace(".", "")}proof$i = $prefix.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).toString}'"
-
-  def provenPart(t: Transaction with ProvenTransaction): String = {
-    val version = t match {
-      case v: VersionedTransaction => v.version
-      case _                       => 1
-    }
-    s"""
-       |   let id = t.id == base58'${t.id().toString}'
-       |   let fee = t.fee == ${t.fee}
-       |   let timestamp = t.timestamp == ${t.timestamp}
-       |   let bodyBytes = blake2b256(t.bodyBytes) == base64'${ByteStr(crypto.fastHash(t.bodyBytes.apply().array)).base64}'
-       |   let sender = t.sender == addressFromPublicKey(base58'${t.sender}')
-       |   let senderPublicKey = t.senderPublicKey == base58'${t.sender}'
-       |   let version = t.version == $version
-       |   ${Range(0, 8).map(letProof(t.proofs, "t")).mkString("\n")}
-     """.stripMargin
-  }
-
-  def assertProofs(p: String): String = {
-    val prefix = p.replace(".", "")
-    s"${prefix}proof0 && ${prefix}proof1 && ${prefix}proof2 && ${prefix}proof3 && ${prefix}proof4 && ${prefix}proof5 && ${prefix}proof6 && ${prefix}proof7"
-  }
-  def assertProvenPart(prefix: String) =
-    s"id && fee && timestamp && sender && senderPublicKey && ${assertProofs(prefix)} && bodyBytes && version"
 
   property("TransferTransaction binding") {
     forAll(Gen.oneOf(transferV1Gen, transferV2Gen)) { t =>
@@ -735,11 +708,11 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     import com.wavesplatform.lang.v1.CTX._
 
     val expr       = Parser.parseExpr(script).get.value
-    val directives = DirectiveSet(V2, Asset, Expression).explicitGet()
+    val directives = DirectiveSet(V2, AssetType, Expression).explicitGet()
     val ctx =
       PureContext.build(V2, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(V2, Asset, Expression).explicitGet())
+        WavesContext.build(Global, DirectiveSet(V2, AssetType, Expression).explicitGet())
 
     val environment = new WavesEnvironment(
       chainId,

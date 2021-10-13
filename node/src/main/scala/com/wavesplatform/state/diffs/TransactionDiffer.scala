@@ -129,9 +129,9 @@ object TransactionDiffer {
   private def verifierDiff(blockchain: Blockchain, tx: Transaction) =
     Verifier(blockchain)(tx).map(complexity => Diff.empty.copy(scriptsComplexity = complexity))
 
-  private def assetsVerifierDiff(
+  def assetsVerifierDiff(
       blockchain: Blockchain,
-      tx: Transaction,
+      tx: TransactionBase,
       verify: Boolean,
       initDiff: Diff,
       remainingComplexity: Int
@@ -245,7 +245,7 @@ object TransactionDiffer {
     } yield ()
 
   // failed transactions related
-  private def transactionMayFail(tx: Transaction): Boolean =
+  private def transactionMayFail(tx: TransactionBase): Boolean =
     tx.tpe == TransactionType.InvokeScript ||
       tx.tpe == TransactionType.InvokeExpression ||
       tx.tpe == TransactionType.Exchange

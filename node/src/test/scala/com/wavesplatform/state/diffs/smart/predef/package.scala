@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.crypto
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils._
@@ -14,7 +15,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.{BlockchainContext, buildThisValue}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{DataTransaction, Transaction}
+import com.wavesplatform.transaction.{Authorized, DataTransaction, EthereumTransaction, Proofs, ProvenTransaction, Transaction, VersionedTransaction}
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 import shapeless.Coproduct
@@ -196,4 +197,42 @@ package object predef {
        | let crypto = bks && sig && str58 && str64
        | crypto""".stripMargin
 
+  def letProof(p: Proofs, prefix: String)(i: Int): String =
+    s"let ${prefix.replace(".", "")}proof$i = $prefix.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).toString}'"
+
+  def provenPart(t: Transaction with Authorized, emptyBodyBytes: Boolean = false, checkProofs: Boolean = true): String = {
+    val version = t match {
+      case _: EthereumTransaction  => 0
+      case v: VersionedTransaction => v.version
+      case _                       => 1
+    }
+    val proofs = t match {
+      case p: ProvenTransaction => p.proofs
+      case _                    => Proofs(Seq())
+    }
+    val bodyBytesCheck =
+      if (emptyBodyBytes)
+        "t.bodyBytes.size() == 0"
+      else
+        s""" blake2b256(t.bodyBytes) == base64'${ByteStr(crypto.fastHash(t.bodyBytes.apply().array)).base64}' """
+
+    s"""
+       | let id = t.id == base58'${t.id().toString}'
+       | let fee = t.fee == ${t.fee}
+       | let timestamp = t.timestamp == ${t.timestamp}
+       | let bodyBytes = $bodyBytesCheck
+       | let sender = t.sender == addressFromPublicKey(base58'${t.sender}')
+       | let senderPublicKey = t.senderPublicKey == base58'${t.sender}'
+       | let version = t.version == $version
+       | ${ if (checkProofs) Range(0, 8).map(letProof(proofs, "t")).mkString("\n") else ""}
+     """.stripMargin
+  }
+
+  def assertProofs(p: String): String = {
+    val prefix = p.replace(".", "")
+    s"${prefix}proof0 && ${prefix}proof1 && ${prefix}proof2 && ${prefix}proof3 && ${prefix}proof4 && ${prefix}proof5 && ${prefix}proof6 && ${prefix}proof7"
+  }
+
+  def assertProvenPart(prefix: String, proofs: Boolean = true): String =
+    s"id && fee && timestamp && sender && senderPublicKey && ${if (proofs) assertProofs(prefix) + " &&" else ""} bodyBytes && version"
 }

@@ -11,9 +11,11 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.transaction.TransactionType.TransactionType
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.serialization.impl.BaseTxJson
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.validation.{TxConstraints, TxValidator, ValidatedV}
 import com.wavesplatform.utils.EthEncoding
 import monix.eval.Coeval
@@ -31,8 +33,9 @@ final case class EthereumTransaction(
     signatureData: SignatureData,
     override val chainId: Byte
 ) extends Transaction(TransactionType.Ethereum)
+    with Authorized
     with VersionedTransaction.ConstV1
-    with PBSince.V1 {
+    with PBSince.V1 { self =>
   import EthereumTransaction._
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(encodeTransaction(underlying, signatureData))
@@ -70,31 +73,60 @@ final case class EthereumTransaction(
       "senderPublicKey" -> signerPublicKey()
     )
   )
+
+  override lazy val sender: PublicKey = signerPublicKey()
+
+  def toTransferLike(a: TxAmount, r: AddressOrAlias, asset: Asset): TransferTransactionLike = new TransferTransactionLike {
+    override val amount: TxAmount               = a
+    override val recipient: AddressOrAlias      = r
+    override val sender: PublicKey              = signerPublicKey()
+    override val assetId: Asset                 = asset
+    override val attachment: ByteStr            = ByteStr.empty
+    override def timestamp: TxTimestamp         = self.timestamp
+    override def chainId: TxType                = self.chainId
+    override def id: Coeval[ByteStr]            = self.id
+    override val tpe: TransactionType           = TransactionType.Transfer
+    override def assetFee: (Asset, TxTimestamp) = self.assetFee
+    override def checkedAssets: Seq[IssuedAsset] = asset match {
+      case i: IssuedAsset => Seq(i)
+      case Asset.Waves    => Nil
+    }
+  }
 }
 
 object EthereumTransaction {
   sealed trait Payload
 
-  case class Transfer(tokenAddress: Option[ERC20Address], amount: Long, recipient: Address) extends Payload
+  case class Transfer(tokenAddress: Option[ERC20Address], amount: Long, recipient: Address) extends Payload {
+    def tryResolveAsset(blockchain: Blockchain): Either[ValidationError, Asset] =
+      tokenAddress
+        .fold[Either[ValidationError, Asset]](
+          Right(Waves)
+        )(a => blockchain.resolveERC20Address(a).toRight(GenericError(s"Can't resolve ERC20 address $a")))
+
+    def toTransferLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, TransferTransactionLike] =
+      tryResolveAsset(blockchain).map(tx.toTransferLike(amount, recipient, _))
+  }
 
   case class Invocation(dApp: Address, hexCallData: String) extends Payload {
     def toInvokeScriptLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, InvokeScriptTransactionLike] =
       for {
         scriptInfo <- blockchain.accountScript(dApp).toRight(GenericError(s"No script at address $dApp"))
         (extractedCall, extractedPayments) = ABIConverter(scriptInfo.script).decodeFunctionCall(hexCallData)
-      } yield new InvokeScriptTransactionLike {
-        override def funcCall: Terms.FUNCTION_CALL                  = extractedCall
-        override def payments: Seq[InvokeScriptTransaction.Payment] = extractedPayments
-        override def id: Coeval[ByteStr]                            = tx.id
-        override def dApp: AddressOrAlias                           = Invocation.this.dApp
-        override def sender: PublicKey                              = tx.signerPublicKey()
-        override def root: InvokeScriptTransactionLike              = this
-        override def assetFee: (Asset, TxTimestamp)                 = tx.assetFee
-        override def timestamp: TxTimestamp                         = tx.timestamp
-        override def chainId: TxVersion                             = tx.chainId
-        override def checkedAssets: Seq[Asset.IssuedAsset]          = this.paymentAssets
-        override val tpe: TransactionType                           = TransactionType.InvokeScript
-      }
+      } yield
+        new InvokeScriptTransactionLike {
+          override def funcCall: Terms.FUNCTION_CALL                  = extractedCall
+          override def payments: Seq[InvokeScriptTransaction.Payment] = extractedPayments
+          override def id: Coeval[ByteStr]                            = tx.id
+          override def dApp: AddressOrAlias                           = Invocation.this.dApp
+          override val sender: PublicKey                              = tx.signerPublicKey()
+          override def root: InvokeScriptTransactionLike              = this
+          override def assetFee: (Asset, TxTimestamp)                 = tx.assetFee
+          override def timestamp: TxTimestamp                         = tx.timestamp
+          override def chainId: TxVersion                             = tx.chainId
+          override def checkedAssets: Seq[Asset.IssuedAsset]          = this.paymentAssets
+          override val tpe: TransactionType                           = TransactionType.InvokeScript
+        }
   }
 
   implicit object EthereumTransactionValidator extends TxValidator[EthereumTransaction] {
