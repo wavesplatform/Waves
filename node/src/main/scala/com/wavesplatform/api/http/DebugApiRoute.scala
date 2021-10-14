@@ -78,7 +78,7 @@ case class DebugApiRoute(
 
   override lazy val route: Route = pathPrefix("debug") {
     stateChanges ~ balanceHistory ~ stateHash ~ validate ~ withAuth {
-      state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ configInfo ~ print
+      state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ minerInfo ~ configInfo ~ print
     }
   }
 
@@ -87,18 +87,6 @@ case class DebugApiRoute(
       log.debug(params.message.take(250))
       ""
     })
-
-  // TODO: Remove?
-  def portfolios: Route = path("portfolios" / AddrSegment) { address =>
-    get {
-      extractScheduler { implicit s =>
-        complete(accountsApi.portfolio(address).toListL.runToFuture.map { assetList =>
-          val bd   = accountsApi.balanceDetails(address)
-          Portfolio(bd.regular, LeaseBalance(bd.leaseIn, bd.leaseOut), assetList.toMap)
-        })
-      }
-    }
-  }
 
   def balanceHistory: Route = (path("balances" / "history" / AddrSegment) & get) { address =>
     complete(Json.toJson(loadBalanceHistory(address).map {
@@ -244,21 +232,25 @@ case class DebugApiRoute(
       val transactionJson = parsedTransaction.fold(_ => jsv, _.json())
 
       val serializer = tracedDiff.resultE
-        .fold(_ => this.serializer, { case (_, diff) =>
-          val compositeBlockchain = CompositeBlockchain(blockchain, diff)
-          this.serializer.copy(blockchain = compositeBlockchain)
+        .fold(_ => this.serializer, {
+          case (_, diff) =>
+            val compositeBlockchain = CompositeBlockchain(blockchain, diff)
+            this.serializer.copy(blockchain = compositeBlockchain)
         })
 
       val extendedJson = tracedDiff.resultE
-        .fold(_ => jsv, { case (tx, diff) =>
-          val meta = tx match {
-            case ist: InvokeScriptTransaction =>
-              val result = diff.scriptResults.get(ist.id())
-              TransactionMeta.Invoke(Height(blockchain.height), ist, succeeded = true, result)
-            case tx => TransactionMeta.Default(Height(blockchain.height), tx, succeeded = true)
+        .fold(
+          _ => jsv, {
+            case (tx, diff) =>
+              val meta = tx match {
+                case ist: InvokeScriptTransaction =>
+                  val result = diff.scriptResults.get(ist.id())
+                  TransactionMeta.Invoke(Height(blockchain.height), ist, succeeded = true, result)
+                case tx => TransactionMeta.Default(Height(blockchain.height), tx, succeeded = true)
+              }
+              serializer.transactionWithMetaJson(meta)
           }
-          serializer.transactionWithMetaJson(meta)
-        })
+        )
 
       val response = Json.obj(
         "valid"          -> error.isEmpty,
