@@ -1,7 +1,5 @@
 package com.wavesplatform.utx
 
-import scala.concurrent.duration._
-
 import com.wavesplatform.TestValues
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
@@ -18,7 +16,10 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import monix.reactive.subjects.PublishSubject
 import org.scalatest.concurrent.Eventually
+
+import scala.concurrent.duration._
 
 //noinspection RedundantDefaultArgument
 class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
@@ -297,7 +298,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
         TxHelpers.genesis(dApp.toAddress, Long.MaxValue / 3)
       )
 
-      val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings.utxSettings)
+      val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, PublishSubject(), settings.utxSettings)
       f(d, utx)
       utx.close()
     }

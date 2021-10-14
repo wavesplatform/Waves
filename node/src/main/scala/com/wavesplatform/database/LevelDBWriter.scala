@@ -2,12 +2,6 @@ package com.wavesplatform.database
 
 import java.nio.ByteBuffer
 
-import scala.annotation.tailrec
-import scala.collection.mutable.{ArrayBuffer, ListBuffer}
-import scala.jdk.CollectionConverters._
-import scala.util.Try
-import scala.util.control.NonFatal
-
 import cats.data.Ior
 import cats.syntax.option._
 import cats.syntax.semigroup._
@@ -16,8 +10,8 @@ import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.database
@@ -27,19 +21,26 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, WavesSettings}
-import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction._
+import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
+import monix.reactive.Observer
 import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
+
+import scala.annotation.tailrec
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import scala.jdk.CollectionConverters._
+import scala.util.Try
+import scala.util.control.NonFatal
 
 object LevelDBWriter extends ScorexLogging {
 
@@ -107,7 +108,7 @@ object LevelDBWriter extends ScorexLogging {
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty).toSeq
   }
 
-  def apply(db: DB, settings: WavesSettings): LevelDBWriter with AutoCloseable = {
+  def apply(db: DB, spendableBalanceChanged: Observer[(Address, Asset)], settings: WavesSettings): LevelDBWriter with AutoCloseable = {
     val expectedHeight = loadHeight(db)
     def load(name: String, key: KeyTags.KeyTag): Option[BloomFilterImpl] = {
       if (settings.dbSettings.useBloomFilter)
@@ -120,7 +121,7 @@ object LevelDBWriter extends ScorexLogging {
     val _dataKeyFilter      = load("account-data", KeyTags.DataHistory)
     val _wavesBalanceFilter = load("waves-balances", KeyTags.WavesBalanceHistory)
     val _assetBalanceFilter = load("asset-balances", KeyTags.AssetBalanceHistory)
-    new LevelDBWriter(db, settings.blockchainSettings, settings.dbSettings) with AutoCloseable {
+    new LevelDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings) with AutoCloseable {
 
       override val orderFilter: BloomFilter        = _orderFilter.getOrElse(BloomFilter.AlwaysEmpty)
       override val dataKeyFilter: BloomFilter      = _dataKeyFilter.getOrElse(BloomFilter.AlwaysEmpty)
@@ -148,7 +149,7 @@ object LevelDBWriter extends ScorexLogging {
       else
         BloomFilter.AlwaysEmpty
 
-    new LevelDBWriter(db, settings.blockchainSettings, settings.dbSettings) {
+    new LevelDBWriter(db, Observer.stopped, settings.blockchainSettings, settings.dbSettings) {
       override val orderFilter: BloomFilter        = loadFilter("orders")
       override val dataKeyFilter: BloomFilter      = loadFilter("account-data")
       override val wavesBalanceFilter: BloomFilter = loadFilter("waves-balances")
@@ -158,7 +159,13 @@ object LevelDBWriter extends ScorexLogging {
 }
 
 //noinspection UnstableApiUsage
-abstract class LevelDBWriter(writableDB: DB, val settings: BlockchainSettings, val dbSettings: DBSettings) extends BlockchainCaches {
+abstract class LevelDBWriter private[database] (
+    writableDB: DB,
+    spendableBalanceChanged: Observer[(Address, Asset)],
+    val settings: BlockchainSettings,
+    val dbSettings: DBSettings
+) extends Caches(spendableBalanceChanged) {
+
   private[this] val log = LoggerFacade(LoggerFactory.getLogger(classOf[LevelDBWriter]))
 
   def orderFilter: BloomFilter

@@ -3,9 +3,6 @@ package com.wavesplatform.mining
 import java.security.Permission
 import java.util.concurrent.{Semaphore, TimeUnit}
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
-
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
@@ -32,6 +29,9 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.scalacheck.{Arbitrary, Gen}
+
+import scala.concurrent.Await
+import scala.concurrent.duration._
 
 class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettings {
 
@@ -114,7 +114,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
   }
 
   def withEnv(f: Env => Unit): Unit = {
-    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, TestFunctionalitySettings.Stub)
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
 
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val minerSettings = settings0.minerSettings.copy(quorum = 0)
@@ -131,10 +131,10 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
       featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
-    val bcu = new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     val pos = PoSSelector(bcu, settings.synchronizationSettings.maxBaseTarget)
 
-    val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, settings0.utxSettings)
+    val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, ignoreSpendableBalanceChanged, settings0.utxSettings)
     val schedulerService: SchedulerService = Scheduler.singleThread("appender")
 
     try {

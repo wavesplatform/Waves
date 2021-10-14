@@ -15,13 +15,14 @@ import com.wavesplatform.transaction.{GenesisTransaction, Proofs}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.utils.{NTP, ScorexLogging}
+import monix.reactive.Observer
 
 object RollbackBenchmark extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val settings      = Application.loadApplicationConfig(Some(new File(args(0))))
     val db            = openDB(settings.dbSettings.directory)
     val time          = new NTP(settings.ntpServer)
-    val levelDBWriter = LevelDBWriter(db, settings)
+    val levelDBWriter = LevelDBWriter(db, Observer.stopped, settings)
 
     val issuer = KeyPair(new Array[Byte](32))
 

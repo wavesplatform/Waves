@@ -12,10 +12,12 @@ import com.wavesplatform.settings._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.utils.NTP
 import monix.execution.UncaughtExceptionReporter
+import monix.reactive.Observer
 import net.ceedubs.ficus.Ficus._
 
 object BaseTargetChecker {
   def main(args: Array[String]): Unit = {
+    implicit val reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.default
     val sharedConfig = Docker.genesisOverride
       .withFallback(Docker.configTemplate)
       .withFallback(defaultApplication())
@@ -25,7 +27,7 @@ object BaseTargetChecker {
     val settings          = WavesSettings.fromRootConfig(sharedConfig)
     val db                = openDB("/tmp/tmp-db")
     val ntpTime           = new NTP("ntp.pool.org")
-    val (blockchainUpdater, _) = StorageFactory(settings, db, ntpTime, BlockchainUpdateTriggers.noop)
+    val (blockchainUpdater, _) = StorageFactory(settings, db, ntpTime, Observer.empty, BlockchainUpdateTriggers.noop)
     val poSSelector       = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
 
     try {

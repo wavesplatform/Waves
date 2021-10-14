@@ -7,8 +7,9 @@ import scala.annotation.tailrec
 
 import cats.kernel.Monoid
 import com.wavesplatform.ResponsivenessLogs
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
@@ -87,6 +88,12 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
     priorityDiffsCombined.transactions.get(txId).map(_.transaction)
 
   def contains(txId: ByteStr): Boolean = transactionById(txId).nonEmpty
+
+  def pessimisticPortfolios(addr: Address): Seq[Portfolio] =
+    for {
+      diff    <- validPriorityDiffs
+      (a, pf) <- diff.portfolios if a == addr
+    } yield pf.pessimistic
 
   def nextMicroBlockSize(limit: Int): Int = {
     @tailrec

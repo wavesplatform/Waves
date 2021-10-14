@@ -2,9 +2,6 @@ package com.wavesplatform.database
 
 import java.util
 
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
-
 import cats.data.Ior
 import cats.syntax.monoid._
 import cats.syntax.option._
@@ -19,9 +16,15 @@ import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.utils.ObservedLoadingCache
+import monix.reactive.Observer
 
-trait BlockchainCaches extends Blockchain with Storage {
-  import BlockchainCaches._
+import scala.jdk.CollectionConverters._
+import scala.concurrent.duration._
+import scala.reflect.ClassTag
+
+abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) extends Blockchain with Storage {
+  import Caches._
 
   val dbSettings: DBSettings
 
@@ -83,7 +86,7 @@ trait BlockchainCaches extends Blockchain with Storage {
   override def leaseBalance(address: Address): LeaseBalance = leaseBalanceCache.get(address)
 
   private val balancesCache: LoadingCache[(Address, Asset), java.lang.Long] =
-    cache(dbSettings.maxCacheSize * 16, loadBalance)
+    observedCache(dbSettings.maxCacheSize * 16, spendableBalanceChanged, loadBalance)
   protected def clearBalancesCache(): Unit                          = balancesCache.invalidateAll()
   protected def discardBalance(key: (Address, Asset)): Unit         = balancesCache.invalidate(key)
   override def balance(address: Address, mayBeAssetId: Asset): Long = balancesCache.get(address -> mayBeAssetId)
@@ -346,7 +349,7 @@ trait BlockchainCaches extends Blockchain with Storage {
   }
 }
 
-object BlockchainCaches {
+object Caches {
   def cache[K <: AnyRef, V <: AnyRef](maximumSize: Int, loader: K => V): LoadingCache[K, V] =
     CacheBuilder
       .newBuilder()
@@ -354,4 +357,7 @@ object BlockchainCaches {
       .build(new CacheLoader[K, V] {
         override def load(key: K): V = loader(key)
       })
+
+  def observedCache[K <: AnyRef, V <: AnyRef](maximumSize: Int, changed: Observer[K], loader: K => V)(implicit ct: ClassTag[K]): LoadingCache[K, V] =
+    new ObservedLoadingCache(cache(maximumSize, loader), changed)
 }

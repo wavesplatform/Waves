@@ -2,13 +2,9 @@ package com.wavesplatform
 
 import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
-
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
-import com.wavesplatform.database.{openDB, DBExt}
+import com.wavesplatform.database.{DBExt, openDB}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.metrics.Metrics
@@ -16,8 +12,14 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils._
 import kamon.Kamon
+import monix.execution.UncaughtExceptionReporter
+import monix.reactive.Observer
 import org.iq80.leveldb.DB
 import scopt.OParser
+
+import scala.concurrent.Await
+import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 object Exporter extends ScorexLogging {
   private[wavesplatform] object Formats {
@@ -37,11 +39,13 @@ object Exporter extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ExporterOptions()).foreach {
       case ExporterOptions(configFile, outputFileNamePrefix, exportHeight, format) =>
+        implicit val reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.default
+
         val settings = Application.loadApplicationConfig(configFile)
 
         val time             = new NTP(settings.ntpServer)
         val db               = openDB(settings.dbSettings.directory)
-        val (blockchain, _)  = StorageFactory(settings, db, time, BlockchainUpdateTriggers.noop)
+        val (blockchain, _)  = StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.noop)
         val blockchainHeight = blockchain.height
         val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
         log.info(s"Blockchain height is $blockchainHeight exporting to $height")

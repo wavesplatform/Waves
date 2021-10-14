@@ -2,11 +2,7 @@ package com.wavesplatform.consensus
 
 import java.nio.file.Files
 
-import scala.concurrent.duration._
-import scala.util.Random
-
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.{crypto, TestHelpers, WithDB}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
@@ -22,8 +18,12 @@ import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.Time
+import com.wavesplatform.{TestHelpers, WithDB, crypto}
 import org.iq80.leveldb.Options
 import org.scalacheck.{Arbitrary, Gen}
+
+import scala.concurrent.duration._
+import scala.util.Random
 
 class FPPoSSelectorTest extends FreeSpec with WithDB with DBCacheSettings {
   import FPPoSSelectorTest._
@@ -244,13 +244,17 @@ class FPPoSSelectorTest extends FreeSpec with WithDB with DBCacheSettings {
     // we are not using the db instance from WithDB trait as it should be recreated between property checks
     val path = Files.createTempDirectory("lvl").toAbsolutePath
     val db   = LevelDBFactory.factory.open(path.toFile, new Options().createIfMissing(true))
-    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, TestFunctionalitySettings.Stub.copy(
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(
+      db,
+      ignoreSpendableBalanceChanged,
+      TestFunctionalitySettings.Stub.copy(
         preActivatedFeatures = Map(BlockchainFeatures.FairPoS.id -> 0) ++ (if (VRFActivated) Map(BlockchainFeatures.BlockV5.id -> 0) else Map())
-      ))
+      )
+    )
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu =
-      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+      new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     val pos = PoSSelector(bcu, settings.synchronizationSettings.maxBaseTarget)
     try {
       val (accounts, blocks) = gen(ntpTime).sample.get

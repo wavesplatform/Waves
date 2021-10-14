@@ -2,10 +2,7 @@ package com.wavesplatform.database
 
 import java.nio.BufferUnderflowException
 
-import scala.concurrent.duration.Duration
-
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.{database, RequestGen, WithDB}
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
@@ -17,17 +14,20 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.settings.{loadConfig, GenesisSettings, TestFunctionalitySettings, TestSettings, WavesSettings}
-import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, TxNum}
+import com.wavesplatform.settings.{GenesisSettings, TestFunctionalitySettings, TestSettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils._
+import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, TxNum}
 import com.wavesplatform.test.FreeSpec
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.utils.{SystemTime, Time}
+import com.wavesplatform.{RequestGen, WithDB, database}
 import org.scalacheck.{Arbitrary, Gen}
+
+import scala.concurrent.duration.Duration
 
 //noinspection NameBooleanParameters
 class LevelDBWriterSpec
@@ -55,14 +55,14 @@ class LevelDBWriterSpec
   }
   "hasScript" - {
     "returns false if a script was not set" in {
-      val writer = TestLevelDB.withFunctionalitySettings(db, TestFunctionalitySettings.Stub)
+      val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
       writer.hasAccountScript(accountGen.sample.get.toAddress) shouldBe false
     }
 
     "returns false if a script was set and then unset" in {
       assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
       resetTest { (_, account) =>
-        val writer = TestLevelDB.withFunctionalitySettings(db, TestFunctionalitySettings.Stub)
+        val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
         writer.hasAccountScript(account.toAddress) shouldBe false
       }
     }
@@ -71,7 +71,7 @@ class LevelDBWriterSpec
       "if there is a script in db" in {
         assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
         test { (_, account) =>
-          val writer = TestLevelDB.withFunctionalitySettings(db, TestFunctionalitySettings.Stub)
+          val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
           writer.hasAccountScript(account.toAddress) shouldBe true
         }
       }
@@ -119,21 +119,27 @@ class LevelDBWriterSpec
 
   "wavesAmount" - {
     "counts genesis" in {
-      val (_, leveldb) = TestStorageFactory(TestSettings.Default.copy(
+      val (_, leveldb) = TestStorageFactory(
+        TestSettings.Default.copy(
           blockchainSettings =
             TestSettings.Default.blockchainSettings.copy(genesisSettings = GenesisSettings(0L, 0L, 1234L, None, Nil, 1, Duration.Zero))
-        ), this.db, SystemTime, BlockchainUpdateTriggers.noop)
+        ),
+        this.db,
+        SystemTime,
+        ignoreSpendableBalanceChanged,
+        BlockchainUpdateTriggers.noop
+      )
 
       leveldb.wavesAmount(1) shouldBe BigInt(1234)
     }
   }
 
   def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (LevelDBWriter, KeyPair) => Unit): Unit = {
-    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, TestFunctionalitySettings.Stub)
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu =
-      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+      new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
 
@@ -150,11 +156,11 @@ class LevelDBWriterSpec
   }
 
   def testWithBlocks(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (LevelDBWriter, Seq[Block], KeyPair) => Unit): Unit = {
-    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, TestFunctionalitySettings.Stub)
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu =
-      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+      new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
 
@@ -195,10 +201,14 @@ class LevelDBWriterSpec
   }
 
   "correctly reassemble block from header and transactions" in {
-    val rw = TestLevelDB.withFunctionalitySettings(db, TestFunctionalitySettings.Stub.copy(preActivatedFeatures = Map(15.toShort -> 5)))
+    val rw = TestLevelDB.withFunctionalitySettings(
+      db,
+      ignoreSpendableBalanceChanged,
+      TestFunctionalitySettings.Stub.copy(preActivatedFeatures = Map(15.toShort -> 5))
+    )
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu       = new BlockchainUpdaterImpl(rw, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+    val bcu       = new BlockchainUpdaterImpl(rw, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     try {
       val master    = KeyPair(ByteStr("master".getBytes()))
       val recipient = KeyPair(ByteStr("recipient".getBytes()))
@@ -282,7 +292,7 @@ class LevelDBWriterSpec
   "addressTransactions" - {
 
     "don't parse irrelevant transactions in transferById" ignore {
-      val writer = TestLevelDB.withFunctionalitySettings(db, TestFunctionalitySettings.Stub)
+      val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
 
       forAll(randomTransactionGen) { tx =>
         val transactionId = tx.id()
@@ -299,7 +309,7 @@ class LevelDBWriterSpec
 
   "readTransactionBytes" - {
     "reads correct failed transactions" in {
-      val writer = TestLevelDB.withFunctionalitySettings(db, TestFunctionalitySettings.Stub)
+      val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
 
       val scenario =
         for {
