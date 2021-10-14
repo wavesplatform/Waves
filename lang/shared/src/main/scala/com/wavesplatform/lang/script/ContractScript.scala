@@ -111,7 +111,7 @@ object ContractScript {
       fixEstimateOfVerifier: Boolean,
       verifier: VerifierFunction
   ): Either[String, (String, Long)] = {
-    if (dApp.containsSyncCall)
+    if (dApp.verifierContainsSyncCall)
       Left("DApp-to-dApp invocations are not allowed from verifier")
     else
       estimator(

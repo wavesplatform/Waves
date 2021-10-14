@@ -1,7 +1,5 @@
 package com.wavesplatform.lang.contract
 
-import cats.Eval
-import cats.implicits._
 import com.wavesplatform.lang.contract.DApp.{CallableFunction, VerifierFunction}
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -14,67 +12,36 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds.{CALLDAPP, CALLDAPPREENTR
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
 import com.wavesplatform.protobuf.dapp.DAppMeta
 
+import scala.annotation.tailrec
+
 case class DApp(
     meta: DAppMeta,
     decs: List[DECLARATION],
     callableFuncs: List[CallableFunction],
     verifierFuncOpt: Option[VerifierFunction]
 ) {
-  val containsSyncCall: Boolean =
-    verifierFuncOpt.map(_.u.body).traverse(containsSyncCall(_)).value.getOrElse(false)
+  val verifierContainsSyncCall: Boolean =
+    verifierFuncOpt.map(_.u.body).exists(e => containsSyncCall(List(e)))
 
-  private def containsSyncCall(e: EXPR): Eval[Boolean] = {
-    def contains2(e1: EXPR, e2: EXPR): Eval[Boolean] =
-      containsEval2(containsSyncCall(e1), containsSyncCall(e2))
+  @tailrec private def containsSyncCall(e: List[EXPR]): Boolean = {
+    def funcBody(header: FunctionHeader): List[EXPR] =
+      decs.collect { case FUNC(header.funcName, _, body) => body }
 
-    def containsEval2(e1: Eval[Boolean], e2: Eval[Boolean]): Eval[Boolean] =
-      for {
-        r1 <- e1
-        r2 <- e2
-      } yield r1 || r2
-
-    def contains3(e1: EXPR, e2: EXPR, e3: EXPR): Eval[Boolean] =
-      for {
-        r1 <- containsSyncCall(e1)
-        r2 <- containsSyncCall(e2)
-        r3 <- containsSyncCall(e3)
-      } yield r1 || r2 || r3
-
-    def checkFunctionBody(header: FunctionHeader) =
-      header match {
-        case Native(_) => Eval.now(false)
-        case FunctionHeader.User(_, name) =>
-          decs
-            .collectFirst {
-              case FUNC(`name`, _, body) => containsSyncCall(body)
-            }
-            .getOrElse(Eval.now(false))
-      }
-
-    def checkFunctionCall(header: FunctionHeader, args: List[EXPR]) = {
-      val checkBody = checkFunctionBody(header)
-      val checkArgs = args.traverse(containsSyncCall(_)).map(_.exists(identity))
-      containsEval2(checkBody, checkArgs)
-    }
-
-    def checkRef(key: String): Eval[Boolean] =
-      decs
-        .collectFirst {
-          case LET(`key`, body) => containsSyncCall(body)
-        }
-        .getOrElse(Eval.now(false))
+    def refBody(key: String): List[EXPR] =
+      decs.collect { case LET(`key`, body) => body }
 
     e match {
-      case GETTER(expr, _)                             => containsSyncCall(expr)
-      case LET_BLOCK(LET(_, value), body)              => contains2(value, body)
-      case BLOCK(LET(_, value), body)                  => contains2(value, body)
-      case BLOCK(FUNC(_, _, value), body)              => contains2(value, body)
-      case IF(cond, ifTrue, ifFalse)                   => contains3(cond, ifTrue, ifFalse)
-      case FUNCTION_CALL(Native(CALLDAPP), _)          => Eval.now(true)
-      case FUNCTION_CALL(Native(CALLDAPPREENTRANT), _) => Eval.now(true)
-      case FUNCTION_CALL(header, args)                 => checkFunctionCall(header, args)
-      case REF(key)                                    => checkRef(key)
-      case _                                           => Eval.now(false)
+      case Nil                                              => false
+      case FUNCTION_CALL(Native(CALLDAPP), _) :: _          => true
+      case FUNCTION_CALL(Native(CALLDAPPREENTRANT), _) :: _ => true
+      case GETTER(expr, _) :: l                             => containsSyncCall(expr :: l)
+      case LET_BLOCK(LET(_, value), body) :: l              => containsSyncCall(value :: body :: l)
+      case BLOCK(LET(_, value), body) :: l                  => containsSyncCall(value :: body :: l)
+      case BLOCK(FUNC(_, _, value), body) :: l              => containsSyncCall(value :: body :: l)
+      case IF(cond, ifTrue, ifFalse) :: l                   => containsSyncCall(cond :: ifTrue :: ifFalse :: l)
+      case FUNCTION_CALL(header, args) :: l                 => containsSyncCall(funcBody(header) ::: args ::: l)
+      case REF(key) :: l                                    => containsSyncCall(refBody(key) ::: l)
+      case _ :: l                                           => containsSyncCall(l)
     }
   }
 }
