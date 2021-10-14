@@ -254,9 +254,6 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def assetDistribution(asset: String): AssetDistribution =
       sync(async(n).assetDistribution(asset))
 
-    def debugPortfoliosFor(address: String, amountsAsStrings: Boolean = false): Portfolio =
-      sync(async(n).debugPortfoliosFor(address, amountsAsStrings))
-
     def broadcastIssue(
         source: KeyPair,
         name: String,

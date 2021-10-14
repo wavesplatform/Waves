@@ -2579,57 +2579,6 @@ paths:
       security:
         - APIKey: []
       x-codegen-request-body-name: address
-  '/debug/portfolios/{address}':
-    get:
-      tags:
-        - debug
-      summary: Portfolio
-      description: >-
-        Get current portfolio considering pessimistic transactions in the UTX
-        pool
-      operationId: getPortfolios
-      parameters:
-        - $ref: '#/components/parameters/address'
-      responses:
-        '200':
-          description: Json portfolio
-          content:
-            application/json:
-              schema:
-                required:
-                  - assets
-                  - balance
-                  - lease
-                type: object
-                properties:
-                  balance:
-                    type: integer
-                    format: int64
-                  lease:
-                    required:
-                      - in
-                      - out
-                    type: object
-                    properties:
-                      in:
-                        type: integer
-                        format: int64
-                      out:
-                        type: integer
-                        format: int64
-                  assets:
-                    type: object
-                    additionalProperties:
-                      type: integer
-                      format: int64
-                    description: map of assetId <-> balance
-                    example:
-                      assetId1: 0
-                      assetId2: 100
-        '403':
-          $ref: '#/components/responses/ApiKeyNotValid'
-      security:
-        - APIKey: []
   '/debug/rollback-to/{id}':
     delete:
       tags:

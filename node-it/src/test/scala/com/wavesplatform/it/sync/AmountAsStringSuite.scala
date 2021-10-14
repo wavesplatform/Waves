@@ -281,10 +281,6 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
 
   test("amount as string in debug api") {
     val firstBalance = sender.balanceDetails(firstAddress).available
-    val portfolio    = sender.debugPortfoliosFor(firstAddress, amountsAsStrings = true)
-    portfolio.balance shouldBe firstBalance
-    portfolio.lease.in shouldBe 0
-    portfolio.lease.out shouldBe 0
 
     sender.debugBalanceHistory(firstAddress, amountsAsStrings = true).head.balance shouldBe firstBalance
 
