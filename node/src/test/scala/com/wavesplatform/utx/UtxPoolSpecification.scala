@@ -2,6 +2,8 @@ package com.wavesplatform.utx
 
 import cats.data.NonEmptyList
 import com.wavesplatform
+import scala.concurrent.duration._
+
 import com.wavesplatform._
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
@@ -43,6 +45,9 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.EitherValues
 import java.nio.file.{Files, Path}
+
+import scala.collection.mutable.ListBuffer
+import scala.util.Random
 
 import com.wavesplatform.lang.directives.values.StdLibVersion.V6
 import com.wavesplatform.test.FreeSpec
@@ -904,7 +909,7 @@ class UtxPoolSpecification
                 new UtxPoolImpl(time, d.blockchainUpdater, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, events += _)
 
               def assertEvents(f: PartialFunction[Seq[UtxEvent], Unit]): Unit = {
-                val currentEvents = events.toVector
+                val currentEvents = events.toList
                 f(currentEvents)
                 events.clear()
               }
