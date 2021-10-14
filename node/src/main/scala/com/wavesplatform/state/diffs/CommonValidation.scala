@@ -118,7 +118,7 @@ object CommonValidation {
       tx.chainId == currentChainId,
       tx,
       GenericError(
-        s"Data from other network: expected: ${AddressScheme.current.chainId}(${AddressScheme.current.chainId.toChar}), actual: ${tx.chainId}(${tx.chainId.toChar})"
+        s"Address belongs to another network: expected: ${AddressScheme.current.chainId}(${AddressScheme.current.chainId.toChar}), actual: ${tx.chainId}(${tx.chainId.toChar})"
       )
     )
 
