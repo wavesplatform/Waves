@@ -2,18 +2,18 @@ package com.wavesplatform.it.sync
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}
+import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.transactions.OverflowBlock
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state.IntegerDataEntry
+import com.wavesplatform.transaction.{CreateAliasTransaction, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.{CreateAliasTransaction, TxVersion}
 import org.asynchttpclient.Response
 import org.scalatest
 import org.scalatest.Assertion
-import play.api.libs.json.{JsString, JsValue, Json}
+import play.api.libs.json.{Json, JsString, JsValue}
 
 class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
 
@@ -272,11 +272,6 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
     rewardsByHeight.totalWavesAmount shouldBe rewardsAsInteger.totalWavesAmount
     rewardsByHeight.currentReward shouldBe rewardsAsInteger.currentReward
     rewardsByHeight.minIncrement shouldBe rewardsAsInteger.minIncrement
-  }
-
-  test("amount as string in consensus api") {
-    val firstGeneratingBalance = sender.balanceDetails(firstAddress).generating
-    sender.generatingBalance(firstAddress, amountsAsStrings = true).balance shouldBe firstGeneratingBalance
   }
 
   test("amount as string in debug api") {
