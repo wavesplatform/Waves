@@ -27,7 +27,6 @@ import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.database.{openDB, DBExt, Keys}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
@@ -328,7 +327,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           transactionPublisher,
           time
         ),
-        NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
         UtilsApiRoute(time, settings.restAPISettings, () => blockchainUpdater.estimator, limitedScheduler, blockchainUpdater),
         PeersApiRoute(settings.restAPISettings, address => networkServer.connect(address), peerDatabase, establishedConnections),
