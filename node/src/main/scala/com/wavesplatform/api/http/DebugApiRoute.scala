@@ -3,12 +3,16 @@ package com.wavesplatform.api.http
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
 
+import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
+import scala.util.control.NonFatal
+
 import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Source
-import cats.kernel.Monoid
 import cats.syntax.either._
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
@@ -20,12 +24,12 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
+import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, StateHash}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, StateHash}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -34,13 +38,8 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
-import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
-
-import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.control.NonFatal
-import scala.util.{Failure, Success}
+import play.api.libs.json.Json.JsValueWrapper
 
 case class DebugApiRoute(
     ws: WavesSettings,
@@ -90,13 +89,13 @@ case class DebugApiRoute(
       ""
     })
 
+  // TODO: Remove?
   def portfolios: Route = path("portfolios" / AddrSegment) { address =>
-    (get & parameter("considerUnspent".as[Boolean].?)) { considerUnspent =>
+    get {
       extractScheduler { implicit s =>
         complete(accountsApi.portfolio(address).toListL.runToFuture.map { assetList =>
           val bd   = accountsApi.balanceDetails(address)
-          val base = Portfolio(bd.regular, LeaseBalance(bd.leaseIn, bd.leaseOut), assetList.toMap)
-          if (considerUnspent.getOrElse(true)) Monoid.combine(base, utxStorage.pessimisticPortfolio(address)) else base
+          Portfolio(bd.regular, LeaseBalance(bd.leaseIn, bd.leaseOut), assetList.toMap)
         })
       }
     }

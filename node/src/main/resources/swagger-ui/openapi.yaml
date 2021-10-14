@@ -2590,12 +2590,6 @@ paths:
       operationId: getPortfolios
       parameters:
         - $ref: '#/components/parameters/address'
-        - name: considerUnspent
-          in: query
-          description: Taking into account pessimistic transactions from UTX pool
-          schema:
-            type: boolean
-            default: true
       responses:
         '200':
           description: Json portfolio
