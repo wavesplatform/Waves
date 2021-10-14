@@ -261,6 +261,9 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def assetDistribution(asset: String): AssetDistribution =
       sync(async(n).assetDistribution(asset))
 
+    def debugPortfoliosFor(address: String, considerUnspent: Boolean, amountsAsStrings: Boolean = false): Portfolio =
+      sync(async(n).debugPortfoliosFor(address, considerUnspent, amountsAsStrings))
+
     def broadcastIssue(
         source: KeyPair,
         name: String,
@@ -629,6 +632,9 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def blockHeadersSeq(fromHeight: Int, toHeight: Int, amountsAsStrings: Boolean = false): Seq[BlockHeader] =
       sync(async(n).blockHeadersSeq(fromHeight, toHeight, amountsAsStrings))
+
+    def generatingBalance(address: String, amountsAsStrings: Boolean = false): GeneratingBalance =
+      sync(async(n).generatingBalance(address, amountsAsStrings))
 
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       sync(async(n).rollback(to, returnToUTX))

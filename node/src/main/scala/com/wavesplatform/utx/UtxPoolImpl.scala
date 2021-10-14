@@ -251,6 +251,12 @@ class UtxPoolImpl(
         .getAggregated(addr)
         .spendableBalanceOf(assetId)
 
+  override def pessimisticPortfolio(addr: Address): Portfolio = {
+    val priority    = priorityPool.pessimisticPortfolios(addr)
+    val pessimistic = pessimisticPortfolios.getAggregated(addr)
+    Monoid.combineAll(priority :+ pessimistic)
+  }
+
   private[utx] def nonPriorityTransactions: Seq[Transaction] = {
     transactions.values.asScala.toVector
       .sorted(inUTXPoolOrdering)
