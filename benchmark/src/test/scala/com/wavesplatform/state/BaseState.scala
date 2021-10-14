@@ -31,7 +31,7 @@ trait BaseState {
   }
 
   private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
-  val state: LevelDBWriter     = TestLevelDB.withFunctionalitySettings(db, portfolioChanges, fsSettings)
+  val state: LevelDBWriter     = TestLevelDB.withFunctionalitySettings(db, fsSettings)
 
   private var _richAccount: KeyPair = _
   def richAccount: KeyPair          = _richAccount

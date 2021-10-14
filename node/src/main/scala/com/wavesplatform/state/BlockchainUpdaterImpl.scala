@@ -8,8 +8,8 @@ import cats.syntax.either._
 import cats.syntax.option._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.Storage
 import com.wavesplatform.events.BlockchainUpdateTriggers
@@ -20,19 +20,18 @@ import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
+import com.wavesplatform.utils.{forceStopApplication, ScorexLogging, Time, UnsupportedFeature}
 import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
-import monix.reactive.{Observable, Observer}
+import monix.reactive.Observable
 
 class BlockchainUpdaterImpl(
     leveldb: Blockchain with Storage,
-    spendableBalanceChanged: Observer[(Address, Asset)],
     wavesSettings: WavesSettings,
     time: Time,
     blockchainUpdateTriggers: BlockchainUpdateTriggers,
@@ -364,8 +363,6 @@ class BlockchainUpdaterImpl(
               _ map {
                 case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, _), discDiffs, reward, hitSource) =>
                   val newHeight   = leveldb.height + 1
-                  val prevNgState = ngState
-
                   restTotalConstraint = updatedTotalConstraint
                   ngState = Some(
                     new NgState(
@@ -379,7 +376,6 @@ class BlockchainUpdaterImpl(
                       cancelLeases(collectLeasesToCancel(newHeight), newHeight)
                     )
                   )
-                  notifyChangedSpendable(prevNgState, ngState)
                   publishLastBlockInfo()
 
                   if ((block.header.timestamp > time
@@ -453,7 +449,6 @@ class BlockchainUpdaterImpl(
     result match {
       case Right(_) =>
         log.info(s"Blockchain rollback to $blockId succeeded")
-        notifyChangedSpendable(prevNgState, ngState)
         publishLastBlockInfo()
         miner.scheduleMining()
 
@@ -461,22 +456,6 @@ class BlockchainUpdaterImpl(
         log.error(s"Blockchain rollback to $blockId failed: ${error.err}")
     }
     result
-  }
-
-  private def notifyChangedSpendable(prevNgState: Option[NgState], newNgState: Option[NgState]): Unit = {
-    val changedPortfolios = (prevNgState, newNgState) match {
-      case (Some(p), Some(n)) => diff(p.bestLiquidDiff.portfolios, n.bestLiquidDiff.portfolios)
-      case (Some(x), _)       => x.bestLiquidDiff.portfolios
-      case (_, Some(x))       => x.bestLiquidDiff.portfolios
-      case _                  => Map.empty
-    }
-
-    changedPortfolios.foreach {
-      case (addr, p) =>
-        p.assetIds.view
-          .filter(x => p.spendableBalanceOf(x) != 0)
-          .foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
-    }
   }
 
   override def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, BlockId] = writeLock {
@@ -527,10 +506,6 @@ class BlockchainUpdaterImpl(
               log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${diff.hashString}")
               internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, ready = true))
 
-              for {
-                (addr, p) <- diff.portfolios
-                assetId   <- p.assetIds
-              } spendableBalanceChanged.onNext(addr -> assetId)
               blockId
             }
         }
@@ -734,8 +709,6 @@ class BlockchainUpdaterImpl(
 }
 
 object BlockchainUpdaterImpl {
-  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]) = Monoid.combine(p1, p2.map { case (k, v) => k -> v.negate })
-
   private def displayFeatures(s: Set[Short]): String =
     s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"
 

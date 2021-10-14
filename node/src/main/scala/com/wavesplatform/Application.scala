@@ -41,7 +41,7 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
+import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils._
@@ -69,8 +69,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   import monix.execution.Scheduler.Implicits.{global => scheduler}
 
   private[this] val db = openDB(settings.dbSettings.directory)
-
-  private[this] val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
 
   private[this] lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
@@ -102,7 +100,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private[this] var miner: Miner with MinerDebugInfo = Miner.Disabled
   private[this] val (blockchainUpdater, levelDB) =
-    StorageFactory(settings, db, time, spendableBalanceChanged, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
+    StorageFactory(settings, db, time, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
 
   @volatile
   private[this] var maybeUtx: Option[UtxPool] = None
@@ -123,7 +121,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val utxStorage =
-      new UtxPoolImpl(time, blockchainUpdater, spendableBalanceChanged, settings.utxSettings, utxEvents.onNext)
+      new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, utxEvents.onNext)
     maybeUtx = Some(utxStorage)
 
     val timer                 = new HashedWheelTimer()
@@ -204,7 +202,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def utx: UtxPool                                                                 = utxStorage
       override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
         Await.result(transactionPublisher.validateAndBroadcast(tx, None), Duration.Inf) // TODO: Replace with async if possible
-      override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
+
       override def actorSystem: ActorSystem                              = app.actorSystem
       override def utxEvents: Observable[UtxEvent]                       = app.utxEvents
 
@@ -403,7 +401,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   def shutdown(): Unit =
     if (shutdownInProgress.compareAndSet(false, true)) {
-      spendableBalanceChanged.onComplete()
       maybeUtx.foreach(_.close())
 
       log.info("Closing REST API")

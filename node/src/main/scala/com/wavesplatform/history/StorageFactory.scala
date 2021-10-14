@@ -1,38 +1,20 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.account.Address
-import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter, loadActiveLeases}
+import com.wavesplatform.database.{loadActiveLeases, DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockchainUpdaterImpl
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
-import monix.reactive.Observer
+import com.wavesplatform.utils.{forceStopApplication, ScorexLogging, Time, UnsupportedFeature}
 import org.iq80.leveldb.DB
 
 object StorageFactory extends ScorexLogging {
   private val StorageVersion = 5
 
-  def apply(
-      settings: WavesSettings,
-      db: DB,
-      time: Time,
-      spendableBalanceChanged: Observer[(Address, Asset)],
-      blockchainUpdateTriggers: BlockchainUpdateTriggers,
-      miner: Miner = _ => ()
-  ): (BlockchainUpdaterImpl, LevelDBWriter with AutoCloseable) = {
+  def apply(settings: WavesSettings, db: DB, time: Time, blockchainUpdateTriggers: BlockchainUpdateTriggers, miner: Miner = _ => ()): (BlockchainUpdaterImpl, LevelDBWriter with AutoCloseable) = {
     checkVersion(db)
-    val levelDBWriter = LevelDBWriter(db, spendableBalanceChanged, settings)
-    val bui = new BlockchainUpdaterImpl(
-      levelDBWriter,
-      spendableBalanceChanged,
-      settings,
-      time,
-      blockchainUpdateTriggers,
-      (minHeight, maxHeight) => loadActiveLeases(db, minHeight, maxHeight),
-      miner
-    )
+    val levelDBWriter = LevelDBWriter(db, settings)
+    val bui = new BlockchainUpdaterImpl(levelDBWriter, settings, time, blockchainUpdateTriggers, (minHeight, maxHeight) => loadActiveLeases(db, minHeight, maxHeight), miner)
     (bui, levelDBWriter)
   }
 

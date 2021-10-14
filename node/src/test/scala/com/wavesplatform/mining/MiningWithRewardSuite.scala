@@ -1,7 +1,11 @@
 package com.wavesplatform.mining
 
+import scala.concurrent.Future
+import scala.concurrent.duration._
+
 import cats.effect.Resource
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.{TransactionGen, WithDB}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
@@ -12,14 +16,13 @@ import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
-import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG}
+import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{TransactionGen, WithDB}
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
@@ -29,9 +32,6 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.compatible.Assertion
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
-
-import scala.concurrent.Future
-import scala.concurrent.duration._
 
 class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with TransactionGen with DBCacheSettings {
   import MiningWithRewardSuite._
@@ -122,7 +122,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
         for {
           _ <- Task.unit
           pos          = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
-          utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings)
+          utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, settings.utxSettings)
           scheduler    = Scheduler.singleThread("appender")
           allChannels  = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
           wallet       = Wallet(WalletSettings(None, Some("123"), None))
@@ -151,7 +151,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
 
   private def resources(settings: WavesSettings): Resource[Task, (BlockchainUpdaterImpl, DB)] =
     Resource.make {
-      val (bcu, _) = TestStorageFactory(settings, db, ntpTime, ignoreSpendableBalanceChanged, ignoreBlockchainUpdateTriggers)
+      val (bcu, _) = TestStorageFactory(settings, db, ntpTime, ignoreBlockchainUpdateTriggers)
       import com.wavesplatform.database.DBExt
       db.readWrite(_.put(Keys.blockReward(0), Some(settings.blockchainSettings.rewardsSettings.initial)))
       Task.now((bcu, db))

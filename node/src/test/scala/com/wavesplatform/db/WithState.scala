@@ -1,10 +1,12 @@
 package com.wavesplatform.db
 
+import java.nio.file.Files
+
 import cats.Monoid
-import com.wavesplatform.account.Address
+import com.wavesplatform.{NTPTime, TestHelpers}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory, loadActiveLeases}
+import com.wavesplatform.database.{loadActiveLeases, LevelDBFactory, LevelDBWriter, TestStorageFactory}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.history.Domain
@@ -12,24 +14,18 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
-import com.wavesplatform.state.diffs.{BlockDiffer, produce}
+import com.wavesplatform.settings.{loadConfig, BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, TestFunctionalitySettings => TFS}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
+import com.wavesplatform.state.diffs.{produce, BlockDiffer}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, Transaction}
-import com.wavesplatform.{NTPTime, TestHelpers}
-import monix.reactive.Observer
-import monix.reactive.subjects.{PublishSubject, Subject}
+import com.wavesplatform.transaction.Transaction
 import org.iq80.leveldb.{DB, Options}
 import org.scalatest.Suite
 import org.scalatest.matchers.should.Matchers
 
-import java.nio.file.Files
-
 trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
-  protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = PublishSubject()
   protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers                   = BlockchainUpdateTriggers.noop
 
   private[this] val currentDbInstance = new ThreadLocal[DB]
@@ -49,13 +45,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
   }
 
   protected def withLevelDBWriter[A](ws: WavesSettings)(test: LevelDBWriter => A): A = tempDb { db =>
-    val (_, ldb) = TestStorageFactory(
-      ws,
-      db,
-      ntpTime,
-      ignoreSpendableBalanceChanged,
-      ignoreBlockchainUpdateTriggers
-    )
+    val (_, ldb) = TestStorageFactory(ws, db, ntpTime, ignoreBlockchainUpdateTriggers)
     test(ldb)
   }
 
@@ -215,14 +205,7 @@ trait WithDomain extends WithState { _: Suite =>
   ): A =
     withLevelDBWriter(settings) { blockchain =>
       var domain: Domain = null
-      val bcu = new BlockchainUpdaterImpl(
-        blockchain,
-        Observer.stopped,
-        settings,
-        ntpTime,
-        BlockchainUpdateTriggers.combined(domain.triggers),
-        loadActiveLeases(db, _, _)
-      )
+      val bcu = new BlockchainUpdaterImpl(blockchain, settings, ntpTime, BlockchainUpdateTriggers.combined(domain.triggers), loadActiveLeases(db, _, _))
       domain = Domain(db, bcu, blockchain, settings)
       try test(domain)
       finally bcu.shutdown()
