@@ -219,7 +219,7 @@ object CommonValidation {
       case _: UpdateAssetInfoTransaction  => activationBarrier(BlockchainFeatures.BlockV5)
       case _: InvokeExpressionTransaction => activationBarrier(BlockchainFeatures.RideV6)
 
-      case _: EthereumTransaction => activationBarrier(BlockchainFeatures.SynchronousCalls)
+      case _: EthereumTransaction => activationBarrier(BlockchainFeatures.RideV6)
 
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }

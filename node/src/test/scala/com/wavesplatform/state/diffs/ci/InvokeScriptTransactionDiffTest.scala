@@ -32,7 +32,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestSettings
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.{produceE, ENOUGH_AMT, FeeValidation}
+import com.wavesplatform.state.diffs.{produceRejectOrFailedDiff, ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
 import com.wavesplatform.test._
@@ -535,7 +535,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fsWithV5) {
-          _ should produceE("WriteSet size can't exceed")
+          _ should produceRejectOrFailedDiff("WriteSet size can't exceed")
         }
     }
   }
@@ -555,7 +555,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fsWithV5) {
-          _ should produceE("Empty keys aren't allowed")
+          _ should produceRejectOrFailedDiff("Empty keys aren't allowed")
         }
     }
   }
@@ -669,7 +669,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
           TestBlock.create(Seq(ci.copy(1.toByte, proofs = proofs))),
           fs
         ) {
-          _ should produceE("Transactions from non-scripted accounts must have exactly 1 proof")
+          _ should produceRejectOrFailedDiff("Transactions from non-scripted accounts must have exactly 1 proof")
         }
     }
   }
@@ -689,7 +689,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
           TestBlock.create(Seq(ci.copy(1.toByte, proofs = proofs))),
           fs
         ) {
-          _ should produceE("Proof doesn't validate as signature")
+          _ should produceRejectOrFailedDiff("Proof doesn't validate as signature")
         }
     }
   }
@@ -719,7 +719,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     } yield (a, am, r._1, r._3, r._6, r._5)) {
       case (_, _, genesis, setScript, aliasTx, ciWithFakeAlias) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(aliasTx, setScript))), TestBlock.create(Seq(ciWithFakeAlias)), fs) {
-          _ should produceE("does not exist")
+          _ should produceRejectOrFailedDiff("does not exist")
         }
     }
   }
@@ -733,7 +733,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     } yield (a, am, r._1, r._2, r._3)) {
       case (_, _, genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produceE("Actions count limit is exceeded")
+          _ should produceRejectOrFailedDiff("Actions count limit is exceeded")
         }
     }
   }
@@ -881,7 +881,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     } yield (a, am, r._1, r._2, r._3, asset, invoker)) {
       case (_, _, genesis, setScript, ci, asset, invoker) =>
         assertDiffEiTraced(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
-          blockDiffEi.resultE should produceE("TransactionNotAllowedByScript")
+          blockDiffEi.resultE should produceRejectOrFailedDiff("TransactionNotAllowedByScript")
           inside(blockDiffEi.trace) {
             case List(_, AssetVerifierTrace(assetId, Some(tne: TransactionNotAllowedByScript), _)) =>
               assetId shouldBe asset.id()
@@ -947,7 +947,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
       case (_, _, genesis, setScript, ci, asset, _) =>
         assertDiffEiTraced(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
-          blockDiffEi.resultE should produceE("Transaction is not allowed by script")
+          blockDiffEi.resultE should produceRejectOrFailedDiff("Transaction is not allowed by script")
         }
     }
   }
@@ -988,7 +988,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     } yield (a, am, r._1, r._2, r._3, asset1, asset2, master)) {
       case (_, _, genesis, setScript, ci, asset1, asset2, _) =>
         assertDiffEiTraced(Seq(TestBlock.create(genesis ++ Seq(asset1, asset2, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
-          blockDiffEi.resultE should produceE("Transaction is not allowed by script")
+          blockDiffEi.resultE should produceRejectOrFailedDiff("Transaction is not allowed by script")
           inside(blockDiffEi.trace) {
             case List(
                 InvokeScriptTrace(_, dAppAddress, functionCall, Right(ScriptResultV3(_, transfers, _)), _, _),
@@ -1053,7 +1053,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
           TestBlock.create(Seq(ci)),
           fs
         ) { blockDiffEi =>
-          blockDiffEi.resultE should produceE("TransactionValidationError")
+          blockDiffEi.resultE should produceRejectOrFailedDiff("TransactionValidationError")
           inside(blockDiffEi.trace) {
             case List(
                 InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, _)), _, _),
@@ -1094,7 +1094,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
             .selfSigned(2.toByte, master, acc.toAddress, IssuedAsset(asset.id()), asset.quantity / 10, Waves, enoughFee, ByteStr.empty, ts)
             .explicitGet()
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, t, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
-          blockDiffEi should produceE("Negative amount")
+          blockDiffEi should produceRejectOrFailedDiff("Negative amount")
         }
     }
   }
@@ -1109,7 +1109,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       fee         <- ciFee(1)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
       ci = InvokeScriptTransaction.create(1.toByte, invoker.publicKey, master.toAddress, Some(fc), Seq(Payment(-1, Waves)), fee, Waves, ts, Proofs.empty, AddressScheme.current.chainId)
-    } yield ci) { _ should produceE("NonPositiveAmount") }
+    } yield ci) { _ should produceRejectOrFailedDiff("NonPositiveAmount") }
   }
 
   property("smart asset payment require extra fee") {
@@ -1136,7 +1136,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
       case (acc, amount, genesis, setScript, ci, asset, master) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
-          blockDiffEi should produceE("does not exceed minimal value")
+          blockDiffEi should produceRejectOrFailedDiff("does not exceed minimal value")
         }
     }
   }
@@ -1169,7 +1169,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     } yield (a, am, r._1, r._2, r._3, asset, invoker)) {
       case (_, _, genesis, setScript, ci, asset, _) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
-          blockDiffEi should produceE("does not exceed minimal value")
+          blockDiffEi should produceRejectOrFailedDiff("does not exceed minimal value")
         }
     }
   }
@@ -1189,7 +1189,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produceE("Attempt to transfer unavailable funds")
+          _ should produceRejectOrFailedDiff("Attempt to transfer unavailable funds")
         }
     }
   }
@@ -1205,7 +1205,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produceE("Attempt to transfer unavailable funds")
+          _ should produceRejectOrFailedDiff("Attempt to transfer unavailable funds")
         }
     }
   }
@@ -1253,7 +1253,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produceE("Can't apply (CONST_BOOLEAN) to 'parseInt(str: String)'")
+          _ should produceRejectOrFailedDiff("Can't apply (CONST_BOOLEAN) to 'parseInt(str: String)'")
         }
     }
   }
@@ -1264,7 +1264,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produceE("Stored data count limit is exceeded")
+          _ should produceRejectOrFailedDiff("Stored data count limit is exceeded")
         }
     }
   }
@@ -1294,7 +1294,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
           else fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
 
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), settings) {
-          _ should produceE(
+          _ should produceRejectOrFailedDiff(
             s"Data entry key size = ${ContractLimits.MaxKeySizeInBytesByVersion(version) + 1} bytes " +
               s"must be less than ${ContractLimits.MaxKeySizeInBytesByVersion(version)}"
           )
@@ -1332,7 +1332,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
           if (version == V3)
             _ shouldBe Symbol("right")
           else
-            _ should produceE("Data entry key should not be empty")
+            _ should produceRejectOrFailedDiff("Data entry key should not be empty")
         }
     }
   }
@@ -1344,7 +1344,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     } yield (r._1, r._2, r._3, invocationArgsCount)) {
       case (genesis, setScript, ci, count) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produceE(s"takes 2 args but $count were(was) given")
+          _ should produceRejectOrFailedDiff(s"takes 2 args but $count were(was) given")
         }
     }
   }
@@ -1401,7 +1401,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     } yield (a, am, r._1, r._2, r._3)) {
       case (_, _, genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produceE(s"takes 1 args but 0 were(was) given")
+          _ should produceRejectOrFailedDiff(s"takes 1 args but 0 were(was) given")
         }
     }
   }
@@ -1417,7 +1417,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     } yield (a, am, r._1, r._2, r._3)) {
       case (_, _, genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produceE("Cannot find callable function `default`, address = ")
+          _ should produceRejectOrFailedDiff("Cannot find callable function `default`, address = ")
         }
     }
   }
@@ -1460,7 +1460,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       case (genesis, setScript, ci) =>
         val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
         assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), features) {
-          _ should produceE("DApp self-payment is forbidden since V4")
+          _ should produceRejectOrFailedDiff("DApp self-payment is forbidden since V4")
         }
     }
   }
@@ -1482,7 +1482,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       case (genesis, setScript, ci) =>
         val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
         assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), features) {
-          _ should produceE("DApp self-transfer is forbidden since V4")
+          _ should produceRejectOrFailedDiff("DApp self-transfer is forbidden since V4")
         }
     }
   }
@@ -1628,7 +1628,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
           )
         InvokeScriptTransactionDiff
           .apply(blockchain, invoke.timestamp, limitedExecution = false)(invoke)
-          .resultE should produceE("is already issued")
+          .resultE should produceRejectOrFailedDiff("is already issued")
     }
   }
 
@@ -1674,7 +1674,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
           )
 
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
-            ei should produceE("Asset is not reissuable")
+            ei should produceRejectOrFailedDiff("Asset is not reissuable")
           }
         }
     }
@@ -1776,7 +1776,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
           )
 
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
-            ei should produceE("negative asset balance")
+            ei should produceRejectOrFailedDiff("negative asset balance")
           }
         }
     }
@@ -1936,7 +1936,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     forAll(scenario) {
       case (invoke, genesisTxs) =>
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) { ei =>
-          ei should produceE("AccountBalanceError")
+          ei should produceRejectOrFailedDiff("AccountBalanceError")
         }
     }
   }
@@ -3057,7 +3057,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
     val (genesisTxs, invokeTx) = recursiveScenario.sample.get
     assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
-      ei should produceE(s"DApp calls limit = 100 is exceeded")
+      ei should produceRejectOrFailedDiff(s"DApp calls limit = 100 is exceeded")
     }
   }
 
@@ -3274,7 +3274,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     forAll(scenario) {
       case (genesisTxs, invokeTx, dApp, service, asset) =>
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
-          ei should produceE(s"Transaction is not allowed by script of the asset $asset")
+          ei should produceRejectOrFailedDiff(s"Transaction is not allowed by script of the asset $asset")
         }
     }
   }
@@ -3387,7 +3387,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     forAll(scenario) {
       case (genesisTxs, invokeTx, dApp, service, asset) =>
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
-          ei should produceE(s"Transaction is not allowed by script of the asset $asset")
+          ei should produceRejectOrFailedDiff(s"Transaction is not allowed by script of the asset $asset")
         }
     }
   }
@@ -3492,7 +3492,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     forAll(scenario) {
       case (genesisTxs, invokeTx, dApp, service, asset) =>
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
-          ei should produceE(
+          ei should produceRejectOrFailedDiff(
             s"Attempt to transfer unavailable funds: " +
               s"Transaction application leads to negative asset '$asset' balance to (at least) temporary negative state, current balance is 0"
           )

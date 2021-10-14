@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.assets
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.lang.v1.traits.domain.Issue
-import com.wavesplatform.state.diffs.produceE
+import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.transaction.{ERC20Address, TxHelpers}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import org.scalamock.scalatest.PathMockFactory
@@ -28,7 +28,7 @@ class Erc20NoConflictIssueTest extends FreeSpec with Matchers with BlockchainStu
         )
       }
       val differ = blockchain.stub.transactionDiffer().andThen(_.resultE)
-      differ(tx) should produceE(s"Asset $assetId is already issued")
+      differ(tx) should produceRejectOrFailedDiff(s"Asset $assetId is already issued")
     }
 
     "in plain issue tx" in {
@@ -37,7 +37,7 @@ class Erc20NoConflictIssueTest extends FreeSpec with Matchers with BlockchainStu
         (b.resolveERC20Address _).when(ERC20Address(tx.asset)).returns(Some(tx.asset)) // Only erc20 entry in the blockchain
       }
       val differ = blockchain.stub.transactionDiffer().andThen(_.resultE)
-      differ(tx) should produceE(s"Asset ${tx.asset} is already issued")
+      differ(tx) should produceRejectOrFailedDiff(s"Asset ${tx.asset} is already issued")
     }
   }
 }

@@ -7,7 +7,7 @@ import com.wavesplatform.{BlockchainStubHelpers, TestValues}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state.diffs.produceE
+import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.test.{FlatSpec, TestTime}
 import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, TxHelpers}
@@ -22,7 +22,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.web3j.crypto.RawTransaction
 import play.api.libs.json.Json
 
-class EthTransactionSpec
+class EthereumTransactionSpec
     extends FlatSpec
     with BeforeAndAfterAll
     with PathMockFactory
@@ -40,7 +40,7 @@ class EthTransactionSpec
     val recipientAddress = TxHelpers.secondSigner.toAddress
 
     val blockchain = createBlockchainStub { b =>
-      b.stub.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls, BlockchainFeatures.Ride4DApps)
+      b.stub.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6, BlockchainFeatures.Ride4DApps)
       b.stub.issueAsset(TestAsset.id)
       b.stub.creditBalance(senderAddress, Waves, Long.MaxValue)
       b.stub.creditBalance(senderAddress, TestAsset, Long.MaxValue)
@@ -64,7 +64,7 @@ class EthTransactionSpec
     val recipientAddress = TxHelpers.secondSigner.toAddress('W'.toByte) // Other network
 
     val blockchain = createBlockchainStub { b =>
-      b.stub.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls)
+      b.stub.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       b.stub.creditBalance(senderAddress, Waves)
       b.stub.creditBalance(senderAddress, TestAsset)
       (b.resolveERC20Address _).when(ERC20Address(TestAsset.id.take(20))).returning(Some(TestAsset))
@@ -177,12 +177,24 @@ class EthTransactionSpec
     )
   }
 
+  it should "not be accepted before RideV6 activation" in {
+    val blockchain = createBlockchainStub { blockchain =>
+      // Activate all features except ride v6
+      val features = BlockchainFeatures.implemented.collect { case id if id != BlockchainFeatures.RideV6.id => BlockchainFeatures.feature(id) }.flatten
+      blockchain.stub.activateFeatures(features.toSeq: _*)
+    }
+    val differ = blockchain.stub.transactionDiffer().andThen(_.resultE)
+
+    val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 123, Waves)
+    differ(transaction) should produceRejectOrFailedDiff("Ride V6 feature has not been activated yet")
+  }
+
   "Ethereum invoke" should "work with all types of arguments" in {
     val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
     val dAppAccount    = TxHelpers.secondSigner
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls)
+      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
@@ -242,7 +254,7 @@ class EthTransactionSpec
     val dAppAccount    = TxHelpers.secondSigner
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls)
+      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
@@ -295,7 +307,7 @@ class EthTransactionSpec
     val dAppAccount    = TxHelpers.secondSigner
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls)
+      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
@@ -342,7 +354,7 @@ class EthTransactionSpec
     val dAppAccount    = TxHelpers.secondSigner
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls)
+      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
@@ -371,7 +383,7 @@ class EthTransactionSpec
       Seq(),
       (1 to com.wavesplatform.lang.v1.ContractLimits.MaxAttachedPaymentAmountV5 + 1).map(InvokeScriptTransaction.Payment(_, Waves))
     )
-    differ(transaction).resultE should produceE("Script payment amount=11 should not exceed 10")
+    differ(transaction).resultE should produceRejectOrFailedDiff("Script payment amount=11 should not exceed 10")
   }
 
   it should "work with default function" in {
@@ -379,7 +391,7 @@ class EthTransactionSpec
     val dAppAccount    = TxHelpers.secondSigner
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls)
+      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
@@ -432,7 +444,7 @@ class EthTransactionSpec
     val dAppAccount    = TxHelpers.secondSigner
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls)
+      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
       sh.issueAsset(TestAsset.id)
@@ -491,7 +503,7 @@ class EthTransactionSpec
     val dAppAccount    = TxHelpers.secondSigner
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls)
+      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
       sh.issueAsset(TestAsset.id)

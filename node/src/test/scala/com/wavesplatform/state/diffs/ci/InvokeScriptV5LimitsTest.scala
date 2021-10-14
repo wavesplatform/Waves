@@ -30,7 +30,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.{produceE, ENOUGH_AMT}
+import com.wavesplatform.state.diffs.{produceRejectOrFailedDiff, ENOUGH_AMT}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.{Asset, utils => _, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -608,7 +608,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
     forAll(scenario) {
       case (genesisTxs, invokeTx, dApp, service) =>
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
-          ei should produceE("Actions count limit is exceeded")
+          ei should produceRejectOrFailedDiff("Actions count limit is exceeded")
         }
     }
   }
