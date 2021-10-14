@@ -286,7 +286,7 @@ class CommonValidationTest extends PropSpec with WithState {
       case (genesis, tx) =>
         tx.chainId should not be AddressScheme.current.chainId
         assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(tx))) { blockDiffEi =>
-          blockDiffEi should produce("Data from other network")
+          blockDiffEi should produce("Address belongs to another network")
         }
     }
   }
