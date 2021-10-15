@@ -8,7 +8,7 @@ import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.google.protobuf.{ByteString, CodedInputStream, WireFormat}
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.validation.Validators
@@ -564,55 +564,18 @@ package object database extends ScorexLogging {
     pb.TransactionData(ptx, !m.succeeded, m.spentComplexity).toByteArray
   }
 
-  /** Returns status (succeed - true, failed -false) and bytes (left - legacy format bytes, right - new format bytes) */
-  def readTransactionBytes(b: Array[Byte]): (Boolean, Either[Array[Byte], Array[Byte]]) = {
-    import pb.TransactionData._
-
-    val coded = CodedInputStream.newInstance(b)
-
-    @inline def validTransactionFieldNum(fieldNum: Int): Boolean = fieldNum == NEW_TRANSACTION_FIELD_NUMBER || fieldNum == LEGACY_BYTES_FIELD_NUMBER
-    @inline def readBytes(fieldNum: Int): Either[Array[Byte], Array[Byte]] = {
-      val size  = coded.readUInt32()
-      val bytes = coded.readRawBytes(size)
-      if (fieldNum == NEW_TRANSACTION_FIELD_NUMBER) Right(bytes) else Left(bytes)
+  def loadTransactions(height: Height, db: ReadOnlyDB): Seq[(TxMeta, Transaction)] = {
+    val transactions = Seq.newBuilder[(TxMeta, Transaction)]
+    db.iterateOver(KeyTags.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height)) { e =>
+      transactions += readTransaction(height)(e.getValue)
     }
-
-    val transactionFieldTag  = coded.readTag()
-    val transactionFieldNum  = WireFormat.getTagFieldNumber(transactionFieldTag)
-    val transactionFieldType = WireFormat.getTagWireType(transactionFieldTag)
-    require(validTransactionFieldNum(transactionFieldNum), "Unknown `transaction` field in transaction data")
-    require(transactionFieldType == WireFormat.WIRETYPE_LENGTH_DELIMITED, "Can't parse `transaction` field in transaction data")
-    val bytes = readBytes(WireFormat.getTagFieldNumber(transactionFieldTag))
-
-    val succeed =
-      if (coded.isAtEnd) true
-      else {
-        val statusFieldTag  = coded.readTag()
-        val statusFieldNum  = WireFormat.getTagFieldNumber(statusFieldTag)
-        val statusFieldType = WireFormat.getTagWireType(statusFieldTag)
-        require(statusFieldNum == FAILED_FIELD_NUMBER, "Unknown `failed` field in transaction data")
-        require(statusFieldType == WireFormat.WIRETYPE_VARINT, "Can't parse `failed` field in transaction data")
-        !coded.readBool()
-      }
-
-    (succeed, bytes)
+    transactions.result()
   }
-
-  def loadTransactions(height: Height, db: ReadOnlyDB): Option[Seq[(TxMeta, Transaction)]] =
-    if (height < 1 || db.get(Keys.height) < height) None
-    else {
-      val transactions = Seq.newBuilder[(TxMeta, Transaction)]
-      db.iterateOver(KeyTags.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height)) { e =>
-        transactions += readTransaction(height)(e.getValue)
-      }
-      Some(transactions.result())
-    }
 
   def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] =
     for {
       meta  <- db.get(Keys.blockMetaAt(height))
-      txs   <- loadTransactions(height, db)
-      block <- createBlock(meta.header, meta.signature, txs.map(_._2)).toOption
+      block <- createBlock(meta.header, meta.signature, loadTransactions(height, db).map(_._2)).toOption
     } yield block
 
   def fromHistory[A](resource: DBResource, historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =

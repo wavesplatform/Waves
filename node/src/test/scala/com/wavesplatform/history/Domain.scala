@@ -218,8 +218,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
         meta -> blockchainUpdater
           .liquidTransactions(meta.id)
-          .orElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
-          .fold(Seq.empty[(TxMeta, Transaction)])(identity)
+          .getOrElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
       }
 
     CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))

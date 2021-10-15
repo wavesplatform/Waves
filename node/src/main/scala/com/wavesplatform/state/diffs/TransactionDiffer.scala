@@ -26,12 +26,11 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.utils.ScorexLogging
 import play.api.libs.json.Json
 
 import scala.collection.immutable.VectorMap
 
-object TransactionDiffer extends ScorexLogging {
+object TransactionDiffer {
   def apply(prevBlockTs: Option[Long], currentBlockTs: Long, verify: Boolean = true)(
       blockchain: Blockchain,
       tx: Transaction
@@ -137,7 +136,6 @@ object TransactionDiffer extends ScorexLogging {
       initDiff: Diff,
       remainingComplexity: Int
   ): TracedResult[ValidationError, Diff] = {
-    log.info(s"Running asset scripts for ${tx.id()}")
     val diff = if (verify) {
       Verifier.assets(blockchain, remainingComplexity)(tx).leftMap {
         case (spentComplexity, ScriptExecutionError(error, log, Some(assetId))) if transactionMayFail(tx) && acceptFailed(blockchain) =>
@@ -181,15 +179,9 @@ object TransactionDiffer extends ScorexLogging {
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
-      .map { d =>
-        val res = d.bindTransaction(tx)
-        log.info(s"${tx.id()}: res complexity: ${res.scriptsComplexity}, init comp: ${initDiff.scriptsComplexity}")
-        initDiff |+| res
-      }
+      .map(d => initDiff |+| d.bindTransaction(tx))
       .leftMap {
-        case fte: FailedTransactionError =>
-          log.info(s"${tx.id()}: FAILED, failed=${fte.spentComplexity}, init=${initDiff.scriptsComplexity}")
-          fte.addComplexity(initDiff.scriptsComplexity)
+        case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
         case ve                          => ve
       }
 

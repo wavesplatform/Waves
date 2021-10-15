@@ -1,6 +1,5 @@
 package com.wavesplatform.database
 
-import java.nio.ByteBuffer
 import java.util
 
 import cats.data.Ior
@@ -8,7 +7,7 @@ import cats.syntax.option._
 import cats.syntax.semigroup._
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
-import com.google.common.primitives.{Ints, Shorts}
+import com.google.common.primitives.Ints
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
@@ -20,7 +19,6 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.database.protobuf.TransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
@@ -38,9 +36,8 @@ import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
-import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
-import scala.util.Try
 import scala.util.control.NonFatal
 
 object LevelDBWriter extends ScorexLogging {
@@ -680,10 +677,9 @@ abstract class LevelDBWriter private[database] (
 
         rollbackAssetsInfo(rw, currentHeight)
 
-        val transactions = transactionsAtHeight(h)
-
-        transactions.foreach {
-          case (num, tx) =>
+        loadTransactions(h, rw).view.zipWithIndex.foreach {
+          case ((_, tx), idx) =>
+            val num = TxNum(idx.toShort)
             forgetTransaction(tx.id())
             (tx: @unchecked) match {
               case _: GenesisTransaction                                                       => // genesis transaction can not be rolled back
@@ -741,7 +737,7 @@ abstract class LevelDBWriter private[database] (
         }
 
         val hitSource = rw.get(Keys.hitSource(currentHeight)).get
-        val block     = createBlock(discardedMeta.header, discardedMeta.signature, transactions.map(_._2)).explicitGet()
+        val block     = createBlock(discardedMeta.header, discardedMeta.signature, loadTransactions(h, rw).map(_._2)).explicitGet()
 
         (block, hitSource)
       }
@@ -948,31 +944,5 @@ abstract class LevelDBWriter private[database] (
 
   def loadStateHash(height: Int): Option[StateHash] = readOnly { db =>
     db.get(Keys.stateHash(height))
-  }
-
-  private def transactionsAtHeight(h: Height): List[(TxNum, Transaction)] = readOnly { db =>
-    import com.wavesplatform.protobuf.transaction.PBSignedTransaction
-
-    val txs = new ListBuffer[(TxNum, Transaction)]()
-
-    val prefix = ByteBuffer
-      .allocate(6)
-      .put(KeyTags.NthTransactionInfoAtHeight.prefixBytes)
-      .putInt(h)
-      .array()
-
-    db.iterateOver(prefix) { entry =>
-      val k = entry.getKey
-
-      for {
-        idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-        tx = readTransactionBytes(entry.getValue) match {
-          case (_, Left(legacyBytes)) => TransactionParsers.parseBytes(legacyBytes).get
-          case (_, Right(newBytes))   => PBTransactions.vanilla(PBSignedTransaction.parseFrom(newBytes)).explicitGet()
-        }
-      } txs.append((TxNum(idx), tx))
-    }
-
-    txs.toList
   }
 }

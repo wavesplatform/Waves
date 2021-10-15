@@ -517,8 +517,7 @@ object Application extends ScorexLogging {
     loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
       meta -> blockchainUpdater
         .liquidTransactions(meta.id)
-        .orElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
-        .getOrElse(Seq.empty[(TxMeta, Transaction)])
+        .getOrElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
     }
 
   private[wavesplatform] def loadBlockMetaAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] = {

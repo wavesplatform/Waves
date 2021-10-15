@@ -130,9 +130,6 @@ inScope(Global)(
       "-language:postfixOps",
       "-Ywarn-unused:-implicits",
       "-Xlint",
-      "-Ystatistics",
-//      "-opt:l:inline",
-//      "-opt-inline-from:**",
       "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
       "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
       "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
