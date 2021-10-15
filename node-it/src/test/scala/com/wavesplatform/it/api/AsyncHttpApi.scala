@@ -241,10 +241,6 @@ object AsyncHttpApi extends Assertions {
 
     def status: Future[Status] = get("/node/status").as[Status]
 
-    def generatingBalance(address: String, amountsAsStrings: Boolean = false): Future[GeneratingBalance] = {
-      get(s"/consensus/generatingbalance/$address", amountsAsStrings).as[GeneratingBalance](amountsAsStrings)
-    }
-
     def activationStatus: Future[ActivationStatus] = get("/activation/status").as[ActivationStatus]
 
     def rewardStatus(height: Option[Int] = None, amountsAsString: Boolean = false): Future[RewardStatus] = {
