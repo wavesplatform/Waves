@@ -330,7 +330,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         )
 
       val apiRoutes = Seq(
-        new EthRpcRoute(blockchainUpdater, extensionContext.transactionsApi),
+        new EthRpcRoute(blockchainUpdater, extensionContext.transactionsApi,time),
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => shutdown()),
         BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, time),
         TransactionsApiRoute(

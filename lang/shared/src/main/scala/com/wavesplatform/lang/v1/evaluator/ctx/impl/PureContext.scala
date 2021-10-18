@@ -1,29 +1,22 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import java.nio.{BufferUnderflowException, ByteBuffer}
-import java.nio.charset.{MalformedInputException, StandardCharsets}
 import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.charset.{MalformedInputException, StandardCharsets}
+import java.nio.{BufferUnderflowException, ByteBuffer}
 
-import scala.annotation.tailrec
-import scala.collection.mutable.ArrayBuffer
-import scala.util.{Success, Try}
-
-import cats.{Id, Monad}
 import cats.implicits._
+import cats.{Id, Monad}
 import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.{CoevalF, ExecutionError}
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils.getDecompilerContext
-import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.{ContextfulUserFunction, ContextfulVal}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -31,6 +24,7 @@ import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, Contextful
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
+import com.wavesplatform.lang.{CoevalF, ExecutionError}
 import monix.eval.Coeval
 
 import scala.annotation.tailrec

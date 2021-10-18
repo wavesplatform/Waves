@@ -235,9 +235,9 @@ object Functions {
       addressType,
       ("publicKey", BYTESTR)
     ) {
-      new ContextfulNativeFunction[Environment]("addressFromPublicKey", addressType, Seq(("AddressOrAlias", addressOrAliasType))) {
-        override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] = {
-          input match {
+      new ContextfulNativeFunction.Simple[Environment]("addressFromPublicKey", addressType, Seq(("AddressOrAlias", addressOrAliasType))) {
+        override def evaluate[F[_]: Monad](env: Environment[F], args: List[EVALUATED]): F[Either[ExecutionError, EVALUATED]] = {
+          (env, args) match {
             case (env, CONST_BYTESTR(publicKey) :: Nil) =>
               env
                 .addressFromPublicKey(publicKey)

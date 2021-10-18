@@ -2,18 +2,12 @@ package com.wavesplatform.it.api
 
 import java.net.InetSocketAddress
 
-import scala.concurrent.{Await, Awaitable, Future}
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.util._
-import scala.util.control.NonFatal
-
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.model.StatusCodes.BadRequest
+import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
-import com.wavesplatform.api.http.{ApiError, DebugMessage}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.IssueRequest
+import com.wavesplatform.api.http.{ApiError, DebugMessage}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
@@ -21,19 +15,25 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
-import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import io.grpc.Status.Code
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
-import org.scalatest.{matchers, Assertion, Assertions}
-import play.api.libs.json._
+import org.scalatest.{Assertion, Assertions, matchers}
 import play.api.libs.json.Json.parse
+import play.api.libs.json._
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Awaitable, Future}
+import scala.util._
+import scala.util.control.NonFatal
 
 object SyncHttpApi extends Assertions with matchers.should.Matchers {
   case class ApiCallException(cause: Throwable) extends Exception("Error in API call", cause)
@@ -44,8 +44,8 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
   object GenericApiError {
     import play.api.libs.functional.syntax._
-    import play.api.libs.json._
     import play.api.libs.json.Reads._
+    import play.api.libs.json._
 
     def apply(id: Int, message: String, code: StatusCode, json: JsObject): GenericApiError =
       new GenericApiError(id, message, code.intValue(), json)

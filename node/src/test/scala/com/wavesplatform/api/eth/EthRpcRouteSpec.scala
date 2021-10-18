@@ -1,28 +1,28 @@
 package com.wavesplatform.api.eth
 
-import scala.concurrent.Future
-
-import com.wavesplatform.http.RouteSpec
 import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
-import com.wavesplatform.api.http.eth.EthRpcRoute
 import com.wavesplatform.api.http.ApiMarshallers._
+import com.wavesplatform.api.http.eth.EthRpcRoute
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.http.RouteSpec
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.transaction.utils.EthConverters._
-import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.utils.EthConverters._
+import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.utils.{EthEncoding, EthHelpers, EthSetChainId}
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.matchers.should.Matchers
 import org.scalatest.BeforeAndAfterEach
-import play.api.libs.json.{JsArray, JsObject, Json}
+import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.Json.JsValueWrapper
+import play.api.libs.json.{JsArray, JsObject, Json}
+
+import scala.concurrent.Future
 
 class EthRpcRouteSpec
     extends RouteSpec("/eth")
@@ -34,7 +34,7 @@ class EthRpcRouteSpec
     with BeforeAndAfterEach {
   var blockchain      = stub[Blockchain]
   var transactionsApi = stub[CommonTransactionsApi]
-  var route           = new EthRpcRoute(blockchain, transactionsApi)
+  var route           = new EthRpcRoute(blockchain, transactionsApi, ntpTime)
 
   "eth_chainId" in testRpc("eth_chainId")(resultInt shouldBe 'E'.toLong)
 
@@ -188,6 +188,6 @@ class EthRpcRouteSpec
     super.beforeEach()
     blockchain = stub[Blockchain]
     transactionsApi = stub[CommonTransactionsApi]
-    route = new EthRpcRoute(blockchain, transactionsApi)
+    route = new EthRpcRoute(blockchain, transactionsApi, ntpTime)
   }
 }
