@@ -933,11 +933,6 @@ object AsyncHttpApi extends Assertions {
     implicit val leaseBalanceFormat: Reads[LeaseBalance] = Json.reads[LeaseBalance]
     implicit val portfolioFormat: Reads[Portfolio]       = Json.reads[Portfolio]
 
-    def debugPortfoliosFor(address: String, considerUnspent: Boolean, amountsAsStrings: Boolean = false): Future[Portfolio] = {
-      get(s"/debug/portfolios/$address?considerUnspent=$considerUnspent", withApiKey = true, amountsAsStrings = amountsAsStrings)
-        .as[Portfolio](amountsAsStrings)
-    }
-
     def debugMinerInfo(): Future[Seq[State]] = getWithApiKey(s"/debug/minerInfo").as[Seq[State]]
 
     def transactionSerializer(body: JsObject): Future[TransactionSerialize] =
@@ -958,7 +953,7 @@ object AsyncHttpApi extends Assertions {
 
     def assertBalances(acc: String, balance: Long, effectiveBalance: Long)(implicit pos: Position): Future[Unit] =
       for {
-        newBalance          <- balanceDetails(acc)
+        newBalance <- balanceDetails(acc)
       } yield {
         withClue(s"effective balance of $acc") {
           newBalance.effective shouldBe effectiveBalance
