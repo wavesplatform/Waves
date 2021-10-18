@@ -633,9 +633,6 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def blockHeadersSeq(fromHeight: Int, toHeight: Int, amountsAsStrings: Boolean = false): Seq[BlockHeader] =
       sync(async(n).blockHeadersSeq(fromHeight, toHeight, amountsAsStrings))
 
-    def generatingBalance(address: String, amountsAsStrings: Boolean = false): GeneratingBalance =
-      sync(async(n).generatingBalance(address, amountsAsStrings))
-
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       sync(async(n).rollback(to, returnToUTX))
 
