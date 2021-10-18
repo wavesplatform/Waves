@@ -10,9 +10,21 @@
         "The exponent."
         "The number of decimals of the exponent."
         "The number of decimals of the resulting value."
-        "One of the rounding functions. The HalfUp() function may be used as the default value."
+        "One of the rounding functions."
       ]
-      complexity: 100
+      complexity: 28
+    }
+    {
+      name: "sqrt"
+      params: [ "Int", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
+      doc: "Returns a square root."
+      paramsDoc: [
+        "The number"
+        "The number of decimals of the number."
+        "The number of decimals of the resulting value."
+        "One of the rounding functions."
+      ]
+      complexity: 2
     }
     {
       name: "log"
@@ -26,7 +38,7 @@
         "The number of decimals of the resulting value."
         '''
         The rounding function.
-        The HalfUp() function may be used as the default value.
+
         '''
       ]
       complexity: 100
@@ -41,9 +53,21 @@
         "The exponent."
         "The number of decimals of the exponent."
         "The number of decimals of the resulting value."
-        "One of the rounding functions. The HalfUp() function may be used as the default value."
+        "One of the rounding functions."
       ]
-      complexity: 200
+      complexity: 270
+    }
+    {
+      name: "sqrt"
+      params: [ "BigInt", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
+      doc: "Returns a square root."
+      paramsDoc: [
+        "The base."
+        "The number of decimals of the base."
+        "The number of decimals of the resulting value."
+        "One of the rounding functions."
+      ]
+      complexity: 5
     }
     {
       name: "log"
@@ -57,7 +81,7 @@
         "The number of decimals of the resulting value."
         '''
         The rounding function.
-        The HalfUp() function may be used as the default value.
+
         '''
       ]
       complexity: 200
@@ -67,28 +91,28 @@
       params: [ "Int", "Int", "Int" ]
       doc: "Multiply and division with unlimited intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]
-      complexity: 14
+      complexity: 1
     }
     {
       name: "fraction"
       params: [ "Int", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Multiply and division with big integer intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor", "Rounding mode" ]
-      complexity: 17
+      complexity: 1
     }
     {
       name: "fraction"
       params: [ "BigInt", "BigInt", "BigInt" ]
       doc: "Multiply and division with unlimited intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]
-      complexity: 128
+      complexity: 1
     }
     {
       name: "fraction"
       params: [ "BigInt", "BigInt", "BigInt", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Multiply and division with unlimited intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor", "Rounding mode" ]
-      complexity: 128
+      complexity: 1
     }
   ]
 }

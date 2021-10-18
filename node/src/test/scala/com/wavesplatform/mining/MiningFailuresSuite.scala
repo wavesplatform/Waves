@@ -8,8 +8,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
+import com.wavesplatform.state.{BalanceSnapshot, Blockchain, BlockMinerInfo, NG}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BalanceSnapshot, BlockMinerInfo, Blockchain, NG}
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
@@ -54,7 +54,7 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithDB {
       val scheduler   = Scheduler.singleThread("appender")
       val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
       val wallet      = Wallet(WalletSettings(None, Some("123"), None))
-      val utxPool     = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, wavesSettings.utxSettings)
+      val utxPool     = new UtxPoolImpl(ntpTime, blockchainUpdater, wavesSettings.utxSettings)
       val pos         = PoSSelector(blockchainUpdater, wavesSettings.synchronizationSettings.maxBaseTarget)
       new MinerImpl(
         allChannels,

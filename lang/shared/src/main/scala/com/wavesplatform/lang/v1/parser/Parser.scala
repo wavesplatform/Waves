@@ -7,7 +7,6 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
 import com.wavesplatform.lang.v1.parser.Expressions._
@@ -177,17 +176,16 @@ object Parser {
   }
 
   def foldP[_: P]: P[EXPR] =
-    (Index ~~ P("FOLD<") ~~ Index ~~ digit.repX(1).! ~~ Index ~~ ">(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ refP ~ ")" ~~ Index)
+    (Index ~~ P("fold_") ~~ digit.repX(1).! ~~ "(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ refP ~ ")" ~~ Index)
       .map {
-        case (start, limStart, limit, limEnd, list, acc, f, end) =>
-          val lim = limit.toInt
-          if (lim < 1)
-            INVALID(Pos(limStart, limEnd), "FOLD limit should be natural")
-          else if (lim > MaxListLengthV4)
-            INVALID(Pos(limStart, limEnd), s"List size limit in FOLD is too big, $lim must be less or equal $MaxListLengthV4")
-          else
-            FOLD(Pos(start, end), lim, list, acc, f)
+        case (start, limit, list, acc, f, end) =>
+          FOLD(Pos(start, end), limit.toInt, list, acc, f)
       }
+
+  def unusedFoldMacroP[_:P]: P[EXPR] = (Index ~~ P("FOLD<") ~~ digit.repX(1).! ~~ ">(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ refP ~ ")" ~~ Index)
+    .map { case (start, _, _, _, _, end) =>
+      INVALID(Pos(start, end), s"The FOLD<> macro is no longer supported, use fold_N function family instead")
+    }
 
   def list[_: P]: P[EXPR] = (Index ~~ P("[") ~ functionCallArgs ~ P("]") ~~ Index).map {
     case (s, e, f) =>
@@ -509,7 +507,7 @@ object Parser {
 
   def baseAtom[_: P](epn: fastparse.P[Any] => P[EXPR]) = {
     def ep[_: P](implicit c: fastparse.P[Any]) = epn(c)
-    comment ~ P(foldP | ifP | matchP | ep | maybeAccessP) ~ comment
+    comment ~ P(foldP | unusedFoldMacroP | ifP | matchP | ep | maybeAccessP) ~ comment
   }
 
   def baseExpr[_: P] = P(strictLetBlockP | binaryOp(baseAtom(block(_))(_), opsByPriority))
@@ -519,7 +517,7 @@ object Parser {
 
   def singleBaseAtom[_: P] =
     comment ~
-      P(foldP | ifP | matchP | maybeAccessP) ~
+      P(foldP | unusedFoldMacroP | ifP | matchP | maybeAccessP) ~
       comment
 
   def singleBaseExpr[_: P] = P(binaryOp(singleBaseAtom(_), opsByPriority))

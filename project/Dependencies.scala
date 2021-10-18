@@ -43,7 +43,10 @@ object Dependencies {
 
   val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.3.14"
 
-  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk15on" % "1.69"
+  // v1.67 introduced unnecessary conversions which slowed down hash computation by a factor of 3-4:
+  // https://github.com/bcgit/bc-java/blob/r1rv67/core/src/main/java/org/bouncycastle/crypto/digests/KeccakDigest.java#L318
+  // Before upping the version, make sure conversions are no longer there.
+  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk15on" % "1.66"
 
   val enforcedVersions = Def.setting(
     Seq(

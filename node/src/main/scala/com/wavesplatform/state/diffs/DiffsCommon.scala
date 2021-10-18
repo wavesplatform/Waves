@@ -38,12 +38,13 @@ object DiffsCommon {
           blockchain.height > blockchain.settings.functionalitySettings.estimatorPreCheckHeight &&
             !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)
 
+        val fixEstimateOfVerifier = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
         val cost =
           if (useV1PreCheck)
-            Script.verifierComplexity(script, ScriptEstimatorV1, !isAsset && blockchain.useReducedVerifierComplexityLimit) *>
-              Script.verifierComplexity(script, ScriptEstimatorV2, !isAsset && blockchain.useReducedVerifierComplexityLimit)
+            Script.verifierComplexity(script, ScriptEstimatorV1, fixEstimateOfVerifier, !isAsset && blockchain.useReducedVerifierComplexityLimit) *>
+              Script.verifierComplexity(script, ScriptEstimatorV2, fixEstimateOfVerifier, !isAsset && blockchain.useReducedVerifierComplexityLimit)
           else
-            Script.verifierComplexity(script, blockchain.estimator, !isAsset && blockchain.useReducedVerifierComplexityLimit)
+            Script.verifierComplexity(script, blockchain.estimator, fixEstimateOfVerifier, !isAsset && blockchain.useReducedVerifierComplexityLimit)
 
         cost.map((script, _))
       }

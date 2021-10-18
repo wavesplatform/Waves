@@ -134,7 +134,9 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), defaultStdLib = blockchain.actualRideVersion)) { result =>
+      val version               = blockchain.actualRideVersion
+      val fixEstimateOfVerifier = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
+      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), version, fixEstimateOfVerifier)) { result =>
         complete(
           checkInvokeExpression(result)
             .fold(
@@ -157,15 +159,9 @@ case class UtilsApiRoute(
   def compileWithImports: Route = path("script" / "compileWithImports") {
     import ScriptWithImportsRequest._
     (post & entity(as[ScriptWithImportsRequest])) { req =>
-      def stdLib: StdLibVersion =
-        if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls, blockchain.height)) {
-          V5
-        } else if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
-          V4
-        } else {
-          StdLibVersion.VersionDic.default
-        }
-      executeLimited(ScriptCompiler.compile(req.script, estimator(), req.imports, stdLib)) { result =>
+      val version               = blockchain.actualRideVersion
+      val fixEstimateOfVerifier = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
+      executeLimited(ScriptCompiler.compile(req.script, estimator(), req.imports, version, fixEstimateOfVerifier)) { result =>
         complete(
           checkInvokeExpression(result)
             .fold(
@@ -191,7 +187,14 @@ case class UtilsApiRoute(
           .left
           .map(_.m)
           .flatMap { script =>
-            Script.complexityInfo(script, estimator(), useContractVerifierLimit = false).map((script, _))
+            Script
+              .complexityInfo(
+                script,
+                estimator(),
+                fixEstimateOfVerifier = blockchain.isFeatureActivated(RideV6),
+                useContractVerifierLimit = false
+              )
+              .map((script, _))
           }
       ) { result =>
         complete(

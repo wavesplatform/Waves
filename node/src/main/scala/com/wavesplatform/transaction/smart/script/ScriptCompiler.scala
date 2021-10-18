@@ -15,54 +15,58 @@ object ScriptCompiler extends ScorexLogging {
   def apply(
       scriptText: String,
       isAssetScript: Boolean,
-      estimator: ScriptEstimator
+      estimator: ScriptEstimator,
+      fixEstimateOfVerifier: Boolean = true
   ): Either[String, (Script, Long)] =
     for {
       directives   <- DirectiveParser(scriptText)
       directiveSet <- Directive.extractDirectives(directives, StdLibVersion.VersionDic.default)
       scriptType = ScriptType.isAssetScript(isAssetScript)
-      result <- applyAndEstimate(scriptText, directiveSet.copy(scriptType = scriptType), estimator, Script.estimate)
+      result <- applyAndEstimate(scriptText, directiveSet.copy(scriptType = scriptType), estimator, Script.estimate, fixEstimateOfVerifier)
     } yield result
 
   def compile(
       scriptText: String,
       estimator: ScriptEstimator,
       libraries: Map[String, String] = Map(),
-      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default
+      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default,
+      fixEstimateOfVerifier: Boolean = true
   ): Either[String, (Script, Long)] =
-    compileAndEstimate(scriptText, estimator, libraries, Script.estimate, defaultStdLib)
+    compileAndEstimate(scriptText, estimator, libraries, Script.estimate, defaultStdLib, fixEstimateOfVerifier)
 
   def compileAndEstimateCallables(
       scriptText: String,
       estimator: ScriptEstimator,
-      libraries: Map[String, String] = Map(),
-      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default
+      defaultStdLib: => StdLibVersion,
+      fixEstimateOfVerifier: Boolean
   ): Either[String, (Script, Script.ComplexityInfo)] =
-    compileAndEstimate(scriptText, estimator, libraries, Script.complexityInfo, defaultStdLib)
+    compileAndEstimate(scriptText, estimator, Map(), Script.complexityInfo, defaultStdLib, fixEstimateOfVerifier)
 
-  def compileAndEstimate[C](
+  private def compileAndEstimate[C](
       scriptText: String,
       estimator: ScriptEstimator,
-      libraries: Map[String, String] = Map(),
-      estimate: (Script, ScriptEstimator, Boolean) => Either[String, C],
-      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default
+      libraries: Map[String, String],
+      estimate: (Script, ScriptEstimator, Boolean, Boolean) => Either[String, C],
+      defaultStdLib: => StdLibVersion,
+      fixEstimateOfVerifier: Boolean
   ): Either[String, (Script, C)] =
     for {
       directives   <- DirectiveParser(scriptText)
       directiveSet <- Directive.extractDirectives(directives, defaultStdLib)
       linkedInput  <- ScriptPreprocessor(scriptText, libraries, directiveSet.imports)
-      result       <- applyAndEstimate(linkedInput, directiveSet, estimator, estimate)
+      result       <- applyAndEstimate(linkedInput, directiveSet, estimator, estimate, fixEstimateOfVerifier)
     } yield result
 
   private def applyAndEstimate[C](
       scriptText: String,
       directiveSet: DirectiveSet,
       estimator: ScriptEstimator,
-      estimate: (Script, ScriptEstimator, Boolean) => Either[String, C]
+      estimate: (Script, ScriptEstimator, Boolean, Boolean) => Either[String, C],
+      fixEstimateOfVerifier: Boolean
   ): Either[String, (Script, C)] =
     for {
       script     <- tryCompile(scriptText, directiveSet)
-      complexity <- estimate(script, estimator, directiveSet.scriptType != Asset)
+      complexity <- estimate(script, estimator, fixEstimateOfVerifier, directiveSet.scriptType != Asset)
     } yield (script, complexity)
 
   private def tryCompile(src: String, directiveSet: DirectiveSet): Either[String, Script] = {

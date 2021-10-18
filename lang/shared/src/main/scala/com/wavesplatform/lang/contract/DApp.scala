@@ -2,19 +2,49 @@ package com.wavesplatform.lang.contract
 
 import com.wavesplatform.lang.contract.DApp.{CallableFunction, VerifierFunction}
 import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
-import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilationError, Terms}
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.{CALLDAPP, CALLDAPPREENTRANT}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
 import com.wavesplatform.protobuf.dapp.DAppMeta
+
+import scala.annotation.tailrec
 
 case class DApp(
     meta: DAppMeta,
     decs: List[DECLARATION],
     callableFuncs: List[CallableFunction],
     verifierFuncOpt: Option[VerifierFunction]
-)
+) {
+  val verifierContainsSyncCall: Boolean =
+    verifierFuncOpt.map(_.u.body).exists(e => containsSyncCall(List(e)))
+
+  @tailrec private def containsSyncCall(e: List[EXPR]): Boolean = {
+    def funcBody(header: FunctionHeader): List[EXPR] =
+      decs.collect { case FUNC(header.funcName, _, body) => body }
+
+    def refBody(key: String): List[EXPR] =
+      decs.collect { case LET(`key`, body) => body }
+
+    e match {
+      case Nil                                              => false
+      case FUNCTION_CALL(Native(CALLDAPP), _) :: _          => true
+      case FUNCTION_CALL(Native(CALLDAPPREENTRANT), _) :: _ => true
+      case GETTER(expr, _) :: l                             => containsSyncCall(expr :: l)
+      case LET_BLOCK(LET(_, value), body) :: l              => containsSyncCall(value :: body :: l)
+      case BLOCK(LET(_, value), body) :: l                  => containsSyncCall(value :: body :: l)
+      case BLOCK(FUNC(_, _, value), body) :: l              => containsSyncCall(value :: body :: l)
+      case IF(cond, ifTrue, ifFalse) :: l                   => containsSyncCall(cond :: ifTrue :: ifFalse :: l)
+      case FUNCTION_CALL(header, args) :: l                 => containsSyncCall(funcBody(header) ::: args ::: l)
+      case REF(key) :: l                                    => containsSyncCall(refBody(key) ::: l)
+      case _ :: l                                           => containsSyncCall(l)
+    }
+  }
+}
 
 object DApp {
 

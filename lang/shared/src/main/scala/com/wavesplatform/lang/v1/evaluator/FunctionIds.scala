@@ -13,7 +13,9 @@ object FunctionIds {
   val MUL_LONG: Short = 104
   val DIV_LONG: Short = 105
   val MOD_LONG: Short = 106
-  val FRACTION: Short = 107
+
+  val FRACTION: Short        = 107
+  val FRACTION_ROUNDS: Short = 110
 
   val POW: Short = 108
   val LOG: Short = 109
@@ -31,38 +33,40 @@ object FunctionIds {
   val DROP_STRING: Short = 304
   val SIZE_STRING: Short = 305
 
-  val TO_BIGINT: Short  = 310
-  val SUM_BIGINT: Short = 311
-  val SUB_BIGINT: Short = 312
-  val MUL_BIGINT: Short = 313
-  val DIV_BIGINT: Short = 314
-  val MOD_BIGINT: Short = 315
-  val FRACTION_BIGINT: Short = 316
+  val TO_BIGINT: Short              = 310
+  val SUM_BIGINT: Short             = 311
+  val SUB_BIGINT: Short             = 312
+  val MUL_BIGINT: Short             = 313
+  val DIV_BIGINT: Short             = 314
+  val MOD_BIGINT: Short             = 315
+  val FRACTION_BIGINT: Short        = 316
   val FRACTION_BIGINT_ROUNDS: Short = 317
-  val UMINUS_BIGINT: Short = 318
-  val GT_BIGINT: Short  = 319
-  val GE_BIGINT: Short  = 320
+  val UMINUS_BIGINT: Short          = 318
+  val GT_BIGINT: Short              = 319
+  val GE_BIGINT: Short              = 320
 
-  val SIZE_LIST: Short         = 400
-  val GET_LIST: Short          = 401
-  val MEDIAN_LIST: Short       = 405
-  val MAX_LIST: Short          = 406
-  val MIN_LIST: Short          = 407
-  val MAX_LIST_BIGINT: Short   = 408
-  val MIN_LIST_BIGINT: Short   = 409
-  val LONG_TO_BYTES: Short     = 410
-  val STRING_TO_BYTES: Short   = 411
-  val BOOLEAN_TO_BYTES: Short  = 412
-  val BIGINT_TO_BYTES: Short   = 413
-  val BYTES_TO_BIGINT: Short   = 414
+  val SIZE_LIST: Short           = 400
+  val GET_LIST: Short            = 401
+  val MEDIAN_LIST: Short         = 405
+  val MAX_LIST: Short            = 406
+  val MIN_LIST: Short            = 407
+  val MAX_LIST_BIGINT: Short     = 408
+  val MIN_LIST_BIGINT: Short     = 409
+  val LONG_TO_BYTES: Short       = 410
+  val STRING_TO_BYTES: Short     = 411
+  val BOOLEAN_TO_BYTES: Short    = 412
+  val BIGINT_TO_BYTES: Short     = 413
+  val BYTES_TO_BIGINT: Short     = 414
   val BYTES_TO_BIGINT_LIM: Short = 415
-  val BIGINT_TO_INT: Short     = 416
-  val LONG_TO_STRING: Short    = 420
-  val BOOLEAN_TO_STRING: Short = 421
-  val BIGINT_TO_STRING: Short  = 422
-  val STRING_TO_BIGINT: Short  = 423
-  val STRING_TO_BIGINTOPT: Short  = 424
-  val MEDIAN_LISTBIGINT: Short    = 425
+  val BIGINT_TO_INT: Short       = 416
+  val LONG_TO_STRING: Short      = 420
+  val BOOLEAN_TO_STRING: Short   = 421
+  val BIGINT_TO_STRING: Short    = 422
+  val STRING_TO_BIGINT: Short    = 423
+  val STRING_TO_BIGINTOPT: Short = 424
+  val MEDIAN_LISTBIGINT: Short   = 425
+
+  val FOLD: Short = 450
 
   val CREATE_LIST: Short             = 1100
   val APPEND_LIST: Short             = 1101
@@ -81,6 +85,11 @@ object FunctionIds {
   val LASTINDEXOF: Short  = 1207
   val LASTINDEXOFN: Short = 1208
   val MAKESTRING: Short   = 1209
+
+  val MAKESTRING1C: Short = 1210
+  val MAKESTRING2C: Short = 1211
+  val SPLIT1C: Short      = 1212
+  val SPLIT4C: Short      = 1213
 
   val CREATE_TUPLE: Short = 1300 // Reserved 22 id for tuple constructors
   val SIZE_TUPLE: Short   = 1350
@@ -126,8 +135,8 @@ object FunctionIds {
   val ACCOUNTASSETONLYBALANCE: Short = 1008
   val ACCOUNTSCRIPTHASH: Short       = 1009
 
-  val CALLDAPP: Short                = 1020
-  val CALLDAPPREENTRANT: Short       = 1021
+  val CALLDAPP: Short          = 1020
+  val CALLDAPPREENTRANT: Short = 1021
 
   val DATA_LONG_FROM_ARRAY: Short    = 1040
   val DATA_BOOLEAN_FROM_ARRAY: Short = 1041
@@ -139,7 +148,7 @@ object FunctionIds {
   val DATA_BYTES_FROM_STATE: Short   = 1052
   val DATA_STRING_FROM_STATE: Short  = 1053
 
-  val IS_UNTOUCHED: Short            = 1054
+  val IS_UNTOUCHED: Short = 1054
 
   val DATA_LONG_FROM_STATE_SELF: Short    = 1055
   val DATA_BOOLEAN_FROM_STATE_SELF: Short = 1056

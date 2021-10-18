@@ -292,7 +292,7 @@ class AssetTransactionsDiffTest
                     AssetScriptInfo(
                       s,
                       Script
-                        .estimate(s, EstimatorProvider.EstimatorBlockchainExt(newState).estimator, useContractVerifierLimit = false)
+                        .estimate(s, EstimatorProvider.EstimatorBlockchainExt(newState).estimator, fixEstimateOfVerifier = true, useContractVerifierLimit = false)
                         .explicitGet()
                     )
                 ),

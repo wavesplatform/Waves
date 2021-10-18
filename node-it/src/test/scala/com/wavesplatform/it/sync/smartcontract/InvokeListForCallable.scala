@@ -5,6 +5,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state._
@@ -21,7 +22,7 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
 
   test("prerequisite: set contract and issue asset") {
     val source =
-      """
+      s"""
       |{-# STDLIB_VERSION 4 #-}
       |{-# CONTENT_TYPE DAPP #-}
       |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -51,7 +52,7 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
       |      case _ => throw("unknown type")
       |    }
       |  }
-      |  IntegerEntry("listsize", a.size()) :: FOLD<4>(a, [], checkType)
+      |  IntegerEntry("listsize", a.size()) :: ${Common.fold(4, "a", "[]", "checkType")()}
       |}
       """.stripMargin
     val script = ScriptCompiler.compile(source, ScriptEstimatorV2).explicitGet()._1.bytes().base64

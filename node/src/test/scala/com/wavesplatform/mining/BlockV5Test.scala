@@ -2,11 +2,15 @@ package com.wavesplatform.mining
 
 import java.util.concurrent.atomic.AtomicReference
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
+
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.{crypto, protobuf, BlocksTransactionsHelpers, TestTime}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
+import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.block.serialization.{BlockHeaderSerializer, BlockSerializer}
 import com.wavesplatform.block.validation.Validators
-import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
@@ -17,9 +21,12 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WalletSettings, WavesSettings}
+import com.wavesplatform.state.{diffs, Blockchain, BlockchainUpdaterImpl, NG}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{diffs, Blockchain, BlockchainUpdaterImpl, NG}
 import com.wavesplatform.test._
+import com.wavesplatform.test.FlatSpec
+import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction, TxHelpers, TxVersion}
@@ -35,9 +42,6 @@ import monix.reactive.{Observable, Observer}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.enablers.Length
-import scala.concurrent.Await
-import scala.concurrent.duration._
-
 class BlockV5Test
     extends FlatSpec
     with WithDomain
@@ -468,7 +472,7 @@ class BlockV5Test
     val pos               = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
     val allChannels       = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val wallet            = Wallet(WalletSettings(None, Some("123"), None))
-    val utxPool           = new UtxPoolImpl(time, blockchain, Observer.stopped, settings.utxSettings)
+    val utxPool           = new UtxPoolImpl(time, blockchain, settings.utxSettings)
     val minerScheduler    = Scheduler.singleThread("miner")
     val appenderScheduler = Scheduler.singleThread("appender")
     val miner             = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler, Observable.empty)

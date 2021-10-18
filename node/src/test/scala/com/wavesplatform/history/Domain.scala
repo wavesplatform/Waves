@@ -30,7 +30,6 @@ import com.wavesplatform.utils.{EthEncoding, SystemTime}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import monix.execution.Scheduler.Implicits.global
-import monix.reactive.Observer
 import org.iq80.leveldb.DB
 
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter, settings: WavesSettings) {
@@ -46,7 +45,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   val transactionDiffer: Transaction => TracedResult[ValidationError, Diff] =
     TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
 
-  lazy val utxPool: UtxPoolImpl = new UtxPoolImpl(SystemTime, blockchain, Observer.empty, settings.utxSettings)
+  lazy val utxPool: UtxPoolImpl = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings)
   lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
