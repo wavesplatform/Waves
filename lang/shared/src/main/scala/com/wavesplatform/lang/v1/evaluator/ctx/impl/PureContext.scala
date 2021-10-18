@@ -374,6 +374,30 @@ object PureContext {
       FUNCTION_CALL(Native(BIGINT_TO_INT), List(r))
     }
 
+  val fractionIntRoundsNative: BaseFunction[NoContext] =
+    NativeFunction(
+      "fraction",
+      1L,
+      FRACTION_ROUNDS,
+      LONG,
+      ("value", LONG),
+      ("numerator", LONG),
+      ("denominator", LONG),
+      ("round", UNION(fromV5RoundTypes))
+    ) {
+      case CONST_LONG(v) :: CONST_LONG(n) :: CONST_LONG(d) :: (r: CaseObj) :: Nil =>
+        for {
+          _ <- Either.cond(d != 0, (), "Fraction: division by zero")
+          r <- global.divide(BigInt(v) * BigInt(n), d, Rounding.byValue(r))
+          _ <- Either.cond(r.isValidLong, (), s"Fraction result $r out of integers range")
+        } yield CONST_LONG(r.longValue)
+      case xs =>
+        notImplemented[Id, EVALUATED](
+          "fraction(value: Int, numerator: Int, denominator: Int, round: Ceiling|Down|Floor|HalfEven|HalfUp)",
+          xs
+        )
+    }
+
   val fractionBigInt: BaseFunction[NoContext] =
     NativeFunction(
       "fraction",
@@ -1708,7 +1732,7 @@ object PureContext {
   private def v4Functions(fixUnicodeFunctions: Boolean) =
     if (fixUnicodeFunctions) v4FunctionsFixed else v4FunctionsUnfixed
 
-  private val v5Functions =
+  private val fromV5Functions =
     v4V5Functions ++
       Array(
         indexOfFixed,
@@ -1740,7 +1764,6 @@ object PureContext {
         listBigIntMin,
         fractionBigInt,
         fractionBigIntRounds(UNION(fromV5RoundTypes)),
-        fractionIntRounds(UNION(fromV5RoundTypes)),
         negativeBigInt,
         getBigIntListMedian,
         powBigInt(UNION(fromV5RoundTypes)),
@@ -1750,8 +1773,11 @@ object PureContext {
         fraction(fixLimitCheck = true)
       )
 
+  private val v5Functions =
+    fromV5Functions :+ fractionIntRounds(UNION(fromV5RoundTypes))
+
   private val v6Functions =
-    v5Functions ++ Array(sizeTuple, makeString1C, makeString2C, splitStr1C, splitStr4C, sqrtInt, sqrtBigInt)
+    fromV5Functions ++ Array(sizeTuple, makeString1C, makeString2C, splitStr1C, splitStr4C, sqrtInt, sqrtBigInt, fractionIntRoundsNative)
 
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =
     CTX[NoContext](

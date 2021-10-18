@@ -98,7 +98,7 @@
       params: [ "Int", "Int", "Int", "Ceiling|Down|Floor|HalfEven|HalfUp" ]
       doc: "Multiply and division with big integer intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor", "Rounding mode" ]
-      complexity: 4
+      complexity: 1
     }
     {
       name: "fraction"
