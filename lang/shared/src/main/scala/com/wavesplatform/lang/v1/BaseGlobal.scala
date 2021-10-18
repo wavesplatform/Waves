@@ -126,7 +126,7 @@ trait BaseGlobal {
       compRes <- ContractCompiler.compileWithParseResult(input, ctx, stdLibVersion, needCompaction, removeUnusedCode)
       (compDAppOpt, exprDApp, compErrorList) = compRes
       complexityWithMap <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty)
-        ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator)
+        ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator, fixEstimateOfVerifier = true)
       else Right((0L, Map.empty[String, Long]))
       bytes <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty) serializeContract(compDAppOpt.get, stdLibVersion) else Right(Array.empty[Byte])
     } yield (bytes, complexityWithMap, exprDApp, compErrorList))
@@ -191,7 +191,7 @@ trait BaseGlobal {
       dApp                                   <- ContractCompiler.compile(input, ctx, stdLibVersion, CallableFunction, needCompaction, removeUnusedCode)
       userFunctionComplexities               <- ContractScript.estimateUserFunctions(stdLibVersion, dApp, estimator)
       globalVariableComplexities             <- ContractScript.estimateGlobalVariables(stdLibVersion, dApp, estimator)
-      (maxComplexity, annotatedComplexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator)
+      (maxComplexity, annotatedComplexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator, fixEstimateOfVerifier = true)
       (verifierComplexity, callableComplexities) = dApp.verifierFuncOpt.fold(
         (0L, annotatedComplexities)
       )(v => (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name))
@@ -218,7 +218,7 @@ trait BaseGlobal {
   ): Either[String, Unit] =
     for {
       _ <- if (estimator == ScriptEstimatorV2)
-        ContractScript.estimateComplexity(version, dApp, ScriptEstimatorV1)
+        ContractScript.estimateComplexity(version, dApp, ScriptEstimatorV1, fixEstimateOfVerifier = true)
       else
         Right(())
       _ <- ContractScript.checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit = true)

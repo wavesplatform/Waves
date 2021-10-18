@@ -7,6 +7,7 @@ import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.FunctionCallPolicyProvider._
 import com.wavesplatform.lang._
@@ -298,7 +299,7 @@ object InvokeScriptTransactionDiff {
     val version    = tx.expression.stdLibVersion
     val estimator  = blockchain.estimator
     ContractScript
-      .estimateComplexity(version, dApp, estimator)
+      .estimateComplexity(version, dApp, estimator, fixEstimateOfVerifier = blockchain.isFeatureActivated(RideV6))
       .leftMap(GenericError(_))
       .map {
         case (_, complexities) =>

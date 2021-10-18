@@ -25,6 +25,6 @@ object RideVersionProvider {
     def actualRideVersion: StdLibVersion =
       actualVersionByFeature
         .collectFirst { case (feature, version) if b.isFeatureActivated(feature) => version }
-        .getOrElse(V2)
+        .getOrElse(V3)
   }
 }
