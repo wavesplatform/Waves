@@ -4,11 +4,15 @@ import cats.instances.list._
 import cats.syntax.traverse._
 import cats.{Id, Monad}
 import com.wavesplatform.lang.ExecutionError
+import com.wavesplatform.lang.directives.DirectiveDictionary
+import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion}
+import com.wavesplatform.lang.utils.getDecompilerContext
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.EvalM
 import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.Lenses._
+import com.wavesplatform.lang.v1.estimator.{HighOrderFunctionInfo, ScriptEstimator}
 import com.wavesplatform.lang.v1.task.imports._
 import monix.eval.Coeval
 
@@ -99,6 +103,7 @@ object ScriptEstimatorV3 extends ScriptEstimator {
         .get(header)
         .map(const)
         .getOrElse(raiseError[Id, EstimatorContext, ExecutionError, (Coeval[Long], Set[String])](s"function '$header' not found"))
+      internalCallsCost <- evalHighOrderFunc(ctx, header, args)
       _ <- update(
         (funcs ~ usedRefs).modify(_) {
           case (funcs, usedRefs) =>
@@ -109,7 +114,40 @@ object ScriptEstimatorV3 extends ScriptEstimator {
         }
       )
       argsCost <- args.traverse(evalHoldingFuncs)
-    } yield argsCost.sum + bodyCost.value()
+    } yield argsCost.sum + bodyCost.value() + internalCallsCost
+
+  private def evalHighOrderFunc(ctx: EstimatorContext, header: FunctionHeader, args: List[EXPR]): EvalM[Long] = {
+    def errorPrefix = {
+      val functionName =
+        header match {
+          case Native(id) =>
+            val version = DirectiveDictionary[StdLibVersion].all.last
+            getDecompilerContext(version, Expression).opCodes.getOrElse(id, header.toString)
+          case u: User =>
+            u.name
+        }
+      s"Unexpected call of high-order function $functionName: "
+    }
+    val r = HighOrderFunctionInfo.all
+      .get(header)
+      .map(
+        info =>
+          args
+            .lift(info.functionIndex)
+            .toRight(s"${errorPrefix}only ${args.size} args passed while ${info.functionIndex + 1} expected")
+            .flatMap {
+              case CONST_STRING(function) =>
+                ctx.funcs
+                  .get(User(function))
+                  .map { case (complexity, _) => complexity.value() * info.callLimit }
+                  .toRight(s"$errorPrefix'$function' is not found in the scope")
+              case expr =>
+                Left(s"${errorPrefix}expression '$expr' is passed as function reference")
+            }
+      )
+      .getOrElse(Right(0L))
+    liftEither(r)
+  }
 
   private def update(f: EstimatorContext => EstimatorContext): EvalM[Unit] =
     modify[Id, EstimatorContext, ExecutionError](f)

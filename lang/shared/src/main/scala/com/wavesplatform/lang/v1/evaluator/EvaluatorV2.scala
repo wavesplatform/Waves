@@ -7,9 +7,11 @@ import cats.instances.lazyList._
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.EvaluationException
+import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, Simple}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.{EvaluationException, incomplete}
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.traits.Environment
 import monix.eval.Coeval
@@ -25,9 +27,9 @@ class EvaluatorV2(
   def apply(expr: EXPR, limit: Int): (EXPR, Int) =
     applyCoeval(expr, limit).value()
 
-  def applyCoeval(expr: EXPR, limit: Int): Coeval[(EXPR, Int)] = {
+  private def applyCoeval(expr: EXPR, limit: Int, parentBlocks: List[BLOCK_DEF] = Nil): Coeval[(EXPR, Int)] = {
     var ref = expr.deepCopy.value
-    root(ref, v => Coeval.delay { ref = v }, limit, Nil)
+    root(ref, v => Coeval.delay { ref = v }, limit, parentBlocks)
       .map((ref, _))
   }
 
@@ -64,8 +66,20 @@ class EvaluatorV2(
       if (limit < cost)
         Coeval.now(limit)
       else {
-        function.ev
-          .evaluateExtended[Id](ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]], limit - cost)
+        val args = fc.args.asInstanceOf[List[EVALUATED]]
+        (function.ev match {
+          case f: Extended[Environment] => f.evaluate[Id](ctx.ec.environment, args, limit - cost, evaluateHighOrder)
+          case f: Simple[Environment]   => Coeval((f.evaluate(ctx.ec.environment, args), 0))
+        }).onErrorHandleWith {
+            case _: SecurityException =>
+              Coeval((s"""An access to ${function.ev} is denied""".asLeft[EVALUATED], 0))
+            case e: Throwable =>
+              val error = e.getMessage match {
+                case null => e.toString
+                case msg  => msg
+              }
+              Coeval((s"""An error during run ${function.ev}: ${e.getClass} $error""".asLeft[EVALUATED], 0))
+          }
           .flatMap {
             case (result, additionalComplexity) =>
               val totalCost        = cost + additionalComplexity
@@ -77,6 +91,18 @@ class EvaluatorV2(
           }
       }
     }
+
+    def evaluateHighOrder(function: String, args: List[EVALUATED], limit: Int): Coeval[(Either[ExecutionError, EVALUATED], Int)] =
+      applyCoeval(FUNCTION_CALL(User(function), args), limit, parentBlocks)
+        .redeem(
+          {
+            case e: EvaluationException => (Left(e.getMessage), limit - e.unusedComplexity)
+            case e                      => (Left(e.getMessage), 0)
+          }, {
+            case (r: EVALUATED, unusedComplexity) => (Right(r), limit - unusedComplexity)
+            case (expr, unusedComplexity)         => (incomplete(expr), limit - unusedComplexity)
+          }
+        )
 
     def evaluateUserFunction(fc: FUNCTION_CALL, limit: Int, name: String, startArgs: List[EXPR]): Option[Coeval[Int]] = {
       ctx.ec.functions
@@ -343,7 +369,10 @@ object EvaluatorV2 {
       expr: EXPR,
       stdLibVersion: StdLibVersion
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, expr => Left(s"Unexpected incomplete evaluation result $expr"))
+    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, incomplete)
+
+  private def incomplete(expr: EXPR): Either[ExecutionError, Nothing] =
+    Left(s"Unexpected incomplete evaluation result $expr")
 
   case class EvaluationException(message: String, unusedComplexity: Int) extends RuntimeException(message)
 }
