@@ -17,19 +17,19 @@ import org.web3j.abi.datatypes.generated.{Uint256, Uint8}
 import org.web3j.crypto._
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters._
-
 import cats.syntax.traverse._
 import cats.syntax.either._
 import cats.instances.vector._
 import cats.data.Validated
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidIds}
 import com.wavesplatform.api.http.assets.AssetsApiRoute
-import com.wavesplatform.utils.EthEncoding
+import com.wavesplatform.utils.{EthEncoding, Time}
 
-class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi) extends ApiRoute {
+class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi, time: Time) extends ApiRoute {
   val route: Route = pathPrefix("eth") {
     (path("assets") & anyParam("id", nonEmpty = true, limit = 100).massValidateEthereumIds) { erc20Ids =>
       val results = erc20Ids
@@ -62,12 +62,12 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
       lazy val param1Str = param1.as[String]
 
       (jso \ "method").as[String] match {
-        case "eth_chainId" =>
+        case "eth_chainId" | "net_version" =>
           resp(id, quantity(AddressScheme.current.chainId.toInt))
         case "eth_blockNumber" =>
           resp(id, quantity(blockchain.height))
         case "eth_getTransactionCount" =>
-          resp(id, quantity(System.currentTimeMillis()))
+          resp(id, quantity(time.getTimestamp()))
         case "eth_getBlockByNumber" =>
           resp(
             id,
