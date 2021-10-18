@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1.parser
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.UnaryOperation._
@@ -79,7 +78,7 @@ class ParserV2(val input: ParserInput) extends Parser {
   }
 
   def Fold: Rule1[EXPR] = rule {
-    push(cursor) ~ "FOLD" ~ WS ~ "<" ~ WS ~ capture(Digits) ~ WS ~ ">" ~ WS ~ "(" ~ WS ~ Expr ~ WS ~ "," ~ WS ~ Expr ~ WS ~ "," ~ WS ~ ReferenceAtom ~ WS ~ ")" ~ push(
+    push(cursor) ~ "fold_" ~ WS ~ capture(Digits) ~ WS ~ "(" ~ WS ~ Expr ~ WS ~ "," ~ WS ~ Expr ~ WS ~ "," ~ WS ~ ReferenceAtom ~ WS ~ ")" ~ push(
       cursor
     ) ~> parseFoldExpr _
   }
@@ -236,12 +235,7 @@ class ParserV2(val input: ParserInput) extends Parser {
   def parseFoldExpr(startPos: Int, limitNumStr: String, list: EXPR, acc: EXPR, f: EXPR, endPos: Int): EXPR = {
     val limit = limitNumStr.toInt
     val pos   = Pos(startPos, endPos)
-    if (limit < 1)
-      INVALID(pos, "FOLD limit should be natural")
-    else if (limit > MaxListLengthV4)
-      INVALID(pos, s"List size limit in FOLD is too big, $limit must be less or equal $MaxListLengthV4")
-    else
-      FOLD(pos, limit, list, acc, f.asInstanceOf[REF])
+    FOLD(pos, limit, list, acc, f.asInstanceOf[REF])
   }
 
   def parseGettableExpr(expr: EXPR, accessors: Seq[Accessor], endPos: Int): EXPR = {

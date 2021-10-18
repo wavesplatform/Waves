@@ -17,7 +17,7 @@ package object repl {
   val internalVarPrefixes: Set[Char] = Set('@', '$')
   val internalFuncPrefix: String = "_"
 
-  val version = V5
+  val version = V6
   val directives: DirectiveSet = DirectiveSet(version, Account, DApp).explicitGet()
 
   val initialCtx: CTX[Environment] =

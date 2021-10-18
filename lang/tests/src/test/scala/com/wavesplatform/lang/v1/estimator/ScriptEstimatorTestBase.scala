@@ -4,6 +4,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
@@ -63,6 +64,15 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*) extends PropSpec {
       script: EXPR
   ): Either[String, Long] = {
     val results = estimators.map(_(lets, functionCosts, script))
+    if (results.distinct.length == 1)
+      results.head
+    else
+      Left(s"Estimators discrepancy: ${results.toString}")
+  }
+
+  protected def estimate(script: String, version: StdLibVersion): Either[String, Long] = {
+    val expr = compile(script)(version)
+    val results = estimators.map(_(lets, functionCosts(version), expr))
     if (results.distinct.length == 1)
       results.head
     else
