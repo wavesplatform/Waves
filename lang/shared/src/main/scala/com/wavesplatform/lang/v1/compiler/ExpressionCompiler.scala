@@ -669,15 +669,15 @@ object ExpressionCompiler {
       func: PART[String]
   ): CompileM[CompilationStepResultExpr] =
     for {
-      (list, listType, _) <- compileExpr(list)
+      (_, listType, _) <- compileExpr(list)
       listInnerType <- (listType match {
         case list: LIST => Right(list.innerType)
-        case other      => Left(Generic(p.start, p.end, s"FOLD first argument should be List[T], but $other found"))
+        case other      => Left(Generic(p.start, p.end, s"Fold first argument should be List[A], but $other found"))
       }).toCompileM
-      (acc, accType, accRaw) <- compileExpr(acc)
-      funcName               <- handlePart(func)
-      ctx                    <- get[Id, CompilerContext, CompilationError]
-      function <- ctx
+      (_, accType, _) <- compileExpr(acc)
+      funcName        <- handlePart(func)
+      ctx             <- get[Id, CompilerContext, CompilationError]
+      compiledFunc <- ctx
         .functionTypeSignaturesByName(funcName)
         .collectFirst {
           case s @ FunctionTypeSignature(_, Seq((_, type1: FINAL), (_, type2: FINAL)), _) if type1 >= accType && type2 >= listInnerType =>
@@ -686,11 +686,21 @@ object ExpressionCompiler {
         .getOrElse {
           val accTypeStr       = if (accType == NOTHING) ANY else accType
           val listInnerTypeStr = if (listInnerType == NOTHING) ANY else listInnerType
-          Left(Generic(p.start, p.end, s"Can't find suitable function $funcName(a: $accTypeStr, b: $listInnerTypeStr) for FOLD"))
+          Left(Generic(p.start, p.end, s"Can't find suitable function $funcName(a: $accTypeStr, b: $listInnerTypeStr) for fold"))
         }
         .toCompileM
-      r <- Right(CompilerMacro.unwrapFold(limit, list, acc, function.header)).toCompileM
-    } yield CompilationStepResultExpr(ctx, r, function.args.head._2.asInstanceOf[FINAL], accRaw)
+      compiledFold <- compileFunctionCall(
+        p,
+        PART.VALID(p, s"fold_$limit"),
+        List(list, acc, Expressions.CONST_STRING(p, func)),
+        saveExprContext = false,
+        allowIllFormedStrings = false
+      )
+      correctedResultType = compiledFunc.result match {
+        case t: FINAL => t
+        case _        => compiledFold.t
+      }
+    } yield compiledFold.copy(t = correctedResultType)
 
   private def matchFuncOverload(
       p: Pos,

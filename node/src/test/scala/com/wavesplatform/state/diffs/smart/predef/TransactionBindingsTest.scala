@@ -5,7 +5,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing.evaluated
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
@@ -17,6 +16,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
+import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.state._
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -350,6 +350,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
         .reverse
         .mkString("[", ",", "]")
 
+      val size = t.payments.size
       val script =
         s"""
            | func assetsAmountSum(acc: Int, p: AttachedPayment) = acc + p.amount
@@ -361,8 +362,8 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
            |
            | match tx {
            |   case t : InvokeScriptTransaction =>
-           |     let paymentAmount = FOLD<${t.payments.size}>(t.payments, 0, assetsAmountSum) == ${t.payments.map(_.amount).sum}
-           |     let paymentAssets = FOLD<${t.payments.size}>(t.payments, nil, extractAssets) == $paymentsStr
+           |     let paymentAmount = ${Common.fold(size, "t.payments", "0", "assetsAmountSum")()} == ${t.payments.map(_.amount).sum}
+           |     let paymentAssets = ${Common.fold(size, "t.payments", "nil", "extractAssets")()} == $paymentsStr
            |
            |     paymentAmount && paymentAssets
            |
