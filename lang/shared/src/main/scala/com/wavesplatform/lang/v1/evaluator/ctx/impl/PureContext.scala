@@ -61,23 +61,26 @@ object PureContext {
     createTryOp(SUM_OP, LONG, LONG, SUM_LONG)((a, b) => Math.addExact(a, b))
   lazy val subLong: BaseFunction[NoContext] =
     createTryOp(SUB_OP, LONG, LONG, SUB_LONG)((a, b) => Math.subtractExact(a, b))
+
   lazy val sumString: BaseFunction[NoContext] =
     createRawOp(
       SUM_OP,
       STRING,
       STRING,
       SUM_STRING,
-      Map[StdLibVersion, Long](V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 20L)
+      Map[StdLibVersion, Long](V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 20L, V5 -> 20L, V6 -> 1L)
     ) {
-      case (CONST_STRING(a), CONST_STRING(b)) =>
-        if (a.length + b.length <= Terms.DataEntryValueMax) {
-          CONST_STRING(a + b)
+      case (s1 @ CONST_STRING(a), s2 @ CONST_STRING(b)) =>
+        val sumWeight = (s1.weight + s2.weight).toInt
+        if (sumWeight <= Terms.DataEntryValueMax) {
+          CONST_STRING(a + b, bytesLength = Some(sumWeight))
         } else {
-          Left(s"String length = ${a.length + b.length} exceeds ${Terms.DataEntryValueMax}")
+          Left(s"String size = $sumWeight exceeds ${Terms.DataEntryValueMax} bytes")
         }
       case args =>
         Left(s"Unexpected args $args for string concatenation operator")
     }
+
   lazy val sumByteStr: BaseFunction[NoContext] =
     createRawOp(
       SUM_OP,
@@ -127,7 +130,7 @@ object PureContext {
     }
 
   lazy val bigIntToString: BaseFunction[NoContext] =
-    NativeFunction("toString", 65, BIGINT_TO_STRING, STRING, ("n", BIGINT)) {
+    NativeFunction("toString", Map(V5 -> 65L, V6 -> 1L), BIGINT_TO_STRING, STRING, ("n", BIGINT)) {
       case CONST_BIGINT(n) :: Nil => CONST_STRING(n.toString)
       case xs                     => notImplemented[Id, EVALUATED]("toString(n: BigInt)", xs)
     }
@@ -327,7 +330,7 @@ object PureContext {
   def fraction(fixLimitCheck: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "fraction",
-      Map[StdLibVersion, Long](V1 -> 1, V2 -> 1, V3 -> 1, V4 -> 1, V5 -> 14),
+      Map[StdLibVersion, Long](V1 -> 1, V2 -> 1, V3 -> 1, V4 -> 1, V5 -> 14, V6 -> 1),
       FRACTION,
       LONG,
       ("value", LONG),
@@ -352,7 +355,7 @@ object PureContext {
   def fractionIntRounds(roundTypes: UNION): BaseFunction[NoContext] =
     UserFunction(
       "fraction",
-      17,
+      Map(V5 -> 17L, V6 -> 4L),
       LONG,
       ("@value", LONG),
       ("@numerator", LONG),
@@ -371,10 +374,34 @@ object PureContext {
       FUNCTION_CALL(Native(BIGINT_TO_INT), List(r))
     }
 
+  val fractionIntRoundsNative: BaseFunction[NoContext] =
+    NativeFunction(
+      "fraction",
+      1L,
+      FRACTION_ROUNDS,
+      LONG,
+      ("value", LONG),
+      ("numerator", LONG),
+      ("denominator", LONG),
+      ("round", UNION(fromV5RoundTypes))
+    ) {
+      case CONST_LONG(v) :: CONST_LONG(n) :: CONST_LONG(d) :: (r: CaseObj) :: Nil =>
+        for {
+          _ <- Either.cond(d != 0, (), "Fraction: division by zero")
+          r <- global.divide(BigInt(v) * BigInt(n), d, Rounding.byValue(r))
+          _ <- Either.cond(r.isValidLong, (), s"Fraction result $r out of integers range")
+        } yield CONST_LONG(r.longValue)
+      case xs =>
+        notImplemented[Id, EVALUATED](
+          "fraction(value: Int, numerator: Int, denominator: Int, round: Ceiling|Down|Floor|HalfEven|HalfUp)",
+          xs
+        )
+    }
+
   val fractionBigInt: BaseFunction[NoContext] =
     NativeFunction(
       "fraction",
-      128,
+      Map(V5 -> 128L, V6 -> 1L),
       FRACTION_BIGINT,
       BIGINT,
       ("value", BIGINT),
@@ -394,7 +421,7 @@ object PureContext {
   def fractionBigIntRounds(roundTypes: UNION): BaseFunction[NoContext] =
     NativeFunction(
       "fraction",
-      128,
+      Map(V5 -> 128L, V6 -> 1L),
       FRACTION_BIGINT_ROUNDS,
       BIGINT,
       ("value", BIGINT),
@@ -970,20 +997,34 @@ object PureContext {
     }
 
   lazy val splitStr: BaseFunction[NoContext] =
-    NativeFunction("split", Map(V3 -> 100L, V4 -> 75L), SPLIT, listString, ("str", STRING), ("separator", STRING)) {
+    NativeFunction("split", Map(V3 -> 100L, V4 -> 75L, V5 -> 75L, V6 -> 51L), SPLIT, listString, ("str", STRING), ("separator", STRING)) {
       case CONST_STRING(str) :: CONST_STRING(sep) :: Nil =>
         ARR(split(str, sep, unicode = false).toIndexedSeq, limited = true)
       case xs =>
         notImplemented[Id, EVALUATED]("split(str: String, separator: String)", xs)
     }
 
-  lazy val splitStrFixed: BaseFunction[NoContext] =
-    NativeFunction("split", Map(V3 -> 100L, V4 -> 75L), SPLIT, listString, ("str", STRING), ("separator", STRING)) {
-      case CONST_STRING(str) :: CONST_STRING(sep) :: Nil =>
-        ARR(split(str, sep, unicode = true).toIndexedSeq, limited = true)
+  def splitStrFixedF(id: Short, inputLimit: Int, outputLimit: Int, v6Complexity: Long): BaseFunction[NoContext] = {
+    val name = if (id == SPLIT) "split" else s"split_${v6Complexity}C"
+    NativeFunction(name, Map(V3 -> 100L, V4 -> 75L, V5 -> 75L, V6 -> v6Complexity), id, listString, ("str", STRING), ("separator", STRING)) {
+      case (s @ CONST_STRING(str)) :: CONST_STRING(sep) :: Nil =>
+        if (s.weight > inputLimit)
+          Left(s"Input string size = ${s.weight} bytes exceeds limit = $inputLimit for $name")
+        else {
+          val result = split(str, sep, unicode = true).toIndexedSeq
+          if (result.size > outputLimit)
+            Left(s"Output list size = ${result.size} exceeds limit = $outputLimit for $name")
+          else
+            ARR(result, limited = true)
+        }
       case xs =>
-        notImplemented[Id, EVALUATED]("split(str: String, separator: String)", xs)
+        notImplemented[Id, EVALUATED](s"$name(str: String, separator: String)", xs)
     }
+  }
+
+  val splitStrFixed = splitStrFixedF(SPLIT, DataEntryValueMax, MaxListLengthV4, 51)
+  val splitStr1C    = splitStrFixedF(SPLIT1C, 500, 20, 1)
+  val splitStr4C    = splitStrFixedF(SPLIT4C, 6000, 100, 4)
 
   private def split(str: String, sep: String, unicode: Boolean): Iterable[CONST_STRING] = {
     if (str == "") listWithEmptyStr
@@ -1017,20 +1058,30 @@ object PureContext {
       )
   }
 
-  lazy val makeString: BaseFunction[NoContext] =
-    NativeFunction("makeString", 30, MAKESTRING, STRING, ("list", LIST(STRING)), ("separator", STRING)) {
+  def makeStringF(id: Short, complexityV6: Long, inputLimit: Int, outputLimit: Int): BaseFunction[NoContext] = {
+    val name = if (inputLimit == MaxListLengthV4) "makeString" else s"makeString_${complexityV6}C"
+    NativeFunction(name, Map(V4 -> 30L, V5 -> 30L, V6 -> complexityV6), id, STRING, ("list", LIST(STRING)), ("separator", STRING)) {
       case (arr: ARR) :: CONST_STRING(separator) :: Nil =>
-        val separatorStringSize =
-          if (arr.xs.length > 1) (arr.xs.length - 1) * separator.length
-          else 0
-        val expectedStringSize = arr.elementsWeightSum + separatorStringSize
-        if (expectedStringSize <= DataEntryValueMax)
-          CONST_STRING(arr.xs.mkString(separator))
-        else
-          Left(s"Constructing string size = $expectedStringSize bytes will exceed $DataEntryValueMax")
+        if (arr.xs.length > inputLimit)
+          Left(s"Input list size = ${arr.xs.length} for $name should not exceed $inputLimit")
+        else {
+          val separatorStringSize =
+            if (arr.xs.length > 1) (arr.xs.length - 1) * separator.length
+            else 0
+          val expectedStringSize = arr.elementsWeightSum + separatorStringSize
+          if (expectedStringSize <= outputLimit)
+            CONST_STRING(arr.xs.mkString(separator))
+          else
+            Left(s"Constructing string size = $expectedStringSize bytes will exceed $outputLimit")
+        }
       case xs =>
-        notImplemented[Id, EVALUATED]("makeString(list: List[String], separator: String)", xs)
+        notImplemented[Id, EVALUATED](s"$name(list: List[String], separator: String)", xs)
     }
+  }
+
+  val makeString: BaseFunction[NoContext]   = makeStringF(MAKESTRING, 11, MaxListLengthV4, DataEntryValueMax)
+  val makeString1C: BaseFunction[NoContext] = makeStringF(MAKESTRING1C, 1, 70, 500)
+  val makeString2C: BaseFunction[NoContext] = makeStringF(MAKESTRING2C, 2, 100, 6000)
 
   lazy val contains: BaseFunction[NoContext] =
     UserFunction(
@@ -1308,7 +1359,16 @@ object PureContext {
     }
 
   def pow(roundTypes: UNION): BaseFunction[NoContext] = {
-    NativeFunction("pow", 100, POW, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", roundTypes)) {
+    NativeFunction("pow",
+                   Map(V3 -> 100L, V4 -> 100L, V5 -> 100L, V6 -> 28L),
+                   POW,
+                   LONG,
+                   ("base", LONG),
+                   ("bp", LONG),
+                   ("exponent", LONG),
+                   ("ep", LONG),
+                   ("rp", LONG),
+                   ("round", roundTypes)) {
       case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
         if (bp < 0
             || bp > 8
@@ -1318,11 +1378,26 @@ object PureContext {
             || rp > 8) {
           Left("pow: scale out of range 0-8")
         } else {
-          global.pow(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_LONG)
+          global.pow(b, bp.toInt, e, ep.toInt, rp.toInt, Rounding.byValue(round)).map(CONST_LONG)
         }
       case xs => notImplemented[Id, EVALUATED]("pow(base: Int, bp: Int, exponent: Int, ep: Int, rp: Int, round: Rounds)", xs)
     }
   }
+
+  val sqrtInt: BaseFunction[NoContext] =
+    UserFunction("sqrt", 2, LONG, ("@number", LONG), ("@precision", LONG), ("@resultPrecision", LONG), ("@round", UNION(fromV5RoundTypes))) {
+      FUNCTION_CALL(
+        Native(POW),
+        List(
+          REF("@number"),
+          REF("@precision"),
+          CONST_LONG(5),
+          CONST_LONG(1),
+          REF("@resultPrecision"),
+          REF("@round")
+        )
+      )
+    }
 
   def log(roundTypes: UNION): BaseFunction[NoContext] = {
     NativeFunction("log", 100, LOG, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", roundTypes)) {
@@ -1344,7 +1419,7 @@ object PureContext {
   def powBigInt(roundTypes: UNION): BaseFunction[NoContext] =
     NativeFunction(
       "pow",
-      200,
+      Map(V5 -> 200L, V6 -> 270L),
       POW_BIGINT,
       BIGINT,
       ("base", BIGINT),
@@ -1361,7 +1436,7 @@ object PureContext {
             || ep > 18
             || rp < 0
             || rp > 18) {
-          Left("pow: scale out of range 0-12")
+          Left("pow: scale out of range 0-18")
         } else {
           global
             .powBigInt(b, bp, e, ep, rp, Rounding.byValue(round))
@@ -1369,6 +1444,30 @@ object PureContext {
             .bimap(e => s"$e on BigInt pow calculation", CONST_BIGINT)
         }
       case xs => notImplemented[Id, EVALUATED]("pow(base: BigInt, bp: Int, exponent:Big Int, ep: Int, rp: Int, round: Rounds)", xs)
+    }
+
+  val sqrtBigInt: BaseFunction[NoContext] =
+    UserFunction(
+      "sqrt",
+      "sqrtBigInt",
+      5,
+      BIGINT,
+      ("@number", BIGINT),
+      ("@precision", LONG),
+      ("@resultPrecision", LONG),
+      ("@round", UNION(fromV5RoundTypes))
+    ) {
+      FUNCTION_CALL(
+        Native(POW_BIGINT),
+        List(
+          REF("@number"),
+          REF("@precision"),
+          CONST_BIGINT(5),
+          CONST_LONG(1),
+          REF("@resultPrecision"),
+          REF("@round")
+        )
+      )
     }
 
   def logBigInt(roundTypes: UNION): BaseFunction[NoContext] =
@@ -1392,7 +1491,7 @@ object PureContext {
               || ep > 18
               || rp < 0
               || rp > 18) {
-            Left("Scale out of range 0-12")
+            Left("Scale out of range 0-18")
           } else {
             global.logBigInt(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_BIGINT)
           }
@@ -1402,7 +1501,7 @@ object PureContext {
 
   val getListMedian: BaseFunction[NoContext] =
     NativeFunction("median", 20, MEDIAN_LIST, LONG, ("arr", PARAMETERIZEDLIST(LONG))) {
-      case xs @ (ARR(arr) :: Nil) =>
+      case xs @ ARR(arr) :: Nil =>
         if (arr.headOption.forall(_.isInstanceOf[CONST_LONG])) {
           if (arr.nonEmpty)
             Right(CONST_LONG(global.median(arr.asInstanceOf[IndexedSeq[CONST_LONG]].map(_.t).toArray)))
@@ -1416,7 +1515,7 @@ object PureContext {
 
   val getBigIntListMedian: BaseFunction[NoContext] =
     NativeFunction("median", 20 * 8, MEDIAN_LISTBIGINT, BIGINT, ("arr", PARAMETERIZEDLIST(BIGINT))) {
-      case xs @ (ARR(arr) :: Nil) =>
+      case xs @ ARR(arr) :: Nil =>
         if (arr.headOption.forall(_.isInstanceOf[CONST_BIGINT])) {
           if (arr.nonEmpty)
             Right(CONST_BIGINT(global.median(arr.asInstanceOf[IndexedSeq[CONST_BIGINT]].map(_.t).toArray)))
@@ -1512,8 +1611,8 @@ object PureContext {
       STRING
     )
 
-  private val allRoundTypes: List[CASETYPEREF]    = Rounding.all.map(_.`type`)
-  private val fromV5RoundTypes: List[CASETYPEREF] = Rounding.fromV5.map(_.`type`)
+  private val allRoundTypes: List[CASETYPEREF]         = Rounding.all.map(_.`type`)
+  private lazy val fromV5RoundTypes: List[CASETYPEREF] = Rounding.fromV5.map(_.`type`)
 
   private val v1v2v3v4Types: Seq[REAL] = commonTypes ++ allRoundTypes
   private val v5Types: Seq[REAL]       = commonTypes ++ fromV5RoundTypes ++ Seq(BIGINT)
@@ -1682,7 +1781,7 @@ object PureContext {
   private def v4Functions(fixUnicodeFunctions: Boolean) =
     if (fixUnicodeFunctions) v4FunctionsFixed else v4FunctionsUnfixed
 
-  private val v5Functions =
+  private val fromV5Functions =
     v4V5Functions ++
       Array(
         indexOfFixed,
@@ -1714,7 +1813,6 @@ object PureContext {
         listBigIntMin,
         fractionBigInt,
         fractionBigIntRounds(UNION(fromV5RoundTypes)),
-        fractionIntRounds(UNION(fromV5RoundTypes)),
         negativeBigInt,
         getBigIntListMedian,
         powBigInt(UNION(fromV5RoundTypes)),
@@ -1724,8 +1822,11 @@ object PureContext {
         fraction(fixLimitCheck = true),
       )
 
+  private val v5Functions =
+    fromV5Functions :+ fractionIntRounds(UNION(fromV5RoundTypes))
+
   private val v6Functions =
-    v5Functions ++ folds.map(_._2) ++ Array(sizeTuple)
+    fromV5Functions ++ folds.map(_._2) ++ Array(sizeTuple, makeString1C, makeString2C, splitStr1C, splitStr4C, sqrtInt, sqrtBigInt, fractionIntRoundsNative)
 
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =
     CTX[NoContext](

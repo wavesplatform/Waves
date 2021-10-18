@@ -367,7 +367,7 @@ object Functions {
   val stringFromAddressF: BaseFunction[Environment] =
     NativeFunction(
       "toString",
-      10,
+      Map(V3 -> 10L, V4 -> 10L, V5 -> 10L, V6 -> 1L),
       ADDRESSTOSTRING,
       STRING,
       ("Address", addressType)
