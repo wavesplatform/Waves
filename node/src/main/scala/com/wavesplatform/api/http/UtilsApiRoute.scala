@@ -11,7 +11,6 @@ import com.wavesplatform.api.http.requests.{ScriptWithImportsRequest, byteStrFor
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
-import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{RideV6, SynchronousCalls}
 import com.wavesplatform.features.RideVersionProvider.RideVersionBlockchainExt
@@ -36,11 +35,11 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.{Blockchain, Diff}
-import com.wavesplatform.transaction.{Asset, TransactionType}
 import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment, InvokeScriptTransaction}
+import com.wavesplatform.transaction.{Asset, TransactionType}
 import com.wavesplatform.utils.Time
 import monix.eval.Coeval
 import monix.execution.Scheduler
