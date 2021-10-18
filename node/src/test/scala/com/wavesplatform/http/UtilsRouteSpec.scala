@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
 import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.UtilsApiRoute
@@ -811,7 +811,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                  """.stripMargin
 
       val (script, _) = ScriptCompiler.compile(str, ScriptEstimatorV2).explicitGet()
-      AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map(1 -> Map("testCallable" -> 200, "testSyncCallComplexityExcess" -> 100)))
+      AccountScriptInfo(TxHelpers.defaultSigner.publicKey, script, 0, Map(1 -> Map("testCallable" -> 200, "testSyncCallComplexityExcess" -> 100)))
     }
 
     val dAppAddress = TxHelpers.defaultSigner.toAddress
@@ -958,7 +958,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
            | }
          """.stripMargin
       )
-      AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map(1 -> Map("callable" -> 999)))
+      AccountScriptInfo(TxHelpers.secondSigner.publicKey, script, 0, Map(1 -> Map("callable" -> 999)))
     }
     (blockchain.hasAccountScript _).when(dAppAddress2).returning(true).anyNumberOfTimes()
     (blockchain.accountScript _).when(dAppAddress2).returning(Some(testScript2)).anyNumberOfTimes()

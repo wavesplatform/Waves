@@ -46,6 +46,7 @@ import monix.eval.Coeval
 import monix.execution.Scheduler
 import play.api.libs.json._
 import shapeless.Coproduct
+
 case class UtilsApiRoute(
     timeService: Time,
     settings: RestAPISettings,
@@ -246,7 +247,9 @@ case class UtilsApiRoute(
 
   def evaluate: Route =
     (path("script" / "evaluate" / ScriptedAddress) & jsonPostD[JsObject]) { (address, obj) =>
-      val script = blockchain.accountScript(address).get.script
+      val scriptInfo = blockchain.accountScript(address).get
+      val pk         = scriptInfo.publicKey
+      val script     = scriptInfo.script
 
       def parseCall(js: JsReadable) = {
         val binaryCall = js
@@ -265,7 +268,7 @@ case class UtilsApiRoute(
       val result =
         for {
           expr                 <- parseCall(obj \ "expr")
-          (result, complexity) <- ScriptCallEvaluator.executeExpression(blockchain, script, address, settings.evaluateScriptComplexityLimit)(expr)
+          (result, complexity) <- ScriptCallEvaluator.executeExpression(blockchain, script, address, pk, settings.evaluateScriptComplexityLimit)(expr)
         } yield Json.obj("result" -> ScriptValuesJson.serializeValue(result), "complexity" -> complexity)
 
       val requestData = obj ++ Json.obj("address" -> address.toString)
@@ -310,7 +313,7 @@ object UtilsApiRoute {
         .map(_._1)
     }
 
-    def executeExpression(blockchain: Blockchain, script: Script, address: Address, limit: Int)(
+    def executeExpression(blockchain: Blockchain, script: Script, address: Address, pk: PublicKey, limit: Int)(
         expr: EXPR
     ): Either[ValidationError, (EVALUATED, Int)] = {
       for {
@@ -349,7 +352,7 @@ object UtilsApiRoute {
                 override val tpe: TransactionType = TransactionType.InvokeScript
               },
               address,
-              PublicKey(ByteStr.fill(KeyLength)(1)),
+              pk,
               Set.empty[Address],
               limitedExecution = false,
               limit,
