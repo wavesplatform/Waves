@@ -148,14 +148,15 @@ trait BaseGlobal {
       scriptType: ScriptType,
       estimator: ScriptEstimator,
       compiler: (String, CompilerContext) => Either[String, EXPR]
-  ): Either[String, (Array[Byte], EXPR, Long)] =
+  ): Either[String, (Array[Byte], EXPR, Long)] = {
+    val isFreeCall = scriptType == Call
     for {
-      expr <- compiler(input, context)
-      isFreeCall = scriptType == Call
-      bytes      = serializeExpression(expr, version, isFreeCall)
-      _          <- ExprScript.validateBytes(bytes, isFreeCall)
+      expr <- if (isFreeCall) compiler(input, context) else ContractCompiler.compileFreeCall(input, context, version)
+      bytes = serializeExpression(expr, version, isFreeCall)
+      _ <- ExprScript.validateBytes(bytes, isFreeCall)
       complexity <- ExprScript.estimateExact(expr, version, isFreeCall, estimator)
     } yield (bytes, expr, complexity)
+  }
 
   def checkExpr(
       expr: EXPR,
