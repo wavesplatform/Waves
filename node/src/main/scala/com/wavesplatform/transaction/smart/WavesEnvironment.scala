@@ -1,9 +1,9 @@
 package com.wavesplatform.transaction.smart
 
+import cats.kernel.Monoid
 import cats.syntax.either._
-import cats.syntax.semigroup._
 import com.wavesplatform.account
-import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -19,7 +19,7 @@ import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff}
+import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff, InvokeScriptTransactionLike}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
@@ -29,12 +29,14 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, TransactionBase}
 import monix.eval.Coeval
 import shapeless._
 
+import scala.util.Try
+
 object WavesEnvironment {
-  type In = Transaction :+: Order :+: PseudoTx :+: CNil
+  type In = TransactionBase :+: Order :+: PseudoTx :+: CNil
 }
 
 class WavesEnvironment(
@@ -130,7 +132,7 @@ class WavesEnvironment(
   override def accountBalanceOf(addressOrAlias: Recipient, maybeAssetId: Option[Array[Byte]]): Either[String, Long] = {
     (for {
       aoa <- addressOrAlias match {
-        case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr, position = 0).map(_._1)
+        case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr)
         case Alias(name)    => com.wavesplatform.account.Alias.create(name)
       }
       address <- blockchain.resolveAlias(aoa)
@@ -141,7 +143,7 @@ class WavesEnvironment(
   override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails] = {
     (for {
       aoa <- addressOrAlias match {
-        case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr, position = 0).map(_._1)
+        case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr)
         case Alias(name)    => com.wavesplatform.account.Alias.create(name)
       }
       address <- blockchain.resolveAlias(aoa)
@@ -217,6 +219,14 @@ class WavesEnvironment(
         address => Address(ByteStr(address.bytes))
       )
 
+  override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address] =
+    Try(PublicKey(publicKey))
+      .toEither
+      .bimap(
+        _.getMessage,
+        pk => Address(ByteStr(pk.toAddress.bytes))
+      )
+
   override def accountScript(addressOrAlias: Recipient): Option[Script] = {
     for {
       address <- toAddress(addressOrAlias)
@@ -285,7 +295,11 @@ object DAppEnvironment {
     }
   }
 
-  final case class DAppInvocation(dAppAddress: com.wavesplatform.account.Address, call: FUNCTION_CALL, payments: Seq[InvokeScriptTransaction.Payment])
+  final case class DAppInvocation(
+      dAppAddress: com.wavesplatform.account.Address,
+      call: FUNCTION_CALL,
+      payments: Seq[InvokeScriptTransaction.Payment]
+  )
 }
 
 // Not thread safe
@@ -296,7 +310,7 @@ class DAppEnvironment(
     blockchain: Blockchain,
     tthis: Environment.Tthis,
     ds: DirectiveSet,
-    tx: Option[InvokeTransaction],
+    tx: InvokeScriptTransactionLike,
     currentDApp: com.wavesplatform.account.Address,
     currentDAppPk: com.wavesplatform.account.PublicKey,
     calledAddresses: Set[com.wavesplatform.account.Address],
@@ -308,7 +322,7 @@ class DAppEnvironment(
     var availableDataSize: Int,
     var currentDiff: Diff,
     val invocationRoot: DAppEnvironment.InvocationTreeTracker
-) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.map(_.id()).getOrElse(ByteStr.empty)) {
+) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
 
   private[this] var mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
 
@@ -343,7 +357,6 @@ class DAppEnvironment(
           )
           .map(
             InvokeScript(
-              currentDApp,
               currentDAppPk,
               _,
               FUNCTION_CALL(User(func, func), args),
@@ -354,7 +367,7 @@ class DAppEnvironment(
       )
       invocationTracker = {
         // Log sub-contract invocation
-        val invocation = DAppEnvironment.DAppInvocation(invoke.dAppAddress, invoke.funcCall, invoke.payments)
+        val invocation = DAppEnvironment.DAppInvocation(invoke.dApp, invoke.funcCall, invoke.payments)
         invocationRoot.record(invocation)
       }
       (diff, evaluated, remainingActions, remainingData, remainingDataSize) <- InvokeScriptDiff( // This is a recursive call
@@ -367,7 +380,7 @@ class DAppEnvironment(
         availableActions,
         availableData,
         availableDataSize,
-        if (reentrant) calledAddresses else calledAddresses + invoke.senderAddress,
+        if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
         invocationTracker
       )(invoke)
     } yield {
@@ -375,7 +388,7 @@ class DAppEnvironment(
         scriptResults = Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))),
         scriptsRun = diff.scriptsRun + 1
       )
-      currentDiff = currentDiff |+| fixedDiff
+      currentDiff = Monoid.combine(currentDiff, fixedDiff)
       mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions

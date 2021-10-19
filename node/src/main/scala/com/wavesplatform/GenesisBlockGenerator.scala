@@ -4,13 +4,16 @@ import java.io.{File, FileNotFoundException}
 import java.nio.file.Files
 import java.time.Instant
 
+import scala.annotation.tailrec
+import scala.concurrent.duration._
+
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.PoSCalculator.{generationSignature, hit}
 import com.wavesplatform.consensus.{FairPoSCalculator, NxtPoSCalculator, PoSCalculator}
+import com.wavesplatform.consensus.PoSCalculator.{generationSignature, hit}
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
@@ -19,9 +22,6 @@ import com.wavesplatform.utils._
 import com.wavesplatform.wallet.Wallet
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
-
-import scala.annotation.tailrec
-import scala.concurrent.duration._
 
 object GenesisBlockGenerator extends App {
 
@@ -204,7 +204,7 @@ object GenesisBlockGenerator extends App {
       settings.initialBalance,
       Some(genesis.signature),
       genesisTxs.map { tx =>
-        GenesisTransactionSettings(tx.recipient.stringRepr, tx.amount)
+        GenesisTransactionSettings(tx.recipient.toString, tx.amount)
       },
       genesis.header.baseTarget,
       settings.averageBlockDelay

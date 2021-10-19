@@ -7,38 +7,46 @@ import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
-import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient, _}
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state._
-import com.wavesplatform.transaction._
+import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{EthereumTransaction, _}
 
 object RealTransactionWrapper {
   private def header(tx: Transaction, txIdOpt: Option[ByteStr] = None): Header = {
     val v = tx match {
+      case _: EthereumTransaction   => 0.toByte
       case vt: VersionedTransaction => vt.version
       case _                        => TxVersion.V1
     }
-    Header(txIdOpt.getOrElse(ByteStr(tx.id().arr)), tx.assetFee._2, tx.timestamp, v)
+    Header(txIdOpt.getOrElse(ByteStr(tx.id().arr)), tx.fee, tx.timestamp, v)
   }
-  private def proven(tx: ProvenTransaction, txIdOpt: Option[ByteStr] = None): Proven =
+
+  private def proven(tx: AuthorizedTransaction, txIdOpt: Option[ByteStr] = None, emptyBodyBytes: Boolean = false): Proven = {
+    val proofs = tx match {
+      case p: ProvenTransaction => p.proofs.map(_.arr).map(ByteStr(_)).toIndexedSeq
+      case _                    => Vector()
+    }
     Proven(
       header(tx, txIdOpt),
-      Recipient.Address(ByteStr(tx.sender.toAddress.bytes)),
-      ByteStr(tx.bodyBytes()),
+      RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes)),
+      if (emptyBodyBytes) ByteStr.empty else ByteStr(tx.bodyBytes()),
       tx.sender,
-      tx.proofs.proofs.map(_.arr).map(ByteStr(_)).toIndexedSeq
+      proofs
     )
+  }
 
   implicit def assetPair(a: AssetPair): APair = APair(a.amountAsset.compatId, a.priceAsset.compatId)
   implicit def ord(o: Order): Ord =
     Ord(
       id = o.id(),
-      sender = Recipient.Address(ByteStr(o.sender.toAddress.bytes)),
+      sender = RideRecipient.Address(ByteStr(o.sender.toAddress.bytes)),
       senderPublicKey = o.senderPublicKey,
       matcherPublicKey = o.matcherPublicKey,
       assetPair = o.assetPair,
@@ -56,20 +64,15 @@ object RealTransactionWrapper {
       matcherFeeAssetId = o.matcherFeeAssetId.compatId
     )
 
-  implicit def aoaToRecipient(aoa: AddressOrAlias): Recipient = (aoa: @unchecked) match {
-    case a: Address => Recipient.Address(ByteStr(a.bytes))
-    case a: Alias   => Recipient.Alias(a.name)
-  }
-
   def apply(
-      tx: Transaction,
+      tx: TransactionBase,
       blockchain: Blockchain,
       stdLibVersion: StdLibVersion,
       target: AttachedPaymentTarget
   ): Either[ExecutionError, Tx] =
     (tx: @unchecked) match {
-      case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient).asRight
-      case t: TransferTransaction => mapTransferTx(t).asRight
+      case g: GenesisTransaction      => Tx.Genesis(header(g), g.amount, toRide(g.recipient)).asRight
+      case t: TransferTransactionLike => mapTransferTx(t).asRight
       case i: IssueTransaction =>
         Tx.Issue(
             proven(i),
@@ -83,7 +86,7 @@ object RealTransactionWrapper {
           .asRight
       case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.asset.id, r.reissuable).asRight
       case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity, b.asset.id).asRight
-      case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount, b.recipient).asRight
+      case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount, toRide(b.recipient)).asRight
       case b: LeaseCancelTransaction => Tx.LeaseCancel(proven(b), b.leaseId).asRight
       case b: CreateAliasTransaction => Tx.CreateAlias(proven(b), b.alias.name).asRight
       case ms: MassTransferTransaction =>
@@ -92,13 +95,13 @@ object RealTransactionWrapper {
             assetId = ms.assetId.compatId,
             transferCount = ms.transfers.length,
             totalAmount = ms.transfers.map(_.amount).sum,
-            transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(r.address, r.amount)).toIndexedSeq,
+            transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(toRide(r.address), r.amount)).toIndexedSeq,
             attachment = ms.attachment
           )
           .asRight
       case ss: SetScriptTransaction      => Tx.SetScript(proven(ss), ss.script.map(_.bytes())).asRight
       case ss: SetAssetScriptTransaction => Tx.SetAssetScript(proven(ss), ss.asset.id, ss.script.map(_.bytes())).asRight
-      case p: PaymentTransaction         => Tx.Payment(proven(p), p.amount, p.recipient).asRight
+      case p: PaymentTransaction         => Tx.Payment(proven(p), p.amount, toRide(p.recipient)).asRight
       case e: ExchangeTransaction        => Tx.Exchange(proven(e), e.amount, e.price, e.buyMatcherFee, e.sellMatcherFee, e.buyOrder, e.sellOrder).asRight
       case s: SponsorFeeTransaction      => Tx.Sponsorship(proven(s), s.asset.id, s.minSponsoredAssetFee).asRight
       case d: DataTransaction =>
@@ -113,34 +116,69 @@ object RealTransactionWrapper {
             }.toIndexedSeq
           )
           .asRight
-      case ci: InvokeScriptTransaction =>
+
+      case ie: InvokeExpressionTransaction =>
+        Tx.InvokeExpression(proven(ie), ie.expressionBytes, ie.feeAssetId.compatId).asRight
+
+      case ci: InvokeScriptTransactionLike =>
+        val (version, bodyBytes, proofs) = ci match {
+          case ist: InvokeScriptTransaction =>
+            (ist.version, ist.bodyBytes(), ist.proofs)
+          case _ =>
+            (0.toByte, Array.emptyByteArray, Proofs.empty)
+        }
+
         AttachedPaymentExtractor
           .extractPayments(ci, stdLibVersion, blockchain, target)
           .map { payments =>
             Tx.CI(
-              proven(ci),
-              ci.dAppAddressOrAlias,
+              Proven(
+                Header(ci.id(), ci.fee, ci.timestamp, version),
+                RideRecipient.Address(ByteStr(ci.sender.toAddress.bytes)),
+                ByteStr(bodyBytes),
+                ci.sender,
+                proofs.toIndexedSeq
+              ),
+              toRide(ci.dApp),
               payments,
               ci.feeAssetId.compatId,
-              ci.funcCallOpt.map(_.function.funcName),
-              ci.funcCallOpt.map(_.args.map(arg => arg.asInstanceOf[EVALUATED])).getOrElse(List.empty)
+              Some(ci.funcCall.function.funcName),
+              ci.funcCall.args.map(arg => arg.asInstanceOf[EVALUATED])
             )
           }
-      case ie: InvokeExpressionTransaction =>
-        Tx.InvokeExpression(proven(ie), ie.expressionBytes, ie.feeAssetId.compatId).asRight
 
       case u: UpdateAssetInfoTransaction =>
         Tx.UpdateAssetInfo(proven(u), u.assetId.id, u.name, u.description).asRight
+
+      case eth: EthereumTransaction =>
+        Left(s"Unexpected $eth")
     }
 
-  def mapTransferTx(t: TransferTransaction): Tx.Transfer =
+  def mapTransferTx(t: TransferTransactionLike): Tx.Transfer = {
+    val (version, bodyBytes, proofs) = t match {
+      case tt: TransferTransaction =>
+        (tt.version, tt.bodyBytes(), tt.proofs)
+      case _ =>
+        (0.toByte, Array.emptyByteArray, Proofs.empty)
+    }
     Tx.Transfer(
-      proven(t),
+      Proven(
+        Header(t.id(), t.fee, t.timestamp, version),
+        RideRecipient.Address(ByteStr(t.sender.toAddress.bytes)),
+        ByteStr(bodyBytes),
+        t.sender,
+        proofs.toIndexedSeq
+      ),
       feeAssetId = t.feeAssetId.compatId,
       assetId = t.assetId.compatId,
       amount = t.amount,
-      recipient = t.recipient,
+      recipient = toRide(t.recipient),
       attachment = t.attachment
     )
+  }
 
+  def toRide(recipient: AddressOrAlias): RideRecipient = recipient match {
+    case address: Address => RideRecipient.Address(ByteStr(address.bytes))
+    case recipient: Alias => RideRecipient.Alias(recipient.name)
+  }
 }

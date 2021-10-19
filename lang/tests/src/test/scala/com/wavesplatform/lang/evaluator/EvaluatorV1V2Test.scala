@@ -465,7 +465,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     }
   }
 
-  property("dropRightBytes(ByteStr, Long) works as the native one") {
+  ignore("dropRightBytes(ByteStr, Long) works as the native one") {
     forAll(genBytesAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(PureContext.dropRightBytes.header, List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))

@@ -2,6 +2,7 @@ package com.wavesplatform.mining
 
 import java.time.LocalTime
 
+
 import cats.syntax.either._
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block._
@@ -26,6 +27,7 @@ import kamon.Kamon
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
+import monix.reactive.Observable
 
 import scala.concurrent.duration._
 
@@ -55,7 +57,8 @@ class MinerImpl(
     wallet: Wallet,
     pos: PoSSelector,
     val minerScheduler: SchedulerService,
-    val appenderScheduler: SchedulerService
+    val appenderScheduler: SchedulerService,
+    transactionAdded: Observable[Unit]
 ) extends Miner
     with MinerDebugInfo
     with ScorexLogging {
@@ -78,6 +81,7 @@ class MinerImpl(
     settings.minerSettings,
     minerScheduler,
     appenderScheduler,
+    transactionAdded,
     utx.priorityPool.nextMicroBlockSize
   )
 
@@ -299,7 +303,7 @@ class MinerImpl(
     val nonScriptedAccounts = wallet.privateKeyAccounts.filterNot(kp => tempBlockchain.getOrElse(blockchainUpdater).hasAccountScript(kp.toAddress))
     scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map { account =>
       generateBlockTask(account, tempBlockchain)
-        .onErrorHandle(err => log.warn(s"Error mining Block: $err"))
+        .onErrorHandle(err => log.warn(s"Error mining Block", err))
         .runAsyncLogErr(appenderScheduler)
     }.toSet)
     microBlockAttempt := SerialCancelable()

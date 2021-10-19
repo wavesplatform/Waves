@@ -27,6 +27,7 @@ import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler
+import monix.reactive.Observable
 import org.iq80.leveldb.DB
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.compatible.Assertion
@@ -126,7 +127,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
           scheduler    = Scheduler.singleThread("appender")
           allChannels  = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
           wallet       = Wallet(WalletSettings(None, Some("123"), None))
-          miner        = new MinerImpl(allChannels, blockchainUpdater, settings, ntpTime, utxPool, wallet, pos, scheduler, scheduler)
+          miner        = new MinerImpl(allChannels, blockchainUpdater, settings, ntpTime, utxPool, wallet, pos, scheduler, scheduler, Observable.empty)
           account      = createAccount
           ts           = ntpTime.correctedTime() - 60000
           genesisBlock = TestBlock.create(ts + 2, List(GenesisTransaction.create(account.toAddress, ENOUGH_AMT, ts + 1).explicitGet()))

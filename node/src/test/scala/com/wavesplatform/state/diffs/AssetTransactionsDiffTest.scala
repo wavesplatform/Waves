@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats._
+import com.wavesplatform.BlocksTransactionsHelpers
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -16,12 +17,11 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.BlocksTransactionsHelpers
-import com.wavesplatform.test.PropSpec
 import fastparse.Parsed
 import org.scalacheck.{Arbitrary, Gen}
 

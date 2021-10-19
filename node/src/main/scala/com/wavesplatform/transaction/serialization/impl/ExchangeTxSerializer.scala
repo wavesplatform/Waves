@@ -30,7 +30,7 @@ object ExchangeTxSerializer {
     version match {
       case TxVersion.V1 =>
         Bytes.concat(
-          Array(builder.typeId),
+          Array(tpe.id.toByte),
           Ints.toByteArray(order1.bytes().length),
           Ints.toByteArray(order2.bytes().length),
           order1.bytes(),
@@ -48,7 +48,7 @@ object ExchangeTxSerializer {
           if (version == 1) Array(1: Byte) else Array.emptyByteArray
 
         Bytes.concat(
-          Array(0: Byte, builder.typeId, version),
+          Array(0: Byte, tpe.id.toByte, version),
           Ints.toByteArray(order1.bytes().length),
           orderMark(order1.version),
           order1.bytes(),

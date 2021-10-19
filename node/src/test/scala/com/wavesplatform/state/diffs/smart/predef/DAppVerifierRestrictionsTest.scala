@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import com.wavesplatform.TestTime
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V5

@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
 import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.UtilsApiRoute
@@ -811,7 +811,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                  """.stripMargin
 
       val (script, _) = ScriptCompiler.compile(str, ScriptEstimatorV2).explicitGet()
-      AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map(1 -> Map("testCallable" -> 200, "testSyncCallComplexityExcess" -> 100)))
+      AccountScriptInfo(TxHelpers.defaultSigner.publicKey, script, 0, Map(1 -> Map("testCallable" -> 200, "testSyncCallComplexityExcess" -> 100)))
     }
 
     val dAppAddress = TxHelpers.defaultSigner.toAddress
@@ -826,7 +826,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
     def responseJson: JsObject = {
       val fullJson = responseAs[JsObject]
-      (fullJson \ "address").as[String] shouldBe dAppAddress.stringRepr
+      (fullJson \ "address").as[String] shouldBe dAppAddress.toString
       (fullJson \ "expr").as[String] should not be empty
       (fullJson \ "result").asOpt[JsObject].getOrElse(fullJson - "address" - "expr")
     }
@@ -920,6 +920,11 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       .returning(DefaultBlockchainSettings)
       .anyNumberOfTimes()
 
+    (utilsApi.blockchain.balance _)
+      .when(*, *)
+      .returning(1000)
+      .anyNumberOfTimes()
+
     evalScript(""" testSyncinvoke() """) ~> route ~> check {
       responseAs[String] shouldBe """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":94,"expr":" testSyncinvoke() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
     }
@@ -953,7 +958,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
            | }
          """.stripMargin
       )
-      AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map(1 -> Map("callable" -> 999)))
+      AccountScriptInfo(TxHelpers.secondSigner.publicKey, script, 0, Map(1 -> Map("callable" -> 999)))
     }
     (blockchain.hasAccountScript _).when(dAppAddress2).returning(true).anyNumberOfTimes()
     (blockchain.accountScript _).when(dAppAddress2).returning(Some(testScript2)).anyNumberOfTimes()

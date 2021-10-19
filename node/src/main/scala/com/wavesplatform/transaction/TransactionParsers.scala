@@ -39,7 +39,6 @@ object TransactionParsers {
     SetAssetScriptTransaction,
     InvokeScriptTransaction,
     TransferTransaction,
-    UpdateAssetInfoTransaction,
     InvokeExpressionTransaction
   ).flatMap { x =>
     x.supportedVersions.map { version =>

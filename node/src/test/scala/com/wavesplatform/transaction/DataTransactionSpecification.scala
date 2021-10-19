@@ -10,6 +10,7 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, Em
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.crypto
 import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
 import play.api.libs.json.Json
@@ -71,7 +72,7 @@ class DataTransactionSpecification extends PropSpec {
         |  ]
         |}""".stripMargin)
 
-    val tx = DataTransaction.serializer.parseBytes(bytes).get
+    val tx = DataTxSerializer.parseBytes(bytes).get
     tx.json() shouldBe json
     assert(crypto.verify(tx.signature, tx.bodyBytes(), tx.sender), "signature should be valid")
   }

@@ -14,9 +14,10 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.utils.StringBytes
 import org.scalacheck.Gen
 
@@ -109,8 +110,7 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
       val dapp       = accountOrAliasGen.sample.get
       val feeAssetId = bytes32gen.map(ByteStr(_)).sample.get
 
-      val invokeScriptTx = InvokeScriptTransaction
-        .selfSigned(
+      val invokeScriptTx = Signed.invokeScript(
           TxVersion.V2,
           Account,
           dapp,
@@ -120,7 +120,6 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
           IssuedAsset(feeAssetId),
           Now
         )
-        .explicitGet()
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(invokeScriptTx)))
 
       decode(base64Str) shouldBe invokeScriptTx
@@ -197,7 +196,7 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
     }
 
     def decode(base64Str: String): Transaction = {
-      PBTransactions.vanilla(PBSignedTransaction.parseFrom(Base64.decode(base64Str))).explicitGet()
+      PBTransactions.vanilla(PBSignedTransaction.parseFrom(Base64.decode(base64Str)), unsafe = false).explicitGet()
     }
   }
 }

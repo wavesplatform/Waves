@@ -240,7 +240,7 @@ class AssetsBroadcastRouteSpec
     SignedTransferV1Request(
       Base58.encode(tx.sender.arr),
       assetId.maybeBase58Repr,
-      recipient.stringRepr,
+      recipient.toString,
       amount,
       fee,
       feeAssetId.maybeBase58Repr,
@@ -255,7 +255,7 @@ class AssetsBroadcastRouteSpec
     SignedTransferV2Request(
       Base58.encode(tx.sender.arr),
       assetId.maybeBase58Repr,
-      recipient.stringRepr,
+      recipient.toString,
       amount,
       feeAssetId.maybeBase58Repr,
       fee,

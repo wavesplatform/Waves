@@ -10,6 +10,7 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
+import monix.reactive.Observable
 
 trait MicroBlockMiner {
   def generateMicroBlockSequence(
@@ -29,6 +30,7 @@ object MicroBlockMiner {
       settings: MinerSettings,
       minerScheduler: SchedulerService,
       appenderScheduler: SchedulerService,
+      transactionAdded: Observable[Unit],
       nextMicroBlockSize: Int => Int = identity
   ): MicroBlockMiner =
     new MicroBlockMinerImpl(
@@ -39,6 +41,7 @@ object MicroBlockMiner {
       settings,
       minerScheduler,
       appenderScheduler,
+      transactionAdded,
       nextMicroBlockSize
     )
 }

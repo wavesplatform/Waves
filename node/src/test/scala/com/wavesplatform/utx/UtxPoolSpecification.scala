@@ -2,10 +2,6 @@ package com.wavesplatform.utx
 
 import java.nio.file.{Files, Path}
 
-import scala.collection.mutable.ListBuffer
-import scala.concurrent.duration._
-import scala.util.Random
-
 import cats.data.NonEmptyList
 import com.wavesplatform
 import com.wavesplatform._
@@ -14,18 +10,18 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.database.{openDB, LevelDBWriter, TestStorageFactory}
+import com.wavesplatform.database.{LevelDBWriter, TestStorageFactory, openDB}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.{randomSig, settingsWithFeatures, DefaultWavesSettings}
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
+import com.wavesplatform.history.{DefaultWavesSettings, randomSig, settingsWithFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.StdLibVersion.V6
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.mining._
@@ -33,23 +29,28 @@ import com.wavesplatform.settings._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.utils.TestLevelDB
-import com.wavesplatform.test.FreeSpec
-import com.wavesplatform.transaction.{Asset, Transaction, _}
+import com.wavesplatform.test.{FreeSpec, _}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{Asset, Transaction, _}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool.PackStrategy
 import monix.reactive.subjects.PublishSubject
 import org.iq80.leveldb.DB
-import org.scalacheck.{Arbitrary, Gen}
 import org.scalacheck.Gen._
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.concurrent.Eventually
 import org.scalatest.EitherValues
+import org.scalatest.concurrent.Eventually
+
+import scala.collection.mutable.ListBuffer
+import scala.concurrent.duration._
+import scala.util.Random
 
 private object UtxPoolSpecification {
   private val ignoreSpendableBalanceChanged = PublishSubject[(Address, Asset)]()
@@ -127,7 +128,7 @@ class UtxPoolSpecification
   private def massTransferWithRecipients(sender: KeyPair, recipients: List[PublicKey], maxAmount: Long, time: Time) = {
     val amount    = maxAmount / (recipients.size + 1)
     val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
-    val minFee    = FeeValidation.FeeConstants(TransferTransaction.typeId) + FeeValidation.FeeConstants(MassTransferTransaction.typeId) * transfers.size
+    val minFee    = FeeValidation.FeeConstants(TransactionType.Transfer) + FeeValidation.FeeConstants(TransactionType.MassTransfer) * transfers.size
     val txs = for { fee <- chooseNum(minFee, amount) } yield MassTransferTransaction
       .selfSigned(1.toByte, sender, Waves, transfers, fee, time.getTimestamp(), ByteStr.empty)
       .explicitGet()
@@ -136,7 +137,7 @@ class UtxPoolSpecification
 
   private def invokeScript(sender: KeyPair, dApp: Address, time: Time) =
     Gen.choose(500000L, 600000L).map { fee =>
-      InvokeScriptTransaction.selfSigned(TxVersion.V1, sender, dApp, None, Seq.empty, fee, Waves, time.getTimestamp()).explicitGet()
+      Signed.invokeScript(TxVersion.V1, sender, dApp, None, Seq.empty, fee, Waves, time.getTimestamp())
     }
 
   private def dAppSetScript(sender: KeyPair, time: Time) = {
@@ -257,9 +258,9 @@ class UtxPoolSpecification
         txs.length,
         PoolDefaultMaxBytes,
         1000,
-        Set(sender.toAddress.stringRepr),
+        Set(sender.toAddress.toString),
         Set.empty,
-        Set(sender.toAddress.stringRepr),
+        Set(sender.toAddress.toString),
         allowTransactionsFromSmartAccounts = true,
         allowSkipChecks = false
       )
@@ -453,7 +454,7 @@ class UtxPoolSpecification
                   1,
                   Set.empty,
                   Set.empty,
-                  Set(sender2.toAddress.stringRepr, sender3.toAddress.stringRepr),
+                  Set(sender2.toAddress.toString, sender3.toAddress.toString),
                   allowTransactionsFromSmartAccounts = true,
                   allowSkipChecks = allowSkipChecks
                 )
@@ -525,7 +526,7 @@ class UtxPoolSpecification
                 1,
                 Set.empty,
                 Set.empty,
-                Set(sender2.toAddress.stringRepr, sender3.toAddress.stringRepr),
+                Set(sender2.toAddress.toString, sender3.toAddress.toString),
                 allowTransactionsFromSmartAccounts = true,
                 allowSkipChecks = allowSkipChecks
               )

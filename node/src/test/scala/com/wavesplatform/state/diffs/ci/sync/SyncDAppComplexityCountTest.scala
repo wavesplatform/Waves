@@ -17,14 +17,15 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, ci, produce}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, ci}
+import com.wavesplatform.test.{PropSpec, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, InvokeTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
 import org.scalacheck.Gen
 
@@ -161,8 +162,8 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
       else
         Nil
 
-      invokeScriptTx = InvokeScriptTransaction
-        .selfSigned(
+      invokeScriptTx = Signed
+        .invokeScript(
           TxVersion.V3,
           invoker,
           dAppAccs.last.toAddress,
@@ -172,7 +173,6 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
           Waves,
           ts + 10
         )
-        .explicitGet()
 
       invokeExpressionTx = ci.toInvokeExpression(setScriptTxs.head, invoker, Some(fee))
     } yield
@@ -216,17 +216,17 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
         else
           diff.errorMessage(invokeTx.id()) shouldBe None
 
-        val dAppAddress = invokeTx.dAppAddressOrAlias.asInstanceOf[Address]
+        val dAppAddress = invokeTx.dApp.asInstanceOf[Address]
         val basePortfolios = Map(
           TestBlock.defaultSigner.toAddress -> Portfolio(CurrentBlockFeePart(invokeTx.fee)),
-          invokeTx.senderAddress            -> Portfolio(-invokeTx.fee)
+          invokeTx.sender.toAddress            -> Portfolio(-invokeTx.fee)
         )
         val paymentsPortfolios = Map(
-          invokeTx.senderAddress -> Portfolio(assets = Map(asset -> -1)),
+          invokeTx.sender.toAddress -> Portfolio(assets = Map(asset -> -1)),
           dAppAddress            -> Portfolio(assets = Map(asset -> 1))
         )
         val throughTransfersPortfolios = Map(
-          invokeTx.senderAddress -> Portfolio(assets = Map(asset -> 1)),
+          invokeTx.sender.toAddress -> Portfolio(assets = Map(asset -> 1)),
           lastCallingDApp        -> Portfolio(assets = Map(asset -> -1))
         )
         val throughPaymentsPortfolios =

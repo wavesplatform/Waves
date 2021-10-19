@@ -1,8 +1,8 @@
 package com.wavesplatform.consensus
 
+import com.wavesplatform.transaction.{Authorized, Transaction}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import com.wavesplatform.transaction.{Authorized, Transaction}
 
 object TransactionsOrdering {
   trait WavesOrdering extends Ordering[Transaction] {
@@ -10,8 +10,8 @@ object TransactionsOrdering {
     def txTimestampOrder(ts: Long): Long
     private def orderBy(t: Transaction): (Boolean, Double, Long, Long) = {
       val byWhiteList = !isWhitelisted(t) // false < true
-      val size        = t.bytes().length
-      val byFee       = if (t.assetFee._1 != Waves) 0 else -t.assetFee._2
+      val size        = t.bytesSize
+      val byFee       = if (t.feeAssetId != Waves) 0 else -t.fee
       val byTimestamp = txTimestampOrder(t.timestamp)
 
       (byWhiteList, byFee.toDouble / size.toDouble, byFee, byTimestamp)
@@ -31,8 +31,8 @@ object TransactionsOrdering {
     override def isWhitelisted(t: Transaction): Boolean =
       t match {
         case _ if whitelistAddresses.isEmpty                                                            => false
-        case a: Authorized if whitelistAddresses.contains(a.sender.toAddress.stringRepr)                => true
-        case i: InvokeScriptTransaction if whitelistAddresses.contains(i.dAppAddressOrAlias.stringRepr) => true
+        case a: Authorized if whitelistAddresses.contains(a.sender.toAddress.toString)                => true
+        case i: InvokeScriptTransaction if whitelistAddresses.contains(i.dApp.toString) => true
         case _                                                                                          => false
       }
     override def txTimestampOrder(ts: Long): Long = ts

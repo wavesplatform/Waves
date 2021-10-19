@@ -1,6 +1,7 @@
 package com.wavesplatform.it.api
 
 import java.net.InetSocketAddress
+
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
@@ -14,7 +15,7 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -56,6 +57,13 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     )((id, message, json) => GenericApiError(id, message, StatusCodes.BadRequest.intValue, json))
   }
 
+  /**
+    *
+    * @param id Expected API error code
+    * @param message Expected API error full message or regex template
+    * @param code Expected HTTP status code, 400/Bad Request by default
+    * @param matchMessage When true, uses `message` as regular expression to find it in response. When false, fully tests `message` equality with received error message.
+    */
   case class AssertiveApiError(id: Int, message: String, code: StatusCode = StatusCodes.BadRequest, matchMessage: Boolean = false)
 
   implicit class ApiErrorOps(error: ApiError) {
@@ -66,8 +74,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
     case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, statusCode, responseBody))) =>
       Assertions.assert(
-        statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"),
-        s"\nexpected '$errorRegex'\nactual '$responseBody'"
+        statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"), s"\nexpected '$errorRegex'\nactual '$responseBody'"
       )
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail("Expecting bad request")

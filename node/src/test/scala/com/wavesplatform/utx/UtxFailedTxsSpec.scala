@@ -12,8 +12,7 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.test.FlatSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment

@@ -324,7 +324,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
       createAliasTxs.foreach(sender.waitForTransaction(_))
 
       val transfers = aliases.map { alias =>
-        Transfer(Alias.create(alias).explicitGet().stringRepr, 2.waves)
+        Transfer(Alias.create(alias).explicitGet().toString, 2.waves)
       }
       val txId = sender.massTransfer(firstKeyPair, transfers, 300000, version = v).id
       nodes.waitForHeightAriseAndTxPresent(txId)

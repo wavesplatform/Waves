@@ -8,7 +8,7 @@ import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets._
@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxValidationError}
 import org.scalacheck.Gen
 
-class TransferTransactionDiffTest extends PropSpec with WithState {
+class TransferDiffTest extends PropSpec with WithState {
 
   val preconditionsAndTransfer: Gen[(GenesisTransaction, IssueTransaction, IssueTransaction, TransferTransaction)] = for {
     master    <- accountGen
@@ -110,7 +110,7 @@ class TransferTransactionDiffTest extends PropSpec with WithState {
       case (genesis, issue, fee, transfer) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(issue, fee)), smartEnabledFS) {
           case (_, state) =>
-            val diffOrError = TransferTransactionDiff(state, System.currentTimeMillis())(transfer)
+            val diffOrError = TransferDiff(state)(transfer.sender.toAddress, transfer.recipient, transfer.amount, transfer.assetId, transfer.fee, transfer.feeAssetId)
             diffOrError shouldBe Left(GenericError("Smart assets can't participate in TransferTransactions as a fee"))
         }
     }

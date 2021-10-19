@@ -1,14 +1,15 @@
 package com.wavesplatform.transaction.assets.exchange
 
+import scala.util.{Failure, Success}
+
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.{Asset, Proofs, TxVersion}
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.utils.EthEncoding
 import play.api.libs.json._
-
-import scala.util.{Failure, Success}
 
 object OrderJson {
   import play.api.libs.functional.syntax._
@@ -36,8 +37,8 @@ object OrderJson {
   implicit lazy val accountPublicKeyReads: Reads[PublicKey] = Reads {
     case JsString(s) =>
       Base58.tryDecodeWithLimit(s) match {
-        case Success(bytes) if bytes.length == 32 => JsSuccess(PublicKey(bytes))
-        case _                                    => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrectAccount"))))
+        case Success(bytes) if PublicKey.isValidSize(bytes.length) => JsSuccess(PublicKey(bytes))
+        case _                                                     => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrectAccount"))))
       }
     case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
   }
@@ -80,7 +81,8 @@ object OrderJson {
       signature: Option[Array[Byte]],
       proofs: Option[Array[Array[Byte]]],
       version: TxVersion,
-      matcherFeeAssetId: Asset
+      matcherFeeAssetId: Asset,
+      eip712Signature: Option[Array[Byte]]
   ): Order = {
 
     val eproofs =
@@ -89,7 +91,21 @@ object OrderJson {
         .orElse(signature.map(s => Proofs(ByteStr(s))))
         .getOrElse(Proofs.empty)
 
-    Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, eproofs)
+    Order(
+      version,
+      sender,
+      matcher,
+      assetPair,
+      orderType,
+      amount,
+      price,
+      timestamp,
+      expiration,
+      matcherFee,
+      matcherFeeAssetId,
+      eproofs,
+      eip712Signature.map(ByteStr(_))
+    )
   }
 
   private val assetReads: Reads[Asset] = {
@@ -142,7 +158,11 @@ object OrderJson {
       (JsPath \ "version").read[Byte] and
       (JsPath \ "matcherFeeAssetId")
         .readNullable[Array[Byte]]
-        .map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
+        .map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_)))) and
+      (JsPath \ "eip712Signature")
+        .readNullable[String]
+        .map(_.map(EthEncoding.toBytes))
+
     r(readOrderV3V4 _)
   }
 
@@ -150,7 +170,7 @@ object OrderJson {
     case jsOrder @ JsObject(map) =>
       map.getOrElse("version", JsNumber(1)) match {
         case JsNumber(x) if x.byteValue >= Order.V3 => orderV3V4Reads.reads(jsOrder)
-        case _                                        => orderV1V2Reads.reads(jsOrder)
+        case _                                      => orderV1V2Reads.reads(jsOrder)
       }
     case invalidOrder => JsError(s"Can't parse invalid order $invalidOrder")
   }

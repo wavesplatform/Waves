@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.TestTime
+import com.wavesplatform.test.TestTime
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.SetScriptTransaction

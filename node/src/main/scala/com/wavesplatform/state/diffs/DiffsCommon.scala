@@ -20,12 +20,12 @@ import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.{Authorized, Transaction}
 
 object DiffsCommon {
-  def countScriptRuns(blockchain: Blockchain, tx: ProvenTransaction): Int =
-    tx.checkedAssets.count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
+  def countScriptRuns(blockchain: Blockchain, tx: Transaction with Authorized): Int =
+    tx.smartAssets(blockchain).size + Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
   def countVerifierComplexity(
       script: Option[Script],
@@ -198,7 +198,7 @@ object DiffsCommon {
             s"time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=$allowedTs"
         )
       )
-      senderPortfolio    = Map(sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
+      senderPortfolio    = Map[Address, Portfolio](sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
       recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
       actionInfo         = lease.copy(status = LeaseDetails.Status.Cancelled(blockchain.height, Some(cancelTxId)))
     } yield Diff(

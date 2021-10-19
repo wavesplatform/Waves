@@ -2,10 +2,6 @@ package com.wavesplatform.events
 
 import java.nio.file.Files
 
-import scala.concurrent.{Await, Promise}
-import scala.concurrent.duration._
-import scala.util.Random
-
 import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, KeyPair}
@@ -13,13 +9,13 @@ import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
+import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
 import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdatesRangeRequest, SubscribeEvent, SubscribeRequest}
-import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.events.protobuf.serde._
+import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -28,15 +24,16 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
-import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation}
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult
+import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.{AssetDescription, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
-import com.wavesplatform.test.{FreeSpec, _}
-import com.wavesplatform.transaction.{Asset, GenesisTransaction, PaymentTransaction, TxHelpers}
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, PaymentTransaction, TxHelpers}
 import io.grpc.StatusException
 import io.grpc.stub.{CallStreamObserver, StreamObserver}
 import monix.execution.CancelableFuture
@@ -44,6 +41,10 @@ import monix.execution.Scheduler.Implicits.global
 import org.scalactic.source.Position
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.ScalaFutures
+
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Promise}
+import scala.util.Random
 
 class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures with PathMockFactory {
   var currentSettings: WavesSettings = domainSettingsWithFS(
@@ -482,18 +483,16 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
           ScriptEstimatorV3
         )
         .explicitGet()
-      val invoke = InvokeScriptTransaction
-        .selfSigned(
-          2.toByte,
-          invoker,
-          issuer.toAddress,
-          Some(FUNCTION_CALL(FunctionHeader.User("issue"), Nil)),
-          Seq.empty,
-          2.waves,
-          Asset.Waves,
-          ntpTime.getTimestamp()
-        )
-        .explicitGet()
+      val invoke = Signed.invokeScript(
+        2.toByte,
+        invoker,
+        issuer.toAddress,
+        Some(FUNCTION_CALL(FunctionHeader.User("issue"), Nil)),
+        Seq.empty,
+        2.waves,
+        Asset.Waves,
+        ntpTime.getTimestamp()
+      )
       d.appendBlock(
         GenesisTransaction.create(issuerAddress, 1000.waves, ntpTime.getTimestamp()).explicitGet(),
         GenesisTransaction.create(invoker.toAddress, 1000.waves, ntpTime.getTimestamp()).explicitGet(),

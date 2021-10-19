@@ -74,7 +74,7 @@ case class AddressApiRoute(
       val maxComplexity        = (callableComplexities.values.toSeq :+ verifierComplexity).max
 
       Json.obj(
-        "address"              -> address.stringRepr,
+        "address"              -> address,
         "script"               -> scriptInfoOpt.map(_.script.bytes().base64),
         "scriptText"           -> scriptInfoOpt.map(_.script.expr.toString),
         "version"              -> scriptInfoOpt.map(_.script.stdLibVersion.id),
@@ -136,7 +136,7 @@ case class AddressApiRoute(
     val details = commonAccountsApi.balanceDetails(address)
     import details._
     complete(
-      Json.obj("address" -> address.stringRepr, "regular" -> regular, "generating" -> generating, "available" -> available, "effective" -> effective)
+      Json.obj("address" -> address, "regular" -> regular, "generating" -> generating, "available" -> available, "effective" -> effective)
     )
   }
 
@@ -243,10 +243,10 @@ case class AddressApiRoute(
     }
 
   private def balanceJson(acc: Address, confirmations: Int) = {
-    Balance(acc.stringRepr, confirmations, commonAccountsApi.balance(acc, confirmations))
+    Balance(acc.toString, confirmations, commonAccountsApi.balance(acc, confirmations))
   }
 
-  private def balanceJson(acc: Address) = Balance(acc.stringRepr, 0, commonAccountsApi.balance(acc))
+  private def balanceJson(acc: Address) = Balance(acc.toString, 0, commonAccountsApi.balance(acc))
 
   private def scriptMetaJson(account: Address): Either[ValidationError.ScriptParseError, AccountScriptMeta] = {
     val accountScript = blockchain.accountScript(account)
@@ -254,11 +254,11 @@ case class AddressApiRoute(
     accountScript
       .map(_.script)
       .traverse(Global.dAppFuncTypes)
-      .map(AccountScriptMeta(account.stringRepr, _))
+      .map(AccountScriptMeta(account.toString, _))
   }
 
   private def effectiveBalanceJson(acc: Address, confirmations: Int) = {
-    Balance(acc.stringRepr, confirmations, commonAccountsApi.effectiveBalance(acc, confirmations))
+    Balance(acc.toString, confirmations, commonAccountsApi.effectiveBalance(acc, confirmations))
   }
 
   private[this] def validateBalanceDepth(height: Int): Directive0 = {
@@ -322,7 +322,7 @@ case class AddressApiRoute(
   }
 
   def publicKey: Route = (path("publicKey" / PublicKeySegment) & get) { publicKey =>
-    complete(Json.obj("address" -> Address.fromPublicKey(publicKey).stringRepr))
+    complete(Json.obj("address" -> Address.fromPublicKey(publicKey).toString))
   }
 }
 

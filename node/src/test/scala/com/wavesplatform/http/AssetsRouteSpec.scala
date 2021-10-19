@@ -3,10 +3,9 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.google.protobuf.ByteString
-import com.wavesplatform.{RequestGen, TestTime, TestValues}
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.common.CommonAssetsApi.AssetInfo
+import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request}
@@ -17,16 +16,17 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, Height}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{RequestGen, TestValues}
 import monix.reactive.Observable
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.{JsObject, Json, JsValue, Writes}
+import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 
 class AssetsRouteSpec
     extends RouteSpec("/assets")
@@ -229,9 +229,9 @@ class AssetsRouteSpec
       val response = responseAs[JsObject]
       response shouldBe Json.obj(
         "hasNext"  -> false,
-        "lastItem" -> TestValues.address.stringRepr,
+        "lastItem" -> TestValues.address.toString,
         "items" -> Json.obj(
-          TestValues.address.stringRepr -> 10L
+          TestValues.address.toString -> 10L
         )
       )
     }

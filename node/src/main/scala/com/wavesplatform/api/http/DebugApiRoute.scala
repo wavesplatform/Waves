@@ -16,7 +16,7 @@ import akka.stream.scaladsl.Source
 import cats.syntax.either._
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
+import com.wavesplatform.api.common.TransactionMeta
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi}
 import com.wavesplatform.api.http.TransactionsApiRoute.TransactionJsonSerializer
 import com.wavesplatform.common.state.ByteStr
@@ -162,7 +162,7 @@ case class DebugApiRoute(
         .collect {
           case (address, Right(offset)) =>
             AccountMiningInfo(
-              address.stringRepr,
+              address.toString,
               blockchain.effectiveBalance(
                 address,
                 ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(blockchain.height),
@@ -338,7 +338,7 @@ object DebugApiRoute {
 
   implicit val accountMiningBalanceFormat: Format[AccountMiningInfo] = Json.format
 
-  implicit val addressWrites: Writes[Address] = Writes((a: Address) => JsString(a.stringRepr))
+  implicit val addressWrites: Writes[Address] = Writes((a: Address) => JsString(a.toString))
 
   implicit val hrCacheSizesFormat: Format[HistoryReplier.CacheSizes]          = Json.format
   implicit val mbsCacheSizesFormat: Format[MicroBlockSynchronizer.CacheSizes] = Json.format

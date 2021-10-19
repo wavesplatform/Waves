@@ -31,6 +31,7 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
+import monix.reactive.Observable
 import org.scalacheck.{Arbitrary, Gen}
 
 class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettings {
@@ -44,7 +45,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
           val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
           val wallet      = Wallet(WalletSettings(None, Some("123"), None))
           val miner =
-            new MinerImpl(allChannels, bcu, settings, ntpTime, utxPoolStub, wallet, pos, scheduler, scheduler)
+            new MinerImpl(allChannels, bcu, settings, ntpTime, utxPoolStub, wallet, pos, scheduler, scheduler, Observable.empty)
 
           val signal = new Semaphore(1)
           signal.acquire()

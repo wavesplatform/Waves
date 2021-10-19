@@ -1,7 +1,10 @@
 package com.wavesplatform.state
 
+import scala.util.Random
+
 import com.google.common.primitives.Longs
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.{EitherMatchers, NTPTime, RequestGen}
 import com.wavesplatform.TestHelpers.enableNG
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
@@ -10,24 +13,22 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.history.{chainBaseAndMicro, randomSig}
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.settings.{WavesSettings, loadConfig}
+import com.wavesplatform.settings.{loadConfig, WavesSettings}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.test.FreeSpec
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.utils.Time
-import com.wavesplatform.{EitherMatchers, NTPTime, RequestGen}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-
-import scala.util.Random
 
 class BlockchainUpdaterImplSpec
     extends FreeSpec
@@ -296,7 +297,7 @@ class BlockchainUpdaterImplSpec
       )
 
       val invoke =
-        InvokeScriptTransaction.selfSigned(3.toByte, sender, dapp.toAddress, None, Seq.empty, 50_0000L, Waves, ntpTime.getTimestamp()).explicitGet()
+        Signed.invokeScript(3.toByte, sender, dapp.toAddress, None, Seq.empty, 50_0000L, Waves, ntpTime.getTimestamp())
 
       d.appendBlock(d.createBlock(5.toByte, Seq(invoke)))
     }

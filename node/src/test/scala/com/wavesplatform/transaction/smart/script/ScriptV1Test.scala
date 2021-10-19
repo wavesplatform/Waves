@@ -10,8 +10,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
-import com.wavesplatform.state.diffs._
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 
 class ScriptV1Test extends PropSpec with TypedScriptGen {
 

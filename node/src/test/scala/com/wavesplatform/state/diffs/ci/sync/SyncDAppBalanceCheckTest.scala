@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.ci.sync
 
+import com.wavesplatform.TransactionGenBase
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -12,9 +13,9 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.{TestTime, TransactionGenBase}
 
 class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with TransactionGenBase {
 
@@ -54,7 +55,7 @@ class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with Transaction
       gTx3     = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
       ssTx1    = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script(dApp2.toAddress)), fee, ts).explicitGet()
       ssTx2    = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp2Script), fee, ts).explicitGet()
-      invokeTx = () => InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts).explicitGet()
+      invokeTx = () => Signed.invokeScript(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts)
     } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx2), invokeTx)
 
   property("temporary negative balance of sync call produce error only after set height") {
@@ -74,7 +75,7 @@ class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with Transaction
       val invoke2 = invoke()
       d.appendBlock()
       (the[RuntimeException] thrownBy d.appendBlock(invoke2)).getMessage should include(
-        s"Sync call leads to temporary negative balance = -100 for address ${invoke2.dAppAddressOrAlias}"
+        s"Sync call leads to temporary negative balance = -100 for address ${invoke2.dApp}"
       )
     }
   }

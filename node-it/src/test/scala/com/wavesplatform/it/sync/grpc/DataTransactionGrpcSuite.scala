@@ -56,7 +56,7 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
     assertGrpcError(
       sender.broadcast(
-        dataTx.getTransaction,
+        dataTx.getWavesTransaction,
         dataTx.proofs :+ ByteString.copyFrom(new Array[Byte](65)),
         waitForTx = true
       ),
@@ -297,7 +297,7 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val txIds = dataSet
         .grouped(100)
         .map(_.toList)
-        .map(data => PBTransactions.vanilla(sender.putData(fourthAcc, data, calcDataFee(data, v), version = v)).explicitGet().id().toString)
+        .map(data => PBTransactions.vanilla(sender.putData(fourthAcc, data, calcDataFee(data, v), version = v), unsafe = false).explicitGet().id().toString)
       txIds.foreach(tx => sender.waitForTransaction(tx))
       val r = scala.util.Random.nextInt(199)
       sender.getDataByKey(fourthAddress, s"int$r") shouldBe List(DataEntry(s"int$r", DataEntry.Value.IntValue(1000 + r)))

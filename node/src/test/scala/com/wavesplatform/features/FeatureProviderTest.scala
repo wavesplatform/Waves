@@ -25,6 +25,7 @@ class FeatureProviderTest extends FlatSpec with MockFactory {
     )
 
     val blockchain = mock[Blockchain]
+    (() => blockchain.height).expects().anyNumberOfTimes().returning(1)
     (() => blockchain.activatedFeatures).expects().anyNumberOfTimes().returning(features)
     (() => blockchain.settings).expects().anyNumberOfTimes().returning(BlockchainSettings('W', fs, GenesisSettings.MAINNET, RewardsSettings.MAINNET))
 

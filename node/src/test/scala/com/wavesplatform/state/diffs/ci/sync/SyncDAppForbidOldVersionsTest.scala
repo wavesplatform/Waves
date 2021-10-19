@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.ci.sync
 
-import com.wavesplatform.TestTime
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
@@ -10,9 +9,10 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, ci}
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test._
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.utils.Signed
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -68,7 +68,7 @@ class SyncDAppForbidOldVersionsTest
       gTx3               = GenesisTransaction.create(proxyDApp.toAddress, ENOUGH_AMT, ts).explicitGet()
       ssTx               = SetScriptTransaction.selfSigned(1.toByte, callingDApp, Some(callingDAppScript(version)), fee, ts).explicitGet()
       ssTx2              = SetScriptTransaction.selfSigned(1.toByte, proxyDApp, Some(proxyDAppScript(callingDApp.toAddress)), fee, ts).explicitGet()
-      invokeScriptTx     = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, proxyDApp.toAddress, None, Nil, fee, Waves, ts).explicitGet()
+      invokeScriptTx     = Signed.invokeScript(TxVersion.V3, invoker, proxyDApp.toAddress, None, Nil, fee, Waves, ts)
       invokeExpressionTx = ci.toInvokeExpression(ssTx2, invoker)
       invokeTx           = if (invokeExpression) invokeExpressionTx else invokeScriptTx
     } yield (Seq(gTx1, gTx2, gTx3, ssTx, ssTx2), invokeTx, proxyDApp.toAddress, callingDApp.toAddress)
@@ -79,7 +79,7 @@ class SyncDAppForbidOldVersionsTest
       invokeExpression   <- Seq(false, true)
     } {
       val (preparingTxs, invoke, proxyDApp, callingDApp) = scenario(callingDAppVersion, invokeExpression).sample.get
-      val (settings, source, target)                     = if (invokeExpression) (RideV6, invoke.senderAddress, callingDApp) else (RideV5, proxyDApp, callingDApp)
+      val (settings, source, target)                     = if (invokeExpression) (RideV6, invoke.sender.toAddress, callingDApp) else (RideV5, proxyDApp, callingDApp)
       withDomain(settings) { d =>
         d.appendBlock(preparingTxs: _*)
         (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include(

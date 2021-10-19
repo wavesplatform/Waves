@@ -14,11 +14,12 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
 import com.wavesplatform.state.Diff
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.utils.Signed
 import org.scalacheck.Gen
 
 class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
@@ -138,7 +139,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
           features
         ) {
           val expectedFee = (0.005 + 0.004 + 0.004 * (ContractLimits.MaxAttachedPaymentAmount - 1)) * Constants.UnitsInWave
-          _ should produce(
+          _ should produceRejectOrFailedDiff(
             s"Fee in WAVES for InvokeScriptTransaction (${ci.fee} in WAVES) " +
               s"with ${ContractLimits.MaxAttachedPaymentAmount} total scripts invoked " +
               s"does not exceed minimal value of ${expectedFee.toLong} WAVES"
@@ -233,7 +234,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
           val payments = issues.map(i => Payment(1, IssuedAsset(i.id())))
           (issues, payments)
         }
-        ci <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, payments, fee, Waves, ts + 3)
+        ci = Signed.invokeScript(1.toByte, invoker, master.toAddress, None, payments, fee, Waves, ts + 3)
       } yield (List(genesis, genesis2), setVerifier, setDApp, ci, issues, master, invoker, fee)
     }.explicitGet()
 

@@ -1,22 +1,22 @@
 package com.wavesplatform.transaction.transfer
 
+import scala.util.{Either, Try}
+
 import cats.instances.list._
 import cats.syntax.traverse._
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.MassTransferTxSerializer
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.MassTransferTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-
-import scala.util.{Either, Try}
 
 case class MassTransferTransaction(
     version: TxVersion,
@@ -28,26 +28,29 @@ case class MassTransferTransaction(
     attachment: ByteStr,
     proofs: Proofs,
     chainId: Byte
-) extends ProvenTransaction
+) extends Transaction(TransactionType.MassTransfer, assetId match {
+      case Waves          => Seq()
+      case a: IssuedAsset => Seq(a)
+    })
+    with ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
     with FastHashId
-    with LegacyPBSwitch.V2 {
+    with PBSince.V2 {
 
-  //noinspection TypeAnnotation
-  override val builder = MassTransferTransaction
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(MassTransferTxSerializer.bodyBytes(this))
+  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(MassTransferTxSerializer.toBytes(this))
+  override val json: Coeval[JsObject]         = Coeval.evalOnce(MassTransferTxSerializer.toJson(this))
 
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
-  override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
-
-  def compactJson(recipients: Set[AddressOrAlias]): JsObject =
-    json() ++ Json.obj("transfers" -> MassTransferTxSerializer.transfersJson(transfers.filter(t => recipients.contains(t.address))))
-
-  override def checkedAssets: Seq[IssuedAsset] = assetId match {
-    case Waves          => Seq()
-    case a: IssuedAsset => Seq(a)
-  }
+  def compactJson(recipient: Address, aliases: Set[Alias]): JsObject =
+    json() ++ Json.obj(
+      "transfers" -> MassTransferTxSerializer.transfersJson(transfers.filter { t =>
+        t.address match {
+          case a: Address => a == recipient
+          case a: Alias   => aliases(a)
+        }
+      })
+    )
 }
 
 object MassTransferTransaction extends TransactionParser {
@@ -63,11 +66,8 @@ object MassTransferTransaction extends TransactionParser {
   implicit def sign(tx: MassTransferTransaction, privateKey: PrivateKey): MassTransferTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-  //noinspection TypeAnnotation
-  val serializer = MassTransferTxSerializer
-
   override def parseBytes(bytes: Array[Byte]): Try[MassTransferTransaction] =
-    serializer.parseBytes(bytes)
+    MassTransferTxSerializer.parseBytes(bytes)
 
   case class Transfer(
       recipient: String,

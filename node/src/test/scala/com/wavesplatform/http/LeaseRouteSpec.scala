@@ -1,7 +1,10 @@
 package com.wavesplatform.http
 
+import scala.concurrent.Future
+
 import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity}
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.{NTPTime, TestWallet, TransactionGen}
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
 import com.wavesplatform.api.http.ApiMarshallers._
@@ -16,21 +19,19 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Diff}
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.test._
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.utils.SystemTime
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{NTPTime, TestWallet, TransactionGen}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.{JsArray, JsObject, Json}
-
-import scala.concurrent.Future
 
 class LeaseRouteSpec
     extends RouteSpec("/leasing")
@@ -87,23 +88,21 @@ class LeaseRouteSpec
       .explicitGet()
 
   private def invokeLeaseCancel(sender: KeyPair, leaseId: ByteStr) =
-    InvokeScriptTransaction
-      .selfSigned(
-        TxVersion.V2,
-        sender,
-        sender.toAddress,
-        Some(
-          FUNCTION_CALL(
-            FunctionHeader.User("cancelLease"),
-            List(CONST_BYTESTR(leaseId).explicitGet())
-          )
-        ),
-        Seq.empty,
-        0.005.waves,
-        Asset.Waves,
-        ntpTime.getTimestamp()
-      )
-      .explicitGet()
+    Signed.invokeScript(
+      TxVersion.V2,
+      sender,
+      sender.toAddress,
+      Some(
+        FUNCTION_CALL(
+          FunctionHeader.User("cancelLease"),
+          List(CONST_BYTESTR(leaseId).explicitGet())
+        )
+      ),
+      Seq.empty,
+      0.005.waves,
+      Asset.Waves,
+      ntpTime.getTimestamp()
+    )
 
   private def leaseCancelTransaction(sender: KeyPair, leaseId: ByteStr) =
     LeaseCancelTransaction.selfSigned(TxVersion.V3, sender, leaseId, 0.001.waves, ntpTime.getTimestamp()).explicitGet()
@@ -202,23 +201,21 @@ class LeaseRouteSpec
       sender,
       genesis,
       setScriptTransaction(sender),
-      InvokeScriptTransaction
-        .selfSigned(
-          TxVersion.V2,
-          sender,
-          sender.toAddress,
-          Some(
-            FUNCTION_CALL(
-              FunctionHeader.User("leaseTo"),
-              List(CONST_BYTESTR(ByteStr(recipient.toAddress.bytes)).explicitGet(), CONST_LONG(10_000.waves))
-            )
-          ),
-          Seq.empty,
-          0.005.waves,
-          Asset.Waves,
-          ntpTime.getTimestamp()
-        )
-        .explicitGet(),
+      Signed.invokeScript(
+        TxVersion.V2,
+        sender,
+        sender.toAddress,
+        Some(
+          FUNCTION_CALL(
+            FunctionHeader.User("leaseTo"),
+            List(CONST_BYTESTR(ByteStr(recipient.toAddress.bytes)).explicitGet(), CONST_LONG(10_000.waves))
+          )
+        ),
+        Seq.empty,
+        0.005.waves,
+        Asset.Waves,
+        ntpTime.getTimestamp()
+      ),
       recipient.toAddress
     )
 
@@ -325,27 +322,25 @@ class LeaseRouteSpec
       case ((proxy, target, recipient), genesisTransactions) =>
         withRoute { (d, r) =>
           d.appendBlock(genesisTransactions: _*)
-          val ist = InvokeScriptTransaction
-            .selfSigned(
-              TxVersion.V2,
-              proxy,
-              proxy.toAddress,
-              Some(
-                FUNCTION_CALL(
-                  FunctionHeader.User("callProxy"),
-                  List(
-                    CONST_BYTESTR(ByteStr(target.toAddress.bytes)).explicitGet(),
-                    CONST_BYTESTR(ByteStr(recipient.bytes)).explicitGet(),
-                    CONST_LONG(10_000.waves)
-                  )
+          val ist = Signed.invokeScript(
+            TxVersion.V2,
+            proxy,
+            proxy.toAddress,
+            Some(
+              FUNCTION_CALL(
+                FunctionHeader.User("callProxy"),
+                List(
+                  CONST_BYTESTR(ByteStr(target.toAddress.bytes)).explicitGet(),
+                  CONST_BYTESTR(ByteStr(recipient.bytes)).explicitGet(),
+                  CONST_LONG(10_000.waves)
                 )
-              ),
-              Seq.empty,
-              0.005.waves,
-              Asset.Waves,
-              ntpTime.getTimestamp()
-            )
-            .explicitGet()
+              )
+            ),
+            Seq.empty,
+            0.005.waves,
+            Asset.Waves,
+            ntpTime.getTimestamp()
+          )
 
           d.appendBlock(ist)
           val leaseId = d.blockchain

@@ -24,7 +24,7 @@ object SetScriptTxSerializer {
     version match {
       case TxVersion.V1 =>
         Bytes.concat(
-          Array(builder.typeId, version, chainId),
+          Array(tpe.id.toByte, version, chainId),
           sender.arr,
           Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes().arr),
           Longs.toByteArray(fee),

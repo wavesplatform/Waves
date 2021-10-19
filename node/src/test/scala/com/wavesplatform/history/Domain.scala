@@ -1,14 +1,14 @@
 package com.wavesplatform.history
 
+import scala.collection.immutable.SortedMap
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
 import cats.syntax.option._
 import com.wavesplatform.{database, Application}
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.api.common.{AddressPortfolio, AddressTransactions, CommonBlocksApi, CommonTransactionsApi}
-import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
+import com.wavesplatform.api.common._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
@@ -19,13 +19,14 @@ import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{BlockchainUpdater, _}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.utils.SystemTime
+import com.wavesplatform.utils.{EthEncoding, SystemTime}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import monix.execution.Scheduler.Implicits.global
@@ -44,8 +45,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   val transactionDiffer: Transaction => TracedResult[ValidationError, Diff] =
     TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
 
-  lazy val utxPool = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings)
-  lazy val wallet  = Wallet(settings.walletSettings.copy(file = None))
+  lazy val utxPool: UtxPoolImpl = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings)
+  lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
     def invokeScriptResult(transactionId: ByteStr): InvokeScriptResult =
@@ -54,7 +55,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     def addressTransactions(address: Address): Seq[Transaction] =
       transactions.transactionsByAddress(address, None, Set.empty, None).map(_.transaction).toListL.runSyncUnsafe()
 
-    lazy val transactions = CommonTransactionsApi(
+    lazy val transactions: CommonTransactionsApi = CommonTransactionsApi(
       blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
       db,
       blockchain,
@@ -63,6 +64,28 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       tx => Future.successful(utxPool.putIfNew(tx)),
       Application.loadBlockAt(db, blockchain)
     )
+  }
+
+  def liquidState: Option[NgState] = {
+    val cls = classOf[BlockchainUpdaterImpl]
+    val field = cls.getDeclaredField("ngState")
+    field.setAccessible(true)
+    field.get(blockchain).asInstanceOf[Option[NgState]]
+  }
+
+  def makeStateHard(): (Int, SortedMap[String, String]) = {
+    if (liquidState.isDefined) appendBlock() // Just append empty block
+    (hardStateHeight, hardStateSnapshot())
+  }
+
+  def hardStateHeight: Int = {
+    db.get(Keys.height)
+  }
+
+  def hardStateSnapshot(): SortedMap[String, String] = {
+    val builder = SortedMap.newBuilder[String, String]
+    db.iterateOver(Array.emptyByteArray)(e => builder.addOne(EthEncoding.toHexString(e.getKey).drop(2) -> EthEncoding.toHexString(e.getValue).drop(2)))
+    builder.result()
   }
 
   def lastBlock: Block = {
@@ -74,6 +97,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def liquidDiff: Diff =
     blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty)
+
+  def microBlocks: Vector[MicroBlock] = blockchain.microblockIds.reverseIterator.flatMap(blockchain.microBlock).to(Vector)
 
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
@@ -222,6 +247,28 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       }
 
     CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
+  }
+
+  //noinspection ScalaStyle
+  object helpers {
+    def creditWavesToDefaultSigner(amount: Long = 10_0000_0000): Unit = {
+      import com.wavesplatform.transaction.utils.EthConverters._
+      appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress, amount), TxHelpers.genesis(TxHelpers.defaultSigner.toEthWavesAddress, amount))
+    }
+
+    def creditWavesFromDefaultSigner(to: Address, amount: Long = 1_0000_0000): Unit = {
+      appendBlock(TxHelpers.transfer(to = to, amount = amount))
+    }
+
+    def issueAsset(script: Script = null): IssuedAsset = {
+      val transaction = TxHelpers.issue(script = script)
+      appendBlock(transaction)
+      IssuedAsset(transaction.id())
+    }
+
+    def setScript(account: KeyPair, script: Script): Unit = {
+      appendBlock(TxHelpers.setScript(account, script))
+    }
   }
 }
 

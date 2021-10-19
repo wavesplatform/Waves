@@ -9,7 +9,6 @@ import cats.{Id, Monad}
 import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.{CoevalF, ExecutionError}
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils.getDecompilerContext
@@ -25,6 +24,7 @@ import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, Contextful
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
+import com.wavesplatform.lang.{CoevalF, ExecutionError}
 import monix.eval.Coeval
 
 import scala.annotation.tailrec
@@ -511,7 +511,7 @@ object PureContext {
       ("xs", BYTESTR),
       ("number", LONG)
     ) {
-      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.take(number))
+      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.take(number.toInt))
       case xs                                             => notImplemented[Id, EVALUATED]("take(xs: ByteVector, number: Int)", xs)
     }
 
@@ -524,7 +524,7 @@ object PureContext {
       ("xs", BYTESTR),
       ("number", LONG)
     ) {
-      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.drop(number))
+      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.drop(number.toInt))
       case xs                                             => notImplemented[Id, EVALUATED]("drop(xs: ByteVector, number: Int)", xs)
     }
 

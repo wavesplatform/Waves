@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs
 
+import scala.util.{Right, Try}
+
 import cats.instances.map._
 import cats.kernel.Monoid
 import cats.syntax.either._
@@ -7,19 +9,17 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
-import com.wavesplatform.transaction.{Asset, TxVersion}
-
-import scala.util.{Right, Try}
 
 object ExchangeTransactionDiff {
 
   def apply(blockchain: Blockchain)(tx: ExchangeTransaction): Either[ValidationError, Diff] = {
     val matcher = tx.buyOrder.matcherPublicKey.toAddress
-    val buyer   = tx.buyOrder.senderPublicKey.toAddress
-    val seller  = tx.sellOrder.senderPublicKey.toAddress
+    val buyer   = tx.buyOrder.senderAddress
+    val seller  = tx.sellOrder.senderAddress
 
     val assetIds =
       List(tx.buyOrder.assetPair.amountAsset, tx.buyOrder.assetPair.priceAsset, tx.sellOrder.assetPair.amountAsset, tx.sellOrder.assetPair.priceAsset).collect {
@@ -109,9 +109,9 @@ object ExchangeTransactionDiff {
 
       val feeDiff = Monoid.combineAll(
         Seq(
-          Map(matcher -> matcherPortfolio),
-          Map(buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee)),
-          Map(seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee))
+          Map[Address, Portfolio](matcher -> matcherPortfolio),
+          Map[Address, Portfolio](buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee)),
+          Map[Address, Portfolio](seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee))
         )
       )
 

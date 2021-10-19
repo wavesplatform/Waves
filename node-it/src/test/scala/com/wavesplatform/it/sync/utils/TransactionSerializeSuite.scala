@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.utils
 
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -12,14 +12,14 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry}
 import com.wavesplatform.test._
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.utils._
 import org.scalatest.Informing
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -362,7 +362,8 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
       smartMinFee,
       Waves,
       ts,
-      Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
+      Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)),
+      AddressScheme.current.chainId
     )
     .explicitGet()
 

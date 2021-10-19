@@ -1,19 +1,19 @@
 package com.wavesplatform.it.sync.transactions
 
+import scala.util.Random
+
 import com.wavesplatform.api.http.ApiError.InvalidIds
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NTPTime
-import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{TransactionInfo, TransactionStatus}
+import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import play.api.libs.json._
-
-import scala.util.Random
 
 class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
@@ -55,7 +55,7 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
     val maxTxList = (1 to 1000).map(_ => txIds.head).toList
     val result    = notMiner.transactionStatus(maxTxList)
     result.size shouldBe maxTxList.size
-    result.forall(_ == result.head)
+    assert(result.forall(_ == result.head))
 
     assertBadRequestAndMessage(notMiner.transactionStatus(maxTxList :+ txIds.head), "Too big sequence requested")
     assertBadRequestAndMessage(notMiner.transactionStatus(Seq()), "Empty request")
@@ -75,7 +75,7 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
     notFound should contain theSameElementsAs data.notFound
   }
 
-  private def mkTransactions: List[ProvenTransaction] =
+  private def mkTransactions: List[Transaction with ProvenTransaction] =
     (1001 to 1020).map { amount =>
       TransferTransaction
         .selfSigned(
@@ -92,7 +92,7 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
         .explicitGet()
     }.toList
 
-  private def waitForTransactions(txs: List[ProvenTransaction]): List[TransactionInfo] =
+  private def waitForTransactions(txs: List[Transaction]): List[TransactionInfo] =
     txs.map(tx => nodes.waitForTransaction(tx.id().toString))
 }
 

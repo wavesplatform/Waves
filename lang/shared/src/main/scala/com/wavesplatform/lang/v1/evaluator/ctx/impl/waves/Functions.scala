@@ -227,6 +227,28 @@ object Functions {
       }
     )
 
+  val addressFromPublicKeyNative: BaseFunction[Environment] =
+    NativeFunction.withEnvironment[Environment](
+      "addressFromPublicKey",
+      Map[StdLibVersion, Long](V6 -> 1L),
+      ADDRESSFROMPUBLICKEY_NATIVE,
+      addressType,
+      ("publicKey", BYTESTR)
+    ) {
+      new ContextfulNativeFunction.Simple[Environment]("addressFromPublicKey", addressType, Seq(("AddressOrAlias", addressOrAliasType))) {
+        override def evaluate[F[_]: Monad](env: Environment[F], args: List[EVALUATED]): F[Either[ExecutionError, EVALUATED]] = {
+          (env, args) match {
+            case (env, CONST_BYTESTR(publicKey) :: Nil) =>
+              env
+                .addressFromPublicKey(publicKey)
+                .map(address => CaseObj(addressType, Map("bytes" -> CONST_BYTESTR(address.bytes).explicitGet())): EVALUATED)
+                .pure[F]
+            case (_, xs) => notImplemented[F, EVALUATED](s"addressFromPublicKey(publicKey: ByteVector)", xs)
+          }
+        }
+      }
+    }
+
   private def removePrefixExpr(str: EXPR, prefix: String): EXPR = IF(
     FUNCTION_CALL(
       PureContext.eq,
@@ -455,7 +477,7 @@ object Functions {
                           "generating" -> CONST_LONG(b.generating),
                           "effective"  -> CONST_LONG(b.effective)
                         )
-                      )
+                    )
                   )
                 )
 

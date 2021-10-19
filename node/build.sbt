@@ -1,7 +1,3 @@
-import CommonSettings.autoImport.network
-import com.typesafe.sbt.SbtNativePackager.Universal
-import sbtassembly.MergeStrategy
-
 name := "waves"
 maintainer := "com.wavesplatform"
 

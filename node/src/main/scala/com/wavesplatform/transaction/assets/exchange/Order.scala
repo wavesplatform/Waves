@@ -1,37 +1,39 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
+import scala.util.Try
+
+import com.wavesplatform.account.{Address, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.serialization.impl.OrderSerializer
 import monix.eval.Coeval
 import play.api.libs.json.{Format, JsObject}
 
-import scala.util.Try
-
 /**
   * Order to matcher service for asset exchange
   */
 case class Order(
-    version: Order.Version,
-    senderPublicKey: PublicKey,
-    matcherPublicKey: PublicKey,
-    assetPair: AssetPair,
-    orderType: OrderType,
-    amount: TxAmount,
-    price: TxAmount,
-    timestamp: TxTimestamp,
-    expiration: TxTimestamp,
-    matcherFee: TxAmount,
-    matcherFeeAssetId: Asset = Waves,
-    proofs: Proofs = Proofs.empty
+                  version: Order.Version,
+                  senderPublicKey: PublicKey,
+                  matcherPublicKey: PublicKey,
+                  assetPair: AssetPair,
+                  orderType: OrderType,
+                  amount: TxAmount,
+                  price: TxAmount,
+                  timestamp: TxTimestamp,
+                  expiration: TxTimestamp,
+                  matcherFee: TxAmount,
+                  matcherFeeAssetId: Asset = Waves,
+                  proofs: Proofs = Proofs.empty,
+                  eip712Signature: Option[ByteStr] = None
 ) extends Proven {
   import Order._
 
-  val sender: PublicKey = senderPublicKey
+  val sender: PublicKey      = senderPublicKey
+  def senderAddress: Address = sender.toAddress
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(amount, price) &&
@@ -41,7 +43,10 @@ case class Order(
     (timestamp > 0) :| "timestamp should be > 0" &&
     (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
     (expiration >= atTime) :| "expiration should be > currentTime" &&
-    (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves"
+    (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves" &&
+    (eip712Signature.isEmpty || version >= Order.V4) :| "eip712Signature available only in V4" &&
+    eip712Signature.forall(es => es.size == 65 || es.size == 129) :| "eip712Signature should be of length 65 or 129" &&
+    (eip712Signature.isEmpty || proofs.isEmpty) :| "eip712Signature excludes proofs"
   }
 
   def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {
@@ -51,9 +56,9 @@ case class Order(
   }
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.bodyBytes(this))
-  val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(crypto.fastHash(bodyBytes())))
-  val idStr: Coeval[String] = Coeval.evalOnce(id().toString)
-  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.toBytes(this))
+  val id: Coeval[ByteStr]            = Coeval.evalOnce(ByteStr(crypto.fastHash(bodyBytes())))
+  val idStr: Coeval[String]          = Coeval.evalOnce(id().toString)
+  val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(OrderSerializer.toBytes(this))
 
   def getReceiveAssetId: Asset = orderType match {
     case OrderType.BUY  => assetPair.amountAsset
@@ -105,7 +110,8 @@ object Order {
       matcherFee: TxAmount,
       matcherFeeAssetId: Asset = Asset.Waves
   ): Order =
-    Order(version, sender.publicKey, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId).signWith(sender.privateKey)
+    Order(version, sender.publicKey, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
+      .signWith(sender.privateKey)
 
   def buy(
       version: TxVersion,

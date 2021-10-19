@@ -61,7 +61,7 @@ lazy val `lang-doc` = project
   .dependsOn(`lang-jvm`)
   .settings(
     Compile / sourceGenerators += Tasks.docSource,
-    libraryDependencies ++= Seq("com.github.spullara.mustache.java" % "compiler" % "0.9.5") ++ Dependencies.test
+    libraryDependencies ++= Seq("com.github.spullara.mustache.java" % "compiler" % "0.9.10") ++ Dependencies.test
   )
 
 lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test")
@@ -111,7 +111,9 @@ lazy val root = (project in file("."))
     node,
     `node-it`,
     `node-generator`,
-    benchmark
+    benchmark,
+    `repl-js`,
+    `repl-jvm`
   )
 
 inScope(Global)(
@@ -131,8 +133,6 @@ inScope(Global)(
       "-language:postfixOps",
       "-Ywarn-unused:-implicits",
       "-Xlint",
-      "-opt:l:inline",
-      "-opt-inline-from:**",
       "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s", // Ignore gRPC warnings
       "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
       "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
@@ -153,7 +153,10 @@ inScope(Global)(
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
     network := Network(sys.props.get("network")),
-    resolvers += Resolver.sonatypeRepo("snapshots"),
+    resolvers ++= Seq(
+      Resolver.sonatypeRepo("snapshots"),
+      Resolver.mavenLocal
+    ),
     Compile / doc / sources := Seq.empty,
     Compile / packageDoc / publishArtifact := false
   )
@@ -184,6 +187,7 @@ checkPRRaw := Def
       (`grpc-server` / Test / test).value
       (node / Test / test).value
       (`repl-js` / Compile / fastOptJS).value
+      (`node-it` / Test / compile).value
     }
   )
   .value

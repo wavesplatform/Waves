@@ -2,8 +2,8 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
-import com.wavesplatform.{crypto, TestTime, TestWallet}
-import com.wavesplatform.account.{Address, AddressOrAlias}
+import com.wavesplatform.{crypto, TestWallet}
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
@@ -22,6 +22,7 @@ import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.Schedulers
 import io.netty.util.HashedWheelTimer
@@ -297,7 +298,7 @@ class AddressRouteSpec
     val contractWithoutMeta = contractWithMeta.copy(meta = DAppMeta())
     (blockchain.accountScript _)
       .when(allAccounts(4).toAddress)
-      .onCall((_: AddressOrAlias) => Some(AccountScriptInfo(allAccounts(4).publicKey, ContractScript(V3, contractWithoutMeta).explicitGet(), 11L)))
+      .onCall((_: Address) => Some(AccountScriptInfo(allAccounts(4).publicKey, ContractScript(V3, contractWithoutMeta).explicitGet(), 11L)))
 
     Get(routePath(s"/scriptInfo/${allAddresses(4)}/meta")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -321,7 +322,7 @@ class AddressRouteSpec
     (blockchain.accountScript _)
       .when(allAccounts(6).toAddress)
       .onCall(
-        (_: AddressOrAlias) =>
+        (_: Address) =>
           Some(
             AccountScriptInfo(
               allAccounts(6).publicKey,

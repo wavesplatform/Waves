@@ -75,12 +75,12 @@ object BlockDiffer extends ScorexLogging {
 
     for {
       _ <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
-      r <- apply(
+      r <- generateDiff(
         CompositeBlockchain(blockchain, Diff.empty, block, hitSource, 0, None),
         constraint,
         maybePrevBlock.map(_.header.timestamp),
         Diff.empty.copy(portfolios = Map(block.sender.toAddress -> (minerReward |+| initialFeeFromThisBlock |+| feeFromPreviousBlock))),
-        stateHeight >= ngHeight,
+        hasNg = stateHeight >= ngHeight,
         block.transactionData,
         verify
       )
@@ -113,12 +113,12 @@ object BlockDiffer extends ScorexLogging {
         )
       )
       _ <- TracedResult(micro.signaturesValid())
-      r <- apply(
+      r <- generateDiff(
         blockchain,
         constraint,
         prevBlockTimestamp,
         Diff.empty,
-        true,
+        hasNg = true,
         micro.transactionData,
         verify
       )
@@ -132,7 +132,7 @@ object BlockDiffer extends ScorexLogging {
       case _ => transactionFee
     }
 
-  private[this] def apply(
+  private[this] def generateDiff(
       blockchain: Blockchain,
       initConstraint: MiningConstraint,
       prevBlockTimestamp: Option[Long],

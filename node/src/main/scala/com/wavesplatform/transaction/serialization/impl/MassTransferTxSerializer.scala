@@ -3,9 +3,8 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import com.wavesplatform.account.{AddressOrAlias, AddressScheme}
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
 import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
@@ -17,7 +16,7 @@ import scala.util.Try
 
 object MassTransferTxSerializer {
   def transfersJson(transfers: Seq[ParsedTransfer]): JsValue =
-    Json.toJson(transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) })
+    Json.toJson(transfers.map { case ParsedTransfer(address, amount) => Transfer(address.toString, amount) })
 
   def toJson(tx: MassTransferTransaction): JsObject = {
     import tx._
@@ -37,7 +36,7 @@ object MassTransferTxSerializer {
         val transferBytes = transfers.map { case ParsedTransfer(recipient, amount) => Bytes.concat(recipient.bytes, Longs.toByteArray(amount)) }
 
         Bytes.concat(
-          Array(builder.typeId, version),
+          Array(tpe.id.toByte, version),
           sender.arr,
           assetId.byteRepr,
           Shorts.toByteArray(transfers.size.toShort),
@@ -59,7 +58,7 @@ object MassTransferTxSerializer {
   def parseBytes(bytes: Array[Byte]): Try[MassTransferTransaction] = Try {
     def parseTransfers(buf: ByteBuffer): Seq[MassTransferTransaction.ParsedTransfer] = {
       def readTransfer(buf: ByteBuffer): ParsedTransfer = {
-        val addressOrAlias = AddressOrAlias.fromBytes(buf).explicitGet()
+        val addressOrAlias = buf.getAddressOrAlias
         val amount         = buf.getLong
         ParsedTransfer(addressOrAlias, amount)
       }

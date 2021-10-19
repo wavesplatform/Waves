@@ -59,12 +59,12 @@ object RewardsSettings {
 }
 
 case class FunctionalitySettings(
-    featureCheckBlocksPeriod: Int,
-    blocksForFeatureActivation: Int,
+    featureCheckBlocksPeriod: Int = 1000,
+    blocksForFeatureActivation: Int = 800,
     generationBalanceDepthFrom50To1000AfterHeight: Int = 0,
     blockVersion3AfterHeight: Int = 0,
     preActivatedFeatures: Map[Short, Int] = Map.empty,
-    doubleFeaturesPeriodsAfterHeight: Int,
+    doubleFeaturesPeriodsAfterHeight: Int = Int.MaxValue,
     maxTransactionTimeBackOffset: FiniteDuration = 120.minutes,
     maxTransactionTimeForwardOffset: FiniteDuration = 90.minutes,
     lastTimeBasedForkParameter: Long = 0L,

@@ -6,7 +6,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
@@ -20,11 +20,11 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds.TO_BIGINT
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.test._
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
-import com.wavesplatform.TestTime
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.utils.Signed
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
@@ -61,7 +61,7 @@ class BigIntInvokeTest
     def dApp(action: EXPR => FUNCTION_CALL): Script = {
       ContractScriptImpl(
         V5,
-        DApp(
+        contract.DApp(
           DAppMeta(),
           Nil,
           List(
@@ -92,8 +92,7 @@ class BigIntInvokeTest
           genesis  <- GenesisTransaction.create(dAppAcc.toAddress, ENOUGH_AMT, ts)
           genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
           setDApp  <- SetScriptTransaction.selfSigned(1.toByte, dAppAcc, Some(dApp(action)), fee, ts)
-          invoke   <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, dAppAcc.toAddress, None, Nil, fee, Waves, ts)
-        } yield (List(genesis, genesis2, setDApp), invoke)
+        } yield (List(genesis, genesis2, setDApp), Signed.invokeScript(1.toByte, invoker, dAppAcc.toAddress, None, Nil, fee, Waves, ts))
       }.explicitGet()
 
     def assert(action: EXPR => FUNCTION_CALL, message: String) = {
@@ -188,9 +187,7 @@ class BigIntInvokeTest
         genesis2 = GenesisTransaction.create(dApp2Acc.toAddress, ENOUGH_AMT, ts).explicitGet()
         setDApp1 = SetScriptTransaction.selfSigned(1.toByte, dApp1Acc, Some(dApp1(dApp2Acc.toAddress)), fee, ts).explicitGet()
         setDApp2 = SetScriptTransaction.selfSigned(1.toByte, dApp2Acc, Some(dApp2), fee, ts).explicitGet()
-        invoke = InvokeScriptTransaction
-          .selfSigned(1.toByte, dApp1Acc, dApp1Acc.toAddress, Some(FUNCTION_CALL(User("default"), Nil)), Nil, fee, Waves, ts)
-          .explicitGet()
+        invoke = Signed.invokeScript(1.toByte, dApp1Acc, dApp1Acc.toAddress, Some(FUNCTION_CALL(User("default"), Nil)), Nil, fee, Waves, ts)
       } yield (List(genesis1, genesis2, setDApp1, setDApp2), invoke)
 
     val (preparingTxs, invoke) = preconditions.sample.get

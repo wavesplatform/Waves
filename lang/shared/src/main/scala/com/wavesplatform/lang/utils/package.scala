@@ -50,6 +50,7 @@ package object utils {
     override def multiPaymentAllowed: Boolean                                                                    = true
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
     override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
+    override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]                               = ???
     override def accountScript(addressOrAlias: Recipient): Option[Script]                                        = ???
     override def callScript(
         dApp: Address,

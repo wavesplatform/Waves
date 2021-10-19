@@ -91,13 +91,13 @@ object CommonValidation {
               identity
 
           for {
-            address <- blockchain.resolveAlias(citx.dAppAddressOrAlias)
+            address <- blockchain.resolveAlias(citx.dApp)
             allowFeeOverdraft = blockchain.accountScript(address) match {
               case Some(AccountScriptInfo(_, ContractScriptImpl(version, _), _, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
               case _                                                                                                                      => false
             }
             check <- foldPayments(citx.payments)
-              .map(p => checkTransfer(citx.sender.toAddress, p.assetId, p.amount, citx.feeAssetId, citx.fee, allowFeeOverdraft))
+              .map(p => checkTransfer(citx.senderAddress, p.assetId, p.amount, citx.feeAssetId, citx.fee, allowFeeOverdraft))
               .find(_.isLeft)
               .getOrElse(Right(tx))
           } yield check
@@ -160,11 +160,11 @@ object CommonValidation {
     }
 
     val versionsBarrier = tx match {
-      case p: LegacyPBSwitch if p.isProtobufVersion =>
+      case p: PBSince if p.isProtobufVersion =>
         activationBarrier(BlockchainFeatures.BlockV5)
 
-      case v: VersionedTransaction if !v.builder.supportedVersions.contains(v.version) =>
-        Left(GenericError(s"Invalid tx version: $v"))
+      case v: VersionedTransaction if !TransactionParsers.all.contains((v.tpe.id.toByte, v.version)) =>
+        Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
 
       case _ =>
         Right(tx)
@@ -216,8 +216,12 @@ object CommonValidation {
       case _: SponsorFeeTransaction   => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _: InvokeScriptTransaction => activationBarrier(BlockchainFeatures.Ride4DApps)
 
-      case _: UpdateAssetInfoTransaction  => activationBarrier(BlockchainFeatures.BlockV5)
-      case _: InvokeExpressionTransaction => activationBarrier(BlockchainFeatures.RideV6)
+      case _: UpdateAssetInfoTransaction => activationBarrier(BlockchainFeatures.BlockV5)
+      case iet: InvokeExpressionTransaction =>
+        if (iet.version == 1) activationBarrier(BlockchainFeatures.RideV6)
+        else Left(TxValidationError.ActivationError(s"Transaction version ${iet.version} has not been activated yet"))
+
+      case _: EthereumTransaction => activationBarrier(BlockchainFeatures.RideV6)
 
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }

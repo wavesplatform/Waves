@@ -13,10 +13,11 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
-import com.wavesplatform.state.diffs.{BlockDiffer, produce}
+import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.{NTPTime, TestHelpers}

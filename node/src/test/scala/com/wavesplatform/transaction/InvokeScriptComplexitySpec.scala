@@ -13,8 +13,9 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.utx.UtxPoolImpl
 
 class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
@@ -97,8 +98,7 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
           issueTx
         )
 
-        val invocation = InvokeScriptTransaction
-          .selfSigned(
+        val invocation = Signed.invokeScript(
             TxVersion.V2,
             invoker,
             dApp1KP.toAddress,
@@ -117,7 +117,6 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
             Waves,
             ntpTime.getTimestamp()
           )
-          .explicitGet()
 
         utx.putIfNew(invocation, true).resultE.explicitGet() shouldBe true
         utx.size shouldBe 1

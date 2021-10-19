@@ -24,7 +24,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
@@ -642,7 +642,7 @@ class BlockchainUpdaterImpl(
     } else leveldb.blockHeader(height)
   }
 
-  override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = readLock {
+  override def transferById(id: BlockId): Option[(Int, TransferTransactionLike)] = readLock {
     compositeBlockchain.transferById(id)
   }
 
@@ -718,6 +718,10 @@ class BlockchainUpdaterImpl(
       case Some(ng) if this.height == height => ng.hitSource.some
       case _                                 => leveldb.hitSource(height)
     }
+  }
+
+  override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = readLock {
+    compositeBlockchain.resolveERC20Address(address)
   }
 
   private[this] def compositeBlockchain =

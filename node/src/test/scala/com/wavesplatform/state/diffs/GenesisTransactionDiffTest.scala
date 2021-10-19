@@ -4,7 +4,7 @@ import cats._
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state._
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import org.scalacheck.Gen
 
 class GenesisTransactionDiffTest extends PropSpec with WithState {

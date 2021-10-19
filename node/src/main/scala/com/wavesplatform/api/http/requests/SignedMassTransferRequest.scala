@@ -38,7 +38,7 @@ case class SignedMassTransferRequest(
   def toTx: Either[ValidationError, MassTransferTransaction] =
     for {
       _sender    <- PublicKey.fromBase58String(senderPublicKey)
-      _assetId   <- parseBase58ToAsset(assetId.filter(_.length > 0), "invalid.assetId")
+      _assetId   <- parseBase58ToAsset(assetId.filter(_.nonEmpty), "invalid.assetId")
       _transfers <- MassTransferTransaction.parseTransfersList(transfers)
       t          <- MassTransferTransaction.create(version.getOrElse(1.toByte), _sender, _assetId, _transfers, fee, timestamp, attachment, proofs)
     } yield t

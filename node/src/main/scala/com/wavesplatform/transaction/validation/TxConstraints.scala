@@ -1,5 +1,7 @@
 package com.wavesplatform.transaction.validation
 
+import scala.util.Try
+
 import cats.data.{NonEmptyList, Validated}
 import cats.data.Validated.{Invalid, Valid}
 import cats.implicits._
@@ -7,12 +9,10 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.{Asset, TxValidationError, TxVersion, VersionedTransaction}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, TooBigArray}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TxValidationError, TxVersion, VersionedTransaction}
-
-import scala.util.Try
 
 object TxConstraints {
   // Generic

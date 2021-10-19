@@ -1,20 +1,19 @@
 package com.wavesplatform.transaction.assets.exchange
 
+import scala.util.{Failure, Success, Try}
+
 import com.google.common.primitives.Bytes
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json.{JsObject, Json}
 
-import scala.util.{Failure, Success, Try}
-
-
 case class AssetPair(
-     amountAsset: Asset,
-     priceAsset: Asset
+    amountAsset: Asset,
+    priceAsset: Asset
 ) {
   import AssetPair._
 
@@ -28,13 +27,16 @@ case class AssetPair(
     "amountAsset" -> amountAsset.maybeBase58Repr,
     "priceAsset"  -> priceAsset.maybeBase58Repr
   )
-  def reverse = AssetPair(priceAsset, amountAsset)
-
+  def reverse: AssetPair = AssetPair(priceAsset, amountAsset)
   def assets: Set[Asset] = Set(amountAsset, priceAsset)
 }
 
 object AssetPair {
   val WavesName = "WAVES"
+
+  implicit class AssetPairExt(val p: AssetPair) extends AnyVal {
+    def checkedAssets: Seq[IssuedAsset] = Seq(p.priceAsset, p.amountAsset).collect { case ia: Asset.IssuedAsset => ia }
+  }
 
   def assetIdStr(aid: Asset): String = aid match {
     case Waves           => WavesName
