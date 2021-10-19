@@ -142,7 +142,9 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
   override def addressFromString(address: String): Either[String, Address] =
     mappings.addressFromString(address)
 
-  override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address] = ???
+  override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address] =
+    mappings.addressFromPublicKey(publicKey)
+
   override def inputEntity: InputEntity                                          = ???
   override def transactionById(id: Array[Byte]): Future[Option[Tx]]              = ???
   override def multiPaymentAllowed: Boolean                                      = ???

@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1.repl.node.http.response
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.repl.node.http.response.model._
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, ScriptAssetInfo, Tx}
@@ -43,4 +44,7 @@ case class ImplicitMappings(chainId: Byte) {
 
   implicit val addressFromString: String => Either[String, Address] =
     chainDependentMapper.addressFromString
+
+  implicit val addressFromPublicKey: ByteStr => Either[String, Address] =
+    b => Right(Address(chainDependentMapper.pkToAddress(ByteString(b.arr))))
 }

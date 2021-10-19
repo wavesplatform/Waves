@@ -78,7 +78,7 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       vrf = b.VRF.map(_.byteStr)
     )
 
-  private def pkToAddress(publicKey: ByteString): ByteStr = {
+  def pkToAddress(publicKey: ByteString): ByteStr = {
     val withoutChecksum =
       ByteBuffer.allocate(1 + 1 + HashLength)
         .put(AddressVersion.toByte)
