@@ -151,7 +151,7 @@ trait BaseGlobal {
   ): Either[String, (Array[Byte], EXPR, Long)] = {
     val isFreeCall = scriptType == Call
     for {
-      expr <- if (isFreeCall) compiler(input, context) else ContractCompiler.compileFreeCall(input, context, version)
+      expr <- if (isFreeCall) ContractCompiler.compileFreeCall(input, context, version) else compiler(input, context)
       bytes = serializeExpression(expr, version, isFreeCall)
       _ <- ExprScript.validateBytes(bytes, isFreeCall)
       complexity <- ExprScript.estimateExact(expr, version, isFreeCall, estimator)
