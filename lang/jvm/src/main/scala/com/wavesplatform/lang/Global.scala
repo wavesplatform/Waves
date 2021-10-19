@@ -105,7 +105,12 @@ object Global extends BaseGlobal {
       } else {
         BigDecimalMath.pow(baseBD, expBD, context)
       }
-      setScale(resultPrecision.toInt, round, context.getPrecision, result)
+      if (useNewPrecision)
+        setScale(resultPrecision.toInt, round, context.getPrecision, result)
+      else {
+        val value = result.setScale(resultPrecision.toInt, round.mode).unscaledValue
+        Right(BigInt(value))
+      }
     }.flatten.map(_.bigInteger.longValueExact())
 
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long] =
@@ -128,7 +133,10 @@ object Global extends BaseGlobal {
       } else {
         BigDecimalMath.pow(base, exp, context)
       }
-      setScale(rp.toInt, round, context.getPrecision, res)
+      if (useNewPrecision)
+        setScale(rp.toInt, round, context.getPrecision, res)
+      else
+        Right(BigInt(res.setScale(rp.toInt, round.mode).unscaledValue))
     }.flatten
 
   private def setScale(

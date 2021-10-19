@@ -31,8 +31,12 @@ class PowNewPrecisionTest extends PropSpec with WithDomain {
       |   let x = 2661956191736
       |   let y = 2554192264270
       |   let sk = (((fraction(scale12, x, y) + fraction(scale12, y, x)) / 2) / 10000)
-      |   let r = (fraction((x + y), scale8, pow(sk, digits8, alpha, alphaDigits, digits8, CEILING)) + (2 * fraction(pow(fraction(x, y, scale8), 0, 5, 1, (digits8 / 2), DOWN), pow((sk - beta), digits8, alpha, alphaDigits, digits8, DOWN), scale8)))
-      |   [ IntegerEntry("result", r) ]
+      |   let r1 = (fraction((x + y), scale8, pow(sk, digits8, alpha, alphaDigits, digits8, CEILING)) + (2 * fraction(pow(fraction(x, y, scale8), 0, 5, 1, (digits8 / 2), DOWN), pow((sk - beta), digits8, alpha, alphaDigits, digits8, DOWN), scale8)))
+      |   let r2 = pow(10, 6, 6, 0, 0, CEILING)
+      |   [
+      |     IntegerEntry("result1", r1),
+      |     IntegerEntry("result2", r2)
+      |   ]
       | }
     """.stripMargin
   )
@@ -59,10 +63,12 @@ class PowNewPrecisionTest extends PropSpec with WithDomain {
       d.appendBlock(genesisTxs: _*)
 
       d.appendBlock(invoke())
-      d.blockchain.accountData(dApp, "result").get.value shouldBe 9049204201489L
+      d.blockchain.accountData(dApp, "result1").get.value shouldBe 9049204201489L
+      d.blockchain.accountData(dApp, "result2").get.value shouldBe 1
 
       d.appendBlock(invoke())
-      d.blockchain.accountData(dApp, "result").get.value shouldBe 9049204201491L
+      d.blockchain.accountData(dApp, "result1").get.value shouldBe 9049204201491L
+      d.blockchain.accountData(dApp, "result2").get.value shouldBe 0
     }
   }
 }
