@@ -10,7 +10,6 @@ import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.{AbiTypes, StructType}
 import org.web3j.crypto._
 
-// TODO: Move to separate package available to node-generator and node:test
 object EthTxGenerator {
   sealed trait Arg
   object Arg {
@@ -25,36 +24,6 @@ object EthTxGenerator {
   }
 
   import org.web3j.abi.{datatypes => ethTypes}
-  // import com.esaulpaugh.headlong.{abi => hl}
-  // import scala.jdk.CollectionConverters._
-
-  //noinspection ScalaDeprecation
-  /* def toEthType(value: Terms.EVALUATED): ethTypes.Type[_] = value match { // TODO remove
-    case Terms.CONST_LONG(t)     => new ethTypes.generated.Int64(t)
-    case Terms.CONST_BIGINT(t)   => new ethTypes.generated.Int256(t.bigInteger)
-    case bs: Terms.CONST_BYTESTR => new ethTypes.DynamicBytes(bs.bs.arr)
-    case s: Terms.CONST_STRING   => new ethTypes.Utf8String(s.s)
-    case Terms.CONST_BOOLEAN(b)  => new ethTypes.Bool(b)
-    case ARR(xs) =>
-      val ethTypedXs = xs.map(toEthType)
-      val arrayClass = (ethTypedXs.headOption match {
-        case Some(value) =>
-          if (classOf[StructType].isAssignableFrom(value.getClass)) value.getClass
-          else ethTypes.AbiTypes.getType(value.getTypeAsString)
-
-        case None => classOf[ethTypes.BytesType]
-      }).asInstanceOf[Class[ethTypes.Type[_]]]
-
-      new ethTypes.DynamicArray(arrayClass, ethTypedXs: _*) {
-        override def getTypeAsString: String = {
-          val head = ethTypedXs.headOption.getOrElse(ethTypes.generated.Bytes32.DEFAULT)
-          (if (classOf[StructType].isAssignableFrom(head.getClass)) head.getTypeAsString else AbiTypes.getTypeAString(getComponentType)) + "[]"
-        }
-      }
-
-    case CaseObj(_, fields) => new ethTypes.DynamicStruct(fields.values.toSeq.map(toEthType): _*)
-    case _                  => ???
-  } */
 
   def toEthType(value: Arg): ethTypes.Type[_] = value match {
     case Arg.Integer(v, typeStr) =>
@@ -82,29 +51,6 @@ object EthTxGenerator {
 
     case Arg.Struct(values @ _*) => new ethTypes.StaticStruct(values.map(toEthType): _*)
   }
-
-  /* def toHLEthType(value: Terms.EVALUATED): hl.ABIType[_] = value match {
-    case Terms.CONST_LONG(_)    => hl.TypeFactory.create[hl.LongType]("int64")
-    case Terms.CONST_BIGINT(_)  => hl.TypeFactory.create[hl.BigIntegerType]("int256")
-    case Terms.CONST_BOOLEAN(_) => hl.TypeFactory.create[hl.BooleanType]("bool")
-    case _: Terms.CONST_BYTESTR => hl.TypeFactory.create[hl.ArrayType[hl.ByteType, Array[Byte]]]("bytes")
-    case _: Terms.CONST_STRING  => hl.TypeFactory.create[hl.ArrayType[hl.ByteType, String]]("string")
-    case ARR(xs)                => hl.TypeFactory.create[hl.ArrayType[_, _]](s"${toHLEthType(xs.head)}[]")
-    case CaseObj(_, fields)     => hl.TypeFactory.create[hl.TupleType](fields.values.map(toHLEthType).mkString("(", ",", ")"))
-  }
-
-  def toHLEthValue(value: Terms.EVALUATED): Any = value match {
-    case Terms.CONST_LONG(t)     => java.lang.Long.valueOf(t)
-    case Terms.CONST_BIGINT(t)   => t.bigInteger
-    case bs: Terms.CONST_BYTESTR => bs.bs.arr
-    case s: Terms.CONST_STRING   => s.s
-    case Terms.CONST_BOOLEAN(b)  => java.lang.Boolean.valueOf(b)
-    case ARR(xs)                 =>
-      val values = xs.map(toHLEthValue)
-      values.toArray(ClassTag(values.head.getClass))
-    case CaseObj(_, fields)      => hl.Tuple.of(fields.values.toSeq.map(toHLEthValue): _*)
-    case _                       => ???
-  } */
 
   def signRawTransaction(keyPair: ECKeyPair, chainId: Byte)(raw: RawTransaction): EthereumTransaction = {
     val signedTx =
@@ -167,18 +113,7 @@ object EthTxGenerator {
       Arg.List(Arg.Struct(Arg.Bytes(ABIConverter.WavesByteRepr, "bytes32"), Arg.Integer(0)), tuples)
     }
 
-    val fullArgs = (args :+ paymentsArg)
-
-    /* val ethFunc = new hl.Function(
-      hl.TypeEnum.FUNCTION,
-      funcName,
-      hl.TupleType.of(fullArgs.map(a => toHLEthType(a).getCanonicalType): _*),
-      hl.TupleType.EMPTY,
-      null,
-      hl.Function.newDefaultDigest()
-    )
-    val values      = fullArgs.map(toHLEthValue)
-    val ethCallData = EthEncoding.toHexString(ethFunc.encodeCallWithArgs(values:_*).array()) */
+    val fullArgs = args :+ paymentsArg
 
     val argsAsEth = fullArgs.map(toEthType)
     val function = new org.web3j.abi.datatypes.Function(
