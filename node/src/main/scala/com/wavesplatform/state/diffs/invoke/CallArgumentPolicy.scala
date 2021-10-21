@@ -1,8 +1,8 @@
 package com.wavesplatform.state.diffs.invoke
 
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.v1.compiler.{ContractCompiler, Terms}
-import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG, CONST_STRING, CaseObj, EVALUATED, EXPR, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.ContractCompiler
+import com.wavesplatform.lang.v1.compiler.Terms._
 
 trait CallArgumentPolicy {
   def check(e: EXPR): Boolean
