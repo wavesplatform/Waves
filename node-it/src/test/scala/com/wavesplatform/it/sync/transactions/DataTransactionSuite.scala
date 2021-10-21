@@ -46,7 +46,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
 
   test("should not put 65-sized proof") {
     val keyPair = sender.createKeyPair()
-    sender.transfer(sender.keyPair, keyPair.toAddress.stringRepr, 1.waves, waitForTx = true)
+    sender.transfer(sender.keyPair, keyPair.toAddress.toString, 1.waves, waitForTx = true)
     sender.setScript(
       keyPair,
       Some(

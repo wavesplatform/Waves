@@ -70,7 +70,8 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
             )
           ),
           waitForTx = true
-        )
+        ),
+        unsafe = false
       )
       .explicitGet()
       .id()
@@ -99,7 +100,7 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
     val firstEffBalance = sender.wavesBalance(firstAddress).effective
 
     sender.setAssetScript(firstAcc, assetWScript, Right(Some(script2)), setAssetScriptFee, waitForTx = true)
-    sender.assetInfo(assetWScript).script.flatMap(sd => PBTransactions.toVanillaScript(sd.scriptBytes)) should contain (script2)
+    sender.assetInfo(assetWScript).script.flatMap(sd => PBTransactions.toVanillaScript(sd.scriptBytes)) should contain(script2)
 
     sender.wavesBalance(firstAddress).available shouldBe firstBalance - setAssetScriptFee
     sender.wavesBalance(firstAddress).effective shouldBe firstEffBalance - setAssetScriptFee
@@ -156,7 +157,8 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
             issueFee,
             script = Right(Some(unchangeableScript)),
             waitForTx = true
-          )
+          ),
+          unsafe = false
         )
         .explicitGet()
         .id()
@@ -172,7 +174,8 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
   test("try to make SetAssetScript for asset v1") {
     val assetV1 = PBTransactions
       .vanilla(
-        sender.broadcastIssue(thirdAcc, "assetV1", someAssetAmount, 8, reissuable = true, issueFee, waitForTx = true)
+        sender.broadcastIssue(thirdAcc, "assetV1", someAssetAmount, 8, reissuable = true, issueFee, waitForTx = true),
+        unsafe = false
       )
       .explicitGet()
       .id()
@@ -192,7 +195,6 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
 
   }
 
-
   protected override def beforeAll(): Unit = {
     super.beforeAll()
     assetWOScript = PBTransactions
@@ -205,7 +207,8 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
           reissuable = false,
           fee = issueFee,
           waitForTx = true
-        )
+        ),
+        unsafe = false
       )
       .explicitGet()
       .id()
@@ -222,7 +225,8 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
           fee = issueFee,
           script = Right(Some(script)),
           waitForTx = true
-        )
+        ),
+        unsafe = false
       )
       .explicitGet()
       .id()

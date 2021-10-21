@@ -316,7 +316,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       )
       .compilerContext
 
-    Global.compileExpression(expr, ctx, V4, ScriptEstimatorV3) should produce("Script is too large: 8756 bytes > 8192 bytes")
+    Global.compileExpression(expr, ctx, V4, Account, ScriptEstimatorV3) should produce("Script is too large: 8756 bytes > 8192 bytes")
   }
 
   property("extract() removed from V4") {
@@ -567,6 +567,17 @@ class ExpressionCompilerV1Test extends PropSpec {
         "Undefined field `_1` of variable of type `Any` in 19-23; " +
         "Undefined field `_2` of variable of type `Any` in 27-31" +
         "]"
+    )
+  }
+
+  property("using removed FOLD macro") {
+    val script =
+      """
+        | func sum(a:Int, b:Int) = a + b
+        | FOLD<20>([1, 2, 3, 4, 5], 9, sum)
+      """.stripMargin
+    ExpressionCompiler.compile(script, compilerContext) should produce(
+      "Compilation failed: [The FOLD<> macro is no longer supported, use fold_N function family instead in 34-67]"
     )
   }
 

@@ -10,8 +10,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
-import com.wavesplatform.state.diffs._
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 
 class ScriptV1Test extends PropSpec with TypedScriptGen {
 
@@ -32,7 +31,7 @@ class ScriptV1Test extends PropSpec with TypedScriptGen {
       }
       .reduceLeft[EXPR](IF(_, _, FALSE))
 
-    Script.estimate(ExprScript(expr).explicitGet(), ScriptEstimatorV2, useContractVerifierLimit = false) should produce("Script is too complex")
+    Script.estimate(ExprScript(expr).explicitGet(), ScriptEstimatorV2, fixEstimateOfVerifier = true, useContractVerifierLimit = false) should produce("Script is too complex")
   }
 
   property("ScriptV1.apply should deny too big scripts") {

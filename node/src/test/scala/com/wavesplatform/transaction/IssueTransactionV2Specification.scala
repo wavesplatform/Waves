@@ -16,6 +16,7 @@ import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state.HistoryTest
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.serialization.impl.IssueTxSerializer
 import com.wavesplatform.utils._
 import com.wavesplatform.{WithDB, crypto}
 import org.scalatest.EitherValues
@@ -72,7 +73,7 @@ class IssueTransactionV2Specification
         |                       }
         |""".stripMargin)
 
-    val tx = IssueTransaction.serializer.parseBytes(bytes).get
+    val tx = IssueTxSerializer.parseBytes(bytes).get
     tx.json() shouldBe json
     assert(crypto.verify(tx.signature, tx.bodyBytes(), tx.sender), "signature should be valid")
   }

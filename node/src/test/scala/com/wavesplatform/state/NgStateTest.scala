@@ -3,7 +3,7 @@ package com.wavesplatform.state
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.history._
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer._
 import org.scalacheck.Gen

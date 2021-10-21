@@ -17,15 +17,15 @@ class AccountOrAliasSpecification extends PropSpec {
     forAll(aliasGen) { alias: Alias =>
       val bytes          = alias.bytes
       val representation = Alias.fromBytes(bytes).explicitGet()
-      representation.stringRepr shouldBe representation.stringRepr
+      representation.toString shouldBe representation.toString
     }
   }
 
   property("AccountOrAlias serialization round trip") {
     forAll(accountOrAliasGen) { aoa: AddressOrAlias =>
       val bytes          = aoa.bytes
-      val addressOrAlias = AddressOrAlias.fromBytes(bytes, 0).explicitGet()
-      addressOrAlias._1.stringRepr shouldBe aoa.stringRepr
+      val addressOrAlias = AddressOrAlias.fromBytes(bytes).explicitGet()
+      addressOrAlias.toString shouldBe aoa.toString
     }
   }
 }

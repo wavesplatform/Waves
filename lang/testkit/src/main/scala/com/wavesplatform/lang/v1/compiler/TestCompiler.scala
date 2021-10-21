@@ -37,11 +37,20 @@ class TestCompiler(version: StdLibVersion) {
   def compileContract(script: String, allowIllFormedStrings: Boolean = false): Script =
     ContractScript(version, compile(script, allowIllFormedStrings).explicitGet()).explicitGet()
 
-  def compileExpression(script: String, allowIllFormedStrings: Boolean = false): Script =
-    ExprScript(version, ExpressionCompiler.compile(script, expressionCompilerContext, allowIllFormedStrings).explicitGet()._1).explicitGet()
+  def compileExpression(script: String, allowIllFormedStrings: Boolean = false, checkSize: Boolean = true): Script =
+    ExprScript(
+      version,
+      ExpressionCompiler.compile(script, expressionCompilerContext, allowIllFormedStrings).explicitGet()._1,
+      checkSize = checkSize
+    ).explicitGet()
 
   def compileAsset(script: String): Script =
     ExprScript(version, ExpressionCompiler.compile(script, assetCompilerContext).explicitGet()._1).explicitGet()
+
+  def compileFreeCall(script: String): ExprScript = {
+    val expr = ContractCompiler.compileFreeCall(script, compilerContext, version).explicitGet()
+    ExprScript(version, expr, isFreeCall = true).explicitGet()
+  }
 }
 
 object TestCompiler {

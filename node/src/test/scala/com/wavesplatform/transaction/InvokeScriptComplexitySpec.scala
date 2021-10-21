@@ -13,10 +13,10 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.utx.UtxPoolImpl
-import monix.reactive.Observer
 
 class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
   private[this] val dApp1 = TestCompiler(V5).compileContract("""
@@ -82,7 +82,7 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
   "correctly estimates complexity when child dApp invocation involves payment in smart asset" in forAll(gen) {
     case (invoker, dApp0KP, dApp1KP) =>
       withDomain(settings) { d =>
-        val utx = new UtxPoolImpl(ntpTime, d.blockchain, Observer.stopped, settings.utxSettings)
+        val utx = new UtxPoolImpl(ntpTime, d.blockchain, settings.utxSettings)
 
         d.appendBlock(
           Seq(invoker.toAddress, dApp0KP.toAddress, dApp1KP.toAddress)
@@ -98,8 +98,7 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
           issueTx
         )
 
-        val invocation = InvokeScriptTransaction
-          .selfSigned(
+        val invocation = Signed.invokeScript(
             TxVersion.V2,
             invoker,
             dApp1KP.toAddress,
@@ -118,7 +117,6 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
             Waves,
             ntpTime.getTimestamp()
           )
-          .explicitGet()
 
         utx.putIfNew(invocation, true).resultE.explicitGet() shouldBe true
         utx.size shouldBe 1

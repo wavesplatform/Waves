@@ -3,13 +3,13 @@ package com.wavesplatform.api.http.requests
 import cats.instances.list._
 import cats.syntax.either._
 import cats.syntax.traverse._
-import com.wavesplatform.account.{AddressOrAlias, PublicKey}
+import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, InvokeTransaction}
 import play.api.libs.json._
 
 object InvokeScriptRequest {
@@ -75,6 +75,7 @@ object InvokeScriptRequest {
 }
 
 case class InvokeScriptRequest(
+    chainId: Option[Byte],
     version: Option[Byte],
     sender: String,
     fee: Long,
@@ -86,6 +87,7 @@ case class InvokeScriptRequest(
 )
 
 case class SignedInvokeScriptRequest(
+    chainId: Option[Byte],
     version: Option[Byte],
     senderPublicKey: String,
     fee: Long,
@@ -100,17 +102,18 @@ case class SignedInvokeScriptRequest(
     for {
       _sender      <- PublicKey.fromBase58String(senderPublicKey)
       _dappAddress <- AddressOrAlias.fromString(dApp)
-      _feeAssetId  <- parseBase58ToAsset(feeAssetId.filter(_.length > 0), "invalid.feeAssetId")
+      _feeAssetId  <- parseBase58ToAsset(feeAssetId.filter(_.nonEmpty), "invalid.feeAssetId")
       t <- InvokeScriptTransaction.create(
         version.getOrElse(2.toByte),
         _sender,
         _dappAddress,
-        call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)),
+        call.map(InvokeScriptRequest.buildFunctionCall).filterNot(_ == InvokeTransaction.DefaultCall),
         payment.getOrElse(Seq()),
         fee,
         _feeAssetId,
         timestamp,
-        proofs
+        proofs,
+        chainId.getOrElse(AddressScheme.current.chainId)
       )
     } yield t
 }

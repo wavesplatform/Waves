@@ -18,6 +18,7 @@ import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAsse
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import monix.eval.Coeval
 
+import scala.annotation.tailrec
 import scala.util.{Left, Right, Try}
 
 object Common {
@@ -90,6 +91,7 @@ object Common {
     override def txId: ByteStr                                                                                   = ???
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
     override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
+    override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]                               = ???
     def accountScript(addressOrAlias: Recipient): Option[Script]                                                 = ???
     override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], remainingComplexity: Int, reentrant: Boolean): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
     }
@@ -119,4 +121,10 @@ object Common {
         else Right(None)
     }
   }
+
+  @tailrec def fold(totalSize: Int, list: String, acc: String, f: String)(size: Int = totalSize): String =
+    if (size == 0)
+      acc
+    else
+      fold(totalSize, list, s"$f($acc, $list[${totalSize - size}])", f)(size - 1)
 }

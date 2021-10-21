@@ -3,6 +3,8 @@ package com.wavesplatform.lang.v1
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
+import scala.util.Try
+
 import cats.instances.lazyList._
 import cats.instances.list._
 import cats.syntax.apply._
@@ -13,8 +15,6 @@ import com.wavesplatform.lang.utils.Serialize._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import monix.eval.Coeval
-
-import scala.util.Try
 
 object Serde {
   val E_LONG: Byte    = 0
@@ -173,6 +173,15 @@ object Serde {
 
   def deserialize(bb: ByteBuffer): Either[String, EXPR] =
     Try(desAux(bb).value()).toEither.left.map(_.getMessage)
+
+  def deserializeFunctionCall(bb: ByteBuffer): Either[Throwable, FUNCTION_CALL] =
+    Try(desAux(bb).value()).toEither.flatMap {
+      case fc: FUNCTION_CALL => Right(fc)
+      case other => Left(new RuntimeException(s"Not a function call: $other"))
+    }
+
+  def deserializeFunctionCall(bb: Array[Byte]): Either[Throwable, FUNCTION_CALL] =
+    deserializeFunctionCall(ByteBuffer.wrap(bb))
 
   def serAux(out: ByteArrayOutputStream, acc: Coeval[Unit], expr: EXPR, allowObjects: Boolean = false): Coeval[Unit] = acc.flatMap { _ =>
     expr match {

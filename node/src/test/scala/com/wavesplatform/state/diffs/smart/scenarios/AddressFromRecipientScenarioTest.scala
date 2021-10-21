@@ -7,7 +7,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CaseObj}
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart.predef._
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction}
@@ -25,7 +25,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with WithState {
     fee                <- smallFeeGen
     aliasTx            <- createAliasGen(other, alias, fee, ts)
     transferViaAddress <- transferGeneratorP(master, other.toAddress, Waves, Waves)
-    transferViaAlias   <- transferGeneratorP(master, AddressOrAlias.fromBytes(alias.bytes, 0).explicitGet()._1, Waves, Waves)
+    transferViaAlias   <- transferGeneratorP(master, AddressOrAlias.fromBytes(alias.bytes).explicitGet(), Waves, Waves)
   } yield (Seq(genesis1, genesis2), aliasTx, transferViaAddress, transferViaAlias)
 
   val script = """

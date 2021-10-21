@@ -81,27 +81,27 @@ object Global extends BaseGlobal {
   private val longDigits  = 19
   private val longContext = new MathContext(longDigits)
 
-  private val bigIntDigits   = 154
+  private val bigIntDigits = 154
   private val bigMathContext = new MathContext(bigIntDigits)
 
   // Math functions
   def pow(
       base: Long,
-      basePrecision: Long,
+      basePrecision: Int,
       exponent: Long,
-      exponentPrecision: Long,
-      resultPrecision: Long,
+      exponentPrecision: Int,
+      resultPrecision: Int,
       round: Rounding
   ): Either[String, Long] =
     tryEither {
-      val baseBD = BD.valueOf(base, basePrecision.toInt)
-      val expBD  = BD.valueOf(exponent, exponentPrecision.toInt)
+      val baseBD = BD.valueOf(base, basePrecision)
+      val expBD  = BD.valueOf(exponent, exponentPrecision)
       val result = if (expBD == BigDecimal(0.5).bigDecimal) {
         BigDecimalMath.sqrt(baseBD, longContext)
       } else {
         BigDecimalMath.pow(baseBD, expBD, longContext)
       }
-      setScale(resultPrecision.toInt, round, longDigits, result)
+      setScale(resultPrecision, round, longDigits, result)
     }.flatten.map(_.bigInteger.longValueExact())
 
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long] =
@@ -126,6 +126,14 @@ object Global extends BaseGlobal {
       setScale(rp.toInt, round, bigIntDigits, res)
     }.flatten
 
+  def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =
+    tryEither {
+      val base = toJBig(b, bp)
+      val exp  = toJBig(e, ep)
+      val res  = BigDecimalMath.log(base, bigMathContext).divide(BigDecimalMath.log(exp, bigMathContext), bigMathContext)
+      BigInt(res.setScale(rp.toInt, round.mode).unscaledValue)
+    }
+
   private def setScale(
       resultPrecision: Int,
       round: Rounding,
@@ -144,14 +152,6 @@ object Global extends BaseGlobal {
     else
       Right(BigInt(value) * BigInteger.TEN.pow(resultPrecision - scale))
   }
-
-  def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =
-    tryEither {
-      val base = toJBig(b, bp)
-      val exp  = toJBig(e, ep)
-      val res  = BigDecimalMath.log(base, bigMathContext).divide(BigDecimalMath.log(exp, bigMathContext), bigMathContext)
-      BigInt(res.setScale(rp.toInt, round.mode).unscaledValue)
-    }
 
   override def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
     Bls12Groth16.verify(verifyingKey, proof, inputs)

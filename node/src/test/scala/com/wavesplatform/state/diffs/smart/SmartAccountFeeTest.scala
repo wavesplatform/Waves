@@ -6,17 +6,17 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
+import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.EmptyDataEntry
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.ci.ciFee
+import com.wavesplatform.test._
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, Transaction, TransactionType, TxWithFee}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, Transaction, TxWithFee}
-import com.wavesplatform.TestTime
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.utils.Signed
 
 class SmartAccountFeeTest extends PropSpec with WithDomain {
 
@@ -82,8 +82,8 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
       accountWithPaidVerifier  <- accountGen
       accountWithSmallVerifier <- accountGen
       accountWithEmptyVerifier <- accountGen
-      transferFee  = FeeUnit * FeeConstants(TransferTransaction.typeId)
-      setScriptFee = FeeUnit * FeeConstants(SetScriptTransaction.typeId)
+      transferFee  = FeeUnit * FeeConstants(TransactionType.Transfer)
+      setScriptFee = FeeUnit * FeeConstants(TransactionType.SetScript)
       invokeFee <- ciFee()
     } yield {
       for {
@@ -94,8 +94,7 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
         setScript2 <- SetScriptTransaction.selfSigned(1.toByte, accountWithSmallVerifier, Some(scriptWithSmallVerifier), setScriptFee, ts)
         setScript3 <- SetScriptTransaction.selfSigned(1.toByte, accountWithEmptyVerifier, Some(scriptWithEmptyVerifier), setScriptFee, ts)
         invokeFromPaidVerifier = () =>
-          InvokeScriptTransaction
-            .selfSigned(
+          Signed.invokeScript(
               1.toByte,
               accountWithPaidVerifier,
               accountWithSmallVerifier.toAddress,
@@ -105,10 +104,8 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
               Waves,
               ts
             )
-            .explicitGet()
         invokeFromSmallVerifier = () =>
-          InvokeScriptTransaction
-            .selfSigned(
+          Signed.invokeScript(
               1.toByte,
               accountWithSmallVerifier,
               accountWithPaidVerifier.toAddress,
@@ -118,10 +115,8 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
               Waves,
               ts
             )
-            .explicitGet()
         invokeFromEmptyVerifier = () =>
-          InvokeScriptTransaction
-            .selfSigned(
+          Signed.invokeScript(
               1.toByte,
               accountWithEmptyVerifier,
               accountWithPaidVerifier.toAddress,
@@ -131,7 +126,6 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
               Waves,
               ts
             )
-            .explicitGet()
         transferFromSmallVerifier = () =>
           TransferTransaction
             .selfSigned(
@@ -223,8 +217,8 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
     e.getMessage should startWith
     "TransactionValidationError(cause = GenericError(Transaction sent from smart account. " +
       s"Requires $ScriptExtraFee extra fee.. " +
-      s"Fee for ${Constants.TransactionNames(tx.typeId)} (${tx.fee} in WAVES) " +
-      s"does not exceed minimal value of ${FeeConstants(tx.typeId) * FeeUnit + ScriptExtraFee} WAVES.)"
+      s"Fee for ${tx.tpe.transactionName} (${tx.fee} in WAVES) " +
+      s"does not exceed minimal value of ${FeeConstants(tx.tpe) * FeeUnit + ScriptExtraFee} WAVES.)"
   }
 
   private def assertNoError(tx: Transaction, d: Domain) =

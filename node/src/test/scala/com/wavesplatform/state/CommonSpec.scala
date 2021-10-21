@@ -6,10 +6,9 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.TestTime
-import com.wavesplatform.test.FreeSpec
 
 class CommonSpec extends FreeSpec with WithDomain {
   private val time          = new TestTime

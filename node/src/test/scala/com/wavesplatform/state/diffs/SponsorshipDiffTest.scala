@@ -8,7 +8,7 @@ import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -133,7 +133,7 @@ class SponsorshipDiffTest extends PropSpec with WithState {
         assertDiffEi(setupBlocks, block(Seq(insufficientFee)), s) { blockDiffEi =>
           val minFee = Sponsorship
             .fromWaves(
-              FeeValidation.FeeConstants(insufficientFee.typeId) * FeeValidation.FeeUnit,
+              FeeValidation.FeeConstants(insufficientFee.tpe) * FeeValidation.FeeUnit,
               sponsor.minSponsoredAssetFee.get
             )
 

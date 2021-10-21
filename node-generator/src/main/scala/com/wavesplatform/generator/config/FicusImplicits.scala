@@ -1,15 +1,16 @@
 package com.wavesplatform.generator.config
 
+import scala.concurrent.duration.{Duration, FiniteDuration}
+
 import com.google.common.base.CaseFormat
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.generator.Worker
 import com.wavesplatform.state.DataEntry
-import com.wavesplatform.transaction.{TransactionParser, TransactionParsers}
+import com.wavesplatform.transaction.{TransactionParser, TransactionParsers, TransactionType}
+import com.wavesplatform.transaction.TransactionType.TransactionType
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.{CollectionReaders, ValueReader}
 import play.api.libs.json._
-
-import scala.concurrent.duration.{Duration, FiniteDuration}
 
 trait FicusImplicits {
 
@@ -22,6 +23,18 @@ trait FicusImplicits {
   implicit val distributionsReader: ValueReader[Map[TransactionParser, Double]] = {
     val converter                                = CaseFormat.LOWER_HYPHEN.converterTo(CaseFormat.UPPER_CAMEL)
     def toTxType(key: String): TransactionParser = by(converter.convert(key)).get
+
+    CollectionReaders.mapValueReader[Double].map { xs =>
+      xs.map {
+        case (k, v) =>
+          toTxType(k) -> v
+      }
+    }
+  }
+
+  implicit val newDistributionsReader: ValueReader[Map[TransactionType, Double]] = {
+    val converter                              = CaseFormat.LOWER_HYPHEN.converterTo(CaseFormat.UPPER_CAMEL)
+    def toTxType(key: String): TransactionType = TransactionType.withName(converter.convert(key).replace("Transaction", ""))
 
     CollectionReaders.mapValueReader[Double].map { xs =>
       xs.map {

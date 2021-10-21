@@ -1,7 +1,10 @@
 package com.wavesplatform.utx
 
+import scala.concurrent.duration._
+
 import cats.data.NonEmptyList
 import cats.kernel.Monoid
+import com.wavesplatform.{BlocksTransactionsHelpers, TestValues}
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
@@ -12,15 +15,14 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.{MultiDimensionalMiningConstraint, OneDimensionalMiningConstraint, TxEstimators}
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.transaction.{Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool.PackStrategy
-import com.wavesplatform.{BlocksTransactionsHelpers, TestValues}
 import org.scalacheck.Gen
 import org.scalacheck.Gen.chooseNum
 import org.scalamock.scalatest.MockFactory
@@ -28,8 +30,6 @@ import org.scalatest.EitherValues
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.PatienceConfiguration.{Interval, Timeout}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
-
-import scala.concurrent.duration._
 
 class UtxPriorityPoolSpecification
     extends FreeSpec
@@ -54,19 +54,6 @@ class UtxPriorityPoolSpecification
           case _ => Diff.empty
         }
         utx.setPriorityDiffs(asDiffs)
-      }
-    }
-
-    def assertPortfolios(utx: UtxPool, transactions: Seq[TransferTransaction]): Unit = {
-      val portfolios = transactions.groupBy(_.sender.toAddress).map {
-        case (addr, transactions) =>
-          val amt = transactions.map(tx => -(tx.amount + tx.fee)).sum
-          (addr, amt)
-      }
-      portfolios.foreach {
-        case (addr, balance) =>
-          val pf = utx.pessimisticPortfolio(addr)
-          pf.balance shouldBe balance
       }
     }
 
@@ -95,6 +82,7 @@ class UtxPriorityPoolSpecification
       val tb = TestBlock.create(Nil)
       (blockchain.blockHeader _).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
       (blockchain.transactionMeta _).when(*).returning(None)
+      (blockchain.resolveERC20Address _).when(*).returning(None)
       blockchain
     }
 
@@ -102,7 +90,7 @@ class UtxPriorityPoolSpecification
       case (tx1, nonScripted, scripted) =>
         val blockchain = createState(scripted.head.sender.toAddress)
         val utx =
-          new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
+          new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
         utx.putIfNew(tx1).resultE should beRight
         val minedTxs = scripted ++ nonScripted
         utx.setPriorityTxs(minedTxs)
@@ -116,7 +104,6 @@ class UtxPriorityPoolSpecification
         val expectedTxs = minedTxs :+ tx1
         utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs)
         utx.all shouldBe expectedTxs
-        assertPortfolios(utx, expectedTxs)
 
         val (left, right) = minedTxs.splitAt(minedTxs.length / 2)
 
@@ -124,31 +111,27 @@ class UtxPriorityPoolSpecification
         utx.priorityPool.priorityTransactions should not be empty
 
         val expectedTxs1 = right :+ tx1
-        assertPortfolios(utx, expectedTxs1)
         all(right.map(utx.putIfNew(_).resultE)) shouldBe Right(false)
         val test = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1
         test shouldBe Some(expectedTxs1)
         utx.all shouldBe expectedTxs1
-        assertPortfolios(utx, expectedTxs1)
 
         val expectedTxs2 = expectedTxs1 ++ left.sorted(TransactionsOrdering.InUTXPool(Set()))
         utx.removeAll(expectedTxs2)
         left.foreach(utx.putIfNew(_).resultE should beRight)
         utx.setPriorityTxs(expectedTxs1)
         utx.all shouldBe expectedTxs2
-        assertPortfolios(utx, expectedTxs2)
 
         utx.removeAll(expectedTxs2)
         utx.all shouldBe empty
         utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe empty
-        all(expectedTxs2.map(tx => utx.pessimisticPortfolio(tx.sender.toAddress))) shouldBe empty
     }
 
     "removes priority transactions from ordinary pool on pack" in forAll(gen) {
       case (_, nonScripted, scripted) =>
         val blockchain = createState(scripted.head.sender.toAddress)
         val utx =
-          new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
+          new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
 
         utx.setPriorityTxs(nonScripted)
         nonScripted.foreach(utx.putIfNew(_).resultE should beRight)
@@ -171,7 +154,7 @@ class UtxPriorityPoolSpecification
         (blockchain.balance _).when(*, *).returning(0) // Should be overriden in composite blockchain
 
         val utx =
-          new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
+          new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
         utx.setPriorityTxs(Seq(tx1))
         utx.putNewTx(tx2, verify = false, forceValidate = false).resultE should beRight
         utx.nonPriorityTransactions shouldBe Seq(tx2)
@@ -181,7 +164,7 @@ class UtxPriorityPoolSpecification
     "counts microblock size from priority diffs" in {
       val blockchain = createState(TxHelpers.defaultSigner.toAddress)
       val utx =
-        new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
+        new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
 
       def createDiff(): Diff =
         Monoid.combineAll((1 to 5).map(_ => Diff.empty.bindTransaction(TxHelpers.issue())))
@@ -200,7 +183,7 @@ class UtxPriorityPoolSpecification
         (blockchain.balance _).when(*, *).returning(0) // All invalid
 
         val utx =
-          new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
+          new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
         utx.setPriorityTxs(Seq(tx1, tx2))
         utx.runCleanup()
 
@@ -214,7 +197,7 @@ class UtxPriorityPoolSpecification
         (blockchain.balance _).when(*, *).returning(0L)
 
         val utx =
-          new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
+          new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
 
         utx.setPriorityTxs(Seq(tx1, tx2))
         utx.removeAll(Seq(TxHelpers.issue()))
@@ -237,7 +220,7 @@ class UtxPriorityPoolSpecification
         (blockchain.balance _).when(tx2.sender.toAddress, *).returning(0)
 
         val utx =
-          new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
+          new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
         utx.setPriorityTxs(Seq(tx1))
         utx.putNewTx(tx2, true, false).resultE.explicitGet()
         utx.nonPriorityTransactions shouldBe Seq(tx2)

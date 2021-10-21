@@ -21,6 +21,8 @@ object BlockchainFeatures {
   val BlockV5                         = BlockchainFeature(15, "Ride V4, VRF, Protobuf, Failed transactions")
   val SynchronousCalls                = BlockchainFeature(16, "Ride V5, dApp-to-dApp invocations")
   val RideV6                          = BlockchainFeature(17, "Ride V6")
+  
+  // Not exposed
   val ContinuationTransaction         = BlockchainFeature(18, "Continuation Transaction")
   val LeaseExpiration                 = BlockchainFeature(19, "Lease Expiration")
 

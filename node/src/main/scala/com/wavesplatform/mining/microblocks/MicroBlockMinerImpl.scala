@@ -21,6 +21,7 @@ import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
+import monix.reactive.Observable
 
 import scala.concurrent.duration._
 
@@ -32,6 +33,7 @@ class MicroBlockMinerImpl(
     settings: MinerSettings,
     minerScheduler: SchedulerService,
     appenderScheduler: SchedulerService,
+    transactionAdded: Observable[Unit],
     nextMicroBlockSize: Int => Int
 ) extends MicroBlockMiner
     with ScorexLogging {
@@ -126,8 +128,8 @@ class MicroBlockMinerImpl(
           log.trace(s"Stopping forging microBlocks, the block is full: $updatedTotalConstraint")
           Task.now(Stop)
         } else {
-          log.trace("UTX is empty, retrying")
-          Task.now(Retry)
+          log.trace("UTX is empty, waiting for new transactions")
+          transactionAdded.headL.map(_ => Retry)
         }
     }
   }

@@ -29,7 +29,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
   private val mappings = ImplicitMappings(settings.chainId)
   import mappings._
 
-  override implicit def chainId: Byte = settings.chainId
+  override implicit def chainId: Byte   = settings.chainId
   override def tthis: Environment.Tthis = Coproduct[Environment.Tthis](Address(ByteStr.decodeBase58(settings.address).get))
 
   override def height: Future[Long] =
@@ -44,18 +44,18 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
   implicit val assetInfoResponseDecoder: Decoder[AssetInfoResponse] = new Decoder[AssetInfoResponse] {
     final def apply(c: HCursor): Decoder.Result[AssetInfoResponse] =
       for {
-        assetId <- c.downField("assetId").as[ByteString]
-        name <- c.downField("name").as[String]
-        description <- c.downField("description").as[String]
-        quantity <- c.downField("quantity").as[Long]
-        decimals <- c.downField("decimals").as[Int]
-        issuer <- c.downField("issuer").as[ByteString]
-        issuerPublicKey <- c.downField("issuerPublicKey").as[ByteString]
-        reissuable <- c.downField("reissuable").as[Boolean]
-        scripted <- c.downField("scripted").as[Boolean]
+        assetId              <- c.downField("assetId").as[ByteString]
+        name                 <- c.downField("name").as[String]
+        description          <- c.downField("description").as[String]
+        quantity             <- c.downField("quantity").as[Long]
+        decimals             <- c.downField("decimals").as[Int]
+        issuer               <- c.downField("issuer").as[ByteString]
+        issuerPublicKey      <- c.downField("issuerPublicKey").as[ByteString]
+        reissuable           <- c.downField("reissuable").as[Boolean]
+        scripted             <- c.downField("scripted").as[Boolean]
         minSponsoredAssetFee <- c.downField("minSponsoredAssetFee").as[Option[Long]]
       } yield {
-        new AssetInfoResponse(assetId, name, description, quantity, decimals, issuer, issuerPublicKey, reissuable,  scripted, minSponsoredAssetFee)
+        new AssetInfoResponse(assetId, name, description, quantity, decimals, issuer, issuerPublicKey, reissuable, scripted, minSponsoredAssetFee)
       }
   }
   override def assetInfoById(id: Array[Byte]): Future[Option[ScriptAssetInfo]] =
@@ -75,12 +75,12 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
   implicit val blockInfoResponseDecoder: Decoder[BlockInfoResponse] = new Decoder[BlockInfoResponse] {
     final def apply(c: HCursor): Decoder.Result[BlockInfoResponse] =
       for {
-        timestamp <- c.downField("timestamp").as[Long]
-        height <- c.downField("height").as[Int]
-        nxt <- c.downField("nxt-consensus").as[NxtData]
-        generator <- c.downField("generator").as[ByteString]
+        timestamp          <- c.downField("timestamp").as[Long]
+        height             <- c.downField("height").as[Int]
+        nxt                <- c.downField("nxt-consensus").as[NxtData]
+        generator          <- c.downField("generator").as[ByteString]
         generatorPublicKey <- c.downField("generatorPublicKey").as[ByteString]
-        vrf <- c.downField("VRF").as[Option[ByteString]]
+        vrf                <- c.downField("VRF").as[Option[ByteString]]
       } yield BlockInfoResponse(timestamp, height, nxt, generator, generatorPublicKey, vrf)
   }
 
@@ -114,9 +114,9 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
   }
 
   override def accountBalanceOf(
-                                 recipient: Recipient,
-                                 assetId: Option[Array[Byte]]
-                               ): Future[Either[String, Long]] =
+      recipient: Recipient,
+      assetId: Option[Array[Byte]]
+  ): Future[Either[String, Long]] =
     for {
       address <- extractAddress(recipient)
       entity <- getEntity[Either[String, *], BalanceResponse, Long]((assetId match {
@@ -126,8 +126,8 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
     } yield entity
 
   override def accountWavesBalanceOf(
-                                      recipient: Recipient
-                                    ): Future[Either[String, Environment.BalanceDetails]] =
+      recipient: Recipient
+  ): Future[Either[String, Environment.BalanceDetails]] =
     for {
       address <- extractAddress(recipient)
       entity  <- client.get[Either[String, *], Environment.BalanceDetails](s"/addresses/balance/details/$address")
@@ -142,18 +142,26 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
   override def addressFromString(address: String): Either[String, Address] =
     mappings.addressFromString(address)
 
-  override def inputEntity: InputEntity                             = ???
-  override def transactionById(id: Array[Byte]): Future[Option[Tx]] = ???
-  override def multiPaymentAllowed: Boolean                         = ???
-  override def txId: ByteStr                                        = ???
+  override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address] =
+    mappings.addressFromPublicKey(publicKey)
+
+  override def inputEntity: InputEntity                                          = ???
+  override def transactionById(id: Array[Byte]): Future[Option[Tx]]              = ???
+  override def multiPaymentAllowed: Boolean                                      = ???
+  override def txId: ByteStr                                                     = ???
 
   override def transferTransactionFromProto(b: Array[Byte]): Future[Option[Tx.Transfer]] = ???
 
-  private def getEntity[F[_]: Functor: ResponseWrapper, A : Decoder, B](url: String)(implicit ev: A => B): Future[F[B]] =
+  private def getEntity[F[_]: Functor: ResponseWrapper, A: Decoder, B](url: String)(implicit ev: A => B): Future[F[B]] =
     client.get[F, A](url).map(_.map(ev))
 
-  override def accountScript(addressOrAlias: Recipient): Future[Option[Script]]                                        = ???
-  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], availableComplexity: Int, reentrant: Boolean): Coeval[Future[(Either[ValidationError, EVALUATED], Int)]] = ???
+  override def accountScript(addressOrAlias: Recipient): Future[Option[Script]] = ???
+  override def callScript(dApp: Address,
+                          func: String,
+                          args: List[EVALUATED],
+                          payments: Seq[(Option[Array[Byte]], Long)],
+                          availableComplexity: Int,
+                          reentrant: Boolean): Coeval[Future[(Either[ValidationError, EVALUATED], Int)]] = ???
 }
 
 object WebEnvironment {

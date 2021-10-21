@@ -23,8 +23,8 @@ object LeaseCancelTxSerializer {
     val baseBytes = Bytes.concat(sender.arr, Longs.toByteArray(fee), Longs.toByteArray(timestamp), leaseId.arr)
 
     version match {
-      case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
-      case TxVersion.V2 => Bytes.concat(Array(typeId, version, chainId), baseBytes)
+      case TxVersion.V1 => Bytes.concat(Array(tpe.id.toByte), baseBytes)
+      case TxVersion.V2 => Bytes.concat(Array(tpe.id.toByte, version, chainId), baseBytes)
       case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }

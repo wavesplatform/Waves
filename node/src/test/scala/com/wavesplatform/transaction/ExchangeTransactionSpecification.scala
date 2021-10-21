@@ -9,6 +9,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
+import com.wavesplatform.transaction.serialization.impl.ExchangeTxSerializer
 import com.wavesplatform.{NTPTime, crypto}
 import org.scalacheck.Gen
 import play.api.libs.json.Json
@@ -109,7 +110,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
         |""".stripMargin
     )
 
-    val tx = ExchangeTransaction.serializer.parseBytes(bytes).get
+    val tx = ExchangeTxSerializer.parseBytes(bytes).get
     tx.json() shouldBe json
     assert(crypto.verify(tx.sellOrder.signature, tx.sellOrder.bodyBytes(), tx.sellOrder.sender), "sellOrder signature should be valid")
     assert(crypto.verify(tx.buyOrder.signature, tx.buyOrder.bodyBytes(), tx.buyOrder.sender), "buyOrder signature should be valid")
@@ -179,7 +180,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
         |""".stripMargin
     )
 
-    val tx = ExchangeTransaction.serializer.parseBytes(bytes).get
+    val tx = ExchangeTxSerializer.parseBytes(bytes).get
     tx.json() shouldBe json
     assert(crypto.verify(tx.sellOrder.signature, tx.sellOrder.bodyBytes(), tx.sellOrder.sender), "sellOrder signature should be valid")
     assert(crypto.verify(tx.buyOrder.signature, tx.buyOrder.bodyBytes(), tx.buyOrder.sender), "buyOrder signature should be valid")

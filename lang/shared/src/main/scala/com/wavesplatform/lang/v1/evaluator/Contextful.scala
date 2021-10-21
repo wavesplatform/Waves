@@ -1,41 +1,46 @@
 package com.wavesplatform.lang.v1.evaluator
 
-import cats.syntax.functor._
-import cats.syntax.either._
 import cats.syntax.applicative._
+import cats.syntax.either._
 import cats.{Eval, Monad}
-import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.Types.TYPE
+import com.wavesplatform.lang.{CoevalF, ExecutionError}
 import monix.eval.Coeval
 
-abstract class ContextfulNativeFunction[C[_[_]]](name: String, resultType: TYPE, args: Seq[(String, TYPE)]) {
-  def ev[F[_]: Monad](input: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]]
+sealed trait ContextfulNativeFunction[C[_[_]]] {
+  val name: String
+  val resultType: TYPE
+  val args: Seq[(String, TYPE)]
 
-  final def apply[F[_]: Monad](input: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] = {
-    try {
-      ev(input)
-    } catch {
-      case _: SecurityException =>
-        Either
-          .left[ExecutionError, EVALUATED](
-            s"""An access to <$name(${args.toSeq.map(a => s"${a._1}: ${a._2}").mkString(", ")}): $resultType> is denied"""
-          )
-          .pure[F]
-      case e: Throwable =>
-        Either
-          .left[ExecutionError, EVALUATED](s"""An error during run <$name(${args.toSeq
-            .map(a => s"${a._1}: ${a._2}")
-            .mkString(", ")}): $resultType>: ${e.getClass()} ${e.getMessage() match {
-            case null => e.toString
-            case msg  => msg
-          }}""")
-          .pure[F]
-    }
+  override def toString =
+    s"""<$name(${args.map(a => s"${a._1}: ${a._2}").mkString(", ")}): $resultType>"""
+}
+
+object ContextfulNativeFunction {
+  abstract class Simple[C[_[_]]](
+      val name: String,
+      val resultType: TYPE,
+      val args: Seq[(String, TYPE)]
+  ) extends ContextfulNativeFunction[C] {
+    def evaluate[F[_]: Monad](
+        env: C[F],
+        evaluatedArgs: List[EVALUATED]
+    ): F[Either[ExecutionError, EVALUATED]]
   }
 
-  def evaluateExtended[F[_]: Monad](env: C[F], args: List[EVALUATED], availableComplexity: Int): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] =
-    Coeval.now(apply((env, args)).map((_, 0)))
+  abstract class Extended[C[_[_]]](
+      val name: String,
+      val resultType: TYPE,
+      val args: Seq[(String, TYPE)]
+  ) extends ContextfulNativeFunction[C] {
+    def evaluate[F[_]: Monad](
+        env: C[F],
+        evaluatedArgs: List[EVALUATED],
+        availableComplexity: Int,
+        evaluateUserFunction: InternalCall[F]
+    )(implicit m: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]]
+  }
 }
 
 trait ContextfulUserFunction[C[_[_]]] {

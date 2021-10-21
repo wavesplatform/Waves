@@ -18,7 +18,7 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
       val reissuerEffBalance = sender.wavesBalance(reissuerAddress).effective
 
       val issuedAssetTx = sender.broadcastIssue(reissuer, "assetname", someAssetAmount, decimals = 2, reissuable = true, issueFee, waitForTx = true)
-      val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().toString
+      val issuedAssetId = PBTransactions.vanilla(issuedAssetTx, unsafe = false).explicitGet().id().toString
 
       sender.broadcastReissue(reissuer, reissueFee, issuedAssetId, someAssetAmount, reissuable = true, version = v, waitForTx = true)
 
@@ -34,7 +34,7 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
       val reissuerEffBalance = sender.wavesBalance(reissuerAddress).effective
 
       val issuedAssetTx = sender.broadcastIssue(reissuer, "assetname", someAssetAmount, decimals = 2, reissuable = false, issueFee, waitForTx = true)
-      val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().toString
+      val issuedAssetId = PBTransactions.vanilla(issuedAssetTx, unsafe = false).explicitGet().id().toString
 
       assertGrpcError(sender.broadcastReissue(reissuer, reissueFee, issuedAssetId, someAssetAmount, version = v, reissuable = true, waitForTx = true),
         "Asset is not reissuable",
@@ -53,7 +53,7 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
       val hugeReissueFee = reissuerEffBalance + 1.waves
 
       val issuedAssetTx = sender.broadcastIssue(reissuer, "assetname", someAssetAmount, decimals = 2, reissuable = true, issueFee, waitForTx = true)
-      val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().toString
+      val issuedAssetId = PBTransactions.vanilla(issuedAssetTx, unsafe = false).explicitGet().id().toString
 
       assertGrpcError(sender.broadcastReissue(reissuer, hugeReissueFee, issuedAssetId, someAssetAmount, reissuable = true, version = v, waitForTx = true),
         "Accounts balance errors",
@@ -71,7 +71,7 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
       val reissuerEffBalance = sender.wavesBalance(reissuerAddress).effective
 
       val issuedAssetTx = sender.broadcastIssue(reissuer, "assetname", someAssetAmount, decimals = 2, reissuable = true, issueFee, waitForTx = true)
-      val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().toString
+      val issuedAssetId = PBTransactions.vanilla(issuedAssetTx, unsafe = false).explicitGet().id().toString
 
       sender.broadcastReissue(reissuer, reissueFee, issuedAssetId, someAssetAmount, reissuable = false, version = v, waitForTx = true)
 
@@ -91,7 +91,7 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
       val reissuerEffBalance = sender.wavesBalance(reissuerAddress).effective
 
       val issuedAssetTx = sender.broadcastIssue(reissuer, "assetname", someAssetAmount, decimals = 2, reissuable = true, issueFee, waitForTx = true)
-      val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().toString
+      val issuedAssetId = PBTransactions.vanilla(issuedAssetTx, unsafe = false).explicitGet().id().toString
 
       sender.broadcastReissue(reissuer, reissueFee, issuedAssetId, someAssetAmount, reissuable = true, version = v, waitForTx = true)
 

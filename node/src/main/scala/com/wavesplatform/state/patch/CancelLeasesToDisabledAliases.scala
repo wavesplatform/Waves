@@ -40,7 +40,7 @@ case object CancelLeasesToDisabledAliases extends PatchDataLoader with DiffPatch
               id -> ld.copy(status = LeaseDetails.Status.Expired(blockchain.height))
             ),
             portfolios =
-              Map(ld.sender.toAddress -> Portfolio(lease = LeaseBalance(0, -ld.amount))) |+|
+              Map[Address, Portfolio](ld.sender.toAddress -> Portfolio(lease = LeaseBalance(0, -ld.amount))) |+|
                 Map(recipientAddress  -> Portfolio(lease = LeaseBalance(-ld.amount, 0)))
           )
       }

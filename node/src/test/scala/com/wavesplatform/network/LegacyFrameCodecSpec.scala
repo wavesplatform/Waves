@@ -19,7 +19,7 @@ import scala.concurrent.duration.DurationInt
 class LegacyFrameCodecSpec extends FreeSpec with MockFactory {
 
   "should handle one message" in forAll(issueGen) { origTx =>
-    val codec = new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes)
+    val codec = new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes, () => false)
 
     val buff = Unpooled.buffer
     write(buff, origTx, TransactionSpec)
@@ -34,7 +34,7 @@ class LegacyFrameCodecSpec extends FreeSpec with MockFactory {
   }
 
   "should handle multiple messages" in forAll(Gen.nonEmptyListOf(issueGen)) { origTxs =>
-    val codec = new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes)
+    val codec = new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes, () => false)
 
     val buff = Unpooled.buffer
     origTxs.foreach(write(buff, _, TransactionSpec))
@@ -55,7 +55,7 @@ class LegacyFrameCodecSpec extends FreeSpec with MockFactory {
 
   "should reject an already received transaction" in {
     val tx    = issueGen.sample.getOrElse(throw new RuntimeException("Can't generate a sample transaction"))
-    val codec = new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes)
+    val codec = new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes, () => false)
     val ch    = new EmbeddedChannel(codec)
 
     val buff1 = Unpooled.buffer
@@ -71,7 +71,7 @@ class LegacyFrameCodecSpec extends FreeSpec with MockFactory {
 
   "should not reject an already received GetPeers" in {
     val msg   = KnownPeers(Seq(InetSocketAddress.createUnresolved("127.0.0.1", 80)))
-    val codec = new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes)
+    val codec = new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes, () => false)
     val ch    = new EmbeddedChannel(codec)
 
     val buff1 = Unpooled.buffer
@@ -89,7 +89,7 @@ class LegacyFrameCodecSpec extends FreeSpec with MockFactory {
     val tx = UpdateAssetInfoTransaction
       .selfSigned(1, TestValues.keyPair, TestValues.asset.id, "bomz", "", System.currentTimeMillis(), TestValues.fee, Waves)
       .explicitGet()
-    RawBytes.fromTransaction(tx) shouldBe RawBytes(PBTransactionSpec.messageCode, PBTransactionSpec.serializeData(tx))
+    RawBytes.fromTransaction(tx, false) shouldBe RawBytes(PBTransactionSpec.messageCode, PBTransactionSpec.serializeData(tx))
   }
 
   private def write[T <: AnyRef](buff: ByteBuf, msg: T, spec: MessageSpec[T]): Unit = {

@@ -1,21 +1,22 @@
 package com.wavesplatform.api.grpc
 
+import scala.concurrent.Future
+
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
+import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
-import com.wavesplatform.state.{InvokeScriptResult => VISR}
-import com.wavesplatform.transaction.Authorized
-import io.grpc.stub.StreamObserver
+import com.wavesplatform.state.{Blockchain, InvokeScriptResult => VISR}
+import com.wavesplatform.transaction.{Authorized, EthereumTransaction}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
 import monix.reactive.Observable
 
-import scala.concurrent.Future
-
-class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Scheduler) extends TransactionsApiGrpc.TransactionsApi {
+class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransactionsApi)(implicit sc: Scheduler)
+    extends TransactionsApiGrpc.TransactionsApi {
 
   override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit =
     responseObserver.interceptErrors {
@@ -25,6 +26,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
         case Some(subject) =>
           val recipientAddrOrAlias = subject
             .toAddressOrAlias(AddressScheme.current.chainId)
+            .flatMap(blockchain.resolveAlias(_))
             .fold(e => throw new IllegalArgumentException(e.toString), identity)
 
           val maybeSender = Option(request.sender)
@@ -83,7 +85,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
       val result = Observable(request.transactionIds: _*)
         .flatMap(txId => Observable.fromIterable(commonApi.transactionById(txId.toByteStr)))
         .collect {
-          case CommonTransactionsApi.TransactionMeta.Invoke(_, transaction, _, invokeScriptResult) =>
+          case TransactionMeta.Invoke(_, transaction, _, invokeScriptResult) =>
             InvokeScriptResultResponse.of(Some(PBTransactions.protobuf(transaction)), invokeScriptResult.map(VISR.toPB))
         }
 
@@ -113,17 +115,18 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
 
   override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] =
     (for {
-      maybeTx <- Future(tx.toVanilla)
-      vtx     <- maybeTx.toFuture
-      result  <- commonApi.broadcastTransaction(vtx)
-      _       <- result.resultE.toFuture
+      vtxEither <- Future(tx.toVanilla) // Intercept runtime errors
+      vtx       <- vtxEither.toFuture
+      _         <- Either.cond(!vtx.isInstanceOf[EthereumTransaction], (), GenericError("ETH transactions should not be broadcasted over gRPC")).toFuture
+      result    <- commonApi.broadcastTransaction(vtx)
+      _         <- result.resultE.toFuture // Check for success
     } yield tx).wrapErrors
 }
 
 private object TransactionsApiGrpcImpl {
   def toTransactionResponse(meta: TransactionMeta): TransactionResponse = {
-    val transactionId                          = meta.transaction.id().toByteString
-    val status                                 = if (meta.succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
+    val transactionId = meta.transaction.id().toByteString
+    val status        = if (meta.succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
     val invokeScriptResult = meta match {
       case TransactionMeta.Invoke(_, _, _, r) => r.map(VISR.toPB)
       case _                                  => None

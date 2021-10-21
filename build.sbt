@@ -61,7 +61,7 @@ lazy val `lang-doc` = project
   .dependsOn(`lang-jvm`)
   .settings(
     Compile / sourceGenerators += Tasks.docSource,
-    libraryDependencies ++= Seq("com.github.spullara.mustache.java" % "compiler" % "0.9.5") ++ Dependencies.test
+    libraryDependencies ++= Seq("com.github.spullara.mustache.java" % "compiler" % "0.9.10") ++ Dependencies.test
   )
 
 lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test")
@@ -88,7 +88,7 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
   )
 
 lazy val `repl-jvm` = repl.jvm
-  .dependsOn(`lang-jvm`)
+  .dependsOn(`lang-jvm`, `lang-testkit` % "test")
   .settings(
     libraryDependencies ++= Dependencies.circe.value ++ Seq(
       "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided,
@@ -106,10 +106,14 @@ lazy val root = (project in file("."))
     `lang-jvm`,
     `lang-tests`,
     `lang-testkit`,
+    `repl-js`,
+    `repl-jvm`,
     node,
     `node-it`,
     `node-generator`,
-    benchmark
+    benchmark,
+    `repl-js`,
+    `repl-jvm`
   )
 
 inScope(Global)(
@@ -117,7 +121,7 @@ inScope(Global)(
     scalaVersion := "2.13.6",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 3, 7),
+    V.fallback := (1, 4, 0),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     scalacOptions ++= Seq(
@@ -129,8 +133,6 @@ inScope(Global)(
       "-language:postfixOps",
       "-Ywarn-unused:-implicits",
       "-Xlint",
-      "-opt:l:inline",
-      "-opt-inline-from:**",
       "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s", // Ignore gRPC warnings
       "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
       "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
@@ -151,7 +153,10 @@ inScope(Global)(
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
     network := Network(sys.props.get("network")),
-    resolvers += Resolver.sonatypeRepo("snapshots"),
+    resolvers ++= Seq(
+      Resolver.sonatypeRepo("snapshots"),
+      Resolver.mavenLocal
+    ),
     Compile / doc / sources := Seq.empty,
     Compile / packageDoc / publishArtifact := false
   )
@@ -177,10 +182,12 @@ checkPRRaw := Def
     Def.task {
       (Test / compile).value
       (`lang-tests` / Test / test).value
+      (`repl-jvm` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
       (`grpc-server` / Test / test).value
       (node / Test / test).value
       (`repl-js` / Compile / fastOptJS).value
+      (`node-it` / Test / compile).value
     }
   )
   .value

@@ -2,21 +2,32 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-trait Transaction {
-  val id: Coeval[ByteStr]
-
-  def typeId: Byte = builder.typeId
-  def builder: TransactionParser
+trait TransactionBase {
   def assetFee: (Asset, Long)
   def timestamp: Long
   def chainId: Byte
+  def id: Coeval[ByteStr]
+  def checkedAssets: Seq[IssuedAsset]
+  val tpe: TransactionType.TransactionType
+}
 
+object TransactionBase {
+  implicit class TBExt(val t: TransactionBase) extends AnyVal {
+    def fee: Long = t.assetFee._2
+    def feeAssetId: Asset = t.assetFee._1
+    def smartAssets(blockchain: Blockchain): Seq[IssuedAsset] = t.checkedAssets.filter(blockchain.hasAssetScript)
+  }
+}
+
+abstract class Transaction(val tpe: TransactionType.TransactionType, val checkedAssets: Seq[IssuedAsset] = Nil) extends TransactionBase {
   def bytesSize: Int         = bytes().length
-  val protoSize: Coeval[Int] = Coeval(PBTransactions.protobuf(this).serializedSize)
+  lazy val protoSize: Coeval[Int] = Coeval(PBTransactions.protobuf(this).serializedSize)
+  val bodyBytes: Coeval[Array[Byte]]
   val bytes: Coeval[Array[Byte]]
   val json: Coeval[JsObject]
 
@@ -28,13 +39,10 @@ trait Transaction {
   }
 
   override def hashCode(): Int = id().hashCode()
-
-  val bodyBytes: Coeval[Array[Byte]]
-  def checkedAssets: Seq[IssuedAsset] = Nil
 }
 
 object Transaction {
-  type Type = Byte
+  type Type = TransactionType.TransactionType
 
   val V1: TxVersion = TxVersion.V1
   val V2: TxVersion = TxVersion.V2

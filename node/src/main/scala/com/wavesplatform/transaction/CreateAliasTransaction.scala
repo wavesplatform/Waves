@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction
 
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{AddressScheme, Alias, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.serialization.impl.CreateAliasTxSerializer
 import com.wavesplatform.transaction.validation.impl.CreateAliasTxValidator
@@ -21,24 +21,23 @@ final case class CreateAliasTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends SigProofsSwitch
+) extends Transaction(TransactionType.CreateAlias)
+    with SigProofsSwitch
     with VersionedTransaction
     with TxWithFee.InWaves
-    with LegacyPBSwitch.V3 {
+    with PBSince.V3 {
 
   lazy val alias: Alias = Alias.createWithChainId(aliasName, chainId).explicitGet()
 
-  override def builder: TransactionParser          = CreateAliasTransaction
-  override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(CreateAliasTransaction.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(CreateAliasTransaction.serializer.toBytes(this))
-  override val json: Coeval[JsObject]              = Coeval.evalOnce(CreateAliasTransaction.serializer.toJson(this))
+  override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(CreateAliasTxSerializer.bodyBytes(this))
+  override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(CreateAliasTxSerializer.toBytes(this))
+  override val json: Coeval[JsObject]              = Coeval.evalOnce(CreateAliasTxSerializer.toJson(this))
 
   override val id: Coeval[ByteStr] = Coeval.evalOnce {
-    val payload = version match {
-      case TxVersion.V1 | TxVersion.V2 => Bytes.concat(Array(builder.typeId), alias.bytes)
+    ByteStr(crypto.fastHash(version match {
+      case TxVersion.V1 | TxVersion.V2 => Bytes.concat(Array(tpe.id.toByte), alias.bytes)
       case _                           => bodyBytes()
-    }
-    ByteStr(crypto.fastHash(payload))
+    }))
   }
 }
 
@@ -49,13 +48,12 @@ object CreateAliasTransaction extends TransactionParser {
   val typeId: TxType                    = 10: Byte
 
   implicit val validator = CreateAliasTxValidator
-  val serializer         = CreateAliasTxSerializer
 
   implicit def sign(tx: CreateAliasTransaction, privateKey: PrivateKey): CreateAliasTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   override def parseBytes(bytes: Array[TxVersion]): Try[CreateAliasTransaction] =
-    serializer.parseBytes(bytes)
+    CreateAliasTxSerializer.parseBytes(bytes)
 
   def create(
       version: TxVersion,

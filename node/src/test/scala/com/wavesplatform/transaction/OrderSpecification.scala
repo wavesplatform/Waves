@@ -1,12 +1,11 @@
 package com.wavesplatform.transaction
 
+import com.wavesplatform.NTPTime
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.diffs._
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.smart.Verifier
-import com.wavesplatform.NTPTime
-import com.wavesplatform.test.PropSpec
 import org.scalatest._
 
 import scala.util.Random

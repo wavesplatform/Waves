@@ -2,14 +2,14 @@ package com.wavesplatform.account
 
 import java.util
 
+import scala.util.{Failure, Success}
+
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.Curve25519
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils
 import play.api.libs.json.{Format, Json, Writes}
-
-import scala.util.{Failure, Success}
 
 final class KeyPair(val seed: Array[Byte]) {
   lazy val privateKey: PrivateKey = PrivateKey(Curve25519.privateKeyFromSeed(seed))

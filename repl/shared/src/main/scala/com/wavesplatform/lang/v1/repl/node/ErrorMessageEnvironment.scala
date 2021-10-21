@@ -31,6 +31,7 @@ case class ErrorMessageEnvironment[F[_]](message: String) extends Environment[F]
   override def txId: ByteStr                                                                                      = unavailable
   override def transferTransactionFromProto(b: Array[Byte]): F[Option[Tx.Transfer]]                               = unavailable
   override def addressFromString(address: String): Either[String, Recipient.Address]                              = unavailable
+  override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]                                  = unavailable
   override def accountScript(addressOrAlias: Recipient): F[Option[Script]]                                        = unavailable
   override def callScript(
       dApp: Address,

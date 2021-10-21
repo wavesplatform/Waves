@@ -3,28 +3,29 @@ package com.wavesplatform.state.diffs.smart.predef
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing.evaluated
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.{Asset => AssetType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
+import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.state.diffs.ci._
+import com.wavesplatform.test._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
-import com.wavesplatform.transaction.smart.{WavesEnvironment, buildThisValue}
-import com.wavesplatform.transaction.{DataTransaction, Proofs, ProvenTransaction, TxVersion, VersionedTransaction}
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, WavesEnvironment, buildThisValue}
+import com.wavesplatform.transaction.{DataTransaction, Proofs, TxVersion}
 import com.wavesplatform.utils.EmptyBlockchain
-import com.wavesplatform.crypto
-import com.wavesplatform.test._
 import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
@@ -32,38 +33,10 @@ import org.scalatest.EitherValues
 import play.api.libs.json.Json
 import shapeless.Coproduct
 
-class TransactionBindingsTest
-    extends PropSpec
-    with PathMockFactory
-    with EitherValues {
+import scala.util.Random
+
+class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherValues {
   private val T = 'T'.toByte
-
-  def letProof(p: Proofs, prefix: String)(i: Int) =
-    s"let ${prefix.replace(".", "")}proof$i = $prefix.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).toString}'"
-
-  def provenPart(t: ProvenTransaction): String = {
-    val version = t match {
-      case v: VersionedTransaction => v.version
-      case _                       => 1
-    }
-    s"""
-       |   let id = t.id == base58'${t.id().toString}'
-       |   let fee = t.fee == ${t.assetFee._2}
-       |   let timestamp = t.timestamp == ${t.timestamp}
-       |   let bodyBytes = blake2b256(t.bodyBytes) == base64'${ByteStr(crypto.fastHash(t.bodyBytes.apply().array)).base64}'
-       |   let sender = t.sender == addressFromPublicKey(base58'${t.sender}')
-       |   let senderPublicKey = t.senderPublicKey == base58'${t.sender}'
-       |   let version = t.version == $version
-       |   ${Range(0, 8).map(letProof(t.proofs, "t")).mkString("\n")}
-     """.stripMargin
-  }
-
-  def assertProofs(p: String): String = {
-    val prefix = p.replace(".", "")
-    s"${prefix}proof0 && ${prefix}proof1 && ${prefix}proof2 && ${prefix}proof3 && ${prefix}proof4 && ${prefix}proof5 && ${prefix}proof6 && ${prefix}proof7"
-  }
-  def assertProvenPart(prefix: String) =
-    s"id && fee && timestamp && sender && senderPublicKey && ${assertProofs(prefix)} && bodyBytes && version"
 
   property("TransferTransaction binding") {
     forAll(Gen.oneOf(transferV1Gen, transferV2Gen)) { t =>
@@ -313,7 +286,7 @@ class TransactionBindingsTest
            |     case ad : Address => ad.bytes
            |     case _ : Alias => base58''
            |   }
-           |   let dappAddress = dAppAddressBytes == base58'${Base58.encode(t.dAppAddressOrAlias.bytes)}'
+           |   let dappAddress = dAppAddressBytes == base58'${Base58.encode(t.dApp.bytes)}'
            |
            |   let paymentAmount = if(${t.payments.nonEmpty})
            |     then extract(t.payment).amount == ${t.payments.headOption.map(_.amount).getOrElse(-1)}
@@ -337,7 +310,7 @@ class TransactionBindingsTest
            | case _ => throw()
            | }
            |""".stripMargin
-      val result = runScriptWithCustomContext(script, Coproduct(t), T, V3)
+      val result = runScriptWithCustomContext(script, t, V3)
       result shouldBe evaluated(true)
     }
   }
@@ -350,6 +323,7 @@ class TransactionBindingsTest
         .reverse
         .mkString("[", ",", "]")
 
+      val size = t.payments.size
       val script =
         s"""
            | func assetsAmountSum(acc: Int, p: AttachedPayment) = acc + p.amount
@@ -361,8 +335,8 @@ class TransactionBindingsTest
            |
            | match tx {
            |   case t : InvokeScriptTransaction =>
-           |     let paymentAmount = FOLD<${t.payments.size}>(t.payments, 0, assetsAmountSum) == ${t.payments.map(_.amount).sum}
-           |     let paymentAssets = FOLD<${t.payments.size}>(t.payments, nil, extractAssets) == $paymentsStr
+           |     let paymentAmount = ${Common.fold(size, "t.payments", "0", "assetsAmountSum")()} == ${t.payments.map(_.amount).sum}
+           |     let paymentAssets = ${Common.fold(size, "t.payments", "nil", "extractAssets")()} == $paymentsStr
            |
            |     paymentAmount && paymentAssets
            |
@@ -373,9 +347,33 @@ class TransactionBindingsTest
       val blockchain = stub[Blockchain]
       (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
 
-      val result = runScriptWithCustomContext(script, Coproduct(t), T, V4, blockchain)
+      val result = runScriptWithCustomContext(script, t, V4, blockchain)
       result shouldBe evaluated(true)
     }
+  }
+
+  property("InvokeExpressionTransaction binding") {
+    val expression = TestCompiler(V6).compileFreeCall("[]")
+    def script(tx: InvokeExpressionTransaction) =
+      s"""
+         | match tx {
+         |   case t: InvokeExpressionTransaction  =>
+         |     ${provenPart(tx)}
+         |     let checkFeeAssetId = t.feeAssetId == ${tx.feeAssetId.fold("unit")(a => s"base58'${a.id.toString}'")}
+         |     let checkExpression = t.expression == base58'${expression.bytes()}'
+         |     ${assertProvenPart("t")} && checkFeeAssetId && checkExpression
+         |   case _ => throw()
+         | }
+       """.stripMargin
+
+    val fee     = ciFee(freeCall = true).sample.get
+    val account = accountGen.sample.get
+    val asset   = IssuedAsset(ByteStr.fromBytes(1, 2, 3))
+    val tx1     = InvokeExpressionTransaction.selfSigned(TxVersion.V1, account, expression, fee, Waves, Random.nextLong()).explicitGet()
+    val tx2     = InvokeExpressionTransaction.selfSigned(TxVersion.V1, account, expression, fee, asset, Random.nextLong()).explicitGet()
+
+    runScriptWithCustomContext(script(tx1), tx1, V6) shouldBe evaluated(true)
+    runScriptWithCustomContext(script(tx2), tx2, V6) shouldBe evaluated(true)
   }
 
   property("SetAssetScriptTransaction binding") {
@@ -711,11 +709,11 @@ class TransactionBindingsTest
     import com.wavesplatform.lang.v1.CTX._
 
     val expr       = Parser.parseExpr(script).get.value
-    val directives = DirectiveSet(V2, Asset, Expression).explicitGet()
+    val directives = DirectiveSet(V2, AssetType, Expression).explicitGet()
     val ctx =
       PureContext.build(V2, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(V2, Asset, Expression).explicitGet())
+        WavesContext.build(Global, DirectiveSet(V2, AssetType, Expression).explicitGet())
 
     val environment = new WavesEnvironment(
       chainId,

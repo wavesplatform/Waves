@@ -27,7 +27,7 @@ object DataTxSerializer {
     version match {
       case TxVersion.V1 =>
         Bytes.concat(
-          Array(builder.typeId, version),
+          Array(tpe.id.toByte, version),
           sender.arr,
           Shorts.toByteArray(data.size.toShort),
           Bytes.concat(data.map(serializeEntry): _*),

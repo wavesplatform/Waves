@@ -26,8 +26,8 @@ object CreateAliasTxSerializer {
     )
 
     version match {
-      case TxVersion.V1 => Bytes.concat(Array(builder.typeId), base)
-      case TxVersion.V2 => Bytes.concat(Array(builder.typeId, version), base)
+      case TxVersion.V1 => Bytes.concat(Array(tpe.id.toByte), base)
+      case TxVersion.V2 => Bytes.concat(Array(tpe.id.toByte, version), base)
       case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }

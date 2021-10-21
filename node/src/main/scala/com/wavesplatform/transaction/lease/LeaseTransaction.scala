@@ -3,9 +3,9 @@ package com.wavesplatform.transaction.lease
 import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.LeaseTxSerializer
 import com.wavesplatform.transaction.validation.impl.LeaseTxValidator
-import com.wavesplatform.transaction._
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -20,15 +20,15 @@ final case class LeaseTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends SigProofsSwitch
+) extends Transaction(TransactionType.Lease)
+    with SigProofsSwitch
     with VersionedTransaction
     with TxWithFee.InWaves
     with FastHashId
-    with LegacyPBSwitch.V3 {
-  override def builder: TransactionParser          = LeaseTransaction
-  override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(LeaseTransaction.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(LeaseTransaction.serializer.toBytes(this))
-  override val json: Coeval[JsObject]              = Coeval.evalOnce(LeaseTransaction.serializer.toJson(this))
+    with PBSince.V3 {
+  override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(LeaseTxSerializer.bodyBytes(this))
+  override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(LeaseTxSerializer.toBytes(this))
+  override val json: Coeval[JsObject]              = Coeval.evalOnce(LeaseTxSerializer.toJson(this))
 }
 
 object LeaseTransaction extends TransactionParser {
@@ -38,13 +38,12 @@ object LeaseTransaction extends TransactionParser {
   val typeId: TxType                    = 8: Byte
 
   implicit val validator = LeaseTxValidator
-  val serializer         = LeaseTxSerializer
 
   implicit def sign(tx: LeaseTransaction, privateKey: PrivateKey): LeaseTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   override def parseBytes(bytes: Array[TxVersion]): Try[LeaseTransaction] =
-    serializer.parseBytes(bytes)
+    LeaseTxSerializer.parseBytes(bytes)
 
   def create(
       version: TxVersion,

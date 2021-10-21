@@ -4,19 +4,14 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncGrpcApi._
-import com.wavesplatform.test.NumericExt
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions, Recipient}
+import com.wavesplatform.test.NumericExt
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils.ScorexLogging
-import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest._
+import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 
-trait GrpcIntegrationSuiteWithThreeAddress
-    extends BaseSuite
-    with ScalaFutures
-    with IntegrationPatience
-    with RecoverMethods
-    with ScorexLogging {
+trait GrpcIntegrationSuiteWithThreeAddress extends BaseSuite with ScalaFutures with IntegrationPatience with RecoverMethods with ScorexLogging {
   this: TestSuite with Nodes =>
 
   protected lazy val firstAcc: KeyPair  = KeyPair("first_acc".getBytes("UTF-8"))
@@ -54,7 +49,8 @@ trait GrpcIntegrationSuiteWithThreeAddress
     def makeTransfers(accounts: Seq[ByteString]): Seq[String] = accounts.map { acc =>
       PBTransactions
         .vanilla(
-          sender.broadcastTransfer(sender.keyPair, Recipient().withPublicKeyHash(acc), defaultBalance, sender.fee(TransferTransaction.typeId))
+          sender.broadcastTransfer(sender.keyPair, Recipient().withPublicKeyHash(acc), defaultBalance, sender.fee(TransferTransaction.typeId)),
+          unsafe = false
         )
         .explicitGet()
         .id()

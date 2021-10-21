@@ -2,6 +2,8 @@ package com.wavesplatform
 
 import java.lang.reflect.Constructor
 
+import scala.util.Try
+
 import com.wavesplatform.account.{PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -9,13 +11,12 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils._
 import org.whispersystems.curve25519.OpportunisticCurve25519Provider
 
-import scala.util.Try
-
 package object crypto extends ScorexLogging {
   // Constants
-  val SignatureLength: Int = Curve25519.SignatureLength
-  val KeyLength: Int       = Curve25519.KeyLength
-  val DigestLength: Int    = 32
+  val SignatureLength: Int   = Curve25519.SignatureLength // 64
+  val KeyLength: Int         = Curve25519.KeyLength // 32
+  val DigestLength: Int      = 32
+  val EthereumKeyLength: Int = 64
 
   // Additional provider
   private val provider: OpportunisticCurve25519Provider = {

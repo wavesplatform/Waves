@@ -13,8 +13,9 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync._
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -56,6 +57,13 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     )((id, message, json) => GenericApiError(id, message, StatusCodes.BadRequest.intValue, json))
   }
 
+  /**
+    *
+    * @param id Expected API error code
+    * @param message Expected API error full message or regex template
+    * @param code Expected HTTP status code, 400/Bad Request by default
+    * @param matchMessage When true, uses `message` as regular expression to find it in response. When false, fully tests `message` equality with received error message.
+    */
   case class AssertiveApiError(id: Int, message: String, code: StatusCode = StatusCodes.BadRequest, matchMessage: Boolean = false)
 
   implicit class ApiErrorOps(error: ApiError) {
@@ -66,8 +74,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
     case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, statusCode, responseBody))) =>
       Assertions.assert(
-        statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"),
-        s"\nexpected '$errorRegex'\nactual '$responseBody'"
+        statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"), s"\nexpected '$errorRegex'\nactual '$responseBody'"
       )
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail("Expecting bad request")
@@ -253,9 +260,6 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def assetDistribution(asset: String): AssetDistribution =
       sync(async(n).assetDistribution(asset))
-
-    def debugPortfoliosFor(address: String, considerUnspent: Boolean, amountsAsStrings: Boolean = false): Portfolio =
-      sync(async(n).debugPortfoliosFor(address, considerUnspent, amountsAsStrings))
 
     def broadcastIssue(
         source: KeyPair,
@@ -626,9 +630,6 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def blockHeadersSeq(fromHeight: Int, toHeight: Int, amountsAsStrings: Boolean = false): Seq[BlockHeader] =
       sync(async(n).blockHeadersSeq(fromHeight, toHeight, amountsAsStrings))
 
-    def generatingBalance(address: String, amountsAsStrings: Boolean = false): GeneratingBalance =
-      sync(async(n).generatingBalance(address, amountsAsStrings))
-
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       sync(async(n).rollback(to, returnToUTX))
 
@@ -696,6 +697,18 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
         case (tx, js) => maybeWaitForTransaction(tx, waitForTx) -> js
       }
     }
+
+    def invokeExpression(
+        caller: KeyPair,
+        expression: ExprScript,
+        fee: Long = invokeExpressionFee,
+        feeAssetId: Option[String] = None,
+        version: TxVersion = TxVersion.V1,
+        waitForTx: Boolean = false
+    ): (Transaction, JsValue) =
+      sync(async(n).invokeExpression(caller, expression, fee, feeAssetId, version)) match {
+        case (tx, js) => maybeWaitForTransaction(tx, waitForTx) -> js
+      }
 
     def validateInvokeScript(
         caller: KeyPair,

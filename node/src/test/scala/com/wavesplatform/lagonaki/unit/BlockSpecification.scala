@@ -5,12 +5,11 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.metrics.Instrumented
-import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.crypto
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 

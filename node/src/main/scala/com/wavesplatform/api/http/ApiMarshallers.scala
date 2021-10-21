@@ -11,10 +11,7 @@ import akka.stream.scaladsl.{Flow, Source}
 import akka.util.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.contract.meta.FunctionSignatures
-import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
-import play.api.libs.json.Json.JsValueWrapper
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import play.api.libs.json._
 
 import scala.util.control.Exception.nonFatalCatch
@@ -26,7 +23,7 @@ case class PlayJsonException(
 ) extends IllegalArgumentException
     with NoStackTrace
 
-trait ApiMarshallers {
+trait ApiMarshallers extends JsonFormats {
   import akka.http.scaladsl.marshalling.PredefinedToResponseMarshallers._
 
   implicit lazy val ApiErrorMarshaller: ToResponseMarshaller[ApiError] =
@@ -34,10 +31,6 @@ trait ApiMarshallers {
 
   implicit lazy val ValidationErrorMarshaller: ToResponseMarshaller[ValidationError] =
     ApiErrorMarshaller.compose(ve => ApiError.fromValidationError(ve))
-
-  implicit lazy val TransactionJsonWrites: OWrites[Transaction] = OWrites(_.json())
-
-  implicit lazy val logWrites: Writes[TraceStep] = Writes(_.json)
 
   def tracedResultMarshaller[A](includeTrace: Boolean)(implicit writes: OWrites[A]): ToResponseMarshaller[TracedResult[ApiError, A]] =
     fromStatusCodeAndValue[StatusCode, JsValue]
@@ -47,27 +40,6 @@ trait ApiMarshallers {
             ae.resultE.fold(_.code, _ => StatusCodes.OK),
             ae.resultE.fold(_.json, writes.writes) ++ (if (includeTrace) Json.obj("trace" -> ae.trace.map(_.loggedJson)) else Json.obj())
           )
-      )
-
-  implicit val functionSignaturesWrites: Writes[FunctionSignatures] =
-    (o: FunctionSignatures) =>
-      Json.obj(
-        "version"          -> o.version.toString,
-        "isArrayArguments" -> true,
-        "callableFuncTypes" -> Json.obj(
-          o.argsWithFuncName.map {
-            case (functionName, args) =>
-              val functionArgs: JsValueWrapper =
-                args.map {
-                  case (argName, argType) =>
-                    Json.obj(
-                      "name" -> argName,
-                      "type" -> argType.name
-                    )
-                }
-              functionName -> functionArgs
-          }: _*
-        )
       )
 
   private[this] lazy val jsonStringUnmarshaller =

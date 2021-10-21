@@ -34,11 +34,11 @@ object ReissueTxSerializer {
 
     version match {
       case TxVersion.V1 =>
-        Bytes.concat(Array(typeId), baseBytes)
+        Bytes.concat(Array(tpe.id.toByte), baseBytes)
 
       case TxVersion.V2 =>
         Bytes.concat(
-          Array(builder.typeId, version, chainId),
+          Array(tpe.id.toByte, version, chainId),
           baseBytes
         )
 
@@ -49,7 +49,7 @@ object ReissueTxSerializer {
 
   def toBytes(tx: ReissueTransaction): Array[Byte] = {
     tx.version match {
-      case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature.arr, this.bodyBytes(tx)) // Signature before body, typeId appears twice
+      case TxVersion.V1 => Bytes.concat(Array(tx.tpe.id.toByte), tx.proofs.toSignature.arr, this.bodyBytes(tx)) // Signature before body, typeId appears twice
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
       case _            => PBTransactionSerializer.bytes(tx)
     }

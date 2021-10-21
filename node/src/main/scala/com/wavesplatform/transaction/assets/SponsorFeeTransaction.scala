@@ -22,19 +22,15 @@ case class SponsorFeeTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends ProvenTransaction
+) extends Transaction(TransactionType.SponsorFee, Seq(asset)) with ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
     with FastHashId
-    with LegacyPBSwitch.V2 {
+    with PBSince.V2 {
 
-  override val builder: SponsorFeeTransaction.type = SponsorFeeTransaction
-
-  val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(builder.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.toBytes(this))
-  override val json: Coeval[JsObject]     = Coeval.evalOnce(builder.serializer.toJson(this))
-
-  override val checkedAssets: Seq[IssuedAsset] = Seq(asset)
+  val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(SponsorFeeTxSerializer.bodyBytes(this))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(SponsorFeeTxSerializer.toBytes(this))
+  override val json: Coeval[JsObject]     = Coeval.evalOnce(SponsorFeeTxSerializer.toJson(this))
 }
 
 object SponsorFeeTransaction extends TransactionParser {
@@ -48,10 +44,8 @@ object SponsorFeeTransaction extends TransactionParser {
   implicit def sign(tx: SponsorFeeTransaction, privateKey: PrivateKey): SponsorFeeTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-  val serializer = SponsorFeeTxSerializer
-
   override def parseBytes(bytes: Array[TxVersion]): Try[SponsorFeeTransaction] =
-    serializer.parseBytes(bytes)
+    SponsorFeeTxSerializer.parseBytes(bytes)
 
   def create(
       version: TxVersion,

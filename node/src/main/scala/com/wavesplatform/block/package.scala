@@ -1,16 +1,16 @@
 package com.wavesplatform
 
+import scala.util.Try
+
 import cats.syntax.either._
 import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.block.Block.{TransactionProof, TransactionsMerkleTree}
-import com.wavesplatform.common.merkle.Merkle._
 import com.wavesplatform.block.validation.Validators._
+import com.wavesplatform.common.merkle.Merkle._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.transaction.Transaction
-
-import scala.util.Try
 
 package object block {
 
@@ -50,9 +50,9 @@ package object block {
     }
   }
 
-  def mkMerkleTree(txs: Seq[Transaction]): TransactionsMerkleTree = mkLevels(txs.map(PBTransactions.protobuf(_).toByteArray))
+  def mkMerkleTree(txs: Seq[Transaction]): TransactionsMerkleTree = mkLevels(txs.map(PBTransactions.toByteArrayMerkle))
 
   def mkTransactionsRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
     if (version < Block.ProtoBlockVersion) ByteStr.empty
-    else mkLevels(transactionData.map(PBTransactions.protobuf(_).toByteArray)).transactionsRoot
+    else mkMerkleTree(transactionData).transactionsRoot
 }
