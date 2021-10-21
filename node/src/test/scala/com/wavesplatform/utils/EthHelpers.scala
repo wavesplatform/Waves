@@ -14,17 +14,13 @@ import org.web3j.utils.Numeric
 trait EthHelpers {
   val EthStubBytes32: Array[Byte] = Array.fill(32)(EthChainId.byte)
 
-  object EthPublicKey {
-    def apply(str: String): PublicKey = PublicKey(EthEncoding.toBytes(str))
-  }
-
   object EthSignature {
     def apply(str: String): Option[ByteStr] = Some(ByteStr(EthEncoding.toBytes(str)))
   }
 
-  val TestEthPublicKey: PublicKey = EthPublicKey(
+  val TestEthPublicKey: PublicKey = PublicKey(EthEncoding.toBytes(
     "0xd10a150ba9a535125481e017a09c2ac6a1ab43fc43f7ab8f0d44635106672dd7de4f775c06b730483862cbc4371a646d86df77b3815593a846b7272ace008c42"
-  )
+  ))
 
   private val time = new TestTime
   private def ts   = time.getTimestamp()
