@@ -9,8 +9,10 @@ import com.wavesplatform.history.{DefaultWavesSettings, Domain, settingsWithFeat
 import com.wavesplatform.http.RouteSpec
 import com.wavesplatform.lang.directives.values.StdLibVersion.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.test._
 import com.wavesplatform.test.node.{randomAddress, randomKeyPair}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.utils.EthConverters._
 import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxHelpers}
@@ -52,12 +54,15 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
       routeTest(d, "eth_getCode", address.toEthAddress)(result shouldBe "0x")
     }
 
-    "has contract" in withDomain(settingsWithFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls, BlockchainFeatures.Ride4DApps)) { d =>
-      val testKP = randomKeyPair()
-      d.appendBlock(
-        GenesisTransaction.create(testKP.toAddress, 1.waves, ntpTime.getTimestamp()).explicitGet(),
-        Signed.setScript(2.toByte, testKP, Some(TestCompiler(V5).compileContract(
-          """{-# STDLIB_VERSION 4 #-}
+    "has contract" in withDomain(settingsWithFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls, BlockchainFeatures.Ride4DApps)) {
+      d =>
+        val testKP = randomKeyPair()
+        d.appendBlock(
+          GenesisTransaction.create(testKP.toAddress, 1.waves, ntpTime.getTimestamp()).explicitGet(),
+          Signed.setScript(
+            2.toByte,
+            testKP,
+            Some(TestCompiler(V5).compileContract("""{-# STDLIB_VERSION 4 #-}
             |{-# CONTENT_TYPE DAPP #-}
             |{-# SCRIPT_TYPE ACCOUNT #-}
             |
@@ -67,9 +72,12 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
             |    BinaryEntry("leaseId", base64'AAA')
             |  ]
             |}
-            |""".stripMargin)), 0.01.waves, ntpTime.getTimestamp())
-      )
-      routeTest(d, "eth_getCode", testKP.toAddress.toEthAddress)(result shouldBe "0xff")
+            |""".stripMargin)),
+            0.01.waves,
+            ntpTime.getTimestamp()
+          )
+        )
+        routeTest(d, "eth_getCode", testKP.toAddress.toEthAddress)(result shouldBe "0xff")
     }
   }
 
@@ -138,57 +146,104 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
   "eth_sendRawTransaction" in withDomain(settingsWithFeatures(BlockchainFeatures.RideV6, BlockchainFeatures.BlockV5)) { d =>
     val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultSigner.toEthKeyPair, TxHelpers.secondAddress, 10, Asset.Waves)
     d.appendBlock(
-      GenesisTransaction.create(transaction.senderAddress(), 50.waves, ntpTime.getTimestamp()).explicitGet(),
+      GenesisTransaction.create(transaction.senderAddress(), 50.waves, ntpTime.getTimestamp()).explicitGet()
     )
     routeTest(d, "eth_sendRawTransaction", EthEncoding.toHexString(transaction.bytes()))(
       result shouldBe transaction.id().toHexString
     )
   }
 
-  "eth/assets" in withDomain() { d =>
+  "eth/assets" in withDomain(settingsWithFeatures(BlockchainFeatures.Ride4DApps, BlockchainFeatures.ReduceNFTFee, BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls)) { d =>
     val randomKP = randomKeyPair()
-    val issue1   = Signed.issue(2.toByte, randomKP, "TEST1", "test asset", 100000, 2, false, None, 1.waves, ntpTime.getTimestamp())
-    val issue2   = Signed.issue(2.toByte, randomKP, "TEST2", "test asset", 200000, 3, false, None, 1.waves, ntpTime.getTimestamp())
+    val invoker  = randomKeyPair()
+    val issue1   = Signed.issue(2.toByte, randomKP, "TEST1", "test asset", 100000, 2, true, None, 1.waves, ntpTime.getTimestamp())
+    val issue2   = Signed.issue(2.toByte, randomKP, "NFT1", "test asset", 1, 0, false, None, 0.001.waves, ntpTime.getTimestamp())
 
     d.appendBlock(
       GenesisTransaction.create(randomKP.toAddress, 5.waves, ntpTime.getTimestamp()).explicitGet(),
-      issue1,
-      issue2
+      GenesisTransaction.create(invoker.toAddress, 5.waves, ntpTime.getTimestamp()).explicitGet()
     )
+
+    val invoke = Signed.invokeScript(
+      2.toByte,
+      invoker,
+      randomKP.toAddress,
+      None,
+      Seq(InvokeScriptTransaction.Payment(1.waves, Asset.Waves)),
+      1.005.waves,
+      Asset.Waves,
+      ntpTime.getTimestamp()
+    )
+    d.appendBlock(
+      issue1,
+      issue2,
+      Signed.setScript(2.toByte, randomKP, Some(TestCompiler(V5).compileContract(
+        """{-# STDLIB_VERSION 4 #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |
+          |@Callable(inv)
+          |func default() = {
+          |  let issue = Issue("INVASSET", "", 10000, 2, false)
+          |  [
+          |    issue,
+          |    BinaryEntry("assetId", calculateAssetId(issue))
+          |  ]
+          |}
+          |""".stripMargin)), 0.01.waves, ntpTime.getTimestamp()),
+      invoke
+    )
+
+    val issue3 = d.blockchain.accountData(randomKP.toAddress, "assetId").get.asInstanceOf[BinaryDataEntry].value
 
     new EthRpcRoute(d.blockchain, d.commonApi.transactions, ntpTime).route
       .anyParamTest(routePath("/assets"), "id")(
         EthEncoding.toHexString(issue1.id().arr.take(20)),
-        EthEncoding.toHexString(issue2.id().arr.take(20))
+        EthEncoding.toHexString(issue2.id().arr.take(20)),
+        EthEncoding.toHexString(issue3.arr.take(20))
       ) {
         responseAs[JsArray] should matchJson(s"""[ {
                                              |  "assetId" : "${issue1.id()}",
-                                             |  "issueHeight" : 1,
+                                             |  "issueHeight" : 2,
                                              |  "issueTimestamp" : ${issue1.timestamp},
                                              |  "issuer" : "${randomKP.toAddress}",
                                              |  "issuerPublicKey" : "${randomKP.publicKey.toString}",
                                              |  "name" : "TEST1",
                                              |  "description" : "test asset",
                                              |  "decimals" : 2,
-                                             |  "reissuable" : false,
+                                             |  "reissuable" : true,
                                              |  "quantity" : 100000,
                                              |  "scripted" : false,
                                              |  "minSponsoredAssetFee" : null,
                                              |  "originTransactionId" : "${issue1.id()}"
                                              |}, {
                                              |  "assetId" : "${issue2.id()}",
-                                             |  "issueHeight" : 1,
+                                             |  "issueHeight" : 2,
                                              |  "issueTimestamp" : ${issue2.timestamp},
                                              |  "issuer" : "${randomKP.toAddress}",
                                              |  "issuerPublicKey" : "${randomKP.publicKey.toString}",
-                                             |  "name" : "TEST2",
+                                             |  "name" : "NFT1",
                                              |  "description" : "test asset",
-                                             |  "decimals" : 3,
+                                             |  "decimals" : 0,
                                              |  "reissuable" : false,
-                                             |  "quantity" : 200000,
+                                             |  "quantity" : 1,
                                              |  "scripted" : false,
                                              |  "minSponsoredAssetFee" : null,
                                              |  "originTransactionId" : "${issue2.id()}"
+                                             |}, {
+                                             |  "assetId" : "$issue3",
+                                             |  "issueHeight" : 2,
+                                             |  "issueTimestamp" : ${invoke.timestamp},
+                                             |  "issuer" : "${randomKP.toAddress}",
+                                             |  "issuerPublicKey" : "${randomKP.publicKey.toString}",
+                                             |  "name" : "INVASSET",
+                                             |  "description" : "",
+                                             |  "decimals" : 2,
+                                             |  "reissuable" : false,
+                                             |  "quantity" : 10000,
+                                             |  "scripted" : false,
+                                             |  "minSponsoredAssetFee" : null,
+                                             |  "originTransactionId" : "${invoke.id()}"
                                              |} ]""".stripMargin)
       }
   }
