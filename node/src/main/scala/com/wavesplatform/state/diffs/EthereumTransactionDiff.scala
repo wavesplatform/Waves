@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.EthereumTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 
 object EthereumTransactionDiff {
-  def apply(blockchain: Blockchain, currentBlockTs: Long)(e: EthereumTransaction): TracedResult[ValidationError, Diff] =
+  def apply(blockchain: Blockchain, currentBlockTs: Long, limitedExecution: Boolean)(e: EthereumTransaction): TracedResult[ValidationError, Diff] =
     e.payload match {
       case et: EthereumTransaction.Transfer =>
         for {
@@ -38,7 +38,7 @@ object EthereumTransactionDiff {
         for {
           invocation   <- TracedResult(ei.toInvokeScriptLike(e, blockchain))
           paymentsDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, invocation, verify = true, Diff(), Int.MaxValue)
-          diff         <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution = true)(invocation)
+          diff         <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(invocation)
         } yield
           paymentsDiff |+| diff.copy(
             ethereumTransactionMeta = Map(
