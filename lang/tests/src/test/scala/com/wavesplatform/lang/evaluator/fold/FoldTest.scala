@@ -2,7 +2,7 @@ package com.wavesplatform.lang.evaluator.fold
 
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.evaluator.EvaluatorSpec
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG}
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 
 class FoldTest extends EvaluatorSpec {
   implicit val startVersion: StdLibVersion = V3
