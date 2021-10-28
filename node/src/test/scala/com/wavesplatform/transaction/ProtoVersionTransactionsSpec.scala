@@ -37,7 +37,7 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
     "CreateAliasTransaction" in {
       val alias = aliasGen.sample.get
 
-      val aliasTx  = CreateAliasTransaction.selfSigned(TxVersion.V3, Account, alias, MinFee, Now).explicitGet()
+      val aliasTx  = CreateAliasTransaction.selfSigned(TxVersion.V3, Account, alias.name, MinFee, Now).explicitGet()
       val base64Tx = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(aliasTx)))
 
       decode(base64Tx) shouldBe aliasTx

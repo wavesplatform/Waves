@@ -1,7 +1,6 @@
 package com.wavesplatform.mining
 
 import com.wavesplatform.TestValues
-import com.wavesplatform.account.Alias
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
@@ -53,7 +52,7 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
         import Scheduler.Implicits.global
         val startTime = System.nanoTime()
         val tx = CreateAliasTransaction
-          .selfSigned(TxVersion.V1, acc, Alias.create("test" + Random.nextInt()).explicitGet(), TestValues.fee, TestValues.timestamp)
+          .selfSigned(TxVersion.V1, acc, "test" + Random.nextInt(), TestValues.fee, TestValues.timestamp)
           .explicitGet()
         utxPool.putIfNew(tx).resultE.explicitGet()
         val result = task.runSyncUnsafe()

@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
 import cats.syntax.semigroup._
-import com.wavesplatform.account.Alias
+import com.wavesplatform.TestTime
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
@@ -22,6 +22,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -29,8 +30,6 @@ import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils._
-import com.wavesplatform.TestTime
-import com.wavesplatform.test.PropSpec
 
 class BalancesV4Test extends PropSpec with WithState {
 
@@ -66,7 +65,7 @@ class BalancesV4Test extends PropSpec with WithState {
       GenesisTransaction
         .create(dapp.toAddress, 10 * Constants.UnitsInWave + SetScriptFee + 2 * InvokeScriptTxFee + 1 * Constants.UnitsInWave, ts)
         .explicitGet(),
-      CreateAliasTransaction.selfSigned(TxVersion.V2, acc1, Alias.create("alias").explicitGet(), MinFee, ts).explicitGet()
+      CreateAliasTransaction.selfSigned(TxVersion.V2, acc1, "alias", MinFee, ts).explicitGet()
     )
     setScript = SetScriptTransaction.selfSigned(1.toByte, dapp, Some(script("alias")), SetScriptFee, ts).explicitGet()
     ci        = InvokeScriptTransaction.selfSigned(1.toByte, master, dapp.toAddress, functionCall, Nil, InvokeScriptTxFee, Waves, ts + 3).explicitGet()
@@ -185,7 +184,7 @@ class BalancesV4Test extends PropSpec with WithState {
       case (acc1, acc2) =>
         val g1    = GenesisTransaction.create(acc1.toAddress, ENOUGH_AMT, nextTs).explicitGet()
         val g2    = GenesisTransaction.create(acc2.toAddress, ENOUGH_AMT, nextTs).explicitGet()
-        val alias = CreateAliasTransaction.selfSigned(TxVersion.V2, acc2, Alias.create("alias").explicitGet(), MinFee, nextTs).explicitGet()
+        val alias = CreateAliasTransaction.selfSigned(TxVersion.V2, acc2, "alias", MinFee, nextTs).explicitGet()
         val issue = IssueTransaction(
           TxVersion.V1,
           acc1.publicKey,
