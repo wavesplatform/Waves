@@ -19,7 +19,7 @@ class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDoc
   import RebroadcastTransactionSuite._
 
   override protected def nodeConfigs: Seq[Config] =
-    Seq(configWithRebroadcastAllowed.withFallback(NotMiner), configWithRebroadcastAllowed.withFallback(Miners.head))
+    Seq(configWithRebroadcastAllowed.withFallback(Miners.head), configWithRebroadcastAllowed.withFallback(NotMiner))
 
   private def nodeA: Node = nodes.head
   private def nodeB: Node = nodes.last
