@@ -25,8 +25,6 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{ABIConverter, Asset, EthereumTransaction, GenesisTransaction}
 import com.wavesplatform.utils.EthHelpers
 
-import scala.util.Random
-
 class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
   import DomainPresets._
 
