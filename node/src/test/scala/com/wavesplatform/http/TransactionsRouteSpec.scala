@@ -308,7 +308,7 @@ class TransactionsRouteSpec
       }
     }
 
-    "invoke with issued assets" in withDomain() { d =>
+    "invoke with issued assets" in withDomain(settingsWithFeatures(BF.BlockV5, BF.Ride4DApps, BF.SynchronousCalls)) { d =>
       val dAppSigner  = testWallet.generateNewAccount().get
       val dAppAddress = dAppSigner.toAddress
       val invokeScript = InvokeScriptTransaction
@@ -350,10 +350,11 @@ class TransactionsRouteSpec
     }
 
     "invoke with verifier" - {
-      "with complexity <= 200" in {}
-      "with complexity > 200" in withDomain(
-        domainSettingsWithPreactivatedFeatures(BF.BlockV5, BF.Ride4DApps, BF.SynchronousCalls)
-      ) { d =>
+      "with complexity <= 200" in {
+        
+
+      }
+      "with complexity > 200" in withDomain(settingsWithFeatures(BF.BlockV5, BF.Ride4DApps, BF.SynchronousCalls)) { d =>
         val dappAccount = testWallet.generateNewAccount().get
         val proxy       = testWallet.generateNewAccount().get
         val sender      = testWallet.generateNewAccount().get
@@ -499,10 +500,8 @@ class TransactionsRouteSpec
       lease
     )
 
-    d.appendBlock(leaseCancel)
-
-    val expectedJson =
-      s"""{
+    def expectedJson(status: String, cancelHeight: Option[Int] = None, cancelTransactionId: Option[ByteStr] = None): JsObject =
+      Json.parse(s"""{
          |  "type" : 9,
          |  "id" : "${leaseCancel.id()}",
          |  "sender" : "${sender.toAddress}",
@@ -514,7 +513,6 @@ class TransactionsRouteSpec
          |  "version" : 2,
          |  "leaseId" : "${lease.id()}",
          |  "chainId" : 84,
-         |  "height" : 2,
          |  "lease" : {
          |    "id" : "${lease.id()}",
          |    "originTransactionId" : "${lease.id()}",
@@ -522,31 +520,36 @@ class TransactionsRouteSpec
          |    "recipient" : "${recipient.toAddress}",
          |    "amount" : ${5.waves},
          |    "height" : 1,
-         |    "status" : "canceled",
-         |    "cancelHeight" : 2,
-         |    "cancelTransactionId" : "${leaseCancel.id()}"
+         |    "status" : "$status",
+         |    "cancelHeight" : ${cancelHeight.getOrElse("null")},
+         |    "cancelTransactionId" : ${cancelTransactionId.fold("null")(id => s"\"$id\"")}
          |  }
-         |}""".stripMargin
+         |}""".stripMargin).as[JsObject]
+
+    d.utxPool.putIfNew(leaseCancel)
+
+    withClue(routePath("/unconfirmed")) {
+      Get(routePath(s"/unconfirmed")) ~> sealedRoute ~> check {
+        responseAs[Seq[JsObject]].head should matchJson(expectedJson("active"))
+      }
+    }
+
+    d.appendBlock(leaseCancel)
+
+    val cancelTransactionJson = expectedJson("canceled", Some(2), Some(leaseCancel.id())) ++ Json.obj("height" -> 2)
 
     withClue(routePath("/address/{address}/limit/{limit}")) {
       Get(routePath(s"/address/${recipient.toAddress}/limit/10")) ~> sealedRoute ~> check {
         val json = (responseAs[JsArray] \ 0 \ 0).as[JsObject]
-        json should matchJson(expectedJson)
+        json should matchJson(cancelTransactionJson)
       }
     }
 
     withClue(routePath("/info/{id}")) {
       Get(routePath(s"/info/${leaseCancel.id()}")) ~> sealedRoute ~> check {
-        responseAs[JsObject] should matchJson(expectedJson)
+        responseAs[JsObject] should matchJson(cancelTransactionJson)
       }
     }
-
-    withClue(routePath("/unconfirmed")) {
-      Get(routePath(s"/unconfirmed")) ~> sealedRoute ~> check {
-        responseAs[Seq[JsObject]].head should matchJson(expectedJson)
-      }
-    }
-
   }
 
   routePath("/address/{address}/limit/{limit}") - {
@@ -1203,12 +1206,11 @@ class TransactionsRouteSpec
              |func default() = {
              |  let leaseToAddress = Lease(Address(base58'${recipient.toAddress}'), ${10.waves})
              |  let leaseToAlias = Lease(Alias("test_alias"), ${20.waves})
+             |  strict leaseId = leaseToAddress.calculateLeaseId()
              |
              |  [
              |    leaseToAddress,
-             |    BinaryEntry("leaseToAddress", leaseToAddress.calculateLeaseId()),
              |    leaseToAlias,
-             |    BinaryEntry("leaseToAlias", leaseToAlias.calculateLeaseId()),
              |    LeaseCancel(base58'${lease.id()}')
              |  ]
              |}
@@ -1225,80 +1227,10 @@ class TransactionsRouteSpec
         .explicitGet()
 
       Post(routePath("/broadcast?trace=true"), invoke.json()) ~> mkRoute(d) ~> check {
-        val leaseToAddress = d.blockchain.binaryData(sender.toAddress, "leaseToCancel").get
-        val leaseToAlias = d.blockchain.binaryData(sender.toAddress, "leaseToAlias").get
-        responseAs[JsObject] should matchJson(
-          s"""{
-            |  "type" : 16,
-            |  "id" : "${invoke.id()}",
-            |  "sender" : "${invoke.senderAddress}",
-            |  "senderPublicKey" : "${invoke.sender}",
-            |  "fee" : ${invoke.fee},
-            |  "feeAssetId" : null,
-            |  "timestamp" : ${invoke.timestamp},
-            |  "proofs" : [ "${invoke.signature}" ],
-            |  "version" : 2,
-            |  "dApp" : "${invoke.dAppAddressOrAlias}",
-            |  "payment" : [ ],
-            |  "trace" : [ {
-            |    "type" : "verifier",
-            |    "id" : "${invoke.senderAddress}",
-            |    "result" : "success",
-            |    "error" : null
-            |  }, {
-            |    "type" : "dApp",
-            |    "id" : "${invoke.dAppAddressOrAlias}",
-            |    "function" : "default",
-            |    "args" : [ ],
-            |    "invocations": [],
-            |    "result" : {
-            |        "data": [
-            |          {
-            |            "key": "leaseToAddress",
-            |            "type": "binary",
-            |            "value": "${leaseToAddress.base64}"
-            |          },
-            |          {
-            |            "key": "leaseToAlias",
-            |            "type": "binary",
-            |            "value": "${leaseToAlias.base64}"
-            |          }
-            |        ],
-            |        "transfers": [],
-            |        "issues": [],
-            |        "reissues": [],
-            |        "burns": [],
-            |        "sponsorFees": [],
-            |        "leases": [
-            |          {
-            |            "recipient": "${recipient.toAddress}",
-            |            "amount": ${10.waves},
-            |            "nonce": 0,
-            |            "id": "$leaseToAddress"
-            |          },
-            |          {
-            |            "recipient": "alias:T:test_alias",
-            |            "amount": ${20.waves},
-            |            "nonce": 0,
-            |            "id": "$leaseToAlias"
-            |          }
-            |        ],
-            |        "leaseCancels": [
-            |          {
-            |            "id": "${lease.id()}"
-            |          }
-            |        ],
-            |        "invokes": []
-            |      ,
-            |    "error" : null,
-            |    "vars" : [ {
-            |      "name" : "test",
-            |      "type" : "Int",
-            |      "value" : 1
-            |    } ]
-            |  } ]
-            |}""".stripMargin
-        )
+        val dappTrace = (responseAs[JsObject] \ "trace").as[Seq[JsObject]].head
+
+        (dappTrace \ "error").get shouldEqual JsNull
+        (dappTrace \ "vars" \\ "name").map(_.as[String]) should contain theSameElementsAs Seq("leaseToAddress", "leaseToAlias", "leaseId")
       }
     }
   }
