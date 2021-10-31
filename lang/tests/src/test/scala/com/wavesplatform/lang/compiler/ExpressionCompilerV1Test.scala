@@ -570,17 +570,6 @@ class ExpressionCompilerV1Test extends PropSpec {
     )
   }
 
-  property("using removed FOLD macro") {
-    val script =
-      """
-        | func sum(a:Int, b:Int) = a + b
-        | FOLD<20>([1, 2, 3, 4, 5], 9, sum)
-      """.stripMargin
-    ExpressionCompiler.compile(script, compilerContext) should produce(
-      "Compilation failed: [The FOLD<> macro is no longer supported, use fold_N function family instead in 34-67]"
-    )
-  }
-
   treeTypeTest("GETTER")(
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
