@@ -13,12 +13,11 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
 
-class SyncDAppArgTypesTest extends PropSpec with WithDomain with TransactionGenBase {
-
+class SyncDAppListArgTypesTest extends PropSpec with WithDomain with TransactionGenBase {
   private val time = new TestTime
   private def ts   = time.getTimestamp()
 
@@ -41,28 +40,25 @@ class SyncDAppArgTypesTest extends PropSpec with WithDomain with TransactionGenB
        """.stripMargin
     )
 
-  private def scenario(args: String) =
-    for {
-      invoker <- accountGen
-      dApp1   <- accountGen
-      dApp2   <- accountGen
-      fee     <- ciFee()
-      gTx1     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2     = GenesisTransaction.create(dApp1.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx3     = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
-      ssTx1    = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script(dApp2.toAddress, args)), fee, ts).explicitGet()
-      ssTx2    = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp2Script), fee, ts).explicitGet()
-      invokeTx = () => Signed.invokeScript(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts)
-    } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx2), invokeTx)
+  private def scenario(args: String): (Seq[Transaction], () => InvokeScriptTransaction) = {
+    val invoker  = accountGen.sample.get
+    val dApp1    = accountGen.sample.get
+    val dApp2    = accountGen.sample.get
+    val fee      = ciFee().sample.get
+    val gTxs     = Seq(invoker, dApp1, dApp2).map(acc => GenesisTransaction.create(acc.toAddress, ENOUGH_AMT, ts).explicitGet())
+    val ssTx1    = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script(dApp2.toAddress, args)), fee, ts).explicitGet()
+    val ssTx2    = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp2Script), fee, ts).explicitGet()
+    val invokeTx = () => Signed.invokeScript(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts)
+    (gTxs ++ Seq(ssTx1, ssTx2), invokeTx)
+  }
 
   private val settings =
     TestFunctionalitySettings.Enabled
       .copy(preActivatedFeatures = Map(Ride4DApps.id -> 0, BlockV5.id -> 0, SynchronousCalls.id -> 0, RideV6.id -> 3))
 
   private def assert(forbidAfterActivation: Boolean, args: String) = {
-    val (preparingTxs, invoke) = scenario(args).sample.get
-
     withDomain(domainSettingsWithFS(settings)) { d =>
+      val (preparingTxs, invoke) = scenario(args)
       d.appendBlock(preparingTxs: _*)
 
       val invoke1 = invoke()
@@ -71,7 +67,7 @@ class SyncDAppArgTypesTest extends PropSpec with WithDomain with TransactionGenB
 
       val invoke2 = invoke()
       if (forbidAfterActivation) {
-        (the[RuntimeException] thrownBy d.appendBlock(invoke2)).getMessage should include(
+        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include(
           s"All arguments of InvokeScript must be one of the types: List[], Boolean, Int, ByteVector, String"
         )
       } else {
@@ -82,13 +78,17 @@ class SyncDAppArgTypesTest extends PropSpec with WithDomain with TransactionGenB
   }
 
   property("sync call args types check") {
-    assert(forbidAfterActivation = false, """ "s" """)
     assert(forbidAfterActivation = false, "1")
+    assert(forbidAfterActivation = false, """ "s" """)
     assert(forbidAfterActivation = false, "true")
     assert(forbidAfterActivation = false, "base58''")
-    assert(forbidAfterActivation = false, """ [1, "s", true, base58'', toBigInt(1), [[[]]], Address(base58'')] """)
+    assert(forbidAfterActivation = false, """ [1, "s", true, base58''] """)
+    assert(forbidAfterActivation = false, """ [] """)
 
-    assert(forbidAfterActivation = true, "Address(base58'')")
+    assert(forbidAfterActivation = true, "unit")
     assert(forbidAfterActivation = true, "toBigInt(1)")
+    assert(forbidAfterActivation = true, "[toBigInt(1)]")
+    assert(forbidAfterActivation = true, "[unit]")
+    assert(forbidAfterActivation = true, "[[]]")
   }
 }

@@ -24,6 +24,11 @@ object CallArgumentPolicy {
     override val expectedTypes: Set[String] = ContractCompiler.allowedCallableTypesV4
   }
 
+  case object PrimitivesAndListsOfPrimitives extends CallArgumentPolicy {
+    override def check(e: EXPR): Boolean    = OnlyPrimitives.check(e) || e.isInstanceOf[ARR] && e.asInstanceOf[ARR].xs.forall(OnlyPrimitives.check)
+    override val expectedTypes: Set[String] = ContractCompiler.allowedCallableTypesV4
+  }
+
   implicit class CallCheck(fc: FUNCTION_CALL) {
     def check(c: CallArgumentPolicy): Either[ExecutionError, Unit] =
       Either.cond(

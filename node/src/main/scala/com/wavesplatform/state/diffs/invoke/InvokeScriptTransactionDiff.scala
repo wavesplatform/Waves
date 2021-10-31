@@ -338,7 +338,9 @@ object InvokeScriptTransactionDiff {
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {
     val policy =
-      if (blockchain.callableListArgumentsAllowed)
+      if (blockchain.callableListArgumentsCorrected)
+        CallArgumentPolicy.PrimitivesAndListsOfPrimitives
+      else if (blockchain.callableListArgumentsAllowed)
         CallArgumentPolicy.PrimitivesAndLists
       else
         CallArgumentPolicy.OnlyPrimitives

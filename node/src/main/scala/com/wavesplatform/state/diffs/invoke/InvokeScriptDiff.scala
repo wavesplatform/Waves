@@ -64,8 +64,8 @@ object InvokeScriptDiff {
       case Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities)) =>
         for {
           _ <- traced {
-            if (blockchain.checkSyncCallArgTypes)
-              tx.funcCall.check(CallArgumentPolicy.PrimitivesAndLists).leftMap(GenericError(_))
+            if (blockchain.checkSyncCallArgumentsTypes)
+              tx.funcCall.check(CallArgumentPolicy.PrimitivesAndListsOfPrimitives).leftMap(GenericError(_))
             else
               Right(())
           }
