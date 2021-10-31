@@ -34,17 +34,17 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
   private val passingArg    = 123L
   private val paymentAmount = 456L
 
-  private def assetScript(tx: EthereumTransaction, dApp: Address, assets: Seq[Asset], version: StdLibVersion): Script =
+  private def assetScript(tx: EthereumTransaction, dApp: Address, assets: Seq[Asset], currentAsset: Asset, version: StdLibVersion): Script =
     TestCompiler(version).compileAsset {
       s"""
        | match tx {
-       |   case t: InvokeScriptTransaction => ${checkEthInvoke(tx, dApp, assets, version)}
+       |   case t: InvokeScriptTransaction => ${checkEthInvoke(tx, dApp, assets, currentAsset, version)}
        |   case _                          => true
        | }
      """.stripMargin
     }
 
-  private def checkEthInvoke(tx: EthereumTransaction, dApp: Address, assets: Seq[Asset], version: StdLibVersion): String = {
+  private def checkEthInvoke(tx: EthereumTransaction, dApp: Address, assets: Seq[Asset], currentAsset: Asset, version: StdLibVersion): String = {
     val payments = assets.map(a => s""" AttachedPayment(base58'$a', $paymentAmount) """).mkString(", ")
     s"""
        | ${provenPart(tx, emptyBodyBytes = true, checkProofs = false)}
@@ -52,11 +52,12 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
        |   case a: Address => a.bytes == base58'$dApp'
        |   case _: Alias   => throw()
        | }
+       | let checkId    = this.id == base58'$currentAsset'
        | let feeAssetId = t.feeAssetId == unit
        | let checkFunc  = t.function == "default"
        | let checkArgs  = t.args == [$passingArg]
        | let payments   = ${if (version > V3) s"t.payments == [$payments]" else s"t.payment == ${if (payments.nonEmpty) payments else "unit"}"}
-       | ${assertProvenPart("t", proofs = false)} && dAppAddress && feeAssetId && checkFunc && checkArgs && payments
+       | ${assertProvenPart("t", proofs = false)} && dAppAddress && feeAssetId && checkFunc && checkArgs && payments && checkId
      """.stripMargin
   }
 
@@ -92,9 +93,11 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
     val emptyScript = Some(ExprScript(Terms.TRUE).explicitGet())
     val issues =
       (1 to paymentCount).map(_ => IssueTransaction.selfSigned(2.toByte, dApp, "Asset", "", ENOUGH_AMT, 8, true, emptyScript, fee, ts).explicitGet())
-    val assets          = issues.map(i => IssuedAsset(i.id()))
-    val resultScript    = assetScript(dummyEthInvoke, dApp.toAddress, assets, assetScriptVersion)
-    val setAssetScripts = assets.map(a => SetAssetScriptTransaction.selfSigned(1.toByte, dApp, a, Some(resultScript), fee, ts).explicitGet())
+    val assets = issues.map(i => IssuedAsset(i.id()))
+    val setAssetScripts = assets.map { asset =>
+      val resultScript = assetScript(dummyEthInvoke, dApp.toAddress, assets, asset, assetScriptVersion)
+      SetAssetScriptTransaction.selfSigned(1.toByte, dApp, asset, Some(resultScript), fee, ts).explicitGet()
+    }
     val assetTransfers =
       assets.map(a => TransferTransaction.selfSigned(2.toByte, dApp, invoker, a, ENOUGH_AMT, Waves, fee, ByteStr.empty, ts).explicitGet())
 
