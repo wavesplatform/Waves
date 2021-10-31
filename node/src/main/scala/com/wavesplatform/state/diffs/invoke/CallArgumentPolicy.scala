@@ -25,7 +25,7 @@ object CallArgumentPolicy {
   }
 
   case object PrimitivesAndListsOfPrimitives extends CallArgumentPolicy {
-    override def check(e: EXPR): Boolean    = OnlyPrimitives.check(e) || e.isInstanceOf[ARR] && e.asInstanceOf[ARR].xs.forall(OnlyPrimitives.check)
+    override def check(e: EXPR): Boolean    = OnlyPrimitives.check(e) || (e.isInstanceOf[ARR] && e.asInstanceOf[ARR].xs.forall(OnlyPrimitives.check))
     override val expectedTypes: Set[String] = ContractCompiler.allowedCallableTypesV4
   }
 
