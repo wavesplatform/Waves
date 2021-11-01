@@ -183,7 +183,7 @@ object Decompiler {
       case Terms.FUNCTION_CALL(func, args) =>
         val argsCoeval = argsStr(args)
         func match {
-          case FunctionHeader.Native(id) if ctx.binaryOps.contains(id) =>
+          case FunctionHeader.Native(id) if ctx.binaryOps.contains(id) && args.size == 2 =>
             val (bs0, be0) = args(0) match {
               case Terms.IF(_,_,_) => ("(", ")")
               case _ => ("", "")

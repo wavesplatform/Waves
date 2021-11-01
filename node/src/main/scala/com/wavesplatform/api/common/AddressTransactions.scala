@@ -4,7 +4,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.database.{DBExt, DBResource, Keys}
-import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, NewTransactionInfo, TransactionId, TxNum}
+import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, TransactionId, TxMeta, TxNum}
 import com.wavesplatform.transaction.{Authorized, EthereumTransaction, GenesisTransaction, Transaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
@@ -22,20 +22,36 @@ trait AddressTransactions {
       fromId: Option[ByteStr]
   ): Observable[TransactionMeta] =
     Observable
-      .fromIterator(
-        Task(
-          allAddressTransactions(db, maybeDiff, subject, sender, types, fromId).map(loadTransactionMeta(db, maybeDiff))
-        )
-      )
+      .fromIterator(Task(allAddressTransactions(db, maybeDiff, subject, sender, types, fromId).map {
+        case (m, transaction) =>
+          def loadISR(t: Transaction) =
+            maybeDiff
+              .flatMap { case (_, diff) => diff.scriptResults.get(t.id()) }
+              .orElse(loadInvokeScriptResult(db, t.id()))
+
+          def loadETM(t: Transaction) =
+            maybeDiff
+              .flatMap { case (_, diff) => diff.ethereumTransactionMeta.get(t.id()) }
+              .orElse(loadEthereumMetadata(db, t.id()))
+
+          TransactionMeta.create(
+            m.height,
+            transaction,
+            m.succeeded,
+            m.spentComplexity,
+            loadISR,
+            loadETM
+          )
+      }))
 }
 
 object AddressTransactions {
-  private def loadTransaction(db: DB, height: Height, txNum: TxNum, sender: Option[Address]): Option[(Height, Transaction, Boolean)] =
+  private def loadTransaction(db: DB, height: Height, txNum: TxNum, sender: Option[Address]): Option[(TxMeta, Transaction)] =
     db.get(Keys.transactionAt(height, txNum)) match {
-      case Some((tx: Authorized, status)) if sender.forall(_ == tx.sender.toAddress)         => Some((height, tx, status))
-      case Some((gt: GenesisTransaction, status)) if sender.isEmpty                          => Some((height, gt, status))
-      case Some((et: EthereumTransaction, status)) if sender.forall(_ == et.senderAddress()) => Some((height, et, status))
-      case _                                                                                 => None
+      case Some((m, tx: Authorized)) if sender.forall(_ == tx.sender.toAddress)         => Some(m -> tx)
+      case Some((m, gt: GenesisTransaction)) if sender.isEmpty                          => Some(m -> gt)
+      case Some((m, et: EthereumTransaction)) if sender.forall(_ == et.senderAddress()) => Some(m -> et)
+      case _                                                                            => None
     }
 
   private def loadInvokeScriptResult(resource: DBResource, txId: ByteStr): Option[InvokeScriptResult] =
@@ -61,7 +77,7 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterator[(Height, Transaction, Boolean)] =
+  ): Iterator[(TxMeta, Transaction)] =
     transactionsFromDiff(maybeDiff, subject, sender, types, fromId) ++
       transactionsFromDB(
         db,
@@ -77,9 +93,9 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterator[(Height, Transaction, Boolean)] =
+  ): Iterator[(TxMeta, Transaction)] =
     db.get(Keys.addressId(subject))
-      .fold(Iterable.empty[(Height, Transaction, Boolean)]) { addressId =>
+      .fold(Iterable.empty[(TxMeta, Transaction)]) { addressId =>
         val (maxHeight, maxTxNum) =
           fromId
             .flatMap(id => db.get(Keys.transactionMetaById(TransactionId(id))))
@@ -104,15 +120,15 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterator[(Height, Transaction, Boolean)] =
+  ): Iterator[(TxMeta, Transaction)] =
     (for {
-      (height, diff)                               <- maybeDiff.toSeq
-      NewTransactionInfo(tx, addresses, succeeded) <- diff.transactions.values.toSeq.reverse
-      if addresses(subject)
-    } yield (height, tx, succeeded))
-      .dropWhile { case (_, tx, _) => fromId.isDefined && !fromId.contains(tx.id()) }
-      .dropWhile { case (_, tx, _) => fromId.contains(tx.id()) }
-      .filter { case (_, tx, _) => types.isEmpty || types.contains(tx.tpe) }
-      .collect { case v @ (_, tx: Authorized, _) if sender.forall(_ == tx.sender.toAddress) => v }
+      (height, diff) <- maybeDiff.toSeq
+      nti            <- diff.transactions.values.toSeq.reverse
+      if nti.affected(subject)
+    } yield (TxMeta(height, nti.applied, nti.spentComplexity), nti.transaction))
+      .dropWhile { case (_, tx) => fromId.isDefined && !fromId.contains(tx.id()) }
+      .dropWhile { case (_, tx) => fromId.contains(tx.id()) }
+      .filter { case (_, tx) => types.isEmpty || types.contains(tx.tpe) }
+      .collect { case v @ (_, tx: Authorized) if sender.forall(_ == tx.sender.toAddress) => v }
       .iterator
 }

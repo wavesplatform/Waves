@@ -4,21 +4,24 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util
 
-import com.google.common.primitives.Longs
+import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressPortfolio
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.database.{AddressId, DBExt, KeyTags, Keys, LevelDBWriter, loadTransactions, openDB, readTransactionHNSeqAndType}
+import com.wavesplatform.database.{AddressId, DBExt, KeyTags, Keys, LevelDBWriter, openDB, readTransaction, readTransactionHNSeqAndType}
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio}
+import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 import scala.jdk.CollectionConverters._
+import scala.util.Try
 
 //noinspection ScalaStyle
 object Explorer extends ScorexLogging {
@@ -218,8 +221,32 @@ object Explorer extends ScorexLogging {
           }
 
         case "TXBH" =>
+          val txs = new ListBuffer[(TxNum, Transaction)]
+
           val h = Height(argument(1, "height").toInt)
-          val txs = db.readOnly(loadTransactions(h, _)).get
+
+          val prefix = ByteBuffer
+            .allocate(6)
+            .put(KeyTags.NthTransactionInfoAtHeight.prefixBytes)
+            .putInt(h)
+            .array()
+
+          val iterator = db.iterator
+
+          try {
+            iterator.seek(prefix)
+            while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) {
+              val entry = iterator.next()
+
+              val k = entry.getKey
+              println(k.toList.map(_.toInt & 0xff))
+
+              for {
+                idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
+                (_, tx) = readTransaction(h)(entry.getValue)
+              } txs.append((TxNum(idx), tx))
+            }
+          } finally iterator.close()
 
           println(txs.length)
           txs.foreach(println)
@@ -255,8 +282,9 @@ object Explorer extends ScorexLogging {
             txCounts(Longs.fromByteArray(e.getKey.slice(2, 10)).toInt) += readTransactionHNSeqAndType(e.getValue)._2.size
           }
           log.info("Sorting result")
-          txCounts.zipWithIndex.sorted.takeRight(100).foreach { case (count, id) =>
-            log.info(s"${db.get(Keys.idToAddress(AddressId(id.toLong)))}: $count")
+          txCounts.zipWithIndex.sorted.takeRight(100).foreach {
+            case (count, id) =>
+              log.info(s"${db.get(Keys.idToAddress(AddressId(id.toLong)))}: $count")
           }
 
 

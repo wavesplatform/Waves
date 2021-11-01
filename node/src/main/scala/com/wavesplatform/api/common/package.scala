@@ -3,7 +3,7 @@ package com.wavesplatform.api
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressTransactions._
 import com.wavesplatform.database.{DBExt, Keys}
-import com.wavesplatform.state.{Diff, Height}
+import com.wavesplatform.state.{Diff, Height, TxMeta}
 import com.wavesplatform.transaction.{CreateAliasTransaction, Transaction, TransactionType}
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
@@ -17,11 +17,12 @@ package object common extends BalanceDistribution with AddressTransactions {
       }
   }
 
-  def loadTransactionMeta(db: DB, maybeDiff: => Option[(Int, Diff)])(m: (Int, Transaction, Boolean)): TransactionMeta =
+  def loadTransactionMeta(db: DB, maybeDiff: => Option[(Int, Diff)])(m: (TxMeta, Transaction)): TransactionMeta =
     TransactionMeta.create(
-      Height(m._1),
+      m._1.height,
       m._2,
-      m._3,
+      m._1.succeeded,
+      m._1.spentComplexity,
       ist =>
         maybeDiff
           .flatMap { case (_, diff) => diff.scriptResults.get(ist.id()) }

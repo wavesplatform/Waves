@@ -1,10 +1,7 @@
 package com.wavesplatform.http
 
-import scala.concurrent.Future
-
 import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity}
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.{NTPTime, TestWallet, TransactionGen}
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
 import com.wavesplatform.api.http.ApiMarshallers._
@@ -19,19 +16,22 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Diff}
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Diff, Height, TxMeta}
 import com.wavesplatform.test._
-import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
 import com.wavesplatform.utils.SystemTime
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{NTPTime, TestWallet, TransactionGen}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.{JsArray, JsObject, Json}
+
+import scala.concurrent.Future
 
 class LeaseRouteSpec
     extends RouteSpec("/leasing")
@@ -255,7 +255,7 @@ class LeaseRouteSpec
         withRoute { (d, r) =>
           d.appendBlock(genesis, setScript)
           d.appendBlock(invoke)
-          val (_, invokeStatus) = d.blockchain.transactionMeta(invoke.id()).get
+          val invokeStatus = d.blockchain.transactionMeta(invoke.id()).get.succeeded
           assert(invokeStatus, "Invoke has failed")
 
           val leaseId = d.blockchain
@@ -370,7 +370,7 @@ class LeaseRouteSpec
 
     val lease       = TxHelpers.lease()
     val leaseCancel = TxHelpers.leaseCancel(lease.id())
-    (blockchain.transactionInfo _).when(lease.id()).returning(Some((1, lease, true)))
+    (blockchain.transactionInfo _).when(lease.id()).returning(Some(TxMeta(Height(1), true, 0L) -> lease))
     (commonApi.leaseInfo _)
       .when(lease.id())
       .returning(

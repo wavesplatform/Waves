@@ -222,7 +222,7 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
     d.appendBlock(genesisTxs: _*)
     d.appendBlock(setNoFix: _*)
     d.appendBlock(checkNoFix: _*)
-    checkNoFix.foreach(tx => d.blockchain.transactionMeta(tx.id.value()).get._2 shouldBe true)
+    checkNoFix.foreach(tx => d.blockchain.transactionSucceeded(tx.id.value()) shouldBe true)
   }
 
   private def assertFix(d: Domain, lastVersion: StdLibVersion): Unit = {
@@ -230,7 +230,7 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
     d.appendBlock(genesisTxs: _*)
     d.appendBlock(setFix: _*)
     d.appendBlock(checkFix: _*)
-    checkFix.foreach(tx => d.blockchain.transactionMeta(tx.id.value()).get._2 shouldBe true)
+    checkFix.foreach(tx => d.blockchain.transactionSucceeded(tx.id.value()) shouldBe true)
 
     d.appendBlock(setNoFix: _*)
     checkNoFix.foreach { tx =>
