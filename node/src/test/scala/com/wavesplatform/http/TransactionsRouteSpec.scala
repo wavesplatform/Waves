@@ -1,7 +1,11 @@
 package com.wavesplatform.http
 
+import scala.concurrent.Future
+import scala.util.Random
+
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.{BlockGen, TestTime, TestValues, TestWallet}
 import com.wavesplatform.account.{AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
@@ -14,36 +18,31 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, _}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.{BlockchainFeatures => BF}
-import com.wavesplatform.history.{Domain, settingsWithFeatures}
+import com.wavesplatform.history.{settingsWithFeatures, Domain}
 import com.wavesplatform.lang.directives.values.StdLibVersion.V5
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONST_STRING, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.LeaseCancel
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult}
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.test._
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, Proofs, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, Proofs, TxHelpers, TxVersion}
-import com.wavesplatform.{BlockGen, TestTime, TestValues, TestWallet}
 import monix.reactive.Observable
-import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
-import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
-
-import scala.concurrent.Future
-import scala.util.Random
+import play.api.libs.json.Json.JsValueWrapper
 
 class TransactionsRouteSpec
     extends RouteSpec("/transactions")
@@ -344,17 +343,81 @@ class TransactionsRouteSpec
         responseAs[JsObject] should matchJson(
           Json.obj(
             "feeAssetId" -> JsNull,
-            "feeAmount"  -> 200500000
+            "feeAmount"  -> 500000
           )
         )
       }
     }
 
     "invoke with verifier" - {
-      "with complexity <= 200" in {
+      "with complexity <= 200" in withDomain(settingsWithFeatures(BF.BlockV5, BF.Ride4DApps, BF.SynchronousCalls)) { d =>
+        val dappAccount = testWallet.generateNewAccount().get
+        val proxy       = testWallet.generateNewAccount().get
+        val sender      = testWallet.generateNewAccount().get
 
+        val invoke = InvokeScriptTransaction
+          .selfSigned(2.toByte, sender, dappAccount.toAddress, None, Seq.empty, 0.009.waves, Asset.Waves, ntpTime.getTimestamp())
+          .explicitGet()
 
+        d.appendBlock(
+          GenesisTransaction.create(dappAccount.toAddress, 20.waves, ntpTime.getTimestamp()).explicitGet(),
+          GenesisTransaction.create(proxy.toAddress, 20.waves, ntpTime.getTimestamp()).explicitGet(),
+          GenesisTransaction.create(sender.toAddress, 20.waves, ntpTime.getTimestamp()).explicitGet()
+        )
+
+        d.appendBlock(
+          SetScriptTransaction
+            .selfSigned(
+              2.toByte,
+              sender,
+              Some(TestCompiler(V5).compileContract("""{-# STDLIB_VERSION 5 #-}
+                                                      |{-# SCRIPT_TYPE ACCOUNT #-}
+                                                      |{-# CONTENT_TYPE DAPP #-}
+                                                      |
+                                                      |@Verifier(tx)
+                                                      |func verify() = {
+                                                      |  true
+                                                      |}
+                                                      |""".stripMargin)),
+              0.01.waves,
+              ntpTime.getTimestamp()
+            )
+            .explicitGet(),
+          SetScriptTransaction
+            .selfSigned(
+              2.toByte,
+              dappAccount,
+              Some(TestCompiler(V5).compileContract(s"""{-# STDLIB_VERSION 5 #-}
+                                                       |{-# CONTENT_TYPE DAPP #-}
+                                                       |{-# SCRIPT_TYPE ACCOUNT #-}
+                                                       |
+                                                       |@Callable(i)
+                                                       |func default() = {
+                                                       |  strict test = ${(1 to 10).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
+                                                       |  [ScriptTransfer(i.caller, 100, unit)]
+                                                       |}
+                                                       |""".stripMargin)),
+              0.01.waves,
+              ntpTime.getTimestamp()
+            )
+            .explicitGet(),
+        )
+
+        d.blockchain.accountScript(sender.toAddress).get.verifierComplexity should be <= 200L
+
+        Post(
+          routePath("/calculateFee"),
+          HttpEntity(ContentTypes.`application/json`, invoke.json().toString())
+        ) ~> mkRoute(d) ~> check {
+          (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 0.005.waves
+        }
+
+        d.appendBlock(invoke)
+
+        val Some((_, _, succeeded)) = d.blockchain.transactionInfo(invoke.id())
+        assert(succeeded, "Transaction should pass")
       }
+
       "with complexity > 200" in withDomain(settingsWithFeatures(BF.BlockV5, BF.Ride4DApps, BF.SynchronousCalls)) { d =>
         val dappAccount = testWallet.generateNewAccount().get
         val proxy       = testWallet.generateNewAccount().get
@@ -402,11 +465,8 @@ class TransactionsRouteSpec
                                                       |
                                                       |@Callable(i)
                                                       |func default() = {
-                                                      |  (
-                                                      |    [
-                                                      |    ScriptTransfer(i.caller, 100, unit)],
-                                                      |    throw("error")
-                                                      |  )
+                                                      |  strict test = ${(1 to 10).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
+                                                      |  [ ScriptTransfer(i.caller, 100, unit)]
                                                       |}
                                                       |""".stripMargin)),
               0.01.waves,
@@ -426,7 +486,8 @@ class TransactionsRouteSpec
 
         d.appendBlock(invoke)
 
-        d.blockchain.transactionInfo(invoke.id()).get._3 shouldBe true
+        val Some((_, _, succeeded)) = d.blockchain.transactionInfo(invoke.id())
+        assert(succeeded, "Transaction should pass")
       }
     }
   }
@@ -1184,7 +1245,8 @@ class TransactionsRouteSpec
         .explicitGet()
 
       Post(routePath("/broadcast?trace=true"), invoke.json()) ~> mkRoute(d) ~> check {
-        val dappTrace = (responseAs[JsObject] \ "trace").as[Seq[JsObject]].head
+        println(Json.prettyPrint(responseAs[JsObject]))
+        val dappTrace = (responseAs[JsObject] \ "trace").as[Seq[JsObject]].find(jsObject => (jsObject \ "type").as[String] == "dApp").get
 
         (dappTrace \ "error").get shouldEqual JsNull
         (dappTrace \ "vars" \\ "name").map(_.as[String]) should contain theSameElementsAs Seq("leaseToAddress", "leaseToAlias", "leaseId")
