@@ -3,15 +3,22 @@ package com.wavesplatform.api.http.eth
 import java.math.BigInteger
 
 import akka.http.scaladsl.server._
-import com.wavesplatform.account.{Address, AddressScheme}
+import cats.data.Validated
+import cats.instances.vector._
+import cats.syntax.either._
+import cats.syntax.traverse._
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidIds}
 import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{ABIConverter, ERC20Address, EthereumTransaction}
 import com.wavesplatform.utils.EthEncoding._
+import com.wavesplatform.utils.{EthEncoding, Time}
 import org.web3j.abi._
 import org.web3j.abi.datatypes.generated.{Uint256, Uint8}
 import org.web3j.crypto._
@@ -21,13 +28,6 @@ import play.api.libs.json._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters._
-import cats.syntax.traverse._
-import cats.syntax.either._
-import cats.instances.vector._
-import cats.data.Validated
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidIds}
-import com.wavesplatform.api.http.assets.AssetsApiRoute
-import com.wavesplatform.utils.{EthEncoding, Time}
 
 class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi, time: Time) extends ApiRoute {
   val route: Route = pathPrefix("eth") {
@@ -63,7 +63,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
 
       (jso \ "method").as[String] match {
         case "eth_chainId" | "net_version" =>
-          resp(id, quantity(AddressScheme.current.chainId.toInt))
+          resp(id, quantity(blockchain.settings.addressSchemeCharacter.toInt))
         case "eth_blockNumber" =>
           resp(id, quantity(blockchain.height))
         case "eth_getTransactionCount" =>
