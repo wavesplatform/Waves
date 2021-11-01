@@ -44,7 +44,7 @@ object ExprScript {
       estimator: ScriptEstimator
   ): Either[String, Long] = {
     val modifiedExpr = if (isFreeCall) BLOCK(LET(ContractCompiler.FreeCallInvocationArg, TRUE), expr) else expr
-    estimator(varNames(version, Expression), functionCosts(version, Expression), modifiedExpr)
+    estimator(varNames(version, Expression), functionCosts(version, Expression, if (isFreeCall) Call else Account), modifiedExpr)
   }
 
   def estimate(
