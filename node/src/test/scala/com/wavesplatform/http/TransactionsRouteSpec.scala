@@ -394,7 +394,11 @@ class TransactionsRouteSpec
                                                        |@Callable(i)
                                                        |func default() = {
                                                        |  strict test = ${(1 to 10).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
-                                                       |  [ScriptTransfer(i.caller, 100, unit)]
+                                                       |  (
+                                                       |    [
+                                                       |    ScriptTransfer(i.caller, 100, unit)],
+                                                       |    throw("error")
+                                                       |  )
                                                        |}
                                                        |""".stripMargin)),
               0.01.waves,
@@ -415,7 +419,7 @@ class TransactionsRouteSpec
         d.appendBlock(invoke)
 
         val Some((_, _, succeeded)) = d.blockchain.transactionInfo(invoke.id())
-        assert(succeeded, "Transaction should pass")
+        assert(!succeeded, "Transaction should be failed")
       }
 
       "with complexity > 200" in withDomain(settingsWithFeatures(BF.BlockV5, BF.Ride4DApps, BF.SynchronousCalls)) { d =>
@@ -466,7 +470,11 @@ class TransactionsRouteSpec
                                                       |@Callable(i)
                                                       |func default() = {
                                                       |  strict test = ${(1 to 10).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
-                                                      |  [ ScriptTransfer(i.caller, 100, unit)]
+                                                      |  (
+                                                      |    [
+                                                      |    ScriptTransfer(i.caller, 100, unit)],
+                                                      |    throw("error")
+                                                      |  )
                                                       |}
                                                       |""".stripMargin)),
               0.01.waves,
@@ -487,7 +495,7 @@ class TransactionsRouteSpec
         d.appendBlock(invoke)
 
         val Some((_, _, succeeded)) = d.blockchain.transactionInfo(invoke.id())
-        assert(succeeded, "Transaction should pass")
+        assert(!succeeded, "Transaction should be failed")
       }
     }
   }
