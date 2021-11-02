@@ -217,4 +217,16 @@ def buildPackages: Command = Command("buildPackages")(_ => Network.networkParser
   state
 }
 
-commands ++= Seq(checkPR, buildPackages)
+def xclean: Command = Command.command("xclean") { state =>
+  import scala.sys.process._
+  val command =
+    if (sys.props("os.name").contains("Windows"))
+      s"powershell Get-ChildItem -path '${state.setting(baseDirectory)}' -Include 'target' -Recurse -force | Remove-Item -force -Recurse"
+    else
+      s"find '${state.setting(baseDirectory)}' -type d -name target | xargs rm -rf {} \\;"
+  
+  command.!(ProcessLogger(_ => ())) // state.log
+  state
+}
+
+commands ++= Seq(checkPR, buildPackages, xclean)
