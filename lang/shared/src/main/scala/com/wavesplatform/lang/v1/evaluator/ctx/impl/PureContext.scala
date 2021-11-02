@@ -35,6 +35,7 @@ object PureContext {
   private val global: BaseGlobal = com.wavesplatform.lang.Global
 
   implicit def intToLong(num: Int): Long = num.toLong
+  private def trimLongToInt(x: Long): Int = Math.toIntExact(Math.max(Math.min(x, Int.MaxValue), Int.MinValue))
 
   private val defaultThrowMessage = "Explicit script termination"
 
@@ -502,7 +503,7 @@ object PureContext {
     case xs                   => notImplemented[Id, EVALUATED]("toString(u: Int)", xs)
   }
 
-  lazy val takeBytes: BaseFunction[NoContext] =
+  def takeBytes(trimLong: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "take",
       Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 6L),
@@ -511,11 +512,11 @@ object PureContext {
       ("xs", BYTESTR),
       ("number", LONG)
     ) {
-      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.take(number.toInt))
+      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.take(if (trimLong) trimLongToInt(number) else number.toInt))
       case xs                                             => notImplemented[Id, EVALUATED]("take(xs: ByteVector, number: Int)", xs)
     }
 
-  lazy val dropBytes: BaseFunction[NoContext] =
+  def dropBytes(trimLong: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "drop",
       Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 6L),
@@ -524,9 +525,44 @@ object PureContext {
       ("xs", BYTESTR),
       ("number", LONG)
     ) {
-      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.drop(number.toInt))
+      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.drop(if (trimLong) trimLongToInt(number) else number.toInt))
       case xs                                             => notImplemented[Id, EVALUATED]("drop(xs: ByteVector, number: Int)", xs)
     }
+
+  private val dropBytesBeforeV6 = dropBytes(trimLong = false)
+  private val dropBytesAfterV6  = dropBytes(trimLong = true)
+  private val takeBytesBeforeV6 = takeBytes(trimLong = false)
+  private val takeBytesAfterV6  = takeBytes(trimLong = true)
+
+  private def dropRightBytesExpr(trimLong: Boolean) =
+    FUNCTION_CALL(
+      if (trimLong) takeBytesAfterV6 else takeBytesBeforeV6,
+      List(
+        REF("@xs"),
+        FUNCTION_CALL(
+          subLong,
+          List(
+            FUNCTION_CALL(sizeBytes, List(REF("@xs"))),
+            REF("@number")
+          )
+        )
+      )
+    )
+
+  private def takeRightBytesExpr(trimLong: Boolean) =
+    FUNCTION_CALL(
+      if (trimLong) dropBytesAfterV6 else dropBytesBeforeV6,
+      List(
+        REF("@xs"),
+        FUNCTION_CALL(
+          subLong,
+          List(
+            FUNCTION_CALL(sizeBytes, List(REF("@xs"))),
+            REF("@number")
+          )
+        )
+      )
+    )
 
   lazy val dropRightBytes: BaseFunction[NoContext] =
     UserFunction(
@@ -537,19 +573,7 @@ object PureContext {
       ("@xs", BYTESTR),
       ("@number", LONG)
     ) {
-      FUNCTION_CALL(
-        takeBytes,
-        List(
-          REF("@xs"),
-          FUNCTION_CALL(
-            subLong,
-            List(
-              FUNCTION_CALL(sizeBytes, List(REF("@xs"))),
-              REF("@number")
-            )
-          )
-        )
-      )
+      dropRightBytesExpr(trimLong = false)
     }
 
   lazy val takeRightBytes: BaseFunction[NoContext] =
@@ -561,22 +585,40 @@ object PureContext {
       ("@xs", BYTESTR),
       ("@number", LONG)
     ) {
-      FUNCTION_CALL(
-        dropBytes,
-        List(
-          REF("@xs"),
-          FUNCTION_CALL(
-            subLong,
-            List(
-              FUNCTION_CALL(sizeBytes, List(REF("@xs"))),
-              REF("@number")
-            )
-          )
-        )
+      takeRightBytesExpr(trimLong = false)
+    }
+
+  lazy val dropRightBytesV6: BaseFunction[NoContext] =
+    UserFunction(
+      "dropRight",
+      "dropRightBytes",
+      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 6L),
+      BYTESTR,
+      ("@xs", BYTESTR),
+      ("@number", LONG)
+    ) {
+      IF(
+        FUNCTION_CALL(ge, List(CONST_LONG(0), REF("@number"))),
+        REF("@xs"),
+        dropRightBytesExpr(trimLong = true)
       )
     }
 
-  private def trimLongToInt(x: Long): Int = Math.toIntExact(Math.max(Math.min(x, Int.MaxValue), Int.MinValue))
+  lazy val takeRightBytesV6: BaseFunction[NoContext] =
+    UserFunction(
+      "takeRight",
+      "takeRightBytes",
+      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 6L),
+      BYTESTR,
+      ("@xs", BYTESTR),
+      ("@number", LONG)
+    ) {
+      IF(
+        FUNCTION_CALL(ge, List(CONST_LONG(0), REF("@number"))),
+        CONST_BYTESTR(ByteStr.empty).explicitGet(),
+        takeRightBytesExpr(trimLong = true)
+      )
+    }
 
   lazy val takeString: BaseFunction[NoContext] =
     NativeFunction(
@@ -698,7 +740,22 @@ object PureContext {
       )
     }
 
-  lazy val takeRightStringFixed: BaseFunction[NoContext] =
+  private val takeRightStringFixedExpr =
+    FUNCTION_CALL(
+    dropStringFixed,
+    List(
+      REF("@xs"),
+      FUNCTION_CALL(
+        subLong,
+        List(
+          FUNCTION_CALL(sizeStringFixed, List(REF("@xs"))),
+          REF("@number")
+        )
+      )
+    )
+  )
+
+  private val takeRightStringFixed: BaseFunction[NoContext] =
     UserFunction(
       "takeRight",
       Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L, V5 -> 20L),
@@ -706,18 +763,21 @@ object PureContext {
       ("@xs", STRING),
       ("@number", LONG)
     ) {
-      FUNCTION_CALL(
-        dropStringFixed,
-        List(
-          REF("@xs"),
-          FUNCTION_CALL(
-            subLong,
-            List(
-              FUNCTION_CALL(sizeStringFixed, List(REF("@xs"))),
-              REF("@number")
-            )
-          )
-        )
+      takeRightStringFixedExpr
+    }
+
+  private val takeRightStringV6: BaseFunction[NoContext] =
+    UserFunction(
+      "takeRight",
+      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L, V5 -> 20L),
+      STRING,
+      ("@xs", STRING),
+      ("@number", LONG)
+    ) {
+      IF(
+        FUNCTION_CALL(ge, List(CONST_LONG(0), REF("@number"))),
+        CONST_STRING("").explicitGet(),
+        takeRightStringFixedExpr
       )
     }
 
@@ -744,7 +804,21 @@ object PureContext {
       )
     }
 
-  lazy val dropRightStringFixed: BaseFunction[NoContext] =
+  private val dropRightStringFixedExpr = FUNCTION_CALL(
+    takeStringFixed,
+    List(
+      REF("@xs"),
+      FUNCTION_CALL(
+        subLong,
+        List(
+          FUNCTION_CALL(sizeStringFixed, List(REF("@xs"))),
+          REF("@number")
+        )
+      )
+    )
+  )
+
+  private val dropRightStringFixed: BaseFunction[NoContext] =
     UserFunction(
       "dropRight",
       Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L, V5 -> 20L),
@@ -752,18 +826,21 @@ object PureContext {
       ("@xs", STRING),
       ("@number", LONG)
     ) {
-      FUNCTION_CALL(
-        takeStringFixed,
-        List(
-          REF("@xs"),
-          FUNCTION_CALL(
-            subLong,
-            List(
-              FUNCTION_CALL(sizeStringFixed, List(REF("@xs"))),
-              REF("@number")
-            )
-          )
-        )
+      dropRightStringFixedExpr
+    }
+
+  private val dropRightStringV6: BaseFunction[NoContext] =
+    UserFunction(
+      "dropRight",
+      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L, V5 -> 20L),
+      STRING,
+      ("@xs", STRING),
+      ("@number", LONG)
+    ) {
+      IF(
+        FUNCTION_CALL(ge, List(CONST_LONG(0), REF("@number"))),
+        REF("@xs"),
+        dropRightStringFixedExpr
       )
     }
 
@@ -1562,7 +1639,7 @@ object PureContext {
                       m.flatMap(result) {
                         case (Right(value), complexity) => evaluateUserFunction(function, List(value, element), complexity)
                         case (error, complexity)        => Coeval((error, complexity).pure[F])
-                      }
+                    }
                   )
             case xs =>
               val err = notImplemented[F, EVALUATED](s"fold_$limit(list: List[A], accumulator: B, function: String)", xs)
@@ -1572,8 +1649,7 @@ object PureContext {
     }
 
   val folds: Array[(Int, BaseFunction[NoContext])] =
-    Array((20, 3), (50, 7), (100, 9), (200, 20), (500, 56), (1000, 115))
-      .zipWithIndex
+    Array((20, 3), (50, 7), (100, 9), (200, 20), (500, 56), (1000, 115)).zipWithIndex
       .map { case ((limit, complexity), index) => (limit, fold(index, limit, complexity)) }
 
   val sizeTuple: BaseFunction[NoContext] = {
@@ -1642,10 +1718,6 @@ object PureContext {
       toBytesBoolean,
       toBytesLong,
       toBytesString,
-      takeBytes,
-      dropBytes,
-      takeRightBytes,
-      dropRightBytes,
       toStringBoolean,
       toStringLong,
       isDefined,
@@ -1654,8 +1726,17 @@ object PureContext {
       throwNoMessage
     ) ++ operators
 
+  private val takeDropBytesUserOld =
+    Array(
+      takeRightBytes,
+      dropRightBytes,
+      takeBytesBeforeV6,
+      dropBytesBeforeV6
+    )
+
   private val v1V2V3CommonFunctionsFixed =
     commonFunctions ++
+      takeDropBytesUserOld ++
       Array(
         extract,
         fraction(fixLimitCheck = false),
@@ -1668,6 +1749,7 @@ object PureContext {
 
   private val v1V2V3CommonFunctionsUnfixed =
     commonFunctions ++
+      takeDropBytesUserOld ++
       Array(
         extract,
         fraction(fixLimitCheck = false),
@@ -1681,7 +1763,7 @@ object PureContext {
   private def v1V2V3CommonFunctions(fixUnicodeFunctions: Boolean) =
     if (fixUnicodeFunctions) v1V2V3CommonFunctionsFixed else v1V2V3CommonFunctionsUnfixed
 
-  private val fromV3V4Functions =
+  private val fromV3Functions =
     Array(
       value,
       valueOrErrorMessage,
@@ -1717,16 +1799,16 @@ object PureContext {
 
   private def v3Functions(fixUnicodeFunctions: Boolean) =
     v1V2V3CommonFunctions(fixUnicodeFunctions) ++
-      fromV3V4Functions ++
+      fromV3Functions ++
       v3V4Functions ++
       Array(
         toUtf8String(reduceLimit = false),
         listConstructor(checkSize = false)
       ) ++ (if (fixUnicodeFunctions) v3FunctionFixed else v3FunctionsUnfixed)
 
-  private val v4V5Functions =
+  private val fromV4Functions =
     commonFunctions ++
-      fromV3V4Functions ++
+      fromV3Functions ++
       Array(
         contains,
         valueOrElse,
@@ -1745,7 +1827,8 @@ object PureContext {
       ) ++ (MinTupleSize to MaxTupleSize).map(i => createTupleN(i))
 
   private val v4FunctionsUnfixed =
-    v4V5Functions ++
+    fromV4Functions ++
+      takeDropBytesUserOld ++
       v3V4Functions ++
       Array(
         indexOf,
@@ -1762,7 +1845,8 @@ object PureContext {
       )
 
   private val v4FunctionsFixed =
-    v4V5Functions ++
+    fromV4Functions ++
+      takeDropBytesUserOld ++
       v3V4Functions ++
       Array(
         indexOfFixed,
@@ -1782,7 +1866,7 @@ object PureContext {
     if (fixUnicodeFunctions) v4FunctionsFixed else v4FunctionsUnfixed
 
   private val fromV5Functions =
-    v4V5Functions ++
+    fromV4Functions ++
       Array(
         indexOfFixed,
         indexOfNFixed,
@@ -1791,9 +1875,7 @@ object PureContext {
         splitStrFixed,
         sizeStringFixed,
         takeStringFixed,
-        dropRightStringFixed,
         dropStringFixed,
-        takeRightStringFixed,
         intToBigInt,
         bigIntToInt,
         bigIntToString,
@@ -1823,10 +1905,26 @@ object PureContext {
       )
 
   private val v5Functions =
-    fromV5Functions :+ fractionIntRounds(UNION(fromV5RoundTypes))
+    fromV5Functions ++ takeDropBytesUserOld ++ Array(dropRightStringFixed, takeRightStringFixed, fractionIntRounds(UNION(fromV5RoundTypes)))
 
   private val v6Functions =
-    fromV5Functions ++ folds.map(_._2) ++ Array(sizeTuple, makeString1C, makeString2C, splitStr1C, splitStr4C, sqrtInt, sqrtBigInt, fractionIntRoundsNative)
+    fromV5Functions ++ folds.map(_._2) ++
+      Array(
+        sizeTuple,
+        makeString1C,
+        makeString2C,
+        splitStr1C,
+        splitStr4C,
+        sqrtInt,
+        sqrtBigInt,
+        fractionIntRoundsNative,
+        dropRightBytesV6,
+        dropRightStringV6,
+        takeRightBytesV6,
+        takeRightStringV6,
+        takeBytes(trimLong = true),
+        dropBytes(trimLong = true)
+      )
 
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =
     CTX[NoContext](

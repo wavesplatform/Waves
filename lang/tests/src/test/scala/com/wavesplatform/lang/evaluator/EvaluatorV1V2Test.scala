@@ -450,7 +450,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   property("drop(ByteStr, Long) works as the native one") {
     forAll(genBytesAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(PureContext.dropBytes.header, List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(Native(FunctionIds.DROP_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
         val actual = evalPure[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.drop(number))
     }
@@ -465,11 +465,11 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     }
   }
 
-  ignore("dropRightBytes(ByteStr, Long) works as the native one") {
+  property("dropRightBytes(ByteStr, Long) works as the native one") {
     forAll(genBytesAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(PureContext.dropRightBytes.header, List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-        val actual = evalPure[EVALUATED](pureEvalContext, expr)
+        val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr)
         actual shouldBe evaluated(xs.dropRight(number))
     }
   }

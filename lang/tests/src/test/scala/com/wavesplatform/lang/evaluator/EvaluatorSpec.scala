@@ -15,10 +15,16 @@ import org.scalatest.Inside
 import org.scalatest.exceptions.TestFailedException
 
 abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
+  private val lastVersion: StdLibVersion = DirectiveDictionary[StdLibVersion].all.last
+
   def eval(code: String)(implicit startVersion: StdLibVersion = V1, checkNext: Boolean = true): Either[String, EVALUATED] = {
+    eval(code, startVersion, if (checkNext) lastVersion else startVersion)
+  }
+
+  def eval(code: String, startVersion: StdLibVersion, endVersion: StdLibVersion): Either[String, EVALUATED] = {
     val parsedExpr = Parser.parseExpr(code).get.value
     val results = DirectiveDictionary[StdLibVersion].all
-      .filter(v => if (checkNext) v.id >= startVersion.id else v.id == startVersion.id)
+      .filter(v => v.id >= startVersion.id && v.id <= endVersion.id)
       .map(version => (version, eval(parsedExpr, version)))
       .toList
       .sortBy(_._1)

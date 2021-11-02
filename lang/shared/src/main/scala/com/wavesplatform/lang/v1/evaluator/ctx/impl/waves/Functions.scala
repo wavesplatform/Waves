@@ -7,6 +7,7 @@ import cats.{Id, Monad}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -15,7 +16,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{scriptTransf
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.{addressOrAliasType, addressType, commonDataEntryType, optionAddress, _}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, notImplemented, unit}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
-import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction, InternalCall}
+import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction, FunctionIds, InternalCall}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
@@ -198,7 +199,7 @@ object Functions {
                       CONST_BYTESTR(ByteStr.fromBytes(EnvironmentFunctions.AddressVersion, env.chainId)).explicitGet(),
                       // publicKeyHash
                       FUNCTION_CALL(
-                        PureContext.takeBytes,
+                        Native(FunctionIds.TAKE_BYTES),
                         List(
                           secureHashExpr(REF("@publicKey"), version),
                           CONST_LONG(EnvironmentFunctions.HashLength)
@@ -213,7 +214,7 @@ object Functions {
                   List(
                     REF("@afpk_withoutChecksum"),
                     FUNCTION_CALL(
-                      PureContext.takeBytes,
+                      Native(FunctionIds.TAKE_BYTES),
                       List(
                         secureHashExpr(REF("@afpk_withoutChecksum"), version),
                         CONST_LONG(EnvironmentFunctions.ChecksumLength)
@@ -268,7 +269,7 @@ object Functions {
       FUNCTION_CALL(PureContext.takeRightBytes, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
       // generated checksum
       FUNCTION_CALL(
-        PureContext.takeBytes,
+        Native(FunctionIds.TAKE_BYTES),
         List(
           secureHashExpr(
             FUNCTION_CALL(PureContext.dropRightBytes, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
@@ -302,7 +303,7 @@ object Functions {
                 FUNCTION_CALL(
                   PureContext.eq,
                   List(
-                    FUNCTION_CALL(PureContext.takeBytes, List(REF("@afs_addrBytes"), CONST_LONG(1))),
+                    FUNCTION_CALL(Native(FunctionIds.TAKE_BYTES), List(REF("@afs_addrBytes"), CONST_LONG(1))),
                     CONST_BYTESTR(ByteStr.fromBytes(EnvironmentFunctions.AddressVersion)).explicitGet()
                   )
                 ),
@@ -312,9 +313,9 @@ object Functions {
                     PureContext.eq,
                     List(
                       FUNCTION_CALL(
-                        PureContext.takeBytes,
+                        Native(FunctionIds.TAKE_BYTES),
                         List(
-                          FUNCTION_CALL(PureContext.dropBytes, List(REF("@afs_addrBytes"), CONST_LONG(1))),
+                          FUNCTION_CALL(Native(FunctionIds.DROP_BYTES), List(REF("@afs_addrBytes"), CONST_LONG(1))),
                           CONST_LONG(1)
                         )
                       ),
