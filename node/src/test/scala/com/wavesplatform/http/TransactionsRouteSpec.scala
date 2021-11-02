@@ -418,7 +418,7 @@ class TransactionsRouteSpec
 
         d.appendBlock(invoke)
 
-        val Some((_, _, succeeded)) = d.blockchain.transactionInfo(invoke.id())
+        val Some((_, _, succeeded)) = (d.blockchain.transactionInfo(invoke.id()): @unchecked)
         assert(!succeeded, "Transaction should be failed")
       }
 
@@ -494,7 +494,7 @@ class TransactionsRouteSpec
 
         d.appendBlock(invoke)
 
-        val Some((_, _, succeeded)) = d.blockchain.transactionInfo(invoke.id())
+        val Some((_, _, succeeded)) = (d.blockchain.transactionInfo(invoke.id()): @unchecked)
         assert(!succeeded, "Transaction should be failed")
       }
     }
