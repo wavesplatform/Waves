@@ -110,7 +110,7 @@ object CommonValidation {
     case _: PaymentTransaction => Right(tx)
     case _ =>
       val id = tx.id()
-      Either.cond(!blockchain.containsTransaction(tx), tx, AlreadyInTheState(id, blockchain.transactionInfo(id).get._1))
+      Either.cond(!blockchain.containsTransaction(tx), tx, AlreadyInTheState(id, blockchain.transactionMeta(id).get.height))
   }
 
   def disallowFromAnotherNetwork[T <: Transaction](tx: T, currentChainId: Byte): Either[ValidationError, T] =

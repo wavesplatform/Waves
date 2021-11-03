@@ -246,7 +246,7 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
 
       val checkNoFixTxs = checkNoFix1 ::: checkNoFixDApp1
       d.appendBlock(checkNoFixTxs: _*)
-      checkNoFixTxs.foreach(tx => d.blockchain.transactionMeta(tx.id.value()).get._2 shouldBe true)
+      checkNoFixTxs.foreach(tx => d.blockchain.transactionSucceeded(tx.id.value()) shouldBe true)
 
       d.appendBlock()
       d.blockchain.height shouldBe activationHeight
@@ -254,7 +254,7 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
       val checkFixTxs = checkFix ::: checkFixDApp
       d.appendBlock(setFix ::: setFixDApp: _*)
       d.appendBlock(checkFixTxs: _*)
-      checkFixTxs.foreach(tx => d.blockchain.transactionMeta(tx.id.value()).get._2 shouldBe true)
+      checkFixTxs.foreach(tx => d.blockchain.transactionSucceeded(tx.id.value()) shouldBe true)
       checkNoFix().foreach { tx =>
         (the[RuntimeException] thrownBy d.appendBlock(tx)).getMessage should include("TransactionNotAllowedByScript")
       }

@@ -3,10 +3,9 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.google.protobuf.ByteString
-import com.wavesplatform.{RequestGen, TestTime, TestValues}
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.common.CommonAssetsApi.AssetInfo
+import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request}
@@ -14,19 +13,20 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
-import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, Height}
+import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, Height, TxMeta}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{RequestGen, TestTime, TestValues}
 import monix.reactive.Observable
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.{JsObject, Json, JsValue, Writes}
+import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 
 class AssetsRouteSpec
     extends RouteSpec("/assets")
@@ -45,7 +45,7 @@ class AssetsRouteSpec
 
   (wallet.privateKeyAccount _).when(senderPrivateKey.toAddress).onCall((_: Address) => Right(senderPrivateKey)).anyNumberOfTimes()
 
-  private val assetsApi: CommonAssetsApi = stub[CommonAssetsApi]
+  private val assetsApi: CommonAssetsApi     = stub[CommonAssetsApi]
   private val accountsApi: CommonAccountsApi = stub[CommonAccountsApi]
 
   private val MaxDistributionDepth = 1
@@ -65,14 +65,25 @@ class AssetsRouteSpec
       (blockchain.balance _).when(TxHelpers.defaultAddress, *).returning(100)
       (accountsApi.portfolio _).when(TxHelpers.defaultAddress).returning(Observable(IssuedAsset(ByteStr.decodeBase58("xxx").get) -> 999L))
       (assetsApi.fullInfo _).when(*).returning {
-        val desc = AssetDescription(ByteStr.empty, TxHelpers.defaultSigner.publicKey, ByteString.EMPTY, ByteString.EMPTY, 0, false, BigInt(123), Height(123), None, 0L, nft = false)
+        val desc = AssetDescription(
+          ByteStr.empty,
+          TxHelpers.defaultSigner.publicKey,
+          ByteString.EMPTY,
+          ByteString.EMPTY,
+          0,
+          false,
+          BigInt(123),
+          Height(123),
+          None,
+          0L,
+          nft = false
+        )
         Some(AssetInfo(desc, None, None))
       }
 
       route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "id")("aaa", "bbb") {
         status shouldBe StatusCodes.OK
-        responseAs[JsValue] should matchJson(
-          """
+        responseAs[JsValue] should matchJson("""
             |{
             |  "address" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
             |  "balances" : [ {
@@ -108,7 +119,7 @@ class AssetsRouteSpec
                                                |}""".stripMargin)
       }
 
-      withClue("over limit")(route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "id")(Seq.fill(101)("aaa"):_*) {
+      withClue("over limit")(route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "id")(Seq.fill(101)("aaa"): _*) {
         status shouldBe StatusCodes.BadRequest
         responseAs[JsValue] should matchJson("""{
                                                |  "error" : 10,
@@ -204,7 +215,7 @@ class AssetsRouteSpec
 
   routePath(s"/details/{id} - smart asset") in forAll(smartIssueAndDetailsGen) {
     case (smartAssetTx, smartAssetDesc) =>
-      (blockchain.transactionInfo _).when(smartAssetTx.id()).onCall((_: ByteStr) => Some((1, smartAssetTx, true)))
+      (blockchain.transactionInfo _).when(smartAssetTx.id()).onCall((_: ByteStr) => Some(TxMeta(Height(1), true, 0L) -> smartAssetTx))
       (blockchain.assetDescription _).when(IssuedAsset(smartAssetTx.id())).onCall((_: IssuedAsset) => Some(smartAssetDesc))
 
       Get(routePath(s"/details/${smartAssetTx.id().toString}")) ~> route ~> check {
@@ -269,7 +280,7 @@ class AssetsRouteSpec
 
   routePath(s"/details/{id} - non-smart asset") in forAll(sillyIssueAndDetailsGen) {
     case (sillyAssetTx, sillyAssetDesc) =>
-      (blockchain.transactionInfo _).when(sillyAssetTx.id()).onCall((_: ByteStr) => Some((1, sillyAssetTx, true)))
+      (blockchain.transactionInfo _).when(sillyAssetTx.id()).onCall((_: ByteStr) => Some(TxMeta(Height(1), true, 0L) -> sillyAssetTx))
       (blockchain.assetDescription _).when(IssuedAsset(sillyAssetTx.id())).onCall((_: IssuedAsset) => Some(sillyAssetDesc))
       Get(routePath(s"/details/${sillyAssetTx.id().toString}")) ~> route ~> check {
         val response = responseAs[JsObject]

@@ -21,7 +21,7 @@ package object utils {
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
   ): Seq[(Height, Transaction)] =
-    AddressTransactions.allAddressTransactions(db, diff, address, None, types, fromId).map { case (h, tx, _) => h -> tx }.toSeq
+    AddressTransactions.allAddressTransactions(db, diff, address, None, types, fromId).map { case (tm, tx) => tm.height -> tx }.toSeq
 
   object TestLevelDB {
     def withFunctionalitySettings(
