@@ -14,7 +14,7 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
+import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -33,7 +33,6 @@ import com.wavesplatform.lang.{Common, EvalF, ExecutionError, Global}
 import com.wavesplatform.test._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.EitherValues
-
 
 class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
@@ -80,7 +79,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     eval[T](context.asInstanceOf[EvaluationContext[Environment, Id]], expr)
 
   private def evalWithLogging(context: EvaluationContext[Environment, Id], expr: EXPR): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
-    val evaluatorV1Result = defaultEvaluator.applyWithLogging[EVALUATED](context, expr)
+    val evaluatorV1Result                      = defaultEvaluator.applyWithLogging[EVALUATED](context, expr)
     val (evaluatorV2Log, _, evaluatorV2Result) = EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion])
 
     evaluatorV2Result.bimap((_, evaluatorV2Log), (_, evaluatorV2Log)) shouldBe evaluatorV1Result
@@ -470,7 +469,15 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(PureContext.dropRightBytesV6.header, List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
         val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr)
-        actual shouldBe evaluated(xs.dropRight(number))
+        val limit  = CONST_BYTESTR.DataTxSize.value
+        actual shouldBe (
+          if (number < 0)
+            Left(s"Unexpected negative number = $number passed to dropRight()")
+          else if (number > limit)
+            Left(s"Number = $number passed to dropRight() exceeds ByteVector limit = $limit")
+          else
+            evaluated(xs.dropRight(number))
+        )
     }
   }
 
@@ -479,7 +486,15 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(PureContext.takeRightBytesV6.header, List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
         val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr)
-        actual shouldBe evaluated(xs.takeRight(number))
+        val limit  = CONST_BYTESTR.DataTxSize.value
+        actual shouldBe (
+          if (number < 0)
+            Left(s"Unexpected negative number = $number passed to takeRight()")
+          else if (number > limit)
+            Left(s"Number = $number passed to takeRight() exceeds ByteVector limit = $limit")
+          else
+            evaluated(xs.takeRight(number))
+        )
     }
   }
 
@@ -1224,7 +1239,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
         version =>
           Rounding.fromV5.foreach { rounding =>
             evalPure(pureContext(version).evaluationContext, REF(rounding.`type`.name.toUpperCase)) shouldBe Right(rounding.value)
-          }
+        }
       )
   }
 
@@ -1239,7 +1254,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
               r shouldBe Right(rounding.value)
             else
               r should produce(s"A definition of '$ref' not found")
-          }
+        }
       )
   }
 }
