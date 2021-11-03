@@ -503,7 +503,7 @@ object PureContext {
     case xs                   => notImplemented[Id, EVALUATED]("toString(u: Int)", xs)
   }
 
-  def takeBytes(checkLimits: Boolean): BaseFunction[NoContext] =
+  private def takeBytes(checkLimits: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "take",
       Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 6L),
@@ -527,7 +527,7 @@ object PureContext {
         notImplemented[Id, EVALUATED]("take(xs: ByteVector, number: Int)", xs)
     }
 
-  def dropBytes(checkLimits: Boolean): BaseFunction[NoContext] =
+  private def dropBytes(checkLimits: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "drop",
       Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 6L),
@@ -556,7 +556,7 @@ object PureContext {
   private val takeBytesBeforeV6 = takeBytes(checkLimits = false)
   private val takeBytesFromV6  = takeBytes(checkLimits = true)
 
-  lazy val dropRightBytesBeforeV6: BaseFunction[NoContext] =
+  private val dropRightBytesBeforeV6: BaseFunction[NoContext] =
     UserFunction(
       "dropRight",
       "dropRightBytes",
@@ -580,7 +580,7 @@ object PureContext {
       )
     }
 
-  lazy val takeRightBytesBeforeV6: BaseFunction[NoContext] =
+  private val takeRightBytesBeforeV6: BaseFunction[NoContext] =
     UserFunction(
       "takeRight",
       "takeRightBytes",
@@ -604,7 +604,7 @@ object PureContext {
       )
     }
 
-  val takeRightBytesV6: BaseFunction[NoContext] =
+  private val takeRightBytesFromV6: BaseFunction[NoContext] =
     NativeFunction(
       "takeRight",
       6,
@@ -625,7 +625,7 @@ object PureContext {
         notImplemented[Id, EVALUATED]("takeRight(xs: ByteVector, number: Int)", xs)
     }
 
-  val dropRightBytesV6: BaseFunction[NoContext] =
+  private val dropRightBytesFromV6: BaseFunction[NoContext] =
     NativeFunction(
       "dropRight",
       6,
@@ -646,7 +646,7 @@ object PureContext {
         notImplemented[Id, EVALUATED]("dropRight(xs: ByteVector, number: Int)", xs)
     }
 
-  lazy val takeString: BaseFunction[NoContext] =
+  private val takeStringBeforeV6: BaseFunction[NoContext] =
     NativeFunction(
       "take",
       Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 20L),
@@ -659,7 +659,7 @@ object PureContext {
       case xs                                            => notImplemented[Id, EVALUATED]("take(xs: String, number: Int)", xs)
     }
 
-  def takeStringFixed(checkLimits: Boolean): BaseFunction[NoContext] =
+  private def takeStringFixed(checkLimits: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "take",
       Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 20L, V5 -> 20L),
@@ -729,7 +729,7 @@ object PureContext {
       case xs                                      => notImplemented[Id, EVALUATED](s"list1: List[T] ${LIST_CONCAT_OP.func} list2: List[T]", xs)
     }
 
-  lazy val dropString: BaseFunction[NoContext] =
+  private val dropStringBeforeV6: BaseFunction[NoContext] =
     NativeFunction(
       "drop",
       Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 20L),
@@ -742,7 +742,7 @@ object PureContext {
       case xs                                            => notImplemented[Id, EVALUATED]("drop(xs: String, number: Int)", xs)
     }
 
-  def dropStringFixed(checkLimits: Boolean): BaseFunction[NoContext] =
+  private def dropStringFixed(checkLimits: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "drop",
       Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 20L, V5 -> 20L),
@@ -773,7 +773,7 @@ object PureContext {
   private val dropStringFixedBeforeV6 = dropStringFixed(checkLimits = false)
   private val dropStringFixedFromV6   = dropStringFixed(checkLimits = true)
 
-  lazy val takeRightString: BaseFunction[NoContext] =
+  private val takeRightStringBeforeV6: BaseFunction[NoContext] =
     UserFunction(
       "takeRight",
       Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L),
@@ -782,7 +782,7 @@ object PureContext {
       ("@number", LONG)
     ) {
       FUNCTION_CALL(
-        dropString,
+        dropStringBeforeV6,
         List(
           REF("@xs"),
           FUNCTION_CALL(
@@ -842,7 +842,7 @@ object PureContext {
         notImplemented[Id, EVALUATED]("takeRight(xs: String, number: Int)", xs)
     }
 
-  lazy val dropRightString: BaseFunction[NoContext] =
+  private val dropRightStringBeforeV6: BaseFunction[NoContext] =
     UserFunction(
       "dropRight",
       Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L),
@@ -851,7 +851,7 @@ object PureContext {
       ("@number", LONG)
     ) {
       FUNCTION_CALL(
-        takeString,
+        takeStringBeforeV6,
         List(
           REF("@xs"),
           FUNCTION_CALL(
@@ -1804,10 +1804,10 @@ object PureContext {
 
   private val takeDropStringUnfixedBeforeV6 =
     Array(
-      takeString,
-      dropString,
-      dropRightString,
-      takeRightString
+      takeStringBeforeV6,
+      dropStringBeforeV6,
+      dropRightStringBeforeV6,
+      takeRightStringBeforeV6
     )
 
   private val takeDropStringFixedBeforeV6 =
@@ -1990,8 +1990,8 @@ object PureContext {
         fractionIntRoundsNative,
         takeBytesFromV6,
         dropBytesFromV6,
-        dropRightBytesV6,
-        takeRightBytesV6,
+        dropRightBytesFromV6,
+        takeRightBytesFromV6,
         dropStringFixedFromV6,
         takeStringFixedFromV6,
         dropRightStringFromV6,

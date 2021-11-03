@@ -7,7 +7,7 @@ import cats.{Id, Monad}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -254,11 +254,11 @@ object Functions {
     FUNCTION_CALL(
       PureContext.eq,
       List(
-        FUNCTION_CALL(PureContext.takeString, List(str, CONST_LONG(prefix.length))),
+        FUNCTION_CALL(Native(FunctionIds.TAKE_STRING), List(str, CONST_LONG(prefix.length))),
         CONST_STRING(prefix).explicitGet()
       )
     ),
-    FUNCTION_CALL(PureContext.dropString, List(str, CONST_LONG(prefix.length))),
+    FUNCTION_CALL(Native(FunctionIds.DROP_STRING), List(str, CONST_LONG(prefix.length))),
     str
   )
 
@@ -266,13 +266,19 @@ object Functions {
     PureContext.eq,
     List(
       // actual checksum
-      FUNCTION_CALL(PureContext.takeRightBytesBeforeV6, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
+      FUNCTION_CALL(
+        if (version >= V6) Native(FunctionIds.TAKE_RIGHT_BYTES) else User("takeRightBytes"),
+        List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))
+      ),
       // generated checksum
       FUNCTION_CALL(
         Native(FunctionIds.TAKE_BYTES),
         List(
           secureHashExpr(
-            FUNCTION_CALL(PureContext.dropRightBytesBeforeV6, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
+            FUNCTION_CALL(
+              if (version >= V6) Native(FunctionIds.DROP_RIGHT_BYTES) else User("dropRightBytes"),
+              List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))
+            ),
             version
           ),
           CONST_LONG(EnvironmentFunctions.ChecksumLength)

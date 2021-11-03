@@ -14,7 +14,7 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -467,7 +467,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   property("dropRightBytes(ByteStr, Long) works as the native one") {
     forAll(genBytesAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(PureContext.dropRightBytesV6.header, List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(Native(FunctionIds.DROP_RIGHT_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
         val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr)
         val limit  = CONST_BYTESTR.DataTxSize.value
         actual shouldBe (
@@ -484,7 +484,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   property("takeRightBytes(ByteStr, Long) works as the native one") {
     forAll(genBytesAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(PureContext.takeRightBytesV6.header, List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(Native(FunctionIds.TAKE_RIGHT_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
         val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr)
         val limit  = CONST_BYTESTR.DataTxSize.value
         actual shouldBe (
@@ -524,7 +524,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   property("dropRight(String, Long) works as the native one") {
     forAll(genStringAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(PureContext.dropRightString.header, List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(User("dropRight"), List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
         val actual = evalPure[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.dropRight(number))
     }
@@ -533,7 +533,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   property("takeRight(String, Long) works as the native one") {
     forAll(genStringAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(PureContext.takeRightString.header, List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(User("takeRight"), List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
         val actual = evalPure[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.takeRight(number))
     }
