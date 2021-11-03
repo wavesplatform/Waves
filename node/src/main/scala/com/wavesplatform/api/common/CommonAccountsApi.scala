@@ -145,7 +145,7 @@ object CommonAccountsApi extends ScorexLogging {
               LeaseInfo.Status.Active
             )
           )
-        case inv @ TransactionMeta.Invoke(invokeHeight, originTransaction, true, Some(scriptResult)) =>
+        case inv @ TransactionMeta.Invoke(invokeHeight, originTransaction, true, _, Some(scriptResult)) =>
           def extractLeases(sender: Address, result: InvokeScriptResult): Seq[LeaseInfo] =
             result.leases.collect {
               case lease if leaseIsActive(lease.id) =>

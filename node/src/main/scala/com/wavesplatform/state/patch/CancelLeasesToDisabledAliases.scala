@@ -6,30 +6,42 @@ import com.wavesplatform.account.{Address, AddressScheme, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.state.reader.LeaseDetails
 import play.api.libs.json.{Json, Reads}
 
-case object CancelLeasesToDisabledAliases extends PatchDataLoader with DiffPatchFactory {
-  private case class CancelDetails(id: String, amount: Long, senderPublicKey: String, recipientAddress: String, recipientAlias: String, height: Int)
-  private implicit val reads: Reads[CancelDetails] = Json.reads
-  private lazy val isMainnet                       = AddressScheme.current.chainId == 'W'
+case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatures.SynchronousCalls, Set('W')) {
+  private[this] case class CancelDetails(
+      id: String,
+      amount: Long,
+      senderPublicKey: String,
+      recipientAddress: String,
+      recipientAlias: String,
+      height: Int
+  )
 
-  override def isDefinedAt(blockchain: Blockchain): Boolean =
-    isMainnet && blockchain.featureActivationHeight(BlockchainFeatures.SynchronousCalls.id).contains(blockchain.height)
+  private[this] lazy val mainnetPatchData = {
+    require(AddressScheme.current.chainId == 'W')
+    implicit val cancelDetailsReads: Reads[CancelDetails] = Json.reads
 
-  lazy val patchData: Map[ByteStr, (LeaseDetails, Address)] = if (isMainnet) {
-    readPatchData[Seq[CancelDetails]]().map { cd =>
-      ByteStr(Base58.decode(cd.id)) -> (LeaseDetails(
-        PublicKey(Base58.decode(cd.senderPublicKey)),
-        Alias.fromString(cd.recipientAlias).explicitGet(),
-        cd.amount,
+    readPatchData[Seq[CancelDetails]]().map { cancelDetails =>
+      val leaseId          = ByteStr(Base58.decode(cancelDetails.id))
+      val sender           = PublicKey(Base58.decode(cancelDetails.senderPublicKey))
+      val recipientAlias   = Alias.fromString(cancelDetails.recipientAlias).explicitGet()
+      val recipientAddress = Address.fromString(cancelDetails.recipientAddress).explicitGet()
+      leaseId -> (LeaseDetails(
+        sender,
+        recipientAlias,
+        cancelDetails.amount,
         LeaseDetails.Status.Expired(0),
-        ByteStr(Base58.decode(cd.id)),
-        cd.height
-      ) -> Address.fromString(cd.recipientAddress).explicitGet())
+        leaseId,
+        cancelDetails.height
+      ) -> recipientAddress)
     }.toMap
-  } else Map.empty
+  }
+
+  def patchData: Map[ByteStr, (LeaseDetails, Address)] =
+    if (AddressScheme.current.chainId == 'W'.toByte) mainnetPatchData else Map.empty
 
   override def apply(blockchain: Blockchain): Diff =
     patchData
@@ -44,5 +56,5 @@ case object CancelLeasesToDisabledAliases extends PatchDataLoader with DiffPatch
                 Map(recipientAddress  -> Portfolio(lease = LeaseBalance(-ld.amount, 0)))
           )
       }
-      .reduceLeft(_ |+| _)
+      .foldLeft(Diff.empty)(_ |+| _)
 }

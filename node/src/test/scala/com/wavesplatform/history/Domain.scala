@@ -131,7 +131,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
         Set.empty,
         from
       )
-      .map { case (h, tx, _) => h -> tx }
+      .map { case (m, tx) => m.height -> tx }
       .toSeq
 
   def portfolio(address: Address): Seq[(IssuedAsset, Long)] = Domain.portfolio(address, db, blockchainUpdater)
@@ -238,12 +238,11 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
     def loadBlockInfoAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(
         height: Int
-    ): Option[(BlockMeta, Seq[(Transaction, Boolean)])] =
+    ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
       loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
         meta -> blockchainUpdater
           .liquidTransactions(meta.id)
-          .orElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
-          .fold(Seq.empty[(Transaction, Boolean)])(identity)
+          .getOrElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
       }
 
     CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
@@ -270,6 +269,9 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       appendBlock(TxHelpers.setScript(account, script))
     }
   }
+
+  val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(blockchainUpdater.bestLiquidDiff.map(Height(blockchainUpdater.height) -> _),
+    db, blockchain, utxPool, wallet, _ => Future.successful(TracedResult(Right(true))), h => blocksApi.blockAtHeight(h))
 }
 
 object Domain {

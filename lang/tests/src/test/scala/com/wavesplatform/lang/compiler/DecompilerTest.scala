@@ -1023,6 +1023,24 @@ class DecompilerTest extends PropSpec {
     res shouldEq scriptWithoutTypes
   }
 
+  property("BigInt unary minus") {
+    val script =
+      s"""
+         |let a = -toBigInt(1)
+         |true
+       """.stripMargin
+
+    val expected =
+      s"""
+         |let a = -(toBigInt(1))
+         |true
+       """.stripMargin.trim
+
+    val expr = TestCompiler(V5).compileExpression(script).expr.asInstanceOf[EXPR]
+    val result = Decompiler(expr, getDecompilerContext(V5, Expression))
+    result shouldBe expected
+  }
+
   property("native fold") {
     val script =
       s"""

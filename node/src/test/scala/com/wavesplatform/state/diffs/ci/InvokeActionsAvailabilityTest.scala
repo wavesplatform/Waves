@@ -134,7 +134,7 @@ class InvokeActionsAvailabilityTest
       val startCallingDAppBalance = d.blockchain.balance(callingDApp)
 
       d.appendBlock(invoke)
-      d.blockchain.transactionInfo(invoke.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
 
       d.blockchain.accountData(callingDApp, "key").get.value shouldBe "value"
       d.blockchain.balance(proxyDApp) shouldBe startProxyDAppBalance + transferAmount

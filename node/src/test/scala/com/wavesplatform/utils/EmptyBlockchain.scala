@@ -44,9 +44,9 @@ trait EmptyBlockchain extends Blockchain {
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] = None
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] = None
+  override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] = None
 
-  override def transactionMeta(id: ByteStr): Option[(Int, Boolean)] = None
+  override def transactionMeta(id: ByteStr): Option[TxMeta] = None
 
   override def containsTransaction(tx: Transaction): Boolean = false
 
@@ -60,7 +60,7 @@ trait EmptyBlockchain extends Blockchain {
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = Option.empty
-  override def balanceSnapshots(address: Address, from: Int, to: Option[ByteStr]): Seq[BalanceSnapshot]         = Seq.empty
+  override def balanceSnapshots(address: Address, from: Int, to: Option[ByteStr]): Seq[BalanceSnapshot]    = Seq.empty
 
   override def accountScript(address: Address): Option[AccountScriptInfo] = None
 

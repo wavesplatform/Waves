@@ -219,10 +219,10 @@ object Explorer extends ScorexLogging {
 
         case "TXBH" =>
           val h = Height(argument(1, "height").toInt)
-          val txs = db.readOnly(loadTransactions(h, _)).get
+          val txs = db.readOnly(loadTransactions(h, _))
 
           println(txs.length)
-          txs.foreach(println)
+          txs.foreach { case (_, tx) => println(tx) }
 
         case "AP" =>
           val address = Address.fromString(argument(1, "address")).explicitGet()
@@ -255,8 +255,9 @@ object Explorer extends ScorexLogging {
             txCounts(Longs.fromByteArray(e.getKey.slice(2, 10)).toInt) += readTransactionHNSeqAndType(e.getValue)._2.size
           }
           log.info("Sorting result")
-          txCounts.zipWithIndex.sorted.takeRight(100).foreach { case (count, id) =>
-            log.info(s"${db.get(Keys.idToAddress(AddressId(id.toLong)))}: $count")
+          txCounts.zipWithIndex.sorted.takeRight(100).foreach {
+            case (count, id) =>
+              log.info(s"${db.get(Keys.idToAddress(AddressId(id.toLong)))}: $count")
           }
 
 
