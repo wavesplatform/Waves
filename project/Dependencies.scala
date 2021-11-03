@@ -8,11 +8,11 @@ object Dependencies {
   private[this] val protoSchemasLib =
     "com.wavesplatform" % "protobuf-schemas" % "1.3.2" classifier "protobuf-src" intransitive ()
 
-  def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.16"
+  def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.17"
 
-  private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.6"
+  private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.7"
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.2.3"
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.3.1"
 
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.13.0"
 
