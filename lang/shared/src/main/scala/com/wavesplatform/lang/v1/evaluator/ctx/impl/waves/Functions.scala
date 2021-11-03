@@ -266,13 +266,13 @@ object Functions {
     PureContext.eq,
     List(
       // actual checksum
-      FUNCTION_CALL(PureContext.takeRightBytes, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
+      FUNCTION_CALL(PureContext.takeRightBytesBeforeV6, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
       // generated checksum
       FUNCTION_CALL(
         Native(FunctionIds.TAKE_BYTES),
         List(
           secureHashExpr(
-            FUNCTION_CALL(PureContext.dropRightBytes, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
+            FUNCTION_CALL(PureContext.dropRightBytesBeforeV6, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
             version
           ),
           CONST_LONG(EnvironmentFunctions.ChecksumLength)

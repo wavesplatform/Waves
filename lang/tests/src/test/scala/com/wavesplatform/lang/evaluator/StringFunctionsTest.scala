@@ -1,69 +1,89 @@
 package com.wavesplatform.lang.evaluator
 
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V1, V3, V4, V5, V6}
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONST_STRING}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.test._
 
 class StringFunctionsTest extends EvaluatorSpec {
-  private val min = Long.MinValue
-  private val max = Long.MaxValue
+  private val min   = Long.MinValue
+  private val max   = Long.MaxValue
+  private val limit = 32767
+
+  private val maxString = "a" * limit
 
   property("take") {
     eval(""" take("abc", 0) """) shouldBe CONST_STRING("")
     eval(""" take("abc", 2) """) shouldBe CONST_STRING("ab")
-
     eval(""" take("abc", 100) """) shouldBe CONST_STRING("abc")
-    eval(s""" take("abc", $max) """) shouldBe CONST_STRING("abc")
 
-    eval(""" take("abc", -100) """) shouldBe CONST_STRING("")
-    eval(s""" take("abc", $min) """) shouldBe CONST_STRING("")
+    eval(s""" take("abc", $max) """, V1, V5) shouldBe CONST_STRING("abc")
+    eval(s""" take("abc", $max) """)(V6) shouldBe Left(s"Number = $max passed to take() exceeds String limit = $limit")
+    eval(s""" take("abc", ${limit + 1}) """)(V6) shouldBe Left(s"Number = ${limit + 1} passed to take() exceeds String limit = $limit")
 
-    eval(s"""take("${"a" * Short.MaxValue}", ${Short.MaxValue}) """) shouldBe CONST_STRING("a" * Short.MaxValue)
+    eval(""" take("abc", -100) """, V1, V5) shouldBe CONST_STRING("")
+    eval(""" take("abc", -100) """)(V6) shouldBe Left("Unexpected negative number = -100 passed to take()")
+    eval(s""" take("abc", $min) """, V1, V5) shouldBe CONST_STRING("")
+    eval(s""" take("abc", $min) """)(V6) shouldBe Left(s"Unexpected negative number = $min passed to take()")
+
+    eval(s"""take("$maxString", $limit) """) shouldBe CONST_STRING(maxString)
   }
 
   property("takeRight") {
     eval(""" takeRight("abc", 0) """) shouldBe CONST_STRING("")
     eval(""" takeRight("abc", 2) """) shouldBe CONST_STRING("bc")
-
     eval(""" takeRight("abc", 100) """) shouldBe CONST_STRING("abc")
-    eval(s""" takeRight("abc", $max) """) shouldBe CONST_STRING("abc")
 
-    eval(""" takeRight("abc", -100) """) shouldBe CONST_STRING("")
+    eval(s""" takeRight("abc", $max) """, V1, V5) shouldBe CONST_STRING("abc")
+    eval(s""" takeRight("abc", $max) """)(V6) shouldBe Left(s"Number = $max passed to takeRight() exceeds String limit = $limit")
+    eval(s""" takeRight("abc", ${limit + 1}) """)(V6) shouldBe Left(s"Number = ${limit + 1} passed to takeRight() exceeds String limit = $limit")
+
+    eval(""" takeRight("abc", -100) """, V1, V5) shouldBe CONST_STRING("")
+    eval(""" takeRight("abc", -100) """)(V6) shouldBe Left("Unexpected negative number = -100 passed to takeRight()")
     eval(s""" takeRight("abc", $min) """, V1, V5) should produce("long overflow")
-    eval(s""" takeRight("abc", $min) """)(V6) shouldBe CONST_STRING("")
+    eval(s""" takeRight("abc", $min) """)(V6) shouldBe Left(s"Unexpected negative number = $min passed to takeRight()")
 
-    eval(s"""takeRight("${"a" * Short.MaxValue}", ${Short.MaxValue}) """) shouldBe CONST_STRING("a" * Short.MaxValue)
+    eval(s"""takeRight("$maxString", $limit) """) shouldBe CONST_STRING(maxString)
   }
 
   property("drop") {
     eval(""" drop("abc", 0) """) shouldBe CONST_STRING("abc")
     eval(""" drop("abc", 2) """) shouldBe CONST_STRING("c")
     eval(""" drop("abc", 100) """) shouldBe CONST_STRING("")
-    eval(s""" drop("abc", $max) """) shouldBe CONST_STRING("")
-    eval(""" drop("abc", -100) """) shouldBe CONST_STRING("abc")
-    eval(s""" drop("abc", $min) """) shouldBe CONST_STRING("abc")
-    eval(s"""drop("${"a" * Short.MaxValue}", ${Short.MaxValue}) """) shouldBe CONST_STRING("")
+
+    eval(s""" drop("abc", $max) """, V1, V5) shouldBe CONST_STRING("")
+    eval(s""" drop("abc", $max) """)(V6) shouldBe Left(s"Number = $max passed to drop() exceeds String limit = $limit")
+    eval(s""" drop("abc", ${limit + 1}) """)(V6) shouldBe Left(s"Number = ${limit + 1} passed to drop() exceeds String limit = $limit")
+
+    eval(""" drop("abc", -100) """, V1, V5) shouldBe CONST_STRING("abc")
+    eval(""" drop("abc", -100) """)(V6) shouldBe Left("Unexpected negative number = -100 passed to drop()")
+    eval(s""" drop("abc", $min) """, V1, V5) shouldBe CONST_STRING("abc")
+    eval(s""" drop("abc", $min) """)(V6) shouldBe Left(s"Unexpected negative number = $min passed to drop()")
+
+    eval(s"""drop("$maxString", $limit) """) shouldBe CONST_STRING("")
   }
 
   property("dropRight") {
     eval(""" dropRight("abc", 0) """) shouldBe CONST_STRING("abc")
     eval(""" dropRight("abc", 2) """) shouldBe CONST_STRING("a")
-
     eval(""" dropRight("abc", 100) """) shouldBe CONST_STRING("")
-    eval(s""" dropRight("abc", $max) """) shouldBe CONST_STRING("")
 
-    eval(""" dropRight("abc", -100) """) shouldBe CONST_STRING("abc")
+    eval(s""" dropRight("abc", $max) """, V1, V5) shouldBe CONST_STRING("")
+    eval(s""" drop("abc", $max) """)(V6) shouldBe Left(s"Number = $max passed to drop() exceeds String limit = $limit")
+    eval(s""" drop("abc", ${limit + 1}) """)(V6) shouldBe Left(s"Number = ${limit + 1} passed to drop() exceeds String limit = $limit")
+
+    eval(""" dropRight("abc", -100) """, V1, V5) shouldBe CONST_STRING("abc")
+    eval(""" dropRight("abc", -100) """)(V6) shouldBe Left("Unexpected negative number = -100 passed to dropRight()")
     eval(s""" dropRight("abc", $min) """, V1, V5) should produce("long overflow")
-    eval(s""" dropRight("abc", $min) """)(V6) shouldBe CONST_STRING("abc")
+    eval(s""" dropRight("abc", $min) """)(V6) shouldBe Left(s"Unexpected negative number = $min passed to dropRight()")
 
-    eval(s"""dropRight("${"a" * Short.MaxValue}", ${Short.MaxValue}) """) shouldBe CONST_STRING("")
+    eval(s"""dropRight("$maxString", $limit) """) shouldBe CONST_STRING("")
   }
 
   property("size") {
     eval(""" "".size() """) shouldBe Right(CONST_LONG(0))
     eval(""" "abc".size() """) shouldBe Right(CONST_LONG(3))
-    eval(s""" "${"a" * Short.MaxValue}".size() """) shouldBe Right(CONST_LONG(Short.MaxValue))
+    eval(s""" "$maxString".size() """) shouldBe Right(CONST_LONG(limit))
   }
 
   property("indexOf") {
@@ -173,6 +193,6 @@ class StringFunctionsTest extends EvaluatorSpec {
     implicit val v: StdLibVersion = V4
     eval(""" "qwerty".contains("we") """) shouldBe Right(CONST_BOOLEAN(true))
     eval(""" "qwerty".contains("xx") """) shouldBe Right(CONST_BOOLEAN(false))
-    eval(s""" "${"a" * Short.MaxValue}".contains("${"a" * Short.MaxValue}") """) shouldBe Right(CONST_BOOLEAN(true))
+    eval(s""" "$maxString".contains("$maxString") """) shouldBe Right(CONST_BOOLEAN(true))
   }
 }

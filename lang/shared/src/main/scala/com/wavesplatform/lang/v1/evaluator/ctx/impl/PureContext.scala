@@ -34,7 +34,7 @@ import scala.util.{Success, Try}
 object PureContext {
   private val global: BaseGlobal = com.wavesplatform.lang.Global
 
-  implicit def intToLong(num: Int): Long = num.toLong
+  implicit def intToLong(num: Int): Long  = num.toLong
   private def trimLongToInt(x: Long): Int = Math.toIntExact(Math.max(Math.min(x, Int.MaxValue), Int.MinValue))
 
   private val defaultThrowMessage = "Explicit script termination"
@@ -503,7 +503,7 @@ object PureContext {
     case xs                   => notImplemented[Id, EVALUATED]("toString(u: Int)", xs)
   }
 
-  def takeBytes(trimLong: Boolean): BaseFunction[NoContext] =
+  def takeBytes(checkLimits: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "take",
       Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 6L),
@@ -512,11 +512,22 @@ object PureContext {
       ("xs", BYTESTR),
       ("number", LONG)
     ) {
-      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.take(if (trimLong) trimLongToInt(number) else number.toInt))
-      case xs                                             => notImplemented[Id, EVALUATED]("take(xs: ByteVector, number: Int)", xs)
+      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil =>
+        val limit = CONST_BYTESTR.DataTxSize.value
+        if (checkLimits) {
+          if (number < 0)
+            Left(s"Unexpected negative number = $number passed to take()")
+          else if (number > limit)
+            Left(s"Number = $number passed to take() exceeds ByteVector limit = $limit")
+          else
+            CONST_BYTESTR(xs.take(number.toInt))
+        } else
+          CONST_BYTESTR(xs.take(number.toInt))
+      case xs =>
+        notImplemented[Id, EVALUATED]("take(xs: ByteVector, number: Int)", xs)
     }
 
-  def dropBytes(trimLong: Boolean): BaseFunction[NoContext] =
+  def dropBytes(checkLimits: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "drop",
       Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 6L),
@@ -525,46 +536,27 @@ object PureContext {
       ("xs", BYTESTR),
       ("number", LONG)
     ) {
-      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.drop(if (trimLong) trimLongToInt(number) else number.toInt))
-      case xs                                             => notImplemented[Id, EVALUATED]("drop(xs: ByteVector, number: Int)", xs)
+      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil =>
+        val limit = CONST_BYTESTR.DataTxSize.value
+        if (checkLimits) {
+          if (number < 0)
+            Left(s"Unexpected negative number = $number passed to drop()")
+          else if (number > limit)
+            Left(s"Number = $number passed to drop() exceeds ByteVector limit = $limit")
+          else
+            CONST_BYTESTR(xs.drop(number.toInt))
+        } else
+          CONST_BYTESTR(xs.drop(number.toInt))
+      case xs =>
+        notImplemented[Id, EVALUATED]("drop(xs: ByteVector, number: Int)", xs)
     }
 
-  private val dropBytesBeforeV6 = dropBytes(trimLong = false)
-  private val dropBytesAfterV6  = dropBytes(trimLong = true)
-  private val takeBytesBeforeV6 = takeBytes(trimLong = false)
-  private val takeBytesAfterV6  = takeBytes(trimLong = true)
+  private val dropBytesBeforeV6 = dropBytes(checkLimits = false)
+  private val dropBytesFromV6  = dropBytes(checkLimits = true)
+  private val takeBytesBeforeV6 = takeBytes(checkLimits = false)
+  private val takeBytesFromV6  = takeBytes(checkLimits = true)
 
-  private def dropRightBytesExpr(trimLong: Boolean) =
-    FUNCTION_CALL(
-      if (trimLong) takeBytesAfterV6 else takeBytesBeforeV6,
-      List(
-        REF("@xs"),
-        FUNCTION_CALL(
-          subLong,
-          List(
-            FUNCTION_CALL(sizeBytes, List(REF("@xs"))),
-            REF("@number")
-          )
-        )
-      )
-    )
-
-  private def takeRightBytesExpr(trimLong: Boolean) =
-    FUNCTION_CALL(
-      if (trimLong) dropBytesAfterV6 else dropBytesBeforeV6,
-      List(
-        REF("@xs"),
-        FUNCTION_CALL(
-          subLong,
-          List(
-            FUNCTION_CALL(sizeBytes, List(REF("@xs"))),
-            REF("@number")
-          )
-        )
-      )
-    )
-
-  lazy val dropRightBytes: BaseFunction[NoContext] =
+  lazy val dropRightBytesBeforeV6: BaseFunction[NoContext] =
     UserFunction(
       "dropRight",
       "dropRightBytes",
@@ -573,10 +565,22 @@ object PureContext {
       ("@xs", BYTESTR),
       ("@number", LONG)
     ) {
-      dropRightBytesExpr(trimLong = false)
+      FUNCTION_CALL(
+        takeBytesBeforeV6,
+        List(
+          REF("@xs"),
+          FUNCTION_CALL(
+            subLong,
+            List(
+              FUNCTION_CALL(sizeBytes, List(REF("@xs"))),
+              REF("@number")
+            )
+          )
+        )
+      )
     }
 
-  lazy val takeRightBytes: BaseFunction[NoContext] =
+  lazy val takeRightBytesBeforeV6: BaseFunction[NoContext] =
     UserFunction(
       "takeRight",
       "takeRightBytes",
@@ -585,39 +589,61 @@ object PureContext {
       ("@xs", BYTESTR),
       ("@number", LONG)
     ) {
-      takeRightBytesExpr(trimLong = false)
+      FUNCTION_CALL(
+        dropBytesBeforeV6,
+        List(
+          REF("@xs"),
+          FUNCTION_CALL(
+            subLong,
+            List(
+              FUNCTION_CALL(sizeBytes, List(REF("@xs"))),
+              REF("@number")
+            )
+          )
+        )
+      )
     }
 
-  lazy val dropRightBytesV6: BaseFunction[NoContext] =
-    UserFunction(
+  val takeRightBytesV6: BaseFunction[NoContext] =
+    NativeFunction(
+      "takeRight",
+      6,
+      TAKE_RIGHT_BYTES,
+      BYTESTR,
+      ("xs", BYTESTR),
+      ("number", LONG)
+    ) {
+      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil =>
+        val limit = CONST_BYTESTR.DataTxSize.value
+        if (number < 0)
+          Left(s"Unexpected negative number = $number passed to takeRight()")
+        else if (number > limit)
+          Left(s"Number = $number passed to takeRight() exceeds ByteVector limit = $limit")
+        else
+          CONST_BYTESTR(xs.takeRight(number.toInt))
+      case xs =>
+        notImplemented[Id, EVALUATED]("takeRight(xs: ByteVector, number: Int)", xs)
+    }
+
+  val dropRightBytesV6: BaseFunction[NoContext] =
+    NativeFunction(
       "dropRight",
-      "dropRightBytes",
-      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 6L),
+      6,
+      DROP_RIGHT_BYTES,
       BYTESTR,
-      ("@xs", BYTESTR),
-      ("@number", LONG)
+      ("xs", BYTESTR),
+      ("number", LONG)
     ) {
-      IF(
-        FUNCTION_CALL(ge, List(CONST_LONG(0), REF("@number"))),
-        REF("@xs"),
-        dropRightBytesExpr(trimLong = true)
-      )
-    }
-
-  lazy val takeRightBytesV6: BaseFunction[NoContext] =
-    UserFunction(
-      "takeRight",
-      "takeRightBytes",
-      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 6L),
-      BYTESTR,
-      ("@xs", BYTESTR),
-      ("@number", LONG)
-    ) {
-      IF(
-        FUNCTION_CALL(ge, List(CONST_LONG(0), REF("@number"))),
-        CONST_BYTESTR(ByteStr.empty).explicitGet(),
-        takeRightBytesExpr(trimLong = true)
-      )
+      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil =>
+        val limit = CONST_BYTESTR.DataTxSize.value
+        if (number < 0)
+          Left(s"Unexpected negative number = $number passed to dropRight()")
+        else if (number > limit)
+          Left(s"Number = $number passed to dropRight() exceeds ByteVector limit = $limit")
+        else
+          CONST_BYTESTR(xs.dropRight(number.toInt))
+      case xs =>
+        notImplemented[Id, EVALUATED]("dropRight(xs: ByteVector, number: Int)", xs)
     }
 
   lazy val takeString: BaseFunction[NoContext] =
@@ -633,7 +659,7 @@ object PureContext {
       case xs                                            => notImplemented[Id, EVALUATED]("take(xs: String, number: Int)", xs)
     }
 
-  lazy val takeStringFixed: BaseFunction[NoContext] =
+  def takeStringFixed(checkLimits: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "take",
       Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 20L, V5 -> 20L),
@@ -643,11 +669,26 @@ object PureContext {
       ("number", LONG)
     ) {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil =>
-        val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
-        CONST_STRING(xs.take(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
+        val limit = Terms.DataEntryValueMax
+        if (checkLimits) {
+          if (number < 0)
+            Left(s"Unexpected negative number = $number passed to take()")
+          else if (number > limit)
+            Left(s"Number = $number passed to take() exceeds String limit = $limit")
+          else {
+            val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
+            CONST_STRING(xs.take(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
+          }
+        } else {
+          val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
+          CONST_STRING(xs.take(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
+        }
       case xs =>
         notImplemented[Id, EVALUATED]("take(xs: String, number: Int)", xs)
     }
+
+  private val takeStringFixedBeforeV6 = takeStringFixed(checkLimits = false)
+  private val takeStringFixedFromV6   = takeStringFixed(checkLimits = true)
 
   def listConstructor(checkSize: Boolean): NativeFunction[NoContext] =
     NativeFunction(
@@ -701,7 +742,7 @@ object PureContext {
       case xs                                            => notImplemented[Id, EVALUATED]("drop(xs: String, number: Int)", xs)
     }
 
-  lazy val dropStringFixed: BaseFunction[NoContext] =
+  def dropStringFixed(checkLimits: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "drop",
       Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 20L, V5 -> 20L),
@@ -711,11 +752,26 @@ object PureContext {
       ("number", LONG)
     ) {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil =>
-        val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
-        CONST_STRING(xs.drop(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
+        val limit = Terms.DataEntryValueMax
+        if (checkLimits) {
+          if (number < 0)
+            Left(s"Unexpected negative number = $number passed to drop()")
+          else if (number > limit)
+            Left(s"Number = $number passed to drop() exceeds String limit = $limit")
+          else {
+            val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
+            CONST_STRING(xs.drop(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
+          }
+        } else {
+          val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
+          CONST_STRING(xs.drop(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
+        }
       case xs =>
         notImplemented[Id, EVALUATED]("drop(xs: String, number: Int)", xs)
     }
+
+  private val dropStringFixedBeforeV6 = dropStringFixed(checkLimits = false)
+  private val dropStringFixedFromV6   = dropStringFixed(checkLimits = true)
 
   lazy val takeRightString: BaseFunction[NoContext] =
     UserFunction(
@@ -740,45 +796,50 @@ object PureContext {
       )
     }
 
-  private val takeRightStringFixedExpr =
-    FUNCTION_CALL(
-    dropStringFixed,
-    List(
-      REF("@xs"),
+  private val takeRightStringFixedBeforeV6: BaseFunction[NoContext] =
+    UserFunction(
+      "takeRight",
+      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L, V5 -> 20L),
+      STRING,
+      ("@xs", STRING),
+      ("@number", LONG)
+    ) {
       FUNCTION_CALL(
-        subLong,
+        dropStringFixedBeforeV6,
         List(
-          FUNCTION_CALL(sizeStringFixed, List(REF("@xs"))),
-          REF("@number")
+          REF("@xs"),
+          FUNCTION_CALL(
+            subLong,
+            List(
+              FUNCTION_CALL(sizeStringFixed, List(REF("@xs"))),
+              REF("@number")
+            )
+          )
         )
       )
-    )
-  )
-
-  private val takeRightStringFixed: BaseFunction[NoContext] =
-    UserFunction(
-      "takeRight",
-      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L, V5 -> 20L),
-      STRING,
-      ("@xs", STRING),
-      ("@number", LONG)
-    ) {
-      takeRightStringFixedExpr
     }
 
-  private val takeRightStringV6: BaseFunction[NoContext] =
-    UserFunction(
+  private val takeRightStringFromV6: BaseFunction[NoContext] =
+    NativeFunction(
       "takeRight",
-      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L, V5 -> 20L),
+      20L,
+      TAKE_RIGHT_STRING,
       STRING,
-      ("@xs", STRING),
-      ("@number", LONG)
+      ("xs", STRING),
+      ("number", LONG)
     ) {
-      IF(
-        FUNCTION_CALL(ge, List(CONST_LONG(0), REF("@number"))),
-        CONST_STRING("").explicitGet(),
-        takeRightStringFixedExpr
-      )
+      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil =>
+        val limit = Terms.DataEntryValueMax
+          if (number < 0)
+            Left(s"Unexpected negative number = $number passed to takeRight()")
+          else if (number > limit)
+            Left(s"Number = $number passed to takeRight() exceeds String limit = $limit")
+          else {
+            val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
+            CONST_STRING(xs.takeRight(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
+          }
+      case xs =>
+        notImplemented[Id, EVALUATED]("takeRight(xs: String, number: Int)", xs)
     }
 
   lazy val dropRightString: BaseFunction[NoContext] =
@@ -804,45 +865,52 @@ object PureContext {
       )
     }
 
-  private val dropRightStringFixedExpr = FUNCTION_CALL(
-    takeStringFixed,
-    List(
-      REF("@xs"),
+  private val dropRightStringFixedBeforeV6: BaseFunction[NoContext] =
+    UserFunction(
+      "dropRight",
+      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L, V5 -> 20L),
+      STRING,
+      ("@xs", STRING),
+      ("@number", LONG)
+    ) {
       FUNCTION_CALL(
-        subLong,
+        takeStringFixedBeforeV6,
         List(
-          FUNCTION_CALL(sizeStringFixed, List(REF("@xs"))),
-          REF("@number")
+          REF("@xs"),
+          FUNCTION_CALL(
+            subLong,
+            List(
+              FUNCTION_CALL(sizeStringFixed, List(REF("@xs"))),
+              REF("@number")
+            )
+          )
         )
       )
-    )
-  )
-
-  private val dropRightStringFixed: BaseFunction[NoContext] =
-    UserFunction(
-      "dropRight",
-      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L, V5 -> 20L),
-      STRING,
-      ("@xs", STRING),
-      ("@number", LONG)
-    ) {
-      dropRightStringFixedExpr
     }
 
-  private val dropRightStringV6: BaseFunction[NoContext] =
-    UserFunction(
+  private val dropRightStringFromV6: BaseFunction[NoContext] =
+    NativeFunction(
       "dropRight",
-      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L, V5 -> 20L),
+      20L,
+      DROP_RIGHT_STRING,
       STRING,
-      ("@xs", STRING),
-      ("@number", LONG)
+      ("xs", STRING),
+      ("number", LONG)
     ) {
-      IF(
-        FUNCTION_CALL(ge, List(CONST_LONG(0), REF("@number"))),
-        REF("@xs"),
-        dropRightStringFixedExpr
-      )
+      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil =>
+        val limit = Terms.DataEntryValueMax
+        if (number < 0)
+          Left(s"Unexpected negative number = $number passed to dropRight()")
+        else if (number > limit)
+          Left(s"Number = $number passed to dropRight() exceeds String limit = $limit")
+        else {
+          val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
+          CONST_STRING(xs.dropRight(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
+        }
+      case xs =>
+        notImplemented[Id, EVALUATED]("dropRight(xs: String, number: Int)", xs)
     }
+
 
   val UTF8Decoder = UTF_8.newDecoder
 
@@ -1726,38 +1794,48 @@ object PureContext {
       throwNoMessage
     ) ++ operators
 
-  private val takeDropBytesUserOld =
+  private val takeDropBytesBeforeV6 =
     Array(
-      takeRightBytes,
-      dropRightBytes,
       takeBytesBeforeV6,
-      dropBytesBeforeV6
+      dropBytesBeforeV6,
+      takeRightBytesBeforeV6,
+      dropRightBytesBeforeV6
+    )
+
+  private val takeDropStringUnfixedBeforeV6 =
+    Array(
+      takeString,
+      dropString,
+      dropRightString,
+      takeRightString
+    )
+
+  private val takeDropStringFixedBeforeV6 =
+    Array(
+      takeStringFixedBeforeV6,
+      dropStringFixedBeforeV6,
+      dropRightStringFixedBeforeV6,
+      takeRightStringFixedBeforeV6
     )
 
   private val v1V2V3CommonFunctionsFixed =
     commonFunctions ++
-      takeDropBytesUserOld ++
+      takeDropBytesBeforeV6 ++
+      takeDropStringFixedBeforeV6 ++
       Array(
         extract,
         fraction(fixLimitCheck = false),
-        takeStringFixed,
-        dropRightStringFixed,
         sizeStringFixed,
-        dropStringFixed,
-        takeRightStringFixed
       )
 
   private val v1V2V3CommonFunctionsUnfixed =
     commonFunctions ++
-      takeDropBytesUserOld ++
+      takeDropBytesBeforeV6 ++
+      takeDropStringUnfixedBeforeV6 ++
       Array(
         extract,
         fraction(fixLimitCheck = false),
-        takeString,
-        dropRightString,
-        sizeString,
-        dropString,
-        takeRightString
+        sizeString
       )
 
   private def v1V2V3CommonFunctions(fixUnicodeFunctions: Boolean) =
@@ -1828,7 +1906,8 @@ object PureContext {
 
   private val v4FunctionsUnfixed =
     fromV4Functions ++
-      takeDropBytesUserOld ++
+      takeDropBytesBeforeV6 ++
+      takeDropStringUnfixedBeforeV6 ++
       v3V4Functions ++
       Array(
         indexOf,
@@ -1837,16 +1916,13 @@ object PureContext {
         lastIndexOfWithOffset,
         splitStr,
         sizeString,
-        takeString,
-        dropRightString,
-        dropString,
-        takeRightString,
         fraction(fixLimitCheck = false)
       )
 
   private val v4FunctionsFixed =
     fromV4Functions ++
-      takeDropBytesUserOld ++
+      takeDropBytesBeforeV6 ++
+      takeDropStringFixedBeforeV6 ++
       v3V4Functions ++
       Array(
         indexOfFixed,
@@ -1855,10 +1931,6 @@ object PureContext {
         lastIndexOfWithOffsetFixed,
         splitStrFixed,
         sizeStringFixed,
-        takeStringFixed,
-        dropRightStringFixed,
-        dropStringFixed,
-        takeRightStringFixed,
         fraction(fixLimitCheck = false)
       )
 
@@ -1874,8 +1946,6 @@ object PureContext {
         lastIndexOfWithOffsetFixed,
         splitStrFixed,
         sizeStringFixed,
-        takeStringFixed,
-        dropStringFixed,
         intToBigInt,
         bigIntToInt,
         bigIntToString,
@@ -1905,7 +1975,7 @@ object PureContext {
       )
 
   private val v5Functions =
-    fromV5Functions ++ takeDropBytesUserOld ++ Array(dropRightStringFixed, takeRightStringFixed, fractionIntRounds(UNION(fromV5RoundTypes)))
+    fromV5Functions ++ takeDropBytesBeforeV6 ++ takeDropStringFixedBeforeV6 :+ fractionIntRounds(UNION(fromV5RoundTypes))
 
   private val v6Functions =
     fromV5Functions ++ folds.map(_._2) ++
@@ -1918,12 +1988,14 @@ object PureContext {
         sqrtInt,
         sqrtBigInt,
         fractionIntRoundsNative,
+        takeBytesFromV6,
+        dropBytesFromV6,
         dropRightBytesV6,
-        dropRightStringV6,
         takeRightBytesV6,
-        takeRightStringV6,
-        takeBytes(trimLong = true),
-        dropBytes(trimLong = true)
+        dropStringFixedFromV6,
+        takeStringFixedFromV6,
+        dropRightStringFromV6,
+        takeRightStringFromV6
       )
 
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =

@@ -963,7 +963,7 @@ class ExpressionCompilerV1Test extends PropSpec {
     }
   )
 
-  private val dropRightFunctionName: String = dropRightBytes.name
+  private val dropRightFunctionName: String = dropRightBytesBeforeV6.name
 
   treeTypeTest("user function overloading 1")(
     ctx = compilerContext,
@@ -975,7 +975,7 @@ class ExpressionCompilerV1Test extends PropSpec {
     expectedResult = { res: Either[String, (EXPR, TYPE)] =>
       res shouldBe Right(
         (
-          FUNCTION_CALL(dropRightBytes.header, List(CONST_BYTESTR(ByteStr.empty).explicitGet(), CONST_LONG(1))),
+          FUNCTION_CALL(dropRightBytesBeforeV6.header, List(CONST_BYTESTR(ByteStr.empty).explicitGet(), CONST_LONG(1))),
           BYTESTR
         )
       )
