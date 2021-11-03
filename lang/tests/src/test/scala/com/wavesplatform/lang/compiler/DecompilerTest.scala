@@ -20,6 +20,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.test.PropSpec
+import com.wavesplatform.lang.utils.getDecompilerContext
 
 class DecompilerTest extends PropSpec {
 
@@ -1020,5 +1021,23 @@ class DecompilerTest extends PropSpec {
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V5, needCompaction = true).explicitGet()
     val res  = Decompiler(dApp, ctx.decompilerContext)
     res shouldEq scriptWithoutTypes
+  }
+
+  property("BigInt unary minus") {
+    val script =
+      s"""
+         |let a = -toBigInt(1)
+         |true
+       """.stripMargin
+
+    val expected =
+      s"""
+         |let a = -(toBigInt(1))
+         |true
+       """.stripMargin.trim
+
+    val expr = TestCompiler(V5).compileExpression(script).expr.asInstanceOf[EXPR]
+    val result = Decompiler(expr, getDecompilerContext(V5, Expression))
+    result shouldBe expected
   }
 }

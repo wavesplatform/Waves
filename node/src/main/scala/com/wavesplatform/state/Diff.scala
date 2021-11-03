@@ -137,7 +137,7 @@ object Sponsorship {
     }
 }
 
-case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], applied: Boolean)
+case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], applied: Boolean, spentComplexity: Long)
 
 case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: AssetVolumeInfo)
 
@@ -197,7 +197,7 @@ object Diff {
         .flatMap(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes))
 
       val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts
-      d.copy(transactions = VectorMap(tx.id() -> NewTransactionInfo(tx, affectedAddresses, applied = true)))
+      d.copy(transactions = VectorMap(tx.id() -> NewTransactionInfo(tx, affectedAddresses, applied = true, d.scriptsComplexity)))
     }
   }
 }

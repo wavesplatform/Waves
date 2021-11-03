@@ -1136,7 +1136,7 @@ class ExchangeTransactionDiffTest
                 state.balance(exchange.sender.toAddress, asset) shouldBe balance
             }
 
-            state.transactionInfo(exchange.id()).map(r => r._2 -> r._3) shouldBe Some((exchange, false))
+            state.transactionInfo(exchange.id()).map(r => r._2 -> r._1.succeeded) shouldBe Some((exchange, false))
         }
     }
   }

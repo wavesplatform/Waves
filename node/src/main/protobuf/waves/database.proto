@@ -32,6 +32,7 @@ message TransactionMeta {
     int32 num = 2;
     int32 type = 3;
     bool failed = 4;
+    int64 spent_complexity = 5;
 }
 
 message TransactionData {
@@ -40,6 +41,7 @@ message TransactionData {
         SignedTransaction new_transaction = 2;
     }
     bool failed = 3;
+    int64 spent_complexity = 4;
 }
 
 message AccountScriptInfo {

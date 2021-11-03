@@ -8,11 +8,11 @@ object Dependencies {
   private[this] val protoSchemasLib =
     "com.wavesplatform" % "protobuf-schemas" % "1.3.2" classifier "protobuf-src" intransitive ()
 
-  def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.16"
+  def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.17"
 
-  private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.6"
+  private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.7"
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.2.3"
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.3.1"
 
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.13.0"
 
@@ -41,7 +41,10 @@ object Dependencies {
 
   val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.3.13"
 
-  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk15on" % "1.69"
+  // v1.67 introduced unnecessary conversions which slowed down hash computation by a factor of 3-4:
+  // https://github.com/bcgit/bc-java/blob/r1rv67/core/src/main/java/org/bouncycastle/crypto/digests/KeccakDigest.java#L318
+  // Before upping the version, make sure conversions are no longer there.
+  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk15on" % "1.66"
 
   val enforcedVersions = Def.setting(
     Seq(

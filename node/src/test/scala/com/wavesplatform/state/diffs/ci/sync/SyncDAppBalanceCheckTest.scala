@@ -69,7 +69,7 @@ class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with Transaction
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)
-      d.blockchain.transactionInfo(invoke1.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
 
       val invoke2 = invoke()
       d.appendBlock()
