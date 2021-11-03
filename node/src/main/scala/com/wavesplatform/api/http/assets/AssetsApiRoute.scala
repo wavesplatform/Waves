@@ -341,15 +341,15 @@ object AssetsApiRoute {
       for {
         tt <- blockchain
           .transactionInfo(id)
-          .filter { case (_, _, confirmed) => confirmed }
+          .filter { case (tm, _) => tm.succeeded }
           .toRight("Failed to find issue/invokeScript transaction by ID")
-        (h, mtx, _) = tt
-        ts <- (mtx match {
+        (txm, tx) = tt
+        ts <- (tx match {
           case tx: IssueTransaction        => Some(tx.timestamp)
           case tx: InvokeScriptTransaction => Some(tx.timestamp)
           case _                           => None
         }).toRight("No issue/invokeScript transaction found with the given asset ID")
-      } yield (ts, h)
+      } yield (ts, txm.height)
 
     for {
       tsh <- additionalInfo(description.originTransactionId)

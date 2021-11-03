@@ -31,7 +31,7 @@ object CommonAssetsApi {
       for {
         assetInfo <- blockchain.assetDescription(assetId)
         sponsorBalance = if (assetInfo.sponsorship != 0) Some(blockchain.wavesPortfolio(assetInfo.issuer.toAddress).spendableBalance) else None
-      } yield AssetInfo(assetInfo, blockchain.transactionInfo(assetId.id).collect { case (_, it: IssueTransaction, true) => it }, sponsorBalance)
+      } yield AssetInfo(assetInfo, blockchain.transactionInfo(assetId.id).collect { case (tm, it: IssueTransaction) if tm.succeeded => it }, sponsorBalance)
 
     override def wavesDistribution(height: Int, after: Option[Address]): Observable[(Address, Long)] =
       balanceDistribution(
