@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{GenesisSettings, TestFunctionalitySettings, TestSettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils._
-import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, TxNum}
+import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, TxMeta, TxNum}
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -327,9 +327,9 @@ class LevelDBWriterSpec
         case (tx, s) =>
           val transactionId = tx.id()
           db.put(Keys.transactionMetaById(TransactionId(transactionId)).keyBytes, TransactionMeta(1, 0, tx.tpe.id, !s).toByteArray)
-          db.put(Keys.transactionAt(Height(1), TxNum(0.toShort)).keyBytes, database.writeTransaction((tx, s)))
+          db.put(Keys.transactionAt(Height(1), TxNum(0.toShort)).keyBytes, database.writeTransaction((TxMeta(Height(1), s, 0L), tx)))
 
-          writer.transactionInfo(transactionId) shouldBe Some((1, tx, s))
+          writer.transactionInfo(transactionId) shouldBe Some(TxMeta(Height(1), s, 0L) -> tx)
       }
     }
   }

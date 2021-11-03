@@ -78,7 +78,7 @@ class InvokePaymentsLimitTest extends PropSpec
     withDomain(settingsForRide(version)) { d =>
       d.appendBlock(preparingTxs: _*)
       d.appendBlock(invoke)
-      d.blockchain.transactionInfo(invoke.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
     }
     val (preparingTxs2, invoke2) = scenario(version, count + 1, nested).sample.get
     withDomain(settingsForRide(version)) { d =>
