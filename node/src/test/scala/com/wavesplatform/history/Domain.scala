@@ -46,14 +46,17 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
 
   lazy val utxPool: UtxPoolImpl = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings)
-  lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
+  lazy val wallet: Wallet       = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
     def invokeScriptResult(transactionId: ByteStr): InvokeScriptResult =
-      transactions.transactionById(transactionId).get.asInstanceOf[TransactionMeta.Invoke].invokeScriptResult.get
+      transactions.transactionById(transactionId).get match {
+        case hsc: TransactionMeta.HasStateChanges => hsc.invokeScriptResult.get
+        case _                                    => ???
+      }
 
-    def addressTransactions(address: Address): Seq[Transaction] =
-      transactions.transactionsByAddress(address, None, Set.empty, None).map(_.transaction).toListL.runSyncUnsafe()
+    def addressTransactions(address: Address): Seq[TransactionMeta] =
+      transactions.transactionsByAddress(address, None, Set.empty, None).toListL.runSyncUnsafe()
 
     lazy val transactions: CommonTransactionsApi = CommonTransactionsApi(
       blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
@@ -67,7 +70,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   }
 
   def liquidState: Option[NgState] = {
-    val cls = classOf[BlockchainUpdaterImpl]
+    val cls   = classOf[BlockchainUpdaterImpl]
     val field = cls.getDeclaredField("ngState")
     field.setAccessible(true)
     field.get(blockchain).asInstanceOf[Option[NgState]]
@@ -84,7 +87,9 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def hardStateSnapshot(): SortedMap[String, String] = {
     val builder = SortedMap.newBuilder[String, String]
-    db.iterateOver(Array.emptyByteArray)(e => builder.addOne(EthEncoding.toHexString(e.getKey).drop(2) -> EthEncoding.toHexString(e.getValue).drop(2)))
+    db.iterateOver(Array.emptyByteArray)(
+      e => builder.addOne(EthEncoding.toHexString(e.getKey).drop(2) -> EthEncoding.toHexString(e.getValue).drop(2))
+    )
     builder.result()
   }
 

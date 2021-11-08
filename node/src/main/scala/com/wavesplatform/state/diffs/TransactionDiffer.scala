@@ -176,7 +176,7 @@ object TransactionDiffer {
           case sstx: SetScriptTransaction        => SetScriptTransactionDiff(blockchain)(sstx).traced
           case sstx: SetAssetScriptTransaction   => AssetTransactionsDiff.setAssetScript(blockchain)(sstx).traced
           case stx: SponsorFeeTransaction        => AssetTransactionsDiff.sponsor(blockchain)(stx).traced
-          case et: EthereumTransaction           => EthereumTransactionDiff(blockchain, currentBlockTs)(et)
+          case et: EthereumTransaction           => EthereumTransactionDiff(blockchain, currentBlockTs, limitedExecution)(et)
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }

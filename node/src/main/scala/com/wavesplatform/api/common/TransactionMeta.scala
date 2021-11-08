@@ -36,6 +36,10 @@ object TransactionMeta {
         Default(height, transaction, succeeded, spentComplexity)
     }
 
+  sealed trait HasStateChanges { self: TransactionMeta =>
+    def invokeScriptResult: Option[InvokeScriptResult]
+  }
+
   final case class Default(height: Height, transaction: Transaction, succeeded: Boolean, spentComplexity: Long) extends TransactionMeta
 
   final case class Invoke(
@@ -44,7 +48,7 @@ object TransactionMeta {
       succeeded: Boolean,
       spentComplexity: Long,
       invokeScriptResult: Option[InvokeScriptResult]
-  ) extends TransactionMeta
+  ) extends TransactionMeta with HasStateChanges
 
   final case class Ethereum(
       height: Height,
@@ -53,5 +57,5 @@ object TransactionMeta {
       spentComplexity: Long,
       meta: Option[EthereumTransactionMeta],
       invokeScriptResult: Option[InvokeScriptResult]
-  ) extends TransactionMeta
+  ) extends TransactionMeta with HasStateChanges
 }
