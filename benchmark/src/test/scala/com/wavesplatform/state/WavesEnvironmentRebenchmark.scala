@@ -170,7 +170,7 @@ object WavesEnvironmentRebenchmark {
           if (txCount == 0)
             None
           else
-            db.get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort))).map(_._1.id().arr)
+            db.get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort))).map(_._2.id().arr)
         }
     }
 
@@ -185,7 +185,7 @@ object WavesEnvironmentRebenchmark {
             None
           else
             db.get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort)))
-              .collect { case (dataTx: DataTransaction, true) if dataTx.data.nonEmpty =>
+              .collect { case (meta, dataTx: DataTransaction) if meta.succeeded && dataTx.data.nonEmpty =>
                 (
                   dataTx.data(Random.nextInt(dataTx.data.length)),
                   Recipient.Address(ByteStr(dataTx.sender.toAddress.bytes))
@@ -205,7 +205,7 @@ object WavesEnvironmentRebenchmark {
             None
           else
             db.get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort)))
-              .collect { case (transferTx: TransferTransaction, true) => transferTx.id() }
+              .collect { case (meta, transferTx: TransferTransaction) if meta.succeeded => transferTx.id() }
         }
     }
 
