@@ -2,6 +2,7 @@ package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.api.common.TransactionMeta
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers
@@ -85,6 +86,8 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
 
     d.appendBlock(invoke)
     d.makeStateSolid()
+
+    d.blockchain.accountData(dApp.toAddress, "test") shouldBe Some(StringDataEntry("test", "foo"))
 
     d.commonApi.transactions.transactionById(invoke.id()) match {
       case Some(meta: TransactionMeta.Ethereum) =>
@@ -231,6 +234,9 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
 
     d.appendBlock(invoke)
     d.makeStateSolid()
+
+    d.blockchain.accountData(dApp.toAddress, "test") shouldBe Some(StringDataEntry("test", "foo"))
+    d.blockchain.accountData(nestedDApp.toAddress, "test1") shouldBe Some(StringDataEntry("test1", "bar"))
 
     d.commonApi.transactions.transactionById(invoke.id()) match {
       case Some(meta: TransactionMeta.Ethereum) =>

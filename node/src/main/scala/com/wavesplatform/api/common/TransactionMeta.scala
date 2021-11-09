@@ -2,8 +2,8 @@ package com.wavesplatform.api.common
 
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.state.{Height, InvokeScriptResult}
-import com.wavesplatform.transaction.smart.InvokeTransaction
 import com.wavesplatform.transaction.{EthereumTransaction, Transaction}
+import com.wavesplatform.transaction.smart.InvokeTransaction
 
 sealed trait TransactionMeta {
   def height: Height
@@ -48,7 +48,8 @@ object TransactionMeta {
       succeeded: Boolean,
       spentComplexity: Long,
       invokeScriptResult: Option[InvokeScriptResult]
-  ) extends TransactionMeta with HasStateChanges
+  ) extends TransactionMeta
+      with HasStateChanges
 
   final case class Ethereum(
       height: Height,
@@ -57,5 +58,6 @@ object TransactionMeta {
       spentComplexity: Long,
       meta: Option[EthereumTransactionMeta],
       invokeScriptResult: Option[InvokeScriptResult]
-  ) extends TransactionMeta with HasStateChanges
+  ) extends TransactionMeta
+      with HasStateChanges
 }
