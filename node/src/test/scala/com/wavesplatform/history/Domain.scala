@@ -23,7 +23,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{BlockchainUpdater, _}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.SystemTime
 import com.wavesplatform.utx.UtxPoolImpl
@@ -49,13 +49,24 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   lazy val wallet  = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
+    /**
+      * @return Tuple of (asset, feeInAsset, feeInWaves)
+      */
+    def calculateFee(tx: Transaction): (Asset, TxAmount, TxAmount) =
+      transactions.calculateFee(tx).explicitGet()
+
+    def calculateWavesFee(tx: Transaction): TxAmount = {
+      val (Waves, _, feeInWaves) = calculateFee(tx)
+      feeInWaves
+    }
+
     def invokeScriptResult(transactionId: ByteStr): InvokeScriptResult =
       transactions.transactionById(transactionId).get.asInstanceOf[TransactionMeta.Invoke].invokeScriptResult.get
 
     def addressTransactions(address: Address): Seq[Transaction] =
       transactions.transactionsByAddress(address, None, Set.empty, None).map(_.transaction).toListL.runSyncUnsafe()
 
-    lazy val transactions = CommonTransactionsApi(
+    lazy val transactions: CommonTransactionsApi = CommonTransactionsApi(
       blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
       db,
       blockchain,
@@ -111,6 +122,13 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       .toSeq
 
   def portfolio(address: Address): Seq[(IssuedAsset, Long)] = Domain.portfolio(address, db, blockchainUpdater)
+
+  def appendAndAssertFailed(txs: Transaction*): Block = {
+    val block = createBlock(Block.PlainBlockVersion, txs)
+    appendBlock(block)
+    txs.foreach(tx => require(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx"))
+    lastBlock
+  }
 
   def appendBlock(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
@@ -224,8 +242,15 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
   }
 
-  val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(blockchainUpdater.bestLiquidDiff.map(Height(blockchainUpdater.height) -> _),
-    db, blockchain, utxPool, wallet, _ => Future.successful(TracedResult(Right(true))), h => blocksApi.blockAtHeight(h))
+  val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
+    blockchainUpdater.bestLiquidDiff.map(Height(blockchainUpdater.height) -> _),
+    db,
+    blockchain,
+    utxPool,
+    wallet,
+    _ => Future.successful(TracedResult(Right(true))),
+    h => blocksApi.blockAtHeight(h)
+  )
 }
 
 object Domain {
