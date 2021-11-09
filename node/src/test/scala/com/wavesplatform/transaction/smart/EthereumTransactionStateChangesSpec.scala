@@ -72,7 +72,8 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
       dApp,
       TxHelpers.scriptV5(s"""@Callable(i)
                             |func deposit() = {
-                            |  [StringEntry("test", "foo")]
+                            |  if ((${(1 to 15).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}) || false) then throw("err")
+                            |  else [StringEntry("test", "foo")]
                             |}""".stripMargin)
     )
 
@@ -125,6 +126,7 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
       TxHelpers.scriptV5(s"""@Callable(i)
                             |func deposit() = {
                             |  strict res1 = invoke(Address(base58'${nestedDApp.toAddress}'), "test", nil, [AttachedPayment(unit, 100)])
+                            |  strict res2 = ((${(1 to 15).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}) || true)
                             |  [StringEntry("test", "foo")]
                             |}""".stripMargin)
     )
@@ -212,6 +214,7 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
       TxHelpers.scriptV5(s"""@Callable(i)
                             |func deposit() = {
                             |  strict res1 = invoke(Address(base58'${nestedDApp.toAddress}'), "test", nil, [AttachedPayment(unit, 100)])
+                            |  strict res2 = ((${(1 to 15).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}) || true)
                             |  [StringEntry("test", "foo")]
                             |}""".stripMargin)
     )
@@ -220,7 +223,8 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
       nestedDApp,
       TxHelpers.scriptV5(s"""@Callable(i)
                             |func test() = {
-                            |  [StringEntry("test1", "bar")]
+                            |  if ((${(1 to 15).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}) || false) then throw("err")
+                            |  else [StringEntry("test1", "bar")]
                             |}""".stripMargin)
     )
 
