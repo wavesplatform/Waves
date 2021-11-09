@@ -4,7 +4,6 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.{BlockchainFeatures => BF}
 import com.wavesplatform.history.settingsWithFeatures
-import com.wavesplatform.it.util._
 import com.wavesplatform.lang.directives.values.StdLibVersion.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.{FreeSpec, NumericExt}

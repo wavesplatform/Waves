@@ -56,7 +56,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       transactions.calculateFee(tx).explicitGet()
 
     def calculateWavesFee(tx: Transaction): TxAmount = {
-      val (Waves, _, feeInWaves) = calculateFee(tx)
+      val (Waves, _, feeInWaves) = (calculateFee(tx): @unchecked)
       feeInWaves
     }
 
