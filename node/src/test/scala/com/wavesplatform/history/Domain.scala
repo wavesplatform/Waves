@@ -3,6 +3,7 @@ package com.wavesplatform.history
 import scala.collection.immutable.SortedMap
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.util.control.NonFatal
 
 import cats.syntax.option._
 import com.wavesplatform.{database, Application}
@@ -75,6 +76,13 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     val field = cls.getDeclaredField("ngState")
     field.setAccessible(true)
     field.get(blockchain).asInstanceOf[Option[NgState]]
+  }
+
+  def liquidAndSolidAssert(doCheck: () => Unit): Unit = {
+    require(liquidState.isDefined, "No liquid state is present")
+    try doCheck() catch { case NonFatal(err) => throw new RuntimeException("Liquid check failed", err) }
+    makeStateSolid()
+    try doCheck() catch { case NonFatal(err) => throw new RuntimeException("Solid check failed", err) }
   }
 
   def makeStateSolid(): (Int, SortedMap[String, String]) = {

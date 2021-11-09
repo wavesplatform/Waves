@@ -35,30 +35,31 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
     )
 
     d.appendBlock(invoke)
-    d.makeStateSolid()
 
-    d.commonApi.transactions.transactionById(invoke.id()) match {
-      case Some(meta: TransactionMeta.Ethereum) =>
-        assert(!meta.succeeded, "should fail")
-        Json.toJson(meta.invokeScriptResult) should matchJson("""
-            |{
-            |  "data" : [ ],
-            |  "transfers" : [ ],
-            |  "issues" : [ ],
-            |  "reissues" : [ ],
-            |  "burns" : [ ],
-            |  "sponsorFees" : [ ],
-            |  "leases" : [ ],
-            |  "leaseCancels" : [ ],
-            |  "invokes" : [ ],
-            |  "error" : {
-            |    "code" : 1,
-            |    "text" : "err"
-            |  }
-            |}
-            |""".stripMargin)
+    d.liquidAndSolidAssert { () =>
+      d.commonApi.transactions.transactionById(invoke.id()) match {
+        case Some(meta: TransactionMeta.Ethereum) =>
+          assert(!meta.succeeded, "should fail")
+          Json.toJson(meta.invokeScriptResult) should matchJson("""
+                                                                  |{
+                                                                  |  "data" : [ ],
+                                                                  |  "transfers" : [ ],
+                                                                  |  "issues" : [ ],
+                                                                  |  "reissues" : [ ],
+                                                                  |  "burns" : [ ],
+                                                                  |  "sponsorFees" : [ ],
+                                                                  |  "leases" : [ ],
+                                                                  |  "leaseCancels" : [ ],
+                                                                  |  "invokes" : [ ],
+                                                                  |  "error" : {
+                                                                  |    "code" : 1,
+                                                                  |    "text" : "err"
+                                                                  |  }
+                                                                  |}
+                                                                  |""".stripMargin)
 
-      case _ => ???
+        case _ => ???
+      }
     }
   }
 
@@ -86,30 +87,30 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
     )
 
     d.appendBlock(invoke)
-    d.makeStateSolid()
 
-    d.blockchain.accountData(dApp.toAddress, "test") shouldBe Some(StringDataEntry("test", "foo"))
+    d.liquidAndSolidAssert { () =>
+      d.blockchain.accountData(dApp.toAddress, "test") shouldBe Some(StringDataEntry("test", "foo"))
+      d.commonApi.transactions.transactionById(invoke.id()) match {
+        case Some(meta: TransactionMeta.Ethereum) =>
+          assert(meta.succeeded, "should succeed")
+          Json.toJson(meta.invokeScriptResult) should matchJson("""{
+                                                                  |  "data" : [ {
+                                                                  |    "key" : "test",
+                                                                  |    "type" : "string",
+                                                                  |    "value" : "foo"
+                                                                  |  } ],
+                                                                  |  "transfers" : [ ],
+                                                                  |  "issues" : [ ],
+                                                                  |  "reissues" : [ ],
+                                                                  |  "burns" : [ ],
+                                                                  |  "sponsorFees" : [ ],
+                                                                  |  "leases" : [ ],
+                                                                  |  "leaseCancels" : [ ],
+                                                                  |  "invokes" : [ ]
+                                                                  |}""".stripMargin)
 
-    d.commonApi.transactions.transactionById(invoke.id()) match {
-      case Some(meta: TransactionMeta.Ethereum) =>
-        assert(meta.succeeded, "should succeed")
-        Json.toJson(meta.invokeScriptResult) should matchJson("""{
-            |  "data" : [ {
-            |    "key" : "test",
-            |    "type" : "string",
-            |    "value" : "foo"
-            |  } ],
-            |  "transfers" : [ ],
-            |  "issues" : [ ],
-            |  "reissues" : [ ],
-            |  "burns" : [ ],
-            |  "sponsorFees" : [ ],
-            |  "leases" : [ ],
-            |  "leaseCancels" : [ ],
-            |  "invokes" : [ ]
-            |}""".stripMargin)
-
-      case _ => ???
+        case _ => ???
+      }
     }
   }
 
@@ -149,55 +150,55 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
     )
 
     d.appendBlock(invoke)
-    d.makeStateSolid()
+    d.liquidAndSolidAssert { () =>
+      d.commonApi.transactions.transactionById(invoke.id()) match {
+        case Some(meta: TransactionMeta.Ethereum) =>
+          assert(!meta.succeeded, "should fail")
+          Json.toJson(meta.invokeScriptResult) should matchJson("""
+                                                                  |{
+                                                                  |  "data" : [ ],
+                                                                  |  "transfers" : [ ],
+                                                                  |  "issues" : [ ],
+                                                                  |  "reissues" : [ ],
+                                                                  |  "burns" : [ ],
+                                                                  |  "sponsorFees" : [ ],
+                                                                  |  "leases" : [ ],
+                                                                  |  "leaseCancels" : [ ],
+                                                                  |  "invokes" : [ {
+                                                                  |    "dApp" : "3N1aSGxVmMSUQbnporHpeX5X34X7Gec6kg3",
+                                                                  |    "call" : {
+                                                                  |      "function" : "test",
+                                                                  |      "args" : [ ]
+                                                                  |    },
+                                                                  |    "payment" : [ {
+                                                                  |      "assetId" : null,
+                                                                  |      "amount" : 100
+                                                                  |    } ],
+                                                                  |    "stateChanges" : {
+                                                                  |      "data" : [ ],
+                                                                  |      "transfers" : [ ],
+                                                                  |      "issues" : [ ],
+                                                                  |      "reissues" : [ ],
+                                                                  |      "burns" : [ ],
+                                                                  |      "sponsorFees" : [ ],
+                                                                  |      "leases" : [ ],
+                                                                  |      "leaseCancels" : [ ],
+                                                                  |      "invokes" : [ ],
+                                                                  |      "error" : {
+                                                                  |        "code" : 1,
+                                                                  |        "text" : "err"
+                                                                  |      }
+                                                                  |    }
+                                                                  |  } ],
+                                                                  |  "error" : {
+                                                                  |    "code" : 1,
+                                                                  |    "text" : "FailedTransactionError(code = 1, error = err, log =)"
+                                                                  |  }
+                                                                  |}
+                                                                  |""".stripMargin)
 
-    d.commonApi.transactions.transactionById(invoke.id()) match {
-      case Some(meta: TransactionMeta.Ethereum) =>
-        assert(!meta.succeeded, "should fail")
-        Json.toJson(meta.invokeScriptResult) should matchJson("""
-            |{
-            |  "data" : [ ],
-            |  "transfers" : [ ],
-            |  "issues" : [ ],
-            |  "reissues" : [ ],
-            |  "burns" : [ ],
-            |  "sponsorFees" : [ ],
-            |  "leases" : [ ],
-            |  "leaseCancels" : [ ],
-            |  "invokes" : [ {
-            |    "dApp" : "3N1aSGxVmMSUQbnporHpeX5X34X7Gec6kg3",
-            |    "call" : {
-            |      "function" : "test",
-            |      "args" : [ ]
-            |    },
-            |    "payment" : [ {
-            |      "assetId" : null,
-            |      "amount" : 100
-            |    } ],
-            |    "stateChanges" : {
-            |      "data" : [ ],
-            |      "transfers" : [ ],
-            |      "issues" : [ ],
-            |      "reissues" : [ ],
-            |      "burns" : [ ],
-            |      "sponsorFees" : [ ],
-            |      "leases" : [ ],
-            |      "leaseCancels" : [ ],
-            |      "invokes" : [ ],
-            |      "error" : {
-            |        "code" : 1,
-            |        "text" : "err"
-            |      }
-            |    }
-            |  } ],
-            |  "error" : {
-            |    "code" : 1,
-            |    "text" : "FailedTransactionError(code = 1, error = err, log =)"
-            |  }
-            |}
-            |""".stripMargin)
-
-      case _ => ???
+        case _ => ???
+      }
     }
   }
 
@@ -237,56 +238,57 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
     )
 
     d.appendBlock(invoke)
-    d.makeStateSolid()
 
-    d.blockchain.accountData(dApp.toAddress, "test") shouldBe Some(StringDataEntry("test", "foo"))
-    d.blockchain.accountData(nestedDApp.toAddress, "test1") shouldBe Some(StringDataEntry("test1", "bar"))
+    d.liquidAndSolidAssert { () =>
+      d.blockchain.accountData(dApp.toAddress, "test") shouldBe Some(StringDataEntry("test", "foo"))
+      d.blockchain.accountData(nestedDApp.toAddress, "test1") shouldBe Some(StringDataEntry("test1", "bar"))
 
-    d.commonApi.transactions.transactionById(invoke.id()) match {
-      case Some(meta: TransactionMeta.Ethereum) =>
-        assert(meta.succeeded, "should succeed")
-        Json.toJson(meta.invokeScriptResult) should matchJson("""{
-            |  "data" : [ {
-            |    "key" : "test",
-            |    "type" : "string",
-            |    "value" : "foo"
-            |  } ],
-            |  "transfers" : [ ],
-            |  "issues" : [ ],
-            |  "reissues" : [ ],
-            |  "burns" : [ ],
-            |  "sponsorFees" : [ ],
-            |  "leases" : [ ],
-            |  "leaseCancels" : [ ],
-            |  "invokes" : [ {
-            |    "dApp" : "3N1aSGxVmMSUQbnporHpeX5X34X7Gec6kg3",
-            |    "call" : {
-            |      "function" : "test",
-            |      "args" : [ ]
-            |    },
-            |    "payment" : [ {
-            |      "assetId" : null,
-            |      "amount" : 100
-            |    } ],
-            |    "stateChanges" : {
-            |      "data" : [ {
-            |        "key" : "test1",
-            |        "type" : "string",
-            |        "value" : "bar"
-            |      } ],
-            |      "transfers" : [ ],
-            |      "issues" : [ ],
-            |      "reissues" : [ ],
-            |      "burns" : [ ],
-            |      "sponsorFees" : [ ],
-            |      "leases" : [ ],
-            |      "leaseCancels" : [ ],
-            |      "invokes" : [ ]
-            |    }
-            |  } ]
-            |}""".stripMargin)
+      d.commonApi.transactions.transactionById(invoke.id()) match {
+        case Some(meta: TransactionMeta.Ethereum) =>
+          assert(meta.succeeded, "should succeed")
+          Json.toJson(meta.invokeScriptResult) should matchJson("""{
+                                                                  |  "data" : [ {
+                                                                  |    "key" : "test",
+                                                                  |    "type" : "string",
+                                                                  |    "value" : "foo"
+                                                                  |  } ],
+                                                                  |  "transfers" : [ ],
+                                                                  |  "issues" : [ ],
+                                                                  |  "reissues" : [ ],
+                                                                  |  "burns" : [ ],
+                                                                  |  "sponsorFees" : [ ],
+                                                                  |  "leases" : [ ],
+                                                                  |  "leaseCancels" : [ ],
+                                                                  |  "invokes" : [ {
+                                                                  |    "dApp" : "3N1aSGxVmMSUQbnporHpeX5X34X7Gec6kg3",
+                                                                  |    "call" : {
+                                                                  |      "function" : "test",
+                                                                  |      "args" : [ ]
+                                                                  |    },
+                                                                  |    "payment" : [ {
+                                                                  |      "assetId" : null,
+                                                                  |      "amount" : 100
+                                                                  |    } ],
+                                                                  |    "stateChanges" : {
+                                                                  |      "data" : [ {
+                                                                  |        "key" : "test1",
+                                                                  |        "type" : "string",
+                                                                  |        "value" : "bar"
+                                                                  |      } ],
+                                                                  |      "transfers" : [ ],
+                                                                  |      "issues" : [ ],
+                                                                  |      "reissues" : [ ],
+                                                                  |      "burns" : [ ],
+                                                                  |      "sponsorFees" : [ ],
+                                                                  |      "leases" : [ ],
+                                                                  |      "leaseCancels" : [ ],
+                                                                  |      "invokes" : [ ]
+                                                                  |    }
+                                                                  |  } ]
+                                                                  |}""".stripMargin)
 
-      case _ => ???
+        case _ => ???
+      }
     }
   }
 }
