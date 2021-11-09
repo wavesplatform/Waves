@@ -49,6 +49,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   lazy val wallet: Wallet       = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
+    //noinspection NotImplementedCode
     def invokeScriptResult(transactionId: ByteStr): InvokeScriptResult =
       transactions.transactionById(transactionId).get match {
         case hsc: TransactionMeta.HasStateChanges => hsc.invokeScriptResult.get
@@ -76,16 +77,16 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     field.get(blockchain).asInstanceOf[Option[NgState]]
   }
 
-  def makeStateHard(): (Int, SortedMap[String, String]) = {
+  def makeStateSolid(): (Int, SortedMap[String, String]) = {
     if (liquidState.isDefined) appendBlock() // Just append empty block
-    (hardStateHeight, hardStateSnapshot())
+    (solidStateHeight, solidStateSnapshot())
   }
 
-  def hardStateHeight: Int = {
+  def solidStateHeight: Int = {
     db.get(Keys.height)
   }
 
-  def hardStateSnapshot(): SortedMap[String, String] = {
+  def solidStateSnapshot(): SortedMap[String, String] = {
     val builder = SortedMap.newBuilder[String, String]
     db.iterateOver(Array.emptyByteArray)(
       e => builder.addOne(EthEncoding.toHexString(e.getKey).drop(2) -> EthEncoding.toHexString(e.getValue).drop(2))
@@ -192,7 +193,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     val parent = ref.flatMap { bs =>
       val height = blockchain.heightOf(bs)
       height.flatMap(blockchain.blockHeader).map(_.header)
-    } getOrElse (lastBlock.header)
+    }.getOrElse(lastBlock.header)
 
     val grandParent = ref.flatMap { bs =>
       val height = blockchain.heightOf(bs)
@@ -275,8 +276,15 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     }
   }
 
-  val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(blockchainUpdater.bestLiquidDiff.map(Height(blockchainUpdater.height) -> _),
-    db, blockchain, utxPool, wallet, _ => Future.successful(TracedResult(Right(true))), h => blocksApi.blockAtHeight(h))
+  val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
+    blockchainUpdater.bestLiquidDiff.map(Height(blockchainUpdater.height) -> _),
+    db,
+    blockchain,
+    utxPool,
+    wallet,
+    _ => Future.successful(TracedResult(Right(true))),
+    h => blocksApi.blockAtHeight(h)
+  )
 }
 
 object Domain {
