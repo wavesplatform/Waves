@@ -6,8 +6,8 @@ import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients}
-import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
 import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
 import com.wavesplatform.transaction.EthereumTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 

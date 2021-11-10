@@ -24,11 +24,11 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier, _}
+import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json
 
-import scala.collection.mutable
+import scala.collection.immutable.VectorMap
 
 object TransactionDiffer {
   def apply(prevBlockTs: Option[Long], currentBlockTs: Long, verify: Boolean = true)(
@@ -270,7 +270,7 @@ object TransactionDiffer {
     } yield {
       val affectedAddresses = portfolios.keySet ++ maybeDApp ++ calledAddresses
       Diff.empty.copy(
-        transactions = mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, affectedAddresses, applied = false))),
+        transactions = VectorMap((tx.id(), NewTransactionInfo(tx, affectedAddresses, applied = false, spentComplexity))),
         portfolios = portfolios,
         scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
         scriptsComplexity = spentComplexity

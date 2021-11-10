@@ -176,8 +176,8 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
         d.appendBlock(genesis: _*)
         d.appendBlock(setInvoke)
         d.appendBlock(setReentrantInvoke)
-        d.blockchain.transactionMeta(setInvoke.id.value()).get._2 shouldBe true
-        d.blockchain.transactionMeta(setReentrantInvoke.id.value()).get._2 shouldBe true
+        d.blockchain.transactionSucceeded(setInvoke.id.value()) shouldBe true
+        d.blockchain.transactionSucceeded(setReentrantInvoke.id.value()) shouldBe true
       }
     }
   }

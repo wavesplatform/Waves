@@ -219,7 +219,7 @@ package object database extends ScorexLogging {
           PBRecipients.toAddressOrAlias(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
           d.amount,
           d.status match {
-            case pb.LeaseDetails.Status.Active(_)                                => LeaseDetails.Status.Active
+            case pb.LeaseDetails.Status.Active(_)                                   => LeaseDetails.Status.Active
             case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height, _)) => LeaseDetails.Status.Expired(height)
             case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId, _)) =>
               LeaseDetails.Status.Cancelled(height, Some(transactionId.toByteStr).filter(!_.isEmpty))
@@ -538,19 +538,18 @@ package object database extends ScorexLogging {
     )
   }
 
-  def readTransaction(b: Array[Byte]): (Transaction, Boolean) = {
-
+  def readTransaction(height: Height)(b: Array[Byte]): (TxMeta, Transaction) = {
     val data = pb.TransactionData.parseFrom(b)
-    data.transaction match {
-      case tx: TD.LegacyBytes         => (TransactionParsers.parseBytes(tx.value.toByteArray).get, !data.failed)
-      case tx: TD.WavesTransaction    => (PBTransactions.vanilla(tx.value, unsafe = false).explicitGet(), !data.failed)
-      case tx: TD.EthereumTransaction => (EthereumTransaction(tx.value.toByteArray).explicitGet(), !data.failed)
+    TxMeta(height, !data.failed, data.spentComplexity) -> (data.transaction match {
+      case tx: TD.LegacyBytes         => TransactionParsers.parseBytes(tx.value.toByteArray).get
+      case tx: TD.WavesTransaction    => PBTransactions.vanilla(tx.value, unsafe = false).explicitGet()
+      case tx: TD.EthereumTransaction => EthereumTransaction(tx.value.toByteArray).explicitGet()
       case _                          => throw new IllegalArgumentException("Illegal transaction data")
-    }
+    })
   }
 
-  def writeTransaction(v: (Transaction, Boolean)): Array[Byte] = {
-    val (tx, succeeded) = v
+  def writeTransaction(v: (TxMeta, Transaction)): Array[Byte] = {
+    val (m, tx) = v
     val ptx = tx match {
       case lps: PBSince if !lps.isProtobufVersion => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _: GenesisTransaction                         => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
@@ -558,24 +557,21 @@ package object database extends ScorexLogging {
       case et: EthereumTransaction                       => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
       case _                                             => TD.WavesTransaction(PBTransactions.protobuf(tx))
     }
-    pb.TransactionData(ptx, !succeeded).toByteArray
+    pb.TransactionData(ptx, !m.succeeded, m.spentComplexity).toByteArray
   }
 
-  def loadTransactions(height: Height, db: ReadOnlyDB): Option[Seq[(Transaction, Boolean)]] =
-    if (height < 1 || db.get(Keys.height) < height) None
-    else {
-      val transactions = Seq.newBuilder[(Transaction, Boolean)]
-      db.iterateOver(KeyTags.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height)) { e =>
-        transactions += readTransaction(e.getValue)
-      }
-      Some(transactions.result())
+  def loadTransactions(height: Height, db: ReadOnlyDB): Seq[(TxMeta, Transaction)] = {
+    val transactions = Seq.newBuilder[(TxMeta, Transaction)]
+    db.iterateOver(KeyTags.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height)) { e =>
+      transactions += readTransaction(height)(e.getValue)
     }
+    transactions.result()
+  }
 
   def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] =
     for {
       meta  <- db.get(Keys.blockMetaAt(height))
-      txs   <- loadTransactions(height, db)
-      block <- createBlock(meta.header, meta.signature, txs.map(_._1)).toOption
+      block <- createBlock(meta.header, meta.signature, loadTransactions(height, db).map(_._2)).toOption
     } yield block
 
   def fromHistory[A](resource: DBResource, historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
@@ -611,7 +607,7 @@ package object database extends ScorexLogging {
       tm <- r.get(Keys.transactionMetaById(TransactionId(id)))
       tx <- r.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)))
     } yield tx).collect {
-      case (lt: LeaseTransaction, true) => lt
+      case (ltm, lt: LeaseTransaction) if ltm.succeeded => lt
     }.toSeq
   }
 

@@ -61,7 +61,7 @@ class SyncDAppMultiVersionTest extends PropSpec with WithDomain {
           withDomain(RideV6) { d =>
             d.appendBlock(preparingTxs: _*)
             d.appendBlock(invoke)
-            d.blockchain.transactionInfo(invoke.txId).get._3 shouldBe true
+            d.blockchain.transactionSucceeded(invoke.txId) shouldBe true
           }
       }
   }

@@ -20,8 +20,8 @@ import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.{Blockchain, InvokeScriptResult, TxMeta}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{Blockchain, InvokeScriptResult}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
@@ -91,12 +91,12 @@ case class TransactionsApiRoute(
   private[this] def loadTransactionStatus(id: ByteStr): JsObject = {
     import Status._
     val statusJson = blockchain.transactionInfo(id) match {
-      case Some((height, _, succeeded)) =>
+      case Some((tm, tx)) =>
         Json.obj(
           "status"        -> Confirmed,
-          "height"        -> height,
-          "confirmations" -> (blockchain.height - height).max(0)
-        ) ++ serializer.applicationStatus(height, succeeded)
+          "height"        -> JsNumber(tm.height),
+          "confirmations" -> (blockchain.height - tm.height).max(0)
+        ) ++ serializer.metaJson(tm)
       case None =>
         commonApi.unconfirmedTransactionById(id) match {
           case Some(_) => Json.obj("status" -> Unconfirmed)
@@ -338,7 +338,7 @@ object TransactionsApiRoute {
 
       Seq(
         TransactionJsonSerializer.height(meta.height),
-        applicationStatus(meta.height, meta.succeeded),
+        metaJson(TxMeta(meta.height, meta.succeeded, meta.spentComplexity)),
         stateChanges,
         specificInfo
       ).reduce(_ ++ _)
@@ -355,16 +355,16 @@ object TransactionsApiRoute {
       case t => t.json()
     }
 
-    def applicationStatus(height: Int, succeeded: Boolean): JsObject =
-      TransactionJsonSerializer.applicationStatus(isBlockV5(height), succeeded)
+    def metaJson(m: TxMeta): JsObject =
+      TransactionJsonSerializer.applicationStatus(isBlockV5(m.height), m.succeeded) ++ Json.obj("spentComplexity" -> m.spentComplexity)
 
     private[this] def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)
 
     // Extended lease format. Overrides default
     private[this] def leaseIdToLeaseRef(leaseId: ByteStr): LeaseRef = {
-      val ld          = blockchain.leaseDetails(leaseId).get
-      val (height, _) = blockchain.transactionMeta(ld.sourceId).get
-      val recipient   = blockchain.resolveAlias(ld.recipient).explicitGet()
+      val ld        = blockchain.leaseDetails(leaseId).get
+      val tm        = blockchain.transactionMeta(ld.sourceId).get
+      val recipient = blockchain.resolveAlias(ld.recipient).explicitGet()
 
       val (status, cancelHeight, cancelTxId) = ld.status match {
         case LeaseDetails.Status.Active                  => (true, None, None)
@@ -372,7 +372,7 @@ object TransactionsApiRoute {
         case LeaseDetails.Status.Expired(height)         => (false, Some(height), None)
       }
 
-      LeaseRef(leaseId, ld.sourceId, ld.sender.toAddress, recipient, ld.amount, height, LeaseStatus(status), cancelHeight, cancelTxId)
+      LeaseRef(leaseId, ld.sourceId, ld.sender.toAddress, recipient, ld.amount, tm.height, LeaseStatus(status), cancelHeight, cancelTxId)
     }
 
     private[http] implicit val leaseWrites: OWrites[InvokeScriptResult.Lease] =

@@ -2,7 +2,6 @@ package com.wavesplatform.api.http
 
 import scala.annotation.tailrec
 import scala.util.Try
-
 import akka.http.scaladsl.server.{Route, StandardRoute}
 import cats.syntax.either._
 import com.wavesplatform.api.BlockMeta
@@ -11,6 +10,7 @@ import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, TooBigArrayAlloca
 import com.wavesplatform.api.http.TransactionsApiRoute.TransactionJsonSerializer
 import com.wavesplatform.block.Block
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.TxMeta
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -142,16 +142,16 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
 }
 
 object BlocksApiRoute {
-  private def toJson(v: (BlockMeta, Seq[(Transaction, Boolean)])): JsObject = v match {
+  private def toJson(v: (BlockMeta, Seq[(TxMeta, Transaction)])): JsObject = v match {
     case (meta, transactions) =>
       meta.json() ++ transactionField(meta.header.version, transactions)
   }
 
-  private def transactionField(blockVersion: Byte, transactions: Seq[(Transaction, Boolean)]): JsObject = Json.obj(
-    "fee" -> transactions.map(_._1.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum,
+  private def transactionField(blockVersion: Byte, transactions: Seq[(TxMeta, Transaction)]): JsObject = Json.obj(
+    "fee" -> transactions.map(_._2.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum,
     "transactions" -> JsArray(transactions.map {
-      case (transaction, succeeded) =>
-        transaction.json() ++ TransactionJsonSerializer.applicationStatus(blockVersion >= Block.ProtoBlockVersion, succeeded)
+      case (tm, transaction) =>
+        transaction.json() ++ TransactionJsonSerializer.applicationStatus(blockVersion >= Block.ProtoBlockVersion, tm.succeeded)
     })
   )
 }

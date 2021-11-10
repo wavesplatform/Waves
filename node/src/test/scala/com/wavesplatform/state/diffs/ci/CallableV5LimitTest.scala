@@ -93,10 +93,10 @@ class CallableV5LimitTest
         "Contract function (default) is too complex: 11432 > 10000"
       )
       d.appendBlock(setAcceptable, invoke)
-      d.blockchain.transactionInfo(invoke.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
 
       d.appendBlock(setSyncDApp, syncInvoke)
-      d.blockchain.transactionInfo(syncInvoke.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(syncInvoke.id.value()) shouldBe true
     }
   }
 }
