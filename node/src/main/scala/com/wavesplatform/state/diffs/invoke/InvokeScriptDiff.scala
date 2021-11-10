@@ -35,6 +35,7 @@ import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, Coe
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import monix.eval.Coeval
 import shapeless.Coproduct
+import com.wavesplatform.features.EvaluatorFixProvider._
 
 object InvokeScriptDiff {
   private val stats = TxProcessingStats
@@ -298,7 +299,7 @@ object InvokeScriptDiff {
   ): Coeval[Either[ValidationError, (ScriptResult, Log[Id])]] = {
     val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     ContractEvaluator
-      .applyV2Coeval(evaluationCtx, contract, invocation, version, limit)
+      .applyV2Coeval(evaluationCtx, contract, invocation, version, limit, blockchain.correctFunctionCallScope)
       .map(
         _.leftMap(
           {
