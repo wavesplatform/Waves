@@ -165,7 +165,7 @@ class SubInvokeStateChangesSpec extends FlatSpec with WithDomain with JsonMatche
 
     val allAddresses = Seq(dAppAddress, addr2s, addr3s, addr2f, addr3f).map(_.toAddress)
     for ((addr, i) <- allAddresses.zipWithIndex)
-      withClue(s"Addr #${i + 1}")(d.commonApi.addressTransactions(addr) should contain(invoke))
+      withClue(s"Addr #${i + 1}")(d.commonApi.addressTransactions(addr).map(_.transaction) should contain(invoke))
   }
 
   def genScript(calls: Iterable[Address], fail: Boolean = false): String =
