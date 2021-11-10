@@ -3,13 +3,13 @@ package com.wavesplatform.lang.v1
 import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.{Blake2b256, Keccak256, Sha256}
 import com.wavesplatform.lang.v1.CalculateAssetIdBenchmark._
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomAddress, randomBytes}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
-import com.wavesplatform.crypto.{Blake2b256, Keccak256, Sha256}
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))

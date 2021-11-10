@@ -8,7 +8,6 @@ import com.wavesplatform.lang.directives.values.{Account, Expression, V5}
 import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
 import org.openjdk.jmh.annotations.{State, _}
 import org.openjdk.jmh.infra.Blackhole
 
@@ -20,34 +19,34 @@ import org.openjdk.jmh.infra.Blackhole
 @Measurement(iterations = 10, time = 1)
 class PowIntBenchmark {
   @Benchmark
-  def pow1(bh: Blackhole, s: PowIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr1, V5))
+  def pow1(bh: Blackhole, s: PowIntSt): Unit = bh.consume(eval(s.ctx, s.expr1, V5))
 
   @Benchmark
-  def pow2(bh: Blackhole, s: PowIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr2, V5))
+  def pow2(bh: Blackhole, s: PowIntSt): Unit = bh.consume(eval(s.ctx, s.expr2, V5))
 
   @Benchmark
-  def pow3(bh: Blackhole, s: PowIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr3, V5))
+  def pow3(bh: Blackhole, s: PowIntSt): Unit = bh.consume(eval(s.ctx, s.expr3, V5))
 
   @Benchmark
-  def pow4(bh: Blackhole, s: PowIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr4, V5))
+  def pow4(bh: Blackhole, s: PowIntSt): Unit = bh.consume(eval(s.ctx, s.expr4, V5))
 
   @Benchmark
-  def pow5(bh: Blackhole, s: PowIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr5, V5))
+  def pow5(bh: Blackhole, s: PowIntSt): Unit = bh.consume(eval(s.ctx, s.expr5, V5))
 
   @Benchmark
-  def pow6(bh: Blackhole, s: PowIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr6, V5))
+  def pow6(bh: Blackhole, s: PowIntSt): Unit = bh.consume(eval(s.ctx, s.expr6, V5))
 
   @Benchmark
-  def pow7(bh: Blackhole, s: PowIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr7, V5))
+  def pow7(bh: Blackhole, s: PowIntSt): Unit = bh.consume(eval(s.ctx, s.expr7, V5))
 
   @Benchmark
-  def pow8(bh: Blackhole, s: PowIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr8, V5))
+  def pow8(bh: Blackhole, s: PowIntSt): Unit = bh.consume(eval(s.ctx, s.expr8, V5))
 
   @Benchmark
-  def pow9(bh: Blackhole, s: PowIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr9, V5))
+  def pow9(bh: Blackhole, s: PowIntSt): Unit = bh.consume(eval(s.ctx, s.expr9, V5))
 
   @Benchmark
-  def pow10(bh: Blackhole, s: PowIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr10, V5))
+  def pow10(bh: Blackhole, s: PowIntSt): Unit = bh.consume(eval(s.ctx, s.expr10, V5))
 }
 
 @State(Scope.Benchmark)

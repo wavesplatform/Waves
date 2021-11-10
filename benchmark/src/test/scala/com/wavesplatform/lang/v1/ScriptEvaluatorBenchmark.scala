@@ -6,6 +6,7 @@ import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.crypto.Curve25519
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values.{V1, V4}
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
@@ -20,7 +21,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, FunctionIds}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
-import com.wavesplatform.crypto.Curve25519
 
 import scala.util.Random
 
