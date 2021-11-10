@@ -469,7 +469,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(Native(FunctionIds.DROP_RIGHT_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
         val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr)
-        val limit  = CONST_BYTESTR.DataTxSize.value
+        val limit  = 165947
         actual shouldBe (
           if (number < 0)
             Left(s"Unexpected negative number = $number passed to dropRight()")
@@ -486,7 +486,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(Native(FunctionIds.TAKE_RIGHT_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
         val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr)
-        val limit  = CONST_BYTESTR.DataTxSize.value
+        val limit  = 165947
         actual shouldBe (
           if (number < 0)
             Left(s"Unexpected negative number = $number passed to takeRight()")
