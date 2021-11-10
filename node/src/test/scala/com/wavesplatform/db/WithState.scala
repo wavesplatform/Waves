@@ -166,10 +166,28 @@ trait WithDomain extends WithState { _: Suite =>
       val functionalitySettings = ws.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = newFeatures)
       ws.copy(blockchainSettings = ws.blockchainSettings.copy(functionalitySettings = functionalitySettings))
     }
+
+    def withActivationPeriod(period: Int): WavesSettings = {
+      ws.copy(
+        blockchainSettings = ws.blockchainSettings.copy(
+          functionalitySettings = ws.blockchainSettings.functionalitySettings
+            .copy(featureCheckBlocksPeriod = period, blocksForFeatureActivation = period, doubleFeaturesPeriodsAfterHeight = 10000)
+        )
+      )
+    }
+
+    def noFeatures(): WavesSettings = {
+      ws.copy(
+        blockchainSettings = ws.blockchainSettings.copy(
+          functionalitySettings = ws.blockchainSettings.functionalitySettings
+            .copy(preActivatedFeatures = Map.empty)
+        ),
+        featuresSettings = ws.featuresSettings.copy(supported = Nil)
+      )
+    }
   }
 
-  lazy val SettingsFromDefaultConfig: WavesSettings =
-    WavesSettings.fromRootConfig(loadConfig(None))
+  lazy val SettingsFromDefaultConfig: WavesSettings =  WavesSettings.fromRootConfig(loadConfig(None))
 
   def domainSettingsWithFS(fs: FunctionalitySettings): WavesSettings =
     SettingsFromDefaultConfig.copy(
@@ -179,10 +197,16 @@ trait WithDomain extends WithState { _: Suite =>
   def domainSettingsWithPreactivatedFeatures(fs: BlockchainFeature*): WavesSettings =
     domainSettingsWithFeatures(fs.map(_ -> 0): _*)
 
-  def domainSettingsWithFeatures(fs: (BlockchainFeature, Int)*): WavesSettings =
-    domainSettingsWithFS(SettingsFromDefaultConfig.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map {
+  def domainSettingsWithFeatures(fs: (BlockchainFeature, Int)*): WavesSettings = {
+    val defaultFS = SettingsFromDefaultConfig
+      .noFeatures()
+      .blockchainSettings
+      .functionalitySettings
+    
+    domainSettingsWithFS(defaultFS.copy(preActivatedFeatures = fs.map {
       case (f, h) => f.id -> h
     }.toMap))
+  }
 
   //noinspection TypeAnnotation
   object DomainPresets {
