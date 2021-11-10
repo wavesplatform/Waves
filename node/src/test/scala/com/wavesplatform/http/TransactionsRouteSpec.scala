@@ -6,7 +6,7 @@ import scala.util.Random
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.{BlockGen, TestTime, TestValues, TestWallet}
-import com.wavesplatform.account.{AddressScheme, KeyPair, PublicKey}
+import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.http.ApiError._
@@ -35,7 +35,6 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import monix.reactive.Observable
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalacheck.Gen._
@@ -74,132 +73,41 @@ class TransactionsRouteSpec
   private val invalidBase58Gen = alphaNumStr.map(_ + "0")
 
   routePath("/calculateFee") - {
-    "transfer with Waves fee" - {
-      val transferTxScenario =
-        for {
-          sender    <- accountGen
-          recipient <- accountGen
-          version   <- Gen.oneOf(TransferTransaction.supportedVersions.toSeq)
-          tx = Json.obj(
-            "type"            -> 4,
-            "version"         -> version,
-            "amount"          -> 1000000,
-            "senderPublicKey" -> sender.publicKey.toString,
-            "recipient"       -> recipient.toAddress
-          )
-        } yield (sender.publicKey, tx)
-      "TransferTransaction" in forAll(transferTxScenario) {
-        case (_, transferTx) =>
-          (addressTransactions.calculateFee _).expects(*).returning(Right((Asset.Waves, 100000L, 0L))).once()
+    "waves" in {
+      val transferTx = Json.obj(
+        "type"            -> 4,
+        "version"         -> 1,
+        "amount"          -> 1000000,
+        "feeAssetId"      -> JsNull,
+        "senderPublicKey" -> TestValues.keyPair.publicKey,
+        "recipient"       -> TestValues.address
+      )
+      (addressTransactions.calculateFee _).expects(*).returning(Right((Asset.Waves, 100000L, 0L))).once()
 
-          Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
-            status shouldEqual StatusCodes.OK
-            (responseAs[JsObject] \ "feeAssetId").asOpt[String] shouldBe empty
-            (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 100000
-          }
-      }
-
-      val massTransferTxScenario =
-        for {
-          sender     <- accountGen
-          recipient1 <- accountGen
-          recipient2 <- accountGen
-          version    <- Gen.oneOf(MassTransferTransaction.supportedVersions.toSeq)
-          tx = Json.obj(
-            "type"            -> 11,
-            "version"         -> version,
-            "senderPublicKey" -> Base58.encode(sender.publicKey.arr),
-            "transfers" -> Json.arr(
-              Json.obj(
-                "recipient" -> recipient1.toAddress,
-                "amount"    -> 1000000
-              ),
-              Json.obj(
-                "recipient" -> recipient2.toAddress,
-                "amount"    -> 2000000
-              )
-            )
-          )
-        } yield (sender.publicKey, tx)
-      "MassTransferTransaction" in forAll(massTransferTxScenario) {
-        case (_, transferTx) =>
-          (addressTransactions.calculateFee _).expects(*).returning(Right((Asset.Waves, 200000L, 0L))).once()
-
-          Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
-            status shouldEqual StatusCodes.OK
-            (responseAs[JsObject] \ "feeAssetId").asOpt[String] shouldBe empty
-            (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 200000
-          }
+      Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        (responseAs[JsObject] \ "feeAssetId").asOpt[String] shouldBe empty
+        (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 100000
       }
     }
 
-    "transfer with Asset fee" - {
-      val transferTxWithAssetFeeScenario =
-        for {
-          assetId   <- issueGen.map(_.assetId)
-          sender    <- accountGen
-          recipient <- accountGen
-          version   <- Gen.oneOf(TransferTransaction.supportedVersions.toSeq)
-          tx = Json.obj(
-            "type"            -> 4,
-            "version"         -> version,
-            "amount"          -> 1000000,
-            "feeAssetId"      -> assetId.toString,
-            "senderPublicKey" -> Base58.encode(sender.publicKey.arr),
-            "recipient"       -> recipient.toAddress
-          )
-        } yield (sender.publicKey, tx, IssuedAsset(assetId))
-      "without sponsorship" in forAll(transferTxWithAssetFeeScenario) {
-        case (_, transferTx, _) =>
-          (addressTransactions.calculateFee _).expects(*).returning(Right((Asset.Waves, 100000L, 0L))).once()
+    "asset" in {
+      val asset: IssuedAsset = TestValues.asset
+      val transferTx = Json.obj(
+        "type"            -> 4,
+        "version"         -> 2,
+        "amount"          -> 1000000,
+        "feeAssetId"      -> asset.id.toString,
+        "senderPublicKey" -> TestValues.keyPair.publicKey,
+        "recipient"       -> TestValues.address
+      )
 
-          Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
-            status shouldEqual StatusCodes.OK
-            (responseAs[JsObject] \ "feeAssetId").asOpt[String] shouldBe empty
-            (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 100000
-          }
-      }
+      (addressTransactions.calculateFee _).expects(*).returning(Right((asset, 5L, 0L))).once()
 
-      "with sponsorship" in {
-        val assetId: IssuedAsset = IssuedAsset(issueGen.sample.get.assetId)
-        val sender: PublicKey    = accountGen.sample.get.publicKey
-        val transferTx = Json.obj(
-          "type"            -> 4,
-          "version"         -> 2,
-          "amount"          -> 1000000,
-          "feeAssetId"      -> assetId.id.toString,
-          "senderPublicKey" -> Base58.encode(sender.arr),
-          "recipient"       -> accountGen.sample.get.toAddress
-        )
-
-        (addressTransactions.calculateFee _).expects(*).returning(Right((assetId, 5L, 0L))).once()
-
-        Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
-          status shouldEqual StatusCodes.OK
-          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.toString
-          (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 5
-        }
-      }
-
-      "with sponsorship, smart token and smart account" in {
-        val assetId: IssuedAsset = IssuedAsset(issueGen.sample.get.assetId)
-        val sender: PublicKey    = accountGen.sample.get.publicKey
-        val transferTx = Json.obj(
-          "type"            -> 4,
-          "version"         -> 2,
-          "amount"          -> 1000000,
-          "feeAssetId"      -> assetId.id.toString,
-          "senderPublicKey" -> Base58.encode(sender.arr),
-          "recipient"       -> accountGen.sample.get.toAddress
-        )
-
-        (addressTransactions.calculateFee _).expects(*).returning(Right((assetId, 45L, 0L))).once()
-
-        Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
-          status shouldEqual StatusCodes.OK
-          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.toString
-          (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 45
-        }
+      Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe asset.id.toString
+        (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 5
       }
     }
   }

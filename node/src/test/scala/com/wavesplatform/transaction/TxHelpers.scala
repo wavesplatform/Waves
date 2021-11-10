@@ -12,12 +12,12 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
 object TxHelpers {
@@ -38,7 +38,14 @@ object TxHelpers {
   def genesis(address: Address, amount: Long = 100_000_000.waves): GenesisTransaction =
     GenesisTransaction.create(address, amount, timestamp).explicitGet()
 
-  def transfer(from: KeyPair = defaultSigner, to: AddressOrAlias = secondAddress, amount: Long = 1.waves, asset: Asset = Waves, fee: Long = TestValues.fee, version: Byte = TxVersion.V1): TransferTransaction =
+  def transfer(
+      from: KeyPair = defaultSigner,
+      to: AddressOrAlias = secondAddress,
+      amount: Long = 1.waves,
+      asset: Asset = Waves,
+      fee: Long = TestValues.fee,
+      version: Byte = TxVersion.V1
+  ): TransferTransaction =
     TransferTransaction.selfSigned(version, from, to, asset, amount, Waves, fee, ByteStr.empty, timestamp).explicitGet()
 
   def issue(amount: Long = 1000, script: Script = null): IssueTransaction =
@@ -111,8 +118,12 @@ object TxHelpers {
       fee: Long = TestValues.fee,
       feeAssetId: Asset = Waves
   ): InvokeScriptTransaction = {
-    val fc = FUNCTION_CALL(FunctionHeader.User(func), args.toList)
+    val fc = functionCall(func, args: _*)
     InvokeScriptTransaction.selfSigned(TxVersion.V1, defaultSigner, dApp, Some(fc), payments, fee, feeAssetId, timestamp).explicitGet()
+  }
+
+  def functionCall(func: String, args: EXPR*): FUNCTION_CALL = {
+    FUNCTION_CALL(FunctionHeader.User(func), args.toList)
   }
 
   def lease(recipient: AddressOrAlias = secondAddress, amount: TxAmount = 10.waves): LeaseTransaction = {

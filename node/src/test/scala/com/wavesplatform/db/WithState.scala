@@ -168,8 +168,15 @@ trait WithDomain extends WithState { _: Suite =>
     }
   }
 
-  lazy val SettingsFromDefaultConfig: WavesSettings =
-    WavesSettings.fromRootConfig(loadConfig(None))
+  lazy val SettingsFromDefaultConfig: WavesSettings = {
+    val config = WavesSettings.fromRootConfig(loadConfig(None))
+    config.copy(
+      blockchainSettings = config.blockchainSettings.copy(
+        functionalitySettings = config.blockchainSettings.functionalitySettings
+          .copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, doubleFeaturesPeriodsAfterHeight = 10000)
+      )
+    )
+  }
 
   def domainSettingsWithFS(fs: FunctionalitySettings): WavesSettings =
     SettingsFromDefaultConfig.copy(

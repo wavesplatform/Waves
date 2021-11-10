@@ -51,6 +51,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   object commonApi {
     /**
       * @return Tuple of (asset, feeInAsset, feeInWaves)
+      * @see [[com.wavesplatform.state.diffs.FeeValidation#getMinFee(com.wavesplatform.state.Blockchain, com.wavesplatform.transaction.Transaction)]]
       */
     def calculateFee(tx: Transaction): (Asset, TxAmount, TxAmount) =
       transactions.calculateFee(tx).explicitGet()
@@ -122,6 +123,13 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       .toSeq
 
   def portfolio(address: Address): Seq[(IssuedAsset, Long)] = Domain.portfolio(address, db, blockchainUpdater)
+
+  def appendAndAssertSucceed(txs: Transaction*): Block = {
+    val block = createBlock(Block.PlainBlockVersion, txs)
+    appendBlock(block)
+    txs.foreach(tx => require(blockchain.transactionSucceeded(tx.id()), s"should succeed: $tx"))
+    lastBlock
+  }
 
   def appendAndAssertFailed(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
