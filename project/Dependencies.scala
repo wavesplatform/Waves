@@ -18,7 +18,7 @@ object Dependencies {
 
   private def catsModule(module: String, version: String = "2.6.1") = Def.setting("org.typelevel" %%% s"cats-$module" % version)
 
-  private def web3jModule(module: String) = "org.web3j" % module % "4.8.7"
+  private def web3jModule(module: String) = "org.web3j" % module % "4.8.8"
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.0")
 
@@ -33,7 +33,7 @@ object Dependencies {
   val janino             = "org.codehaus.janino" % "janino" % "3.1.6"
   val asyncHttpClient    = "org.asynchttpclient" % "async-http-client" % "2.12.3"
   val curve25519         = "com.wavesplatform" % "curve25519-java" % "0.6.4"
-  val nettyHandler       = "io.netty" % "netty-handler" % "4.1.69.Final"
+  val nettyHandler       = "io.netty" % "netty-handler" % "4.1.70.Final"
 
   val catsEffect = catsModule("effect", "2.1.3")
   val catsCore   = catsModule("core")
@@ -41,7 +41,7 @@ object Dependencies {
 
   val scalaTest = "org.scalatest" %% "scalatest" % "3.2.10" % Test
 
-  val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.3.14"
+  val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.3.16"
 
   // v1.67 introduced unnecessary conversions which slowed down hash computation by a factor of 3-4:
   // https://github.com/bcgit/bc-java/blob/r1rv67/core/src/main/java/org/bouncycastle/crypto/digests/KeccakDigest.java#L318
@@ -112,7 +112,7 @@ object Dependencies {
       web3jModule("crypto"),
       web3jModule("abi"),
       web3jModule("rlp"),
-      "com.esaulpaugh" % "headlong" % "5.4.0"
+      "com.esaulpaugh" % "headlong" % "5.5.0"
     ) ++ langCompilerPlugins.value ++ scalapbRuntime.value ++ protobuf.value
   )
 
