@@ -8,7 +8,7 @@ import com.wavesplatform.test._
 class BytesDropTakeTest extends EvaluatorSpec {
   private val min   = Long.MinValue
   private val max   = Long.MaxValue
-  private val limit = 153600
+  private val limit = 165947
 
   private val b = s"base58'${ByteStr.fromBytes(1, 2, 3, 4, 5)}'"
 

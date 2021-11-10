@@ -513,7 +513,7 @@ object PureContext {
       ("number", LONG)
     ) {
       case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil =>
-        val limit = CONST_BYTESTR.DataTxSize.value
+        val limit = Terms.DataTxMaxProtoBytes
         if (checkLimits) {
           if (number < 0)
             Left(s"Unexpected negative number = $number passed to take()")
@@ -537,7 +537,7 @@ object PureContext {
       ("number", LONG)
     ) {
       case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil =>
-        val limit = CONST_BYTESTR.DataTxSize.value
+        val limit = Terms.DataTxMaxProtoBytes
         if (checkLimits) {
           if (number < 0)
             Left(s"Unexpected negative number = $number passed to drop()")
@@ -614,7 +614,7 @@ object PureContext {
       ("number", LONG)
     ) {
       case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil =>
-        val limit = CONST_BYTESTR.DataTxSize.value
+        val limit = Terms.DataTxMaxProtoBytes
         if (number < 0)
           Left(s"Unexpected negative number = $number passed to takeRight()")
         else if (number > limit)
@@ -635,7 +635,7 @@ object PureContext {
       ("number", LONG)
     ) {
       case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil =>
-        val limit = CONST_BYTESTR.DataTxSize.value
+        val limit = Terms.DataTxMaxProtoBytes
         if (number < 0)
           Left(s"Unexpected negative number = $number passed to dropRight()")
         else if (number > limit)
