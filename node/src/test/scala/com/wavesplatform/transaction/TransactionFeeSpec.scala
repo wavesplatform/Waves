@@ -229,7 +229,7 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
   }
 
   "transfer transaction" - {
-    "with sponsored asset fee" in withDomain(DomainPresets.ScriptsAndSponsorship) { d =>
+    "with sponsored asset fee" in withDomain(DomainPresets.ScriptsAndSponsorship.withActivationPeriod(1)) { d =>
       val issue = TxHelpers.issue()
       d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress, 10.waves))
       d.appendBlock(issue)
