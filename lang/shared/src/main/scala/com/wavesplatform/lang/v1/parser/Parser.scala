@@ -645,7 +645,7 @@ object Parser {
     }
   }
 
-  def parseDAPPWithErrorRecovery(scriptStr: String): Either[Throwable, (DAPP, Option[RemovedCharPos])] = {
+  def parseDAPPWithErrorRecovery(scriptStr: String, lastInsertedCharPos: Option[Int]): Either[Throwable, (DAPP, Option[RemovedCharPos])] = {
 
     def parse(str: String): Either[Parsed.Failure, DAPP] =
       parseContract(str) match {
@@ -656,10 +656,17 @@ object Parser {
     parseWithError[DAPP](
       new StringBuilder(scriptStr),
       parse,
-      DAPP(Pos(0, scriptStr.length - 1), List.empty, List.empty)
-    ).map { dAppAndErrorIndexes =>
-      val removedCharPosOpt = if (dAppAndErrorIndexes._2.isEmpty) None else Some(Pos(dAppAndErrorIndexes._2.min, dAppAndErrorIndexes._2.max))
-      (dAppAndErrorIndexes._1, removedCharPosOpt)
+      DAPP(Pos(0, scriptStr.length - 1), List.empty, List.empty),
+      lastInsertedCharPos
+    ).map {
+      dAppAndErrorIndexes =>
+        val removedCharPosOpt =
+          if (dAppAndErrorIndexes._2.isEmpty) {
+            None
+          } else {
+            Some(Pos(dAppAndErrorIndexes._2.min, dAppAndErrorIndexes._2.max))
+          }
+        (dAppAndErrorIndexes._1, removedCharPosOpt)
     }
   }
 
@@ -679,18 +686,19 @@ object Parser {
   private def parseWithError[T](
       source: StringBuilder,
       parse: String => Either[Parsed.Failure, T],
-      defaultResult: T
+      defaultResult: T,
+      lastInsertedCharPos: Option[Int] = None
   ): Either[Throwable, (T, Iterable[Int])] = {
     parse(source.toString())
       .map(dApp => (dApp, Nil))
       .left
       .flatMap {
         case ex: Parsed.Failure => {
-          val errorLastPos       = ex.index
+          val errorLastPos       = lastInsertedCharPos.map(_ + 1).getOrElse(ex.index)
           val lastRemovedCharPos = clearChar(source, errorLastPos - 1)
           val posList            = Set(errorLastPos, lastRemovedCharPos)
           if (lastRemovedCharPos > 0) {
-            parseWithError(source, parse, defaultResult)
+            parseWithError(source, parse, defaultResult, lastInsertedCharPos.map(_ - 1))
               .map(dAppAndErrorIndexes => (dAppAndErrorIndexes._1, posList ++ dAppAndErrorIndexes._2.toList))
           } else {
             Right((defaultResult, posList))

@@ -323,7 +323,7 @@ object ContractCompiler {
             raiseError[Id, CompilerContext, CompilationError, Unit](
               Generic(p.position.start, p.position.start, s"Annotation binding `${p.v}` overrides already defined var")
             )
-          }
+        }
       )
       _ <- annAndFuncArgsIntersection.flatMap {
         _.headOption.flatten match {
@@ -379,11 +379,12 @@ object ContractCompiler {
       input: String,
       ctx: CompilerContext,
       version: StdLibVersion,
+      lastInsertedCharPos: Option[Int] = None,
       needCompaction: Boolean = false,
       removeUnusedCode: Boolean = false,
       saveExprContext: Boolean = true
   ): Either[String, (Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
-    Parser.parseDAPPWithErrorRecovery(input) match {
+    Parser.parseDAPPWithErrorRecovery(input, lastInsertedCharPos) match {
       case Right((parseResult, removedCharPosOpt)) =>
         compileContract(ctx, parseResult, version, needCompaction, removeUnusedCode, ScriptResultSource.CallableFunction, saveExprContext)
           .run(ctx)
@@ -391,16 +392,16 @@ object ContractCompiler {
             _._2
               .map { compRes =>
                 val errorList =
-                  compRes._3 ++
-                    (if (removedCharPosOpt.isEmpty) Nil
-                     else
-                       List(
-                         Generic(
-                           removedCharPosOpt.get.start,
-                           removedCharPosOpt.get.end,
-                           "Parsing failed. Some chars was removed as result of recovery process."
-                         )
-                       ))
+                  if (removedCharPosOpt.isEmpty)
+                    compRes._3
+                  else
+                    List(
+                      Generic(
+                        removedCharPosOpt.get.start,
+                        removedCharPosOpt.get.end,
+                        "Parsing failed. Some chars was removed as result of recovery process."
+                      )
+                    )
                 (compRes._1, compRes._2, errorList)
               }
               .leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}")

@@ -130,6 +130,7 @@ object JsAPI {
   def parseAndCompile(
       input: String,
       estimatorVersion: Int,
+      lastInsertedCharPos: js.UndefOr[Int] = None.orUndefined,
       needCompaction: Boolean = false,
       removeUnusedCode: Boolean = false,
       libraries: Dictionary[String] = Dictionary.empty
@@ -143,7 +144,14 @@ object JsAPI {
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
-      compiled    <- parseAndCompileScript(ds, linkedInput, allEstimators.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode)
+      compiled <- parseAndCompileScript(
+        ds,
+        linkedInput,
+        allEstimators.toIndexedSeq(estimatorVer - 1),
+        lastInsertedCharPos.toOption,
+        needCompaction,
+        removeUnusedCode
+      )
     } yield compiled
     r.fold(
       e => js.Dynamic.literal("error" -> e),
@@ -155,6 +163,7 @@ object JsAPI {
       ds: DirectiveSet,
       input: String,
       estimator: ScriptEstimator,
+      lastInsertedCharPos: Option[Int],
       needCompaction: Boolean,
       removeUnusedCode: Boolean
   ) = {
@@ -195,7 +204,15 @@ object JsAPI {
           }
       case DAppType =>
         Global
-          .parseAndCompileContract(input, fullDAppContext(ds.stdLibVersion).compilerContext, stdLibVer, estimator, needCompaction, removeUnusedCode)
+          .parseAndCompileContract(
+            input,
+            fullDAppContext(ds.stdLibVersion).compilerContext,
+            stdLibVer,
+            estimator,
+            lastInsertedCharPos,
+            needCompaction,
+            removeUnusedCode
+          )
           .map {
             case (bytes, complexityWithMap, exprDApp, compErrorList) =>
               js.Dynamic.literal(

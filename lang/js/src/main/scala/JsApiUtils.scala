@@ -59,7 +59,7 @@ package object JsApiUtils {
       "posStart"    -> ast.position.start,
       "posEnd"      -> ast.position.end,
       "decList"     -> ast.decs.map(serDec).toJSArray,
-      "annFuncList" -> ast.fs.map(serAnnFunc)
+      "annFuncList" -> ast.fs.map(serAnnFunc).toJSArray
     )
   }
 

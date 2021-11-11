@@ -119,11 +119,12 @@ trait BaseGlobal {
       ctx: CompilerContext,
       stdLibVersion: StdLibVersion,
       estimator: ScriptEstimator,
+      lastInsertedCharPos: Option[Int],
       needCompaction: Boolean,
       removeUnusedCode: Boolean
   ): Either[String, (Array[Byte], (Long, Map[String, Long]), Expressions.DAPP, Iterable[CompilationError])] = {
     (for {
-      compRes <- ContractCompiler.compileWithParseResult(input, ctx, stdLibVersion, needCompaction, removeUnusedCode)
+      compRes <- ContractCompiler.compileWithParseResult(input, ctx, stdLibVersion, lastInsertedCharPos, needCompaction, removeUnusedCode)
       (compDAppOpt, exprDApp, compErrorList) = compRes
       complexityWithMap <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty)
         ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator, fixEstimateOfVerifier = true)
