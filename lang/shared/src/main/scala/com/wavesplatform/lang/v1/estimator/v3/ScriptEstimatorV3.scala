@@ -16,7 +16,9 @@ import com.wavesplatform.lang.v1.estimator.{HighOrderFunctionInfo, ScriptEstimat
 import com.wavesplatform.lang.v1.task.imports._
 import monix.eval.Coeval
 
-object ScriptEstimatorV3 extends ScriptEstimator {
+case class ScriptEstimatorV3(overhead: Boolean) extends ScriptEstimator {
+  private val overheadCost: Long = if (overhead) 1 else 0
+
   override val version: Int = 3
 
   override def apply(
@@ -38,7 +40,7 @@ object ScriptEstimatorV3 extends ScriptEstimator {
         case BLOCK(f: FUNC, inner)       => evalFuncBlock(f, inner)
         case BLOCK(_: FAILED_DEC, _)     => const(0)
         case REF(str)                    => markRef(str)
-        case _: EVALUATED                => const(1L)
+        case _: EVALUATED                => const(overheadCost)
         case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
         case GETTER(expr, _)             => evalGetter(expr)
         case FUNCTION_CALL(header, args) => evalFuncCall(header, args)
@@ -87,13 +89,13 @@ object ScriptEstimatorV3 extends ScriptEstimator {
       cond  <- evalHoldingFuncs(cond)
       right <- evalHoldingFuncs(ifTrue)
       left  <- evalHoldingFuncs(ifFalse)
-    } yield cond + Math.max(right, left) + 1
+    } yield cond + Math.max(right, left) + overheadCost
 
   private def markRef(key: String): EvalM[Long] =
-    update(usedRefs.modify(_)(_ + key)).map(_ => 1)
+    update(usedRefs.modify(_)(_ + key)).map(_ => overheadCost)
 
   private def evalGetter(expr: EXPR): EvalM[Long] =
-    evalExpr(expr).map(_ + 1)
+    evalExpr(expr).map(_ + overheadCost)
 
   private def evalFuncCall(header: FunctionHeader, args: List[EXPR]): EvalM[Long] =
     for {

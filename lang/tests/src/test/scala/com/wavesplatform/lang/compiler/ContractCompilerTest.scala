@@ -1008,7 +1008,8 @@ class ContractCompilerTest extends PropSpec {
         |
       """.stripMargin
 
-    Global.compileContract(dApp, dAppV4Ctx, V4, ScriptEstimatorV3, false, false) should produce("Script is too large: 37551 bytes > 32768 bytes")
+    val e = ScriptEstimatorV3(overhead = true)
+    Global.compileContract(dApp, dAppV4Ctx, V4, e, false, false) should produce("Script is too large: 37551 bytes > 32768 bytes")
   }
 
   property("@Callable Invoke") {

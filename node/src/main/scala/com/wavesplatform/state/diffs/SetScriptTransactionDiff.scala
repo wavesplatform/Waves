@@ -63,7 +63,7 @@ object SetScriptTransactionDiff {
       version: StdLibVersion,
       dApp: DApp
   ): Either[String, List[(Long, Map[String, Long])]] =
-    ScriptEstimator.all
+    ScriptEstimator.all(???)
       .drop(blockchain.estimator.version)
       .traverse(
         se =>
