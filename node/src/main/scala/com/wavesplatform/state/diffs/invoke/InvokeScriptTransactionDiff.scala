@@ -24,6 +24,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient, _}
+import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.metrics.{TxProcessingStats => Stats}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.state._
@@ -333,6 +334,7 @@ object InvokeScriptTransactionDiff {
           } else
             ScriptExecutionError.dAppExecution(error, log)
       }
+      .map { r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1); r }
   }
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {

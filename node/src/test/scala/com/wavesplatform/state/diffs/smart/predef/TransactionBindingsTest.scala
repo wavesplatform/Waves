@@ -17,6 +17,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.lang.{Common, Global}
+import com.wavesplatform.settings.TestSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ci._
 import com.wavesplatform.test._
@@ -346,6 +347,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
 
       val blockchain = stub[Blockchain]
       (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
+      (() => blockchain.settings).when().returning(TestSettings.Default.blockchainSettings)
 
       val result = runScriptWithCustomContext(script, t, V4, blockchain)
       result shouldBe evaluated(true)
@@ -711,7 +713,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     val expr       = Parser.parseExpr(script).get.value
     val directives = DirectiveSet(V2, AssetType, Expression).explicitGet()
     val ctx =
-      PureContext.build(V2, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V2, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V2, AssetType, Expression).explicitGet())
 
@@ -742,7 +744,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
 
     val ctx =
-      PureContext.build(V2, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V2, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
         WavesContext.build(Global, directives)
 

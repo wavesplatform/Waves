@@ -25,7 +25,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{BlockchainUpdater, _}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.{EthEncoding, SystemTime}
 import com.wavesplatform.utx.UtxPoolImpl
@@ -50,7 +50,18 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   lazy val wallet: Wallet       = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
-    //noinspection NotImplementedCode
+    /**
+      * @return Tuple of (asset, feeInAsset, feeInWaves)
+      * @see [[com.wavesplatform.state.diffs.FeeValidation#getMinFee(com.wavesplatform.state.Blockchain, com.wavesplatform.transaction.Transaction)]]
+      */
+    def calculateFee(tx: Transaction): (Asset, TxAmount, TxAmount) =
+      transactions.calculateFee(tx).explicitGet()
+
+    def calculateWavesFee(tx: Transaction): TxAmount = {
+      val (Waves, _, feeInWaves) = (calculateFee(tx): @unchecked)
+      feeInWaves
+    }
+
     def invokeScriptResult(transactionId: ByteStr): InvokeScriptResult =
       transactions.transactionById(transactionId).get match {
         case hsc: TransactionMeta.HasStateChanges => hsc.invokeScriptResult.get
@@ -149,6 +160,20 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       .toSeq
 
   def portfolio(address: Address): Seq[(IssuedAsset, Long)] = Domain.portfolio(address, db, blockchainUpdater)
+
+  def appendAndAssertSucceed(txs: Transaction*): Block = {
+    val block = createBlock(Block.PlainBlockVersion, txs)
+    appendBlock(block)
+    txs.foreach(tx => require(blockchain.transactionSucceeded(tx.id()), s"should succeed: $tx"))
+    lastBlock
+  }
+
+  def appendAndAssertFailed(txs: Transaction*): Block = {
+    val block = createBlock(Block.PlainBlockVersion, txs)
+    appendBlock(block)
+    txs.foreach(tx => require(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx"))
+    lastBlock
+  }
 
   def appendBlock(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)

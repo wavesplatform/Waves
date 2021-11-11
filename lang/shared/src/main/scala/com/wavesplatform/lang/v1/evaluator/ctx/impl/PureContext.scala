@@ -1358,7 +1358,7 @@ object PureContext {
       IF(REF("@p"), FALSE, TRUE)
     }
 
-  def pow(roundTypes: UNION): BaseFunction[NoContext] = {
+  def pow(roundTypes: UNION, useNewPrecision: Boolean): BaseFunction[NoContext] = {
     NativeFunction("pow",
                    Map(V3 -> 100L, V4 -> 100L, V5 -> 100L, V6 -> 28L),
                    POW,
@@ -1378,7 +1378,7 @@ object PureContext {
             || rp > 8) {
           Left("pow: scale out of range 0-8")
         } else {
-          global.pow(b, bp.toInt, e, ep.toInt, rp.toInt, Rounding.byValue(round)).map(CONST_LONG)
+          global.pow(b, bp.toInt, e, ep.toInt, rp.toInt, Rounding.byValue(round), useNewPrecision).map(CONST_LONG)
         }
       case xs => notImplemented[Id, EVALUATED]("pow(base: Int, bp: Int, exponent: Int, ep: Int, rp: Int, round: Rounds)", xs)
     }
@@ -1416,7 +1416,7 @@ object PureContext {
     }
   }
 
-  def powBigInt(roundTypes: UNION): BaseFunction[NoContext] =
+  def powBigInt(roundTypes: UNION, useNewPrecision: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "pow",
       Map(V5 -> 200L, V6 -> 270L),
@@ -1439,7 +1439,7 @@ object PureContext {
           Left("pow: scale out of range 0-18")
         } else {
           global
-            .powBigInt(b, bp, e, ep, rp, Rounding.byValue(round))
+            .powBigInt(b, bp, e, ep, rp, Rounding.byValue(round), useNewPrecision)
             .filterOrElse(v => v <= BigIntMax && v >= BigIntMin, "Result out of 512-bit range")
             .bimap(e => s"$e on BigInt pow calculation", CONST_BIGINT)
         }
@@ -1691,9 +1691,9 @@ object PureContext {
       parseIntVal
     )
 
-  private val v3V4Functions =
+  private def v3V4Functions(useNewPowPrecision: Boolean) =
     Array(
-      pow(UNION(allRoundTypes)),
+      pow(UNION(allRoundTypes), useNewPowPrecision),
       log(UNION(allRoundTypes))
     )
 
@@ -1715,10 +1715,10 @@ object PureContext {
       splitStrFixed
     )
 
-  private def v3Functions(fixUnicodeFunctions: Boolean) =
+  private def v3Functions(fixUnicodeFunctions: Boolean, useNewPowPrecision: Boolean) =
     v1V2V3CommonFunctions(fixUnicodeFunctions) ++
       fromV3V4Functions ++
-      v3V4Functions ++
+      v3V4Functions(useNewPowPrecision) ++
       Array(
         toUtf8String(reduceLimit = false),
         listConstructor(checkSize = false)
@@ -1744,9 +1744,9 @@ object PureContext {
         makeString
       ) ++ (MinTupleSize to MaxTupleSize).map(i => createTupleN(i))
 
-  private val v4FunctionsUnfixed =
+  private def v4FunctionsUnfixed(useNewPowPrecision: Boolean) =
     v4V5Functions ++
-      v3V4Functions ++
+      v3V4Functions(useNewPowPrecision) ++
       Array(
         indexOf,
         indexOfN,
@@ -1761,9 +1761,9 @@ object PureContext {
         fraction(fixLimitCheck = false)
       )
 
-  private val v4FunctionsFixed =
+  private def v4FunctionsFixed(useNewPowPrecision: Boolean) =
     v4V5Functions ++
-      v3V4Functions ++
+      v3V4Functions(useNewPowPrecision) ++
       Array(
         indexOfFixed,
         indexOfNFixed,
@@ -1778,10 +1778,10 @@ object PureContext {
         fraction(fixLimitCheck = false)
       )
 
-  private def v4Functions(fixUnicodeFunctions: Boolean) =
-    if (fixUnicodeFunctions) v4FunctionsFixed else v4FunctionsUnfixed
+  private def v4Functions(fixUnicodeFunctions: Boolean, useNewPowPrecision: Boolean) =
+    if (fixUnicodeFunctions) v4FunctionsFixed(useNewPowPrecision) else v4FunctionsUnfixed(useNewPowPrecision)
 
-  private val fromV5Functions =
+  private def fromV5Functions(useNewPowPrecision: Boolean) =
     v4V5Functions ++
       Array(
         indexOfFixed,
@@ -1815,18 +1815,18 @@ object PureContext {
         fractionBigIntRounds(UNION(fromV5RoundTypes)),
         negativeBigInt,
         getBigIntListMedian,
-        powBigInt(UNION(fromV5RoundTypes)),
+        powBigInt(UNION(fromV5RoundTypes), useNewPowPrecision),
         logBigInt(UNION(fromV5RoundTypes)),
-        pow(UNION(fromV5RoundTypes)),
+        pow(UNION(fromV5RoundTypes), useNewPowPrecision),
         log(UNION(fromV5RoundTypes)),
         fraction(fixLimitCheck = true),
       )
 
-  private val v5Functions =
-    fromV5Functions :+ fractionIntRounds(UNION(fromV5RoundTypes))
+  private def v5Functions(useNewPowPrecision: Boolean) =
+    fromV5Functions(useNewPowPrecision) :+ fractionIntRounds(UNION(fromV5RoundTypes))
 
   private val v6Functions =
-    fromV5Functions ++ folds.map(_._2) ++ Array(sizeTuple, makeString1C, makeString2C, splitStr1C, splitStr4C, sqrtInt, sqrtBigInt, fractionIntRoundsNative)
+    fromV5Functions(true) ++ folds.map(_._2) ++ Array(sizeTuple, makeString1C, makeString2C, splitStr1C, splitStr4C, sqrtInt, sqrtBigInt, fractionIntRoundsNative)
 
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =
     CTX[NoContext](
@@ -1835,33 +1835,33 @@ object PureContext {
       v1V2V3CommonFunctions(fixUnicodeFunctions)
     )
 
-  private def v3Ctx(fixUnicodeFunctions: Boolean) =
+  private def v3Ctx(fixUnicodeFunctions: Boolean, useNewPowPrecision: Boolean) =
     CTX[NoContext](
       v1v2v3v4Types,
       v3V4Vars,
-      v3Functions(fixUnicodeFunctions)
+      v3Functions(fixUnicodeFunctions, useNewPowPrecision)
     )
 
-  private def v4Ctx(fixUnicodeFunctions: Boolean) =
+  private def v4Ctx(fixUnicodeFunctions: Boolean, useNewPowPrecision: Boolean) =
     CTX[NoContext](
       v1v2v3v4Types,
       v3V4Vars,
-      v4Functions(fixUnicodeFunctions)
+      v4Functions(fixUnicodeFunctions, useNewPowPrecision)
     )
 
   private val v1V2CtxFixed = v1V2Ctx(true)
-  private val v3CtxFixed   = v3Ctx(true)
-  private val v4CtxFixed   = v4Ctx(true)
+  private def v3CtxFixed(useNewPowPrecision: Boolean)   = v3Ctx(true, useNewPowPrecision)
+  private def v4CtxFixed(useNewPowPrecision: Boolean)   = v4Ctx(true, useNewPowPrecision)
 
   private val v1V2CtxUnfixed = v1V2Ctx(false)
-  private val v3CtxUnfixed   = v3Ctx(false)
-  private val v4CtxUnfixed   = v4Ctx(false)
+  private def v3CtxUnfixed(useNewPowPrecision: Boolean)   = v3Ctx(false, useNewPowPrecision)
+  private def v4CtxUnfixed(useNewPowPrecision: Boolean)   = v4Ctx(false, useNewPowPrecision)
 
-  private val v5Ctx =
+  private def v5Ctx(useNewPowPrecision: Boolean) =
     CTX[NoContext](
       v5Types,
       v5Vars,
-      v5Functions
+      v5Functions(useNewPowPrecision)
     )
 
   private val v6Ctx =
@@ -1871,15 +1871,15 @@ object PureContext {
       v6Functions
     )
 
-  def build(version: StdLibVersion, fixUnicodeFunctions: Boolean): CTX[NoContext] =
+  def build(version: StdLibVersion, fixUnicodeFunctions: Boolean, useNewPowPrecision: Boolean): CTX[NoContext] =
     version match {
       case V1 | V2 if fixUnicodeFunctions => v1V2CtxFixed
-      case V3 if fixUnicodeFunctions      => v3CtxFixed
-      case V4 if fixUnicodeFunctions      => v4CtxFixed
+      case V3 if fixUnicodeFunctions      => v3CtxFixed(useNewPowPrecision)
+      case V4 if fixUnicodeFunctions      => v4CtxFixed(useNewPowPrecision)
       case V1 | V2                        => v1V2CtxUnfixed
-      case V3                             => v3CtxUnfixed
-      case V4                             => v4CtxUnfixed
-      case V5                             => v5Ctx
+      case V3                             => v3CtxUnfixed(useNewPowPrecision)
+      case V4                             => v4CtxUnfixed(useNewPowPrecision)
+      case V5                             => v5Ctx(useNewPowPrecision)
       case V6                             => v6Ctx
     }
 }
