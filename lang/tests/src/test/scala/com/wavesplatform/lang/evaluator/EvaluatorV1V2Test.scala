@@ -260,8 +260,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     forAll(blockBuilder) { block =>
       var functionEvaluated = 0
 
-      val f = NativeFunction[NoContext]("F", 1: Long, 258: Short, LONG: TYPE, Seq(("_", LONG)): _*) {
-        case _ =>
+      val f = NativeFunction[NoContext]("F", 1: Long, 258: Short, LONG: TYPE, Seq(("_", LONG))*) {
+        _ =>
           functionEvaluated = functionEvaluated + 1
           evaluated(1L)
       }
@@ -306,10 +306,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   property("successful on function call getter evaluation") {
     val fooType = CASETYPEREF("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction[NoContext]("createFoo", 1: Long, 259: Short, fooType, List.empty: _*) {
-      case _ =>
-        evaluated(CaseObj(fooType, Map("bar" -> "bAr", "buz" -> 1L)))
-    }
+    val fooCtor = NativeFunction[NoContext]("createFoo", 1: Long, 259: Short, fooType, List.empty*)(_ =>
+      evaluated(CaseObj(fooType, Map("bar" -> "bAr", "buz" -> 1L))))
 
     val context = EvaluationContext.build(
       typeDefs = Map.empty,
@@ -324,8 +322,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   property("successful on block getter evaluation") {
     val fooType = CASETYPEREF("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction[NoContext]("createFoo", 1: Long, 259: Short, fooType, List.empty: _*) {
-      case _ =>
+    val fooCtor = NativeFunction[NoContext]("createFoo", 1: Long, 259: Short, fooType, List.empty*) {
+      _ =>
         evaluated(
           CaseObj(
             fooType,
@@ -338,7 +336,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     }
     val fooTransform =
       NativeFunction[NoContext]("transformFoo", 1: Long, 260: Short, fooType, ("foo", fooType)) {
-        case (fooObj: CaseObj) :: Nil => evaluated(fooObj.copy(fields = fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
+        case (fooObj: CaseObj) :: Nil => evaluated(CaseObj(fooObj.caseType, fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
         case _                        => ???
       }
 

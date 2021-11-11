@@ -1,6 +1,5 @@
 package com.wavesplatform.api.eth
 
-import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.eth.EthRpcRoute
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -10,10 +9,10 @@ import com.wavesplatform.http.RouteSpec
 import com.wavesplatform.lang.directives.values.StdLibVersion.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.BinaryDataEntry
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.test.node.{randomAddress, randomKeyPair}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import com.wavesplatform.transaction.utils.EthConverters._
+import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxHelpers}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers}
@@ -25,7 +24,7 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
   def routeTest[T](d: Domain, method: String, params: JsValueWrapper*)(body: => T): Unit = {
     Post(
       routePath(""),
-      Json.obj("method" -> method, "params" -> Json.arr(params: _*), "id" -> "test")
+      Json.obj("method" -> method, "params" -> Json.arr(params*), "id" -> "test")
     ) ~> new EthRpcRoute(d.blockchain, d.commonApi.transactions, ntpTime).route ~> check(body)
   }
 

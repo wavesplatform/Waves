@@ -7,17 +7,17 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.Blake2b256
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.BaseFreeSpec
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
-import org.scalatest._
+import org.scalatest.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class MerkleRootTestSuite
     extends BaseFreeSpec
     with ActivationStatusRequest
     with OptionValues {
-  import MerkleRootTestSuite._
+  import MerkleRootTestSuite.*
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -90,15 +90,15 @@ class MerkleRootTestSuite
       if (nodes.head.height == currentHeight) {
         txsBuf += tx
         val txsSeq = txsBuf.toSeq
-        merkleProofBefore = nodes.head.getMerkleProof(txsSeq: _*).map(resp => resp.merkleProof)
-        merkleProofPostBefore = nodes.head.getMerkleProofPost(txsSeq: _*).map(resp => resp.merkleProof)
+        merkleProofBefore = nodes.head.getMerkleProof(txsSeq*).map(resp => resp.merkleProof)
+        merkleProofPostBefore = nodes.head.getMerkleProofPost(txsSeq*).map(resp => resp.merkleProof)
         blockTransactionsRootBefore = nodes.head.blockAt(currentHeight).transactionsRoot.get
       }
     }
     nodes.head.height shouldBe currentHeight + 1
     val txsSeq = txsBuf.toSeq
-    nodes.head.getMerkleProof(txsSeq: _*).map(resp => resp.merkleProof) should not be merkleProofBefore
-    nodes.head.getMerkleProofPost(txsSeq: _*).map(resp => resp.merkleProof) should not be merkleProofPostBefore
+    nodes.head.getMerkleProof(txsSeq*).map(resp => resp.merkleProof) should not be merkleProofBefore
+    nodes.head.getMerkleProofPost(txsSeq*).map(resp => resp.merkleProof) should not be merkleProofPostBefore
     nodes.head.blockAt(currentHeight).transactionsRoot.get should not be blockTransactionsRootBefore
   }
 }

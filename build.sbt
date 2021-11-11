@@ -126,6 +126,7 @@ inScope(Global)(
     organizationHomepage := Some(url("https://wavesplatform.com")),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     scalacOptions ++= Seq(
+      "-Xsource:3",
       "-feature",
       "-deprecation",
       "-unchecked",

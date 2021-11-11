@@ -197,7 +197,7 @@ trait WithDomain extends WithState { _: Suite =>
     )
 
   def domainSettingsWithPreactivatedFeatures(fs: BlockchainFeature*): WavesSettings =
-    domainSettingsWithFeatures(fs.map(_ -> 0): _*)
+    domainSettingsWithFeatures(fs.map(_ -> 0)*)
 
   def domainSettingsWithFeatures(fs: (BlockchainFeature, Int)*): WavesSettings = {
     val defaultFS = SettingsFromDefaultConfig

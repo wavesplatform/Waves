@@ -3,20 +3,20 @@ package com.wavesplatform.api.http
 import java.security.SecureRandom
 
 import akka.http.scaladsl.server.{PathMatcher1, Route}
-import cats.syntax.either._
-import cats.syntax.semigroup._
+import cats.syntax.either.*
+import cats.syntax.semigroup.*
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, ScriptCompilerError, TooBigArrayAllocation}
 import com.wavesplatform.api.http.requests.{ScriptWithImportsRequest, byteStrFormat}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{RideV6, SynchronousCalls}
 import com.wavesplatform.features.RideVersionProvider.RideVersionBlockchainExt
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -43,7 +43,7 @@ import com.wavesplatform.transaction.{Asset, TransactionType}
 import com.wavesplatform.utils.Time
 import monix.eval.Coeval
 import monix.execution.Scheduler
-import play.api.libs.json._
+import play.api.libs.json.*
 import shapeless.Coproduct
 
 case class UtilsApiRoute(
@@ -56,7 +56,7 @@ case class UtilsApiRoute(
     with AuthRoute
     with TimeLimitedRoute {
 
-  import UtilsApiRoute._
+  import UtilsApiRoute.*
 
   private def seed(length: Int): JsObject = {
     val seed = new Array[Byte](length)
@@ -103,7 +103,7 @@ case class UtilsApiRoute(
               val result  = directives ::: "script" -> JsString(scriptText) :: Nil
               val wrapped = result.map { case (k, v) => (k, toJsFieldJsValueWrapper(v)) }
               complete(
-                Json.obj(wrapped: _*)
+                Json.obj(wrapped*)
               )
           }
       }
@@ -157,7 +157,7 @@ case class UtilsApiRoute(
   }
 
   def compileWithImports: Route = path("script" / "compileWithImports") {
-    import ScriptWithImportsRequest._
+    import ScriptWithImportsRequest.*
     (post & entity(as[ScriptWithImportsRequest])) { req =>
       val version               = blockchain.actualRideVersion
       val fixEstimateOfVerifier = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)

@@ -82,7 +82,7 @@ class VerifierSpecification
             BlockchainFeatures.Ride4DApps
           )
         ) { d =>
-          d.appendBlock(genesisTxs: _*)
+          d.appendBlock(genesisTxs*)
           d.appendBlock(
             SetScriptTransaction
               .selfSigned(
@@ -165,7 +165,7 @@ class VerifierSpecification
             BlockchainFeatures.Ride4DApps
           )
         ) { d =>
-          d.appendBlock(genesisTxs: _*)
+          d.appendBlock(genesisTxs*)
 
           d.blockchainUpdater.processBlock(
             d.createBlock(2.toByte, Seq(setAssetScript(buyFeeAsset, Some(ExprScript(Terms.FALSE).explicitGet())), exchangeTx))

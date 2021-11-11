@@ -5,14 +5,14 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures._
+import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
@@ -76,19 +76,19 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
       dApp3   <- accountGen
       dApp4   <- accountGen
       fee     <- ciFee()
-      gTx1       = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2       = GenesisTransaction.create(dApp1.toAddress, fee, ts).explicitGet()
-      gTx3       = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx4       = GenesisTransaction.create(dApp3.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx5       = GenesisTransaction.create(dApp4.toAddress, ENOUGH_AMT, ts).explicitGet()
-      limit      = ContractLimits.MaxWriteSetSizeInBytes - 9
-      wholeLimit = ContractLimits.MaxTotalWriteSetSizeInBytes - 9
-      size       = if (exceed5Kb) limit + 1 else limit
-      ssTx1      = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script(dApp2.toAddress, size, sync)), fee, ts).explicitGet()
-      ssTx2      = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp2Script(dApp3.toAddress, size)), fee, ts).explicitGet()
-      ssTx3      = SetScriptTransaction.selfSigned(1.toByte, dApp3, Some(dApp3Script(dApp4.toAddress, size)), fee, ts).explicitGet()
-      ssTx4      = SetScriptTransaction.selfSigned(1.toByte, dApp4, Some(dApp4Script(size, !reach15kb)), fee, ts).explicitGet()
-      invokeTx   = () => Signed.invokeScript(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts)
+      gTx1     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+      gTx2     = GenesisTransaction.create(dApp1.toAddress, fee, ts).explicitGet()
+      gTx3     = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
+      gTx4     = GenesisTransaction.create(dApp3.toAddress, ENOUGH_AMT, ts).explicitGet()
+      gTx5     = GenesisTransaction.create(dApp4.toAddress, ENOUGH_AMT, ts).explicitGet()
+      limit    = ContractLimits.MaxWriteSetSizeInBytes - 9
+      _        = ContractLimits.MaxTotalWriteSetSizeInBytes - 9
+      size     = if (exceed5Kb) limit + 1 else limit
+      ssTx1    = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script(dApp2.toAddress, size, sync)), fee, ts).explicitGet()
+      ssTx2    = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp2Script(dApp3.toAddress, size)), fee, ts).explicitGet()
+      ssTx3    = SetScriptTransaction.selfSigned(1.toByte, dApp3, Some(dApp3Script(dApp4.toAddress, size)), fee, ts).explicitGet()
+      ssTx4    = SetScriptTransaction.selfSigned(1.toByte, dApp4, Some(dApp4Script(size, !reach15kb)), fee, ts).explicitGet()
+      invokeTx = () => Signed.invokeScript(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts)
     } yield (Seq(gTx1, gTx2, gTx3, gTx4, gTx5, ssTx1, ssTx2, ssTx3, ssTx4), invokeTx)
 
   private val settings =
@@ -99,7 +99,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
   property("exceeding 5 Kb before and after activation") {
     withDomain(domainSettingsWithFS(settings)) { d =>
       val (preparingTxs, invoke) = scenario(exceed5Kb = true, sync = true).sample.get
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs *)
 
       val invoke1 = invoke()
       (the[RuntimeException] thrownBy d.appendBlock(invoke1)).getMessage should include(
@@ -118,7 +118,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
   property("exceeding 15 Kb before activation, after checkTotalDataEntriesBytesHeight and after syncDAppCheckTransfersHeight") {
     withDomain(domainSettingsWithFS(settings)) { d =>
       val (preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true).sample.get
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs *)
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)
@@ -140,7 +140,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
   property("reaching 5 Kb before and after activation") {
     withDomain(domainSettingsWithFS(settings)) { d =>
       val (preparingTxs, invoke) = scenario(exceed5Kb = false, sync = false).sample.get
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs *)
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)
@@ -155,7 +155,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
   property("reaching 15 Kb after activation") {
     withDomain(domainSettingsWithFS(settings)) { d =>
       val (preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true, reach15kb = true).sample.get
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs *)
       d.appendBlock()
 
       val invoke1 = invoke()

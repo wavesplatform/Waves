@@ -2,8 +2,7 @@ package com.wavesplatform.http
 
 import com.wavesplatform.RequestGen
 import com.wavesplatform.api.common.CommonAccountsApi
-import com.wavesplatform.api.http.ApiError._
-import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
@@ -12,11 +11,11 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseCancelTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
+import org.scalacheck.Gen as G
 import org.scalacheck.Gen.posNum
-import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json.Json._
-import play.api.libs.json._
+import play.api.libs.json.*
+import play.api.libs.json.Json.*
 
 class LeaseBroadcastRouteSpec
     extends RouteSpec("/leasing/broadcast/")

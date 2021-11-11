@@ -260,7 +260,7 @@ object JsAPI {
                     error => Seq("error" -> error),
                     _ => Seq()
                   )
-              js.Dynamic.literal.applyDynamic("apply")(resultFields ++ errorFieldOpt: _*)
+              js.Dynamic.literal.applyDynamic("apply")((resultFields ++ errorFieldOpt)*)
           }
       case Library =>
         val ctx = buildScriptContext(version, isAsset, ds.contentType == DAppType)
@@ -306,7 +306,7 @@ object JsAPI {
                     _ => Seq()
                   )
               }
-              js.Dynamic.literal.applyDynamic("apply")(resultFields ++ errorFieldOpt: _*)
+              js.Dynamic.literal.applyDynamic("apply")((resultFields ++ errorFieldOpt)*)
           }
     }
   }
