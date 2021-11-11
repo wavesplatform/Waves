@@ -75,12 +75,13 @@ object BlockDiffer extends ScorexLogging {
 
     for {
       _ <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
-      r <- generateDiff(
-        CompositeBlockchain(blockchain, Diff.empty, block, hitSource, 0, None),
+      blockchainWithNewBlock = CompositeBlockchain(blockchain, Diff.empty, block, hitSource, 0, None)
+      r <- apply(
+        blockchainWithNewBlock,
         constraint,
         maybePrevBlock.map(_.header.timestamp),
-        Diff.empty.copy(portfolios = Map(block.sender.toAddress -> (minerReward |+| initialFeeFromThisBlock |+| feeFromPreviousBlock))),
-        hasNg = stateHeight >= ngHeight,
+        Diff.empty.copy(portfolios = Map(block.sender.toAddress -> (minerReward |+| initialFeeFromThisBlock |+| feeFromPreviousBlock))) |+| patchesDiff(blockchainWithNewBlock),
+        stateHeight >= ngHeight,
         block.transactionData,
         verify
       )
@@ -113,12 +114,12 @@ object BlockDiffer extends ScorexLogging {
         )
       )
       _ <- TracedResult(micro.signaturesValid())
-      r <- generateDiff(
+      r <- apply(
         blockchain,
         constraint,
         prevBlockTimestamp,
         Diff.empty,
-        hasNg = true,
+        true,
         micro.transactionData,
         verify
       )
@@ -132,7 +133,7 @@ object BlockDiffer extends ScorexLogging {
       case _ => transactionFee
     }
 
-  private[this] def generateDiff(
+  private[this] def apply(
       blockchain: Blockchain,
       initConstraint: MiningConstraint,
       prevBlockTimestamp: Option[Long],
@@ -151,13 +152,8 @@ object BlockDiffer extends ScorexLogging {
     val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify) _
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
-    val initDiffWithPatches = Seq(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn, CancelLeasesToDisabledAliases).foldLeft(initDiff) {
-      case (prevDiff, patch) =>
-        patch.lift(CompositeBlockchain(blockchain, prevDiff)).fold(prevDiff)(prevDiff |+| _)
-    }
-
     txs
-      .foldLeft(TracedResult(Result(initDiffWithPatches, 0L, 0L, initConstraint, DetailedDiff(initDiffWithPatches, Nil)).asRight[ValidationError])) {
+      .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil)).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _, _), _) => acc
         case (TracedResult(Right(Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs))), _, _), tx) =>
           val currBlockchain = CompositeBlockchain(blockchain, currDiff)
@@ -193,5 +189,12 @@ object BlockDiffer extends ScorexLogging {
             }
           }
       }
+  }
+
+  private def patchesDiff(blockchain: Blockchain): Diff = {
+    Seq(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn, CancelLeasesToDisabledAliases).foldLeft(Diff.empty) {
+      case (prevDiff, patch) =>
+        patch.lift(CompositeBlockchain(blockchain, prevDiff)).fold(prevDiff)(prevDiff |+| _)
+    }
   }
 }

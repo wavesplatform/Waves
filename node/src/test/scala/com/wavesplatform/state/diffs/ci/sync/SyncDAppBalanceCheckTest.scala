@@ -16,7 +16,9 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import org.scalatest.Ignore
 
+@Ignore
 class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with TransactionGenBase {
 
   private val time = new TestTime
@@ -70,7 +72,7 @@ class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with Transaction
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)
-      d.blockchain.transactionInfo(invoke1.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
 
       val invoke2 = invoke()
       d.appendBlock()

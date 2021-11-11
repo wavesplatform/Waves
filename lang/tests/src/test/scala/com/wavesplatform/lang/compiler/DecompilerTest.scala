@@ -799,7 +799,7 @@ class DecompilerTest extends PropSpec {
 
     val ctx =
       Monoid.combine(
-        PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment],
+        PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
       )
 
@@ -860,7 +860,7 @@ class DecompilerTest extends PropSpec {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V4).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
         )
@@ -901,7 +901,7 @@ class DecompilerTest extends PropSpec {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V4).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
         )
@@ -933,7 +933,7 @@ class DecompilerTest extends PropSpec {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V5, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V5).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
         )
@@ -967,7 +967,7 @@ class DecompilerTest extends PropSpec {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V5, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V5).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
         )
@@ -1012,7 +1012,7 @@ class DecompilerTest extends PropSpec {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V5, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V5).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
         )
@@ -1021,6 +1021,24 @@ class DecompilerTest extends PropSpec {
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V5, needCompaction = true).explicitGet()
     val res  = Decompiler(dApp, ctx.decompilerContext)
     res shouldEq scriptWithoutTypes
+  }
+
+  property("BigInt unary minus") {
+    val script =
+      s"""
+         |let a = -toBigInt(1)
+         |true
+       """.stripMargin
+
+    val expected =
+      s"""
+         |let a = -(toBigInt(1))
+         |true
+       """.stripMargin.trim
+
+    val expr = TestCompiler(V5).compileExpression(script).expr.asInstanceOf[EXPR]
+    val result = Decompiler(expr, getDecompilerContext(V5, Expression))
+    result shouldBe expected
   }
 
   property("native fold") {

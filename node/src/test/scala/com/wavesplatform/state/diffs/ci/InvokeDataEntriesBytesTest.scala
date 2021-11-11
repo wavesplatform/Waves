@@ -94,7 +94,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(checkTotalDataEntriesBytesHeight = 3)
+      .copy(checkTotalDataEntriesBytesHeight = 3, syncDAppCheckTransfersHeight = 4)
 
   property("exceeding 5 Kb before and after activation") {
     withDomain(domainSettingsWithFS(settings)) { d =>
@@ -115,18 +115,23 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
     }
   }
 
-  property("exceeding 15 Kb before and after activation") {
+  property("exceeding 15 Kb before activation, after checkTotalDataEntriesBytesHeight and after syncDAppCheckTransfersHeight") {
     withDomain(domainSettingsWithFS(settings)) { d =>
       val (preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true).sample.get
       d.appendBlock(preparingTxs: _*)
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)
-      d.blockchain.transactionInfo(invoke1.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
 
       val invoke2 = invoke()
       d.appendBlock(invoke2)
       d.blockchain.bestLiquidDiff.get.errorMessage(invoke2.id.value()).get.text should include(
+        "Storing data size should not exceed 15360, actual: 20476 bytes"
+      )
+
+      val invoke3 = invoke()
+      (the[Exception] thrownBy d.appendBlock(invoke3)).getMessage should include(
         "Storing data size should not exceed 15360, actual: 20476 bytes"
       )
     }
@@ -139,11 +144,11 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)
-      d.blockchain.transactionInfo(invoke1.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
 
       val invoke2 = invoke()
       d.appendBlock(invoke2)
-      d.blockchain.transactionInfo(invoke2.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke2.id.value()) shouldBe true
     }
   }
 
@@ -155,7 +160,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)
-      d.blockchain.transactionInfo(invoke1.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
     }
   }
 }

@@ -21,6 +21,7 @@ import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
@@ -439,6 +440,9 @@ object StateUpdate {
 
           case lt: LeaseTransaction =>
             TransactionMetadata.Metadata.Lease(TransactionMetadata.LeaseMetadata(lt.recipient.resolve.toByteString))
+
+          case ext: ExchangeTransaction =>
+            TransactionMetadata.Metadata.Exchange(TransactionMetadata.ExchangeMetadata(Seq(ext.order1, ext.order2).map(_.id().toByteString)))
 
           case ist: InvokeScriptTransaction =>
             TransactionMetadata.Metadata.InvokeScript(invokeScriptLikeToMetadata(ist))

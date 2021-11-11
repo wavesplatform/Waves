@@ -43,8 +43,8 @@ trait Blockchain {
   def wavesAmount(height: Int): BigInt
 
   def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)]
-  def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)]
-  def transactionMeta(id: ByteStr): Option[(Int, Boolean)]
+  def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)]
+  def transactionMeta(id: ByteStr): Option[TxMeta]
 
   def containsTransaction(tx: Transaction): Boolean
 
@@ -198,5 +198,7 @@ object Blockchain {
           case _: ContractScript.ContractScriptImpl => true
           case _                                    => false
         })
+
+    def transactionSucceeded(id: ByteStr): Boolean = blockchain.transactionMeta(id).exists(_.succeeded)
   }
 }

@@ -287,10 +287,10 @@ class EvaluatorV2(
       .onErrorHandle { e =>
         val error = if (e.getMessage != null) e.getMessage else e.toString
         ctx.log(let, Left(error))
-        throw if (e.isInstanceOf[EvaluationException])
-          e
-        else
-          EvaluationException(e.getMessage, limit)
+        throw e match {
+          case _: EvaluationException | _: RejectException => e
+          case _                                           => EvaluationException(e.getMessage, limit)
+        }
       }
   }
 

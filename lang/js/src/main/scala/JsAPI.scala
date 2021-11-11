@@ -22,15 +22,18 @@ import scala.scalajs.js.{Any, Dictionary}
 
 object JsAPI {
 
-  private def wavesContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean) =
+  private def wavesContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean): CTX[Environment] =
+    wavesContext(v, ScriptType.isAssetScript(isTokenContext), isContract)
+
+  private def wavesContext(v: StdLibVersion, scriptType: ScriptType, isContract: Boolean): CTX[Environment] =
     WavesContext.build(
       Global,
-      DirectiveSet(v, ScriptType.isAssetScript(isTokenContext), if (isContract) DAppType else Expression)
+      DirectiveSet(v, scriptType, if (isContract) DAppType else Expression)
         .explicitGet()
     )
 
   private def cryptoContext(version: StdLibVersion) = CryptoContext.build(Global, version).withEnvironment[Environment]
-  private def pureContext(version: StdLibVersion)   = PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[Environment]
+  private def pureContext(version: StdLibVersion)   = PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment]
 
   private val fullDAppContext: Map[StdLibVersion, CTX[Environment]] =
     DirectiveDictionary[StdLibVersion].all
@@ -40,6 +43,9 @@ object JsAPI {
 
   private def buildScriptContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean): CTX[Environment] =
     Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, isTokenContext, isContract)))
+
+  private def buildScriptContext(v: StdLibVersion, scriptType: ScriptType, isContract: Boolean): CTX[Environment] =
+    Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, scriptType, isContract)))
 
   private def buildContractContext(v: StdLibVersion): CTX[Environment] =
     Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, false, true)))
@@ -237,7 +243,7 @@ object JsAPI {
     val isAsset = ds.scriptType == Asset
     ds.contentType match {
       case Expression =>
-        val ctx = buildScriptContext(version, isAsset, ds.contentType == DAppType)
+        val ctx = buildScriptContext(version, ds.scriptType, ds.contentType == DAppType)
         Global
           .compileExpression(input, ctx.compilerContext, version, ds.scriptType, estimator)
           .map {
