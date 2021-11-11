@@ -86,13 +86,13 @@ object Global extends BaseGlobal {
 
   def toLongExact(v: BigInt) = Either.cond(v.isValidLong, v.toLong, s"$v out of range")
 
-  override def pow(b: Long, bp: Int, e: Long, ep: Int, rp: Int, round: Rounding): Either[String, Long] =
+  override def pow(b: Long, bp: Int, e: Long, ep: Int, rp: Int, round: Rounding, useNewPrecision: Boolean): Either[String, Long] =
     calcScaled(Math.pow)(b, bp, e, ep, rp, round).flatMap(toLongExact)
 
   override def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long] =
     calcScaled(Math.log(_) / Math.log(_))(b, bp, e, ep, rp, round).flatMap(toLongExact)
 
-  override def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =
+  override def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding, useNewPrecision: Boolean): Either[String, BigInt] =
     calcScaled(Math.pow)(b, bp, e, ep, rp, round)
 
   override def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =

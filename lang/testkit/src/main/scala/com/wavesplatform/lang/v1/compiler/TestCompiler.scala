@@ -16,7 +16,7 @@ import scala.collection.mutable
 
 class TestCompiler(version: StdLibVersion) {
   private lazy val baseCompilerContext =
-    PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+    PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
       CryptoContext.build(Global, version).withEnvironment[Environment]
 
   private lazy val compilerContext =

@@ -396,7 +396,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             TestBlock.create(
               nextTs,
               genesisBlockId,
-              Seq(CreateAliasTransaction.selfSigned(1.toByte, sender, alias, 1, nextTs).explicitGet())
+              Seq(CreateAliasTransaction.selfSigned(1.toByte, sender, alias.name, 1, nextTs).explicitGet())
             )
           )
 
