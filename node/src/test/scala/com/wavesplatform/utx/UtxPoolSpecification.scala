@@ -67,13 +67,7 @@ private object UtxPoolSpecification {
   }
 }
 
-class UtxPoolSpecification
-    extends FreeSpec
-    with MockFactory
-    with BlocksTransactionsHelpers
-    with WithDomain
-    with EitherValues
-    with Eventually {
+class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransactionsHelpers with WithDomain with EitherValues with Eventually {
   private val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
 
   import FeeValidation.{ScriptExtraFee => extraFee}
@@ -123,7 +117,6 @@ class UtxPoolSpecification
       .selfSigned(1.toByte, sender, recipient.toAddress, Waves, amount, Waves, fee, ByteStr.empty, time.getTimestamp())
       .explicitGet())
       .label("transferWithRecipient")
-
 
   private def massTransferWithRecipients(sender: KeyPair, recipients: List[PublicKey], maxAmount: Long, time: Time) = {
     val amount    = maxAmount / (recipients.size + 1)
@@ -190,7 +183,10 @@ class UtxPoolSpecification
   } yield {
     val time = new TestTime()
     val utx =
-      new UtxPoolImpl(time, bcu, UtxSettings(
+      new UtxPoolImpl(
+        time,
+        bcu,
+        UtxSettings(
           10,
           PoolDefaultMaxBytes,
           1000,
@@ -199,7 +195,8 @@ class UtxPoolSpecification
           Set.empty,
           allowTransactionsFromSmartAccounts = true,
           allowSkipChecks = false
-        ))
+        )
+      )
     val amountPart = (senderBalance - fee) / 2 - fee
     val txs        = for (_ <- 1 to n) yield createWavesTransfer(sender, recipient.toAddress, amountPart, fee, time.getTimestamp()).explicitGet()
     (utx, time, txs, (offset + 1000).millis)
@@ -313,7 +310,10 @@ class UtxPoolSpecification
       tx2    <- listOfN(count1, transfer(sender, senderBalance / 2, new TestTime(ts + maxAge.toMillis + 1000)))
     } yield {
       val time = new TestTime()
-      val utx = new UtxPoolImpl(time, bcu, UtxSettings(
+      val utx = new UtxPoolImpl(
+        time,
+        bcu,
+        UtxSettings(
           10,
           PoolDefaultMaxBytes,
           1000,
@@ -322,7 +322,8 @@ class UtxPoolSpecification
           Set.empty,
           allowTransactionsFromSmartAccounts = true,
           allowSkipChecks = false
-        ))
+        )
+      )
       (utx, time, tx1, tx2)
     }
 
@@ -350,7 +351,10 @@ class UtxPoolSpecification
     } yield {
       // val smartAccountsFs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
       preconditions.foreach(b => bcu.processBlock(b) should beRight)
-      val utx = new UtxPoolImpl(time, bcu, UtxSettings(
+      val utx = new UtxPoolImpl(
+        time,
+        bcu,
+        UtxSettings(
           10,
           PoolDefaultMaxBytes,
           1000,
@@ -359,7 +363,8 @@ class UtxPoolSpecification
           Set.empty,
           allowTransactionsFromSmartAccounts = scEnabled,
           allowSkipChecks = false
-        ))
+        )
+      )
 
       (sender, senderBalance, utx, bcu.lastBlockTimestamp.getOrElse(0L))
     }
@@ -598,7 +603,10 @@ class UtxPoolSpecification
         val (_, block, scripted, unscripted) = generateBlock.sample.get
         d.blockchainUpdater.processBlock(block) should beRight
 
-        val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, UtxSettings(
+        val utx = new UtxPoolImpl(
+          ntpTime,
+          d.blockchainUpdater,
+          UtxSettings(
             9999999,
             PoolDefaultMaxBytes,
             999999,
@@ -607,7 +615,8 @@ class UtxPoolSpecification
             Set.empty,
             allowTransactionsFromSmartAccounts = true,
             allowSkipChecks = false
-          ))
+          )
+        )
         (scripted ++ unscripted).foreach(tx => utx.putIfNew(tx).resultE.explicitGet())
 
         val constraint = MultiDimensionalMiningConstraint(
@@ -803,19 +812,18 @@ class UtxPoolSpecification
           BlockchainFeatures.BlockV5,
           BlockchainFeatures.RideV6
         )
-      ) {
-        d =>
-          d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, ENOUGH_AMT))
+      ) { d =>
+        d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, ENOUGH_AMT))
 
-          val expr   = TestCompiler(V6).compileFreeCall(""" [ BooleanEntry("check", true) ] """)
-          val invoke = TxHelpers.invokeExpression(expr)
-          val utx    = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings)
+        val expr   = TestCompiler(V6).compileFreeCall(""" [ BooleanEntry("check", true) ] """)
+        val invoke = TxHelpers.invokeExpression(expr)
+        val utx    = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings)
 
-          utx.putIfNew(invoke).resultE.explicitGet() shouldBe true
-          utx.all shouldBe Seq(invoke)
+        utx.putIfNew(invoke).resultE.explicitGet() shouldBe true
+        utx.all shouldBe Seq(invoke)
 
-          val (result, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Estimate(3 seconds))
-          result shouldBe Some(Seq(invoke))
+        val (result, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Estimate(3 seconds))
+        result shouldBe Some(Seq(invoke))
       }
     }
 
@@ -826,6 +834,18 @@ class UtxPoolSpecification
         transfers.foreach(tx => d.utxPool.addTransaction(tx, verify = false))
         d.utxPool.cleanUnconfirmed() shouldBe Nil
         d.utxPool.nonPriorityTransactions.toSet shouldBe transfers.toSet
+      }
+
+      "takes the priority diff into account" in withDomain() { d =>
+        d.helpers.creditWavesToDefaultSigner(11.waves)
+        val transfer1 = TxHelpers.transfer(amount = 10.waves)
+        val transfer2 = TxHelpers.transfer(amount = 10.waves) // Double spend
+
+        d.utxPool.priorityPool.setPriorityDiffs(Seq(d.transactionDiff(transfer1)))
+        d.utxPool.addTransaction(transfer2, verify = false)
+
+        d.utxPool.cleanUnconfirmed() shouldBe Seq(transfer2)
+        d.utxPool.nonPriorityTransactions shouldBe Nil
       }
 
       "doesnt validate transactions which are removed" in {

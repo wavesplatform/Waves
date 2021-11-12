@@ -46,6 +46,9 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   val transactionDiffer: Transaction => TracedResult[ValidationError, Diff] =
     TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
 
+  def transactionDiff(tx: Transaction): Diff =
+    transactionDiffer(tx).resultE.explicitGet()
+
   lazy val utxPool: UtxPoolImpl = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings)
   lazy val wallet: Wallet       = Wallet(settings.walletSettings.copy(file = None))
 

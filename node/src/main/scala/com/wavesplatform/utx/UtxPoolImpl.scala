@@ -59,7 +59,7 @@ class UtxPoolImpl(
   private[this] val inUTXPoolOrdering = TransactionsOrdering.InUTXPool(utxSettings.fastLaneAddresses)
 
   // State
-  val priorityPool = new UtxPriorityPool(blockchain)
+  val priorityPool               = new UtxPriorityPool(blockchain)
   private[this] val transactions = new ConcurrentHashMap[ByteStr, Transaction]()
 
   override def putIfNew(tx: Transaction, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = {
@@ -198,7 +198,7 @@ class UtxPoolImpl(
       canLock: Boolean = true
   ): TracedResult[ValidationError, Boolean] = {
     val diffEi = {
-      def calculateDiff() = {
+      def calculateDiff(): TracedResult[ValidationError, Diff] = {
         if (forceValidate)
           TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, tx)
         else
@@ -259,21 +259,23 @@ class UtxPoolImpl(
   def cleanUnconfirmed(): Seq[Transaction] = {
     log.trace(s"Starting UTX cleanup at height ${blockchain.height}")
 
-    // TODO: should priority be validated here?
-    val removedTransactions = this.createTxEntrySeq().flatMap {
-      case TxEntry(tx, _) =>
+    val removedTransactions = this.transactions
+      .values()
+      .asScala
+      .toVector // Should be strict
+      .flatMap { tx =>
         if (TxCheck.isExpired(tx)) {
           TxStateActions.removeExpired(tx)
           Some(tx)
         } else {
-          val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, _)
+          val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, _)
           val diffEi = differ(tx).resultE
           diffEi.left.toOption.map { error =>
             TxStateActions.removeInvalid(tx, error)
             tx
           }
         }
-    }
+      }
 
     priorityPool.invalidateTxs(removedTransactions.map(_.id()).toSet)
     removedTransactions
