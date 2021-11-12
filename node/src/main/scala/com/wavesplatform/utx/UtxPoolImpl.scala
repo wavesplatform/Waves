@@ -278,14 +278,34 @@ class UtxPoolImpl(
     pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()))(initialConstraint, strategy, cancelled)
   }
 
-  def cleanUnconfirmed(): Unit = {
+  def cleanUnconfirmed(): Seq[Transaction] = {
     log.trace(s"Starting UTX cleanup at height ${blockchain.height}")
 
-    pack(TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime()))(
-      MultiDimensionalMiningConstraint.unlimited,
-      PackStrategy.Unlimited,
-      () => false
-    )
+    // TODO: should priority be validated here?
+    val removedTransactions = this.createTxEntrySeq().flatMap {
+      case TxEntry(tx, _) =>
+        if (TxCheck.isExpired(tx)) {
+          log.debug(s"Transaction ${tx.id()} expired")
+          ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Expired)
+          this.removeFromOrdPool(tx.id())
+          onEvent(UtxEvent.TxRemoved(tx, Some(GenericError("Expired"))))
+          Some(tx)
+        } else {
+          val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, _)
+          val diffEi = differ(tx).resultE
+          diffEi.left.toOption.map { error =>
+            log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
+            traceLogger.trace(error.toString)
+            onEvent(UtxEvent.TxRemoved(tx, Some(error)))
+            ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Invalidated, Some(extractErrorClass(error)))
+            this.removeFromOrdPool(tx.id())
+            tx
+          }
+        }
+    }
+
+    priorityPool.invalidateTxs(removedTransactions.map(_.id()).toSet)
+    removedTransactions
   }
 
   private def pack(differ: (Blockchain, Transaction) => TracedResult[ValidationError, Diff])(
