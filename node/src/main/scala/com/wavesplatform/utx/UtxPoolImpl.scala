@@ -198,10 +198,7 @@ class UtxPoolImpl(
   private[this] def removeIds(removed: Set[ByteStr]): Unit = {
     val priorityRemoved = priorityPool.removeIds(removed)
     val factRemoved     = priorityRemoved ++ removed.flatMap(id => removeFromOrdPool(id))
-    factRemoved.foreach { tx =>
-      ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Mined)
-      onEvent(UtxEvent.TxRemoved(tx, None))
-    }
+    factRemoved.foreach(TxStateActions.removeMined(_))
   }
 
   private[utx] def addTransaction(
@@ -222,17 +219,8 @@ class UtxPoolImpl(
       else calculateDiff()
     }
 
-    def addPortfolio(): Unit = diffEi.map { diff =>
-      onEvent(UtxEvent.TxAdded(tx, diff))
-    }
-
     if (!verify || diffEi.resultE.isRight) {
-      transactions.computeIfAbsent(tx.id(), { _ =>
-        PoolMetrics.addTransaction(tx)
-        ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Received)
-        addPortfolio()
-        tx
-      })
+      TxStateActions.addReceived(tx, diffEi.resultE.toOption)
     }
 
     diffEi.map(_ => true)
@@ -285,20 +273,13 @@ class UtxPoolImpl(
     val removedTransactions = this.createTxEntrySeq().flatMap {
       case TxEntry(tx, _) =>
         if (TxCheck.isExpired(tx)) {
-          log.debug(s"Transaction ${tx.id()} expired")
-          ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Expired)
-          this.removeFromOrdPool(tx.id())
-          onEvent(UtxEvent.TxRemoved(tx, Some(GenericError("Expired"))))
+          TxStateActions.removeExpired(tx)
           Some(tx)
         } else {
           val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, _)
           val diffEi = differ(tx).resultE
           diffEi.left.toOption.map { error =>
-            log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
-            traceLogger.trace(error.toString)
-            onEvent(UtxEvent.TxRemoved(tx, Some(error)))
-            ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Invalidated, Some(extractErrorClass(error)))
-            this.removeFromOrdPool(tx.id())
+            TxStateActions.removeInvalid(tx, error)
             tx
           }
         }
@@ -340,10 +321,7 @@ class UtxPoolImpl(
               if (r.constraint.isFull || isLimitReached || isAlreadyRemoved || cancelled())
                 r // don't run any checks here to speed up mining
               else if (TxCheck.isExpired(tx)) {
-                log.debug(s"Transaction ${tx.id()} expired")
-                ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Expired)
-                this.removeFromOrdPool(tx.id())
-                onEvent(UtxEvent.TxRemoved(tx, Some(GenericError("Expired"))))
+                TxStateActions.removeExpired(tx)
                 r.copy(iterations = r.iterations + 1, removedTransactions = r.removedTransactions + tx.id())
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
@@ -392,11 +370,7 @@ class UtxPoolImpl(
                       r
 
                     case Left(error) =>
-                      ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Invalidated, Some(extractErrorClass(error)))
-                      log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
-                      traceLogger.trace(error.toString)
-                      this.removeFromOrdPool(tx.id())
-                      onEvent(UtxEvent.TxRemoved(tx, Some(error)))
+                      TxStateActions.removeInvalid(tx, error)
                       r.copy(
                         iterations = r.iterations + 1,
                         validatedTransactions = r.validatedTransactions + tx.id(),
@@ -466,6 +440,42 @@ class UtxPoolImpl(
     case _: TxValidationError.TransactionNotAllowedByScript => "TransactionNotAllowedByScript"
     case TransactionValidationError(cause, _)               => extractErrorMessage(cause)
     case other                                              => other.toString
+  }
+
+  private[this] object TxStateActions {
+    def addReceived(tx: Transaction, diff: Option[Diff]): Unit =
+      UtxPoolImpl.this.transactions.computeIfAbsent(
+        tx.id(), { _ =>
+          PoolMetrics.addTransaction(tx)
+          ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Received)
+          diff.foreach(diff => onEvent(UtxEvent.TxAdded(tx, diff))) // Only emits event if diff was computed
+          tx
+        }
+      )
+
+    def removeMined(tx: Transaction): Unit = {
+      ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Mined)
+      onEvent(UtxEvent.TxRemoved(tx, None))
+    }
+
+    def removeInvalid(tx: Transaction, error: ValidationError): Unit = {
+      log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
+      traceLogger.trace(error.toString)
+
+      ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Invalidated, Some(extractErrorClass(error)))
+      onEvent(UtxEvent.TxRemoved(tx, Some(error)))
+
+      UtxPoolImpl.this.removeFromOrdPool(tx.id())
+    }
+
+    def removeExpired(tx: Transaction): Unit = {
+      log.debug(s"Transaction ${tx.id()} expired")
+
+      ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Expired)
+      onEvent(UtxEvent.TxRemoved(tx, Some(GenericError("Expired"))))
+
+      UtxPoolImpl.this.removeFromOrdPool(tx.id())
+    }
   }
 
   //noinspection ScalaStyle
