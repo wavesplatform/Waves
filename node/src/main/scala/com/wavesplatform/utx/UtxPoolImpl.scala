@@ -27,7 +27,6 @@ import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted}
-import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -54,15 +53,14 @@ class UtxPoolImpl(
 
   import com.wavesplatform.utx.UtxPoolImpl._
 
-  val priorityPool = new UtxPriorityPool(blockchain)
-
   // Context
   private[this] val cleanupScheduler: SchedulerService =
     Schedulers.singleThread("utx-pool-cleanup", executionModel = ExecutionModel.AlwaysAsyncExecution)
+  private[this] val inUTXPoolOrdering = TransactionsOrdering.InUTXPool(utxSettings.fastLaneAddresses)
 
   // State
-  private[this] val transactions      = new ConcurrentHashMap[ByteStr, Transaction]()
-  private[this] val inUTXPoolOrdering = TransactionsOrdering.InUTXPool(utxSettings.fastLaneAddresses)
+  val priorityPool = new UtxPriorityPool(blockchain)
+  private[this] val transactions = new ConcurrentHashMap[ByteStr, Transaction]()
 
   override def putIfNew(tx: Transaction, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id()) || priorityPool.contains(tx.id())) TracedResult.wrapValue(false)
@@ -74,18 +72,6 @@ class UtxPoolImpl(
 
     val checks = if (verify) PoolMetrics.putTimeStats.measure {
       object LimitChecks {
-        def canReissue(tx: Transaction): Either[GenericError, Unit] =
-          PoolMetrics.checkCanReissue.measure(tx match {
-            case r: ReissueTransaction if !TxCheck.canReissue(r.asset) => Left(GenericError(s"Asset is not reissuable"))
-            case _                                                     => Right(())
-          })
-
-        def checkAlias(tx: Transaction): Either[GenericError, Unit] =
-          PoolMetrics.checkAlias.measure(tx match {
-            case cat: CreateAliasTransaction if !TxCheck.canCreateAlias(cat.alias) => Left(GenericError("Alias already claimed"))
-            case _                                                                 => Right(())
-          })
-
         def checkScripted(tx: Transaction, skipSizeCheck: Boolean): Either[GenericError, Transaction] =
           PoolMetrics.checkScripted.measure(
             if (!TxCheck.isScripted(tx)) Right(tx)
@@ -141,13 +127,19 @@ class UtxPoolImpl(
         }
       }
 
-      lazy val skipSizeCheck = LimitChecks.checkWhitelisted(tx) || (utxSettings.allowSkipChecks && LimitChecks.checkIsMostProfitable(tx))
+      val skipSizeCheck = LimitChecks.checkWhitelisted(tx) || (utxSettings.allowSkipChecks && LimitChecks.checkIsMostProfitable(tx))
+
       lazy val transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
         .map(_.bytes().length)
         .sum
 
       for {
-        _ <- Either.cond(skipSizeCheck || transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+        _ <- Either.cond(
+          skipSizeCheck || transactions.size
+            < utxSettings.maxSize,
+          (),
+          GenericError("Transaction pool size limit is reached")
+        )
         _ <- Either.cond(
           skipSizeCheck || (transactionsBytes + tx.bytesSize) <= utxSettings.maxBytesSize,
           (),
@@ -156,8 +148,6 @@ class UtxPoolImpl(
 
         _ <- LimitChecks.checkNotBlacklisted(tx)
         _ <- LimitChecks.checkScripted(tx, skipSizeCheck)
-        _ <- LimitChecks.checkAlias(tx)
-        _ <- LimitChecks.canReissue(tx)
       } yield ()
     } else Right(())
 
@@ -366,7 +356,7 @@ class UtxPoolImpl(
 
                     case Left(TransactionValidationError(AlreadyInTheState(txId, _), tx)) if r.validatedTransactions.contains(tx.id()) =>
                       log.trace(s"Transaction $txId already validated in priority pool")
-                      removeFromOrdPool(tx.id())
+                      removeFromOrdPool(tx.id()) // Dont run events/metrics publication here because the tx is still exists in the priority pool
                       r
 
                     case Left(error) =>
