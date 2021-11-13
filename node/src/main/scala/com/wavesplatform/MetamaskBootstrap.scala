@@ -94,7 +94,7 @@ object MetamaskBootstrap extends App {
       |}
       |
       |""".stripMargin,
-      ScriptEstimatorV3
+      ScriptEstimatorV3(overhead = false)
     )
     .explicitGet()
   val fundDApp = TransferTransaction

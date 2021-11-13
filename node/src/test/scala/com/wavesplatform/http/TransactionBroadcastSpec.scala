@@ -245,7 +245,7 @@ class TransactionBroadcastSpec
                |    else []
                |}
                |""".stripMargin,
-            ScriptEstimatorV3
+            ScriptEstimatorV3(overhead = true)
           )
           .explicitGet()
 
