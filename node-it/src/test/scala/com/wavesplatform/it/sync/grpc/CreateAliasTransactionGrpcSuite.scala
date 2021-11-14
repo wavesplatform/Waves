@@ -62,7 +62,9 @@ class CreateAliasTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPT
       val secondEffBalance = sender.wavesBalance(secondAddress).effective
 
       sender.broadcastCreateAlias(aliasCreator, alias, minFee, version = v, waitForTx = true)
-      assertGrpcError(sender.broadcastCreateAlias(secondAcc, alias, minFee, version = v), "Alias already claimed", Code.INVALID_ARGUMENT)
+      
+      Try(assertGrpcError(sender.broadcastCreateAlias(secondAcc, alias, minFee, version = v), "Alias already claimed", Code.INVALID_ARGUMENT))
+        .getOrElse(assertGrpcError(sender.broadcastCreateAlias(secondAcc, alias, minFee, version = v), "is already in the state", Code.INVALID_ARGUMENT))
 
       sender.wavesBalance(secondAddress).available shouldBe secondBalance
       sender.wavesBalance(secondAddress).effective shouldBe secondEffBalance

@@ -440,7 +440,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     assertApiError(sender.burn(firstKeyPair, assetWOSupport, 10, smartMinFee), errNotAllowedByTokenApiError)
     assertApiError(
       sender.reissue(firstKeyPair, assetWOSupport, someAssetAmount, true, issueFee + smartFee),
-      AssertiveApiError(112, "State check failed. Reason: Asset was issued by other address")
+      AssertiveApiError(112, "State check failed. Reason: Asset is not reissuable")
     )
 
     val transfers = List(Transfer(firstAddress, 10))
