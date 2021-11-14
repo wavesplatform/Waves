@@ -1,7 +1,5 @@
 package com.wavesplatform.utx
 
-import scala.concurrent.duration._
-
 import cats.data.NonEmptyList
 import cats.kernel.Monoid
 import com.wavesplatform.{BlocksTransactionsHelpers, TestValues}
@@ -28,7 +26,6 @@ import org.scalacheck.Gen.chooseNum
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatest.concurrent.Eventually
-import org.scalatest.concurrent.PatienceConfiguration.{Interval, Timeout}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 class UtxPriorityPoolSpecification
@@ -177,7 +174,7 @@ class UtxPriorityPoolSpecification
       utx.priorityPool.nextMicroBlockSize(12) shouldBe 12
     }
 
-    "runs cleanup on priority pool" in forAll(genDependent) {
+    "doesnt run cleanup on priority pool" in forAll(genDependent) {
       case (tx1, tx2) =>
         val blockchain = createState(tx1.sender.toAddress, setBalance = false)
         (blockchain.balance _).when(*, *).returning(0) // All invalid
@@ -185,9 +182,8 @@ class UtxPriorityPoolSpecification
         val utx =
           new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
         utx.setPriorityTxs(Seq(tx1, tx2))
-        utx.runCleanup()
-
-        eventually(Timeout(5 seconds), Interval(50 millis))(utx.all shouldBe empty)
+        utx.cleanUnconfirmed() shouldBe Nil
+        utx.all shouldBe Seq(tx1, tx2)
     }
 
     "invalidates priority pool on different microblock" in forAll(genDependent) {

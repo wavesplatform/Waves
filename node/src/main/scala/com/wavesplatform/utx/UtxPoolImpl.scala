@@ -268,7 +268,7 @@ class UtxPoolImpl(
           TxStateActions.removeExpired(tx)
           Some(tx)
         } else {
-          val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, _)
+          val differ = TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, _)
           val diffEi = differ(tx).resultE
           diffEi.left.toOption.map { error =>
             TxStateActions.removeInvalid(tx, error)
