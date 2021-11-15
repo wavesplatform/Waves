@@ -62,8 +62,12 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       feeInWaves
     }
 
+    def transactionMeta(transactionId: ByteStr): TransactionMeta =
+      transactions.transactionById(transactionId)
+        .getOrElse(throw new NoSuchElementException(s"No meta for $transactionId"))
+
     def invokeScriptResult(transactionId: ByteStr): InvokeScriptResult =
-      transactions.transactionById(transactionId).get match {
+      transactionMeta(transactionId) match {
         case hsc: TransactionMeta.HasStateChanges => hsc.invokeScriptResult.get
         case _                                    => ???
       }

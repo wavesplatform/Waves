@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs
 
+import scala.collection.immutable.VectorMap
+
 import cats.instances.either._
 import cats.instances.map._
 import cats.kernel.Monoid
@@ -14,21 +16,19 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
+import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
 import com.wavesplatform.transaction.smart._
+import com.wavesplatform.transaction.smart.script.trace.{TracedResult, TraceStep}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json
-
-import scala.collection.immutable.VectorMap
 
 object TransactionDiffer {
   def apply(prevBlockTs: Option[Long], currentBlockTs: Long, verify: Boolean = true)(
@@ -269,12 +269,16 @@ object TransactionDiffer {
       calledAddresses = scriptResult.map(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes)).getOrElse(Nil)
     } yield {
       val affectedAddresses = portfolios.keySet ++ maybeDApp ++ calledAddresses
+      val ethereumMetaDiff = tx match {
+        case e: EthereumTransaction => EthereumTransactionDiff.meta(blockchain)(e)
+        case _                      => Diff.empty
+      }
       Diff.empty.copy(
         transactions = VectorMap((tx.id(), NewTransactionInfo(tx, affectedAddresses, applied = false, spentComplexity))),
         portfolios = portfolios,
         scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
         scriptsComplexity = spentComplexity
-      )
+      ) |+| ethereumMetaDiff
     }
   }
 
