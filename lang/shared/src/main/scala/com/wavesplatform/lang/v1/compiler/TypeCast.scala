@@ -19,7 +19,24 @@ object TypeCast {
     }
 
   private def exactTo(p: Pos, t: FINAL, expr: CompilationStepResultExpr): CompilationStepResultExpr =
-    cast(p, t, t, expr, FUNCTION_CALL(throwWithMessage, List(CONST_STRING(s"Couldn't cast ${expr.t} to $t").explicitGet())))
+    cast(
+      p,
+      t,
+      t,
+      expr,
+      FUNCTION_CALL(
+        throwWithMessage,
+        List(
+          FUNCTION_CALL(
+            sumString.header,
+            List(
+              FUNCTION_CALL(_getType.header, List(expr.expr)),
+              CONST_STRING(s" couldn't be cast to $t").explicitGet()
+            )
+          )
+        )
+      )
+    )
 
   private def to(p: Pos, t: FINAL, expr: CompilationStepResultExpr): CompilationStepResultExpr =
     cast(p, t, UNION(t, UNIT), expr, REF(unitVarName))

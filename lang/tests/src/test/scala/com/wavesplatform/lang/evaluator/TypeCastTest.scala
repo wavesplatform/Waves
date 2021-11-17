@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.evaluator
 
-import com.wavesplatform.lang.directives.values.{V3, V5}
+import com.wavesplatform.lang.directives.values.{V3, V5, V6}
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.test._
 
@@ -77,7 +77,7 @@ class TypeCastTest extends EvaluatorSpec {
          | func f(a: Any) = a.exactAs[Int]
          | f("")
       """.stripMargin
-    ) shouldBe Left("Couldn't cast Any to Int")
+    )(V6) shouldBe Left("String couldn't be cast to Int")
   }
 
   property("type cast to concrete list is not supported") {
