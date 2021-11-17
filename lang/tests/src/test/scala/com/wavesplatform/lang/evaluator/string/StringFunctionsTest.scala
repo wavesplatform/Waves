@@ -16,14 +16,14 @@ class StringFunctionsTest extends EvaluatorSpec {
   property("take") {
     eval(""" take("abc", 0) """) shouldBe CONST_STRING("")
     eval(""" take("abc", 2) """) shouldBe CONST_STRING("ab")
-    eval(""" take("abc", 100) """) shouldBe CONST_STRING("abc")
+    eval(s""" take("abc", $limit) """) shouldBe CONST_STRING("abc")
 
     eval(s""" take("abc", $max) """, V1, V5) shouldBe CONST_STRING("abc")
     eval(s""" take("abc", $max) """)(V6) shouldBe Left(s"Number = $max passed to take() exceeds String limit = $limit")
     eval(s""" take("abc", ${limit + 1}) """)(V6) shouldBe Left(s"Number = ${limit + 1} passed to take() exceeds String limit = $limit")
 
-    eval(""" take("abc", -100) """, V1, V5) shouldBe CONST_STRING("")
-    eval(""" take("abc", -100) """)(V6) shouldBe Left("Unexpected negative number = -100 passed to take()")
+    eval(""" take("abc", -1) """, V1, V5) shouldBe CONST_STRING("")
+    eval(""" take("abc", -1) """)(V6) shouldBe Left("Unexpected negative number = -1 passed to take()")
     eval(s""" take("abc", $min) """, V1, V5) shouldBe CONST_STRING("")
     eval(s""" take("abc", $min) """)(V6) shouldBe Left(s"Unexpected negative number = $min passed to take()")
 
@@ -33,14 +33,14 @@ class StringFunctionsTest extends EvaluatorSpec {
   property("takeRight") {
     eval(""" takeRight("abc", 0) """) shouldBe CONST_STRING("")
     eval(""" takeRight("abc", 2) """) shouldBe CONST_STRING("bc")
-    eval(""" takeRight("abc", 100) """) shouldBe CONST_STRING("abc")
+    eval(s""" takeRight("abc", $limit) """) shouldBe CONST_STRING("abc")
 
     eval(s""" takeRight("abc", $max) """, V1, V5) shouldBe CONST_STRING("abc")
     eval(s""" takeRight("abc", $max) """)(V6) shouldBe Left(s"Number = $max passed to takeRight() exceeds String limit = $limit")
     eval(s""" takeRight("abc", ${limit + 1}) """)(V6) shouldBe Left(s"Number = ${limit + 1} passed to takeRight() exceeds String limit = $limit")
 
-    eval(""" takeRight("abc", -100) """, V1, V5) shouldBe CONST_STRING("")
-    eval(""" takeRight("abc", -100) """)(V6) shouldBe Left("Unexpected negative number = -100 passed to takeRight()")
+    eval(""" takeRight("abc", -1) """, V1, V5) shouldBe CONST_STRING("")
+    eval(""" takeRight("abc", -1) """)(V6) shouldBe Left("Unexpected negative number = -1 passed to takeRight()")
     eval(s""" takeRight("abc", $min) """, V1, V5) should produce("long overflow")
     eval(s""" takeRight("abc", $min) """)(V6) shouldBe Left(s"Unexpected negative number = $min passed to takeRight()")
 
@@ -50,14 +50,14 @@ class StringFunctionsTest extends EvaluatorSpec {
   property("drop") {
     eval(""" drop("abc", 0) """) shouldBe CONST_STRING("abc")
     eval(""" drop("abc", 2) """) shouldBe CONST_STRING("c")
-    eval(""" drop("abc", 100) """) shouldBe CONST_STRING("")
+    eval(s""" drop("abc", $limit) """) shouldBe CONST_STRING("")
 
     eval(s""" drop("abc", $max) """, V1, V5) shouldBe CONST_STRING("")
     eval(s""" drop("abc", $max) """)(V6) shouldBe Left(s"Number = $max passed to drop() exceeds String limit = $limit")
     eval(s""" drop("abc", ${limit + 1}) """)(V6) shouldBe Left(s"Number = ${limit + 1} passed to drop() exceeds String limit = $limit")
 
-    eval(""" drop("abc", -100) """, V1, V5) shouldBe CONST_STRING("abc")
-    eval(""" drop("abc", -100) """)(V6) shouldBe Left("Unexpected negative number = -100 passed to drop()")
+    eval(""" drop("abc", -1) """, V1, V5) shouldBe CONST_STRING("abc")
+    eval(""" drop("abc", -1) """)(V6) shouldBe Left("Unexpected negative number = -1 passed to drop()")
     eval(s""" drop("abc", $min) """, V1, V5) shouldBe CONST_STRING("abc")
     eval(s""" drop("abc", $min) """)(V6) shouldBe Left(s"Unexpected negative number = $min passed to drop()")
 
@@ -67,14 +67,14 @@ class StringFunctionsTest extends EvaluatorSpec {
   property("dropRight") {
     eval(""" dropRight("abc", 0) """) shouldBe CONST_STRING("abc")
     eval(""" dropRight("abc", 2) """) shouldBe CONST_STRING("a")
-    eval(""" dropRight("abc", 100) """) shouldBe CONST_STRING("")
+    eval(s""" dropRight("abc", $limit) """) shouldBe CONST_STRING("")
 
     eval(s""" dropRight("abc", $max) """, V1, V5) shouldBe CONST_STRING("")
-    eval(s""" drop("abc", $max) """)(V6) shouldBe Left(s"Number = $max passed to drop() exceeds String limit = $limit")
-    eval(s""" drop("abc", ${limit + 1}) """)(V6) shouldBe Left(s"Number = ${limit + 1} passed to drop() exceeds String limit = $limit")
+    eval(s""" dropRight("abc", $max) """)(V6) shouldBe Left(s"Number = $max passed to dropRight() exceeds String limit = $limit")
+    eval(s""" dropRight("abc", ${limit + 1}) """)(V6) shouldBe Left(s"Number = ${limit + 1} passed to dropRight() exceeds String limit = $limit")
 
-    eval(""" dropRight("abc", -100) """, V1, V5) shouldBe CONST_STRING("abc")
-    eval(""" dropRight("abc", -100) """)(V6) shouldBe Left("Unexpected negative number = -100 passed to dropRight()")
+    eval(""" dropRight("abc", -1) """, V1, V5) shouldBe CONST_STRING("abc")
+    eval(""" dropRight("abc", -1) """)(V6) shouldBe Left("Unexpected negative number = -1 passed to dropRight()")
     eval(s""" dropRight("abc", $min) """, V1, V5) should produce("long overflow")
     eval(s""" dropRight("abc", $min) """)(V6) shouldBe Left(s"Unexpected negative number = $min passed to dropRight()")
 

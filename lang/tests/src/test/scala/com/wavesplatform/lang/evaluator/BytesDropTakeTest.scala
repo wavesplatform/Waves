@@ -2,8 +2,12 @@ package com.wavesplatform.lang.evaluator
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values.{V1, V5, V6}
-import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
+import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.test._
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR.NoLimit
 
 class BytesDropTakeTest extends EvaluatorSpec {
   private val min   = Long.MinValue
@@ -17,7 +21,7 @@ class BytesDropTakeTest extends EvaluatorSpec {
   property("take") {
     eval(s""" take($b, 0) """) shouldBe bytes()
     eval(s""" take($b, 2) """) shouldBe bytes(1, 2)
-    eval(s""" take($b, 100) """) shouldBe bytes(1, 2, 3, 4, 5)
+    eval(s""" take($b, $limit) """) shouldBe bytes(1, 2, 3, 4, 5)
 
     eval(s""" take($b, $max) """, V1, V5) shouldBe bytes()
     eval(s""" take($b, $max) """)(V6) shouldBe Left(s"Number = $max passed to take() exceeds ByteVector limit = $limit")
@@ -32,7 +36,7 @@ class BytesDropTakeTest extends EvaluatorSpec {
   property("takeRight") {
     eval(s""" takeRight($b, 0) """) shouldBe bytes()
     eval(s""" takeRight($b, 2) """) shouldBe bytes(4, 5)
-    eval(s""" takeRight($b, 100) """) shouldBe bytes(1, 2, 3, 4, 5)
+    eval(s""" takeRight($b, $limit) """) shouldBe bytes(1, 2, 3, 4, 5)
 
     eval(s""" takeRight($b, $max) """, V1, V5) shouldBe bytes()
     eval(s""" takeRight($b, $max) """)(V6) shouldBe Left(s"Number = $max passed to takeRight() exceeds ByteVector limit = $limit")
@@ -47,7 +51,7 @@ class BytesDropTakeTest extends EvaluatorSpec {
   property("drop") {
     eval(s""" drop($b, 0) """) shouldBe bytes(1, 2, 3, 4, 5)
     eval(s""" drop($b, 2) """) shouldBe bytes(3, 4, 5)
-    eval(s""" drop($b, 100) """) shouldBe bytes()
+    eval(s""" drop($b, $limit) """) shouldBe bytes()
 
     eval(s""" drop($b, $max) """, V1, V5) shouldBe bytes(1, 2, 3, 4, 5)
     eval(s""" drop($b, $max) """)(V6) shouldBe Left(s"Number = $max passed to drop() exceeds ByteVector limit = $limit")
@@ -62,7 +66,7 @@ class BytesDropTakeTest extends EvaluatorSpec {
   property("dropRight") {
     eval(s""" dropRight($b, 0) """) shouldBe bytes(1, 2, 3, 4, 5)
     eval(s""" dropRight($b, 2) """) shouldBe bytes(1, 2, 3)
-    eval(s""" dropRight($b, 100) """) shouldBe bytes()
+    eval(s""" dropRight($b, $limit) """) shouldBe bytes()
 
     eval(s""" dropRight($b, $max) """, V1, V5) shouldBe bytes(1, 2, 3, 4, 5)
     eval(s""" dropRight($b, $max) """)(V6) shouldBe Left(s"Number = $max passed to dropRight() exceeds ByteVector limit = $limit")
@@ -72,5 +76,14 @@ class BytesDropTakeTest extends EvaluatorSpec {
     eval(s""" dropRight($b, -1) """)(V6) shouldBe Left("Unexpected negative number = -1 passed to dropRight()")
     eval(s""" dropRight($b, $min) """, V1, V5) should produce("long overflow")
     eval(s""" dropRight($b, $min) """)(V6) shouldBe Left(s"Unexpected negative number = $min passed to dropRight()")
+  }
+
+  property("max size bytes") {
+    val maxBytes = CONST_BYTESTR(ByteStr.fill(limit)(1), NoLimit)
+    def call(id: Short) = FUNCTION_CALL(Native(id), List(maxBytes.explicitGet(), CONST_LONG(limit)))
+    eval(call(TAKE_BYTES), V1, lastVersion) shouldBe maxBytes
+    eval(call(TAKE_RIGHT_BYTES), V6, lastVersion) shouldBe maxBytes
+    eval(call(DROP_BYTES), V1, lastVersion) shouldBe CONST_BYTESTR(ByteStr.empty)
+    eval(call(DROP_RIGHT_BYTES), V6, lastVersion) shouldBe CONST_BYTESTR(ByteStr.empty)
   }
 }
