@@ -14,8 +14,8 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 final class CompositeBlockchain private (
     inner: Blockchain,
@@ -42,30 +42,30 @@ final class CompositeBlockchain private (
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] =
     CompositeBlockchain.assetDescription(asset, maybeDiff.orEmpty, inner.assetDescription(asset), inner.assetScript(asset), height)
 
-  override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
-    inner.leaseDetails(leaseId)
+  override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] =
+    inner
+      .leaseDetails(leaseId)
       .map(ld => ld.copy(status = diff.leaseState.get(leaseId).map(_.status).getOrElse(ld.status)))
       .orElse(diff.leaseState.get(leaseId))
-  }
 
-  override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] =
+  override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
     diff.transactions
       .get(id)
       .collect {
-        case NewTransactionInfo(tx: TransferTransaction, _, true) => (height, tx)
+        case NewTransactionInfo(tx: TransferTransaction, _, true, _) => (height, tx)
       }
       .orElse(inner.transferById(id))
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] =
+  override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] =
     diff.transactions
       .get(id)
-      .map(t => (this.height, t.transaction, t.applied))
+      .map(t => (TxMeta(Height(this.height), t.applied, t.spentComplexity), t.transaction))
       .orElse(inner.transactionInfo(id))
 
-  override def transactionMeta(id: ByteStr): Option[(Int, Boolean)] =
+  override def transactionMeta(id: ByteStr): Option[TxMeta] =
     diff.transactions
       .get(id)
-      .map(info => (this.height, info.applied))
+      .map(t => TxMeta(Height(this.height), t.applied, t.spentComplexity))
       .orElse(inner.transactionMeta(id))
 
   override def height: Int = inner.height + blockMeta.fold(0)(_ => 1)
@@ -151,6 +151,11 @@ final class CompositeBlockchain private (
     blockMeta
       .collect { case (_, hitSource) if this.height == height => hitSource }
       .orElse(inner.hitSource(height))
+
+  override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
+    inner
+      .resolveERC20Address(address)
+      .orElse(diff.issuedAssets.keys.find(id => ERC20Address(id) == address))
 }
 
 object CompositeBlockchain {
@@ -246,7 +251,7 @@ object CompositeBlockchain {
     assetDescription map { z =>
       diff.transactions.values
         .foldLeft(z.copy(script = script)) {
-          case (acc, NewTransactionInfo(ut: UpdateAssetInfoTransaction, _, true)) if ut.assetId == asset =>
+          case (acc, NewTransactionInfo(ut: UpdateAssetInfoTransaction, _, true, _)) if ut.assetId == asset =>
             acc.copy(name = ByteString.copyFromUtf8(ut.name), description = ByteString.copyFromUtf8(ut.description), lastUpdatedAt = Height(height))
           case (acc, _) => acc
         }

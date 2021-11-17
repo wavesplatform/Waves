@@ -21,18 +21,15 @@ case class SetScriptTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends ProvenTransaction
+) extends Transaction(TransactionType.SetScript) with ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
     with FastHashId
-    with LegacyPBSwitch.V2 {
+    with PBSince.V2 {
 
-  //noinspection TypeAnnotation
-  override val builder = SetScriptTransaction
-
-  val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(SetScriptTransaction.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(SetScriptTransaction.serializer.toBytes(this))
-  override val json: Coeval[JsObject]     = Coeval.evalOnce(SetScriptTransaction.serializer.toJson(this))
+  val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(SetScriptTxSerializer.bodyBytes(this))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(SetScriptTxSerializer.toBytes(this))
+  override val json: Coeval[JsObject]     = Coeval.evalOnce(SetScriptTxSerializer.toJson(this))
 }
 
 object SetScriptTransaction extends TransactionParser {
@@ -42,13 +39,12 @@ object SetScriptTransaction extends TransactionParser {
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
 
   implicit val validator: TxValidator[SetScriptTransaction] = SetScriptTxValidator
-  val serializer                                            = SetScriptTxSerializer
 
   implicit def sign(tx: SetScriptTransaction, privateKey: PrivateKey): SetScriptTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   override def parseBytes(bytes: Array[TxVersion]): Try[SetScriptTransaction] =
-    serializer.parseBytes(bytes)
+    SetScriptTxSerializer.parseBytes(bytes)
 
   def create(
       version: TxVersion,

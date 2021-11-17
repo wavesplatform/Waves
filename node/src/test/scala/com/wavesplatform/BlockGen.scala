@@ -5,7 +5,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.{GenerationSignatureLength, GenerationVRFSignatureLength, ProtoBlockVersion}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
+import com.wavesplatform.transaction.Transaction
 import org.scalacheck.Gen
 import org.scalatest.Suite
 
@@ -13,7 +13,7 @@ trait BlockGen extends TransactionGen { _: Suite =>
 
   import BlockGen._
 
-  val blockParamGen: Gen[(Seq[ProvenTransaction], KeyPair)] = for {
+  val blockParamGen: Gen[(Seq[Transaction], KeyPair)] = for {
     count        <- Gen.choose(minTransactionsInBlockCount, maxTransactionsInBlockCount)
     transactions <- randomTransactionsGen(count)
     signer       <- accountGen

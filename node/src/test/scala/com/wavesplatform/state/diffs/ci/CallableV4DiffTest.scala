@@ -10,16 +10,17 @@ import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.state.{EmptyDataEntry, SponsorshipValue}
+import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, _}
-import com.wavesplatform.state.{EmptyDataEntry, SponsorshipValue}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TransactionType, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
+import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
+import com.wavesplatform.transaction.utils.Signed
 import org.scalacheck.Gen
 import org.scalatest.EitherValues
 
@@ -59,7 +60,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        )(_ should produce("Transaction is not allowed by script of the asset", requireFailed = true))
+        )(_ should produceRejectOrFailedDiff("Transaction is not allowed by script of the asset", requireFailed = true))
     }
   }
 
@@ -80,7 +81,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        )(_ should produce("Transaction is not allowed by script of the asset", requireFailed = true))
+        )(_ should produceRejectOrFailedDiff("Transaction is not allowed by script of the asset", requireFailed = true))
     }
   }
 
@@ -127,14 +128,14 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
   }
 
   property("check fee") {
-    val minimalFee = 6 * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeValidation.FeeUnit
+    val minimalFee = 6 * ScriptExtraFee + FeeConstants(TransactionType.InvokeScript) * FeeValidation.FeeUnit
     forAll(multiActionPreconditions(feeMultiplier = 5, withScriptError = false)) {
       case (genesis, setScript, invoke, issue, _, _, _, _, _) =>
         assertDiffEi(
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        )(_ should produce(s" with 6 total scripts invoked does not exceed minimal value of $minimalFee WAVES"))
+        )(_ should produceRejectOrFailedDiff(s" with 6 total scripts invoked does not exceed minimal value of $minimalFee WAVES"))
     }
   }
 
@@ -179,8 +180,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
           genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
           genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
           setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
-          ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
-        } yield (List(genesis, genesis2), setDApp, ci, master)
+        } yield (List(genesis, genesis2), setDApp, Signed.invokeScript(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3), master)
       }.explicitGet()
 
     forAll(deleteEntryPreconditions) {
@@ -218,8 +218,15 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
-      } yield (List(genesis, genesis2), setDApp, ci, issue, master, reissueAmount, burnAmount)
+      } yield (
+        List(genesis, genesis2),
+        setDApp,
+        Signed.invokeScript(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3),
+        issue,
+        master,
+        reissueAmount,
+        burnAmount
+      )
     }.explicitGet()
 
   private def sponsorFeePreconditions: Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, Option[Long])] =
@@ -227,7 +234,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
       master               <- accountGen
       invoker              <- accountGen
       ts                   <- timestampGen
-      fee                  <- ciFee(1).map(_ + FeeUnit * FeeConstants(IssueTransaction.typeId))
+      fee                  <- ciFee(1).map(_ + FeeUnit * FeeConstants(TransactionType.Issue))
       minSponsoredAssetFee <- Gen.oneOf(None, Some(1000L))
     } yield {
       val dApp = Some(sponsorFeeDApp(minSponsoredAssetFee))
@@ -235,8 +242,12 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
-      } yield (List(genesis, genesis2), setDApp, ci, minSponsoredAssetFee)
+      } yield (
+        List(genesis, genesis2),
+        setDApp,
+        Signed.invokeScript(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3),
+        minSponsoredAssetFee
+      )
     }.explicitGet()
 
   private def multiActionDApp(
@@ -341,7 +352,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(TxVersion.V1, master, dApp, fee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(TxVersion.V1, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
+        ci = Signed.invokeScript(TxVersion.V1, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
       } yield (List(genesis, genesis2), setDApp, ci, issue, master, invoker, reissueAmount, burnAmount, transferAmount)
     }.explicitGet()
 
@@ -416,8 +427,13 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
-      } yield (List(genesis, genesis2, setDApp), ci, master, invoker, amount)
+      } yield (
+        List(genesis, genesis2, setDApp),
+        Signed.invokeScript(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3),
+        master,
+        invoker,
+        amount
+      )
     }.explicitGet()
 
   private def issueDApp(

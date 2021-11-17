@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import com.wavesplatform.TestTime
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -12,10 +11,11 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test._
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.utils.Signed
 import org.scalacheck.Gen
 import org.scalatest.EitherValues
 
@@ -206,18 +206,9 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
             .selfSigned(TxVersion.V2, a._1, recipient.toAddress, Waves, 1, Waves, fee, ByteStr.empty, ts)
             .explicitGet()
       )
-      checkFixDApp = dAppWithFix.map(
-        a =>
-          InvokeScriptTransaction
-            .selfSigned(TxVersion.V2, invoker, a._1.toAddress, None, Nil, fee, Waves, ts)
-            .explicitGet()
-      )
-      checkNoFixDApp = dAppWithNoFix.map(
-        a =>
-          InvokeScriptTransaction
-            .selfSigned(TxVersion.V2, invoker, a._1.toAddress, None, Nil, fee, Waves, ts)
-            .explicitGet()
-      )
+      checkFixDApp = dAppWithFix
+        .map(a => Signed.invokeScript(TxVersion.V2, invoker, a._1.toAddress, None, Nil, fee, Waves, ts))
+      checkNoFixDApp = dAppWithNoFix.map(a => Signed.invokeScript(TxVersion.V2, invoker, a._1.toAddress, None, Nil, fee, Waves, ts))
     } yield (
       invokerGenesis :: genesisTxs,
       setNoFixVerifier ::: setNoFixDApp,
@@ -231,7 +222,7 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
     d.appendBlock(genesisTxs: _*)
     d.appendBlock(setNoFix: _*)
     d.appendBlock(checkNoFix: _*)
-    checkNoFix.foreach(tx => d.blockchain.transactionMeta(tx.id.value()).get._2 shouldBe true)
+    checkNoFix.foreach(tx => d.blockchain.transactionSucceeded(tx.id.value()) shouldBe true)
   }
 
   private def assertFix(d: Domain, lastVersion: StdLibVersion): Unit = {
@@ -239,7 +230,7 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
     d.appendBlock(genesisTxs: _*)
     d.appendBlock(setFix: _*)
     d.appendBlock(checkFix: _*)
-    checkFix.foreach(tx => d.blockchain.transactionMeta(tx.id.value()).get._2 shouldBe true)
+    checkFix.foreach(tx => d.blockchain.transactionSucceeded(tx.id.value()) shouldBe true)
 
     d.appendBlock(setNoFix: _*)
     checkNoFix.foreach { tx =>

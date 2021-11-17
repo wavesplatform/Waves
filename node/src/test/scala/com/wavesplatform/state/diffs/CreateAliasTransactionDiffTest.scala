@@ -9,10 +9,10 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.utils.addressTransactions
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, Transaction, TransactionType}
 import org.scalacheck.Gen
 
 class CreateAliasTransactionDiffTest extends PropSpec with WithState {
@@ -49,7 +49,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
             val senderAcc = anotherAliasTx.sender.toAddress
             blockDiff.aliases shouldBe Map(anotherAliasTx.alias -> senderAcc)
 
-            addressTransactions(db, Some(Height(newState.height + 1) -> blockDiff), senderAcc, Set(CreateAliasTransaction.typeId), None).collect {
+            addressTransactions(db, Some(Height(newState.height + 1) -> blockDiff), senderAcc, Set(TransactionType.CreateAlias), None).collect {
               case (_, cat: CreateAliasTransaction) => cat.alias
             }.toSet shouldBe Set(
               anotherAliasTx.alias,
@@ -87,7 +87,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
     maybeFeeAsset            <- Gen.oneOf(maybeAsset, maybeAsset2)
     alias                    <- aliasGen
     fee                      <- smallFeeGen
-    aliasTx = CreateAliasTransaction.selfSigned(Transaction.V2, aliasedRecipient, alias, fee, ts).explicitGet()
+    aliasTx = CreateAliasTransaction.selfSigned(Transaction.V2, aliasedRecipient, alias.name, fee, ts).explicitGet()
     transfer <- transferGeneratorP(
       master,
       alias,

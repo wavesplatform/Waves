@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs.ci
 
+import scala.collection.immutable
+
 import cats.kernel.Monoid
 import com.wavesplatform.account._
 import com.wavesplatform.block.Block
@@ -8,38 +10,37 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.{utils, Global}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.{compiler, FunctionHeader}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{CREATE_LIST, THROW}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
-import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.state.diffs.{produceRejectOrFailedDiff, ENOUGH_AMT}
+import com.wavesplatform.test._
+import com.wavesplatform.transaction.{Asset, utils => _, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{Asset, _}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.utils.Signed
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
-
-import scala.collection.immutable
 
 class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSettings with MockFactory with EitherValues {
 
@@ -277,7 +278,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(stdLibVersion, fixUnicodeFunctions = true).withEnvironment[Environment],
+            PureContext.build(stdLibVersion, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
             CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment],
             WavesContext.build(
               Global,
@@ -315,26 +316,24 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
         FunctionHeader.User(funcBinding),
         List.fill(invocationParamsCount)(FALSE)
       )
-      ci = InvokeScriptTransaction
-        .selfSigned(
-          1.toByte,
-          invoker,
-          master.toAddress,
-          Some(fc),
-          payment.toSeq,
-          if (sponsored) {
-            sponsorTx.minSponsoredAssetFee.get * 5
-          } else {
-            fee
-          },
-          if (sponsored) {
-            IssuedAsset(issueTx.id())
-          } else {
-            Waves
-          },
-          ts
-        )
-        .explicitGet()
+      ci = Signed.invokeScript(
+        1.toByte,
+        invoker,
+        master.toAddress,
+        Some(fc),
+        payment.toSeq,
+        if (sponsored) {
+          sponsorTx.minSponsoredAssetFee.get * 5
+        } else {
+          fee
+        },
+        if (sponsored) {
+          IssuedAsset(issueTx.id())
+        } else {
+          Waves
+        },
+        ts
+      )
     } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
   }
 
@@ -386,8 +385,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
         Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet())))
       else
         None
-      ci = InvokeScriptTransaction
-        .selfSigned(
+      ci = Signed.invokeScript(
           txVersion,
           invoker,
           master.toAddress,
@@ -395,9 +393,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
           payment.toSeq,
           if (sponsored) sponsoredFee else fee,
           if (sponsored) sponsorTx.asset else Waves,
-          ts + 3
-        )
-        .explicitGet()
+          ts + 3)
     } yield (if (selfSend) List(genesis) else List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
 
   def preconditionsAndSetContractWithVerifier(
@@ -430,8 +426,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
         Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet())))
       else
         None
-      ci = InvokeScriptTransaction
-        .selfSigned(
+      ci = Signed.invokeScript(
           1.toByte,
           invoker,
           master.toAddress,
@@ -447,9 +442,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
           } else {
             Waves
           },
-          ts + 3
-        )
-        .explicitGet()
+          ts + 3)
     } yield (List(genesis, genesis2), setVerifier, setContract, ci, master, issueTx, sponsorTx)
 
   def preconditionsAndSetContractWithAlias(
@@ -481,8 +474,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
         Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet())))
       else
         None
-      ciWithAlias = InvokeScriptTransaction
-        .selfSigned(
+      ciWithAlias = Signed.invokeScript(
           1.toByte,
           invoker,
           masterAlias,
@@ -498,11 +490,8 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
           } else {
             Waves
           },
-          ts + 3
-        )
-        .explicitGet()
-      ciWithFakeAlias = InvokeScriptTransaction
-        .selfSigned(
+          ts + 3)
+      ciWithFakeAlias = Signed.invokeScript(
           1.toByte,
           invoker,
           fakeAlias,
@@ -518,9 +507,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
           } else {
             Waves
           },
-          ts + 3
-        )
-        .explicitGet()
+          ts + 3)
     } yield (List(genesis, genesis2), master, setContract, ciWithAlias, ciWithFakeAlias, aliasTx)
 
   property("Allow not more 30 non-data actions") {
@@ -615,15 +602,13 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
         ssTx1    = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10L, Waves))
-        invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
-          .explicitGet()
+        invokeTx = Signed.invokeScript(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
       } yield (Seq(gTx1, gTx2, gTx3, aliasTx, ssTx1, ssTx), invokeTx, master.toAddress, service.toAddress)
 
     forAll(scenario) {
       case (genesisTxs, invokeTx, dApp, service) =>
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
-          ei should produce("Actions count limit is exceeded")
+          ei should produceRejectOrFailedDiff("Actions count limit is exceeded")
         }
     }
   }
@@ -716,9 +701,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
         ssTx1    = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10L, Waves))
-        invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
-          .explicitGet()
+        invokeTx = Signed.invokeScript(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
       } yield (Seq(gTx1, gTx2, gTx3, aliasTx, ssTx1, ssTx), invokeTx, master.toAddress, service.toAddress)
 
     forAll(scenario) {

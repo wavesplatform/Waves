@@ -7,13 +7,14 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.crypto
 import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.serialization.impl.ReissueTxSerializer
 import play.api.libs.json.Json
 
 class ReissueTransactionV1Specification extends PropSpec {
 
   property("Reissue serialization roundtrip") {
     forAll(reissueGen) { tx: ReissueTransaction =>
-      val recovered = tx.builder.parseBytes(tx.bytes()).get
+      val recovered = ReissueTxSerializer.parseBytes(tx.bytes()).get
       recovered.bytes() shouldEqual tx.bytes()
     }
   }
@@ -38,7 +39,7 @@ class ReissueTransactionV1Specification extends PropSpec {
                             |  "timestamp" : 31761529735035
                             |}""".stripMargin)
 
-    val tx = ReissueTransaction.serializer.parseBytes(bytes).get
+    val tx = ReissueTxSerializer.parseBytes(bytes).get
     tx.json() shouldBe json
     assert(crypto.verify(tx.signature, tx.bodyBytes(), tx.sender), "signature should be valid")
   }

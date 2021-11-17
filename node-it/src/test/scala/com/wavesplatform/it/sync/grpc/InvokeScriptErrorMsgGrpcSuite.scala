@@ -55,7 +55,8 @@ class InvokeScriptErrorMsgGrpcSuite extends GrpcBaseTransactionSuite {
           fee = issueFee + smartFee,
           script = Right(Some(script)),
           waitForTx = true
-        )
+        ),
+        unsafe = false
       )
       .explicitGet()
       .id()

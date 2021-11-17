@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs
 import cats._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.features.OverdraftValidationProvider._
-import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures, RideVersionProvider}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 
 import scala.util.{Left, Right}
@@ -91,13 +91,13 @@ object CommonValidation {
               identity
 
           for {
-            address <- blockchain.resolveAlias(citx.dAppAddressOrAlias)
+            address <- blockchain.resolveAlias(citx.dApp)
             allowFeeOverdraft = blockchain.accountScript(address) match {
               case Some(AccountScriptInfo(_, ContractScriptImpl(version, _), _, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
               case _                                                                                                                      => false
             }
             check <- foldPayments(citx.payments)
-              .map(p => checkTransfer(citx.sender.toAddress, p.assetId, p.amount, citx.feeAssetId, citx.fee, allowFeeOverdraft))
+              .map(p => checkTransfer(citx.senderAddress, p.assetId, p.amount, citx.feeAssetId, citx.fee, allowFeeOverdraft))
               .find(_.isLeft)
               .getOrElse(Right(tx))
           } yield check
@@ -110,7 +110,7 @@ object CommonValidation {
     case _: PaymentTransaction => Right(tx)
     case _ =>
       val id = tx.id()
-      Either.cond(!blockchain.containsTransaction(tx), tx, AlreadyInTheState(id, blockchain.transactionInfo(id).get._1))
+      Either.cond(!blockchain.containsTransaction(tx), tx, AlreadyInTheState(id, blockchain.transactionMeta(id).get.height))
   }
 
   def disallowFromAnotherNetwork[T <: Transaction](tx: T, currentChainId: Byte): Either[ValidationError, T] =
@@ -118,7 +118,7 @@ object CommonValidation {
       tx.chainId == currentChainId,
       tx,
       GenericError(
-        s"Data from other network: expected: ${AddressScheme.current.chainId}(${AddressScheme.current.chainId.toChar}), actual: ${tx.chainId}(${tx.chainId.toChar})"
+        s"Address belongs to another network: expected: ${AddressScheme.current.chainId}(${AddressScheme.current.chainId.toChar}), actual: ${tx.chainId}(${tx.chainId.toChar})"
       )
     )
 
@@ -131,25 +131,19 @@ object CommonValidation {
       )
 
     def scriptActivation(sc: Script): Either[ActivationError, T] = {
-
-      val v3Activation = activationBarrier(BlockchainFeatures.Ride4DApps)
-      val v4Activation = activationBarrier(BlockchainFeatures.BlockV5)
-      val v5Activation = activationBarrier(BlockchainFeatures.SynchronousCalls)
-      val v6Activation = activationBarrier(BlockchainFeatures.RideV6)
+      val barrierByVersion =
+        RideVersionProvider.actualVersionByFeature.map { case (feature, version) => (version, activationBarrier(feature)) }.toMap
 
       def scriptVersionActivation(sc: Script): Either[ActivationError, T] = sc.stdLibVersion match {
-        case V1 | V2 | V3 if sc.containsArray => v4Activation
-        case V1 | V2 if sc.containsBlockV2()  => v3Activation
+        case V1 | V2 | V3 if sc.containsArray => barrierByVersion(V4)
+        case V1 | V2 if sc.containsBlockV2()  => barrierByVersion(V3)
         case V1 | V2                          => Right(tx)
-        case V3                               => v3Activation
-        case V4                               => v4Activation
-        case V5                               => v5Activation
-        case V6                               => v6Activation
+        case v                                => barrierByVersion(v)
       }
 
       def scriptTypeActivation(sc: Script): Either[ActivationError, T] = (sc: @unchecked) match {
         case _: ExprScript                        => Right(tx)
-        case _: ContractScript.ContractScriptImpl => v3Activation
+        case _: ContractScript.ContractScriptImpl => barrierByVersion(V3)
       }
 
       for {
@@ -166,11 +160,11 @@ object CommonValidation {
     }
 
     val versionsBarrier = tx match {
-      case p: LegacyPBSwitch if p.isProtobufVersion =>
+      case p: PBSince if p.isProtobufVersion =>
         activationBarrier(BlockchainFeatures.BlockV5)
 
-      case v: VersionedTransaction if !v.builder.supportedVersions.contains(v.version) =>
-        Left(GenericError(s"Invalid tx version: $v"))
+      case v: VersionedTransaction if !TransactionParsers.all.contains((v.tpe.id.toByte, v.version)) =>
+        Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
 
       case _ =>
         Right(tx)
@@ -223,6 +217,11 @@ object CommonValidation {
       case _: InvokeScriptTransaction => activationBarrier(BlockchainFeatures.Ride4DApps)
 
       case _: UpdateAssetInfoTransaction => activationBarrier(BlockchainFeatures.BlockV5)
+      case iet: InvokeExpressionTransaction =>
+        if (iet.version == 1) activationBarrier(BlockchainFeatures.RideV6)
+        else Left(TxValidationError.ActivationError(s"Transaction version ${iet.version} has not been activated yet"))
+
+      case _: EthereumTransaction => activationBarrier(BlockchainFeatures.RideV6)
 
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }

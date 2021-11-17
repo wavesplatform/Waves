@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.ci.sync
 
-import com.wavesplatform.TestTime
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -10,9 +9,10 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test._
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.utils.Signed
 
 class SyncDAppMultiVersionTest extends PropSpec with WithDomain {
   import DomainPresets._
@@ -50,7 +50,7 @@ class SyncDAppMultiVersionTest extends PropSpec with WithDomain {
       gTx3     = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
       ssTx1    = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script(version1, dApp2.toAddress)), fee, ts).explicitGet()
       ssTx2    = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp2Script(version2)), fee, ts).explicitGet()
-      invokeTx = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts).explicitGet()
+      invokeTx = Signed.invokeScript(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts)
     } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx2), invokeTx)
 
   property("sync call can be performed between V5 and V6 dApps") {
@@ -61,7 +61,7 @@ class SyncDAppMultiVersionTest extends PropSpec with WithDomain {
           withDomain(RideV6) { d =>
             d.appendBlock(preparingTxs: _*)
             d.appendBlock(invoke)
-            d.blockchain.transactionInfo(invoke.txId).get._3 shouldBe true
+            d.blockchain.transactionSucceeded(invoke.txId) shouldBe true
           }
       }
   }

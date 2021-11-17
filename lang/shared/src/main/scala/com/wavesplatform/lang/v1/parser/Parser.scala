@@ -176,7 +176,14 @@ object Parser {
     case (_, id, None, _)                                           => id
   }
 
-  def foldP[_: P]: P[EXPR] =
+  def foldNativeP[_: P]: P[EXPR] =
+    (Index ~~ P("fold_") ~~ digit.repX(1).! ~~ "(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ refP ~ ")" ~~ Index)
+      .map {
+        case (start, limit, list, acc, f, end) =>
+          FOLD(Pos(start, end), limit.toInt, list, acc, f, isNative = true)
+      }
+
+  def foldMacroP[_: P]: P[EXPR] =
     (Index ~~ P("FOLD<") ~~ Index ~~ digit.repX(1).! ~~ Index ~~ ">(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ refP ~ ")" ~~ Index)
       .map {
         case (start, limStart, limit, limEnd, list, acc, f, end) =>
@@ -186,7 +193,7 @@ object Parser {
           else if (lim > MaxListLengthV4)
             INVALID(Pos(limStart, limEnd), s"List size limit in FOLD is too big, $lim must be less or equal $MaxListLengthV4")
           else
-            FOLD(Pos(start, end), lim, list, acc, f)
+            FOLD(Pos(start, end), lim, list, acc, f, isNative = false)
       }
 
   def list[_: P]: P[EXPR] = (Index ~~ P("[") ~ functionCallArgs ~ P("]") ~~ Index).map {
@@ -509,7 +516,7 @@ object Parser {
 
   def baseAtom[_: P](epn: fastparse.P[Any] => P[EXPR]) = {
     def ep[_: P](implicit c: fastparse.P[Any]) = epn(c)
-    comment ~ P(foldP | ifP | matchP | ep | maybeAccessP) ~ comment
+    comment ~ P(foldNativeP | foldMacroP | ifP | matchP | ep | maybeAccessP) ~ comment
   }
 
   def baseExpr[_: P] = P(strictLetBlockP | binaryOp(baseAtom(block(_))(_), opsByPriority))
@@ -519,7 +526,7 @@ object Parser {
 
   def singleBaseAtom[_: P] =
     comment ~
-      P(foldP | ifP | matchP | maybeAccessP) ~
+      P(foldNativeP | foldMacroP | ifP | matchP | maybeAccessP) ~
       comment
 
   def singleBaseExpr[_: P] = P(binaryOp(singleBaseAtom(_), opsByPriority))
@@ -590,12 +597,12 @@ object Parser {
 
   def parseExpr(str: String): Parsed[EXPR] = {
     def expr[_: P] = P(Start ~ unusedText ~ (baseExpr | invalid) ~ End)
-    parse(str, expr(_))
+    parse(str, expr(_), verboseFailures = true)
   }
 
   def parseExprOrDecl(str: String): Parsed[EXPR] = {
     def e[_: P] = P(Start ~ unusedText ~ (baseExprOrDecl | invalid) ~ End)
-    parse(str, e(_))
+    parse(str, e(_), verboseFailures = true)
   }
 
   def parseContract(str: String): Parsed[DAPP] = {
@@ -604,7 +611,8 @@ object Parser {
         .map {
           case (ds, fs, t, end) => (DAPP(Pos(0, end), ds.flatten.toList, fs.toList), t)
         }
-    parse(str, contract(_)) match {
+
+    parse(str, contract(_), verboseFailures = true) match {
       case Parsed.Success((s, t), _) if (t.nonEmpty) =>
         def contract[_: P] = P(Start ~ unusedText ~ (declaration.rep) ~ comment ~ (annotatedFunc.rep) ~ !declaration.rep(1) ~ End ~~ Index)
         parse(str, contract(_)) match {

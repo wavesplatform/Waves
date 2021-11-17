@@ -201,7 +201,7 @@ case class AssetsApiRoute(
 
   def balanceDistribution(assetId: IssuedAsset): Route =
     balanceDistribution(assetId, blockchain.height, Int.MaxValue, None) { l =>
-      Json.toJson(l.map { case (a, b) => a.stringRepr -> b }.toMap)
+      Json.toJson(l.map { case (a, b) => a.toString -> b }.toMap)
     }
 
   def balanceDistributionAtHeight(assetId: IssuedAsset, heightParam: Int, limitParam: Int, afterParam: Option[String]): Route =
@@ -218,7 +218,7 @@ case class AssetsApiRoute(
               "lastItem" -> l.lastOption.map(_._1),
               "items" -> Json.toJson(l.map {
                 case (a, b) =>
-                  a.stringRepr -> accept.fold[JsValue](JsNumber(b)) {
+                  a.toString -> accept.fold[JsValue](JsNumber(b)) {
                     case a if a.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings) => JsString(b.toString)
                     case _                                                             => JsNumber(b)
                   }
@@ -341,15 +341,15 @@ object AssetsApiRoute {
       for {
         tt <- blockchain
           .transactionInfo(id)
-          .filter { case (_, _, confirmed) => confirmed }
+          .filter { case (tm, _) => tm.succeeded }
           .toRight("Failed to find issue/invokeScript transaction by ID")
-        (h, mtx, _) = tt
-        ts <- (mtx match {
+        (txm, tx) = tt
+        ts <- (tx match {
           case tx: IssueTransaction        => Some(tx.timestamp)
           case tx: InvokeScriptTransaction => Some(tx.timestamp)
           case _                           => None
         }).toRight("No issue/invokeScript transaction found with the given asset ID")
-      } yield (ts, h)
+      } yield (ts, txm.height)
 
     for {
       tsh <- additionalInfo(description.originTransactionId)

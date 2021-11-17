@@ -6,7 +6,7 @@ import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.{GenesisTransaction, PaymentTransaction}
 import org.scalacheck.Gen
 

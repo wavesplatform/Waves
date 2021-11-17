@@ -25,6 +25,8 @@ trait Script {
 
   val containsArray: Boolean
 
+  val isFreeCall: Boolean
+
   override def equals(obj: scala.Any): Boolean = obj match {
     case that: Script => stdLibVersion == that.stdLibVersion && expr == that.expr
     case _            => false
@@ -52,8 +54,9 @@ object Script {
       case _: ExprScript => Expression
       case _             => DAppType
     }
-    val ctx = getDecompilerContext(s.stdLibVersion, cType)
+    val ctx = getDecompilerContext(s.stdLibVersion, cType, if (s.isFreeCall) Call else Account)
     val (scriptText, directives) = (s: @unchecked) match {
+      case e: ExprScript if e.isFreeCall   => (Decompiler(e.expr, ctx), List(s.stdLibVersion, Expression, Call))
       case e: ExprScript                   => (Decompiler(e.expr, ctx), List(s.stdLibVersion, Expression))
       case ContractScriptImpl(_, contract) => (Decompiler(contract, ctx), List(s.stdLibVersion, Account, DAppType))
     }
@@ -68,19 +71,24 @@ object Script {
   def complexityInfo(
       script: Script,
       estimator: ScriptEstimator,
+      fixEstimateOfVerifier: Boolean,
       useContractVerifierLimit: Boolean
   ): Either[String, ComplexityInfo] =
     (script: @unchecked) match {
       case script: ExprScript =>
         ExprScript
-          .estimate(script.expr, script.stdLibVersion, estimator, useContractVerifierLimit)
-          .map(complexity => ComplexityInfo(complexity, Map(), complexity))
+          .estimate(script.expr, script.stdLibVersion, script.isFreeCall, estimator, useContractVerifierLimit)
+          .map { complexity =>
+            val verifierComplexity = if (script.isFreeCall) 0 else complexity
+            ComplexityInfo(verifierComplexity, Map(), complexity)
+          }
       case ContractScriptImpl(version, contract @ DApp(_, _, _, verifierFuncOpt)) =>
         for {
           (maxComplexity, callableComplexities) <- ContractScript.estimateComplexity(
             version,
             contract,
             estimator,
+            fixEstimateOfVerifier,
             useContractVerifierLimit
           )
           complexityInfo = verifierFuncOpt.fold(
@@ -91,15 +99,16 @@ object Script {
         } yield complexityInfo
     }
 
-  def estimate(script: Script, estimator: ScriptEstimator, useContractVerifierLimit: Boolean): Either[String, Long] =
-    complexityInfo(script, estimator, useContractVerifierLimit)
+  def estimate(script: Script, estimator: ScriptEstimator, fixEstimateOfVerifier: Boolean, useContractVerifierLimit: Boolean): Either[String, Long] =
+    complexityInfo(script, estimator, fixEstimateOfVerifier, useContractVerifierLimit)
       .map(_.maxComplexity)
 
   def verifierComplexity(
       script: Script,
       estimator: ScriptEstimator,
+      fixEstimateOfVerifier: Boolean,
       useContractVerifierLimit: Boolean
   ): Either[String, Long] =
-    complexityInfo(script, estimator, useContractVerifierLimit)
+    complexityInfo(script, estimator, fixEstimateOfVerifier, useContractVerifierLimit)
       .map(_.verifierComplexity)
 }

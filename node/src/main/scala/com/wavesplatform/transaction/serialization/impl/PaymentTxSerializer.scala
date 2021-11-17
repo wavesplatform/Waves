@@ -12,13 +12,13 @@ import scala.util.Try
 object PaymentTxSerializer {
   def toJson(tx: PaymentTransaction): JsObject = {
     import tx._
-    BaseTxJson.toJson(tx) ++ Json.obj("recipient" -> recipient.stringRepr, "amount" -> amount)
+    BaseTxJson.toJson(tx) ++ Json.obj("recipient" -> recipient.toString, "amount" -> amount)
   }
 
   def hashBytes(tx: PaymentTransaction): Array[Byte] = {
     import tx._
     Bytes.concat(
-      Array(builder.typeId),
+      Array(tpe.id.toByte),
       Longs.toByteArray(timestamp),
       sender.arr,
       recipient.bytes,
@@ -30,7 +30,7 @@ object PaymentTxSerializer {
   def bodyBytes(tx: PaymentTransaction): Array[Byte] = {
     import tx._
     Bytes.concat(
-      Ints.toByteArray(builder.typeId), // 4 bytes
+      Ints.toByteArray(tpe.id), // 4 bytes
       Longs.toByteArray(timestamp),
       sender.arr,
       recipient.bytes,

@@ -40,7 +40,8 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
           description = "description",
           version = 1,
           waitForTx = true
-        )
+        ),
+        unsafe = false
       )
       .explicitGet()
       .id()
@@ -54,7 +55,8 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
     val updateAssetInfoTxId =
       PBTransactions
         .vanilla(
-          sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)
+          sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee),
+          unsafe = false
         )
         .explicitGet()
         .id()
@@ -149,7 +151,8 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
             fee = issueFee,
             script = Right(Some(script)),
             waitForTx = true
-          )
+          ),
+          unsafe = false
         )
         .explicitGet()
         .id()

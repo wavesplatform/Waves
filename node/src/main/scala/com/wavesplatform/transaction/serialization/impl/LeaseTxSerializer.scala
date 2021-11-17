@@ -16,7 +16,7 @@ object LeaseTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "amount"    -> amount,
-      "recipient" -> recipient.stringRepr
+      "recipient" -> recipient.toString
     )
   }
 
@@ -25,8 +25,8 @@ object LeaseTxSerializer {
     val baseBytes = Bytes.concat(sender.arr, recipient.bytes, Longs.toByteArray(amount), Longs.toByteArray(fee), Longs.toByteArray(timestamp))
 
     version match {
-      case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
-      case TxVersion.V2 => Bytes.concat(Array(typeId, version), Waves.byteRepr, baseBytes)
+      case TxVersion.V1 => Bytes.concat(Array(tpe.id.toByte), baseBytes)
+      case TxVersion.V2 => Bytes.concat(Array(tpe.id.toByte, version), Waves.byteRepr, baseBytes)
       case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }

@@ -22,15 +22,18 @@ import scala.scalajs.js.{Any, Dictionary}
 
 object JsAPI {
 
-  private def wavesContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean) =
+  private def wavesContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean): CTX[Environment] =
+    wavesContext(v, ScriptType.isAssetScript(isTokenContext), isContract)
+
+  private def wavesContext(v: StdLibVersion, scriptType: ScriptType, isContract: Boolean): CTX[Environment] =
     WavesContext.build(
       Global,
-      DirectiveSet(v, ScriptType.isAssetScript(isTokenContext), if (isContract) DAppType else Expression)
+      DirectiveSet(v, scriptType, if (isContract) DAppType else Expression)
         .explicitGet()
     )
 
   private def cryptoContext(version: StdLibVersion) = CryptoContext.build(Global, version).withEnvironment[Environment]
-  private def pureContext(version: StdLibVersion)   = PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[Environment]
+  private def pureContext(version: StdLibVersion)   = PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment]
 
   private val fullDAppContext: Map[StdLibVersion, CTX[Environment]] =
     DirectiveDictionary[StdLibVersion].all
@@ -40,6 +43,9 @@ object JsAPI {
 
   private def buildScriptContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean): CTX[Environment] =
     Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, isTokenContext, isContract)))
+
+  private def buildScriptContext(v: StdLibVersion, scriptType: ScriptType, isContract: Boolean): CTX[Environment] =
+    Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, scriptType, isContract)))
 
   private def buildContractContext(v: StdLibVersion): CTX[Environment] =
     Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, false, true)))
@@ -156,7 +162,14 @@ object JsAPI {
       case Expression =>
         val ctx = buildScriptContext(stdLibVer, isAsset, ds.contentType == DAppType)
         Global
-          .parseAndCompileExpression(input, ctx.compilerContext, Global.LetBlockVersions.contains(stdLibVer), stdLibVer, estimator)
+          .parseAndCompileExpression(
+            input,
+            ctx.compilerContext,
+            Global.LetBlockVersions.contains(stdLibVer),
+            stdLibVer,
+            ds.scriptType == Call,
+            estimator
+          )
           .map {
             case (bytes, complexity, exprScript, compErrorList) =>
               js.Dynamic.literal(
@@ -169,7 +182,7 @@ object JsAPI {
       case Library =>
         val ctx = buildScriptContext(stdLibVer, isAsset, ds.contentType == DAppType)
         Global
-          .compileDecls(input, ctx.compilerContext, stdLibVer, estimator)
+          .compileDecls(input, ctx.compilerContext, stdLibVer, ds.scriptType, estimator)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(
@@ -230,9 +243,9 @@ object JsAPI {
     val isAsset = ds.scriptType == Asset
     ds.contentType match {
       case Expression =>
-        val ctx = buildScriptContext(version, isAsset, ds.contentType == DAppType)
+        val ctx = buildScriptContext(version, ds.scriptType, ds.contentType == DAppType)
         Global
-          .compileExpression(input, ctx.compilerContext, version, estimator)
+          .compileExpression(input, ctx.compilerContext, version, ds.scriptType, estimator)
           .map {
             case (bytes, expr, complexity) =>
               val resultFields: Seq[(String, Any)] = Seq(
@@ -242,7 +255,7 @@ object JsAPI {
               )
               val errorFieldOpt: Seq[(String, Any)] =
                 Global
-                  .checkExpr(expr, complexity, version, isAsset, estimator)
+                  .checkExpr(expr, complexity, version, ds.scriptType, estimator)
                   .fold(
                     error => Seq("error" -> error),
                     _ => Seq()
@@ -252,7 +265,7 @@ object JsAPI {
       case Library =>
         val ctx = buildScriptContext(version, isAsset, ds.contentType == DAppType)
         Global
-          .compileDecls(input, ctx.compilerContext, version, estimator)
+          .compileDecls(input, ctx.compilerContext, version, ds.scriptType, estimator)
           .map {
             case (bytes, expr, complexity) =>
               js.Dynamic.literal(

@@ -5,7 +5,7 @@
       params: [ "ByteVector" ]
       doc: "Converts account public key to [address](blockhain/address.md)."
       paramsDoc: [ "The public key to convert." ]
-      complexity: 63
+      complexity: 1
     }
     {
       name: "addressFromRecipient"
@@ -121,7 +121,7 @@
       params: [ "Address" ]
       doc: "Convert address bytes to string"
       paramsDoc: [ "The address to convert" ]
-      complexity: 10
+      complexity: 1
     }
     {
       name: "toString"
@@ -142,7 +142,7 @@
       params: [ "BigInt" ]
       doc: "Convert BigInt to string"
       paramsDoc: [ "The BigInt to convert" ]
-      complexity: 65
+      complexity: 1
     }
     {
       name: "toUtf8String"

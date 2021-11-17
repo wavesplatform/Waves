@@ -5,6 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.serialization.impl.TransferTxSerializer
 import com.wavesplatform.transaction.transfer._
 import play.api.libs.json.Json
 
@@ -41,7 +42,7 @@ class TransferTransactionV2Specification extends PropSpec {
         |""".stripMargin
     )
 
-    val tx = TransferTransaction.serializer.parseBytes(bytes)
+    val tx = TransferTxSerializer.parseBytes(bytes)
     tx.get.json() shouldBe json
   }
 

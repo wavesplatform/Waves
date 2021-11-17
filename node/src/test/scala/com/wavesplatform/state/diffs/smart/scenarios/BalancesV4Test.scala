@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
 import cats.syntax.semigroup._
-import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
@@ -22,15 +21,15 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.utils._
-import com.wavesplatform.TestTime
-import com.wavesplatform.test.PropSpec
 
 class BalancesV4Test extends PropSpec with WithState {
 
@@ -66,10 +65,10 @@ class BalancesV4Test extends PropSpec with WithState {
       GenesisTransaction
         .create(dapp.toAddress, 10 * Constants.UnitsInWave + SetScriptFee + 2 * InvokeScriptTxFee + 1 * Constants.UnitsInWave, ts)
         .explicitGet(),
-      CreateAliasTransaction.selfSigned(TxVersion.V2, acc1, Alias.create("alias").explicitGet(), MinFee, ts).explicitGet()
+      CreateAliasTransaction.selfSigned(TxVersion.V2, acc1, "alias", MinFee, ts).explicitGet()
     )
     setScript = SetScriptTransaction.selfSigned(1.toByte, dapp, Some(script("alias")), SetScriptFee, ts).explicitGet()
-    ci        = InvokeScriptTransaction.selfSigned(1.toByte, master, dapp.toAddress, functionCall, Nil, InvokeScriptTxFee, Waves, ts + 3).explicitGet()
+    ci        = Signed.invokeScript(1.toByte, master, dapp.toAddress, functionCall, Nil, InvokeScriptTxFee, Waves, ts + 3)
     lease1    = LeaseTransaction.selfSigned(2.toByte, acc1, dapp.toAddress, 10 * Constants.UnitsInWave, MinFee, ts + 2).explicitGet()
     lease2    = LeaseTransaction.selfSigned(2.toByte, acc1, dapp.toAddress, 10 * Constants.UnitsInWave, MinFee, ts + 3).explicitGet()
     leaseD    = LeaseTransaction.selfSigned(2.toByte, dapp, acc1.toAddress, 1 * Constants.UnitsInWave, MinFee, ts + 3).explicitGet()
@@ -134,7 +133,7 @@ class BalancesV4Test extends PropSpec with WithState {
     def assetScript(acc: ByteStr): Script = {
       val ctx = {
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
-        PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+        PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
           WavesContext.build(Global, directives)
       }
@@ -185,7 +184,7 @@ class BalancesV4Test extends PropSpec with WithState {
       case (acc1, acc2) =>
         val g1    = GenesisTransaction.create(acc1.toAddress, ENOUGH_AMT, nextTs).explicitGet()
         val g2    = GenesisTransaction.create(acc2.toAddress, ENOUGH_AMT, nextTs).explicitGet()
-        val alias = CreateAliasTransaction.selfSigned(TxVersion.V2, acc2, Alias.create("alias").explicitGet(), MinFee, nextTs).explicitGet()
+        val alias = CreateAliasTransaction.selfSigned(TxVersion.V2, acc2, "alias", MinFee, nextTs).explicitGet()
         val issue = IssueTransaction(
           TxVersion.V1,
           acc1.publicKey,
@@ -201,7 +200,7 @@ class BalancesV4Test extends PropSpec with WithState {
         val setScript = SetScriptTransaction
           .selfSigned(1.toByte, acc1, Some(dappScript(ByteStr(acc2.toAddress.bytes), issue.id())), SetScriptFee, nextTs)
           .explicitGet()
-        val ci = InvokeScriptTransaction.selfSigned(1.toByte, acc1, acc1.toAddress, functionCall, Nil, InvokeScriptTxFee, Waves, nextTs).explicitGet()
+        val ci = Signed.invokeScript(1.toByte, acc1, acc1.toAddress, functionCall, Nil, InvokeScriptTxFee, Waves, nextTs)
 
         assertDiffAndState(Seq(TestBlock.create(Seq(g1, g2, alias, issue, setScript))), TestBlock.create(Seq(ci)), rideV4Activated) {
           case (d, s) =>
@@ -219,7 +218,7 @@ class BalancesV4Test extends PropSpec with WithState {
     def assetScript(acc: ByteStr): Script = {
       val ctx = {
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
-        PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+        PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
           WavesContext.build(Global, directives)
       }
@@ -285,7 +284,7 @@ class BalancesV4Test extends PropSpec with WithState {
         val setScript = SetScriptTransaction
           .selfSigned(1.toByte, acc1, Some(dappScript(ByteStr(acc2.toAddress.bytes), issue.id())), SetScriptFee, nextTs)
           .explicitGet()
-        val ci = InvokeScriptTransaction.selfSigned(1.toByte, acc2, acc1.toAddress, functionCall, Nil, InvokeScriptTxFee, Waves, nextTs).explicitGet()
+        val ci = Signed.invokeScript(1.toByte, acc2, acc1.toAddress, functionCall, Nil, InvokeScriptTxFee, Waves, nextTs)
 
         assertDiffAndState(Seq(TestBlock.create(Seq(g1, g2, issue, setScript))), TestBlock.create(Seq(ci)), rideV4Activated) {
           case (d, s) =>

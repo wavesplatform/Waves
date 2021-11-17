@@ -6,38 +6,40 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler, Terms, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TransactionType, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.utils._
 import org.scalacheck.Gen
 import shapeless.Coproduct
 
-class ContextFunctionsTest extends PropSpec with WithDomain {
+class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
   import DomainPresets._
 
   def compactDataTransactionGen(sender: KeyPair): Gen[DataTransaction] =
@@ -198,7 +200,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain {
     }
   }
 
-  property("base64 amplification") {
+  ignore("base64 amplification") {
     val script =
       """
         |let a = base58'7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy'
@@ -510,18 +512,16 @@ class ContextFunctionsTest extends PropSpec with WithDomain {
             SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
           val fc = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)
 
-          val ci = InvokeScriptTransaction
-            .selfSigned(
-              1.toByte,
-              masterAcc,
-              masterAcc.toAddress,
-              Some(fc),
-              Seq.empty,
-              FeeValidation.FeeUnit * (FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee),
-              Waves,
-              System.currentTimeMillis()
-            )
-            .explicitGet()
+          val ci = Signed.invokeScript(
+            1.toByte,
+            masterAcc,
+            masterAcc.toAddress,
+            Some(fc),
+            Seq.empty,
+            FeeValidation.FeeUnit * (FeeValidation.FeeConstants(TransactionType.InvokeScript) + FeeValidation.ScriptExtraFee),
+            Waves,
+            System.currentTimeMillis()
+          )
 
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(ci)).explicitGet()
@@ -754,7 +754,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain {
           val expr = Parser.parseContract(script).get.value
 
           val ctx =
-            PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+            PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
               CryptoContext.build(Global, version).withEnvironment[Environment] |+|
               WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet())
 
@@ -762,24 +762,48 @@ class ContextFunctionsTest extends PropSpec with WithDomain {
           val setScriptTx =
             SetScriptTransaction.selfSigned(1.toByte, recipient, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
 
-          val ci = InvokeScriptTransaction
-            .selfSigned(
+          val ci = Signed.invokeScript(
               1.toByte,
               masterAcc,
               recipient.toAddress,
               None,
               Seq.empty,
-              FeeUnit * (FeeConstants(InvokeScriptTransaction.typeId) + ScriptExtraFee),
+              FeeUnit * (FeeConstants(TransactionType.InvokeScript) + ScriptExtraFee),
               Waves,
               System.currentTimeMillis()
             )
-            .explicitGet()
 
           append(genesis).explicitGet()
           append(Seq(dataTransaction)).explicitGet()
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(ci)).explicitGet()
         }
+    }
+  }
+
+  property("addressFromPublicKey native") {
+    val (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) = preconditionsAndPayments.sample.get
+    val fs                                                                                    = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (BlockchainFeatures.RideV6.id -> 0))
+
+    assertDiffAndState(fs) { append =>
+      append(genesis).explicitGet()
+      append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+      append(Seq(transferTx)).explicitGet()
+
+      val script = TestCompiler(V6)
+        .compileExpression(
+          s"""
+             | addressFromPublicKey(base58'${transferTx.sender}') == Address(base58'${transferTx.sender.toAddress}') &&
+             | addressFromPublicKey(base58'$TestEthPublicKey') == Address(base58'${TestEthPublicKey.toAddress}')
+           """.stripMargin
+        )
+
+      val setScriptTx = SetScriptTransaction
+        .selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5)
+        .explicitGet()
+
+      append(Seq(setScriptTx)).explicitGet()
+      append(Seq(transfer2)).explicitGet()
     }
   }
 }

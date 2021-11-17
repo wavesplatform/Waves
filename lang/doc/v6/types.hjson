@@ -634,6 +634,52 @@
       ]
     }
     {
+      name: InvokeExpressionTransaction
+      fields:
+      [
+        {
+          name: expression
+          type: ByteVector
+        }
+        {
+          name: feeAssetId
+          type: ByteVector|Unit
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
       name: UpdateAssetInfoTransaction
       fields:
       [

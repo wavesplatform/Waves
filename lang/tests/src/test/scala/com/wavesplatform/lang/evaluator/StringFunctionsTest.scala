@@ -1,10 +1,8 @@
 package com.wavesplatform.lang.evaluator
 
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONST_STRING}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
-import com.wavesplatform.test.produce
 
 class StringFunctionsTest extends EvaluatorSpec {
   property("take") {
@@ -153,19 +151,5 @@ class StringFunctionsTest extends EvaluatorSpec {
     eval(""" "qwerty".contains("we") """) shouldBe Right(CONST_BOOLEAN(true))
     eval(""" "qwerty".contains("xx") """) shouldBe Right(CONST_BOOLEAN(false))
     eval(s""" "${"a" * Short.MaxValue}".contains("${"a" * Short.MaxValue}") """) shouldBe Right(CONST_BOOLEAN(true))
-  }
-
-  property("makeString") {
-    implicit val v: StdLibVersion = V4
-    eval(""" ["cat", "dog", "pig"].makeString(", ") """) shouldBe CONST_STRING("cat, dog, pig")
-    eval(""" [].makeString(", ") """) shouldBe CONST_STRING("")
-    eval(""" ["abc"].makeString(", ") == "abc" """) shouldBe Right(CONST_BOOLEAN(true))
-
-    val script = s""" [${s""" "${"a" * 1000}", """ * 32} "${"a" * 704}"].makeString(", ") """
-    eval(script) should produce("Constructing string size = 32768 bytes will exceed 32767")
-    // 1000 * 32 + 704 + 2 * 32 = 32768
-
-    val script2 = s""" [${s""" "${"a" * 1000}", """ * 32} "${"a" * 703}"].makeString(", ") """
-    eval(script2).explicitGet().asInstanceOf[CONST_STRING].s.length shouldBe 32767
   }
 }

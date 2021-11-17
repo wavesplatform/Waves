@@ -131,7 +131,7 @@ object BlockStats {
         "3P5dg6PtSAQmdH1qCGKJWu7bkzRG27mny5i",
         "3PNDoRLsFoPtW1P3nvVHAt7V6hfpyQ8Az9w"
       )
-      whitelistAddrs(b.sender.toAddress.stringRepr)
+      whitelistAddrs(b.sender.toAddress.toString)
     }
 
     measurement(Type.Block)

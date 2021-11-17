@@ -144,7 +144,7 @@ object Wallet extends ScorexLogging {
     }
 
     override def privateKeyAccount(account: Address): Either[ValidationError, KeyPair] =
-      accountsCache.get(account.stringRepr).toRight[ValidationError](MissingSenderPrivateKey)
+      accountsCache.get(account.toString).toRight[ValidationError](MissingSenderPrivateKey)
 
     override def nonce: Int =
       walletData.nonce

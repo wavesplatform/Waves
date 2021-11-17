@@ -3,6 +3,9 @@ package com.wavesplatform.mining
 import java.security.Permission
 import java.util.concurrent.{Semaphore, TimeUnit}
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
+
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
@@ -28,10 +31,8 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
+import monix.reactive.Observable
 import org.scalacheck.{Arbitrary, Gen}
-
-import scala.concurrent.Await
-import scala.concurrent.duration._
 
 class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettings {
 
@@ -44,7 +45,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
           val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
           val wallet      = Wallet(WalletSettings(None, Some("123"), None))
           val miner =
-            new MinerImpl(allChannels, bcu, settings, ntpTime, utxPoolStub, wallet, pos, scheduler, scheduler)
+            new MinerImpl(allChannels, bcu, settings, ntpTime, utxPoolStub, wallet, pos, scheduler, scheduler, Observable.empty)
 
           val signal = new Semaphore(1)
           signal.acquire()
@@ -134,7 +135,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
     val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     val pos = PoSSelector(bcu, settings.synchronizationSettings.maxBaseTarget)
 
-    val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, ignoreSpendableBalanceChanged, settings0.utxSettings)
+    val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, settings0.utxSettings)
     val schedulerService: SchedulerService = Scheduler.singleThread("appender")
 
     try {

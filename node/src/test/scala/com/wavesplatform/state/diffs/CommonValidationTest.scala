@@ -12,7 +12,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -286,7 +286,7 @@ class CommonValidationTest extends PropSpec with WithState {
       case (genesis, tx) =>
         tx.chainId should not be AddressScheme.current.chainId
         assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(tx))) { blockDiffEi =>
-          blockDiffEi should produce("Data from other network")
+          blockDiffEi should produce("Address belongs to another network")
         }
     }
   }

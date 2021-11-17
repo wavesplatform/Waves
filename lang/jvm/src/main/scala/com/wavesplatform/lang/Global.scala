@@ -78,30 +78,39 @@ object Global extends BaseGlobal {
   override def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean =
     Merkle.verify(rootBytes, proofBytes, valueBytes)
 
-  private val longDigits  = 19
-  private val longContext = new MathContext(longDigits)
+  private val longDigits     = 19
+  private val longContext    = new MathContext(longDigits)
+  private val oldLongContext = MathContext.DECIMAL128
 
-  private val bigIntDigits   = 154
+  private val bigIntDigits = 154
   private val bigMathContext = new MathContext(bigIntDigits)
+  private val oldBigMathContext = new MathContext(156 + 40)
 
   // Math functions
   def pow(
       base: Long,
-      basePrecision: Long,
+      basePrecision: Int,
       exponent: Long,
-      exponentPrecision: Long,
-      resultPrecision: Long,
-      round: Rounding
+      exponentPrecision: Int,
+      resultPrecision: Int,
+      round: Rounding,
+      useNewPrecision: Boolean
   ): Either[String, Long] =
     tryEither {
-      val baseBD = BD.valueOf(base, basePrecision.toInt)
-      val expBD  = BD.valueOf(exponent, exponentPrecision.toInt)
+      val baseBD  = BD.valueOf(base, basePrecision)
+      val expBD   = BD.valueOf(exponent, exponentPrecision)
+      val context = if (useNewPrecision) longContext else oldLongContext
       val result = if (expBD == BigDecimal(0.5).bigDecimal) {
-        BigDecimalMath.sqrt(baseBD, longContext)
+        BigDecimalMath.sqrt(baseBD, context)
       } else {
-        BigDecimalMath.pow(baseBD, expBD, longContext)
+        BigDecimalMath.pow(baseBD, expBD, context)
       }
-      setScale(resultPrecision.toInt, round, longDigits, result)
+      if (useNewPrecision)
+        setScale(resultPrecision, round, context.getPrecision, result)
+      else {
+        val value = result.setScale(resultPrecision.toInt, round.mode).unscaledValue
+        Right(BigInt(value))
+      }
     }.flatten.map(_.bigInteger.longValueExact())
 
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long] =
@@ -114,17 +123,29 @@ object Global extends BaseGlobal {
 
   def toJBig(v: BigInt, p: Long) = BigDecimal(v).bigDecimal.multiply(BD.valueOf(1L, p.toInt))
 
-  def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =
+  def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding, useNewPrecision: Boolean): Either[String, BigInt] =
+    tryEither {
+      val base    = toJBig(b, bp)
+      val exp     = toJBig(e, ep)
+      val context = if (useNewPrecision) bigMathContext else oldBigMathContext
+      val res = if (exp == BigDecimal(0.5).bigDecimal) {
+        BigDecimalMath.sqrt(base, context)
+      } else {
+        BigDecimalMath.pow(base, exp, context)
+      }
+      if (useNewPrecision)
+        setScale(rp.toInt, round, context.getPrecision, res)
+      else
+        Right(BigInt(res.setScale(rp.toInt, round.mode).unscaledValue))
+    }.flatten
+
+  def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =
     tryEither {
       val base = toJBig(b, bp)
       val exp  = toJBig(e, ep)
-      val res = if (exp == BigDecimal(0.5).bigDecimal) {
-        BigDecimalMath.sqrt(base, bigMathContext)
-      } else {
-        BigDecimalMath.pow(base, exp, bigMathContext)
-      }
-      setScale(rp.toInt, round, bigIntDigits, res)
-    }.flatten
+      val res  = BigDecimalMath.log(base, bigMathContext).divide(BigDecimalMath.log(exp, bigMathContext), bigMathContext)
+      BigInt(res.setScale(rp.toInt, round.mode).unscaledValue)
+    }
 
   private def setScale(
       resultPrecision: Int,
@@ -144,14 +165,6 @@ object Global extends BaseGlobal {
     else
       Right(BigInt(value) * BigInteger.TEN.pow(resultPrecision - scale))
   }
-
-  def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =
-    tryEither {
-      val base = toJBig(b, bp)
-      val exp  = toJBig(e, ep)
-      val res  = BigDecimalMath.log(base, bigMathContext).divide(BigDecimalMath.log(exp, bigMathContext), bigMathContext)
-      BigInt(res.setScale(rp.toInt, round.mode).unscaledValue)
-    }
 
   override def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
     Bls12Groth16.verify(verifyingKey, proof, inputs)

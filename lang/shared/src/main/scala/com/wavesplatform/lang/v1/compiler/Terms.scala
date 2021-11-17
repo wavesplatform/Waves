@@ -206,12 +206,12 @@ object Terms {
       Some(arg.bs)
   }
 
-  class CONST_STRING private (val s: String) extends EVALUATED {
+  class CONST_STRING private (val s: String, bytesLength: Int) extends EVALUATED {
     override def toString: String                 = s
     override def prettyString(level: Int): String = "\"" ++ escape(s) ++ "\""
-    override val weight: Long                     = s.getBytes.length
+    override lazy val weight: Long                = bytesLength
 
-    override  val getType: REAL = STRING
+    override val getType: REAL = STRING
 
     override def equals(obj: Any): Boolean =
       obj match {
@@ -221,17 +221,18 @@ object Terms {
 
     override def hashCode(): Int = s.hashCode
   }
+
   object CONST_STRING {
-    def apply(s: String, reduceLimit: Boolean = true): Either[ExecutionError, CONST_STRING] = {
+    def apply(s: String, reduceLimit: Boolean = true, bytesLength: Option[Int] = None): Either[ExecutionError, CONST_STRING] = {
       val limit =
         if (reduceLimit) DataEntryValueMax
         else DataTxMaxBytes
 
-      val actualSize = s.getBytes(StandardCharsets.UTF_8).length
+      val actualSize = bytesLength.getOrElse(s.getBytes(StandardCharsets.UTF_8).length)
 
       Either.cond(
         actualSize <= limit,
-        new CONST_STRING(s),
+        new CONST_STRING(s, actualSize),
         s"String size=$actualSize exceeds $limit bytes"
       )
     }

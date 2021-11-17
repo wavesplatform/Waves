@@ -4,13 +4,14 @@ import com.wavesplatform.account.{Alias, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.serialization.impl.CreateAliasTxSerializer
 import play.api.libs.json.Json
 
 class CreateAliasTransactionSpecification extends PropSpec {
 
   property("CreateAliasTransaction serialization roundtrip") {
     forAll(createAliasGen) { tx: CreateAliasTransaction =>
-      val recovered = tx.builder.parseBytes(tx.bytes()).get
+      val recovered = CreateAliasTxSerializer.parseBytes(tx.bytes()).get
       recovered shouldEqual tx
     }
   }
@@ -25,8 +26,8 @@ class CreateAliasTransactionSpecification extends PropSpec {
   property("The same aliases from different senders have the same id") {
     forAll(accountGen, accountGen, aliasGen, timestampGen) {
       case (a1: KeyPair, a2: KeyPair, a: Alias, t: Long) =>
-        val tx1 = CreateAliasTransaction.selfSigned(1.toByte, a1, a, MinIssueFee, t).explicitGet()
-        val tx2 = CreateAliasTransaction.selfSigned(1.toByte, a2, a, MinIssueFee, t).explicitGet()
+        val tx1 = CreateAliasTransaction.selfSigned(1.toByte, a1, a.name, MinIssueFee, t).explicitGet()
+        val tx2 = CreateAliasTransaction.selfSigned(1.toByte, a2, a.name, MinIssueFee, t).explicitGet()
         tx1.id() shouldBe tx2.id()
     }
   }

@@ -16,7 +16,7 @@ object TransferTxSerializer {
   def toJson(tx: TransferTransaction): JsObject = {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
-      "recipient"  -> recipient.stringRepr,
+      "recipient"  -> recipient.toString,
       "assetId"    -> assetId.maybeBase58Repr,
       "feeAsset"   -> feeAssetId.maybeBase58Repr, // legacy v0.11.1 compat
       "amount"     -> amount,
@@ -39,14 +39,14 @@ object TransferTxSerializer {
       )
 
     version match {
-      case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
-      case TxVersion.V2 => Bytes.concat(Array(typeId, version), baseBytes)
+      case TxVersion.V1 => Bytes.concat(Array(tpe.id.toByte), baseBytes)
+      case TxVersion.V2 => Bytes.concat(Array(tpe.id.toByte, version), baseBytes)
       case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
   def toBytes(tx: TransferTransaction): Array[Byte] = tx.version match {
-    case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature.arr, this.bodyBytes(tx))
+    case TxVersion.V1 => Bytes.concat(Array(tx.tpe.id.toByte), tx.proofs.toSignature.arr, this.bodyBytes(tx))
     case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
     case _            => PBTransactionSerializer.bytes(tx)
   }
@@ -62,7 +62,19 @@ object TransferTxSerializer {
       val recipient  = buf.getAddressOrAlias
       val attachment = buf.getByteArrayWithLength
 
-      TransferTransaction(version, sender, recipient, assetId, amount, feeAssetId, fee, ByteStr(attachment), ts, Proofs.empty, recipient.chainId)
+      TransferTransaction(
+        version,
+        sender,
+        recipient,
+        assetId,
+        amount,
+        feeAssetId,
+        fee,
+        ByteStr(attachment),
+        ts,
+        Proofs.empty,
+        recipient.chainId
+      )
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

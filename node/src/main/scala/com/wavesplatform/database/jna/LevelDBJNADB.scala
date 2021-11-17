@@ -117,10 +117,10 @@ private object LevelDBJNADB {
       false
 
     override def prev(): DBEntry =
-      ???
+      throw new NotImplementedError("prev() is not implemented")
 
     override def peekPrev(): DBEntry =
-      ???
+      throw new NotImplementedError("peekPrev() is not implemented")
 
     override def seekToLast(): Unit =
       iterator.seekToLast()
@@ -136,7 +136,7 @@ private object LevelDBJNADB {
         new DBEntry {
           override def getKey: Array[Byte]                       = pair.getKey
           override def getValue: Array[Byte]                     = pair.getValue
-          override def setValue(value: Array[Byte]): Array[Byte] = ???
+          override def setValue(value: Array[Byte]): Array[Byte] = throw new NotImplementedError("setValue(Array[Byte]) is not implemented")
         }
       } else {
         this.endOfData()

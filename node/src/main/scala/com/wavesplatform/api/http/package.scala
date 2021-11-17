@@ -3,33 +3,28 @@ package com.wavesplatform.api
 import java.util.NoSuchElementException
 import java.util.concurrent.ExecutionException
 
-import scala.concurrent.Future
-import scala.util.{Failure, Success, Try}
-import scala.util.control.NonFatal
-
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server._
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.ApiError.{InvalidAssetId, InvalidBlockId, InvalidPublicKey, InvalidSignature, InvalidTransactionId, WrongJson}
-import com.wavesplatform.api.http.requests._
 import com.wavesplatform.api.http.requests.DataRequest._
 import com.wavesplatform.api.http.requests.SponsorFeeRequest._
+import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
-import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction._
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Scheduler
 import play.api.libs.json._
+
+import scala.concurrent.Future
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 package object http extends ApiMarshallers with ScorexLogging {
   val versionReads: Reads[Byte] = {
@@ -58,26 +53,24 @@ package object http extends ApiMarshallers with ScorexLogging {
         PublicKey
           .fromBase58String(senderPk)
           .flatMap { senderPk =>
-            TransactionParsers.by(typeId, version) match {
-              case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
-              case Some(x) =>
-                (x: @unchecked) match {
-                  case TransferTransaction        => txJson.as[TransferRequest].toTxFrom(senderPk)
-                  case CreateAliasTransaction     => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
-                  case LeaseTransaction           => txJson.as[LeaseRequest].toTxFrom(senderPk)
-                  case LeaseCancelTransaction     => txJson.as[LeaseCancelRequest].toTxFrom(senderPk)
-                  case ExchangeTransaction        => txJson.as[ExchangeRequest].toTxFrom(senderPk)
-                  case IssueTransaction           => txJson.as[IssueRequest].toTxFrom(senderPk)
-                  case ReissueTransaction         => txJson.as[ReissueRequest].toTxFrom(senderPk)
-                  case BurnTransaction            => txJson.as[BurnRequest].toTxFrom(senderPk)
-                  case MassTransferTransaction    => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], senderPk)
-                  case DataTransaction            => TransactionFactory.data(txJson.as[DataRequest], senderPk)
-                  case InvokeScriptTransaction    => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], senderPk)
-                  case SetScriptTransaction       => TransactionFactory.setScript(txJson.as[SetScriptRequest], senderPk)
-                  case SetAssetScriptTransaction  => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], senderPk)
-                  case SponsorFeeTransaction      => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderPk)
-                  case UpdateAssetInfoTransaction => txJson.as[UpdateAssetInfoRequest].toTxFrom(senderPk)
-                }
+            TransactionType(typeId) match {
+              case TransactionType.Transfer        => txJson.as[TransferRequest].toTxFrom(senderPk)
+              case TransactionType.CreateAlias     => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
+              case TransactionType.Lease           => txJson.as[LeaseRequest].toTxFrom(senderPk)
+              case TransactionType.LeaseCancel     => txJson.as[LeaseCancelRequest].toTxFrom(senderPk)
+              case TransactionType.Exchange        => txJson.as[ExchangeRequest].toTxFrom(senderPk)
+              case TransactionType.Issue           => txJson.as[IssueRequest].toTxFrom(senderPk)
+              case TransactionType.Reissue         => txJson.as[ReissueRequest].toTxFrom(senderPk)
+              case TransactionType.Burn            => txJson.as[BurnRequest].toTxFrom(senderPk)
+              case TransactionType.MassTransfer    => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], senderPk)
+              case TransactionType.Data            => TransactionFactory.data(txJson.as[DataRequest], senderPk)
+              case TransactionType.InvokeScript    => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], senderPk)
+              case TransactionType.SetScript       => TransactionFactory.setScript(txJson.as[SetScriptRequest], senderPk)
+              case TransactionType.SetAssetScript  => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], senderPk)
+              case TransactionType.SponsorFee      => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderPk)
+              case TransactionType.UpdateAssetInfo => txJson.as[UpdateAssetInfoRequest].toTxFrom(senderPk)
+              case TransactionType.InvokeExpression => TransactionFactory.invokeExpression(txJson.as[InvokeExpressionRequest], senderPk)
+              case other => throw new IllegalArgumentException(s"Unsupported transaction type: $other")
             }
           }
           .fold(ApiError.fromValidationError, txToResponse)

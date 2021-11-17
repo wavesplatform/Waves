@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -361,7 +361,7 @@ class ScriptsCountTest extends PropSpec with WithState with Inside {
       ) {
         case (blockDiff, _) =>
           blockDiff.scriptsRun shouldBe 31
-          blockDiff.scriptsComplexity shouldBe (Script.estimate(allAllowed, ScriptEstimatorV2, useContractVerifierLimit = false).explicitGet() * 31)
+          blockDiff.scriptsComplexity shouldBe (Script.estimate(allAllowed, ScriptEstimatorV2, fixEstimateOfVerifier = true, useContractVerifierLimit = false).explicitGet() * 31)
       }
     }) { x =>
       x

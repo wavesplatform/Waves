@@ -4,7 +4,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.settings.TestFunctionalitySettings.Enabled
 import com.wavesplatform.state._
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import org.scalacheck.Gen
 
 class CommonValidationTimeTest extends PropSpec with WithState {

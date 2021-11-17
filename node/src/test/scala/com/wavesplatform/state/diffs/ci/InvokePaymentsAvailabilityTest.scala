@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.wavesplatform.TestTime
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
@@ -9,11 +8,12 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test._
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.utils.Signed
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
 
@@ -79,7 +79,7 @@ class InvokePaymentsAvailabilityTest extends PropSpec with Inside with DBCacheSe
       asset    = IssuedAsset(issue.id.value())
       payments = Seq(Payment(paymentAmount, asset))
       dApp     = if (syncCall) proxyDApp.toAddress else callingDApp.toAddress
-      invokeTx = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, dApp, None, payments, fee, Waves, ts).explicitGet()
+      invokeTx = Signed.invokeScript(TxVersion.V3, invoker, dApp, None, payments, fee, Waves, ts)
     } yield (Seq(gTx1, gTx2, gTx3, ssTx, ssTx2, issue), invokeTx, callingDApp.toAddress, proxyDApp.toAddress, asset)
 
   property("payments availability in usual call") {
@@ -88,7 +88,7 @@ class InvokePaymentsAvailabilityTest extends PropSpec with Inside with DBCacheSe
       d.appendBlock(preparingTxs: _*)
       d.appendBlock(invoke)
 
-      d.blockchain.transactionInfo(invoke.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
       d.blockchain.balance(invoke.senderAddress, asset) shouldBe ENOUGH_AMT - paymentAmount
 
       val expectingCallingDAppBalance = paymentAmount
@@ -107,7 +107,7 @@ class InvokePaymentsAvailabilityTest extends PropSpec with Inside with DBCacheSe
       d.appendBlock(preparingTxs: _*)
       d.appendBlock(invoke)
 
-      d.blockchain.transactionInfo(invoke.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
       d.blockchain.balance(invoke.senderAddress, asset) shouldBe ENOUGH_AMT - paymentAmount
 
       val expectingProxyDAppBalance = 0

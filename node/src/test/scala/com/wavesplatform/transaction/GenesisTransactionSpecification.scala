@@ -43,7 +43,7 @@ class GenesisTransactionSpecification extends PropSpec {
         source should equal(dest)
 
         val proto           = PBTransactions.protobuf(source)
-        val fromProto       = PBTransactions.vanilla(proto).explicitGet()
+        val fromProto       = PBTransactions.vanilla(proto, unsafe = false).explicitGet()
         val fromProtoUnsafe = PBTransactions.vanillaUnsafe(proto)
         fromProto shouldBe source
         fromProtoUnsafe shouldBe source

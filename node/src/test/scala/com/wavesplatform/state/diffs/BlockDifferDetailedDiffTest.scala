@@ -12,7 +12,7 @@ import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.BlockGen
-import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.test._
 import org.scalacheck.Gen
 
 class BlockDifferDetailedDiffTest extends FreeSpec with BlockGen with WithState {
@@ -107,7 +107,7 @@ class BlockDifferDetailedDiffTest extends FreeSpec with BlockGen with WithState 
         "with NG" - {
           val ngFs = TFS.Enabled.copy(preActivatedFeatures = TFS.Enabled.preActivatedFeatures + (BlockchainFeatures.NG.id -> 0))
 
-          "no history — only 40% from current block" in
+          "no history - only 40% from current block" in
             forAll(genesisTransfersBlockGen) {
               case (addr1, _, _, _, b) =>
                 assertDetailedDiff(Seq.empty, b, ngFs) {
@@ -116,7 +116,7 @@ class BlockDifferDetailedDiffTest extends FreeSpec with BlockGen with WithState 
                 }
             }
 
-          "with history — 60% from last + 40% from current block" in {
+          "with history - 60% from last + 40% from current block" in {
             val blocksNgMinerGen: Gen[(Seq[Block], Block, Address)] = for {
               a1    <- accountGen
               a2    <- accountGen suchThat (_ != a1)

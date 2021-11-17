@@ -225,6 +225,6 @@ class TransactionsOrderingSpecification extends PropSpec {
         )
         .explicitGet()
     )
-    Random.shuffle(correctSeq).sorted(TransactionsOrdering.InUTXPool(Set(whitelisted.toAddress.stringRepr))) shouldBe correctSeq
+    Random.shuffle(correctSeq).sorted(TransactionsOrdering.InUTXPool(Set(whitelisted.toAddress.toString))) shouldBe correctSeq
   }
 }

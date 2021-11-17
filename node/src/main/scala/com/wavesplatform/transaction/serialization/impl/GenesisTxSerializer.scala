@@ -17,19 +17,19 @@ object GenesisTxSerializer {
   def toJson(tx: GenesisTransaction): JsObject = {
     import tx._
     Json.obj(
-      "type"      -> builder.typeId,
+      "type"      -> tpe.id,
       "id"        -> id().toString,
       "fee"       -> 0,
       "timestamp" -> timestamp,
       "signature" -> signature.toString,
-      "recipient" -> recipient.stringRepr,
+      "recipient" -> recipient.toString,
       "amount"    -> amount
     )
   }
 
   def toBytes(tx: GenesisTransaction): Array[Byte] = {
     import tx._
-    val typeBytes      = Array(builder.typeId)
+    val typeBytes      = Array(tpe.id.toByte)
     val timestampBytes = Longs.toByteArray(timestamp)
     val rcpBytes       = recipient.bytes
     val amountBytes    = Longs.toByteArray(amount)

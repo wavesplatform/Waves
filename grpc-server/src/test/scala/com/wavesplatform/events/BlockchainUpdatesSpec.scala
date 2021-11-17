@@ -2,10 +2,6 @@ package com.wavesplatform.events
 
 import java.nio.file.Files
 
-import scala.concurrent.{Await, Promise}
-import scala.concurrent.duration._
-import scala.util.Random
-
 import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, KeyPair}
@@ -13,13 +9,13 @@ import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
+import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
 import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdatesRangeRequest, SubscribeEvent, SubscribeRequest}
-import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.events.protobuf.serde._
+import com.wavesplatform.events.protobuf.{TransactionMetadata, BlockchainUpdated => PBBlockchainUpdated}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -28,22 +24,29 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
-import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation}
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult
+import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
-import com.wavesplatform.state.{AssetDescription, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
-import com.wavesplatform.test.{FreeSpec, _}
-import com.wavesplatform.transaction.{Asset, GenesisTransaction, PaymentTransaction, TxHelpers}
+import com.wavesplatform.state.{AssetDescription, Blockchain, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.assets.exchange.OrderType
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, PaymentTransaction, TxHelpers}
 import io.grpc.StatusException
 import io.grpc.stub.{CallStreamObserver, StreamObserver}
+import monix.eval.Task
 import monix.execution.CancelableFuture
 import monix.execution.Scheduler.Implicits.global
 import org.scalactic.source.Position
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.ScalaFutures
+
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Promise}
+import scala.util.Random
 
 class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures with PathMockFactory {
   var currentSettings: WavesSettings = domainSettingsWithFS(
@@ -73,6 +76,22 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
   }
 
   "BlockchainUpdates" - {
+    "should return order ids in exchange metadata" in withSettings(DomainPresets.RideV4)(withDomainAndRepo {
+      case (d, repo) =>
+        val issue = TxHelpers.issue()
+        d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
+        d.appendBlock(issue)
+
+        val subscription = repo.createSubscriptionObserver(SubscribeRequest.of(1, 0))
+        val exchange     = TxHelpers.exchange(TxHelpers.order(OrderType.BUY, issue.asset), TxHelpers.order(OrderType.SELL, issue.asset))
+        d.appendBlock(exchange)
+
+        subscription.lastAppendEvent(d.blockchain).transactionMetadata should matchPattern {
+          case Seq(TransactionMetadata(TransactionMetadata.Metadata.Exchange(TransactionMetadata.ExchangeMetadata(ids, _)), _))
+              if ids.map(_.toByteStr) == Seq(exchange.order1.id(), exchange.order2.id()) =>
+        }
+    })
+
     "should process nested invoke with args" in withDomainAndRepo {
       case (d, repo) =>
         val script = TxHelpers.script("""
@@ -482,18 +501,16 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
           ScriptEstimatorV3
         )
         .explicitGet()
-      val invoke = InvokeScriptTransaction
-        .selfSigned(
-          2.toByte,
-          invoker,
-          issuer.toAddress,
-          Some(FUNCTION_CALL(FunctionHeader.User("issue"), Nil)),
-          Seq.empty,
-          2.waves,
-          Asset.Waves,
-          ntpTime.getTimestamp()
-        )
-        .explicitGet()
+      val invoke = Signed.invokeScript(
+        2.toByte,
+        invoker,
+        issuer.toAddress,
+        Some(FUNCTION_CALL(FunctionHeader.User("issue"), Nil)),
+        Seq.empty,
+        2.waves,
+        Asset.Waves,
+        ntpTime.getTimestamp()
+      )
       d.appendBlock(
         GenesisTransaction.create(issuerAddress, 1000.waves, ntpTime.getTimestamp()).explicitGet(),
         GenesisTransaction.create(invoker.toAddress, 1000.waves, ntpTime.getTimestamp()).explicitGet(),
@@ -569,10 +586,35 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
     finally repo.shutdown()
   }
 
-  def createFakeObserver[T](): (StreamObserver[T], CancelableFuture[Seq[T]]) = {
+  trait FakeObserver[T] extends StreamObserver[T] {
+    def values: Seq[T]
+  }
+
+  object FakeObserver {
+    implicit class FakeObserverOps[T](fo: FakeObserver[T]) {
+      def fetchUntil(conditionF: Seq[T] => Boolean): Seq[T] = {
+        def waitRecTask: Task[Unit] =
+          if (conditionF(fo.values)) Task.unit else Task.defer(waitRecTask).delayExecution(50 millis)
+
+        waitRecTask
+          .map(_ => fo.values)
+          .runSyncUnsafe(1.minute)
+      }
+    }
+
+    implicit class EventsFakeObserverOps(fo: FakeObserver[SubscribeEvent]) {
+      def fetchAllEvents(bc: Blockchain): Seq[SubscribeEvent] =
+        fo.fetchUntil(_.exists(_.update.map(_.id.toByteStr) == bc.lastBlockId))
+
+      def lastAppendEvent(bc: Blockchain): BlockAppended =
+        fetchAllEvents(bc).last.getUpdate.vanillaAppend
+    }
+  }
+
+  def createFakeObserver[T](): (FakeObserver[T], CancelableFuture[Seq[T]]) = {
     val promise = Promise[Seq[T]]()
-    val obs: StreamObserver[T] = new CallStreamObserver[T] {
-      @volatile private[this] var values = Seq.empty[T]
+    val obs: CallStreamObserver[T] with FakeObserver[T] = new CallStreamObserver[T] with FakeObserver[T] {
+      @volatile var values = Seq.empty[T]
 
       override def isReady: Boolean                                  = true
       override def setOnReadyHandler(onReadyHandler: Runnable): Unit = ()
@@ -594,6 +636,13 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
       val (obs, future) = createFakeObserver[SubscribeEvent]()
       ur.subscribe(request, obs)
       future
+    }
+
+    // A better way
+    def createSubscriptionObserver(request: SubscribeRequest): FakeObserver[SubscribeEvent] = {
+      val (obs, _) = createFakeObserver[SubscribeEvent]()
+      ur.subscribe(request, obs)
+      obs
     }
   }
 

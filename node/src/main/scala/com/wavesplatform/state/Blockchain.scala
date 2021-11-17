@@ -1,12 +1,13 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
-import com.wavesplatform.block.Block.{BlockId, GenesisBlockVersion, NgBlockVersion, PlainBlockVersion, ProtoBlockVersion, RewardBlockVersion}
+import com.wavesplatform.account._
+import com.wavesplatform.block.Block._
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.traits.domain.Issue
 import com.wavesplatform.settings.BlockchainSettings
@@ -14,8 +15,8 @@ import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.transfer.TransferTransactionLike
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 trait Blockchain {
   def settings: BlockchainSettings
@@ -41,9 +42,9 @@ trait Blockchain {
 
   def wavesAmount(height: Int): BigInt
 
-  def transferById(id: ByteStr): Option[(Int, TransferTransaction)]
-  def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)]
-  def transactionMeta(id: ByteStr): Option[(Int, Boolean)]
+  def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)]
+  def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)]
+  def transactionMeta(id: ByteStr): Option[TxMeta]
 
   def containsTransaction(tx: Transaction): Boolean
 
@@ -71,6 +72,8 @@ trait Blockchain {
   def leaseBalance(address: Address): LeaseBalance
 
   def balance(address: Address, mayBeAssetId: Asset = Waves): Long
+
+  def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 }
 
 object Blockchain {
@@ -180,13 +183,22 @@ object Blockchain {
       if (isFeatureActivated(BlockchainFeatures.BlockV5, height)) ProtoBlockVersion
       else if (isFeatureActivated(BlockchainFeatures.BlockReward, height)) {
         if (blockchain.activatedFeatures(BlockchainFeatures.BlockReward.id) == height) NgBlockVersion else RewardBlockVersion
-      }
-      else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight + 1 < height) NgBlockVersion
+      } else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight + 1 < height) NgBlockVersion
       else if (height > 1) PlainBlockVersion
       else GenesisBlockVersion
 
     def binaryData(address: Address, key: String): Option[ByteStr] = blockchain.accountData(address, key).collect {
       case BinaryDataEntry(_, value) => value
     }
+
+    def hasDApp(address: Address): Boolean =
+      blockchain.hasAccountScript(address) && blockchain
+        .accountScript(address)
+        .exists(_.script match {
+          case _: ContractScript.ContractScriptImpl => true
+          case _                                    => false
+        })
+
+    def transactionSucceeded(id: ByteStr): Boolean = blockchain.transactionMeta(id).exists(_.succeeded)
   }
 }

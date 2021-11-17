@@ -1,7 +1,5 @@
 package com.wavesplatform.state.diffs.invoke
 
-import scala.util.Right
-
 import cats.Id
 import cats.instances.list._
 import cats.syntax.either._
@@ -17,24 +15,26 @@ import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, RejectException, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
+import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient, _}
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.{Transaction, TxValidationError}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, CoevalR, TracedResult}
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
+import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, CoevalR, TracedResult}
+import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
+import com.wavesplatform.transaction.{Asset, TransactionType, TxValidationError}
 import monix.eval.Coeval
 import shapeless.Coproduct
+
+import scala.util.Right
 
 object InvokeScriptDiff {
   private val stats = TxProcessingStats
@@ -55,8 +55,8 @@ object InvokeScriptDiff {
   )(
       tx: InvokeScript
   ): CoevalR[(Diff, EVALUATED, Int, Int, Int)] = {
-    val dAppAddress = tx.dAppAddress
-    val invoker     = tx.senderDApp
+    val dAppAddress = tx.dApp
+    val invoker     = tx.sender.toAddress
 
     val result = blockchain.accountScript(dAppAddress) match {
       case Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities)) =>
@@ -108,9 +108,9 @@ object InvokeScriptDiff {
               val usedComplexity = totalComplexityLimit - nextRemainingComplexity
               val pseudoTx = ScriptTransfer(
                 Some(assetId),
-                Recipient.Address(ByteStr(tx.senderDApp.bytes)),
+                RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes)),
                 tx.sender,
-                Recipient.Address(ByteStr(tx.dAppAddress.bytes)),
+                RideRecipient.Address(ByteStr(tx.dApp.bytes)),
                 amount,
                 tx.timestamp,
                 tx.txId
@@ -142,29 +142,26 @@ object InvokeScriptDiff {
           complexityAfterPayments <- CoevalR(Coeval.now(complexityAfterPaymentsTraced))
           paymentsComplexity = checkedPayments.map(_._1.complexity).sum.toInt
 
-          tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
+          tthis = Coproduct[Environment.Tthis](RideRecipient.Address(ByteStr(dAppAddress.bytes)))
           input <- traced(
-            tx.root
-              .map(t => buildThisValue(Coproduct[TxOrd](t: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply))
-              .getOrElse(Right(null))
-          )
+            buildThisValue(Coproduct[TxOrd](tx.root), blockchain, directives, tthis).leftMap(GenericError.apply))
 
           result <- for {
             (diff, (scriptResult, log), availableActions, availableData, availableDataSize) <- {
-              stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
+              stats.invokedScriptExecution.measureForType(TransactionType.InvokeScript)({
                 val height = blockchain.height
                 val invocation = ContractEvaluator.Invocation(
                   tx.funcCall,
-                  Recipient.Address(ByteStr(invoker.bytes)),
+                  RideRecipient.Address(ByteStr(invoker.bytes)),
                   ByteStr(tx.sender.arr),
-                  Recipient.Address(ByteStr(tx.root.fold(invoker)(_.senderAddress).bytes)),
-                  ByteStr(tx.root.getOrElse(tx).sender.arr),
+                  RideRecipient.Address(ByteStr(tx.root.sender.toAddress.bytes)),
+                  ByteStr(tx.root.sender.arr),
                   payments,
                   tx.txId,
-                  tx.root.map(_.fee).getOrElse(0L),
-                  tx.root.flatMap(_.feeAssetId.compatId)
+                  tx.root.fee,
+                  tx.root.feeAssetId.compatId
                 )
-                val paymentsPart                                    = InvokeDiffsCommon.paymentsPart(tx, tx.dAppAddress, Map())
+                val paymentsPart                                    = InvokeDiffsCommon.paymentsPart(tx, tx.dApp, Map())
                 val (paymentsPartInsideDApp, paymentsPartToResolve) = if (version < V5) (Diff.empty, paymentsPart) else (paymentsPart, Diff.empty)
                 val environment = new DAppEnvironment(
                   AddressScheme.current.chainId,
@@ -174,7 +171,7 @@ object InvokeScriptDiff {
                   tthis,
                   directives,
                   tx.root,
-                  tx.dAppAddress,
+                  tx.dApp,
                   pk,
                   calledAddresses,
                   limitedExecution,
@@ -208,13 +205,17 @@ object InvokeScriptDiff {
             }
             _ = invocationRoot.setLog(log)
 
+            _ = if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
+              checkDiffBalances(diff, blockchain)
+
             newBlockchain = CompositeBlockchain(blockchain, diff)
-            newBalance    = newBlockchain.balance(invoker)
+
             _ <- traced {
+              val newBalance    = newBlockchain.balance(invoker)
               Either.cond(
                 blockchain.height < blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight || newBalance >= 0,
                 (),
-                GenericError(s"Sync call leads to temporary negative balance = $newBalance for address $invoker"),
+                GenericError(balanceError(invoker, newBalance, Waves)),
               )
             }
 
@@ -242,17 +243,19 @@ object InvokeScriptDiff {
 
             process = { (actions: List[CallableAction], unusedComplexity: Int, actionsCount: Int, dataCount: Int, dataSize: Int, ret: EVALUATED) =>
               for {
-                _ <- CoevalR(Coeval(InvokeDiffsCommon.checkCallResultLimits(
-                  blockchain,
-                  remainingComplexity - unusedComplexity,
-                  log,
-                  actionsCount,
-                  dataCount,
-                  dataSize,
-                  availableActions,
-                  availableData,
-                  availableDataSize
-                )))
+                _ <- CoevalR(
+                  Coeval(
+                    InvokeDiffsCommon.checkCallResultLimits(
+                      blockchain,
+                      remainingComplexity - unusedComplexity,
+                      log,
+                      actionsCount,
+                      dataCount,
+                      dataSize,
+                      availableActions,
+                      availableData,
+                      availableDataSize
+                    )))
                 diff <- doProcessActions(actions, unusedComplexity)
               } yield (diff, ret, availableActions - actionsCount, availableData - dataCount, availableDataSize - dataSize)
             }
@@ -277,17 +280,49 @@ object InvokeScriptDiff {
                 traced(error.asLeft[(Diff, EVALUATED, Int, Int, Int)])
             }
             resultDiff = diff.copy(scriptsComplexity = 0) |+| actionsDiff |+| Diff.empty.copy(scriptsComplexity = paymentsComplexity)
-            _          = invocationRoot.setResult(scriptResult)
+
+            _ = if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
+              checkDiffBalances(resultDiff, blockchain)
+
+            _ = invocationRoot.setResult(scriptResult)
           } yield (resultDiff, evaluated, remainingActions1, remainingData1, remainingDataSize1)
         } yield result
 
-      case _ => traced(Left(GenericError(s"No contract at address ${tx.dAppAddress}")))
+      case _ => traced(Left(GenericError(s"No contract at address ${tx.dApp}")))
     }
 
     result.leftMap { err =>
       invocationRoot.setError(err)
       err
     }
+  }
+
+  private def checkDiffBalances(diff: Diff, blockchain: Blockchain): Unit = {
+    val newBlockchain = CompositeBlockchain(blockchain, diff)
+    diff.portfolios.toList.foreach {
+      case (address, portfolio) =>
+        if (portfolio.balance < 0) {
+          val newBalance = newBlockchain.balance(address)
+          if (newBalance < 0)
+            throw RejectException(balanceError(address, newBalance, Waves))
+        }
+        portfolio.assets.foreach {
+          case (asset, amount) =>
+            if (amount < 0) {
+              val newBalance = newBlockchain.balance(address, asset)
+              if (newBalance < 0)
+                throw RejectException(balanceError(address, newBalance, asset))
+            }
+        }
+    }
+  }
+
+  private def balanceError(address: Address, balance: Long, asset: Asset) = {
+    val assetInfo = asset match {
+      case IssuedAsset(id) => s" asset $id"
+      case Waves           => ""
+    }
+    s"Sync call leads to temporary negative$assetInfo balance = $balance for address $address"
   }
 
   private def evaluateV2(
@@ -301,7 +336,7 @@ object InvokeScriptDiff {
   ): Coeval[Either[ValidationError, (ScriptResult, Log[Id])]] = {
     val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     ContractEvaluator
-      .applyV2Coeval(evaluationCtx, Map(), contract, invocation, version, limit)
+      .applyV2Coeval(evaluationCtx, contract, invocation, version, limit)
       .map(
         _.leftMap(
           {
@@ -310,6 +345,7 @@ object InvokeScriptDiff {
               FailedTransactionError.dAppExecution(error, usedComplexity, log)
           }
         )
+        .map { r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1); r }
       )
   }
 }

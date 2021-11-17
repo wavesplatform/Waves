@@ -9,9 +9,8 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{Constants, FunctionalitySettings}
-import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{Blockchain, LeaseBalance}
-import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import org.scalacheck.Gen

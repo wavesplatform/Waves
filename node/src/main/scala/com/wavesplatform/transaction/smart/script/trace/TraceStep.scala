@@ -9,14 +9,14 @@ import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.TransactionBase
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import play.api.libs.json._
 import play.api.libs.json.Json.JsValueWrapper
+import play.api.libs.json._
 
 sealed abstract class TraceStep {
   def json: JsObject // TODO: Is this format necessary?
@@ -31,7 +31,7 @@ case class AccountVerifierTrace(
   override lazy val json: JsObject = Json
     .obj(
       "type" -> "verifier",
-      "id"   -> address.stringRepr
+      "id"   -> address.toString
     ) ++ TraceStep.maybeErrorJson(errorOpt)
 }
 
@@ -40,7 +40,7 @@ object AssetVerifierTrace {
   object AssetContext extends Enumeration {
     val Unknown, OrderAmount, OrderPrice, MatcherFee, Payment, Reissue, Burn, Sponsor, Transfer, UpdateInfo = Value
 
-    def fromTxAndAsset(tx: Transaction, asset: IssuedAsset): AssetContext = tx match {
+    def fromTxAndAsset(tx: TransactionBase, asset: IssuedAsset): AssetContext = tx match {
       case i: InvokeScriptTransaction if i.payments.exists(_.assetId == asset) => AssetContext.Payment
 
       case e: ExchangeTransaction if e.order1.assetPair.amountAsset == asset                            => AssetContext.OrderAmount
@@ -87,7 +87,7 @@ case class InvokeScriptTrace(
   def maybeLoggedJson(logged: Boolean)(implicit invokeResultWrites: OWrites[InvokeScriptResult] = InvokeScriptResult.jsonFormat): JsObject = {
     Json.obj(
       "type"        -> "dApp",
-      "id"          -> dAppAddressOrAlias.stringRepr,
+      "id"          -> dAppAddressOrAlias.toString,
       "function"    -> functionCall.function.funcName,
       "args"        -> functionCall.args.map(_.toString),
       "invocations" -> invocations.map(_.maybeLoggedJson(logged)(invokeResultWrites))

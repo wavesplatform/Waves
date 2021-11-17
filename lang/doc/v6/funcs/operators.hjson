@@ -75,7 +75,7 @@
       params: [ "String", "String" ]
       doc: "Concat limited strings."
       paramsDoc: [ "First value", "Second value" ]
-      complexity: 20
+      complexity: 1
     }
     {
       name: "+"

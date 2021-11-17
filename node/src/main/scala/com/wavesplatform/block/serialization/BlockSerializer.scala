@@ -61,7 +61,7 @@ object BlockHeaderSerializer {
       else Json.obj("desiredReward" -> JsNumber(blockHeader.rewardVote))
 
     val generatorJson =
-      Json.obj("generator" -> blockHeader.generator.toAddress, "generatorPublicKey" -> blockHeader.generator)
+      Json.obj("generator" -> blockHeader.generator.toAddress.toString, "generatorPublicKey" -> blockHeader.generator)
 
     Json.obj(
       "version"   -> blockHeader.version,

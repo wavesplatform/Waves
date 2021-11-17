@@ -133,13 +133,13 @@ object ExpressionCompiler {
             List(Generic(x.position.start, x.position.end, x.message))
           ).pure[CompileM]
 
-        case Expressions.GETTER(p, ref, field, _, _, c)     => compileGetter(p, field, ref, saveExprContext, allowIllFormedStrings, c)
-        case Expressions.BLOCK(p, dec, body, _, _)          => compileBlock(p, dec, body, saveExprContext, allowIllFormedStrings)
-        case Expressions.IF(p, cond, ifTrue, ifFalse, _, _) => compileIf(p, cond, ifTrue, ifFalse, saveExprContext, allowIllFormedStrings)
-        case Expressions.REF(p, key, _, _)                  => compileRef(p, key, saveExprContext)
-        case Expressions.FUNCTION_CALL(p, name, args, _, _) => compileFunctionCall(p, name, args, saveExprContext, allowIllFormedStrings)
-        case Expressions.MATCH(p, ex, cases, _, _)          => compileMatch(p, ex, cases.toList, saveExprContext, allowIllFormedStrings)
-        case Expressions.FOLD(p, limit, list, acc, f, _, _) => compileFold(p, limit, list, acc, f.key)
+        case Expressions.GETTER(p, ref, field, _, _, c)        => compileGetter(p, field, ref, saveExprContext, allowIllFormedStrings, c)
+        case Expressions.BLOCK(p, dec, body, _, _)             => compileBlock(p, dec, body, saveExprContext, allowIllFormedStrings)
+        case Expressions.IF(p, cond, ifTrue, ifFalse, _, _)    => compileIf(p, cond, ifTrue, ifFalse, saveExprContext, allowIllFormedStrings)
+        case Expressions.REF(p, key, _, _)                     => compileRef(p, key, saveExprContext)
+        case Expressions.FUNCTION_CALL(p, name, args, _, _)    => compileFunctionCall(p, name, args, saveExprContext, allowIllFormedStrings)
+        case Expressions.MATCH(p, ex, cases, _, _)             => compileMatch(p, ex, cases.toList, saveExprContext, allowIllFormedStrings)
+        case Expressions.FOLD(p, limit, list, acc, f, n, _, _) => compileFold(p, limit, list, acc, f.key, n)
         case Expressions.GENERIC_FUNCTION_CALL(p, e, name, t, _, _) =>
           compileGenericFunctionCall(p, e, name, t, saveExprContext, allowIllFormedStrings)
         case Expressions.BINARY_OP(p, a, op, b, _, _) =>
@@ -666,18 +666,20 @@ object ExpressionCompiler {
       limit: Int,
       list: Expressions.EXPR,
       acc: Expressions.EXPR,
-      func: PART[String]
+      func: PART[String],
+      isNative: Boolean
   ): CompileM[CompilationStepResultExpr] =
     for {
-      (list, listType, _) <- compileExpr(list)
+      (compiledList, listType, _) <- compileExpr(list)
+      name = if (isNative) s"fold_$limit" else s"FOLD<$limit>"
       listInnerType <- (listType match {
         case list: LIST => Right(list.innerType)
-        case other      => Left(Generic(p.start, p.end, s"FOLD first argument should be List[T], but $other found"))
+        case other      => Left(Generic(p.start, p.end, s"First $name argument should be List[A], but $other found"))
       }).toCompileM
-      (acc, accType, accRaw) <- compileExpr(acc)
-      funcName               <- handlePart(func)
-      ctx                    <- get[Id, CompilerContext, CompilationError]
-      function <- ctx
+      (compiledAcc, accType, accRaw) <- compileExpr(acc)
+      funcName                       <- handlePart(func)
+      ctx                            <- get[Id, CompilerContext, CompilationError]
+      compiledFunc <- ctx
         .functionTypeSignaturesByName(funcName)
         .collectFirst {
           case s @ FunctionTypeSignature(_, Seq((_, type1: FINAL), (_, type2: FINAL)), _) if type1 >= accType && type2 >= listInnerType =>
@@ -686,11 +688,25 @@ object ExpressionCompiler {
         .getOrElse {
           val accTypeStr       = if (accType == NOTHING) ANY else accType
           val listInnerTypeStr = if (listInnerType == NOTHING) ANY else listInnerType
-          Left(Generic(p.start, p.end, s"Can't find suitable function $funcName(a: $accTypeStr, b: $listInnerTypeStr) for FOLD"))
+          Left(Generic(p.start, p.end, s"Can't find suitable function $funcName(a: $accTypeStr, b: $listInnerTypeStr) for $name"))
         }
         .toCompileM
-      r <- Right(CompilerMacro.unwrapFold(limit, list, acc, function.header)).toCompileM
-    } yield CompilationStepResultExpr(ctx, r, function.args.head._2.asInstanceOf[FINAL], accRaw)
+      resultType = compiledFunc.args.head._2.asInstanceOf[FINAL]
+      compiledFold <- if (isNative)
+        compileFunctionCall(
+          p,
+          PART.VALID(p, s"fold_$limit"),
+          List(list, acc, Expressions.CONST_STRING(p, func)),
+          saveExprContext = false,
+          allowIllFormedStrings = false
+        ).map(_.copy(t = resultType))
+      else {
+        val unwrapped = CompilerMacro.unwrapFold(limit, compiledList, compiledAcc, compiledFunc.header)
+        CompilationStepResultExpr(ctx, unwrapped, resultType, accRaw)
+          .asRight[CompilationError]
+          .toCompileM
+      }
+    } yield compiledFold
 
   private def matchFuncOverload(
       p: Pos,
@@ -860,9 +876,9 @@ object ExpressionCompiler {
                 ),
                 blockWithNewVar,
                 further
-
+              )
             )
-          )}
+        }
       }
     }
 

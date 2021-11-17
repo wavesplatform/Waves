@@ -10,7 +10,7 @@
         "The exponent."
         "The number of decimals of the exponent."
         "The number of decimals of the resulting value."
-        "One of the rounding functions. The HalfUp() function may be used as the default value."
+        "One of the rounding functions."
       ]
       complexity: 100
     }
@@ -26,7 +26,7 @@
         "The number of decimals of the resulting value."
         '''
         The rounding function.
-        The HalfUp() function may be used as the default value.
+
         '''
       ]
       complexity: 100
@@ -41,7 +41,7 @@
         "The exponent."
         "The number of decimals of the exponent."
         "The number of decimals of the resulting value."
-        "One of the rounding functions. The HalfUp() function may be used as the default value."
+        "One of the rounding functions."
       ]
       complexity: 200
     }
@@ -57,7 +57,7 @@
         "The number of decimals of the resulting value."
         '''
         The rounding function.
-        The HalfUp() function may be used as the default value.
+
         '''
       ]
       complexity: 200

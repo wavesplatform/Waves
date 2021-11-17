@@ -1,5 +1,7 @@
 package com.wavesplatform.lang
 
+import java.nio.charset.StandardCharsets
+
 import cats.Id
 import cats.kernel.Monoid
 import cats.syntax.either._
@@ -29,7 +31,6 @@ import com.wavesplatform.test._
 import org.scalatest.Inside
 import org.web3j.crypto.Keys
 
-import java.nio.charset.StandardCharsets
 import scala.util.{Random, Try}
 
 class IntegrationTest extends PropSpec with Inside {
@@ -82,7 +83,7 @@ class IntegrationTest extends PropSpec with Inside {
     val ctx: CTX[C] =
       Monoid.combineAll(
         Seq(
-          PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[C],
+          PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[C],
           CryptoContext.build(Global, version).withEnvironment[C],
           addCtx.withEnvironment[C],
           CTX[C](sampleTypes, stringToTuple, Array(f, f2)),
@@ -429,7 +430,7 @@ class IntegrationTest extends PropSpec with Inside {
     }
 
     val context = Monoid.combine(
-      PureContext.build(V1, fixUnicodeFunctions = true).evaluationContext[Id],
+      PureContext.build(V1, fixUnicodeFunctions = true, useNewPowPrecision = true).evaluationContext[Id],
       EvaluationContext.build(
         typeDefs = Map.empty,
         letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3L))),
@@ -443,7 +444,7 @@ class IntegrationTest extends PropSpec with Inside {
 
   property("context won't change after execution of an inner block") {
     val context = Monoid.combine(
-      PureContext.build(V1, fixUnicodeFunctions = true).evaluationContext[Id],
+      PureContext.build(V1, fixUnicodeFunctions = true, useNewPowPrecision = true).evaluationContext[Id],
       EvaluationContext.build(
         typeDefs = Map.empty,
         letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3L))),
@@ -1411,8 +1412,8 @@ class IntegrationTest extends PropSpec with Inside {
     eval(constructingMaxStringAndBytes, version = V3) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
     eval(constructingMaxStringAndBytes, version = V4) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
 
-    eval(constructingTooBigString, version = V3) should produce("String length = 32768 exceeds 32767")
-    eval(constructingTooBigString, version = V4) should produce("String length = 32768 exceeds 32767")
+    eval(constructingTooBigString, version = V3) should produce("String size = 32768 exceeds 32767 bytes")
+    eval(constructingTooBigString, version = V4) should produce("String size = 32768 exceeds 32767 bytes")
   }
 
   property("bytes limit") {

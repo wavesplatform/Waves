@@ -27,24 +27,28 @@ case class TransferTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends VersionedTransaction
-    with SigProofsSwitch
+) extends Transaction(TransactionType.Transfer, assetId match {
+      case Waves          => Seq()
+      case a: IssuedAsset => Seq(a)
+    })
+    with TransferTransactionLike
+    with VersionedTransaction
     with FastHashId
+    with SigProofsSwitch
     with TxWithFee.InCustomAsset
-    with LegacyPBSwitch.V3 {
+    with PBSince.V3 {
 
-  override val typeId: TxType = TransferTransaction.typeId
+  val bodyBytes: Coeval[TxByteArray] = Coeval.evalOnce(TransferTxSerializer.bodyBytes(this))
+  val bytes: Coeval[TxByteArray]     = Coeval.evalOnce(TransferTxSerializer.toBytes(this))
+  final val json: Coeval[JsObject]   = Coeval.evalOnce(TransferTxSerializer.toJson(this))
+}
 
-  val bodyBytes: Coeval[TxByteArray] = Coeval.evalOnce(TransferTransaction.serializer.bodyBytes(this))
-  val bytes: Coeval[TxByteArray]     = Coeval.evalOnce(TransferTransaction.serializer.toBytes(this))
-  final val json: Coeval[JsObject]   = Coeval.evalOnce(TransferTransaction.serializer.toJson(this))
-
-  override def checkedAssets: Seq[IssuedAsset] = assetId match {
-    case a: IssuedAsset => Seq(a)
-    case Waves          => Nil
-  }
-
-  override def builder: TransactionParser = TransferTransaction
+trait TransferTransactionLike extends TransactionBase with Authorized {
+  val sender: PublicKey
+  val recipient: AddressOrAlias
+  val assetId: Asset
+  val amount: TxAmount
+  val attachment: ByteStr
 }
 
 object TransferTransaction extends TransactionParser {
@@ -61,9 +65,7 @@ object TransferTransaction extends TransactionParser {
   implicit def sign(tx: TransferTransaction, privateKey: PrivateKey): TransferTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-  val serializer = TransferTxSerializer
-
-  override def parseBytes(bytes: TxByteArray): Try[TransferTransaction] = serializer.parseBytes(bytes)
+  override def parseBytes(bytes: TxByteArray): Try[TransferTransaction] = TransferTxSerializer.parseBytes(bytes)
 
   def create(
       version: TxVersion,
@@ -77,7 +79,7 @@ object TransferTransaction extends TransactionParser {
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, TransferTransaction] =
-    TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs, recipient.chainId).validatedEither
+    TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs, AddressScheme.current.chainId).validatedEither
 
   def signed(
       version: TxVersion,

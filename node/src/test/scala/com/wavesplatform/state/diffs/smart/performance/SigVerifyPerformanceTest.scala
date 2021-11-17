@@ -14,7 +14,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer._

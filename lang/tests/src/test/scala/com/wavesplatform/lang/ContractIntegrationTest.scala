@@ -24,7 +24,7 @@ import org.scalatest.Inside
 class ContractIntegrationTest extends PropSpec with Inside {
 
   private val ctx: CTX[Environment] =
-      PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
       CTX[Environment](sampleTypes, Map.empty, Array.empty) |+|
       WavesContext.build(
         Global,
@@ -157,7 +157,6 @@ class ContractIntegrationTest extends PropSpec with Inside {
 
     ContractEvaluator.applyV2Coeval(
       ctx.evaluationContext(environment),
-      Map(),
       compiled,
       Invocation(
         Terms.FUNCTION_CALL(FunctionHeader.User(func), args),

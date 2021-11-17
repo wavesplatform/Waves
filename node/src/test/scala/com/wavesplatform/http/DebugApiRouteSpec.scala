@@ -2,8 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import com.wavesplatform.account.Alias
-import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
+import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.api.http.DebugApiRoute
 import com.wavesplatform.block.SignedBlockHeader
@@ -12,8 +11,10 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, LeaseCancel, Recipient}
@@ -22,17 +23,18 @@ import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash, TxMeta}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{ERC20Address, TxHelpers, TxVersion}
 import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet}
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
+import org.scalatest.Assertion
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 
 import scala.util.Random
@@ -46,6 +48,7 @@ class DebugApiRouteSpec
     with PathMockFactory
     with BlockchainStubHelpers
     with WithDomain {
+  import DomainPresets._
 
   val wavesSettings = WavesSettings.default()
   val configObject  = wavesSettings.config.root()
@@ -120,7 +123,7 @@ class DebugApiRouteSpec
       val route = routeWithBlockchain(d.blockchain)
       val tx    = TxHelpers.transfer(TxHelpers.secondSigner, TestValues.address, 1.waves)
       validatePost(tx) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe true
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
       }
@@ -134,7 +137,7 @@ class DebugApiRouteSpec
 
       val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, 1.waves)
       validatePost(tx) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe true
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
       }
@@ -148,7 +151,7 @@ class DebugApiRouteSpec
 
       val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, Long.MaxValue)
       validatePost(tx) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe false
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
         (json \ "error").as[String] should include("Attempt to transfer unavailable funds")
@@ -185,7 +188,7 @@ class DebugApiRouteSpec
       val route = routeWithBlockchain(blockchain)
       val tx    = TxHelpers.exchange(TxHelpers.order(OrderType.BUY, TestValues.asset), TxHelpers.order(OrderType.SELL, TestValues.asset))
       jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe false
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
         (json \ "error").as[String] should include("not allowed by script of the asset")
@@ -228,6 +231,9 @@ class DebugApiRouteSpec
               )
             )
           )
+
+        (blockchain.resolveERC20Address _).when(ERC20Address(TestValues.asset)).returns(Some(TestValues.asset))
+        (blockchain.resolveERC20Address _).when(*).returns(None)
 
         val (dAppScript, _) = ScriptCompiler
           .compile(
@@ -286,7 +292,7 @@ class DebugApiRouteSpec
         val tx = TxHelpers.invoke(TxHelpers.defaultAddress, name, fee = 102500000)
 
         jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
-          val json = Json.parse(responseAs[String])
+          val json = responseAs[JsValue]
 
           if ((json \ "valid").as[Boolean])
             assert(tx.json().fieldSet subsetOf json.as[JsObject].fieldSet)
@@ -301,7 +307,7 @@ class DebugApiRouteSpec
         val tx = TxHelpers.invoke(TxHelpers.secondAddress, "test", fee = 1300000, payments = Seq(Payment(1L, TestValues.asset)))
 
         jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
-          val json = Json.parse(responseAs[String])
+          val json = responseAs[JsValue]
 
           if ((json \ "valid").as[Boolean])
             assert(tx.json().fieldSet subsetOf json.as[JsObject].fieldSet)
@@ -545,7 +551,7 @@ class DebugApiRouteSpec
 
     "invoke tx returning leases" in {
       val dAppPk        = TxHelpers.defaultSigner.publicKey
-      val dAppAddress = dAppPk.toAddress
+      val dAppAddress   = dAppPk.toAddress
       val invoke        = TxHelpers.invoke(dAppPk.toAddress, "test")
       val leaseCancelId = ByteStr(bytes32gen.sample.get)
 
@@ -606,7 +612,7 @@ class DebugApiRouteSpec
 
         (blockchain.transactionMeta _)
           .when(leaseCancelId)
-          .returns(Some((1, true)))
+          .returns(Some(TxMeta(Height(1), true, 0L)))
           .anyNumberOfTimes()
 
         (blockchain.leaseDetails _)
@@ -632,7 +638,7 @@ class DebugApiRouteSpec
         .route
 
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, invoke.json().toString())) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe true
         (json \ "stateChanges").as[JsObject] should matchJson(s"""{
                                                                 |  "data" : [ ],
@@ -748,9 +754,9 @@ class DebugApiRouteSpec
     }
 
     "invoke tx with nested call" in {
-      val dAppPk        = TxHelpers.defaultSigner.publicKey
+      val dAppPk      = TxHelpers.defaultSigner.publicKey
       val dAppAddress = dAppPk.toAddress
-      val invoke        = TxHelpers.invoke(dAppPk.toAddress, "test1")
+      val invoke      = TxHelpers.invoke(dAppPk.toAddress, "test1")
 
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
@@ -804,7 +810,7 @@ class DebugApiRouteSpec
         .route
 
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, invoke.json().toString())) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe true
         (json \ "stateChanges").as[JsObject] should matchJson(s"""{
                                                                  |  "data" : [ ],
@@ -908,7 +914,6 @@ class DebugApiRouteSpec
       }
     }
 
-
     "transfer transaction with asset fail" in {
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue / 2)
@@ -986,22 +991,91 @@ class DebugApiRouteSpec
 
       val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TxHelpers.secondSigner.toAddress, 1.waves, fee = transferFee, version = TxVersion.V2)
       validatePost(tx) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe true
       }
 
       val tx2 = TxHelpers.transfer(TxHelpers.secondSigner, TestValues.address, 1.waves, fee = transferFee, version = TxVersion.V2)
       validatePost(tx2) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe false
         (json \ "error").as[String] should include("Requires 400000 extra fee")
       }
 
       val tx3 = TxHelpers.transfer(TxHelpers.signer(3), TestValues.address, 1.waves, fee = transferFee, version = TxVersion.V2)
       validatePost(tx3) ~> route ~> check {
-        val json = Json.parse(responseAs[String])
+        val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe true
       }
+    }
+
+    "InvokeExpression" in {
+      def assert(wavesSettings: WavesSettings): Assertion = {
+        val blockchain = createBlockchainStub { blockchain =>
+          val settings = wavesSettings.blockchainSettings.functionalitySettings
+          (() => blockchain.settings).when().returns(WavesSettings.default().blockchainSettings.copy(functionalitySettings = settings))
+          (() => blockchain.activatedFeatures).when().returns(settings.preActivatedFeatures)
+          (blockchain.balance _).when(*, *).returns(ENOUGH_AMT)
+          (blockchain.accountScript _).when(*).returns(None)
+          (blockchain.assetScript _).when(*).returns(None)
+          (blockchain.assetDescription _).when(TestValues.asset).returns(Some(TestValues.assetDescription))
+        }
+        val route = routeWithBlockchain(blockchain)
+
+        val expression = TestCompiler(V6).compileFreeCall(
+          s"""
+           | let assetId = base58'${TestValues.asset}'
+           | [ Reissue(assetId, 1, true) ]
+         """.stripMargin
+        )
+        val invokeExpression = TxHelpers.invokeExpression(expression)
+        jsonPost(routePath("/validate"), invokeExpression.json()) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "expression").as[String] shouldBe expression.bytes.value().base64
+          (json \ "valid").as[Boolean] shouldBe true
+          (json \ "trace").as[JsArray] should matchJson(
+            """
+            |  [
+            |    {
+            |      "type": "dApp",
+            |      "id": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+            |      "function": "default",
+            |      "args": [],
+            |      "invocations": [],
+            |      "result": {
+            |        "data": [],
+            |        "transfers": [],
+            |        "issues": [],
+            |        "reissues": [
+            |          {
+            |            "assetId": "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+            |            "isReissuable": true,
+            |            "quantity": 1
+            |          }
+            |        ],
+            |        "burns": [],
+            |        "sponsorFees": [],
+            |        "leases": [],
+            |        "leaseCancels": [],
+            |        "invokes": []
+            |      },
+            |      "error": null,
+            |      "vars": [
+            |        {
+            |          "name": "assetId",
+            |          "type": "ByteVector",
+            |          "value": "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+            |        }
+            |      ]
+            |    }
+            |  ]
+          """.stripMargin
+          )
+        }
+      }
+
+      assert(RideV6)
+      intercept[Exception](assert(RideV5)).getMessage should include("Ride V6 feature has not been activated yet")
     }
   }
 
@@ -1022,7 +1096,7 @@ class DebugApiRouteSpec
       (() => blockchain.activatedFeatures).when().returning(Map.empty).anyNumberOfTimes()
       (transactionsApi.transactionById _)
         .when(invoke.id())
-        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, succeeded = true, Some(scriptResult))))
+        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, succeeded = true, 0L, Some(scriptResult))))
         .once()
 
       (blockchain.leaseDetails _)
@@ -1034,7 +1108,7 @@ class DebugApiRouteSpec
       (blockchain.leaseDetails _)
         .when(leaseCancelId)
         .returning(Some(LeaseDetails(invoke.sender, recipientAddress, 100, LeaseDetails.Status.Cancelled(2, Some(leaseCancelId)), invoke.id(), 1)))
-      (blockchain.transactionMeta _).when(invoke.id()).returning(Some((1, true)))
+      (blockchain.transactionMeta _).when(invoke.id()).returning(Some(TxMeta(Height(1), true, 1L)))
 
       Get(routePath(s"/stateChanges/info/${invoke.id()}")) ~> route ~> check {
         status shouldEqual StatusCodes.OK

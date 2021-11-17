@@ -36,7 +36,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
 
   private lazy val chainId: Char = miner.settings.blockchainSettings.addressSchemeCharacter
 
-  private lazy val settings = NodeConnectionSettings(miner.nodeApiEndpoint.toString, chainId.toByte, alice.toAddress.stringRepr)
+  private lazy val settings = NodeConnectionSettings(miner.nodeApiEndpoint.toString, chainId.toByte, alice.toAddress.toString)
   private lazy val repl     = Repl(Some(settings))
 
   private var dataTxId       = ""
@@ -92,7 +92,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   }
 
   test("this") {
-    assert("this.toString()", s""""${alice.toAddress.stringRepr}"""")
+    assert("this.toString()", s""""${alice.toAddress}"""")
   }
 
   test("height") {
@@ -168,7 +168,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   test("assetInfo()") {
     assert(
       s"assetInfo(base58'$assetId').value().issuer.toString()",
-      s""""${alice.toAddress.stringRepr}""""
+      s""""${alice.toAddress}""""
     )
   }
 
@@ -250,28 +250,28 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   test("addressFromPublicKey()") {
     assert(
       s"addressFromPublicKey(base58'${alice.publicKey}').value().toString()",
-      s""""${alice.toAddress.stringRepr}""""
+      s""""${alice.toAddress}""""
     )
   }
 
   test("addressFromRecipient() with alias") {
     assert(
       s"""addressFromRecipient(transferTx1.recipient).toString()""",
-      s""""${bob.toAddress.stringRepr}""""
+      s""""${bob.toAddress}""""
     )
   }
 
   test("addressFromString()") {
     assert(
-      s"""addressFromString("${alice.toAddress.stringRepr}").value().toString()""",
-      s""""${alice.toAddress.stringRepr}""""
+      s"""addressFromString("${alice.toAddress}").value().toString()""",
+      s""""${alice.toAddress}""""
     )
   }
 
   test("addressFromStringValue()") {
     assert(
-      s"""addressFromStringValue("${alice.toAddress.stringRepr}").toString()""",
-      s""""${alice.toAddress.stringRepr}""""
+      s"""addressFromStringValue("${alice.toAddress}").toString()""",
+      s""""${alice.toAddress}""""
     )
   }
 }

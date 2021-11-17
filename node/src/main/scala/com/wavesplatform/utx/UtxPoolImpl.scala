@@ -19,7 +19,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
+import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
@@ -39,14 +39,12 @@ import kamon.metric.MeasurementUnit
 import monix.execution.ExecutionModel
 import monix.execution.atomic.AtomicBoolean
 import monix.execution.schedulers.SchedulerService
-import monix.reactive.Observer
 import org.slf4j.LoggerFactory
 
 //noinspection ScalaStyle
 class UtxPoolImpl(
     time: Time,
     blockchain: Blockchain,
-    spendableBalanceChanged: Observer[(Address, Asset)],
     utxSettings: UtxSettings,
     onEvent: UtxEvent => Unit = _ => (),
     nanoTimeSource: () => TxTimestamp = () => System.nanoTime()
@@ -63,9 +61,7 @@ class UtxPoolImpl(
     Schedulers.singleThread("utx-pool-cleanup", executionModel = ExecutionModel.AlwaysAsyncExecution)
 
   // State
-  private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
-  private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionMeta(_).isDefined) // TODO delete in the future
-
+  private[this] val transactions      = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val inUTXPoolOrdering = TransactionsOrdering.InUTXPool(utxSettings.fastLaneAddresses)
 
   override def putIfNew(tx: Transaction, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = {
@@ -126,7 +122,7 @@ class UtxPoolImpl(
                 }
                 val allowed =
                   recipients.nonEmpty &&
-                    recipients.forall(r => utxSettings.allowBlacklistedTransferTo.contains(r.stringRepr))
+                    recipients.forall(r => utxSettings.allowBlacklistedTransferTo.contains(r.toString))
                 Either.cond(allowed, (), SenderIsBlacklisted(addr))
               case _ => Right(())
             }
@@ -195,7 +191,6 @@ class UtxPoolImpl(
   private[this] def removeFromOrdPool(txId: ByteStr): Option[Transaction] = {
     for (tx <- Option(transactions.remove(txId))) yield {
       PoolMetrics.removeTransaction(tx)
-      pessimisticPortfolios.remove(txId)
       tx
     }
   }
@@ -228,7 +223,6 @@ class UtxPoolImpl(
     }
 
     def addPortfolio(): Unit = diffEi.map { diff =>
-      pessimisticPortfolios.add(tx.id(), diff)
       onEvent(UtxEvent.TxAdded(tx, diff))
     }
 
@@ -242,19 +236,6 @@ class UtxPoolImpl(
     }
 
     diffEi.map(_ => true)
-  }
-
-  override def spendableBalance(addr: Address, assetId: Asset): Long =
-    blockchain.balance(addr, assetId) -
-      assetId.fold(blockchain.leaseBalance(addr).out)(_ => 0L) +
-      pessimisticPortfolios
-        .getAggregated(addr)
-        .spendableBalanceOf(assetId)
-
-  override def pessimisticPortfolio(addr: Address): Portfolio = {
-    val priority    = priorityPool.pessimisticPortfolios(addr)
-    val pessimistic = pessimisticPortfolios.getAggregated(addr)
-    Monoid.combineAll(priority :+ pessimistic)
   }
 
   private[utx] def nonPriorityTransactions: Seq[Transaction] = {
@@ -274,10 +255,10 @@ class UtxPoolImpl(
   private def scriptedAddresses(tx: Transaction): Set[Address] = tx match {
     case t if inUTXPoolOrdering.isWhitelisted(t) => Set.empty
     case i: InvokeScriptTransaction =>
-      Set(i.sender.toAddress)
-        .filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
+      Set[Address](i.senderAddress)
+        .filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dApp).fold[Set[Address]](_ => Set.empty, Set(_))
     case e: ExchangeTransaction =>
-      Set(e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasAccountScript)
+      Set[Address](e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasAccountScript)
     case a: Authorized if blockchain.hasAccountScript(a.sender.toAddress) => Set(a.sender.toAddress)
     case _                                                                => Set.empty
   }
@@ -350,7 +331,7 @@ class UtxPoolImpl(
                 else {
                   val updatedBlockchain   = CompositeBlockchain(blockchain, r.totalDiff)
                   val newCheckedAddresses = newScriptedAddresses ++ r.checkedAddresses
-                  val e = differ(updatedBlockchain, tx).resultE
+                  val e                   = differ(updatedBlockchain, tx).resultE
                   e match {
                     case Right(newDiff) =>
                       val updatedConstraint = r.constraint.put(updatedBlockchain, tx, newDiff)
@@ -568,50 +549,4 @@ private object UtxPoolImpl {
       validatedTransactions: Set[ByteStr],
       removedTransactions: Set[ByteStr]
   )
-
-  class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Asset)], isTxKnown: ByteStr => Boolean) {
-    private type Portfolios = Map[Address, Portfolio]
-    private val transactionPortfolios = new ConcurrentHashMap[ByteStr, Portfolios]()
-    private val transactions          = new ConcurrentHashMap[Address, Set[ByteStr]]()
-
-    def add(txId: ByteStr, txDiff: Diff): Unit = {
-      val pessimisticPortfolios         = txDiff.portfolios.map { case (addr, portfolio)        => addr -> portfolio.pessimistic }
-      val nonEmptyPessimisticPortfolios = pessimisticPortfolios.filterNot { case (_, portfolio) => portfolio.isEmpty }
-
-      if (nonEmptyPessimisticPortfolios.nonEmpty &&
-          Option(transactionPortfolios.put(txId, nonEmptyPessimisticPortfolios)).isEmpty) {
-        nonEmptyPessimisticPortfolios.keys.foreach { address =>
-          transactions.put(address, transactions.getOrDefault(address, Set.empty) + txId)
-        }
-      }
-
-      // Because we need to notify about balance changes when they are applied
-      pessimisticPortfolios.foreach {
-        case (addr, p) => p.assetIds.foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
-      }
-    }
-
-    def getAggregated(accountAddr: Address): Portfolio = {
-      val portfolios = for {
-        txId <- transactions.getOrDefault(accountAddr, Set.empty).toSeq
-        if !isTxKnown(txId)
-        txPortfolios = transactionPortfolios.getOrDefault(txId, Map.empty[Address, Portfolio])
-        txAccountPortfolio <- txPortfolios.get(accountAddr).toSeq
-      } yield txAccountPortfolio
-
-      Monoid.combineAll(portfolios)
-    }
-
-    def remove(txId: ByteStr): Unit = {
-      Option(transactionPortfolios.remove(txId)) match {
-        case Some(txPortfolios) =>
-          txPortfolios.foreach {
-            case (addr, p) =>
-              transactions.computeIfPresent(addr, (_, prevTxs) => prevTxs - txId)
-              p.assetIds.foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
-          }
-        case None =>
-      }
-    }
-  }
 }

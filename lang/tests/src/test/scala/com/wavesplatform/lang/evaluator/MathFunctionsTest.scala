@@ -1,5 +1,5 @@
 package com.wavesplatform.lang.evaluator
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V5}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V5, V6}
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 import com.wavesplatform.test.produce
 
@@ -71,5 +71,7 @@ class MathFunctionsTest extends EvaluatorSpec {
   property("sqrt") {
     eval(s"pow(${Long.MaxValue}, 0, 5, 1, 8, DOWN)") shouldBe Right(CONST_LONG(303700049997604969L))
     eval(s"pow(${Long.MaxValue}, 8, 5, 1, 8, DOWN)") shouldBe Right(CONST_LONG(30370004999760L))
+    eval(s"sqrt(${Long.MaxValue}, 0, 8, DOWN)")(V6) shouldBe Right(CONST_LONG(303700049997604969L))
+    eval(s"sqrt(${Long.MaxValue}, 8, 8, DOWN)")(V6) shouldBe Right(CONST_LONG(30370004999760L))
   }
 }

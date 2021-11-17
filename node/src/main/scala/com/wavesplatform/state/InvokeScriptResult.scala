@@ -79,7 +79,7 @@ object InvokeScriptResult {
   object Lease {
     implicit val recipientWrites = Writes[AddressOrAlias] {
       case address: Address => implicitly[Writes[Address]].writes(address)
-      case alias: Alias     => JsString(alias.stringRepr)
+      case alias: Alias     => JsString(alias.toString)
       case _                => JsNull
     }
     implicit val jsonWrites = Json.writes[Lease]
@@ -110,7 +110,7 @@ object InvokeScriptResult {
   implicit val errorMessageFormat = Json.writes[ErrorMessage]
   implicit val invocationFormat: Writes[Invocation] = (i: Invocation) =>
     Json.obj(
-      "dApp"         -> i.dApp,
+      "dApp"         -> i.dApp.toString,
       "call"         -> i.call,
       "payment"      -> i.payments,
       "stateChanges" -> jsonFormat.writes(i.stateChanges)
@@ -184,7 +184,7 @@ object InvokeScriptResult {
       case ScriptResultV3(ds, ts, _) =>
         InvokeScriptResult(data = ds.map(DataEntry.fromLangDataOp), transfers = ts.map(langTransferToPayment))
 
-      case ScriptResultV4(actions, _, ret) =>
+      case ScriptResultV4(actions, _, _) =>
         // XXX need return value processing
         val issues       = actions.collect { case i: lang.Issue         => i }
         val reissues     = actions.collect { case ri: lang.Reissue      => ri }
@@ -199,13 +199,13 @@ object InvokeScriptResult {
             Invocation(
               langAddressToAddress(dApp),
               Call(fname, args),
-              (payments.map {
+              payments.map {
                 case CaseObj(_, fields) =>
                   ((fields("assetId"), fields("amount")): @unchecked) match {
                     case (CONST_BYTESTR(b), CONST_LONG(a)) => InvokeScriptResult.AttachedPayment(IssuedAsset(b), a)
                     case (_, CONST_LONG(a))                => InvokeScriptResult.AttachedPayment(Waves, a)
                   }
-              }),
+              },
               fromLangResult(invokeId, r)
             )
         }

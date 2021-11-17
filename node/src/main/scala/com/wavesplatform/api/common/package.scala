@@ -1,29 +1,37 @@
 package com.wavesplatform.api
+
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.api.common.AddressTransactions._
 import com.wavesplatform.database.{DBExt, Keys}
-import com.wavesplatform.state.{Diff, Height}
-import com.wavesplatform.transaction.CreateAliasTransaction
-import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.state.{Diff, Height, TxMeta}
+import com.wavesplatform.transaction.{CreateAliasTransaction, Transaction, TransactionType}
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
 package object common extends BalanceDistribution with AddressTransactions {
   def aliasesOfAddress(db: DB, maybeDiff: => Option[(Height, Diff)], address: Address): Observable[(Height, CreateAliasTransaction)] = {
     val disabledAliases = db.get(Keys.disabledAliases)
-    addressTransactions(db, maybeDiff, address, Some(address), Set(CreateAliasTransaction.typeId), None)
+    addressTransactions(db, maybeDiff, address, Some(address), Set(TransactionType.CreateAlias), None)
       .collect {
         case TransactionMeta(height, cat: CreateAliasTransaction, true) if disabledAliases.isEmpty || !disabledAliases(cat.alias) => height -> cat
       }
   }
 
-  def activeLeases(
-      db: DB,
-      maybeDiff: Option[(Height, Diff)],
-      address: Address,
-      leaseIsActive: ByteStr => Boolean
-  ): Observable[(Height, LeaseTransaction)] =
-    addressTransactions(db, maybeDiff, address, None, Set(LeaseTransaction.typeId), None)
-      .collect { case TransactionMeta(h, lt: LeaseTransaction, true) if leaseIsActive(lt.id()) => h -> lt }
+  def loadTransactionMeta(db: DB, maybeDiff: => Option[(Int, Diff)])(tuple: (TxMeta, Transaction)): TransactionMeta = {
+    val (meta, transaction) = tuple
+    TransactionMeta.create(
+      meta.height,
+      transaction,
+      meta.succeeded,
+      meta.spentComplexity,
+      ist =>
+        maybeDiff
+          .flatMap { case (_, diff) => diff.scriptResults.get(ist.id()) }
+          .orElse(loadInvokeScriptResult(db, ist.id())),
+      et =>
+        maybeDiff
+          .flatMap { case (_, diff) => diff.ethereumTransactionMeta.get(et.id()) }
+          .orElse(loadEthereumMetadata(db, et.id()))
+    )
+  }
 }

@@ -19,7 +19,7 @@ import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctio
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ExchangeTransactionDiff.getOrderFeePortfolio
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
 import com.wavesplatform.transaction._
@@ -175,7 +175,7 @@ class ExchangeTransactionDiffTest
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
             val matcherPortfolio =
-              Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
+              Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_ == exchange.sender.toAddress).values)
 
             val restoredMatcherPortfolio =
               Monoid.combineAll(
@@ -270,7 +270,7 @@ class ExchangeTransactionDiffTest
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
             val matcherPortfolio =
-              Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
+              Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_ == exchange.sender.toAddress).values)
 
             val restoredMatcherPortfolio =
               Monoid.combineAll(
@@ -675,7 +675,7 @@ class ExchangeTransactionDiffTest
 
     forAll(allValidP) {
       case (genesis, transfers, issueAndScripts, etx) =>
-        val enoughFee = FeeValidation.ScriptExtraFee + FeeValidation.FeeConstants(ExchangeTransaction.typeId) * FeeValidation.FeeUnit
+        val enoughFee = FeeValidation.ScriptExtraFee + FeeValidation.FeeConstants(TransactionType.Exchange) * FeeValidation.FeeUnit
         val smallFee  = enoughFee - 1
         val exchangeWithSmallFee = ExchangeTransaction
           .signed(2.toByte, MATCHER.privateKey, etx.buyOrder, etx.sellOrder, 1000000, 1000000, 0, 0, smallFee, etx.timestamp)
@@ -1136,7 +1136,7 @@ class ExchangeTransactionDiffTest
                 state.balance(exchange.sender.toAddress, asset) shouldBe balance
             }
 
-            state.transactionInfo(exchange.id()).map(r => r._2 -> r._3) shouldBe Some((exchange, false))
+            state.transactionInfo(exchange.id()).map(r => r._2 -> r._1.succeeded) shouldBe Some((exchange, false))
         }
     }
   }
@@ -1187,7 +1187,6 @@ class ExchangeTransactionDiffTest
       val order2FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
 
       test(priceAssetIssue, amountAssetIssue, order1FeeAssetIssue, order2FeeAssetIssue, TestValues.rejectAssetScriptComplexity)
-
     }
 
     withClue("amount asset fails") {

@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
+import com.wavesplatform.TransactionGenBase
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -13,9 +14,9 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.{TestTime, TransactionGenBase}
 
 class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with TransactionGenBase {
   private val time = new TestTime
@@ -87,13 +88,13 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
       ssTx2      = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp2Script(dApp3.toAddress, size)), fee, ts).explicitGet()
       ssTx3      = SetScriptTransaction.selfSigned(1.toByte, dApp3, Some(dApp3Script(dApp4.toAddress, size)), fee, ts).explicitGet()
       ssTx4      = SetScriptTransaction.selfSigned(1.toByte, dApp4, Some(dApp4Script(size, !reach15kb)), fee, ts).explicitGet()
-      invokeTx   = () => InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts).explicitGet()
+      invokeTx   = () => Signed.invokeScript(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts)
     } yield (Seq(gTx1, gTx2, gTx3, gTx4, gTx5, ssTx1, ssTx2, ssTx3, ssTx4), invokeTx)
 
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(checkTotalDataEntriesBytesHeight = 3)
+      .copy(checkTotalDataEntriesBytesHeight = 3, syncDAppCheckTransfersHeight = 4)
 
   property("exceeding 5 Kb before and after activation") {
     withDomain(domainSettingsWithFS(settings)) { d =>
@@ -114,18 +115,23 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
     }
   }
 
-  property("exceeding 15 Kb before and after activation") {
+  property("exceeding 15 Kb before activation, after checkTotalDataEntriesBytesHeight and after syncDAppCheckTransfersHeight") {
     withDomain(domainSettingsWithFS(settings)) { d =>
       val (preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true).sample.get
       d.appendBlock(preparingTxs: _*)
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)
-      d.blockchain.transactionInfo(invoke1.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
 
       val invoke2 = invoke()
       d.appendBlock(invoke2)
       d.blockchain.bestLiquidDiff.get.errorMessage(invoke2.id.value()).get.text should include(
+        "Storing data size should not exceed 15360, actual: 20476 bytes"
+      )
+
+      val invoke3 = invoke()
+      (the[Exception] thrownBy d.appendBlock(invoke3)).getMessage should include(
         "Storing data size should not exceed 15360, actual: 20476 bytes"
       )
     }
@@ -138,11 +144,11 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)
-      d.blockchain.transactionInfo(invoke1.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
 
       val invoke2 = invoke()
       d.appendBlock(invoke2)
-      d.blockchain.transactionInfo(invoke2.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke2.id.value()) shouldBe true
     }
   }
 
@@ -154,7 +160,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)
-      d.blockchain.transactionInfo(invoke1.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
     }
   }
 }

@@ -11,15 +11,15 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.TestTime
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.utils.Signed
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
 
@@ -112,7 +112,7 @@ class DiffComplexityCountTest
         setDApp     <- SetScriptTransaction.selfSigned(1.toByte, account1, Some(dApp(asset)), fee, ts)
         payments = Seq(Payment(1, asset), Payment(1, asset))
         invokeFromScripted = () =>
-          InvokeScriptTransaction.selfSigned(1.toByte, account2, account1.toAddress, None, payments, fee, Waves, ts).explicitGet()
+          Signed.invokeScript(1.toByte, account2, account1.toAddress, None, payments, fee, Waves, ts)
       } yield (List(genesis, genesis2, issue, transfer1, setVerifier, setDApp), invokeFromScripted)
     }.explicitGet()
 

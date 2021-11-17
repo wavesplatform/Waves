@@ -42,7 +42,7 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
           genesisTimestamp,
           Constants.TotalWaves,
           None,
-          Seq(GenesisTransactionSettings(sender.toAddress.stringRepr, Constants.TotalWaves)),
+          Seq(GenesisTransactionSettings(sender.toAddress.toString, Constants.TotalWaves)),
           1000,
           1.minute
         )
