@@ -451,6 +451,14 @@ object PureContext {
         Right(FALSE)
     }
 
+  lazy val _getType: BaseFunction[NoContext] =
+    NativeFunction("_getType", 1, GET_TYPE, BOOLEAN, ("obj", TYPEPARAM('T'))) {
+      case (value: EVALUATED) :: Nil =>
+        CONST_STRING(value.getType.name)
+      case xs =>
+        notImplemented[Id, EVALUATED]("_getType(obj: T)", xs)
+    }
+
   lazy val sizeBytes: BaseFunction[NoContext] = NativeFunction("size", 1, SIZE_BYTES, LONG, ("byteVector", BYTESTR)) {
     case CONST_BYTESTR(bv) :: Nil => Right(CONST_LONG(bv.arr.length))
     case xs                       => notImplemented[Id, EVALUATED]("size(byteVector: ByteVector)", xs)
@@ -1826,7 +1834,7 @@ object PureContext {
     fromV5Functions(useNewPowPrecision) :+ fractionIntRounds(UNION(fromV5RoundTypes))
 
   private val v6Functions =
-    fromV5Functions(true) ++ folds.map(_._2) ++ Array(sizeTuple, makeString1C, makeString2C, splitStr1C, splitStr4C, sqrtInt, sqrtBigInt, fractionIntRoundsNative)
+    fromV5Functions(true) ++ folds.map(_._2) ++ Array(sizeTuple, makeString1C, makeString2C, splitStr1C, splitStr4C, sqrtInt, sqrtBigInt, fractionIntRoundsNative, _getType)
 
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =
     CTX[NoContext](

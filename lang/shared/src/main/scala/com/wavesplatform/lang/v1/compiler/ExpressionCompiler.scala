@@ -872,7 +872,7 @@ object ExpressionCompiler {
                       Expressions.FUNCTION_CALL(pos, PART.VALID(pos, "_isInstanceOf"), List(refTmp, Expressions.CONST_STRING(pos, t.name))),
                       BinaryOperation.AND_OP,
                       Expressions.BLOCK(pos, Expressions.LET(pos, newRef.key, newRef, Some(caseType), true), checkingCond)
-                  )
+                )
                 ),
                 blockWithNewVar,
                 further

@@ -5,6 +5,7 @@ object FunctionIds {
   val EQ: Short           = 0
   val ISINSTANCEOF: Short = 1
   val THROW: Short        = 2
+  val GET_TYPE: Short     = 3
 
   val SUM_LONG: Short = 100
   val SUB_LONG: Short = 101
