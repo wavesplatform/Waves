@@ -1,9 +1,6 @@
 package com.wavesplatform.http
 
-import scala.util.Random
-
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
-import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet}
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
@@ -23,21 +20,24 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash}
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash, TxMeta}
 import com.wavesplatform.test._
-import com.wavesplatform.transaction.{ERC20Address, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{ERC20Address, TxHelpers, TxVersion}
+import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet}
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Assertion
-import play.api.libs.json.{JsArray, JsObject, Json, JsValue}
+import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
+
+import scala.util.Random
 
 //noinspection ScalaStyle
 class DebugApiRouteSpec
@@ -612,7 +612,7 @@ class DebugApiRouteSpec
 
         (blockchain.transactionMeta _)
           .when(leaseCancelId)
-          .returns(Some((1, true)))
+          .returns(Some(TxMeta(Height(1), true, 0L)))
           .anyNumberOfTimes()
 
         (blockchain.leaseDetails _)
@@ -1096,7 +1096,7 @@ class DebugApiRouteSpec
       (() => blockchain.activatedFeatures).when().returning(Map.empty).anyNumberOfTimes()
       (transactionsApi.transactionById _)
         .when(invoke.id())
-        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, succeeded = true, Some(scriptResult))))
+        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, succeeded = true, 0L, Some(scriptResult))))
         .once()
 
       (blockchain.leaseDetails _)
@@ -1108,7 +1108,7 @@ class DebugApiRouteSpec
       (blockchain.leaseDetails _)
         .when(leaseCancelId)
         .returning(Some(LeaseDetails(invoke.sender, recipientAddress, 100, LeaseDetails.Status.Cancelled(2, Some(leaseCancelId)), invoke.id(), 1)))
-      (blockchain.transactionMeta _).when(invoke.id()).returning(Some((1, true)))
+      (blockchain.transactionMeta _).when(invoke.id()).returning(Some(TxMeta(Height(1), true, 1L)))
 
       Get(routePath(s"/stateChanges/info/${invoke.id()}")) ~> route ~> check {
         status shouldEqual StatusCodes.OK

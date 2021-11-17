@@ -39,7 +39,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   implicit val version: StdLibVersion = V4
 
-  private def pureContext(implicit version: StdLibVersion) = PureContext.build(version, fixUnicodeFunctions = true)
+  private def pureContext(implicit version: StdLibVersion) = PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true)
 
   private def defaultCryptoContext(implicit version: StdLibVersion) = CryptoContext.build(Global, version)
 
@@ -58,7 +58,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     )
 
   private def pureEvalContext(implicit version: StdLibVersion): EvaluationContext[NoContext, Id] =
-    PureContext.build(version, fixUnicodeFunctions = true).evaluationContext
+    PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).evaluationContext
 
   private val defaultEvaluator = new EvaluatorV1[Id, Environment]()
 

@@ -267,18 +267,16 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     """.stripMargin
 
   val freeCall =
-    """
-      |let a = this
-      |func f () = throw()
-      |
-      |[BooleanEntry("check", (i.caller == a)), BinaryEntry("transactionId", i.transactionId)]
-    """.stripMargin.trim
-
-  val freeCallDirectives =
     s"""
-       |{-# STDLIB_VERSION 6 #-}
-       |{-# CONTENT_TYPE EXPRESSION #-}
-       |{-# SCRIPT_TYPE CALL #-}
+       | {-# STDLIB_VERSION 6 #-}
+       | {-# CONTENT_TYPE EXPRESSION #-}
+       | {-# SCRIPT_TYPE CALL #-}
+       |
+       | let a = this
+       | strict r = invoke(Address(base58'3MS5SZmYhDWiFh8DvAhKuMMdcmGDiNWqawv'), "child", [], [])
+       | func f () = throw()
+       |
+       | [BooleanEntry("check", (i.caller == a)), BinaryEntry("transactionId", i.transactionId)]
      """.stripMargin.trim + "\n"
 
   val freeCallExpr =
@@ -347,7 +345,21 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     testdAppDirective("\t\t \n\n" + dappVerBytesStr + " \t \n \t")
 
     Post(routePath("/script/decompile"), freeCallExpr) ~> route ~> check {
-      (responseAs[JsValue] \ "script").as[String].trim shouldBe freeCallDirectives + freeCall
+      (responseAs[JsValue] \ "script").as[String].trim shouldBe
+        """
+          |{-# STDLIB_VERSION 6 #-}
+          |{-# CONTENT_TYPE EXPRESSION #-}
+          |{-# SCRIPT_TYPE CALL #-}
+          |let a = this
+          |let r = invoke(Address(base58'3MS5SZmYhDWiFh8DvAhKuMMdcmGDiNWqawv'), "child", nil, nil)
+          |if ((r == r))
+          |    then {
+          |        func f () =         throw()
+          |
+          |[BooleanEntry("check", (i.caller == a)), BinaryEntry("transactionId", i.transactionId)]
+          |        }
+          |    else throw("Strict value is not equal to itself.")
+        """.stripMargin.trim
     }
   }
 
@@ -601,7 +613,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
-    Post(routePath("/script/compileCode"), freeCallDirectives + freeCall) ~> route ~> check {
+    Post(routePath("/script/compileCode"), freeCall) ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "error").as[Int] shouldBe 305
       (json \ "message").as[String] shouldBe "Invoke Expression Transaction is not activated yet"
@@ -613,9 +625,9 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     val route      = seal(utilsApi.copy(blockchain = blockchain).route)
     (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0, BlockchainFeatures.RideV6.id -> 0))
 
-    Post(routePath("/script/compileCode"), freeCallDirectives + freeCall) ~> route ~> check {
+    Post(routePath("/script/compileCode"), freeCall) ~> route ~> check {
       val json = responseAs[JsValue]
-      (json \ "complexity").as[Long] shouldBe 39
+      (json \ "complexity").as[Long] shouldBe 132
       (json \ "verifierComplexity").as[Long] shouldBe 0
       (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map()
       (json \ "extraFee").as[Long] shouldBe 0
@@ -741,7 +753,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
     Post(routePath("/script/estimate"), freeCallExpr) ~> route ~> check {
       val json = responseAs[JsValue]
-      (json \ "complexity").as[Long] shouldBe 39
+      (json \ "complexity").as[Long] shouldBe 132
       (json \ "verifierComplexity").as[Long] shouldBe 0
       (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map()
       (json \ "extraFee").as[Long] shouldBe 0

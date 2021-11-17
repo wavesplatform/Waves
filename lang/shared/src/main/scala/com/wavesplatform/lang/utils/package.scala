@@ -76,7 +76,7 @@ package object utils {
         val ctx = Coeval.evalOnce(
           Monoid.combineAll(
             Seq(
-              PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[Environment],
+              PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
               CryptoContext.build(Global, version).withEnvironment[Environment],
               WavesContext.build(Global, ds)
             )
@@ -107,12 +107,13 @@ package object utils {
   def functionCosts(
       version: StdLibVersion,
       contentType: ContentType = Expression,
+      scriptType: ScriptType = Account,
       isDAppVerifier: Boolean = false
   ): Map[FunctionHeader, Coeval[Long]] =
     if (isDAppVerifier)
       dAppVerifierFunctionCosts(version)
     else
-      functionCosts(DirectiveSet(version, Account, contentType).explicitGet())
+      functionCosts(DirectiveSet(version, scriptType, contentType).explicitGet())
 
   def functionCosts(ds: DirectiveSet): Map[FunctionHeader, Coeval[Long]] =
     lazyFunctionCosts(ds)()
@@ -137,8 +138,8 @@ package object utils {
 
   def compilerContext(ds: DirectiveSet): CompilerContext = lazyContexts(ds.copy(imports = Imports()))().compilerContext
 
-  def getDecompilerContext(v: StdLibVersion, cType: ContentType): DecompilerContext =
-    lazyContexts(DirectiveSet(v, Account, cType).explicitGet())().decompilerContext
+  def getDecompilerContext(v: StdLibVersion, cType: ContentType, scriptType: ScriptType = Account): DecompilerContext =
+    lazyContexts(DirectiveSet(v, scriptType, cType).explicitGet())().decompilerContext
 
   def varNames(version: StdLibVersion, cType: ContentType): Set[String] =
     compilerContext(version, cType, isAssetScript = false).varDefs.keySet

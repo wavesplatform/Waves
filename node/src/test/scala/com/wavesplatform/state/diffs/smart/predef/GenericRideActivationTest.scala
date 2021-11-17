@@ -53,7 +53,7 @@ class GenericRideActivationTest extends PropSpec with WithDomain with EitherValu
             d.appendBlock(genesisTxs: _*)
             d.appendBlock(setScriptTxs: _*)
             d.appendBlock(invoke)
-            d.blockchain.transactionInfo(invoke.id.value()).get._3 shouldBe true
+            d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
             nextVersion.foreach { v =>
               val (_, setScriptTxs, _) = scenario(v).sample.get
               (the[RuntimeException] thrownBy d.appendBlock(setScriptTxs: _*)).getMessage should include("ActivationError")

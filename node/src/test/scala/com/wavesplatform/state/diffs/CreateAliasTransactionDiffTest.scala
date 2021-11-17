@@ -87,7 +87,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
     maybeFeeAsset            <- Gen.oneOf(maybeAsset, maybeAsset2)
     alias                    <- aliasGen
     fee                      <- smallFeeGen
-    aliasTx = CreateAliasTransaction.selfSigned(Transaction.V2, aliasedRecipient, alias, fee, ts).explicitGet()
+    aliasTx = CreateAliasTransaction.selfSigned(Transaction.V2, aliasedRecipient, alias.name, fee, ts).explicitGet()
     transfer <- transferGeneratorP(
       master,
       alias,

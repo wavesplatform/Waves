@@ -63,7 +63,7 @@ class SyncDAppListArgTypesTest extends PropSpec with WithDomain with Transaction
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)
-      d.blockchain.transactionInfo(invoke1.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
 
       val invoke2 = invoke()
       if (forbidAfterActivation) {
@@ -72,7 +72,7 @@ class SyncDAppListArgTypesTest extends PropSpec with WithDomain with Transaction
         )
       } else {
         d.appendBlock(invoke2)
-        d.blockchain.transactionInfo(invoke2.id.value()).get._3 shouldBe true
+        d.blockchain.transactionSucceeded(invoke2.id.value()) shouldBe true
       }
     }
   }

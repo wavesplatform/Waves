@@ -32,7 +32,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V1, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V1, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V1).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -97,7 +97,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V2, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V2, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V2).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -162,7 +162,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,

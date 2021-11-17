@@ -148,14 +148,15 @@ trait BaseGlobal {
       scriptType: ScriptType,
       estimator: ScriptEstimator,
       compiler: (String, CompilerContext) => Either[String, EXPR]
-  ): Either[String, (Array[Byte], EXPR, Long)] =
+  ): Either[String, (Array[Byte], EXPR, Long)] = {
+    val isFreeCall = scriptType == Call
     for {
-      expr <- compiler(input, context)
-      isFreeCall = scriptType == Call
-      bytes      = serializeExpression(expr, version, isFreeCall)
-      _          <- ExprScript.validateBytes(bytes, isFreeCall)
+      expr <- if (isFreeCall) ContractCompiler.compileFreeCall(input, context, version) else compiler(input, context)
+      bytes = serializeExpression(expr, version, isFreeCall)
+      _ <- ExprScript.validateBytes(bytes, isFreeCall)
       complexity <- ExprScript.estimateExact(expr, version, isFreeCall, estimator)
     } yield (bytes, expr, complexity)
+  }
 
   def checkExpr(
       expr: EXPR,
@@ -259,9 +260,9 @@ trait BaseGlobal {
 
   // Math functions
 
-  def pow(b: Long, bp: Int, e: Long, ep: Int, rp: Int, round: Rounding): Either[String, Long]
+  def pow(b: Long, bp: Int, e: Long, ep: Int, rp: Int, round: Rounding, useNewPrecision: Boolean): Either[String, Long]
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long]
-  def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt]
+  def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding, useNewPrecision: Boolean): Either[String, BigInt]
   def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt]
 
   def divide(a: BigInt, b: BigInt, rounding: Rounding): Either[String, BigInt] = {

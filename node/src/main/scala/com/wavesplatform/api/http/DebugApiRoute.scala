@@ -246,8 +246,8 @@ case class DebugApiRoute(
               val meta = tx match {
                 case ist: InvokeScriptTransaction =>
                   val result = diff.scriptResults.get(ist.id())
-                  TransactionMeta.Invoke(Height(blockchain.height), ist, succeeded = true, result)
-                case tx => TransactionMeta.Default(Height(blockchain.height), tx, succeeded = true)
+                  TransactionMeta.Invoke(Height(blockchain.height), ist, succeeded = true, diff.scriptsComplexity, result)
+                case tx => TransactionMeta.Default(Height(blockchain.height), tx, succeeded = true, diff.scriptsComplexity)
               }
               serializer.transactionWithMetaJson(meta)
           }

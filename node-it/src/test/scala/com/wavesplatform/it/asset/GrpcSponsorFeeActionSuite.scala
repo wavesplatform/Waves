@@ -441,7 +441,7 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
 
       assertBadRequestAndMessage(
         miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee),
-        "NegativeMinFee"
+        "Negative sponsor amount = -1"
       )
     }
 

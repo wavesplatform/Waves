@@ -396,7 +396,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             TestBlock.create(
               nextTs,
               genesisBlockId,
-              Seq(CreateAliasTransaction.selfSigned(1.toByte, sender, alias, 1, nextTs).explicitGet())
+              Seq(CreateAliasTransaction.selfSigned(1.toByte, sender, alias.name, 1, nextTs).explicitGet())
             )
           )
 
@@ -797,7 +797,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
         // liquid block rollback
         val leaseCancelId     = append(d.lastBlockId, call)
-        val (cancelHeight, _) = d.blockchain.transactionMeta(leaseCancelId).get
+        val cancelHeight = d.blockchain.transactionMeta(leaseCancelId).get.height
 
         d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance.empty
