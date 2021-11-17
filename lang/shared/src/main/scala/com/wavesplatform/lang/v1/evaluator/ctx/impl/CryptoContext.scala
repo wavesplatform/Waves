@@ -74,7 +74,7 @@ object CryptoContext {
       val complexity =
         if (version < V4) 10
         else if (version < V6) 200
-        else 200
+        else 195
       hashFunction("keccak256", KECCAK256, complexity)(global.keccak256)
     }
 
@@ -82,7 +82,7 @@ object CryptoContext {
       val complexity =
         if (version < V4) 10
         else if (version < V6) 200
-        else 200
+        else 136
       hashFunction("blake2b256", BLAKE256, complexity)(global.blake2b256)
     }
 
@@ -90,7 +90,7 @@ object CryptoContext {
       val complexity =
         if (version < V4) 10
         else if (version < V6) 200
-        else 200
+        else 118
       hashFunction("sha256", SHA256, complexity)(global.sha256)
     }
 
@@ -115,53 +115,86 @@ object CryptoContext {
           notImplemented[Id, EVALUATED](s"${name}_${limit}Kb(bytes: ByteVector)", xs)
       }
 
-    val keccak256F_lim: Array[BaseFunction[NoContext]] =
+    def keccak256F_lim: Array[BaseFunction[NoContext]] =
       hashLimFunction(
         "keccak256",
         KECCAK256_LIM,
-        List(
-          (16, 10),
-          (32, 25),
-          (64, 50),
-          (128, 100)
-        )
+        if (version >= V6)
+          List(
+            (16, 20),
+            (32, 39),
+            (64, 74),
+            (128, 147)
+          )
+        else
+          List(
+            (16, 10),
+            (32, 25),
+            (64, 50),
+            (128, 100)
+          )
       )(global.keccak256)
 
     val blake2b256F_lim: Array[BaseFunction[NoContext]] =
       hashLimFunction(
         "blake2b256",
         BLAKE256_LIM,
-        List(
-          (16, 10),
-          (32, 25),
-          (64, 50),
-          (128, 100)
-        )
+        if (version >= V6)
+          List(
+            (16, 13),
+            (32, 29),
+            (64, 58),
+            (128, 115)
+          )
+        else
+          List(
+            (16, 10),
+            (32, 25),
+            (64, 50),
+            (128, 100)
+          )
       )(global.blake2b256)
 
     val sha256F_lim: Array[BaseFunction[NoContext]] =
       hashLimFunction(
         "sha256",
         SHA256_LIM,
-        List(
-          (16, 10),
-          (32, 25),
-          (64, 50),
-          (128, 100)
-        )
+        if (version >= V6)
+          List(
+            (16, 12),
+            (32, 23),
+            (64, 47),
+            (128, 93)
+          )
+        else
+          List(
+            (16, 10),
+            (32, 25),
+            (64, 50),
+            (128, 100)
+          )
       )(global.sha256)
 
     val sigVerifyL: Array[BaseFunction[NoContext]] =
       functionFamily(
         SIGVERIFY_LIM,
         limit => s"sigVerify_${limit}Kb",
-        List(
-          (8, 47),
-          (16, 57),
-          (32, 70),
-          (64, 102),
-          (128, 172)
-        ),
+        if (version >= V6)
+          List(
+            (8, 43),
+            (16, 50),
+            (32, 64),
+            (64, 93),
+            (128, 150)
+          )
+        else
+          List(
+            (8, 47),
+            (16, 57),
+            (32, 70),
+            (64, 102),
+            (128, 172)
+          ),
         BOOLEAN,
         ("message", BYTESTR),
         ("sig", BYTESTR),
@@ -179,12 +212,15 @@ object CryptoContext {
 
     def sigVerifyF(contextVer: StdLibVersion): BaseFunction[NoContext] = {
       val lim = global.MaxByteStrSizeForVerifyFuncs
-      NativeFunction("sigVerify", (if (version < V4) {
-                                     100
-                                   } else {
-                                     200
-                                   }), SIGVERIFY, BOOLEAN, ("message", BYTESTR), ("sig", BYTESTR), ("pub", BYTESTR)) {
-        case CONST_BYTESTR(msg) :: CONST_BYTESTR(sig) :: CONST_BYTESTR(pub) :: Nil if (contextVer == V3 && msg.size > lim) =>
+      val complexity =
+        if (version < V4)
+          100
+        else if (version < V6)
+          200
+        else
+          180
+      NativeFunction("sigVerify", complexity, SIGVERIFY, BOOLEAN, ("message", BYTESTR), ("sig", BYTESTR), ("pub", BYTESTR)) {
+        case CONST_BYTESTR(msg) :: CONST_BYTESTR(_) :: CONST_BYTESTR(_) :: Nil if contextVer == V3 && msg.size > lim =>
           Left(s"Invalid message size = ${msg.size} bytes, must be not greater than ${lim / 1024} KB")
         case CONST_BYTESTR(msg) :: CONST_BYTESTR(sig) :: CONST_BYTESTR(pub) :: Nil =>
           Right(CONST_BOOLEAN(global.curve25519verify(msg.arr, sig.arr, pub.arr)))
