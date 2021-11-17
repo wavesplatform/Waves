@@ -81,9 +81,9 @@ class BytesDropTakeTest extends EvaluatorSpec {
   property("max size bytes") {
     val maxBytes = CONST_BYTESTR(ByteStr.fill(limit)(1), NoLimit)
     def call(id: Short) = FUNCTION_CALL(Native(id), List(maxBytes.explicitGet(), CONST_LONG(limit)))
-    eval(call(TAKE_BYTES), V1, lastVersion) shouldBe maxBytes
+    eval(call(TAKE_BYTES), V6, lastVersion) shouldBe maxBytes
     eval(call(TAKE_RIGHT_BYTES), V6, lastVersion) shouldBe maxBytes
-    eval(call(DROP_BYTES), V1, lastVersion) shouldBe CONST_BYTESTR(ByteStr.empty)
+    eval(call(DROP_BYTES), V6, lastVersion) shouldBe CONST_BYTESTR(ByteStr.empty)
     eval(call(DROP_RIGHT_BYTES), V6, lastVersion) shouldBe CONST_BYTESTR(ByteStr.empty)
   }
 }

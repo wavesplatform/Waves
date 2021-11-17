@@ -15,6 +15,7 @@ import com.wavesplatform.lang.utils.getDecompilerContext
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR.{DataEntrySize, NoLimit}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
@@ -528,7 +529,7 @@ object PureContext {
           else if (number > limit)
             Left(s"Number = $number passed to take() exceeds ByteVector limit = $limit")
           else
-            CONST_BYTESTR(xs.take(number.toInt))
+            CONST_BYTESTR(xs.take(number.toInt), NoLimit)
         } else
           CONST_BYTESTR(xs.take(number.toInt))
       case xs =>
@@ -552,7 +553,7 @@ object PureContext {
           else if (number > limit)
             Left(s"Number = $number passed to drop() exceeds ByteVector limit = $limit")
           else
-            CONST_BYTESTR(xs.drop(number.toInt))
+            CONST_BYTESTR(xs.drop(number.toInt), NoLimit)
         } else
           CONST_BYTESTR(xs.drop(number.toInt))
       case xs =>
@@ -628,7 +629,7 @@ object PureContext {
         else if (number > limit)
           Left(s"Number = $number passed to takeRight() exceeds ByteVector limit = $limit")
         else
-          CONST_BYTESTR(xs.takeRight(number.toInt))
+          CONST_BYTESTR(xs.takeRight(number.toInt), NoLimit)
       case xs =>
         notImplemented[Id, EVALUATED]("takeRight(xs: ByteVector, number: Int)", xs)
     }
@@ -649,7 +650,7 @@ object PureContext {
         else if (number > limit)
           Left(s"Number = $number passed to dropRight() exceeds ByteVector limit = $limit")
         else
-          CONST_BYTESTR(xs.dropRight(number.toInt))
+          CONST_BYTESTR(xs.dropRight(number.toInt), NoLimit)
       case xs =>
         notImplemented[Id, EVALUATED]("dropRight(xs: ByteVector, number: Int)", xs)
     }
@@ -1986,7 +1987,7 @@ object PureContext {
     fromV5Functions(useNewPowPrecision) ++ takeDropBytesBeforeV6 ++ takeDropStringFixedBeforeV6 :+ fractionIntRounds(UNION(fromV5RoundTypes))
 
   private val v6Functions =
-    fromV5Functions(true) ++ folds.map(_._2) ++ Array(sizeTuple, makeString1C, makeString2C, splitStr1C, splitStr4C, sqrtInt, sqrtBigInt, fractionIntRoundsNative, _getType) ++
+    fromV5Functions(true) ++ folds.map(_._2) ++
       Array(
         sizeTuple,
         makeString1C,
@@ -2003,7 +2004,8 @@ object PureContext {
         dropStringFixedFromV6,
         takeStringFixedFromV6,
         dropRightStringFromV6,
-        takeRightStringFromV6
+        takeRightStringFromV6,
+        _getType
       )
 
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =
