@@ -19,13 +19,13 @@ package object estimator {
     WavesContext.build(Global, DirectiveSet.contractDirectiveSet)
 
   private val environment = Common.emptyBlockchainEnvironment()
-  private val evaluator =
-    new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), ctx.evaluationContext(environment)), version)
+  private def evaluator(overhead: Boolean) =
+    new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), ctx.evaluationContext(environment)), version, overhead)
 
-  val evaluatorV2AsEstimator = new ScriptEstimator {
+  def evaluatorV2AsEstimator(overhead: Boolean) = new ScriptEstimator {
     override val version: Int = 0
 
     override def apply(declaredVals: Set[String], functionCosts: Map[FunctionHeader, Coeval[Long]], expr: Terms.EXPR): Either[String, Long] =
-      Right(evaluator(expr, 4000)._2)
+      Right(evaluator(overhead)(expr, 4000)._2)
   }
 }

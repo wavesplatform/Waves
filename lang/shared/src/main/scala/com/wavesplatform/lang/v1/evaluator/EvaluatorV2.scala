@@ -22,8 +22,11 @@ import scala.collection.mutable.ListBuffer
 class EvaluatorV2(
     val ctx: LoggedEvaluationContext[Environment, Id],
     val stdLibVersion: StdLibVersion,
+    val overhead: Boolean,
     val checkConstructorArgsTypes: Boolean = false
 ) {
+  private val overheadCost: Int = if (overhead) 1 else 0
+
   def apply(expr: EXPR, limit: Int): (EXPR, Int) =
     applyCoeval(expr, limit).value()
 
@@ -172,7 +175,7 @@ class EvaluatorV2(
           ).flatMap { unused =>
             g.expr match {
               case co: CaseObj if unused > 0 =>
-                update(co.fields(g.field)).map(_ => unused - 1)
+                update(co.fields(g.field)).map(_ => unused - overheadCost)
               case _: CaseObj =>
                 Coeval.now(unused)
               case ev: EVALUATED =>
@@ -280,7 +283,7 @@ class EvaluatorV2(
       parentBlocks = nextParentBlocks
     ).flatMap { unused =>
         let.value match {
-          case ev: EVALUATED if unused > 0 => update(ev).map(_ => unused - 1)
+          case ev: EVALUATED if unused > 0 => update(ev).map(_ => unused - overheadCost)
           case _                           => Coeval.now(unused)
         }
       }
@@ -299,7 +302,7 @@ class EvaluatorV2(
       .get(key)
       .map { v =>
         val globalValue = v.value.value.fold(e => throw EvaluationException(e, limit), identity)
-        update(globalValue).map(_ => limit - 1)
+        update(globalValue).map(_ => limit - overheadCost)
       }
 
   @tailrec
@@ -318,9 +321,10 @@ object EvaluatorV2 {
       limit: Int,
       ctx: EvaluationContext[Environment, Id],
       stdLibVersion: StdLibVersion,
+      overhead: Boolean,
       checkConstructorArgsTypes: Boolean = false
   ): Either[(ExecutionError, Log[Id]), (EXPR, Int, Log[Id])] =
-    applyLimitedCoeval(expr, limit, ctx, stdLibVersion, checkConstructorArgsTypes)
+    applyLimitedCoeval(expr, limit, ctx, stdLibVersion, overhead, checkConstructorArgsTypes)
       .value()
       .leftMap { case (e, _, unused) => (e, unused) }
 
@@ -329,11 +333,12 @@ object EvaluatorV2 {
       limit: Int,
       ctx: EvaluationContext[Environment, Id],
       stdLibVersion: StdLibVersion,
+      overhead: Boolean,
       checkConstructorArgsTypes: Boolean = false
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (EXPR, Int, Log[Id])]] = {
     val log       = ListBuffer[LogItem[Id]]()
     val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
-    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion, checkConstructorArgsTypes)
+    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion, overhead, checkConstructorArgsTypes)
     evaluator
       .applyCoeval(expr, limit)
       .redeem(
@@ -349,10 +354,11 @@ object EvaluatorV2 {
       expr: EXPR,
       stdLibVersion: StdLibVersion,
       complexityLimit: Int,
+      overhead: Boolean,
       handleExpr: EXPR => Either[ExecutionError, EVALUATED]
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
     EvaluatorV2
-      .applyLimitedCoeval(expr, complexityLimit, ctx, stdLibVersion)
+      .applyLimitedCoeval(expr, complexityLimit, ctx, stdLibVersion, overhead)
       .value()
       .fold(
         { case (error, complexity, log) => (log, complexity, Left(error)) }, {
@@ -367,9 +373,10 @@ object EvaluatorV2 {
   def applyCompleted(
       ctx: EvaluationContext[Environment, Id],
       expr: EXPR,
-      stdLibVersion: StdLibVersion
+      stdLibVersion: StdLibVersion,
+      overhead: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, incomplete)
+    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, overhead, incomplete)
 
   private def incomplete(expr: EXPR): Either[ExecutionError, Nothing] =
     Left(s"Unexpected incomplete evaluation result $expr")

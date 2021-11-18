@@ -14,7 +14,8 @@ class CommonScriptEstimatorTest
       ScriptEstimatorV2,
       ScriptEstimatorV3(overhead = true),
       ScriptEstimatorV3(overhead = false),
-      evaluatorV2AsEstimator
+      evaluatorV2AsEstimator(overhead = true),
+      evaluatorV2AsEstimator(overhead = false)
     ) {
 
   property("context leak") {
