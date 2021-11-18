@@ -17,6 +17,6 @@ trait ScriptEstimator {
 }
 
 object ScriptEstimator {
-  def all(overhead: Boolean): List[ScriptEstimator] =
-    List(ScriptEstimatorV1, ScriptEstimatorV2, ScriptEstimatorV3(overhead))
+  val all: List[ScriptEstimator] =
+    List(ScriptEstimatorV1, ScriptEstimatorV2, ScriptEstimatorV3(overhead = false))
 }
