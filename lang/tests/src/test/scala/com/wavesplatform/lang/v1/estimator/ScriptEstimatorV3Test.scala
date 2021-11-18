@@ -1,15 +1,16 @@
 package com.wavesplatform.lang.v1.estimator
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.ExecutionError
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.{Common, ExecutionError}
 import com.wavesplatform.test._
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.utils.functionCosts
+import com.wavesplatform.lang.utils.{functionCosts, lazyContexts}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.lang.v1.evaluator.FunctionIds
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, FunctionIds}
 
 class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(overhead = true)) {
   private def estimateNoOverhead(script: String): Either[ExecutionError, Long] =
@@ -59,8 +60,9 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(ov
       cost(else) = cost(h) + cost(f) + cost(g) + 3 = 16
     */
     estimateNoOverhead(script) shouldBe Right(
-      15 /* cond */ +
-      16 /* else */ +
+      1  /* if-then-else */ +
+      15 /* cond */         +
+      16 /* else */         +
       1  /* b    */
     )
   }
@@ -98,6 +100,7 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(ov
     )
 
     estimateNoOverhead(script) shouldBe Right(
+      1 /* if-then-else                      */ +
       1 /* a == b    condition               */ +
       2 /* d + y + 1 expr inside else block  */ +
       0 /* let y     decl inside else block  */ +
@@ -128,10 +131,11 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(ov
 
     /*
       cost(f0) = 0
-      cost(f1) = cost(f0) = 1 + 1 + 1 = 1 * 2 + 1
-      cost(fn) = cost(f0)
+      cost(f1) = cost(cond) = 1
+      cost(f2) = cost(f1) + cost(cond) = 2
+      cost(fn) = cost(100)
     */
-    estimateNoOverhead(script) shouldBe Right(0)
+    estimateNoOverhead(script) shouldBe Right(100)
   }
 
   property("overlapped func") {
@@ -183,7 +187,9 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(ov
     estimateNoOverhead(script) shouldBe Right(
         0 /* let a                      */ +
         0 /* let b                      */ +
+        1 /* if-then-else               */ +
         1 /* a == 1         condition   */ +
+        1 /* if-then-else               */ +
         1 /* a > 1          condition   */ +
         1 /* b == "a"       condition   */
     )

@@ -89,7 +89,7 @@ case class ScriptEstimatorV3(overhead: Boolean) extends ScriptEstimator {
       cond  <- evalHoldingFuncs(cond)
       right <- evalHoldingFuncs(ifTrue)
       left  <- evalHoldingFuncs(ifFalse)
-    } yield cond + Math.max(right, left) + overheadCost
+    } yield cond + Math.max(right, left) + 1
 
   private def markRef(key: String): EvalM[Long] =
     update(usedRefs.modify(_)(_ + key)).map(_ => overheadCost)
