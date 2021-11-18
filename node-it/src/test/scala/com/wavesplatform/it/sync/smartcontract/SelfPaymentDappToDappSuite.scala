@@ -49,7 +49,7 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
        |
          """.stripMargin,
     isAssetScript = false,
-    ScriptEstimatorV3
+    ScriptEstimatorV3(overhead = false)
   ).explicitGet()._1.bytes().base64
 
   private val dAppScript2 = ScriptCompiler(
@@ -72,7 +72,7 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
        |
          """.stripMargin,
     isAssetScript = false,
-    ScriptEstimatorV3
+    ScriptEstimatorV3(overhead = false)
   ).explicitGet()._1.bytes().base64
 
   protected override def beforeAll(): Unit = {
