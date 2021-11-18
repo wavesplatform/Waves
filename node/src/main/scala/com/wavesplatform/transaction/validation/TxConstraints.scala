@@ -26,7 +26,8 @@ object TxConstraints {
   }
 
   def cond(cond: => Boolean, err: => ValidationError): ValidatedNV =
-    if (cond) Valid(()) else Invalid(err).toValidatedNel
+    if (cond) Valid(())
+    else Invalid(err).toValidatedNel
 
   def byVersionSet[T <: VersionedTransaction](tx: T)(f: (Set[TxVersion], () => ValidatedV[Any])*): ValidatedV[T] = {
     seq(tx)(f.collect {

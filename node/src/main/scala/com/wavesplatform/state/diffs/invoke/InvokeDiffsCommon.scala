@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
+import scala.util.{Failure, Right, Success, Try}
+
 import cats.Id
 import cats.instances.list._
 import cats.instances.map._
@@ -23,27 +25,25 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, _}
 import com.wavesplatform.lang.v1.evaluator.{Log, RejectException, ScriptResult, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.DiffsCommon
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.transaction.{Asset, AssetIdLength, ERC20Address, PBSince, TransactionType}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
+import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
-import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
-import com.wavesplatform.transaction.validation.impl.{LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
-import com.wavesplatform.transaction.{Asset, AssetIdLength, ERC20Address, PBSince, TransactionType}
+import com.wavesplatform.transaction.validation.impl.{DataTxValidator, LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
 import com.wavesplatform.utils._
 import shapeless.Coproduct
-
-import scala.util.{Failure, Right, Success, Try}
 
 object InvokeDiffsCommon {
   def txFeeDiff(blockchain: Blockchain, tx: InvokeScriptTransactionLike): Either[GenericError, (Long, Map[Address, Portfolio])] = {
@@ -184,7 +184,7 @@ object InvokeDiffsCommon {
     val dataEntries     = actionsByType(classOf[DataOp]).asInstanceOf[List[DataOp]].map(dataItemToEntry)
 
     for {
-      _ <- TracedResult(checkDataEntries(tx, dataEntries, version)).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
+      _ <- TracedResult(checkDataEntries(blockchain, tx, dataEntries, version)).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
       _ <- TracedResult(checkLeaseCancels(leaseCancelList)).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
       _ <- TracedResult(
         Either.cond(
@@ -340,11 +340,7 @@ object InvokeDiffsCommon {
     else
       Right(())
 
-  private[this] def checkDataEntries(
-      tx: InvokeScriptLike,
-      dataEntries: Seq[DataEntry[_]],
-      stdLibVersion: StdLibVersion
-  ): Either[String, Unit] =
+  private def checkDataEntries(blockchain: Blockchain, tx: InvokeScriptLike, dataEntries: Seq[DataEntry[_]], stdLibVersion: StdLibVersion) =
     for {
       _ <- Either.cond(
         dataEntries.length <= ContractLimits.MaxWriteSetSize(stdLibVersion),
@@ -377,12 +373,7 @@ object InvokeDiffsCommon {
         }
         .toLeft(())
 
-      totalDataBytes = dataEntries.map(_.toBytes.length).sum
-      _ <- Either.cond(
-        totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes,
-        (),
-        s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"
-      )
+      _ <- DataTxValidator.verifyInvokeWriteSet(blockchain, dataEntries)
     } yield ()
 
   private def checkLeaseCancels(leaseCancels: Seq[LeaseCancel]): Either[String, Unit] = {
