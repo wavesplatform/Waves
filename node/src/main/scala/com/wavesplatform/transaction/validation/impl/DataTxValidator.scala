@@ -19,6 +19,7 @@ object DataTxValidator extends TxValidator[DataTransaction] {
       V.cond(data.length <= MaxEntryCount && data.forall(_.isValid(version)), TxValidationError.TooBigArray),
       V.cond(data.forall(_.key.nonEmpty), TxValidationError.EmptyDataKey),
       V.cond(data.map(_.key) == data.map(_.key).distinct, TxValidationError.DuplicatedDataKeys),
+      V.cond(tx.version > TxVersion.V1 || tx.data.forall(!_.isEmpty), GenericError("Empty data is not allowed in V1")),
       V.fee(fee)
     )
   }
@@ -26,14 +27,11 @@ object DataTxValidator extends TxValidator[DataTransaction] {
   def entrySizeValidation(blockchain: Blockchain, tx: DataTransaction): ValidatedV[DataTransaction] = {
     if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6)) {
       val payloadSize = realUserPayloadSize(tx.data)
-      V.cond(payloadSize <= DataTransaction.MaxBytes, TxValidationError.TooBigArray).map(_ => tx)
+      V.cond(payloadSize <= DataTransaction.MaxRideV6Bytes, TxValidationError.TooBigArray).map(_ => tx)
     } else
       V.byVersion(tx)(
         TxVersion.V1 -> { () =>
-          V.seq(tx)(
-            V.cond(tx.data.forall(!_.isEmpty), GenericError("Empty data is not allowed in V1")),
-            V.cond(Try(tx.bytes().length <= DataTransaction.MaxBytes).getOrElse(false), TxValidationError.TooBigArray)
-          )
+          V.cond(Try(tx.bytes().length <= DataTransaction.MaxBytes).getOrElse(false), TxValidationError.TooBigArray)
         },
         TxVersion.V2 -> { () =>
           V.cond(Try(tx.protoDataPayload.length <= DataTransaction.MaxProtoBytes).getOrElse(false), TxValidationError.TooBigArray)

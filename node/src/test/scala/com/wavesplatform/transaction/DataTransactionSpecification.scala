@@ -5,11 +5,11 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.requests.SignedDataRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.state.DataEntry._
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.crypto
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry}
+import com.wavesplatform.state.DataEntry._
 import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
@@ -151,11 +151,6 @@ class DataTransactionSpecification extends PropSpec {
     val gen = Arbitrary.arbBool.arbitrary.flatMap(proto => dataTransactionGen(DataTransaction.MaxEntryCount, withDeleteEntry = proto))
     forAll(gen) {
       case tx @ DataTransaction(version, sender, data, fee, timestamp, proofs, _) =>
-        val dataSize     = if (tx.isProtobufVersion) 110 else 100
-        val dataTooBig   = List.tabulate(dataSize)(n => StringDataEntry((100 + n).toString, "a" * 1527))
-        val dataTooBigEi = DataTransaction.create(version, sender, dataTooBig, fee, timestamp, proofs)
-        dataTooBigEi shouldBe Left(TxValidationError.TooBigArray)
-
         val emptyKey   = List(IntegerDataEntry("", 2))
         val emptyKeyEi = DataTransaction.create(version, sender, emptyKey, fee, timestamp, proofs)
         emptyKeyEi shouldBe Left(TxValidationError.EmptyDataKey)
