@@ -12,22 +12,17 @@ import com.wavesplatform.transaction.EthereumTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 
 object EthereumTransactionDiff {
-  def apply(blockchain: Blockchain, currentBlockTs: Long, limitedExecution: Boolean)(e: EthereumTransaction): TracedResult[ValidationError, Diff] =
-    e.payload match {
+  def meta(blockchain: Blockchain)(e: EthereumTransaction): Diff = {
+    val resultEi = e.payload match {
       case et: EthereumTransaction.Transfer =>
-        for {
-          asset     <- TracedResult(et.tryResolveAsset(blockchain))
-          transfer  <- TracedResult(et.toTransferLike(e, blockchain))
-          assetDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, transfer, verify = true, Diff(), Int.MaxValue)
-          diff      <- TransferDiff(blockchain)(e.senderAddress(), et.recipient, et.amount, asset, e.fee, e.feeAssetId)
-        } yield
-          assetDiff |+| diff.copy(
+        for (assetId <- et.tryResolveAsset(blockchain))
+          yield Diff.empty.copy(
             ethereumTransactionMeta = Map(
               e.id() -> EthereumTransactionMeta(
                 EthereumTransactionMeta.Payload.Transfer(
                   EthereumTransactionMeta.Transfer(
                     ByteString.copyFrom(PBRecipients.publicKeyHash(et.recipient)),
-                    Some(PBAmounts.fromAssetAndAmount(asset, et.amount))
+                    Some(PBAmounts.fromAssetAndAmount(assetId, et.amount))
                   )
                 )
               )
@@ -36,21 +31,41 @@ object EthereumTransactionDiff {
 
       case ei: EthereumTransaction.Invocation =>
         for {
-          invocation   <- TracedResult(ei.toInvokeScriptLike(e, blockchain))
-          paymentsDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, invocation, verify = true, Diff(), Int.MaxValue)
-          diff         <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(invocation)
-        } yield
-          paymentsDiff |+| diff.copy(
-            ethereumTransactionMeta = Map(
-              e.id() -> EthereumTransactionMeta(
-                EthereumTransactionMeta.Payload.Invocation(
-                  EthereumTransactionMeta.Invocation(
-                    ByteString.copyFrom(Serde.serialize(invocation.funcCall)),
-                    invocation.payments.map(p => PBAmounts.fromAssetAndAmount(p.assetId, p.amount))
-                  )
+          invocation <- ei.toInvokeScriptLike(e, blockchain)
+        } yield Diff.empty.copy(
+          ethereumTransactionMeta = Map(
+            e.id() -> EthereumTransactionMeta(
+              EthereumTransactionMeta.Payload.Invocation(
+                EthereumTransactionMeta.Invocation(
+                  ByteString.copyFrom(Serde.serialize(invocation.funcCall)),
+                  invocation.payments.map(p => PBAmounts.fromAssetAndAmount(p.assetId, p.amount))
                 )
               )
             )
           )
+        )
     }
+    resultEi.getOrElse(Diff.empty)
+  }
+
+  def apply(blockchain: Blockchain, currentBlockTs: Long, limitedExecution: Boolean)(e: EthereumTransaction): TracedResult[ValidationError, Diff] = {
+    val baseDiff = e.payload match {
+      case et: EthereumTransaction.Transfer =>
+        for {
+          asset     <- TracedResult(et.tryResolveAsset(blockchain))
+          transfer  <- TracedResult(et.toTransferLike(e, blockchain))
+          assetDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, transfer, verify = true, Diff(), Int.MaxValue)
+          diff      <- TransferDiff(blockchain)(e.senderAddress(), et.recipient, et.amount, asset, e.fee, e.feeAssetId)
+        } yield assetDiff |+| diff
+
+      case ei: EthereumTransaction.Invocation =>
+        for {
+          invocation   <- TracedResult(ei.toInvokeScriptLike(e, blockchain))
+          paymentsDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, invocation, verify = true, Diff(), Int.MaxValue)
+          diff         <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(invocation)
+        } yield paymentsDiff |+| diff
+    }
+
+    baseDiff.map(_ |+| this.meta(blockchain)(e))
+  }
 }
