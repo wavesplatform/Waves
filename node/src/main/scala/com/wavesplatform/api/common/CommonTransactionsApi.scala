@@ -11,7 +11,6 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 import com.wavesplatform.state.{Blockchain, Diff, Height, TxMeta}
 import com.wavesplatform.transaction.TransactionType.TransactionType
-import com.wavesplatform.transaction.smart.InvokeTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
@@ -73,16 +72,13 @@ object CommonTransactionsApi {
     override def unconfirmedTransactionById(transactionId: ByteStr): Option[Transaction] =
       utx.transactionById(transactionId)
 
-    override def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
-      val defaultFee = FeeValidation.getMinFee(blockchain, tx)
-      (tx match {
-        case ist: InvokeTransaction => FeeValidation.calculateInvokeFee(blockchain, ist).fold(defaultFee)(Right(_))
-        case _                      => defaultFee
-      }).map {
-        case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
-          (asset, feeInAsset, feeInWaves)
-      }
-    }
+    override def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)] =
+      FeeValidation
+        .getMinFee(blockchain, tx)
+        .map {
+          case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
+            (asset, feeInAsset, feeInWaves)
+        }
 
     override def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]] = publishTransaction(tx)
 

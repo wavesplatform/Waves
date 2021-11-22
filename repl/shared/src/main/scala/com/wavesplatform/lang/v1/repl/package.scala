@@ -22,7 +22,7 @@ package object repl {
 
   val initialCtx: CTX[Environment] =
     CryptoContext.build(global, version).withEnvironment[Environment]  |+|
-    PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+    PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
     WavesContext.build(global, directives)
 
   def buildEnvironment(settings: Option[NodeConnectionSettings]): Environment[Future] =

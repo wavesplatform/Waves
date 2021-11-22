@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
@@ -10,11 +10,11 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test._
-import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
 import org.scalacheck.Gen
 
 class ScriptTransferByAliasTest extends PropSpec with WithDomain {
@@ -85,7 +85,7 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
         genesis     <- GenesisTransaction.create(dAppAcc.toAddress, ENOUGH_AMT, ts)
         genesis2    <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         genesis3    <- GenesisTransaction.create(receiver.toAddress, ENOUGH_AMT, ts)
-        createAlias <- CreateAliasTransaction.selfSigned(2.toByte, receiver, Alias.create(alias).explicitGet(), fee, ts)
+        createAlias <- CreateAliasTransaction.selfSigned(2.toByte, receiver, alias, fee, ts)
         issue       <- IssueTransaction.selfSigned(2.toByte, dAppAcc, "Asset", "Description", ENOUGH_AMT, 8, true, Some(verifier), fee, ts)
         asset = IssuedAsset(issue.id())
         setDApp <- SetScriptTransaction.selfSigned(1.toByte, dAppAcc, Some(dApp(asset)), fee, ts)
