@@ -1185,4 +1185,28 @@ class EvaluatorV2Test extends PropSpec with Inside {
         |)
       """.stripMargin.trim
   }
+
+  property("updated evaluator should use predefined user function complexity") {
+    evalOld("1 != 1", 100) shouldBe ((FALSE, "false", 5))
+    evalNew("1 != 1", 100) shouldBe ((FALSE, "false", 1))  // decreased by 4
+
+    val script =
+      """
+        | let x =
+        |   if (1 != 1)
+        |     then throw()
+        |     else 1 != 1
+        |
+        | func f() =
+        |   if (1 != 1)
+        |     then throw()
+        |     else 1 != 1
+        |
+        | f() || x
+        |
+      """.stripMargin
+
+    evalOld(script, 100) shouldBe ((FALSE, "false", 24))
+    evalNew(script, 100) shouldBe ((FALSE, "false", 24 - 4 * 4 - 1))  // 4 times decreased by 4 and 1 for access to let
+  }
 }

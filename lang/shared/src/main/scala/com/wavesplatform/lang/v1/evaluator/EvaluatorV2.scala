@@ -111,19 +111,25 @@ class EvaluatorV2(
       ctx.ec.functions
         .get(fc.function)
         .map(_.asInstanceOf[UserFunction[Environment]])
-        .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment, startArgs)))
-        .orElse(findUserFunction(name, parentBlocks))
-        .map { signature =>
-          val argsWithExpr =
-            (signature.args zip fc.args)
-              .foldRight(signature.body.deepCopy.value) {
-                case ((argName, argValue), argsWithExpr) =>
-                  BLOCK(LET(argName, argValue), argsWithExpr)
-              }
-          update(argsWithExpr)
-            .flatMap(
-              _ => root(argsWithExpr, update, limit, parentBlocks)
-            )
+        .map { f =>
+          val func = FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment, startArgs))
+          val cost = f.costByLibVersion(stdLibVersion).toInt
+          (func, if (overhead) None else Some(limit - cost))
+        }
+        .orElse(findUserFunction(name, parentBlocks).map((_, None)))
+        .map {
+          case (signature, precalculatedLimitOpt) =>
+            val argsWithExpr =
+              (signature.args zip fc.args)
+                .foldRight(signature.body.deepCopy.value) {
+                  case ((argName, argValue), argsWithExpr) =>
+                    BLOCK(LET(argName, argValue), argsWithExpr)
+                }
+            update(argsWithExpr)
+              .flatMap(_ =>
+                root(argsWithExpr, update, precalculatedLimitOpt.getOrElse(limit), parentBlocks)
+              )
+              .map(r => precalculatedLimitOpt.getOrElse(r))
         }
     }
 
