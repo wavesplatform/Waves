@@ -1,6 +1,7 @@
-package com.wavesplatform.lang.evaluator
+package com.wavesplatform.lang.evaluator.string
 
 import com.wavesplatform.lang.directives.values.{V3, V6}
+import com.wavesplatform.lang.evaluator.EvaluatorSpec
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ctx.BaseFunction
