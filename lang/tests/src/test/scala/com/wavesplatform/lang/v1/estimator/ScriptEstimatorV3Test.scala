@@ -1,16 +1,15 @@
 package com.wavesplatform.lang.v1.estimator
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.{Common, ExecutionError}
-import com.wavesplatform.test._
+import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.utils.{functionCosts, lazyContexts}
+import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, FunctionIds}
+import com.wavesplatform.lang.v1.evaluator.FunctionIds
+import com.wavesplatform.test._
 
 class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(overhead = true)) {
   private def estimateNoOverhead(script: String): Either[ExecutionError, Long] =

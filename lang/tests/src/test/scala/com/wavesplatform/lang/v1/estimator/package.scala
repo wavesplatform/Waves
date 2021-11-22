@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1
 
 import cats.syntax.semigroup._
-import com.wavesplatform.lang.{Global, Common}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -10,6 +9,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.{Common, Global}
 import monix.eval.Coeval
 
 package object estimator {
