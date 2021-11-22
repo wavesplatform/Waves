@@ -5,6 +5,7 @@ import cats.syntax.either._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -84,9 +85,9 @@ object ScriptRunner {
     def evaluate(ctx: EvaluationContext[Environment, Id], expr: EXPR): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
       val (log, unusedComplexity, result) =
         if (complexityLimit == Int.MaxValue)
-          EvaluatorV2.applyCompleted(ctx, expr, script.stdLibVersion)
+          EvaluatorV2.applyCompleted(ctx, expr, script.stdLibVersion, overhead = blockchain.complexityOverhead)
         else
-          EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, complexityLimit, _ => Right(default))
+          EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, complexityLimit, blockchain.complexityOverhead, _ => Right(default))
       (log, complexityLimit - unusedComplexity, result)
     }
 
