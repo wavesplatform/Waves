@@ -6,7 +6,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, _}
 import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.EvaluationException
 import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext
@@ -31,12 +31,12 @@ class EvaluatorV2Test extends PropSpec with Inside {
   private val environment = Common.emptyBlockchainEnvironment()
   private val evalCtx     = LoggedEvaluationContext[Environment, Id](_ => _ => (), ctx.evaluationContext(environment))
 
-  private val evaluatorNoOverhead   = new EvaluatorV2(evalCtx, version, overhead = false)
-  private val evaluatorWithOverhead = new EvaluatorV2(evalCtx, version, overhead = true)
+  private val oldEvaluator = new EvaluatorV2(evalCtx, version, correctFunctionCallScope = false)
+  private val newEvaluator = new EvaluatorV2(evalCtx, version, correctFunctionCallScope = true)
 
   private def evalBoth(expr: EXPR, limit: Int): (EXPR, String, Int) = {
-    val (result, unusedComplexity)   = evaluatorWithOverhead(expr, limit)
-    val (result2, unusedComplexity2) = evaluatorNoOverhead(expr, limit)
+    val (result, unusedComplexity)   = newEvaluator(expr, limit)
+    val (result2, unusedComplexity2) = oldEvaluator(expr, limit)
     result shouldBe result2
     unusedComplexity shouldBe unusedComplexity2
     (result, Decompiler(result, ctx.decompilerContext), limit - unusedComplexity)
@@ -46,7 +46,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
     evalBoth(compile(script), limit)
 
   private def evalNew(expr: EXPR, limit: Int): (EXPR, String, Int) = {
-    val (result, unusedComplexity) = evaluatorNoOverhead(expr, limit)
+    val (result, unusedComplexity) = newEvaluator(expr, limit)
     (result, Decompiler(result, ctx.decompilerContext), limit - unusedComplexity)
   }
 
@@ -54,7 +54,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
     evalNew(compile(script), limit)
 
   private def evalOld(expr: EXPR, limit: Int): (EXPR, String, Int) = {
-    val (result, unusedComplexity) = evaluatorWithOverhead(expr, limit)
+    val (result, unusedComplexity) = oldEvaluator(expr, limit)
     (result, Decompiler(result, ctx.decompilerContext), limit - unusedComplexity)
   }
 
@@ -1186,43 +1186,30 @@ class EvaluatorV2Test extends PropSpec with Inside {
       """.stripMargin.trim
   }
 
-  property("arg of the first function should NOT overlap var accessed from body of the second function after fix") {
-    eval(
+  property("arg of the first function should NOT overlap var accessed from body of the second function AFTER fix") {
+    val script =
       """
-        |let a = 4
-        |func g(b: Int) = a
-        |func f(a: Int) = g(a)
-        |f(1)
-      """.stripMargin,
-      1000
-    )._1 shouldBe CONST_LONG(4)
-  }
+        | let a = 4
+        | func g(b: Int) = a
+        | func f(a: Int) = g(a)
+        | f(1)
+      """.stripMargin
 
-  property("arg of the first function should overlap var accessed from body of the second function before fix") {
-    EvaluatorV2.applyLimitedCoeval(
-      compile("""
-        |let a = 4
-        |func g(b: Int) = a
-        |func f(a: Int) = g(a)
-        |f(1)
-      """.stripMargin),
-      1000,
-      ctx.evaluationContext(environment),
-      V3,
-      correctFunctionCallScope = false
-    ).value().explicitGet()._1 shouldBe CONST_LONG(1)
+    evalOld(script, 1000)._1 shouldBe CONST_LONG(1)
+    evalNew(script, 1000)._1 shouldBe CONST_LONG(4)
   }
 
   property("arg of the function should not overlap var accessed from the let") {
-    eval(
+    val script =
       """
-        |let a = 4
-        |let x = a
-        |func f(a: Int) = x
-        |f(1)
-      """.stripMargin,
-      1000
-    )._1 shouldBe CONST_LONG(4)
+        | let a = 4
+        | let x = a
+        | func f(a: Int) = x
+        | f(1)
+      """.stripMargin
+
+    evalOld(script, 1000)._1 shouldBe CONST_LONG(4)
+    evalNew(script, 1000)._1 shouldBe CONST_LONG(4)
   }
 
   property("updated evaluator should use predefined user function complexity") {

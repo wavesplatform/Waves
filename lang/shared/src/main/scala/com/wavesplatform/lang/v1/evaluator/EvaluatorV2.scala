@@ -25,7 +25,7 @@ class EvaluatorV2(
     val correctFunctionCallScope: Boolean,
     val checkConstructorArgsTypes: Boolean = false
 ) {
-  private val overheadCost: Int = if (overhead) 1 else 0
+  private val overheadCost: Int = if (correctFunctionCallScope) 0 else 1
 
   def apply(expr: EXPR, limit: Int): (EXPR, Int) =
     applyCoeval(expr, limit).value()
@@ -105,16 +105,21 @@ class EvaluatorV2(
           }
         )
 
-    def evaluateUserFunction(fc: FUNCTION_CALL, limit: Int, name: String, startArgs: List[EXPR]): Option[Coeval[Int]] = {
+    def evaluateUserFunction(fc: FUNCTION_CALL, limit: Int, name: String, startArgs: List[EXPR]): Option[Coeval[Int]] =
       ctx.ec.functions
         .get(fc.function)
         .map(_.asInstanceOf[UserFunction[Environment]])
         .map { f =>
           val func = FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment, startArgs))
-          val cost = f.costByLibVersion(stdLibVersion).toInt
-          (func, if (correctFunctionCallScope) None else Some(limit - cost), parentBlocks)
+          val precalculatedLimit =
+            if (correctFunctionCallScope) {
+              val cost = f.costByLibVersion(stdLibVersion).toInt
+              Some(limit - cost)
+            } else
+              None
+          (func, precalculatedLimit, parentBlocks)
         }
-        .orElse(findUserFunction(name, parentBlocks).map((_, None)))
+        .orElse(findUserFunction(name, parentBlocks).map { case (func, blocks) => (func, None, blocks) })
         .map {
           case (signature, precalculatedLimitOpt, functionScopeBlocks) =>
             val argsWithExpr =
@@ -130,7 +135,6 @@ class EvaluatorV2(
               }
               .map(r => precalculatedLimitOpt.getOrElse(r))
         }
-    }
 
     def evaluateConstructor(fc: FUNCTION_CALL, limit: Int, name: String): Coeval[Int] =
       for {

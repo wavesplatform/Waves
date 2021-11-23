@@ -117,7 +117,7 @@ object ContractEvaluator {
         case Left(error)  => Coeval.now(Left(error))
       }
 
-  def applyV2Coeval(
+  private def applyV2Coeval(
       ctx: EvaluationContext[Environment, Id],
       expr: EXPR,
       version: StdLibVersion,
