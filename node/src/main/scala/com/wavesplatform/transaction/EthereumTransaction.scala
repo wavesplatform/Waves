@@ -3,6 +3,7 @@ package com.wavesplatform.transaction
 import java.math.BigInteger
 
 import scala.reflect.ClassTag
+
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.EthereumKeyLength
@@ -10,8 +11,8 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
-import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.serialization.impl.BaseTxJson
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -42,7 +43,7 @@ final case class EthereumTransaction(
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(TransactionEncoder.encode(underlying, chainId.toLong))
 
-  override val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(Hash.sha3(bodyBytes())))
+  override val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(Hash.sha3(this.bytes())))
 
   override def assetFee: (Asset, Long) = Asset.Waves -> underlying.getGasLimit.longValueExact()
 
@@ -57,7 +58,7 @@ final case class EthereumTransaction(
     PublicKey(
       ByteStr(
         Sign
-          .recoverFromSignature(recoveryId.intValue, sig, id().arr)
+          .recoverFromSignature(recoveryId.intValue, sig, Hash.sha3(this.bodyBytes()))
           .toByteArray
           .takeRight(EthereumKeyLength)
       )
@@ -113,24 +114,24 @@ object EthereumTransaction {
       for {
         scriptInfo <- blockchain.accountScript(dApp).toRight(GenericError(s"No script at address $dApp"))
         (extractedCall, extractedPayments) = ABIConverter(scriptInfo.script).decodeFunctionCall(hexCallData)
-      } yield
-        new InvokeScriptTransactionLike {
-          override def funcCall: Terms.FUNCTION_CALL                  = extractedCall
-          override def payments: Seq[InvokeScriptTransaction.Payment] = extractedPayments
-          override def id: Coeval[ByteStr]                            = tx.id
-          override def dApp: AddressOrAlias                           = Invocation.this.dApp
-          override val sender: PublicKey                              = tx.signerPublicKey()
-          override def root: InvokeScriptTransactionLike              = this
-          override def assetFee: (Asset, TxTimestamp)                 = tx.assetFee
-          override def timestamp: TxTimestamp                         = tx.timestamp
-          override def chainId: TxVersion                             = tx.chainId
-          override def checkedAssets: Seq[Asset.IssuedAsset]          = this.paymentAssets
-          override val tpe: TransactionType                           = TransactionType.InvokeScript
-        }
+      } yield new InvokeScriptTransactionLike {
+        override def funcCall: Terms.FUNCTION_CALL                  = extractedCall
+        override def payments: Seq[InvokeScriptTransaction.Payment] = extractedPayments
+        override def id: Coeval[ByteStr]                            = tx.id
+        override def dApp: AddressOrAlias                           = Invocation.this.dApp
+        override val sender: PublicKey                              = tx.signerPublicKey()
+        override def root: InvokeScriptTransactionLike              = this
+        override def assetFee: (Asset, TxTimestamp)                 = tx.assetFee
+        override def timestamp: TxTimestamp                         = tx.timestamp
+        override def chainId: TxVersion                             = tx.chainId
+        override def checkedAssets: Seq[Asset.IssuedAsset]          = this.paymentAssets
+        override val tpe: TransactionType                           = TransactionType.InvokeScript
+      }
   }
 
   implicit object EthereumTransactionValidator extends TxValidator[EthereumTransaction] {
     override def validate(tx: EthereumTransaction): ValidatedV[EthereumTransaction] = TxConstraints.seq(tx)(
+      TxConstraints.cond(BigInt(1, tx.signatureData.getV) > 28, GenericError("Legacy transactions are not supported")),
       TxConstraints.fee(tx.underlying.getGasLimit.longValueExact()),
       TxConstraints
         .positiveOrZeroAmount((BigInt(tx.underlying.getValue) / AmountMultiplier).bigInteger.longValueExact(), "waves"),
