@@ -335,7 +335,7 @@ object EvaluatorV2 {
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (EXPR, Int, Log[Id])]] = {
     val log       = ListBuffer[LogItem[Id]]()
     val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
-    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion, checkConstructorArgsTypes)
+    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion, correctFunctionCallScope, checkConstructorArgsTypes)
     evaluator
       .applyCoeval(expr, limit)
       .redeem(
