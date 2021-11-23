@@ -22,7 +22,7 @@ import scala.collection.mutable.ListBuffer
 class EvaluatorV2(
     val ctx: LoggedEvaluationContext[Environment, Id],
     val stdLibVersion: StdLibVersion,
-    val overhead: Boolean,
+    val correctFunctionCallScope: Boolean,
     val checkConstructorArgsTypes: Boolean = false
 ) {
   private val overheadCost: Int = if (overhead) 1 else 0
@@ -112,11 +112,11 @@ class EvaluatorV2(
         .map { f =>
           val func = FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment, startArgs))
           val cost = f.costByLibVersion(stdLibVersion).toInt
-          (func, if (overhead) None else Some(limit - cost))
+          (func, if (correctFunctionCallScope) None else Some(limit - cost), parentBlocks)
         }
         .orElse(findUserFunction(name, parentBlocks).map((_, None)))
         .map {
-          case (signature, precalculatedLimitOpt) =>
+          case (signature, precalculatedLimitOpt, functionScopeBlocks) =>
             val argsWithExpr =
               (signature.args zip fc.args)
                 .foldRight(signature.body.deepCopy.value) {
@@ -124,7 +124,10 @@ class EvaluatorV2(
                     BLOCK(LET(argName, argValue), argsWithExpr)
                 }
             update(argsWithExpr)
-              .flatMap(_ => root(argsWithExpr, update, precalculatedLimitOpt.getOrElse(limit), parentBlocks))
+              .flatMap { _ =>
+                val blocks = if (correctFunctionCallScope) functionScopeBlocks else parentBlocks
+                root(argsWithExpr, update, precalculatedLimitOpt.getOrElse(limit), blocks)
+              }
               .map(r => precalculatedLimitOpt.getOrElse(r))
         }
     }
@@ -206,7 +209,7 @@ class EvaluatorV2(
                       update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks
-                    )
+                  )
                 )
               case FALSE if unused > 0 =>
                 update(i.ifFalse).flatMap(
@@ -216,7 +219,7 @@ class EvaluatorV2(
                       update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks
-                    )
+                  )
                 )
               case _: EVALUATED => throw EvaluationException("Non-boolean result in cond", unused)
               case _            => Coeval.now(unused)
@@ -279,8 +282,8 @@ class EvaluatorV2(
               let.value match {
                 case e: EVALUATED => ctx.log(let, Right(e))
                 case _            =>
-              }
-          ),
+            }
+        ),
       limit = limit,
       parentBlocks = nextParentBlocks
     ).flatMap { unused =>
@@ -308,39 +311,27 @@ class EvaluatorV2(
       }
 
   @tailrec
-  private def findUserFunction(name: String, parentBlocks: List[BLOCK_DEF]): Option[FUNC] =
+  private def findUserFunction(name: String, parentBlocks: List[BLOCK_DEF]): Option[(FUNC, List[BLOCK_DEF])] =
     parentBlocks match {
-      case (_: LET_BLOCK) :: xs                  => findUserFunction(name, xs)
-      case BLOCK(f @ FUNC(`name`, _, _), _) :: _ => Some(f)
-      case _ :: xs                               => findUserFunction(name, xs)
-      case Nil                                   => None
+      case (_: LET_BLOCK) :: xs                            => findUserFunction(name, xs)
+      case BLOCK(f @ FUNC(`name`, _, _), _) :: scopeBlocks => Some((f, scopeBlocks))
+      case _ :: xs                                         => findUserFunction(name, xs)
+      case Nil                                             => None
     }
 }
 
 object EvaluatorV2 {
-  def applyLimited(
-      expr: EXPR,
-      limit: Int,
-      ctx: EvaluationContext[Environment, Id],
-      stdLibVersion: StdLibVersion,
-      overhead: Boolean,
-      checkConstructorArgsTypes: Boolean = false
-  ): Either[(ExecutionError, Log[Id]), (EXPR, Int, Log[Id])] =
-    applyLimitedCoeval(expr, limit, ctx, stdLibVersion, overhead, checkConstructorArgsTypes)
-      .value()
-      .leftMap { case (e, _, unused) => (e, unused) }
-
   def applyLimitedCoeval(
       expr: EXPR,
       limit: Int,
       ctx: EvaluationContext[Environment, Id],
       stdLibVersion: StdLibVersion,
-      overhead: Boolean,
+      correctFunctionCallScope: Boolean,
       checkConstructorArgsTypes: Boolean = false
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (EXPR, Int, Log[Id])]] = {
     val log       = ListBuffer[LogItem[Id]]()
     val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
-    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion, overhead, checkConstructorArgsTypes)
+    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion, checkConstructorArgsTypes)
     evaluator
       .applyCoeval(expr, limit)
       .redeem(
@@ -356,11 +347,11 @@ object EvaluatorV2 {
       expr: EXPR,
       stdLibVersion: StdLibVersion,
       complexityLimit: Int,
-      overhead: Boolean,
+      correctFunctionCallScope: Boolean,
       handleExpr: EXPR => Either[ExecutionError, EVALUATED]
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
     EvaluatorV2
-      .applyLimitedCoeval(expr, complexityLimit, ctx, stdLibVersion, overhead)
+      .applyLimitedCoeval(expr, complexityLimit, ctx, stdLibVersion, correctFunctionCallScope)
       .value()
       .fold(
         { case (error, complexity, log) => (log, complexity, Left(error)) }, {
@@ -376,9 +367,9 @@ object EvaluatorV2 {
       ctx: EvaluationContext[Environment, Id],
       expr: EXPR,
       stdLibVersion: StdLibVersion,
-      overhead: Boolean
+      correctFunctionCallScope: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, overhead, incomplete)
+    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, correctFunctionCallScope, incomplete)
 
   private def incomplete(expr: EXPR): Either[ExecutionError, Nothing] =
     Left(s"Unexpected incomplete evaluation result $expr")

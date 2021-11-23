@@ -1,16 +1,15 @@
 package com.wavesplatform.lang.v1
 
+import java.util.concurrent.TimeUnit
+
 import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Expression, V5}
 import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
 import org.openjdk.jmh.annotations.{State, _}
 import org.openjdk.jmh.infra.Blackhole
-
-import java.util.concurrent.TimeUnit
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -20,28 +19,28 @@ import java.util.concurrent.TimeUnit
 @Measurement(iterations = 30)
 class FoldBenchmark {
   @Benchmark
-  def singleCall(bh: Blackhole, s: FoldSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.singleCall, V5))
+  def singleCall(bh: Blackhole, s: FoldSt): Unit = bh.consume(eval(s.ctx, s.singleCall, V5))
 
   @Benchmark
-  def fold10(bh: Blackhole, s: FoldSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.fold10, V5))
+  def fold10(bh: Blackhole, s: FoldSt): Unit = bh.consume(eval(s.ctx, s.fold10, V5))
 
   @Benchmark
-  def fold20(bh: Blackhole, s: FoldSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.fold20, V5))
+  def fold20(bh: Blackhole, s: FoldSt): Unit = bh.consume(eval(s.ctx, s.fold20, V5))
 
   @Benchmark
-  def fold50(bh: Blackhole, s: FoldSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.fold50, V5))
+  def fold50(bh: Blackhole, s: FoldSt): Unit = bh.consume(eval(s.ctx, s.fold50, V5))
 
   @Benchmark
-  def fold100(bh: Blackhole, s: FoldSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.fold100, V5))
+  def fold100(bh: Blackhole, s: FoldSt): Unit = bh.consume(eval(s.ctx, s.fold100, V5))
 
   @Benchmark
-  def fold200(bh: Blackhole, s: FoldSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.fold200, V5))
+  def fold200(bh: Blackhole, s: FoldSt): Unit = bh.consume(eval(s.ctx, s.fold200, V5))
 
   @Benchmark
-  def fold500(bh: Blackhole, s: FoldSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.fold500, V5))
+  def fold500(bh: Blackhole, s: FoldSt): Unit = bh.consume(eval(s.ctx, s.fold500, V5))
 
   @Benchmark
-  def fold1000(bh: Blackhole, s: FoldSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.fold1000, V5))
+  def fold1000(bh: Blackhole, s: FoldSt): Unit = bh.consume(eval(s.ctx, s.fold1000, V5))
 }
 
 @State(Scope.Benchmark)

@@ -1186,6 +1186,45 @@ class EvaluatorV2Test extends PropSpec with Inside {
       """.stripMargin.trim
   }
 
+  property("arg of the first function should NOT overlap var accessed from body of the second function after fix") {
+    eval(
+      """
+        |let a = 4
+        |func g(b: Int) = a
+        |func f(a: Int) = g(a)
+        |f(1)
+      """.stripMargin,
+      1000
+    )._1 shouldBe CONST_LONG(4)
+  }
+
+  property("arg of the first function should overlap var accessed from body of the second function before fix") {
+    EvaluatorV2.applyLimitedCoeval(
+      compile("""
+        |let a = 4
+        |func g(b: Int) = a
+        |func f(a: Int) = g(a)
+        |f(1)
+      """.stripMargin),
+      1000,
+      ctx.evaluationContext(environment),
+      V3,
+      correctFunctionCallScope = false
+    ).value().explicitGet()._1 shouldBe CONST_LONG(1)
+  }
+
+  property("arg of the function should not overlap var accessed from the let") {
+    eval(
+      """
+        |let a = 4
+        |let x = a
+        |func f(a: Int) = x
+        |f(1)
+      """.stripMargin,
+      1000
+    )._1 shouldBe CONST_LONG(4)
+  }
+
   property("updated evaluator should use predefined user function complexity") {
     evalOld("1 != 1", 100) shouldBe ((FALSE, "false", 5))
     evalNew("1 != 1", 100) shouldBe ((FALSE, "false", 1))  // decreased by 4
