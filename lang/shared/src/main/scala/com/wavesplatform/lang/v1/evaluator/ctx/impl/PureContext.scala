@@ -1684,7 +1684,7 @@ object PureContext {
   private def fold(index: Int, limit: Int, complexity: Long): BaseFunction[NoContext] =
     NativeFunction.withEnvironment[NoContext](
       s"fold_$limit",
-      Map[StdLibVersion, Long](V5 -> complexity),
+      complexity,
       (FOLD + index).toShort,
       TYPEPARAM('B'),
       ("list", PARAMETERIZEDLIST(TYPEPARAM('A'))),

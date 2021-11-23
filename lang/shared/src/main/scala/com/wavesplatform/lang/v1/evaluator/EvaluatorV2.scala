@@ -72,7 +72,7 @@ class EvaluatorV2(
         val args = fc.args.asInstanceOf[List[EVALUATED]]
         (function.ev match {
           case f: Extended[Environment] => f.evaluate[Id](ctx.ec.environment, args, limit - cost, evaluateHighOrder)
-          case f: Simple[Environment]   => Coeval((f.evaluate(ctx.ec.environment, args), 0))
+          case f: Simple[Environment]   => Coeval((f.evaluate(ctx.ec.environment, args), limit - cost))
         }).onErrorHandleWith {
             case _: SecurityException =>
               Coeval((s"""An access to ${function.ev} is denied""".asLeft[EVALUATED], 0))
@@ -84,12 +84,10 @@ class EvaluatorV2(
               Coeval((s"""An error during run ${function.ev}: ${e.getClass} $error""".asLeft[EVALUATED], 0))
           }
           .flatMap {
-            case (result, additionalComplexity) =>
-              val totalCost        = cost + additionalComplexity
-              val unusedComplexity = limit - totalCost
+            case (result, unused) =>
               result.fold(
-                error => throw EvaluationException(error, unusedComplexity),
-                evaluated => update(evaluated).map(_ => unusedComplexity)
+                error => throw EvaluationException(error, unused),
+                evaluated => update(evaluated).map(_ => unused)
               )
           }
       }
@@ -99,11 +97,11 @@ class EvaluatorV2(
       applyCoeval(FUNCTION_CALL(User(function), args), limit, parentBlocks)
         .redeem(
           {
-            case e: EvaluationException => (Left(e.getMessage), limit - e.unusedComplexity)
-            case e                      => (Left(e.getMessage), 0)
+            case e: EvaluationException => (Left(e.getMessage), e.unusedComplexity)
+            case e                      => (Left(e.getMessage), limit)
           }, {
-            case (r: EVALUATED, unusedComplexity) => (Right(r), limit - unusedComplexity)
-            case (expr, unusedComplexity)         => (incomplete(expr), limit - unusedComplexity)
+            case (r: EVALUATED, unusedComplexity) => (Right(r), unusedComplexity)
+            case (expr, unusedComplexity)         => (incomplete(expr), unusedComplexity)
           }
         )
 
@@ -126,9 +124,7 @@ class EvaluatorV2(
                     BLOCK(LET(argName, argValue), argsWithExpr)
                 }
             update(argsWithExpr)
-              .flatMap(_ =>
-                root(argsWithExpr, update, precalculatedLimitOpt.getOrElse(limit), parentBlocks)
-              )
+              .flatMap(_ => root(argsWithExpr, update, precalculatedLimitOpt.getOrElse(limit), parentBlocks))
               .map(r => precalculatedLimitOpt.getOrElse(r))
         }
     }
