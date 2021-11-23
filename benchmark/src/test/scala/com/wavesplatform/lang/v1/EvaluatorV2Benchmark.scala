@@ -6,13 +6,15 @@ import cats.Id
 import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.values.{V1, V3}
 import com.wavesplatform.lang.v1.EvaluatorV2Benchmark._
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, IF, TRUE}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.traits.Environment
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
+
+import scala.annotation.tailrec
 
 object EvaluatorV2Benchmark {
   val pureContext: CTX[Environment]                       = PureContext.build(V1, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment]
@@ -37,6 +39,9 @@ class EvaluatorV2Benchmark {
 
   @Benchmark
   def littleCustom(st: LittleCustomFunc, bh: Blackhole): Unit = bh.consume(eval(pureEvalContext, st.expr, V1))
+
+  @Benchmark
+  def conditions(st: Conditions, bh: Blackhole): Unit = bh.consume(eval(pureEvalContext, st.expr, V1))
 }
 
 @State(Scope.Benchmark)
@@ -153,4 +158,13 @@ class LittleCustomFunc {
       """.stripMargin
 
   val expr = TestCompiler(V3).compileExpression(script).expr.asInstanceOf[EXPR]
+}
+
+@State(Scope.Benchmark)
+class Conditions {
+  @tailrec private def build(r: EXPR, count: Int): EXPR =
+    if (count > 0) build(IF(TRUE, TRUE, r), count - 1)
+    else r
+
+  val expr = build(TRUE, 11000) // ~ 32 KB
 }
