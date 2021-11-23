@@ -21,6 +21,7 @@ import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.lang.utils.getDecompilerContext
+import org.scalatest.Assertion
 
 class DecompilerTest extends PropSpec {
 
@@ -31,6 +32,12 @@ class DecompilerTest extends PropSpec {
 
   val decompilerContextV3 = getTestContext(V3).decompilerContext
   val decompilerContextV4 = getTestContext(V4).decompilerContext
+
+  private def assertDecompile(script: String, decompiled: String): Assertion = {
+    val expr   = TestCompiler(V5).compileExpression(script.stripMargin).expr.asInstanceOf[EXPR]
+    val result = Decompiler(expr, getDecompilerContext(V5, Expression))
+    result shouldBe decompiled.stripMargin.trim
+  }
 
   property("successful on very deep expressions (stack overflow check)") {
     val expr = (1 to 10000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
@@ -954,13 +961,13 @@ class DecompilerTest extends PropSpec {
     val types = ": BigInt"
 
     def script(paramTypes: String) =
-                            s"""
-                               | func m (v$paramTypes) =
-                               |   match v {
-                               |    case _$types => 0
-                               |    case _       => 0
-                               |   }
-                             """.stripMargin
+      s"""
+         | func m (v$paramTypes) =
+         |   match v {
+         |     case _$types => 0
+         |     case _       => 0
+         |   }
+       """.stripMargin
 
     val parsedExpr = Parser.parseContract(directives ++ script(types)).get.value
 
@@ -1024,20 +1031,54 @@ class DecompilerTest extends PropSpec {
   }
 
   property("BigInt unary minus") {
-    val script =
+    assertDecompile(
       s"""
          |let a = -toBigInt(1)
          |true
-       """.stripMargin
-
-    val expected =
+       """,
       s"""
          |let a = -(toBigInt(1))
          |true
-       """.stripMargin.trim
+       """
+    )
+  }
 
-    val expr = TestCompiler(V5).compileExpression(script).expr.asInstanceOf[EXPR]
-    val result = Decompiler(expr, getDecompilerContext(V5, Expression))
-    result shouldBe expected
+  property("type cast") {
+    assertDecompile(
+      s"""
+         |func f() = true
+         |func g() = f().as[Boolean]
+         |let a    = g().exactAs[Boolean] && f().exactAs[Boolean]
+         |a.as[Boolean]
+       """,
+      s"""
+         |func f () = true
+         |
+         |func g () = {
+         |    let @ = f()
+         |    if (_isInstanceOf(@, "Boolean"))
+         |        then @
+         |        else unit
+         |    }
+         |
+         |let a = if ({
+         |    let @ = g()
+         |    if (_isInstanceOf(@, "Boolean"))
+         |        then @
+         |        else throw("Couldn't cast Boolean|Unit to Boolean")
+         |    })
+         |    then {
+         |        let @ = f()
+         |        if (_isInstanceOf(@, "Boolean"))
+         |            then @
+         |            else throw("Couldn't cast Boolean to Boolean")
+         |        }
+         |    else false
+         |let @ = a
+         |if (_isInstanceOf(@, "Boolean"))
+         |    then @
+         |    else unit
+       """
+    )
   }
 }
