@@ -42,7 +42,7 @@ abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
       .toList
       .map(version => (version, eval(toExpr, version)))
       .sortBy(_._1)
-    if (results.map(_._2).distinct.size == 1)
+    if (results.map { case (_, r) => r.map(_._1) }.distinct.size == 1)
       results.head._2
     else
       throw new TestFailedException(s"Evaluation results are not the same: $results", 0)
