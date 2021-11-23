@@ -3,14 +3,13 @@ package com.wavesplatform.lang.v1
 import java.util.concurrent.TimeUnit
 
 import cats.Id
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common
-import com.wavesplatform.lang.directives.values.V1
+import com.wavesplatform.lang.directives.values.{V1, V3}
 import com.wavesplatform.lang.v1.EvaluatorV2Benchmark._
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -24,8 +23,8 @@ object EvaluatorV2Benchmark {
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(1)
 @Fork(1)
-@Warmup(iterations = 20)
-@Measurement(iterations = 10)
+@Warmup(iterations = 10, time = 1)
+@Measurement(iterations = 10, time = 1)
 class EvaluatorV2Benchmark {
   @Benchmark
   def funcs(st: Funcs, bh: Blackhole): Unit = bh.consume(eval(pureEvalContext, st.expr, V1))
@@ -42,8 +41,6 @@ class EvaluatorV2Benchmark {
 
 @State(Scope.Benchmark)
 class Funcs {
-  val context = pureEvalContext
-
   val count = 2000
   val script =
     s"""
@@ -54,14 +51,11 @@ class Funcs {
        | a$count() == a$count()
       """.stripMargin
 
-  val parsed = Parser.parseExpr(script).get.value
-  val expr   = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
+  val expr = TestCompiler(V3).compileExpression(script).expr.asInstanceOf[EXPR]
 }
 
 @State(Scope.Benchmark)
 class Lets {
-  val context = pureEvalContext
-
   val count = 5000
   val script =
     s"""
@@ -70,14 +64,11 @@ class Lets {
        | a$count == a$count
       """.stripMargin
 
-  val parsed = Parser.parseExpr(script).get.value
-  val expr   = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
+  val expr = TestCompiler(V3).compileExpression(script).expr.asInstanceOf[EXPR]
 }
 
 @State(Scope.Benchmark)
 class CustomFunc {
-  val context = pureEvalContext
-
   val script =
     s"""
        | func f() = {
@@ -117,14 +108,11 @@ class CustomFunc {
        | f() && f() && f() && f() && f() && f() && f()
       """.stripMargin
 
-  val parsed = Parser.parseExpr(script).get.value
-  val expr   = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
+  val expr = TestCompiler(V3).compileExpression(script).expr.asInstanceOf[EXPR]
 }
 
 @State(Scope.Benchmark)
 class LittleCustomFunc {
-  val context = pureEvalContext
-
   val script =
     s"""
        | func f() = {
@@ -164,6 +152,5 @@ class LittleCustomFunc {
        | f()
       """.stripMargin
 
-  val parsed = Parser.parseExpr(script).get.value
-  val expr   = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
+  val expr = TestCompiler(V3).compileExpression(script).expr.asInstanceOf[EXPR]
 }
