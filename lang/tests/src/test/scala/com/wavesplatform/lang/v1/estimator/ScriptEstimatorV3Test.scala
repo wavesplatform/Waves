@@ -59,9 +59,8 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(ov
       cost(else) = cost(h) + cost(f) + cost(g) + 3 = 16
     */
     estimateNoOverhead(script) shouldBe Right(
-      1  /* if-then-else */ +
-      15 /* cond */         +
-      16 /* else */         +
+      15 /* cond */  +
+      16 /* else */  +
       1  /* b    */
     )
   }
@@ -99,7 +98,6 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(ov
     )
 
     estimateNoOverhead(script) shouldBe Right(
-      1 /* if-then-else                      */ +
       1 /* a == b    condition               */ +
       2 /* d + y + 1 expr inside else block  */ +
       0 /* let y     decl inside else block  */ +
@@ -112,7 +110,7 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(ov
   }
 
   property("big function call tree") {
-    val n = 100
+    val n = 750
     val script =
      s"""
         | func f0() = 0
@@ -129,12 +127,10 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(ov
     estimate(script) shouldBe Right(n * 2 + 1)
 
     /*
-      cost(f0) = 0
-      cost(f1) = cost(cond) = 1
-      cost(f2) = cost(f1) + cost(cond) = 2
-      cost(fn) = cost(100)
+      cost(f0) = 1
+      cost(fn) = 1
     */
-    estimateNoOverhead(script) shouldBe Right(100)
+    estimateNoOverhead(script) shouldBe Right(1)
   }
 
   property("overlapped func") {
@@ -154,7 +150,7 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(ov
         |""".stripMargin
 
     estimate(script) shouldBe Right(1)
-    estimateNoOverhead(script) shouldBe Right(0)
+    estimateNoOverhead(script) shouldBe Right(1)
   }
 
   property("different if branches") {
@@ -186,9 +182,7 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(ov
     estimateNoOverhead(script) shouldBe Right(
         0 /* let a                      */ +
         0 /* let b                      */ +
-        1 /* if-then-else               */ +
         1 /* a == 1         condition   */ +
-        1 /* if-then-else               */ +
         1 /* a > 1          condition   */ +
         1 /* b == "a"       condition   */
     )

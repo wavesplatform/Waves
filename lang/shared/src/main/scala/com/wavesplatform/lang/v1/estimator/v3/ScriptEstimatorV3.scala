@@ -89,7 +89,7 @@ case class ScriptEstimatorV3(overhead: Boolean) extends ScriptEstimator {
       cond  <- evalHoldingFuncs(cond)
       right <- evalHoldingFuncs(ifTrue)
       left  <- evalHoldingFuncs(ifFalse)
-    } yield cond + Math.max(right, left) + 1
+    } yield cond + Math.max(right, left) + overheadCost
 
   private def markRef(key: String): EvalM[Long] =
     update(usedRefs.modify(_)(_ + key)).map(_ => overheadCost)
@@ -116,7 +116,9 @@ case class ScriptEstimatorV3(overhead: Boolean) extends ScriptEstimator {
         }
       )
       argsCost <- args.traverse(evalHoldingFuncs)
-    } yield argsCost.sum + bodyCost.value() + internalCallsCost
+      bodyCostV         = bodyCost.value()
+      correctedBodyCost = if (!overhead && bodyCostV == 0) 1 else bodyCostV
+    } yield argsCost.sum + correctedBodyCost + internalCallsCost
 
   private def evalHighOrderFunc(ctx: EstimatorContext, header: FunctionHeader, args: List[EXPR]): EvalM[Long] = {
     def errorPrefix = {
@@ -145,7 +147,7 @@ case class ScriptEstimatorV3(overhead: Boolean) extends ScriptEstimator {
                   .toRight(s"$errorPrefix'$function' is not found in the scope")
               case expr =>
                 Left(s"${errorPrefix}expression '$expr' is passed as function reference")
-            }
+          }
       )
       .getOrElse(Right(0L))
     liftEither(r)
