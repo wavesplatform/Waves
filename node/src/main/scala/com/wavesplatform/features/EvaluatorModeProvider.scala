@@ -2,9 +2,9 @@ package com.wavesplatform.features
 
 import com.wavesplatform.state.Blockchain
 
-object EvaluatorFixProvider {
-  implicit class newModeExt(b: Blockchain) {
-    def newMode: Boolean =
+object EvaluatorModeProvider {
+  implicit class EvaluatorModeExt(b: Blockchain) {
+    def newEvaluatorMode: Boolean =
       b.isFeatureActivated(BlockchainFeatures.RideV6)
   }
 }
