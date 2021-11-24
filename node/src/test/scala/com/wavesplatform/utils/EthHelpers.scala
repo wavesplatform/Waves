@@ -6,10 +6,10 @@ import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.test.TestTime
 import com.wavesplatform.transaction.{EthereumTransaction, TxHelpers}
+import com.wavesplatform.transaction.utils.EthTxGenerator
 import org.scalatest.{BeforeAndAfterAll, Suite}
-import org.web3j.crypto.Sign.SignatureData
 import org.web3j.crypto.{Bip32ECKeyPair, RawTransaction}
-import org.web3j.utils.Numeric
+import org.web3j.crypto.Sign.SignatureData
 
 trait EthHelpers {
   val EthStubBytes32: Array[Byte] = Array.fill(32)(EthChainId.byte)
@@ -18,9 +18,7 @@ trait EthHelpers {
     def apply(str: String): Option[ByteStr] = Some(ByteStr(EthEncoding.toBytes(str)))
   }
 
-  val TestEthPublicKey: PublicKey = PublicKey(EthEncoding.toBytes(
-    "0xd10a150ba9a535125481e017a09c2ac6a1ab43fc43f7ab8f0d44635106672dd7de4f775c06b730483862cbc4371a646d86df77b3815593a846b7272ace008c42"
-  ))
+  val TestEthPublicKey: PublicKey = PublicKey(EthEncoding.toBytes(EthEncoding.toHexString(TxHelpers.defaultEthSigner.getPublicKey: BigInt)))
 
   private val time = new TestTime
   private def ts   = time.getTimestamp()
@@ -35,11 +33,8 @@ trait EthHelpers {
       ""
     )
 
-  val TestEthSignature = new SignatureData(
-    28.toByte,
-    Numeric.hexStringToByteArray("0x0464eee9e2fe1a10ffe48c78b80de1ed8dcf996f3f60955cb2e03cb21903d930"),
-    Numeric.hexStringToByteArray("0x06624da478b3f862582e85b31c6a21c6cae2eee2bd50f55c93c4faad9d9c8d7f")
-  )
+  val TestEthSignature: SignatureData =
+    EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, 'T'.toByte)(TestEthUnderlying).signatureData
 
   object EthChainId {
     val byte: Byte = 'E'.toByte
