@@ -20,9 +20,6 @@ object EstimatorProvider {
 
     def storeEvaluatedComplexity: Boolean =
       b.isFeatureActivated(SynchronousCalls)
-
-    def complexityOverhead: Boolean =
-      !b.isFeatureActivated(RideV6)
   }
 
   implicit class EstimatorWavesSettingsExt(ws: WavesSettings) {
