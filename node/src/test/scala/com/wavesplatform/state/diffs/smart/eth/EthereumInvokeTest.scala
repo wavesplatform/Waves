@@ -76,7 +76,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with E
     val fee            = ciFee().sample.get
     val dApp           = accountGen.sample.get
     val dummyInvoke    = EthereumTransaction.Invocation(dApp.toAddress, "")
-    val dummyEthInvoke = EthereumTransaction(dummyInvoke, TestEthUnderlying, TestEthSignature, 'E'.toByte)  // needed to pass into asset script
+    val dummyEthInvoke = EthereumTransaction(dummyInvoke, TestEthRawTransaction, TestEthSignature, 'E'.toByte)  // needed to pass into asset script
     val aScript        = assetScript(dummyEthInvoke, dApp.toAddress)
     val issue          = IssueTransaction.selfSigned(2.toByte, dApp, "Asset", "", ENOUGH_AMT, 8, true, Some(aScript), fee, ts).explicitGet()
     val asset          = IssuedAsset(issue.id())

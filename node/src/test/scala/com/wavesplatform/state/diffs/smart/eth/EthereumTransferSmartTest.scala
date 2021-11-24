@@ -67,7 +67,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
     val fee         = ciFee().sample.get
     val recipient   = accountGen.sample.get
     val transfer    = EthereumTransaction.Transfer(None, transferAmount, recipient.toAddress)
-    val ethTransfer = EthereumTransaction(transfer, TestEthUnderlying, TestEthSignature, 'E'.toByte)
+    val ethTransfer = EthereumTransaction(transfer, TestEthRawTransaction, TestEthSignature, 'E'.toByte)
     val gTx1        = GenesisTransaction.create(ethTransfer.senderAddress(), ENOUGH_AMT, ts).explicitGet()
     val gTx2        = GenesisTransaction.create(recipient.toAddress, ENOUGH_AMT, ts).explicitGet()
     val verifier    = Some(script(ethTransfer, recipient.toAddress))
@@ -91,7 +91,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
     val recipient = accountGen.sample.get
 
     val dummyTransfer    = EthereumTransaction.Transfer(None, transferAmount, recipient.toAddress)
-    val dummyEthTransfer = EthereumTransaction(dummyTransfer, TestEthUnderlying, TestEthSignature, 'E'.toByte) // needed to pass into asset script
+    val dummyEthTransfer = EthereumTransaction(dummyTransfer, TestEthRawTransaction, TestEthSignature, 'E'.toByte) // needed to pass into asset script
 
     val sender      = dummyEthTransfer.senderAddress()
     val aScript     = assetScript(dummyEthTransfer, recipient.toAddress)

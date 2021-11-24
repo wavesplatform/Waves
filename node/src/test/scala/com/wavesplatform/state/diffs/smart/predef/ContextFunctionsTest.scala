@@ -794,7 +794,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
         .compileExpression(
           s"""
              | addressFromPublicKey(base58'${transferTx.sender}') == Address(base58'${transferTx.sender.toAddress}') &&
-             | addressFromPublicKey(base58'$TestEthPublicKey') == Address(base58'${TestEthPublicKey.toAddress}')
+             | addressFromPublicKey(base58'$TestEthOrdersPublicKey') == Address(base58'${TestEthOrdersPublicKey.toAddress}')
            """.stripMargin
         )
 
