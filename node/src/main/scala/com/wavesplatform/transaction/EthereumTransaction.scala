@@ -131,7 +131,8 @@ object EthereumTransaction {
 
   implicit object EthereumTransactionValidator extends TxValidator[EthereumTransaction] {
     override def validate(tx: EthereumTransaction): ValidatedV[EthereumTransaction] = TxConstraints.seq(tx)(
-      TxConstraints.cond(BigInt(1, tx.signatureData.getV) > 28, GenericError("Legacy transactions are not supported")),
+      TxConstraints
+        .cond(tx.signatureData.getV.isEmpty || BigInt(1, tx.signatureData.getV) > 28, GenericError("Legacy transactions are not supported")),
       TxConstraints.fee(tx.underlying.getGasLimit.longValueExact()),
       TxConstraints
         .positiveOrZeroAmount((BigInt(tx.underlying.getValue) / AmountMultiplier).bigInteger.longValueExact(), "waves"),

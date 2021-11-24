@@ -4,7 +4,7 @@ import scala.concurrent.Future
 import scala.util.Random
 
 import com.wavesplatform.BlockchainStubHelpers
-import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.wavesplatform.account.{AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.TransactionsApiRoute
@@ -22,7 +22,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
-import com.wavesplatform.utils.EthHelpers
+import com.wavesplatform.utils.{EthEncoding, EthHelpers}
 import com.wavesplatform.wallet.Wallet
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.{JsObject, Json, JsValue}
@@ -48,6 +48,10 @@ class TransactionBroadcastSpec
   )
 
   private val route = seal(transactionsApiRoute.route)
+
+  override val TestEthPublicKey: PublicKey = PublicKey(EthEncoding.toBytes(
+    "0xd10a150ba9a535125481e017a09c2ac6a1ab43fc43f7ab8f0d44635106672dd7de4f775c06b730483862cbc4371a646d86df77b3815593a846b7272ace008c42"
+  ))
 
   "exchange" - {
     "accepted with ETH signed orders" in EthChainId.withEChainId {

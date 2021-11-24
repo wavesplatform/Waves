@@ -34,7 +34,7 @@ trait EthHelpers {
     )
 
   val TestEthSignature: SignatureData =
-    EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, 'T'.toByte)(TestEthUnderlying).signatureData
+    EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, 'E'.toByte)(TestEthUnderlying).signatureData
 
   object EthChainId {
     val byte: Byte = 'E'.toByte
