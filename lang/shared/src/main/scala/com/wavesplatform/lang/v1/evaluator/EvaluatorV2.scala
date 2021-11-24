@@ -60,6 +60,20 @@ class EvaluatorV2(
           }
       }
 
+    def evaluateFunction(fc: FUNCTION_CALL, startArgs: List[EXPR], complexity: Int) = {
+      val r = fc.function match {
+        case FunctionHeader.Native(_) =>
+          evaluateNativeFunction(fc, complexity)
+        case FunctionHeader.User(_, name) =>
+          evaluateUserFunction(fc, complexity, name, startArgs)
+            .getOrElse(evaluateConstructor(fc, complexity, name))
+      }
+      if (correctFunctionCallScope)
+        r.map(unused => if (unused == complexity) unused - 1 else unused)
+      else
+        r
+    }
+
     def evaluateNativeFunction(fc: FUNCTION_CALL, limit: Int): Coeval[Int] = {
       val function =
         ctx.ec.functions
@@ -211,7 +225,7 @@ class EvaluatorV2(
                     root(
                       expr = i.ifTrue,
                       update = update,
-                      limit = unused - 1,
+                      limit = unused - overheadCost,
                       parentBlocks = parentBlocks
                   )
                 )
@@ -221,7 +235,7 @@ class EvaluatorV2(
                     root(
                       expr = i.ifFalse,
                       update = update,
-                      limit = unused - 1,
+                      limit = unused - overheadCost,
                       parentBlocks = parentBlocks
                   )
                 )
@@ -244,13 +258,8 @@ class EvaluatorV2(
           .flatMap { unusedArgsComplexity =>
             val argsEvaluated = fc.args.forall(_.isInstanceOf[EVALUATED])
             if (argsEvaluated && unusedArgsComplexity > 0)
-              fc.function match {
-                case FunctionHeader.Native(_) =>
-                  evaluateNativeFunction(fc, unusedArgsComplexity)
-                case FunctionHeader.User(_, name) =>
-                  evaluateUserFunction(fc, unusedArgsComplexity, name, startArgs)
-                    .getOrElse(evaluateConstructor(fc, unusedArgsComplexity, name))
-              } else
+              evaluateFunction(fc, startArgs, unusedArgsComplexity)
+            else
               Coeval.now(unusedArgsComplexity)
           }
 

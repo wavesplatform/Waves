@@ -616,14 +616,14 @@ class EvaluatorV2Test extends PropSpec with Inside {
         | func g(a: Int, b: Int) = a * b             # 3                              1
         | let expected = (a - b + x) * (b - a + x)   # 11                             5
         | let actual = g(f(a, b), f(b, a))           # 3 + 5 * 2 + 4 = 17             1 + 2 * 2 = 5
-        | actual == expected &&                      # 11 + 17 + 4 = 32               5 + 5 + 2 = 12
-        | actual == expected &&                      # 4                              2
-        | x == 3             &&                      # 3                              2
-        | a == 2             &&                      # 3                              2
+        | actual == expected &&                      # 11 + 17 + 4 = 32               5 + 5 + 1 = 11
+        | actual == expected &&                      # 4                              1
+        | x == 3             &&                      # 3                              1
+        | a == 2             &&                      # 3                              1
         | b == 4                                     # 2                              1
         |
         | # Total old: 32 + 4 + 3 + 3 + 2 + 2 (x value) + 1 (a value) = 47
-        | # Total new: 12 + 2 + 2 + 2 + 1 + 2 (x value) + 1 (a value) = 22
+        | # Total new: 11 + 1 + 1 + 1 + 1 + 2 (x value) + 1 (a value) = 18
       """.stripMargin
 
     inside(evalOld(script, limit = 47)) {
@@ -632,9 +632,9 @@ class EvaluatorV2Test extends PropSpec with Inside {
         result shouldBe "true"
     }
 
-    inside(evalNew(script, limit = 22)) {
+    inside(evalNew(script, limit = 18)) {
       case (_, result, cost) =>
-        cost shouldBe 22
+        cost shouldBe 18
         result shouldBe "true"
     }
   }
@@ -784,7 +784,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
   property("if block by step") {
     val script = "if (2 > 1) then 1 + 2 + 3 else 3 + 4"
 
-    inside(evalBoth(script, limit = 0)) {
+    inside(evalOld(script, limit = 0)) {
       case (_, result, cost) =>
         cost shouldBe 0
         result shouldBe
@@ -795,7 +795,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
           """.stripMargin.trim
     }
 
-    inside(evalBoth(script, limit = 1)) {
+    inside(evalOld(script, limit = 1)) {
       case (_, result, cost) =>
         cost shouldBe 1
         result shouldBe
@@ -806,21 +806,55 @@ class EvaluatorV2Test extends PropSpec with Inside {
           """.stripMargin.trim
     }
 
-    inside(evalBoth(script, limit = 2)) {
+    inside(evalOld(script, limit = 2)) {
       case (_, result, cost) =>
         cost shouldBe 2
         result shouldBe "((1 + 2) + 3)"
     }
 
-    inside(evalBoth(script, limit = 3)) {
+    inside(evalOld(script, limit = 3)) {
       case (_, result, cost) =>
         cost shouldBe 3
         result shouldBe "(3 + 3)"
     }
 
-    inside(evalBoth(script, limit = 4)) {
+    inside(evalOld(script, limit = 4)) {
       case (_, result, cost) =>
         cost shouldBe 4
+        result shouldBe "6"
+    }
+
+    inside(evalNew(script, limit = 0)) {
+      case (_, result, cost) =>
+        cost shouldBe 0
+        result shouldBe
+          """
+            |if ((2 > 1))
+            |    then ((1 + 2) + 3)
+            |    else (3 + 4)
+          """.stripMargin.trim
+    }
+
+    inside(evalNew(script, limit = 1)) {
+      case (_, result, cost) =>
+        cost shouldBe 1
+        result shouldBe
+          """
+            |if (true)
+            |    then ((1 + 2) + 3)
+            |    else (3 + 4)
+          """.stripMargin.trim
+    }
+
+    inside(evalNew(script, limit = 2)) {
+      case (_, result, cost) =>
+        cost shouldBe 2
+        result shouldBe "(3 + 3)"
+    }
+
+    inside(evalNew(script, limit = 3)) {
+      case (_, result, cost) =>
+        cost shouldBe 3
         result shouldBe "6"
     }
   }
@@ -860,7 +894,19 @@ class EvaluatorV2Test extends PropSpec with Inside {
 
     inside(evalNew(script, limit = 1)) {
       case (_, result, cost) =>
-        cost shouldBe 0
+        cost shouldBe 1
+        result shouldBe
+          """
+            |let address = Address(
+            |	bytes = base58'aaaa'
+            |)
+            |address.bytes
+          """.stripMargin.trim
+    }
+
+    inside(evalNew(script, limit = 2)) {
+      case (_, result, cost) =>
+        cost shouldBe 1
         result shouldBe "base58'aaaa'"
     }
   }
@@ -1084,7 +1130,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
     inside(evalNew(strictScript, 100)) {
       case (expr, _, cost) =>
         expr shouldBe CONST_LONG(100542)
-        cost shouldBe 3
+        cost shouldBe 2
     }
   }
 
@@ -1114,15 +1160,10 @@ class EvaluatorV2Test extends PropSpec with Inside {
         |
       """.stripMargin.trim
 
-    inside(evalOld(defaultScript, 100)) {
+    inside(evalBoth(defaultScript, 100)) {
       case (expr, _, cost) =>
         expr shouldBe CONST_STRING("42").explicitGet()
         cost shouldBe 1
-    }
-    inside(evalNew(defaultScript, 42)) {
-      case (expr, _, cost) =>
-        expr shouldBe CONST_STRING("42").explicitGet()
-        cost shouldBe 0
     }
 
     val strictScript =
@@ -1144,7 +1185,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
     inside(evalNew(strictScript, 100)) {
       case (expr, _, cost) =>
         expr shouldBe CONST_STRING("42").explicitGet()
-        cost shouldBe 12
+        cost shouldBe 11
     }
   }
 
@@ -1153,37 +1194,36 @@ class EvaluatorV2Test extends PropSpec with Inside {
       FunctionHeader.User("IntegerEntry"),
       List(CONST_STRING("key").explicitGet(), CONST_LONG(1))
     )
-    evalBoth(exprWithCorrectArgs, 100)._2 shouldBe
+    val expected =
       """
         |IntegerEntry(
         |	key = "key"
         |	value = 1
         |)
       """.stripMargin.trim
+    evalOld(exprWithCorrectArgs, 100)._2 shouldBe expected
+    evalNew(exprWithCorrectArgs, 100)._2 shouldBe expected
 
     val exprWithIllegalArgs = FUNCTION_CALL(
       FunctionHeader.User("IntegerEntry"),
       List(CONST_STRING("key").explicitGet(), CONST_BOOLEAN(true))
     )
-    evalBoth(exprWithIllegalArgs, 100)._2 shouldBe
+    val expectedBool =
       """
         |IntegerEntry(
         |	key = "key"
         |	value = true
         |)
       """.stripMargin.trim
+    evalOld(exprWithIllegalArgs, 100)._2 shouldBe expectedBool
+    evalOld(exprWithIllegalArgs, 100)._2 shouldBe expectedBool
 
     val exprWithTooManyArgs = FUNCTION_CALL(
       FunctionHeader.User("IntegerEntry"),
       List(CONST_STRING("key").explicitGet(), CONST_BOOLEAN(true), CONST_LONG(1))
     )
-    evalBoth(exprWithTooManyArgs, 100)._2 shouldBe
-      """
-        |IntegerEntry(
-        |	key = "key"
-        |	value = true
-        |)
-      """.stripMargin.trim
+    evalOld(exprWithTooManyArgs, 100)._2 shouldBe expectedBool
+    evalNew(exprWithTooManyArgs, 100)._2 shouldBe expectedBool
   }
 
   property("arg of the first function should NOT overlap var accessed from body of the second function AFTER fix") {
@@ -1214,7 +1254,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
 
   property("updated evaluator should use predefined user function complexity") {
     evalOld("1 != 1", 100) shouldBe ((FALSE, "false", 5))
-    evalNew("1 != 1", 100) shouldBe ((FALSE, "false", 1))  // decreased by 4
+    evalNew("1 != 1", 100) shouldBe ((FALSE, "false", 1))
 
     val script =
       """
@@ -1233,6 +1273,6 @@ class EvaluatorV2Test extends PropSpec with Inside {
       """.stripMargin
 
     evalOld(script, 100) shouldBe ((FALSE, "false", 24))
-    evalNew(script, 100) shouldBe ((FALSE, "false", 24 - 4 * 4 - 1))  // 4 times decreased by 4 and 1 for access to let
+    evalNew(script, 100) shouldBe ((FALSE, "false", 4))
   }
 }
