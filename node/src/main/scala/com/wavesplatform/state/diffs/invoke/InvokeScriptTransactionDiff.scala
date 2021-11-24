@@ -322,7 +322,7 @@ object InvokeScriptTransactionDiff {
     val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     val startLimit    = limit - paymentsComplexity
     ContractEvaluator
-      .applyV2Coeval(evaluationCtx, contract, invocation, version, startLimit, blockchain.correctFunctionCallScope)
+      .applyV2Coeval(evaluationCtx, contract, invocation, version, startLimit, blockchain.newMode)
       .runAttempt()
       .leftMap(error => (error.getMessage: ExecutionError, 0, Nil: Log[Id]))
       .flatten

@@ -65,7 +65,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     defaultEvaluator[T](context, expr)
 
   private def evalV2[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] =
-    EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion], correctFunctionCallScope = true)._3
+    EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion], newMode = true)._3
       .asInstanceOf[Either[ExecutionError, T]]
 
   private def eval[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] = {
@@ -81,7 +81,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   private def evalWithLogging(context: EvaluationContext[Environment, Id], expr: EXPR): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
     val evaluatorV1Result                      = defaultEvaluator.applyWithLogging[EVALUATED](context, expr)
-    val (evaluatorV2Log, _, evaluatorV2Result) = EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion], correctFunctionCallScope = true)
+    val (evaluatorV2Log, _, evaluatorV2Result) = EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion], newMode = true)
 
     evaluatorV2Result.bimap((_, evaluatorV2Log), (_, evaluatorV2Log)) shouldBe evaluatorV1Result
     evaluatorV1Result

@@ -85,9 +85,9 @@ object ScriptRunner {
     def evaluate(ctx: EvaluationContext[Environment, Id], expr: EXPR): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
       val (log, unusedComplexity, result) =
         if (complexityLimit == Int.MaxValue)
-          EvaluatorV2.applyCompleted(ctx, expr, script.stdLibVersion, blockchain.correctFunctionCallScope)
+          EvaluatorV2.applyCompleted(ctx, expr, script.stdLibVersion, blockchain.newMode)
         else
-          EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, complexityLimit, blockchain.correctFunctionCallScope, _ => Right(default))
+          EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, complexityLimit, blockchain.newMode, _ => Right(default))
       (log, complexityLimit - unusedComplexity, result)
     }
 

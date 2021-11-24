@@ -31,8 +31,8 @@ class EvaluatorV2Test extends PropSpec with Inside {
   private val environment = Common.emptyBlockchainEnvironment()
   private val evalCtx     = LoggedEvaluationContext[Environment, Id](_ => _ => (), ctx.evaluationContext(environment))
 
-  private val oldEvaluator = new EvaluatorV2(evalCtx, version, correctFunctionCallScope = false)
-  private val newEvaluator = new EvaluatorV2(evalCtx, version, correctFunctionCallScope = true)
+  private val oldEvaluator = new EvaluatorV2(evalCtx, version, newMode = false)
+  private val newEvaluator = new EvaluatorV2(evalCtx, version, newMode = true)
 
   private def evalBoth(expr: EXPR, limit: Int): (EXPR, String, Int) = {
     val (result, unusedComplexity)   = newEvaluator(expr, limit)

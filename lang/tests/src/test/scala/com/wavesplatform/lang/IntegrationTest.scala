@@ -96,7 +96,7 @@ class IntegrationTest extends PropSpec with Inside {
       .asInstanceOf[LoggedEvaluationContext[Environment, Id]]
     typed.flatMap(
       v =>
-        Try(new EvaluatorV2(loggedCtx, version, correctFunctionCallScope = true)(v._1, Int.MaxValue)._1.asInstanceOf[T]).toEither
+        Try(new EvaluatorV2(loggedCtx, version, newMode = true)(v._1, Int.MaxValue)._1.asInstanceOf[T]).toEither
           .leftMap(_.getMessage)
     )
   }
