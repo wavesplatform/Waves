@@ -62,7 +62,7 @@ class NegativeBurnTest extends PropSpec with WithDomain with TransactionGenBase 
 
         val invoke1 = invoke()
         d.appendBlock(invoke1)
-        d.blockchain.transactionInfo(invoke1.txId).get._3 shouldBe true
+        d.blockchain.transactionSucceeded(invoke1.txId) shouldBe true
         d.blockchain.balance(dApp, asset) shouldBe 101
 
         val invoke2 = invoke()
