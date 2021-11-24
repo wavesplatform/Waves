@@ -16,7 +16,9 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import org.scalatest.Ignore
 
+@Ignore
 class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with TransactionGenBase {
 
   private val time = new TestTime

@@ -24,7 +24,7 @@ import org.scalatest.Inside
 class ContractIntegrationTest extends PropSpec with Inside {
 
   private val ctx: CTX[Environment] =
-      PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
       CTX[Environment](sampleTypes, Map.empty, Array.empty) |+|
       WavesContext.build(
         Global,
@@ -170,7 +170,8 @@ class ContractIntegrationTest extends PropSpec with Inside {
         feeAssetId
       ),
       V3,
-      Int.MaxValue
+      Int.MaxValue,
+      correctFunctionCallScope = true
     ).value().leftMap { case (e, _, log) => (e, log) }
   }
 
@@ -182,7 +183,7 @@ class ContractIntegrationTest extends PropSpec with Inside {
       compiled.decs,
       compiled.verifierFuncOpt.get,
       ctx.evaluationContext(environment),
-      EvaluatorV2.applyCompleted(_, _, V3),
+      EvaluatorV2.applyCompleted(_, _, V3, correctFunctionCallScope = true),
       txObject
     )._3
   }

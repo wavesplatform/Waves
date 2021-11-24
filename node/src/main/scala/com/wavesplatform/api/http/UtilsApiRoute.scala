@@ -13,6 +13,7 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{RideV6, SynchronousCalls}
+import com.wavesplatform.features.EvaluatorFixProvider._
 import com.wavesplatform.features.RideVersionProvider.RideVersionBlockchainExt
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -298,7 +299,7 @@ object UtilsApiRoute {
   private object ScriptCallEvaluator {
     def compile(stdLibVersion: StdLibVersion)(str: String): Either[GenericError, EXPR] = {
       val ctx =
-        PureContext.build(stdLibVersion, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+        PureContext.build(stdLibVersion, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
           CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment] |+|
           WavesContext.build(Global, DirectiveSet(stdLibVersion, Account, Expression).explicitGet())
 
@@ -364,11 +365,13 @@ object UtilsApiRoute {
               availableDataSize = ContractLimits.MaxTotalWriteSetSizeInBytes,
               currentDiff = Diff.empty,
               invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(address, null, Nil))
-            )
+            ),
+            fixUnicodeFunctions = true,
+            useNewPowPrecision = true
           )
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
         limitedResult <- EvaluatorV2
-          .applyLimitedCoeval(call, limit, ctx, script.stdLibVersion, checkConstructorArgsTypes = true)
+          .applyLimitedCoeval(call, limit, ctx, script.stdLibVersion, blockchain.correctFunctionCallScope, checkConstructorArgsTypes = true)
           .value()
           .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err, log) }
         result <- limitedResult match {

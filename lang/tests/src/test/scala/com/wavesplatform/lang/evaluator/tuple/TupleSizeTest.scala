@@ -1,5 +1,7 @@
-package com.wavesplatform.lang.evaluator
+package com.wavesplatform.lang.evaluator.tuple
+
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V6}
+import com.wavesplatform.lang.evaluator.EvaluatorSpec
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 

@@ -17,12 +17,13 @@ package object common extends BalanceDistribution with AddressTransactions {
       }
   }
 
-  def loadTransactionMeta(db: DB, maybeDiff: => Option[(Int, Diff)])(m: (TxMeta, Transaction)): TransactionMeta =
+  def loadTransactionMeta(db: DB, maybeDiff: => Option[(Int, Diff)])(tuple: (TxMeta, Transaction)): TransactionMeta = {
+    val (meta, transaction) = tuple
     TransactionMeta.create(
-      m._1.height,
-      m._2,
-      m._1.succeeded,
-      m._1.spentComplexity,
+      meta.height,
+      transaction,
+      meta.succeeded,
+      meta.spentComplexity,
       ist =>
         maybeDiff
           .flatMap { case (_, diff) => diff.scriptResults.get(ist.id()) }
@@ -32,4 +33,5 @@ package object common extends BalanceDistribution with AddressTransactions {
           .flatMap { case (_, diff) => diff.ethereumTransactionMeta.get(et.id()) }
           .orElse(loadEthereumMetadata(db, et.id()))
     )
+  }
 }

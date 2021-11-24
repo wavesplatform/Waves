@@ -10,6 +10,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.FunctionCallPolicyProvider._
+import com.wavesplatform.features.EvaluatorFixProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
@@ -24,6 +25,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient, _}
+import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.metrics.{TxProcessingStats => Stats}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.state._
@@ -320,7 +322,7 @@ object InvokeScriptTransactionDiff {
     val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     val startLimit    = limit - paymentsComplexity
     ContractEvaluator
-      .applyV2Coeval(evaluationCtx, contract, invocation, version, startLimit)
+      .applyV2Coeval(evaluationCtx, contract, invocation, version, startLimit, blockchain.correctFunctionCallScope)
       .runAttempt()
       .leftMap(error => (error.getMessage: ExecutionError, 0, Nil: Log[Id]))
       .flatten
@@ -333,6 +335,7 @@ object InvokeScriptTransactionDiff {
           } else
             ScriptExecutionError.dAppExecution(error, log)
       }
+      .map { r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1); r }
   }
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {
