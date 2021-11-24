@@ -1275,4 +1275,36 @@ class EvaluatorV2Test extends PropSpec with Inside {
     evalOld(script, 100) shouldBe ((FALSE, "false", 24))
     evalNew(script, 100) shouldBe ((FALSE, "false", 4))
   }
+
+  property("function call should not be free for new mode") {
+    val script =
+      """
+        | func f() = true
+        | f()
+      """.stripMargin
+
+    evalOld(script, 100) shouldBe ((TRUE, "true", 0))
+    evalNew(script, 100) shouldBe ((TRUE, "true", 1))
+
+    val script2 =
+      """
+        | func f() = true
+        | func g() = {
+        |   func g1() = {
+        |     let x = {
+        |       func g2() = true
+        |       g2()
+        |     }
+        |     x
+        |   }
+        |   g1()
+        | }
+        | func h() = if true then g() else f()
+        |
+        | f() && g() && h()
+      """.stripMargin
+
+    evalOld(script2, 100) shouldBe ((TRUE, "true", 5)) // 3 conditions + ref twice
+    evalNew(script2, 100) shouldBe ((TRUE, "true", 3)) // 3 function call
+  }
 }
