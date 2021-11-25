@@ -81,7 +81,7 @@ class SyncDAppPaymentBalanceCheckTest extends PropSpec with WithDomain with Tran
         val invoke1 = invoke()
         val error   = s"Sync call leads to temporary negative balance = -100 for address ${invoke1.dAppAddressOrAlias}"
         d.appendBlock(invoke1)
-        d.blockchain.transactionInfo(invoke1.id.value()).get._3 shouldBe true
+        d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
 
         d.appendBlock()
 
