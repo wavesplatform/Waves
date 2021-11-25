@@ -1,10 +1,12 @@
-package com.wavesplatform.lang.evaluator
-import com.wavesplatform.test._
+package com.wavesplatform.lang.evaluator.math
+
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V5, V6}
+import com.wavesplatform.lang.evaluator.EvaluatorSpec
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding._
 import org.scalatest.Ignore
+import com.wavesplatform.test._
 
 @Ignore
 class FractionIntRoundsTest extends EvaluatorSpec {
