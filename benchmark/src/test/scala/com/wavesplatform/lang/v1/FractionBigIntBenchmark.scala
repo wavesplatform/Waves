@@ -8,7 +8,6 @@ import com.wavesplatform.lang.directives.values.{Account, Expression, V5}
 import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BIGINT, FUNCTION_CALL}
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FRACTION_BIGINT, FRACTION_BIGINT_ROUNDS}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, Rounding}
 import org.openjdk.jmh.annotations.{State, _}
@@ -22,22 +21,22 @@ import org.openjdk.jmh.infra.Blackhole
 @Measurement(iterations = 10, time = 1)
 class FractionBigIntBenchmark {
   @Benchmark
-  def fraction1(bh: Blackhole, s: FractionBigIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr1, V5))
+  def fraction1(bh: Blackhole, s: FractionBigIntSt): Unit = bh.consume(eval(s.ctx, s.expr1, V5))
 
   @Benchmark
-  def fraction2(bh: Blackhole, s: FractionBigIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr2, V5))
+  def fraction2(bh: Blackhole, s: FractionBigIntSt): Unit = bh.consume(eval(s.ctx, s.expr2, V5))
 
   @Benchmark
-  def fraction3(bh: Blackhole, s: FractionBigIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr3, V5))
+  def fraction3(bh: Blackhole, s: FractionBigIntSt): Unit = bh.consume(eval(s.ctx, s.expr3, V5))
 
   @Benchmark
-  def fraction1Round(bh: Blackhole, s: FractionBigIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr1Round, V5))
+  def fraction1Round(bh: Blackhole, s: FractionBigIntSt): Unit = bh.consume(eval(s.ctx, s.expr1Round, V5))
 
   @Benchmark
-  def fraction2Round(bh: Blackhole, s: FractionBigIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr2Round, V5))
+  def fraction2Round(bh: Blackhole, s: FractionBigIntSt): Unit = bh.consume(eval(s.ctx, s.expr2Round, V5))
 
   @Benchmark
-  def fraction3Round(bh: Blackhole, s: FractionBigIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr3Round, V5))
+  def fraction3Round(bh: Blackhole, s: FractionBigIntSt): Unit = bh.consume(eval(s.ctx, s.expr3Round, V5))
 }
 
 @State(Scope.Benchmark)

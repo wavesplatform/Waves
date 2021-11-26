@@ -33,6 +33,7 @@ import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import com.wavesplatform.transaction.{Asset, TransactionType, TxValidationError}
 import monix.eval.Coeval
 import shapeless.Coproduct
+import com.wavesplatform.features.EvaluatorFixProvider._
 
 import scala.util.Right
 
@@ -336,7 +337,7 @@ object InvokeScriptDiff {
   ): Coeval[Either[ValidationError, (ScriptResult, Log[Id])]] = {
     val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     ContractEvaluator
-      .applyV2Coeval(evaluationCtx, contract, invocation, version, limit)
+      .applyV2Coeval(evaluationCtx, contract, invocation, version, limit, blockchain.correctFunctionCallScope)
       .map(
         _.leftMap(
           {

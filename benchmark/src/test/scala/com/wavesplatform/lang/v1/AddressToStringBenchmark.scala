@@ -4,18 +4,18 @@ import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto.Curve25519
+import com.wavesplatform.lang.v1.AddressToStringBenchmark.AddressToString
 import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.v1.PureFunctionsRebenchmark.evalV5
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CaseObj, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
 import org.openjdk.jmh.annotations._
-import com.wavesplatform.common.utils._
-import com.wavesplatform.lang.v1.AddressToStringBenchmark.AddressToString
 import org.openjdk.jmh.infra.Blackhole
 
 import scala.util.Random
-import com.wavesplatform.lang.v1.PureFunctionsRebenchmark.evalV5
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
