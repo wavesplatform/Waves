@@ -58,6 +58,18 @@ class EthereumTransactionSpec
     )
   }
 
+  it should "fail with empty to field" in {
+    val rawTransaction = RawTransaction.createTransaction(
+      BigInt(System.currentTimeMillis()).bigInteger,
+      EthereumTransaction.GasPrice,
+      BigInt(100000).bigInteger, // fee
+      "", // empty "to"
+      (BigInt(1) * EthereumTransaction.AmountMultiplier).bigInteger,
+      ""
+    )
+    a[RuntimeException] should be thrownBy(EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(rawTransaction))
+  }
+
   it should "use chainId in signer key recovery" in {
     val senderAccount    = TxHelpers.defaultSigner.toEthKeyPair
     val senderAddress    = TxHelpers.defaultSigner.toEthWavesAddress
