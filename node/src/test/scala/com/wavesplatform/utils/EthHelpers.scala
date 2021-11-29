@@ -30,7 +30,7 @@ trait EthHelpers {
       BigInteger.valueOf(ts),
       EthereumTransaction.GasPrice,
       EthereumTransaction.GasPrice,
-      "",
+      EthEncoding.toHexString(new Array[Byte](20)),
       (BigInt(123) * EthereumTransaction.AmountMultiplier).bigInteger,
       ""
     )
