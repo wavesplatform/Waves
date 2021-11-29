@@ -1075,7 +1075,7 @@ class DebugApiRouteSpec
       }
 
       assert(RideV6)
-      intercept[Exception](assert(RideV5)).getMessage should include("Ride V6 feature has not been activated yet")
+      intercept[Exception](assert(RideV5)).getMessage should include("Ride V6, MetaMask support, Invoke Expression feature has not been activated yet")
     }
   }
 
