@@ -338,7 +338,7 @@ object InvokeScriptDiff {
   ): Coeval[Either[ValidationError, (ScriptResult, Log[Id])]] = {
     val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     ContractEvaluator
-      .applyV2Coeval(evaluationCtx, Map(), contract, invocation, version, limit)
+      .applyV2Coeval(evaluationCtx, Map(), contract, invocation, version, limit, correctFunctionCallScope = blockchain.checkEstimatorSumOverflow)
       .map(
         _.leftMap(
           {

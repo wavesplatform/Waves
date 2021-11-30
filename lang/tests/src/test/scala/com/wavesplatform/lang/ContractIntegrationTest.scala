@@ -171,7 +171,8 @@ class ContractIntegrationTest extends PropSpec with Inside {
         feeAssetId
       ),
       V3,
-      Int.MaxValue
+      Int.MaxValue,
+      correctFunctionCallScope = true
     ).value().leftMap { case (e, _, log) => (e, log) }
   }
 
@@ -182,7 +183,7 @@ class ContractIntegrationTest extends PropSpec with Inside {
     ContractEvaluator.verify(
       compiled.decs,
       compiled.verifierFuncOpt.get,
-      EvaluatorV2.applyCompleted(ctx.evaluationContext(environment), _, V3),
+      EvaluatorV2.applyCompleted(ctx.evaluationContext(environment), _, V3, correctFunctionCallScope = true),
       txObject
     )._3
   }
