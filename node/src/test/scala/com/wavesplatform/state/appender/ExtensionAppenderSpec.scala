@@ -14,7 +14,7 @@ import monix.reactive.subjects.ConcurrentSubject
 
 class ExtensionAppenderSpec extends FlatSpec with WithDomain {
   "Extension appender" should "drop duplicate transactions from UTX" in withDomain() { d =>
-    val utx               = new UtxPoolImpl(SystemTime, d.blockchain, ConcurrentSubject.publish, SettingsFromDefaultConfig.utxSettings)
+    val utx               = new UtxPoolImpl(SystemTime, d.blockchain, ConcurrentSubject.publish, d.settings.utxSettings)
     val time              = new TestTime()
     val extensionAppender = ExtensionAppender(d.blockchain, utx, d.posSelector, time, InvalidBlockStorage.NoOp, PeerDatabase.NoOp, global)(null, _)
 
