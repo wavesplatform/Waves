@@ -1,5 +1,7 @@
 package com.wavesplatform.utx
 
+import java.nio.file.{Files, Path}
+
 import cats.data.NonEmptyList
 import com.wavesplatform
 import com.wavesplatform._
@@ -26,6 +28,7 @@ import com.wavesplatform.settings._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.utils.TestLevelDB
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -40,11 +43,8 @@ import org.iq80.leveldb.DB
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.concurrent.Eventually
 import org.scalatest.EitherValues
-import java.nio.file.{Files, Path}
-
-import com.wavesplatform.test.FreeSpec
+import org.scalatest.concurrent.Eventually
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
@@ -903,7 +903,7 @@ class UtxPoolSpecification
                  |    }
                  | }
                """.stripMargin,
-              ScriptEstimatorV3
+              ScriptEstimatorV3(fixOverflow = true)
             )
             .explicitGet()
             ._1

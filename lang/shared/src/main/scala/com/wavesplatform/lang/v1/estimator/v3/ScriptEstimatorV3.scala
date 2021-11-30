@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1.estimator.v3
 
-import cats.instances.list._
-import cats.syntax.traverse._
+import cats.implicits._
 import cats.{Id, Monad}
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -12,7 +11,9 @@ import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.Lenses._
 import com.wavesplatform.lang.v1.task.imports._
 import monix.eval.Coeval
 
-object ScriptEstimatorV3 extends ScriptEstimator {
+import scala.util.Try
+
+case class ScriptEstimatorV3(fixOverflow: Boolean) extends ScriptEstimator {
   override val version: Int = 3
 
   override def apply(
@@ -58,7 +59,8 @@ object ScriptEstimatorV3 extends ScriptEstimator {
       ctx      <- get[Id, EstimatorContext, ExecutionError]
       letCost  <- if (ctx.usedRefs.contains(let.name)) letEval else const(0L)
       _        <- update(usedRefs.modify(_)(r => if (overlap) r + let.name else r - let.name))
-    } yield nextCost + letCost
+      result   <- sum(nextCost, letCost)
+    } yield result
 
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[Long] =
     for {
@@ -83,13 +85,15 @@ object ScriptEstimatorV3 extends ScriptEstimator {
       cond  <- evalHoldingFuncs(cond)
       right <- evalHoldingFuncs(ifTrue)
       left  <- evalHoldingFuncs(ifFalse)
-    } yield cond + Math.max(right, left) + 1
+      r1    <- sum(cond, Math.max(right, left))
+      r2    <- sum(r1, 1)
+    } yield r2
 
   private def markRef(key: String): EvalM[Long] =
     update(usedRefs.modify(_)(_ + key)).map(_ => 1)
 
   private def evalGetter(expr: EXPR): EvalM[Long] =
-    evalExpr(expr).map(_ + 1)
+    evalExpr(expr).flatMap(sum(_, 1))
 
   private def evalFuncCall(header: FunctionHeader, args: List[EXPR]): EvalM[Long] =
     for {
@@ -108,12 +112,19 @@ object ScriptEstimatorV3 extends ScriptEstimator {
             )
         }
       )
-      argsCost <- args.traverse(evalHoldingFuncs)
-    } yield argsCost.sum + bodyCost.value()
+      argsCosts    <- args.traverse(evalHoldingFuncs)
+      argsCostsSum <- argsCosts.foldM(0L)(sum)
+      result       <- sum(argsCostsSum, bodyCost.value())
+    } yield result
 
   private def update(f: EstimatorContext => EstimatorContext): EvalM[Unit] =
     modify[Id, EstimatorContext, ExecutionError](f)
 
   private def const[A](a: A): EvalM[A] =
     Monad[EvalM].pure(a)
+
+  private def sum(a: Long, b: Long): EvalM[Long] = {
+    def r = if (fixOverflow) Math.addExact(a, b) else a + b
+    liftEither(Try(r).toEither.leftMap(_ => "Illegal script"))
+  }
 }

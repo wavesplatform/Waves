@@ -182,8 +182,7 @@ class ContractIntegrationTest extends PropSpec with Inside {
     ContractEvaluator.verify(
       compiled.decs,
       compiled.verifierFuncOpt.get,
-      ctx.evaluationContext(environment),
-      EvaluatorV2.applyCompleted(_, _, V3),
+      EvaluatorV2.applyCompleted(ctx.evaluationContext(environment), _, V3),
       txObject
     )._3
   }

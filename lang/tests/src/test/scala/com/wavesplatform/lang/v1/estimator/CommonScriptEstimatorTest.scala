@@ -8,7 +8,14 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.SUM_LONG
 
-class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV1, ScriptEstimatorV2, ScriptEstimatorV3, evaluatorV2AsEstimator) {
+class CommonScriptEstimatorTest
+    extends ScriptEstimatorTestBase(
+      ScriptEstimatorV1,
+      ScriptEstimatorV2,
+      ScriptEstimatorV3(fixOverflow = true),
+      ScriptEstimatorV3(fixOverflow = false),
+      evaluatorV2AsEstimator
+    ) {
   property("context leak") {
     def script(ref: String) =
       compile {

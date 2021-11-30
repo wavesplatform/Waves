@@ -102,7 +102,7 @@ object TxHelpers {
   }
 
   def script(scriptText: String): Script = {
-    val (script, _) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()
+    val (script, _) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3(fixOverflow = true)).explicitGet()
     script
   }
 

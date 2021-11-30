@@ -3,7 +3,9 @@ package com.wavesplatform.state.diffs.smart.predef
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.DefaultWavesSettings
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing.evaluated
 import com.wavesplatform.lang.directives.values._
@@ -17,6 +19,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.state._
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In

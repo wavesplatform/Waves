@@ -2038,7 +2038,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
         fee     <- ciFee(1)
         gTx1             = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2             = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-        (assetScript, _) = ScriptCompiler.compile("false", ScriptEstimatorV3).explicitGet()
+        (assetScript, _) = ScriptCompiler.compile("false", ScriptEstimatorV3(fixOverflow = true)).explicitGet()
         iTx = IssueTransaction
           .selfSigned(2.toByte, master, "False asset", "", ENOUGH_AMT, 8, reissuable = true, Some(assetScript), fee, ts + 1)
           .explicitGet()
@@ -2076,7 +2076,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
          |true""".stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
+      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()
     }
 
     val (falseScript, falseComplexity) = {
@@ -2085,7 +2085,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
          |false""".stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
+      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()
     }
 
     def contract(assets: Seq[String]): DApp = {
@@ -3141,7 +3141,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
          |true""".stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
+      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()
     }
 
     def contract(asset: ByteStr): DApp = {
@@ -3253,7 +3253,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
          |false""".stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
+      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()
     }
 
     def contract(asset: ByteStr): DApp = {
@@ -3363,7 +3363,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
          |false""".stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
+      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()
     }
 
     def contract: DApp = {
@@ -3597,7 +3597,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
                       | {-# CONTENT_TYPE EXPRESSION #-}
                       | assetBalance(this.issuer, this.id) == $ENOUGH_AMT
                     """.stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()._1
     }
 
     val transferScript = {
@@ -3617,7 +3617,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
                       | issuerBalance.regular == startWavesBalance                                            &&
                       | resultInvokerBalance == startInvokerBalance - $fee
                     """.stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()._1
     }
 
     def serviceDApp(): DApp = {

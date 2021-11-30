@@ -90,8 +90,7 @@ object ContractEvaluator {
   def verify(
       decls: List[DECLARATION],
       v: VerifierFunction,
-      ctx: EvaluationContext[Environment, Id],
-      evaluate: (EvaluationContext[Environment, Id], EXPR) => (Log[Id], Int, Either[ExecutionError, EVALUATED]),
+      evaluate: EXPR => (Log[Id], Int, Either[ExecutionError, EVALUATED]),
       entity: CaseObj
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
     val verifierBlock =
@@ -100,7 +99,7 @@ object ContractEvaluator {
         BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(entity)))
       )
 
-    evaluate(ctx, foldDeclarations(decls, verifierBlock))
+    evaluate(foldDeclarations(decls, verifierBlock))
   }
 
   def applyV2Coeval(

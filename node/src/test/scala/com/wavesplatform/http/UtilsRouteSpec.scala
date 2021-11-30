@@ -763,6 +763,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
 
     (utilsApi.blockchain.hasAccountScript _).when(dAppAddress).returning(false).once()
+    (() => utilsApi.blockchain.settings).when().returning(DefaultBlockchainSettings).anyNumberOfTimes()
 
     evalScript("testNone()") ~> route ~> check {
       responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> s"Address $dAppAddress is not dApp")

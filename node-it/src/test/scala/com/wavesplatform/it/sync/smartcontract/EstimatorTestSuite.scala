@@ -23,6 +23,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
       .overrideBase(_.raw(s"""
                               | waves.blockchain.custom.functionality {
                               |   estimator-pre-check-height =  $featureHeight
+                              |   estimator-sum-overflow-fix-height = 999999
                               |   pre-activated-features = {14 = 0, 15 = 999999}
                               |}""".stripMargin))
       .buildNonConflicting()
