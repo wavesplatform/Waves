@@ -650,8 +650,8 @@ class EvaluatorV2Test extends PropSpec with Inside {
     }
   }
 
-  ignore("big function assignment chain") {
-    val count = 3000
+  property("big function assignment chain") {
+    val count = 5000
     val script =
       s"""
          | func a0() = {
@@ -664,7 +664,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
     eval(script, 10000)
   }
 
-  ignore("big let assignment chain with function") {
+  property("big let assignment chain with function") {
     val count = 5000
     val script =
       s"""

@@ -5,7 +5,7 @@ import cats.syntax.either._
 import com.wavesplatform.lang.{ExecutionError, StringError}
 import monix.eval.Coeval
 
-case class EvaluationResult[A](value: Coeval[Either[(ExecutionError, Int), A]]) {
+case class EvaluationResult[+A](value: Coeval[Either[(ExecutionError, Int), A]]) {
   def flatMap[B](f: A => EvaluationResult[B]): EvaluationResult[B] =
     EvaluationResult.monad.flatMap(this)(f)
 
@@ -27,4 +27,9 @@ object EvaluationResult {
         case Right(r)    => f(r).value
       })
   }
+}
+
+object Defer {
+  def apply[A](r: => EvaluationResult[A]): EvaluationResult[A] =
+    EvaluationResult(Coeval.defer(r.value))
 }

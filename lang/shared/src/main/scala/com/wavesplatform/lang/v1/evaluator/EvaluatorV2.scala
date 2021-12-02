@@ -29,22 +29,22 @@ class EvaluatorV2(
       parentBlocks: List[BLOCK_DEF]
   ): EvaluationResult[Int] = {
     def evaluateFunctionArgs(fc: FUNCTION_CALL): EvaluationResult[Int] =
-      //Coeval.defer {
-      fc.args.indices
-        .to(LazyList)
-        .foldM(limit) {
-          case (unused, argIndex) =>
-            if (unused <= 0)
-              EvaluationResult(unused)
-            else
-              root(
-                expr = fc.args(argIndex),
-                update = argValue => EvaluationResult(fc.args = fc.args.updated(argIndex, argValue)),
-                limit = unused,
-                parentBlocks
-              )
-        }
-    // }
+      Defer {
+        fc.args.indices
+          .to(LazyList)
+          .foldM(limit) {
+            case (unused, argIndex) =>
+              if (unused <= 0)
+                EvaluationResult(unused)
+              else
+                root(
+                  expr = fc.args(argIndex),
+                  update = argValue => EvaluationResult(fc.args = fc.args.updated(argIndex, argValue)),
+                  limit = unused,
+                  parentBlocks
+                )
+          }
+      }
 
     def evaluateNativeFunction(fc: FUNCTION_CALL, limit: Int): EvaluationResult[Int] =
       for {
@@ -119,82 +119,81 @@ class EvaluatorV2(
 
     expr match {
       case b: BLOCK_DEF =>
-        //Coeval.defer(
-        root(
-          expr = b.body,
-          update = {
-            case ev: EVALUATED =>
-              /*Coeval.defer*/
-              update(ev)
-            case nonEvaluated => EvaluationResult(b.body = nonEvaluated)
-          },
-          limit = limit,
-          parentBlocks = b :: parentBlocks
-        )
-      //)
+        Defer {
+          root(
+            expr = b.body,
+            update = {
+              case ev: EVALUATED =>
+                Defer(update(ev))
+              case nonEvaluated => EvaluationResult(b.body = nonEvaluated)
+            },
+            limit = limit,
+            parentBlocks = b :: parentBlocks
+          )
+        }
       case g: GETTER =>
-        //Coeval.defer(
-        root(
-          expr = g.expr,
-          update = v => EvaluationResult(g.expr = v),
-          limit = limit,
-          parentBlocks = parentBlocks
-        ).flatMap { unused =>
-          g.expr match {
-            case co: CaseObj if unused > 0 =>
-              update(co.fields(g.field)).map(_ => unused - 1)
-            case _: CaseObj =>
-              EvaluationResult(unused)
-            case ev: EVALUATED =>
-              EvaluationResult(s"GETTER of non-case-object $ev with field '${g.field}", unused)
-            case _ =>
-              EvaluationResult(unused)
+        Defer(
+          root(
+            expr = g.expr,
+            update = v => EvaluationResult(g.expr = v),
+            limit = limit,
+            parentBlocks = parentBlocks
+          ).flatMap { unused =>
+            g.expr match {
+              case co: CaseObj if unused > 0 =>
+                update(co.fields(g.field)).map(_ => unused - 1)
+              case _: CaseObj =>
+                EvaluationResult(unused)
+              case ev: EVALUATED =>
+                EvaluationResult(s"GETTER of non-case-object $ev with field '${g.field}", unused)
+              case _ =>
+                EvaluationResult(unused)
+            }
           }
-        }
-      //)
+        )
       case i: IF =>
-        //Coeval.defer(
-        root(
-          expr = i.cond,
-          update = v => EvaluationResult(i.cond = v),
-          limit = limit,
-          parentBlocks = parentBlocks
-        ).flatMap { unused =>
-          i.cond match {
-            case TRUE | FALSE if unused <= 0 =>
-              EvaluationResult(unused)
-            case TRUE if unused > 0 =>
-              update(i.ifTrue).flatMap(
-                _ =>
-                  root(
-                    expr = i.ifTrue,
-                    update = update,
-                    limit = unused - 1,
-                    parentBlocks = parentBlocks
+        Defer(
+          root(
+            expr = i.cond,
+            update = v => EvaluationResult(i.cond = v),
+            limit = limit,
+            parentBlocks = parentBlocks
+          ).flatMap { unused =>
+            i.cond match {
+              case TRUE | FALSE if unused <= 0 =>
+                EvaluationResult(unused)
+              case TRUE if unused > 0 =>
+                update(i.ifTrue).flatMap(
+                  _ =>
+                    root(
+                      expr = i.ifTrue,
+                      update = update,
+                      limit = unused - 1,
+                      parentBlocks = parentBlocks
+                  )
                 )
-              )
-            case FALSE if unused > 0 =>
-              update(i.ifFalse).flatMap(
-                _ =>
-                  root(
-                    expr = i.ifFalse,
-                    update = update,
-                    limit = unused - 1,
-                    parentBlocks = parentBlocks
+              case FALSE if unused > 0 =>
+                update(i.ifFalse).flatMap(
+                  _ =>
+                    root(
+                      expr = i.ifFalse,
+                      update = update,
+                      limit = unused - 1,
+                      parentBlocks = parentBlocks
+                  )
                 )
-              )
-            case _: EVALUATED => EvaluationResult("Non-boolean result in cond", unused)
-            case _            => EvaluationResult(unused)
+              case _: EVALUATED => EvaluationResult("Non-boolean result in cond", unused)
+              case _            => EvaluationResult(unused)
+            }
           }
-        }
-      // )
+        )
 
       case REF(key) =>
-        //Coeval.defer {
-        visitRef(key, update, limit, parentBlocks)
-          .orElse(findGlobalVar(key, update, limit))
-          .getOrElse(EvaluationResult(s"A definition of '$key' not found", limit))
-      // }
+        Defer {
+          visitRef(key, update, limit, parentBlocks)
+            .orElse(findGlobalVar(key, update, limit))
+            .getOrElse(EvaluationResult(s"A definition of '$key' not found", limit))
+        }
 
       case fc: FUNCTION_CALL =>
         val startArgs = fc.args
