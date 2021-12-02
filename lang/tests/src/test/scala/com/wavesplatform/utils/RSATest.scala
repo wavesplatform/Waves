@@ -6,7 +6,7 @@ import cats.Id
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
-import com.wavesplatform.lang.{Global, StringError}
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler

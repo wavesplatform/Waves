@@ -27,7 +27,7 @@ class ReplEngine[F[_] : Monad] {
       for {
         parsed                              <- EitherT.fromEither[F](parse(expr))
         (newCompileCtx, compiled, exprType) <- EitherT.fromEither[F](ExpressionCompiler.applyWithCtx(compileCtx, parsed))
-        evaluated                           <- EitherT(evaluator.applyWithCtx(evalCtx, compiled)).leftMap(error => if (error.isEmpty) "Evaluation error" else error)
+        evaluated                           <- EitherT(evaluator.applyWithCtx(evalCtx, compiled)).leftMap(error => if (error.message.isEmpty) "Evaluation error" else error.message)
       } yield resultWithCtx(evaluated, compileCtx, newCompileCtx, exprType)
 
     r.value
