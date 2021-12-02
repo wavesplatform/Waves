@@ -1,5 +1,7 @@
 package com.wavesplatform.lang
 
+import java.nio.charset.StandardCharsets
+
 import cats.Id
 import cats.kernel.Monoid
 import cats.syntax.either._
@@ -29,8 +31,7 @@ import com.wavesplatform.test._
 import org.scalatest.Inside
 import org.web3j.crypto.Keys
 
-import java.nio.charset.StandardCharsets
-import scala.util.{Random, Try}
+import scala.util.Random
 
 class IntegrationTest extends PropSpec with Inside {
   private def eval[T <: EVALUATED](
@@ -90,13 +91,10 @@ class IntegrationTest extends PropSpec with Inside {
         )
       )
 
-    val typed = ExpressionCompiler(ctx.compilerContext, untyped)
-    val loggedCtx = LoggedEvaluationContext[C, Id](_ => _ => (), ctx.evaluationContext(env))
-      .asInstanceOf[LoggedEvaluationContext[Environment, Id]]
-    typed.flatMap(
-      v =>
-        Try(new EvaluatorV2(loggedCtx, version).apply(v._1, Int.MaxValue)._1.asInstanceOf[T]).toEither
-          .leftMap(_.getMessage)
+    val compiled = ExpressionCompiler(ctx.compilerContext, untyped)
+    val evalCtx = ctx.evaluationContext(env).asInstanceOf[EvaluationContext[Environment, Id]]
+    compiled.flatMap(
+      v => EvaluatorV2.applyCompleted(evalCtx, v._1, version)._3.bimap(_.message, _.asInstanceOf[T])
     )
   }
 

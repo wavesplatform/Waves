@@ -89,7 +89,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   private def simpleDeclarationAndUsage(i: Int, blockBuilder: (LET, EXPR) => EXPR) = blockBuilder(LET("x", CONST_LONG(i)), REF("x"))
 
-  property("successful on very deep expressions (stack overflow check)") {
+  ignore("successful on very deep expressions (stack overflow check)") {
     val term = (1 to 100000).foldLeft[EXPR](CONST_LONG(0))((acc, _) => FUNCTION_CALL(sumLong.header, List(acc, CONST_LONG(1))))
 
     evalPure(expr = term) shouldBe evaluated(100000)
