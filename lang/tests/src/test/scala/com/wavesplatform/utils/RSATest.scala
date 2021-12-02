@@ -3,10 +3,10 @@ package com.wavesplatform.utils
 import java.security.{KeyPair, KeyPairGenerator, SecureRandom, Signature}
 
 import cats.Id
-import cats.syntax.monoid._
+import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
-import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.{Global, StringError}
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
@@ -336,9 +336,9 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
   private val evaluator = new EvaluatorV1[Id, NoContext]()
 
   private def eval[T <: EVALUATED](code: String, ctx: CTX[NoContext] = PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4)): Either[String, T] = {
-    val untyped      = Parser.parseExpr(code).get.value
+    val untyped  = Parser.parseExpr(code).get.value
     val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => evaluator.apply[T](ctx.evaluationContext, v._1))
+    typed.flatMap(v => evaluator[T](ctx.evaluationContext, v._1).leftMap(_.message))
   }
 
 }

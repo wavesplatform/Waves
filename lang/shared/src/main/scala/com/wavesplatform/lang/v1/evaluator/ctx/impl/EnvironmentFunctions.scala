@@ -1,8 +1,8 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.Monad
-import cats.syntax.either._
-import com.wavesplatform.lang.ExecutionError
+import cats.implicits._
+import com.wavesplatform.lang.{ExecutionError, StringError}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_STRING, CaseObj}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
 import com.wavesplatform.lang.v1.traits.domain.Recipient
@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
 class EnvironmentFunctions[F[_]: Monad](environment: Environment[F]) {
 
-  def toScala(addressOrAlias: CaseObj) = {
+  def toScala(addressOrAlias: CaseObj): Either[String, Recipient] = {
     val objTypeName = addressOrAlias.caseType.name
     if (objTypeName == Types.addressType.name) {
       addressOrAlias.fields
@@ -30,16 +30,16 @@ class EnvironmentFunctions[F[_]: Monad](environment: Environment[F]) {
     }
   }
 
-  def getData(addressOrAlias: CaseObj, key: String, dataType: DataType): F[Either[String, Option[Any]]] = {
-    toScala(addressOrAlias).traverse(environment.data(_, key, dataType))
+  def getData(addressOrAlias: CaseObj, key: String, dataType: DataType): F[Either[ExecutionError, Option[Any]]] = {
+    toScala(addressOrAlias).leftMap(StringError).traverse(environment.data(_, key, dataType))
   }
 
-  def hasData(addressOrAlias: CaseObj): F[Either[String, Boolean]] = {
-    toScala(addressOrAlias).traverse(environment.hasData(_))
+  def hasData(addressOrAlias: CaseObj): F[Either[ExecutionError, Boolean]] = {
+    toScala(addressOrAlias).leftMap(StringError).traverse(environment.hasData)
   }
 
   def addressFromAlias(name: String): F[Either[ExecutionError, Recipient.Address]] =
-    environment.resolveAlias(name)
+    environment.resolveAlias(name).map(_.leftMap(StringError))
 }
 
 object EnvironmentFunctions {

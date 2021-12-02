@@ -1,7 +1,7 @@
 package com.wavesplatform.utils
 
 import cats.Id
-import cats.syntax.monoid._
+import cats.implicits._
 import com.google.common.primitives.Ints
 import com.wavesplatform.common.merkle.Merkle._
 import com.wavesplatform.common.merkle._
@@ -114,7 +114,7 @@ class MerkleTest extends PropSpec {
     val untyped = Parser.parseExpr(code).get.value
     val ctx     = PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true) |+| CryptoContext.build(Global, version)
     val typed   = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => evaluator.apply[T](ctx.evaluationContext, v._1))
+    typed.flatMap(v => evaluator[T](ctx.evaluationContext, v._1).leftMap(_.toString))
   }
 
   private def scriptSrc(root: Array[Byte], proof: Array[Byte], value: Array[Byte]): String = {

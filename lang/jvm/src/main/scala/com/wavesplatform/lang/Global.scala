@@ -144,7 +144,7 @@ object Global extends BaseGlobal {
       round: Rounding,
       precision: Int,
       result: java.math.BigDecimal
-  ): Either[ExecutionError, BigInt] = {
+  ): Either[String, BigInt] = {
     val value = result.unscaledValue()
     val scale = result.scale()
     if (scale > resultPrecision)

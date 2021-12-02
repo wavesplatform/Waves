@@ -126,7 +126,7 @@ object InvokeScriptDiff {
               val totalComplexity  = usedComplexity + scriptComplexity
               result match {
                 case Left(error) =>
-                  val err = FailedTransactionError.assetExecutionInAction(error, totalComplexity, log, assetId)
+                  val err = FailedTransactionError.assetExecutionInAction(error.message, totalComplexity, log, assetId)
                   TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
                 case Right(FALSE) =>
                   val err = FailedTransactionError.notAllowedByAsset(totalComplexity, log, assetId)
@@ -342,12 +342,13 @@ object InvokeScriptDiff {
       .map(
         _.leftMap(
           {
+            case (reject: AlwaysRejectError, _, _) =>
+              reject
             case (error, unusedComplexity, log) =>
               val usedComplexity = startComplexity - unusedComplexity
-              FailedTransactionError.dAppExecution(error, usedComplexity, log)
+              FailedTransactionError.dAppExecution(error.message, usedComplexity, log)
           }
-        )
-        .map { r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1); r }
+        ).flatMap { r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1).map(_ => r) }
       )
   }
 }

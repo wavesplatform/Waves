@@ -1,7 +1,8 @@
 package com.wavesplatform.lang.evaluator
 
+import cats.implicits._
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common
+import com.wavesplatform.lang.{Common, StringError}
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.utils.lazyContexts
@@ -32,6 +33,6 @@ abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
     val ctx           = lazyContexts(DirectiveSet(version, Account, Expression).explicitGet()).value()
     val typed         = ExpressionCompiler(ctx.compilerContext, parsedExpr, allowIllFormedStrings = true)
     val evaluationCtx = ctx.evaluationContext(Common.emptyBlockchainEnvironment())
-    typed.flatMap(v => EvaluatorV2.applyCompleted(evaluationCtx, v._1, version)._3)
+    typed.flatMap(v => EvaluatorV2.applyCompleted(evaluationCtx, v._1, version)._3.leftMap(_.message))
   }
 }

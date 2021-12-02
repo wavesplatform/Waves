@@ -3,7 +3,6 @@ package com.wavesplatform.transaction.smart
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.diffs.invoke.InvokeScriptLike
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
-import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments._
@@ -15,7 +14,7 @@ object AttachedPaymentExtractor {
     version:      StdLibVersion,
     blockchain:   Blockchain,
     targetScript: AttachedPaymentTarget
-  ): Either[ExecutionError, AttachedPayments] =
+  ): Either[String, AttachedPayments] =
     if (tx.payments.size <= 1)
       if (version.supportsMultiPayment)
         multiple(tx)

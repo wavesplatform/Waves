@@ -1,9 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
+import cats.implicits._
 import cats.Id
-import cats.instances.map._
-import cats.syntax.either._
-import cats.syntax.semigroup._
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
@@ -609,7 +607,7 @@ object InvokeDiffsCommon {
       )
       val complexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else estimatedComplexity
       result match {
-        case Left(error)  => Left(FailedTransactionError.assetExecutionInAction(error, complexity, log, assetId))
+        case Left(error)  => Left(FailedTransactionError.assetExecutionInAction(error.message, complexity, log, assetId))
         case Right(FALSE) => Left(FailedTransactionError.notAllowedByAssetInAction(complexity, log, assetId))
         case Right(TRUE)  => Right(nextDiff.copy(scriptsComplexity = nextDiff.scriptsComplexity + complexity))
         case Right(x) =>
@@ -657,25 +655,31 @@ object InvokeDiffsCommon {
       TracedResult(Right(()))
   }
 
-  def checkScriptResultFields(blockchain: Blockchain, r: ScriptResult): Unit =
+  def checkScriptResultFields(blockchain: Blockchain, r: ScriptResult): Either[AlwaysRejectError, Unit] =
     r match {
       case ScriptResultV4(actions, _, _) if blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight =>
-        actions.foreach {
-          case Reissue(_, _, quantity) => if (quantity < 0) throw RejectException(s"Negative reissue quantity = $quantity")
-          case Burn(_, quantity)       => if (quantity < 0) throw RejectException(s"Negative burn quantity = $quantity")
-          case t: AssetTransfer        => if (t.amount < 0) throw RejectException(s"Negative transfer amount = ${t.amount}")
-          case l: Lease                => if (l.amount < 0) throw RejectException(s"Negative lease amount = ${l.amount}")
+        actions.traverse {
+          case Reissue(_, _, quantity) => if (quantity < 0) Left(AlwaysRejectError(s"Negative reissue quantity = $quantity")) else Right(())
+          case Burn(_, quantity)       => if (quantity < 0) Left(AlwaysRejectError(s"Negative burn quantity = $quantity")) else Right(())
+          case t: AssetTransfer        => if (t.amount < 0) Left(AlwaysRejectError(s"Negative transfer amount = ${t.amount}")) else Right(())
+          case l: Lease                => if (l.amount < 0) Left(AlwaysRejectError(s"Negative lease amount = ${l.amount}")) else Right(())
           case s: SponsorFee =>
-            if (s.minSponsoredAssetFee.exists(_ < 0)) throw RejectException(s"Negative sponsor amount = ${s.minSponsoredAssetFee.get}")
+            if (s.minSponsoredAssetFee.exists(_ < 0))
+              Left(AlwaysRejectError(s"Negative sponsor amount = ${s.minSponsoredAssetFee.get}"))
+            else
+              Right(())
           case i: Issue =>
             val length = i.name.getBytes("UTF-8").length
             if (length < IssueTransaction.MinAssetNameLength || length > IssueTransaction.MaxAssetNameLength) {
-              throw RejectException("Invalid asset name")
+              Left(AlwaysRejectError("Invalid asset name"))
             } else if (i.description.length > IssueTransaction.MaxAssetDescriptionLength) {
-              throw RejectException("Invalid asset description")
-            }
+              Left(AlwaysRejectError("Invalid asset description"))
+            } else
+              Right(())
           case _ =>
-        }
+            Right(())
+        }.map(_ => ())
       case _ =>
+        Right(())
     }
 }

@@ -3,10 +3,9 @@ package com.wavesplatform.lang.v1.estimator.v2
 import cats.instances.list._
 import cats.syntax.traverse._
 import cats.{Id, Monad}
-import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.estimator.{EstimationError, ScriptEstimator}
 import com.wavesplatform.lang.v1.estimator.v2.EstimatorContext.EvalM
 import com.wavesplatform.lang.v1.estimator.v2.EstimatorContext.Lenses._
 import com.wavesplatform.lang.v1.task.imports._
@@ -19,7 +18,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
       vars: Set[String],
       funcs: Map[FunctionHeader, Coeval[Long]],
       expr: EXPR
-  ): Either[ExecutionError, Long] = {
+  ): Either[EstimationError, Long] = {
     val v = vars.map((_, (true, const(0)))).toMap
     val f = funcs.view.mapValues(_.value()).toMap
     evalExpr(expr).run(EstimatorContext(v, f)).value._2
@@ -77,11 +76,11 @@ object ScriptEstimatorV2 extends ScriptEstimator {
 
   private def evalRef(key: String): EvalM[Long] =
     for {
-      ctx <- get[Id, EstimatorContext, ExecutionError]
+      ctx <- get[Id, EstimatorContext, EstimationError]
       r <- lets.get(ctx).get(key) match {
         case Some((false, lzy)) => setRefEvaluated(key, lzy)
         case Some((true, _))    => const(0)
-        case None               => raiseError[Id, EstimatorContext, ExecutionError, Long](s"A definition of '$key' not found")
+        case None               => raiseError[Id, EstimatorContext, EstimationError, Long](s"A definition of '$key' not found")
       }
     } yield r + 2
 
@@ -94,25 +93,25 @@ object ScriptEstimatorV2 extends ScriptEstimator {
 
   private def evalFuncCall(header: FunctionHeader, args: List[EXPR]): EvalM[Long] =
     for {
-      ctx <- get[Id, EstimatorContext, ExecutionError]
+      ctx <- get[Id, EstimatorContext, EstimationError]
       bodyComplexity <- predefFuncs
         .get(ctx)
         .get(header)
         .map(bodyComplexity => evalFuncArgs(args).map(_ + bodyComplexity))
         .orElse(userFuncs.get(ctx).get(header).map(evalUserFuncCall(_, args)))
-        .getOrElse(raiseError[Id, EstimatorContext, ExecutionError, Long](s"function '$header' not found"))
+        .getOrElse(raiseError[Id, EstimatorContext, EstimationError, Long](s"function '$header' not found"))
     } yield bodyComplexity
 
   private def evalUserFuncCall(func: FUNC, args: List[EXPR]): EvalM[Long] =
     for {
       argsComplexity <- evalFuncArgs(args)
-      ctx            <- get[Id, EstimatorContext, ExecutionError]
+      ctx            <- get[Id, EstimatorContext, EstimationError]
       _              <- update(lets.modify(_)(_ ++ ctx.overlappedRefs))
       overlapped = func.args.flatMap(arg => ctx.letDefs.get(arg).map((arg, _))).toMap
       ctxArgs    = func.args.map((_, (false, const(1)))).toMap
       _              <- update((lets ~ overlappedRefs).modify(_) { case (l, or) => (l ++ ctxArgs, or ++ overlapped) })
       bodyComplexity <- evalExpr(func.body).map(_ + func.args.size * 5)
-      evaluatedCtx   <- get[Id, EstimatorContext, ExecutionError]
+      evaluatedCtx   <- get[Id, EstimatorContext, EstimationError]
       overlappedChanges = overlapped.map { case ref @ (name, _) => evaluatedCtx.letDefs.get(name).map((name, _)).getOrElse(ref) }
       _ <- update((lets ~ overlappedRefs).modify(_) { case (l, or) => (l -- ctxArgs.keys ++ overlapped, or ++ overlappedChanges) })
     } yield bodyComplexity + argsComplexity
@@ -121,7 +120,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     args.traverse(evalExpr).map(_.sum)
 
   private def update(f: EstimatorContext => EstimatorContext): EvalM[Unit] =
-    modify[Id, EstimatorContext, ExecutionError](f)
+    modify[Id, EstimatorContext, EstimationError](f)
 
   private def const(l: Long): EvalM[Long] =
     Monad[EvalM].pure(l)

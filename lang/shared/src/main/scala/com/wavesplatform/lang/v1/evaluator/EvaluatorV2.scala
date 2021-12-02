@@ -1,10 +1,10 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.Id
+import cats.instances.lazyList._
 import cats.syntax.either._
 import cats.syntax.foldable._
-import cats.instances.lazyList._
-import com.wavesplatform.lang.ExecutionError
+import com.wavesplatform.lang.{AlwaysRejectError, ExecutionError}
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -71,7 +71,10 @@ class EvaluatorV2(
               val totalCost        = cost + additionalComplexity
               val unusedComplexity = limit - totalCost
               result.fold(
-                error => throw EvaluationException(error, unusedComplexity),
+                {
+                  case e: AlwaysRejectError => throw RejectException(e.message)
+                  case e                    => throw EvaluationException(e.message, unusedComplexity)
+                },
                 evaluated => update(evaluated).map(_ => unusedComplexity)
               )
           }
@@ -272,7 +275,10 @@ class EvaluatorV2(
     ctx.ec.letDefs
       .get(key)
       .map { v =>
-        val globalValue = v.value.value.fold(e => throw EvaluationException(e, limit), identity)
+        val globalValue = v.value.value.fold(
+          error => throw EvaluationException(error.message, limit),
+          identity
+        )
         update(globalValue).map(_ => limit - 1)
       }
 
@@ -313,6 +319,7 @@ object EvaluatorV2 {
       .redeem(
         {
           case e: EvaluationException => Left((e.getMessage, e.unusedComplexity, log.toList))
+          case r: RejectException     => Left((AlwaysRejectError(r.error), limit, log.toList))
           case e                      => Left((e.getMessage, limit, log.toList))
         }, { case (expr, unused)      => Right((expr, unused, log.toList)) }
       )

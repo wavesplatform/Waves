@@ -1,10 +1,10 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import cats.syntax.semigroup._
+import cats.implicits._
 import cats.{Id, Monad}
 import com.wavesplatform.common.merkle.Merkle.createRoot
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.ExecutionError
+import com.wavesplatform.lang.{ExecutionError, StringError}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, _}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -34,8 +34,8 @@ object CryptoContext {
     rsaTypeNames.zip(List(NONE, MD5, SHA1, SHA224, SHA256, SHA384, SHA512, SHA3224, SHA3256, SHA3384, SHA3512)).toMap
   }
 
-  private def algFromCO(obj: Terms.CaseObj): Either[String, DigestAlgorithm] = {
-    rsaHashLib.get(obj.caseType.name).fold(Left[String, DigestAlgorithm]("Unknown digest type"): Either[String, DigestAlgorithm])(Right(_))
+  private def algFromCO(obj: Terms.CaseObj): Either[ExecutionError, DigestAlgorithm] = {
+    rsaHashLib.get(obj.caseType.name).fold(Left("Unknown digest type"): Either[ExecutionError, DigestAlgorithm])(Right(_))
   }
 
   private def digestAlgValue(tpe: CASETYPEREF): ContextfulVal[NoContext] =
@@ -174,7 +174,7 @@ object CryptoContext {
     ) =
       for {
         alg    <- algFromCO(digestAlg)
-        result <- global.rsaVerify(alg, msg.arr, sig.arr, pub.arr)
+        result <- global.rsaVerify(alg, msg.arr, sig.arr, pub.arr).leftMap(StringError)
       } yield CONST_BOOLEAN(result)
 
     val rsaVerifyF: BaseFunction[NoContext] = {
@@ -236,7 +236,7 @@ object CryptoContext {
         STRING,
         ("bytes", BYTESTR)
       ) {
-        case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base58Encode(bytes.arr).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
+        case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base58Encode(bytes.arr).leftMap(StringError).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
         case xs                                   => notImplemented[Id, EVALUATED]("toBase58String(bytes: ByteVector)", xs)
       }
 
@@ -248,7 +248,7 @@ object CryptoContext {
         BYTESTR,
         ("str", STRING)
       ) {
-        case CONST_STRING(str: String) :: Nil => global.base58Decode(str, global.MaxBase58String).flatMap(x => CONST_BYTESTR(ByteStr(x)))
+        case CONST_STRING(str: String) :: Nil => global.base58Decode(str, global.MaxBase58String).leftMap(StringError).flatMap(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented[Id, EVALUATED]("fromBase58String(str: String)", xs)
       }
 
@@ -260,7 +260,7 @@ object CryptoContext {
         STRING,
         ("bytes", BYTESTR)
       ) {
-        case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base64Encode(bytes.arr).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
+        case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base64Encode(bytes.arr).leftMap(StringError).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
         case xs                                   => notImplemented[Id, EVALUATED]("toBase64String(bytes: ByteVector)", xs)
       }
 
@@ -272,7 +272,7 @@ object CryptoContext {
         BYTESTR,
         ("str", STRING)
       ) {
-        case CONST_STRING(str: String) :: Nil => global.base64Decode(str, global.MaxBase64String).flatMap(x => CONST_BYTESTR(ByteStr(x)))
+        case CONST_STRING(str: String) :: Nil => global.base64Decode(str, global.MaxBase64String).leftMap(StringError).flatMap(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented[Id, EVALUATED]("fromBase64String(str: String)", xs)
       }
 
@@ -317,13 +317,13 @@ object CryptoContext {
       }
 
     def toBase16StringF(checkLength: Boolean): BaseFunction[NoContext] = NativeFunction("toBase16String", 10, TOBASE16, STRING, ("bytes", BYTESTR)) {
-      case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr, checkLength).flatMap(CONST_STRING(_))
+      case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr, checkLength).leftMap(StringError).flatMap(CONST_STRING(_))
       case xs                                   => notImplemented[Id, EVALUATED]("toBase16String(bytes: ByteVector)", xs)
     }
 
     def fromBase16StringF(checkLength: Boolean): BaseFunction[NoContext] =
       NativeFunction("fromBase16String", 10, FROMBASE16, BYTESTR, ("str", STRING)) {
-        case CONST_STRING(str: String) :: Nil => global.base16Decode(str, checkLength).flatMap(x => CONST_BYTESTR(ByteStr(x)))
+        case CONST_STRING(str: String) :: Nil => global.base16Decode(str, checkLength).leftMap(StringError).flatMap(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented[Id, EVALUATED]("fromBase16String(str: String)", xs)
       }
 

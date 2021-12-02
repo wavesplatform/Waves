@@ -6,6 +6,7 @@ import cats.Id
 import cats.syntax.semigroup._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{ContentType, ScriptType, StdLibVersion}
 import com.wavesplatform.lang.v1.CTX
@@ -13,7 +14,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{ExecutionError, Global}
 import com.wavesplatform.state._
 import monix.eval.Coeval
 
@@ -33,7 +33,7 @@ object BlockchainContext {
       isContract: Boolean,
       address: Environment.Tthis,
       txId: ByteStr
-  ): Either[ExecutionError, EvaluationContext[Environment, Id]] =
+  ): Either[String, EvaluationContext[Environment, Id]] =
     DirectiveSet(
       version,
       ScriptType.isAssetScript(isTokenContext),

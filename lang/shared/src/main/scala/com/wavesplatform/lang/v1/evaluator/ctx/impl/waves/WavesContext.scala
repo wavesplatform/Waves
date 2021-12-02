@@ -3,6 +3,8 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.v1.compiler.Types.FINAL
+import com.wavesplatform.lang.v1.evaluator.ContextfulVal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Functions.{addressFromStringF, _}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Vals._
@@ -124,7 +126,7 @@ object WavesContext {
       version: StdLibVersion,
       contentType: ContentType,
       proofsEnabled: Boolean
-  ) = {
+  ): Map[String, (FINAL, ContextfulVal[Environment])] = {
     val txVal = tx(isTokenContext, version, proofsEnabled)
     version match {
       case V1 => Map(txVal)

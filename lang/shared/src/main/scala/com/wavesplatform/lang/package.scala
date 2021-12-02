@@ -4,7 +4,8 @@ import cats.Eval
 import cats.data.EitherT
 
 package object lang {
-  type ExecutionError = String
+  implicit def toError(msg: String): StringError = StringError(msg)
+
   type ExecutionLog   = String
 
   type EvalF[F[_], A]                 = Eval[F[A]]

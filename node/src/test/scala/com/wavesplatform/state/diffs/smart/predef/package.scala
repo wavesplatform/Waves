@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.smart
 
+import cats.syntax.either._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -37,7 +38,7 @@ package object predef {
                                              isContract = false,
                                              Coproduct[Environment.Tthis](Environment.AssetId(Array())),
                                              ByteStr.empty)
-      r <- EvaluatorV1().apply[T](evalContext, typedExpr)
+      r <- EvaluatorV1().apply[T](evalContext, typedExpr).leftMap(_.message)
     } yield r
   }
 

@@ -127,7 +127,7 @@ object ScriptRunner {
         (Nil, 0, Verifier.verifyAsEllipticCurveSignature(proven).bimap(_.err, _ => TRUE))
 
       case other =>
-        (Nil, 0, s"$other: Unsupported script version".asLeft[EVALUATED])
+        (Nil, 0, Left(s"$other: Unsupported script version"))
     }
   }
 }

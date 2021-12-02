@@ -339,7 +339,7 @@ object UtilsApiRoute {
         limitedResult <- EvaluatorV2
           .applyLimitedCoeval(call, limit, ctx, script.stdLibVersion, checkConstructorArgsTypes = true)
           .value()
-          .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err, log) }
+          .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err.message, log) }
         result <- limitedResult match {
           case (eval: EVALUATED, unusedComplexity, _) => Right((eval, limit - unusedComplexity))
           case (_: EXPR, _, log)                      => Left(ScriptExecutionError.dAppExecution(s"Calculation complexity limit exceeded", log))

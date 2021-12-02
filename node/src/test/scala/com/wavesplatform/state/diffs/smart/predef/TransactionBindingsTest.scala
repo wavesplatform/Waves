@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.smart.predef
 
+import cats.syntax.either._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -729,7 +730,7 @@ class TransactionBindingsTest
     for {
       compileResult <- compiler.ExpressionCompiler(ctx.compilerContext, expr)
       (typedExpr, _) = compileResult
-      r <- EvaluatorV1().apply[EVALUATED](ctx.evaluationContext(environment), typedExpr)
+      r <- EvaluatorV1().apply[EVALUATED](ctx.evaluationContext(environment), typedExpr).leftMap(_.message)
     } yield r
   }
 
@@ -761,7 +762,7 @@ class TransactionBindingsTest
     for {
       compileResult <- ExpressionCompiler(ctx.compilerContext, expr)
       (typedExpr, _) = compileResult
-      r <- EvaluatorV1().apply[EVALUATED](ctx.evaluationContext(env), typedExpr)
+      r <- EvaluatorV1().apply[EVALUATED](ctx.evaluationContext(env), typedExpr).leftMap(_.message)
     } yield r
   }
 }

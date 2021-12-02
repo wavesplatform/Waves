@@ -294,16 +294,20 @@ object InvokeScriptTransactionDiff {
       .leftMap {
         case (error, unusedComplexity, log) =>
           val usedComplexity = startLimit - unusedComplexity.max(0)
-          if (usedComplexity > failFreeLimit) {
+          if (usedComplexity > failFreeLimit && !error.isInstanceOf[AlwaysRejectError]) {
             val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
-            FailedTransactionError.dAppExecution(error, storingComplexity + paymentsComplexity, log)
+            FailedTransactionError.dAppExecution(error.message, storingComplexity + paymentsComplexity, log)
           } else
-            ScriptExecutionError.dAppExecution(error, log)
+            ScriptExecutionError.dAppExecution(error.message, log)
       }
-      .map { r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1); r }
+      .flatMap { r =>
+        InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1)
+          .leftMap(e => ScriptExecutionError(e.message, r._2, None))
+          .map(_ => r)
+      }
   }
 
-  private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {
+  private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[String, Unit] = {
     val (check, expectedTypes) =
       if (blockchain.callableListArgumentsAllowed)
         (
