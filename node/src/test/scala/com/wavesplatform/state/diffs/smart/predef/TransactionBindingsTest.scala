@@ -25,6 +25,7 @@ import com.wavesplatform.transaction.smart.{WavesEnvironment, buildThisValue}
 import com.wavesplatform.transaction.{DataTransaction, Proofs, ProvenTransaction, TxVersion, VersionedTransaction}
 import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.crypto
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test._
 import monix.eval.Coeval
 import org.scalacheck.Gen
@@ -373,6 +374,7 @@ class TransactionBindingsTest
 
       val blockchain = stub[Blockchain]
       (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
+      (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
 
       val result = runScriptWithCustomContext(script, Coproduct(t), T, V4, blockchain)
       result shouldBe evaluated(true)
