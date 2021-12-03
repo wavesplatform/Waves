@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, _}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{ExecutionError, StringError}
+import com.wavesplatform.lang.{AlwaysRejectError, ExecutionError, StringError}
 import monix.eval.Coeval
 import shapeless.syntax.std.tuple._
 
@@ -235,8 +235,8 @@ class EvaluatorV2(
       limit: Int,
       let: LET,
       nextParentBlocks: List[BLOCK_DEF]
-  ): EvaluationResult[Int] =
-    root(
+  ): EvaluationResult[Int] = {
+    val result = root(
       expr = let.value,
       update = v =>
         EvaluationResult(let.value = v)
@@ -255,14 +255,19 @@ class EvaluatorV2(
         case _                           => EvaluationResult(unused)
       }
     }
+    logError(let, result)
+  }
 //      .onErrorHandle { e =>
 //        val error = if (e.getMessage != null) e.getMessage else e.toString
-//        ctx.log(let, Left(error))
+//
 //        throw e match {
 //          case _: EvaluationException | _: RejectException => e
 //          case _                                           => EvaluationException(e.getMessage, limit)
 //        }
 //      }
+
+  private def logError(let: LET, r: EvaluationResult[Int]): EvaluationResult[Int] =
+    EvaluationResult(r.value.map(_.leftMap { case l @ (error, _) => ctx.log(let, Left(error)); l }))
 
   private def findGlobalVar(key: String, update: EVALUATED => EvaluationResult[Unit], limit: Int): Option[EvaluationResult[Int]] =
     ctx.ec.letDefs
@@ -312,9 +317,7 @@ object EvaluatorV2 {
       .redeem(
         {
           //case e: EvaluationException => Left((e.getMessage, e.unusedComplexity, log.toList))
-          //case r: RejectException     => Left((AlwaysRejectError(r.error), limit, log.toList))
-          e =>
-            Left((e.getMessage, limit, log.toList))
+          e => Left((e.getMessage, limit, log.toList))
         },
         _.bimap(_ :+ log.toList, _ :+ log.toList)
       )
