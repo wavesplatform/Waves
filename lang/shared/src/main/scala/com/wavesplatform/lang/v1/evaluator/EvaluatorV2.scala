@@ -257,17 +257,16 @@ class EvaluatorV2(
     }
     logError(let, result)
   }
-//      .onErrorHandle { e =>
-//        val error = if (e.getMessage != null) e.getMessage else e.toString
-//
-//        throw e match {
-//          case _: EvaluationException | _: RejectException => e
-//          case _                                           => EvaluationException(e.getMessage, limit)
-//        }
-//      }
 
   private def logError(let: LET, r: EvaluationResult[Int]): EvaluationResult[Int] =
-    EvaluationResult(r.value.map(_.leftMap { case l @ (error, _) => ctx.log(let, Left(error)); l }))
+    EvaluationResult(
+      r.value
+        .map(_.leftMap {
+          case l @ (error, _) =>
+            ctx.log(let, Left(error))
+            l
+        })
+    )
 
   private def findGlobalVar(key: String, update: EVALUATED => EvaluationResult[Unit], limit: Int): Option[EvaluationResult[Int]] =
     ctx.ec.letDefs
@@ -315,10 +314,7 @@ object EvaluatorV2 {
       .map((ref, _))
       .value
       .redeem(
-        {
-          //case e: EvaluationException => Left((e.getMessage, e.unusedComplexity, log.toList))
-          e => Left((e.getMessage, limit, log.toList))
-        },
+        e => Left((e.getMessage, limit, log.toList)),
         _.bimap(_ :+ log.toList, _ :+ log.toList)
       )
   }
@@ -335,8 +331,8 @@ object EvaluatorV2 {
       .value()
       .fold(
         { case (error, complexity, log) => (log, complexity, Left(error)) }, {
-          case (expr, complexity, log) =>
-            expr match {
+          case (result, complexity, log) =>
+            result match {
               case evaluated: EVALUATED => (log, complexity, Right(evaluated))
               case expr: EXPR           => (log, complexity, handleExpr(expr))
             }
