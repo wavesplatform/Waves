@@ -62,16 +62,18 @@ class EvaluatorV2(
 
     def doEvaluateNativeFunction(fc: FUNCTION_CALL, function: BaseFunction[Environment], limit: Int, cost: Int): EvaluationResult[Int] =
       for {
-        (result, additionalComplexity) <- EvaluationResult(
+        (result, unusedComplexity) <- EvaluationResult(
           function
             .asInstanceOf[NativeFunction[Environment]]
             .ev
             .evaluateExtended[Id](ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]], limit - cost)
-            .map { case (r, additionalComplexity) => r.bimap((_, limit - additionalComplexity), (_, additionalComplexity)) }
+            .map { case (result, additionalComplexity) =>
+              val unusedComplexity = limit - cost - additionalComplexity
+              result.bimap((_, unusedComplexity), (_, unusedComplexity))
+            }
         )
         _ <- update(result)
-        totalCost = cost + additionalComplexity
-      } yield limit - totalCost
+      } yield unusedComplexity
 
     def evaluateUserFunction(fc: FUNCTION_CALL, limit: Int, name: String, startArgs: List[EXPR]): Option[EvaluationResult[Int]] =
       ctx.ec.functions
