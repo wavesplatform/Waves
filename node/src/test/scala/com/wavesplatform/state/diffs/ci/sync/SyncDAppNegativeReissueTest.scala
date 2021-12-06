@@ -83,7 +83,7 @@ class SyncDAppNegativeReissueTest extends PropSpec with WithDomain with Transact
 
         val invoke1 = invoke()
         d.appendBlock(invoke1)
-        d.blockchain.transactionInfo(invoke1.txId).get._3 shouldBe true
+        d.blockchain.transactionSucceeded(invoke1.txId) shouldBe true
         d.blockchain.balance(dApp, asset) shouldBe 99
 
         val invoke2 = invoke()
