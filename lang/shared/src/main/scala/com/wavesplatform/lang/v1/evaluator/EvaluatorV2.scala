@@ -67,9 +67,10 @@ class EvaluatorV2(
             .asInstanceOf[NativeFunction[Environment]]
             .ev
             .evaluateExtended[Id](ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]], limit - cost)
-            .map { case (result, additionalComplexity) =>
-              val unusedComplexity = limit - cost - additionalComplexity
-              result.bimap((_, unusedComplexity), (_, unusedComplexity))
+            .map {
+              case (result, additionalComplexity) =>
+                val unusedComplexity = limit - cost - additionalComplexity
+                result.bimap((_, unusedComplexity), (_, unusedComplexity))
             }
         )
         _ <- update(result)
@@ -134,7 +135,7 @@ class EvaluatorV2(
           )
         }
       case g: GETTER =>
-        Defer(
+        Defer {
           root(
             expr = g.expr,
             update = v => EvaluationResult(g.expr = v),
@@ -152,9 +153,9 @@ class EvaluatorV2(
                 EvaluationResult(unused)
             }
           }
-        )
+        }
       case i: IF =>
-        Defer(
+        Defer {
           root(
             expr = i.cond,
             update = v => EvaluationResult(i.cond = v),
@@ -188,7 +189,7 @@ class EvaluatorV2(
               case _            => EvaluationResult(unused)
             }
           }
-        )
+        }
 
       case REF(key) =>
         Defer {
@@ -221,10 +222,12 @@ class EvaluatorV2(
   }
 
   @tailrec
-  private def visitRef(key: String,
-                       update: EVALUATED => EvaluationResult[Unit],
-                       limit: Int,
-                       parentBlocks: List[BLOCK_DEF]): Option[EvaluationResult[Int]] =
+  private def visitRef(
+      key: String,
+      update: EVALUATED => EvaluationResult[Unit],
+      limit: Int,
+      parentBlocks: List[BLOCK_DEF]
+  ): Option[EvaluationResult[Int]] =
     parentBlocks match {
       case LET_BLOCK(l @ LET(`key`, _), _) :: nextParentBlocks => Some(evaluateRef(update, limit, l, nextParentBlocks))
       case BLOCK(l @ LET(`key`, _), _) :: nextParentBlocks     => Some(evaluateRef(update, limit, l, nextParentBlocks))
