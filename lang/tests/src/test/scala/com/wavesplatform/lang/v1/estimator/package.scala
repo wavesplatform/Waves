@@ -6,7 +6,6 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
-import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.traits.Environment
