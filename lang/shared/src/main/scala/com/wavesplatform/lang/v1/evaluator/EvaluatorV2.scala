@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, _}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{AlwaysRejectError, ExecutionError, StringError}
+import com.wavesplatform.lang.{ExecutionError, StringError}
 import monix.eval.Coeval
 import shapeless.syntax.std.tuple._
 
@@ -67,7 +67,7 @@ class EvaluatorV2(
             .asInstanceOf[NativeFunction[Environment]]
             .ev
             .evaluateExtended[Id](ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]], limit - cost)
-            .map { case (r, additionalComplexity) => r.bimap((_, additionalComplexity), (_, additionalComplexity)) }
+            .map { case (r, additionalComplexity) => r.bimap((_, limit - additionalComplexity), (_, additionalComplexity)) }
         )
         _ <- update(result)
         totalCost = cost + additionalComplexity
