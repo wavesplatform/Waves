@@ -588,11 +588,12 @@ object Functions {
                   availableComplexity,
                   reentrant
                 )
-                .map(_.map { case (result, complexity) =>
-                  (result.leftMap {
+                .map(_.map { case (result, spentComplexity) =>
+                  val mappedError = result.leftMap {
                     case reject: AlwaysRejectError => reject
-                    case other                     => other.toString
-                  }, complexity)
+                    case other                     => StringError(other.toString)
+                  }
+                  (mappedError, spentComplexity)
                 })
             case xs =>
               val err = notImplemented[F, EVALUATED](s"invoke(dApp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
