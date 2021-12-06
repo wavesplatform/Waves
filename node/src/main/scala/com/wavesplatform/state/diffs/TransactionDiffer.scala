@@ -29,6 +29,7 @@ import com.wavesplatform.transaction.transfer.{MassTransferTransaction, Transfer
 import play.api.libs.json.Json
 
 import scala.collection.immutable.VectorMap
+import scala.util.control.NonFatal
 
 object TransactionDiffer {
   def apply(prevBlockTs: Option[Long], currentBlockTs: Long, verify: Boolean = true)(
@@ -159,9 +160,14 @@ object TransactionDiffer {
     stats.transactionDiffValidation
       .measureForType(tx.typeId) {
         tx match {
-          case gtx: GenesisTransaction           => GenesisTransactionDiff(blockchain.height)(gtx).traced
-          case ptx: PaymentTransaction           => PaymentTransactionDiff(blockchain)(ptx).traced
-          case ci: InvokeScriptTransaction       => InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(ci)
+          case gtx: GenesisTransaction => GenesisTransactionDiff(blockchain.height)(gtx).traced
+          case ptx: PaymentTransaction => PaymentTransactionDiff(blockchain)(ptx).traced
+          case ci: InvokeScriptTransaction =>
+            try {
+              InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(ci)
+            } catch {
+              case NonFatal(e) => TracedResult(Left(GenericError(s"${e.getMessage}")))
+            }
           case etx: ExchangeTransaction          => ExchangeTransactionDiff(blockchain)(etx).traced
           case itx: IssueTransaction             => AssetTransactionsDiff.issue(blockchain)(itx).traced
           case rtx: ReissueTransaction           => AssetTransactionsDiff.reissue(blockchain, currentBlockTs)(rtx).traced
