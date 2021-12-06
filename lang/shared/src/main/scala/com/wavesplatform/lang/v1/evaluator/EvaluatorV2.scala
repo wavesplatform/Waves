@@ -126,9 +126,8 @@ class EvaluatorV2(
           root(
             expr = b.body,
             update = {
-              case ev: EVALUATED =>
-                Defer(update(ev))
-              case nonEvaluated => EvaluationResult(b.body = nonEvaluated)
+              case ev: EVALUATED => Defer(update(ev))
+              case nonEvaluated  => EvaluationResult(b.body = nonEvaluated)
             },
             limit = limit,
             parentBlocks = b :: parentBlocks
@@ -143,14 +142,10 @@ class EvaluatorV2(
             parentBlocks = parentBlocks
           ).flatMap { unused =>
             g.expr match {
-              case co: CaseObj if unused > 0 =>
-                update(co.fields(g.field)).map(_ => unused - 1)
-              case _: CaseObj =>
-                EvaluationResult(unused)
-              case ev: EVALUATED =>
-                EvaluationResult(s"GETTER of non-case-object $ev with field '${g.field}", unused)
-              case _ =>
-                EvaluationResult(unused)
+              case co: CaseObj if unused > 0 => update(co.fields(g.field)).map(_ => unused - 1)
+              case _: CaseObj                => EvaluationResult(unused)
+              case ev: EVALUATED             => EvaluationResult(s"GETTER of non-case-object $ev with field '${g.field}", unused)
+              case _                         => EvaluationResult(unused)
             }
           }
         }
