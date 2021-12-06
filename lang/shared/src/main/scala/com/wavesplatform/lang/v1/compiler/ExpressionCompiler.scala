@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{BaseGlobal, ContractLimits, FunctionHeader}
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.lang.StringError
+import com.wavesplatform.lang.CommonError
 
 import scala.util.Try
 
@@ -113,7 +113,7 @@ object ExpressionCompiler {
 
       def adjustStr(expr: Expressions.CONST_STRING, str: String): Either[CompilationError, CompilationStepResultExpr] =
         CONST_STRING(str)
-          .filterOrElse(_ => allowIllFormedStrings || !global.isIllFormed(str), StringError(s"String '$str' contains ill-formed characters"))
+          .filterOrElse(_ => allowIllFormedStrings || !global.isIllFormed(str), CommonError(s"String '$str' contains ill-formed characters"))
           .leftMap(e => CompilationError.Generic(expr.position.start, expr.position.end, e.message))
           .map(CompilationStepResultExpr(ctx, _, STRING, expr))
           .recover { case err => CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, expr, List(err)) }

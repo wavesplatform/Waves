@@ -11,7 +11,7 @@ import cats.{Id, Monad}
 import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.{ExecutionError, StringError}
+import com.wavesplatform.lang.{ExecutionError, CommonError}
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils.getDecompilerContext
@@ -140,7 +140,7 @@ object PureContext {
           .cond(n.length <= 155, BigInt(n), s"String too long for 512-bits big integers (${n.length} when max is 155)")
           .filterOrElse(v => v <= BigIntMax && v >= BigIntMin, "Value too big for 512-bits big integer")
           .map(CONST_BIGINT.apply)
-          .leftMap(StringError)
+          .leftMap(CommonError)
       case xs => notImplemented[Id, EVALUATED]("parseBigIntValue(n: String)", xs)
     }
 
@@ -206,7 +206,7 @@ object PureContext {
             s"$a ${op.func} $b is out of range."
           )
           .map(CONST_BIGINT)
-          .leftMap(StringError)
+          .leftMap(CommonError)
       case args =>
         Left(s"Unexpected args $args for BigInt operator '${op.func}'")
     }
@@ -349,7 +349,7 @@ object PureContext {
           _ <- Either.cond(checkMax(result), (), s"Long overflow: value `$result` greater than 2^63-1")
           _ <- Either.cond(checkMin(result), (), s"Long overflow: value `$result` less than -2^63-1")
         } yield CONST_LONG(result.toLong)
-        r.leftMap(StringError)
+        r.leftMap(CommonError)
       case xs => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
     }
 
@@ -392,7 +392,7 @@ object PureContext {
           _ <- Either.cond(result <= BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
           _ <- Either.cond(result >= BigIntMin, (), s"Long overflow: value `$result` less than -2^511")
         } yield CONST_BIGINT(result)
-        r.leftMap(StringError)
+        r.leftMap(CommonError)
       case xs => notImplemented[Id, EVALUATED]("fraction(value: BigInt, numerator: BigInt, denominator: BigInt)", xs)
     }
 
@@ -414,7 +414,7 @@ object PureContext {
           _ <- Either.cond(r <= BigIntMax, (), s"Long overflow: value `$r` greater than 2^511-1")
           _ <- Either.cond(r >= BigIntMin, (), s"Long overflow: value `$r` less than -2^511")
         } yield CONST_BIGINT(r)
-        r.leftMap(StringError)
+        r.leftMap(CommonError)
       case xs =>
         notImplemented[Id, EVALUATED](
           "fraction(value: BigInt, numerator: BigInt, denominator: BigInt, round: Ceiling|Down|Floor|HalfEven|HalfUp)",
@@ -1350,7 +1350,7 @@ object PureContext {
             || rp > 8) {
           Left("pow: scale out of range 0-8")
         } else {
-          global.pow(b, bp, e, ep, rp, Rounding.byValue(round), useNewPrecision).map(CONST_LONG).leftMap(StringError)
+          global.pow(b, bp, e, ep, rp, Rounding.byValue(round), useNewPrecision).map(CONST_LONG).leftMap(CommonError)
         }
       case xs => notImplemented[Id, EVALUATED]("pow(base: Int, bp: Int, exponent: Int, ep: Int, rp: Int, round: Rounds)", xs)
     }
@@ -1365,9 +1365,9 @@ object PureContext {
             || ep > 8
             || rp < 0
             || rp > 8) {
-          Left(StringError("log: scale out of range 0-8"))
+          Left(CommonError("log: scale out of range 0-8"))
         } else {
-          global.log(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_LONG).leftMap(StringError)
+          global.log(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_LONG).leftMap(CommonError)
         }
       case xs => notImplemented[Id, EVALUATED]("log(exponent: Int, ep: Int, base: Int, bp: Int, rp: Int, round: Rounds)", xs)
     }

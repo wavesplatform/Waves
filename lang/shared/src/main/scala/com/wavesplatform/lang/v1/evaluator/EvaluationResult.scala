@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.evaluator
 
 import cats.{Monad, StackSafeMonad}
 import cats.syntax.either._
-import com.wavesplatform.lang.{ExecutionError, StringError}
+import com.wavesplatform.lang.{ExecutionError, CommonError}
 import monix.eval.Coeval
 
 case class EvaluationResult[+A](value: Coeval[Either[(ExecutionError, Int), A]]) {
@@ -15,7 +15,7 @@ case class EvaluationResult[+A](value: Coeval[Either[(ExecutionError, Int), A]])
 
 object EvaluationResult {
   def apply[A](value: A): EvaluationResult[A]                  = EvaluationResult(Coeval(Right(value)))
-  def apply[A](error: String, limit: Int): EvaluationResult[A] = EvaluationResult(Coeval(Left((StringError(error), limit))))
+  def apply[A](error: String, limit: Int): EvaluationResult[A] = EvaluationResult(Coeval(Left((CommonError(error), limit))))
 
   implicit val monad: Monad[EvaluationResult] = new StackSafeMonad[EvaluationResult] {
     override def pure[A](a: A): EvaluationResult[A] =

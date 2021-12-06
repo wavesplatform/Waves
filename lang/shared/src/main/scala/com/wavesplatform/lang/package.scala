@@ -4,7 +4,7 @@ import cats.Eval
 import cats.data.EitherT
 
 package object lang {
-  implicit def toError(msg: String): StringError = StringError(msg)
+  implicit def toError(msg: String): CommonError = CommonError(msg)
 
   type ExecutionLog   = String
 

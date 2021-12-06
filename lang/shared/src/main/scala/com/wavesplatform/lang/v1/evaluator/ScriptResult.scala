@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.evaluator
 import cats.Id
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.{ExecutionError, StringError}
+import com.wavesplatform.lang.{ExecutionError, CommonError}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
@@ -34,7 +34,7 @@ object ScriptResult {
   private def err[A](actual: AnyRef, version: StdLibVersion, expected: String = ""): Either[ExecutionError, A] =
     Types
       .callableReturnType(version)
-      .leftMap(StringError)
+      .leftMap(CommonError)
       .flatMap(
         t =>
           Left(
@@ -111,7 +111,7 @@ object ScriptResult {
           recipient <- processRecipient(recipient, ctx, version)
           address <- recipient match {
             case a: Address  => Right(a)
-            case Alias(name) => ctx.environment.resolveAlias(name).leftMap(StringError)
+            case Alias(name) => ctx.environment.resolveAlias(name).leftMap(CommonError)
           }
         } yield AssetTransfer(address, recipient, b, token)
       case other =>

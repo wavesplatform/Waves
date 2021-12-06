@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, _}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{ExecutionError, StringError}
+import com.wavesplatform.lang.{ExecutionError, CommonError}
 import monix.eval.Coeval
 import shapeless.syntax.std.tuple._
 
@@ -51,7 +51,7 @@ class EvaluatorV2(
         function <- EvaluationResult(Coeval {
           ctx.ec.functions
             .get(fc.function)
-            .toRight((StringError(s"function '${fc.function}' not found"), limit))
+            .toRight((CommonError(s"function '${fc.function}' not found"), limit))
         })
         cost = function.costByLibVersion(stdLibVersion).toInt
         result <- if (limit < cost)

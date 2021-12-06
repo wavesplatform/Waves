@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 import cats.syntax.either._
 import cats.syntax.functor._
 import cats.{Eval, Monad}
-import com.wavesplatform.lang.{ExecutionError, StringError}
+import com.wavesplatform.lang.{ExecutionError, CommonError}
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -44,7 +44,7 @@ object Vals {
                     case sf: SponsorFeePseudoTx => Bindings.mapSponsorFeePseudoTx(sf, version).asRight[ExecutionError]
                     case st: ScriptTransfer     => Bindings.scriptTransfer(st, version).asRight[ExecutionError]
                   },
-                  _ => StringError("Expected Transaction or Order").asLeft[EVALUATED]
+                  _ => CommonError("Expected Transaction or Order").asLeft[EVALUATED]
                 )
               )
             )

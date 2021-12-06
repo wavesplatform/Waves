@@ -4,7 +4,7 @@ import cats.Id
 import cats.syntax.either._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.{ExecutionError, StringError}
+import com.wavesplatform.lang.{ExecutionError, CommonError}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.VerifierFunction
 import com.wavesplatform.lang.directives.values.StdLibVersion
@@ -64,7 +64,7 @@ object ContractEvaluator {
           if (otherFuncs contains functionName)
             s"function '$functionName exists in the script but is not marked as @Callable, therefore cannot not be invoked"
           else s"@Callable function '$functionName' doesn't exist in the script"
-        StringError(message).asLeft[EXPR]
+        CommonError(message).asLeft[EXPR]
 
       case Some((f, fc)) =>
         val takingArgsNumber = f.u.args.size
@@ -78,7 +78,7 @@ object ContractEvaluator {
             )
           ).asRight[ExecutionError]
         } else {
-          StringError(s"function '$functionName takes $takingArgsNumber args but $passedArgsNumber were(was) given")
+          CommonError(s"function '$functionName takes $takingArgsNumber args but $passedArgsNumber were(was) given")
             .asLeft[EXPR]
         }
     }

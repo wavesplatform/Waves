@@ -7,7 +7,7 @@ import cats.instances.list._
 import cats.syntax.traverse._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.lang.{ExecutionError, StringError}
+import com.wavesplatform.lang.{ExecutionError, CommonError}
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -195,7 +195,7 @@ object Terms {
     case object DataTxSize      extends Limit(DataTxMaxBytes)
     case object NoLimit         extends Limit(Int.MaxValue)
 
-    def apply(bs: ByteStr, limit: Limit = DataEntrySize): Either[StringError, EVALUATED] =
+    def apply(bs: ByteStr, limit: Limit = DataEntrySize): Either[CommonError, EVALUATED] =
       Either.cond(
         bs.size <= limit.value,
         new CONST_BYTESTR(bs),
@@ -222,7 +222,7 @@ object Terms {
     override def hashCode(): Int = s.hashCode
   }
   object CONST_STRING {
-    def apply(s: String, reduceLimit: Boolean = true): Either[StringError, CONST_STRING] = {
+    def apply(s: String, reduceLimit: Boolean = true): Either[CommonError, CONST_STRING] = {
       val limit =
         if (reduceLimit) DataEntryValueMax
         else DataTxMaxBytes

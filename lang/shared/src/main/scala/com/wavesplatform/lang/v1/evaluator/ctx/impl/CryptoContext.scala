@@ -4,7 +4,7 @@ import cats.implicits._
 import cats.{Id, Monad}
 import com.wavesplatform.common.merkle.Merkle.createRoot
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.{ExecutionError, StringError}
+import com.wavesplatform.lang.{ExecutionError, CommonError}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, _}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -174,7 +174,7 @@ object CryptoContext {
     ) =
       for {
         alg    <- algFromCO(digestAlg)
-        result <- global.rsaVerify(alg, msg.arr, sig.arr, pub.arr).leftMap(StringError)
+        result <- global.rsaVerify(alg, msg.arr, sig.arr, pub.arr).leftMap(CommonError)
       } yield CONST_BOOLEAN(result)
 
     val rsaVerifyF: BaseFunction[NoContext] = {
@@ -236,7 +236,7 @@ object CryptoContext {
         STRING,
         ("bytes", BYTESTR)
       ) {
-        case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base58Encode(bytes.arr).leftMap(StringError).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
+        case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base58Encode(bytes.arr).leftMap(CommonError).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
         case xs                                   => notImplemented[Id, EVALUATED]("toBase58String(bytes: ByteVector)", xs)
       }
 
@@ -248,7 +248,7 @@ object CryptoContext {
         BYTESTR,
         ("str", STRING)
       ) {
-        case CONST_STRING(str: String) :: Nil => global.base58Decode(str, global.MaxBase58String).leftMap(StringError).flatMap(x => CONST_BYTESTR(ByteStr(x)))
+        case CONST_STRING(str: String) :: Nil => global.base58Decode(str, global.MaxBase58String).leftMap(CommonError).flatMap(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented[Id, EVALUATED]("fromBase58String(str: String)", xs)
       }
 
@@ -260,7 +260,7 @@ object CryptoContext {
         STRING,
         ("bytes", BYTESTR)
       ) {
-        case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base64Encode(bytes.arr).leftMap(StringError).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
+        case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base64Encode(bytes.arr).leftMap(CommonError).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
         case xs                                   => notImplemented[Id, EVALUATED]("toBase64String(bytes: ByteVector)", xs)
       }
 
@@ -272,7 +272,7 @@ object CryptoContext {
         BYTESTR,
         ("str", STRING)
       ) {
-        case CONST_STRING(str: String) :: Nil => global.base64Decode(str, global.MaxBase64String).leftMap(StringError).flatMap(x => CONST_BYTESTR(ByteStr(x)))
+        case CONST_STRING(str: String) :: Nil => global.base64Decode(str, global.MaxBase64String).leftMap(CommonError).flatMap(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented[Id, EVALUATED]("fromBase64String(str: String)", xs)
       }
 
@@ -317,13 +317,13 @@ object CryptoContext {
       }
 
     def toBase16StringF(checkLength: Boolean): BaseFunction[NoContext] = NativeFunction("toBase16String", 10, TOBASE16, STRING, ("bytes", BYTESTR)) {
-      case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr, checkLength).leftMap(StringError).flatMap(CONST_STRING(_))
+      case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr, checkLength).leftMap(CommonError).flatMap(CONST_STRING(_))
       case xs                                   => notImplemented[Id, EVALUATED]("toBase16String(bytes: ByteVector)", xs)
     }
 
     def fromBase16StringF(checkLength: Boolean): BaseFunction[NoContext] =
       NativeFunction("fromBase16String", 10, FROMBASE16, BYTESTR, ("str", STRING)) {
-        case CONST_STRING(str: String) :: Nil => global.base16Decode(str, checkLength).leftMap(StringError).flatMap(x => CONST_BYTESTR(ByteStr(x)))
+        case CONST_STRING(str: String) :: Nil => global.base16Decode(str, checkLength).leftMap(CommonError).flatMap(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented[Id, EVALUATED]("fromBase16String(str: String)", xs)
       }
 

@@ -3,13 +3,13 @@ package com.wavesplatform.lang.v1.evaluator.ctx
 import cats.Monad
 import cats.syntax.applicative._
 import cats.syntax.either._
-import com.wavesplatform.lang.{ExecutionError, StringError}
+import com.wavesplatform.lang.{ExecutionError, CommonError}
 import com.wavesplatform.lang.v1.compiler.Terms.CaseObj
 import com.wavesplatform.lang.v1.compiler.Types.UNIT
 
 package object impl {
   def notImplemented[F[_] : Monad, R](funcName: String, args: List[Any]): F[Either[ExecutionError, R]] =
-    (StringError(s"Can't apply (${args.map(_.getClass.getSimpleName).mkString(", ")}) to '$funcName'"): ExecutionError)
+    (CommonError(s"Can't apply (${args.map(_.getClass.getSimpleName).mkString(", ")}) to '$funcName'"): ExecutionError)
         .asLeft[R].pure[F]
 
   lazy val unit: CaseObj = CaseObj(UNIT, Map.empty)
