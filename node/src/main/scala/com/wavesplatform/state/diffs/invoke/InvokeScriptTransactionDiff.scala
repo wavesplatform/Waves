@@ -5,6 +5,7 @@ import scala.util.Right
 import cats.Id
 import cats.syntax.either._
 import cats.syntax.semigroup._
+import cats.syntax.flatMap._
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -122,7 +123,13 @@ object InvokeScriptTransactionDiff {
               tx.dAppAddressOrAlias,
               functionCall,
               scriptResultE.map(_.scriptResult),
-              scriptResultE.fold(_.log, _.log),
+              scriptResultE.fold(
+                {
+                  case w: WithLog => w.log
+                  case _          => Nil
+                },
+                _.log
+              ),
               environment.invocationRoot.toTraceList(tx.id())
             )
           )
@@ -283,7 +290,7 @@ object InvokeScriptTransactionDiff {
       estimatedComplexity: Int,
       paymentsComplexity: Int,
       blockchain: Blockchain
-  ): Either[ValidationError with WithLog, (ScriptResult, Log[Id])] = {
+  ): Either[ValidationError, (ScriptResult, Log[Id])] = {
     val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     val startLimit    = limit - paymentsComplexity
     ContractEvaluator
@@ -291,7 +298,7 @@ object InvokeScriptTransactionDiff {
       .runAttempt()
       .leftMap(error => (error.getMessage: ExecutionError, 0, Nil: Log[Id]))
       .flatten
-      .leftMap {
+      .leftMap[ValidationError] {
         case (error, unusedComplexity, log) =>
           val usedComplexity = startLimit - unusedComplexity.max(0)
           if (usedComplexity > failFreeLimit && !error.isInstanceOf[AlwaysRejectError]) {
@@ -300,11 +307,7 @@ object InvokeScriptTransactionDiff {
           } else
             ScriptExecutionError.dAppExecution(error.message, log)
       }
-      .flatMap { r =>
-        InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1)
-          .leftMap(e => ScriptExecutionError(e.message, r._2, None))
-          .map(_ => r)
-      }
+      .flatTap { r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1) }
   }
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[String, Unit] = {

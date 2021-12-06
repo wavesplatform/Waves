@@ -5,6 +5,8 @@ import cats.Id
 import cats.instances.list._
 import cats.syntax.either._
 import cats.syntax.semigroup._
+import cats.syntax.foldable._
+import cats.syntax.flatMap._
 import cats.syntax.traverseFilter._
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
@@ -16,7 +18,7 @@ import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, RejectException, ScriptResult, ScriptResultV3, ScriptResultV4}
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
@@ -207,13 +209,14 @@ object InvokeScriptDiff {
             }
             _ = invocationRoot.setLog(log)
 
-            _ = if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
-              checkDiffBalances(diff, blockchain)
+            _ <- if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
+              traced(checkDiffBalances(diff, blockchain))
+            else traced(Right(()))
 
             newBlockchain = CompositeBlockchain(blockchain, diff)
 
             _ <- traced {
-              val newBalance    = newBlockchain.balance(invoker)
+              val newBalance = newBlockchain.balance(invoker)
               Either.cond(
                 blockchain.height < blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight || newBalance >= 0,
                 (),
@@ -283,8 +286,10 @@ object InvokeScriptDiff {
             }
             resultDiff = diff.copy(scriptsComplexity = 0) |+| actionsDiff |+| Diff.empty.copy(scriptsComplexity = paymentsComplexity)
 
-            _ = if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
-              checkDiffBalances(resultDiff, blockchain)
+            _ <- if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
+              traced(checkDiffBalances(resultDiff, blockchain))
+            else
+              traced(Right(()))
 
             _ = invocationRoot.setResult(scriptResult)
           } yield (resultDiff, evaluated, remainingActions1, remainingData1, remainingDataSize1)
@@ -299,24 +304,25 @@ object InvokeScriptDiff {
     }
   }
 
-  private def checkDiffBalances(diff: Diff, blockchain: Blockchain): Unit = {
+  private def checkDiffBalances(diff: Diff, blockchain: Blockchain): Either[AlwaysRejectError, Unit] = {
     val newBlockchain = CompositeBlockchain(blockchain, diff)
-    diff.portfolios.toList.foreach {
-      case (address, portfolio) =>
-        if (portfolio.balance < 0) {
-          val newBalance = newBlockchain.balance(address)
-          if (newBalance < 0)
-            throw RejectException(balanceError(address, newBalance, Waves))
-        }
-        portfolio.assets.foreach {
-          case (asset, amount) =>
-            if (amount < 0) {
-              val newBalance = newBlockchain.balance(address, asset)
-              if (newBalance < 0)
-                throw RejectException(balanceError(address, newBalance, asset))
-            }
-        }
+
+    def checkBalance(address: Address, asset: Asset, amount: Long): Option[AlwaysRejectError] = {
+      lazy val newBalance = newBlockchain.balance(address, asset)
+      if (amount < 0 && newBalance < 0)
+        Some(AlwaysRejectError(balanceError(address, newBalance, asset)))
+      else
+        None
     }
+
+    diff.portfolios.toList
+      .collectFirstSome {
+        case (address, portfolio) =>
+          val wavesBalanceError = checkBalance(address, Waves, portfolio.balance)
+          val assetBalanceError = portfolio.assets.toList.collectFirstSome { case (asset, amount) => checkBalance(address, asset, amount) }
+          wavesBalanceError.orElse(assetBalanceError)
+      }
+      .toLeft(())
   }
 
   private def balanceError(address: Address, balance: Long, asset: Asset) = {
@@ -348,7 +354,7 @@ object InvokeScriptDiff {
               val usedComplexity = startComplexity - unusedComplexity
               FailedTransactionError.dAppExecution(error.message, usedComplexity, log)
           }
-        ).flatMap { r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1).map(_ => r) }
+        ).flatTap(r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1))
       )
   }
 }

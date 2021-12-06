@@ -17,7 +17,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, _}
-import com.wavesplatform.lang.v1.evaluator.{Log, RejectException, ScriptResult, ScriptResultV4}
+import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, _}
@@ -241,7 +241,10 @@ object InvokeDiffsCommon {
       }
 
       compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff, complexityLimit)
-        .leftMap(_.addComplexity(storingComplexity))
+        .leftMap {
+          case failed: FailedTransactionError => failed.addComplexity(storingComplexity)
+          case other                          => other
+        }
 
       isr = InvokeScriptResult(
         dataEntries,
@@ -393,8 +396,8 @@ object InvokeDiffsCommon {
       actions: List[CallableAction],
       paymentsDiff: Diff,
       remainingLimit: Int
-  ): TracedResult[FailedTransactionError, Diff] =
-    actions.foldLeft(TracedResult(paymentsDiff.asRight[FailedTransactionError])) { (diffAcc, action) =>
+  ): TracedResult[ValidationError, Diff] =
+    actions.foldLeft(TracedResult(paymentsDiff.asRight[ValidationError])) { (diffAcc, action) =>
       diffAcc match {
         case TracedResult(Right(curDiff), _, _) =>
           val complexityLimit =
@@ -460,7 +463,7 @@ object InvokeDiffsCommon {
           def applyDataItem(item: DataOp): TracedResult[FailedTransactionError, Diff] =
             TracedResult.wrapValue(Diff(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item))))))
 
-          def applyIssue(itx: InvokeScriptLike, pk: PublicKey, issue: Issue): TracedResult[FailedTransactionError, Diff] = {
+          def applyIssue(itx: InvokeScriptLike, pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] = {
             if (issue.name
                   .getBytes("UTF-8")
                   .length < IssueTransaction.MinAssetNameLength || issue.name.getBytes("UTF-8").length > IssueTransaction.MaxAssetNameLength) {
@@ -469,7 +472,7 @@ object InvokeDiffsCommon {
               TracedResult(Left(FailedTransactionError.dAppExecution("Invalid asset description", 0L)), List())
             } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined) {
               if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
-                throw RejectException(s"Asset ${issue.id} is already issued")
+                TracedResult(Left(AlwaysRejectError(s"Asset ${issue.id} is already issued")))
               else
                 TracedResult(Left(FailedTransactionError.dAppExecution(s"Asset ${issue.id} is already issued", 0L)), List())
             } else {
@@ -492,20 +495,20 @@ object InvokeDiffsCommon {
             }
           }
 
-          def applyReissue(reissue: Reissue, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
+          def applyReissue(reissue: Reissue, pk: PublicKey): TracedResult[ValidationError, Diff] = {
             val reissueDiff =
               DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue).leftMap(FailedTransactionError.asFailedScriptError)
             val pseudoTx = ReissuePseudoTx(reissue, actionSender, pk, tx.txId, tx.timestamp)
             callAssetVerifierWithPseudoTx(reissueDiff, reissue.assetId, pseudoTx, AssetContext.Reissue)
           }
 
-          def applyBurn(burn: Burn, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
+          def applyBurn(burn: Burn, pk: PublicKey): TracedResult[ValidationError, Diff] = {
             val burnDiff = DiffsCommon.processBurn(blockchain, dAppAddress, fee = 0, burn).leftMap(FailedTransactionError.asFailedScriptError)
             val pseudoTx = BurnPseudoTx(burn, actionSender, pk, tx.txId, tx.timestamp)
             callAssetVerifierWithPseudoTx(burnDiff, burn.assetId, pseudoTx, AssetContext.Burn)
           }
 
-          def applySponsorFee(sponsorFee: SponsorFee, pk: PublicKey): TracedResult[FailedTransactionError, Diff] =
+          def applySponsorFee(sponsorFee: SponsorFee, pk: PublicKey): TracedResult[ValidationError, Diff] =
             for {
               _ <- TracedResult(
                 Either.cond(
@@ -543,7 +546,7 @@ object InvokeDiffsCommon {
               assetId: ByteStr,
               pseudoTx: PseudoTx,
               assetType: AssetContext
-          ): TracedResult[FailedTransactionError, Diff] =
+          ): TracedResult[ValidationError, Diff] =
             blockchain.assetScript(IssuedAsset(assetId)).fold(TracedResult(actionDiff)) {
               case AssetScriptInfo(script, complexity) =>
                 val assetValidationDiff =
@@ -580,7 +583,10 @@ object InvokeDiffsCommon {
             case l: Lease        => applyLease(l).leftMap(FailedTransactionError.asFailedScriptError)
             case lc: LeaseCancel => applyLeaseCancel(lc).leftMap(FailedTransactionError.asFailedScriptError)
           }
-          diffAcc |+| diff.leftMap(_.addComplexity(curDiff.scriptsComplexity))
+          diffAcc |+| diff.leftMap {
+            case failed: FailedTransactionError => failed.addComplexity(curDiff.scriptsComplexity)
+            case other                          => other
+          }
 
         case _ => diffAcc
       }
@@ -644,7 +650,7 @@ object InvokeDiffsCommon {
       val actual  = limit + dataSize - availableDataSize
       val message = s"Storing data size should not exceed $limit, actual: $actual bytes"
       if (blockchain.height >= checkSizeRejectHeight) {
-        throw RejectException(message)
+        TracedResult(Left(AlwaysRejectError(message)))
       } else if (blockchain.height >= checkSizeHeight)
         error(message)
       else
@@ -658,27 +664,25 @@ object InvokeDiffsCommon {
   def checkScriptResultFields(blockchain: Blockchain, r: ScriptResult): Either[AlwaysRejectError, Unit] =
     r match {
       case ScriptResultV4(actions, _, _) if blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight =>
-        actions.traverse {
-          case Reissue(_, _, quantity) => if (quantity < 0) Left(AlwaysRejectError(s"Negative reissue quantity = $quantity")) else Right(())
-          case Burn(_, quantity)       => if (quantity < 0) Left(AlwaysRejectError(s"Negative burn quantity = $quantity")) else Right(())
-          case t: AssetTransfer        => if (t.amount < 0) Left(AlwaysRejectError(s"Negative transfer amount = ${t.amount}")) else Right(())
-          case l: Lease                => if (l.amount < 0) Left(AlwaysRejectError(s"Negative lease amount = ${l.amount}")) else Right(())
-          case s: SponsorFee =>
-            if (s.minSponsoredAssetFee.exists(_ < 0))
-              Left(AlwaysRejectError(s"Negative sponsor amount = ${s.minSponsoredAssetFee.get}"))
-            else
-              Right(())
-          case i: Issue =>
-            val length = i.name.getBytes("UTF-8").length
-            if (length < IssueTransaction.MinAssetNameLength || length > IssueTransaction.MaxAssetNameLength) {
-              Left(AlwaysRejectError("Invalid asset name"))
-            } else if (i.description.length > IssueTransaction.MaxAssetDescriptionLength) {
-              Left(AlwaysRejectError("Invalid asset description"))
-            } else
-              Right(())
-          case _ =>
-            Right(())
-        }.map(_ => ())
+        actions
+          .collectFirstSome {
+            case Reissue(_, _, quantity) if quantity < 0   => Some(AlwaysRejectError(s"Negative reissue quantity = $quantity"))
+            case Burn(_, quantity) if quantity < 0         => Some(AlwaysRejectError(s"Negative burn quantity = $quantity"))
+            case t: AssetTransfer if t.amount < 0          => Some(AlwaysRejectError(s"Negative transfer amount = ${t.amount}"))
+            case l: Lease if l.amount < 0                  => Some(AlwaysRejectError(s"Negative lease amount = ${l.amount}"))
+            case SponsorFee(_, Some(amount)) if amount < 0 => Some(AlwaysRejectError(s"Negative sponsor amount = $amount"))
+            case i: Issue =>
+              val length = i.name.getBytes("UTF-8").length
+              if (length < IssueTransaction.MinAssetNameLength || length > IssueTransaction.MaxAssetNameLength)
+                Some(AlwaysRejectError("Invalid asset name"))
+              else if (i.description.length > IssueTransaction.MaxAssetDescriptionLength)
+                Some(AlwaysRejectError("Invalid asset description"))
+              else
+                None
+            case _ =>
+              None
+          }
+          .toLeft(())
       case _ =>
         Right(())
     }
