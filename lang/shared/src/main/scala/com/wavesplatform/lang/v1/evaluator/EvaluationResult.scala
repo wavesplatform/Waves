@@ -14,7 +14,7 @@ case class EvaluationResult[+A](value: Coeval[Either[(ExecutionError, Int), A]])
 }
 
 object EvaluationResult {
-  def apply[A](value: => A): EvaluationResult[A]               = EvaluationResult(Coeval(Right(value)))
+  def apply[A](value: A): EvaluationResult[A]                  = EvaluationResult(Coeval(Right(value)))
   def apply[A](error: String, limit: Int): EvaluationResult[A] = EvaluationResult(Coeval(Left((StringError(error), limit))))
 
   implicit val monad: Monad[EvaluationResult] = new StackSafeMonad[EvaluationResult] {
