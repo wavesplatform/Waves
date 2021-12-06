@@ -102,12 +102,12 @@ class EvaluatorV2(
           case _                           => EvaluationResult(s"Function or type '$name' not found", limit)
         }
         passedArgs = fc.args.asInstanceOf[List[EVALUATED]]
-        _ <- EvaluationResult(Coeval(if (checkConstructorArgsTypes) doCheckConstructorArgsTypes(objectType, passedArgs, limit) else ()))
+        _ <- if (checkConstructorArgsTypes) doCheckConstructorArgsTypes(objectType, passedArgs, limit) else EvaluationResult(())
         fields = objectType.fields.map(_._1) zip passedArgs
         r <- root(CaseObj(objectType, fields.toMap), update, limit, parentBlocks)
       } yield r
 
-    def doCheckConstructorArgsTypes(objectType: CASETYPEREF, passedArgs: List[EVALUATED], limit: Int): Unit = {
+    def doCheckConstructorArgsTypes(objectType: CASETYPEREF, passedArgs: List[EVALUATED], limit: Int): EvaluationResult[Unit] = {
       def str[T](l: List[T]) = l.mkString("(", ", ", ")")
 
       if (objectType.fields.size != passedArgs.size)
@@ -117,6 +117,8 @@ class EvaluatorV2(
         val passedArgsTypes = passedArgs.map(_.getType)
         if (!(fieldTypes zip passedArgsTypes).forall { case (fieldType, passedType) => fieldType >= passedType })
           EvaluationResult(s"Passed args ${str(passedArgs)} are unsuitable for constructor ${objectType.name}${str(fieldTypes)}", limit)
+        else
+          EvaluationResult(())
       }
     }
 
