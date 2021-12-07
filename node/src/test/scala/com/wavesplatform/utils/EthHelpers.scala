@@ -6,8 +6,8 @@ import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.{EthereumTransaction, TxHelpers}
 import com.wavesplatform.transaction.utils.EthTxGenerator
-import org.scalatest.{BeforeAndAfterAll, Suite}
-import org.web3j.crypto.{Bip32ECKeyPair, RawTransaction}
+import org.scalatest.{BeforeAndAfterEach, Suite}
+import org.web3j.crypto.{Bip32ECKeyPair, RawTransaction, SignedRawTransaction}
 import org.web3j.crypto.Sign.SignatureData
 
 trait EthHelpers {
@@ -63,15 +63,19 @@ trait EthHelpers {
     def defaultEthSigner: Bip32ECKeyPair = helpers.defaultSigner.toEthKeyPair
     def defaultEthAddress: Address       = helpers.defaultSigner.toEthWavesAddress
   }
+
+  implicit class EthTransactionTestExt(tx: EthereumTransaction) {
+    def toSignedRawTransaction: SignedRawTransaction = new SignedRawTransaction(tx.underlying.getTransaction, tx.signatureData)
+  }
 }
 
-trait EthSetChainId extends BeforeAndAfterAll with EthHelpers { self: Suite =>
-  abstract override protected def beforeAll(): Unit = {
+trait EthSetChainId extends BeforeAndAfterEach with EthHelpers { self: Suite =>
+  abstract override protected def beforeEach(): Unit = {
+    super.beforeEach()
     EthChainId.set()
-    super.beforeAll()
   }
-  abstract override protected def afterAll(): Unit = {
+  abstract override protected def afterEach(): Unit = {
     EthChainId.unset()
-    super.afterAll()
+    super.afterEach()
   }
 }

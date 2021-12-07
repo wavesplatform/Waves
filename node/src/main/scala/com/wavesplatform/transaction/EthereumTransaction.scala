@@ -178,39 +178,52 @@ object EthereumTransaction {
 
   val ERC20TransferPrefix: String = "a9059cbb"
 
-  def extractPayload(underlying: RawTransaction): Payload = {
-    val hexData          = EthEncoding.cleanHexPrefix(underlying.getData)
-    val recipientAddress = ByteStr(EthEncoding.toBytes(underlying.getTo))
-    if (hexData.isEmpty) {
-      Transfer(
-        None,
-        (BigInt(underlying.getValue) / AmountMultiplier).bigInteger.longValueExact(),
-        Address(recipientAddress.arr)
-      )
-    } else if (hexData.startsWith(ERC20TransferPrefix)) {
-      val recipient = decode[EthAddress](hexData, 8)
-      val amount    = decode[Uint256](hexData, 72)
-      Transfer(
-        Some(ERC20Address(recipientAddress)),
-        amount.getValue.longValueExact(),
-        Address(EthEncoding.toBytes(recipient.toString))
-      )
-    } else Invocation(Address(recipientAddress.arr), hexData)
+  def extractPayload(underlying: RawTransaction, chainId: Byte): Payload = {
+    val hexData               = EthEncoding.cleanHexPrefix(underlying.getData)
+    val recipientBytes        = ByteStr(EthEncoding.toBytes(underlying.getTo))
+    lazy val recipientAddress = Address(recipientBytes.arr, chainId)
+
+    hexData match {
+      // Waves transfer
+      case "" =>
+        val amount = BigInt(underlying.getValue) / AmountMultiplier
+        Transfer(
+          None,
+          amount.bigInteger.longValueExact(),
+          recipientAddress
+        )
+
+      // Asset transfer
+      case transferCall if transferCall.startsWith(ERC20TransferPrefix) =>
+        val recipient = decode[EthAddress](transferCall, 8)
+        val amount    = decode[Uint256](transferCall, 72)
+        Transfer(
+          Some(ERC20Address(recipientBytes)),
+          amount.getValue.longValueExact(),
+          Address(EthEncoding.toBytes(recipient.toString), chainId)
+        )
+
+      // Script invocation
+      case customCall =>
+        Invocation(recipientAddress, customCall)
+    }
   }
 
   def apply(underlying: RawTransaction): Either[ValidationError, EthereumTransaction] =
     new EthereumTransaction(
-      extractPayload(underlying),
+      extractPayload(underlying, AddressScheme.current.chainId),
       underlying,
       new SignatureData(Array.emptyByteArray, Array.emptyByteArray, Array.emptyByteArray),
       AddressScheme.current.chainId
     ).validatedEither
 
-  def apply(underlying: SignedRawTransaction): Either[ValidationError, EthereumTransaction] =
+  def apply(underlying: SignedRawTransaction): Either[ValidationError, EthereumTransaction] = {
+    val chainId = Option(underlying.getChainId).fold(AddressScheme.current.chainId)(_.toByte)
     new EthereumTransaction(
-      extractPayload(underlying),
+      extractPayload(underlying, chainId),
       underlying,
       underlying.getSignatureData,
-      Option(underlying.getChainId).fold(AddressScheme.current.chainId)(_.toByte)
+      chainId
     ).validatedEither
+  }
 }

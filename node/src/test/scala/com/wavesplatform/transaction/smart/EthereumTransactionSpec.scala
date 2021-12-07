@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, EthSetChainId, JsonMatchers}
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.{BeforeAndAfterAll, Inside}
 import org.web3j.crypto.{RawTransaction, Sign, SignedRawTransaction, TransactionEncoder}
 import play.api.libs.json.Json
 
@@ -31,7 +31,8 @@ class EthereumTransactionSpec
     with EthHelpers
     with EthSetChainId
     with DiffMatchers
-    with JsonMatchers {
+    with JsonMatchers
+    with Inside {
 
   val TestAsset: IssuedAsset = TestValues.asset
 
@@ -40,6 +41,26 @@ class EthereumTransactionSpec
     val senderAddress = TxHelpers.defaultSigner.toEthWavesAddress
     val transaction   = EthTxGenerator.generateEthTransfer(senderAccount, senderAddress, 1, Waves)
     transaction.senderAddress() shouldBe senderAccount.toWavesAddress
+  }
+
+  it should "recover correct address chainId" in {
+    val transfer      = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 1, Waves)
+    val assetTransfer = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 1, TestValues.asset)
+    val invoke        = EthTxGenerator.generateEthInvoke(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, "test", Nil, Nil)
+
+    EthChainId.unset() // Set to 'T'
+
+    inside(EthereumTransaction(transfer.toSignedRawTransaction).explicitGet().payload) {
+      case t: EthereumTransaction.Transfer => t.recipient.chainId shouldBe 'E'.toByte
+    }
+
+    inside(EthereumTransaction(assetTransfer.toSignedRawTransaction).explicitGet().payload) {
+      case t: EthereumTransaction.Transfer => t.recipient.chainId shouldBe 'E'.toByte
+    }
+
+    inside(EthereumTransaction(invoke.toSignedRawTransaction).explicitGet().payload) {
+      case t: EthereumTransaction.Invocation => t.dApp.chainId shouldBe 'E'.toByte
+    }
   }
 
   it should "change id if signature is changed" in {
@@ -51,8 +72,8 @@ class EthereumTransactionSpec
   }
 
   it should "reject legacy transactions" in {
-    val senderAccount = TxHelpers.defaultEthSigner
-    val eip155Transaction  = EthTxGenerator.generateEthTransfer(senderAccount, TxHelpers.defaultAddress, 1, Waves)
+    val senderAccount     = TxHelpers.defaultEthSigner
+    val eip155Transaction = EthTxGenerator.generateEthTransfer(senderAccount, TxHelpers.defaultAddress, 1, Waves)
 
     val legacyTransaction =
       new SignedRawTransaction(
