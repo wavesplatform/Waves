@@ -13,13 +13,15 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script.ComplexityInfo
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
+import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCompiler}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -32,7 +34,6 @@ import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{Blockchain, Diff}
-import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment}
@@ -113,7 +114,7 @@ case class UtilsApiRoute(
   }
 
   def compileCode: Route = path("script" / "compileCode") {
-    (post & entity(as[String])) { code =>
+    (post & entity(as[String]) & parameter("compact".as[Boolean] ? false)) { (code, compact) =>
       val v5Activated = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
       def stdLib: StdLibVersion = {
         if (v5Activated) {
@@ -124,28 +125,32 @@ case class UtilsApiRoute(
           StdLibVersion.VersionDic.default
         }
       }
-      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), defaultStdLib = stdLib)) { result =>
-        complete(
-          result
-            .fold(
-              e => ScriptCompilerError(e), {
-                case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
-                  val extraFee =
-                    if (verifierComplexity <= ContractLimits.FreeVerifierComplexity && v5Activated)
-                      0
-                    else
-                      FeeValidation.ScriptExtraFee
-                  Json.obj(
-                    "script"               -> script.bytes().base64,
-                    "complexity"           -> maxComplexity,
-                    "verifierComplexity"   -> verifierComplexity,
-                    "callableComplexities" -> callableComplexities,
-                    "extraFee"             -> extraFee
-                  )
-              }
-            )
-        )
+      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), defaultStdLib = stdLib)) {
+        case Left(e) =>
+          complete(ScriptCompilerError(e))
 
+        case Right((script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity))) =>
+          val extraFee =
+            if (verifierComplexity <= ContractLimits.FreeVerifierComplexity && v5Activated)
+              0
+            else
+              FeeValidation.ScriptExtraFee
+
+          val compactedScript = script match {
+            case ContractScript.ContractScriptImpl(stdLibVersion, expr) if compact =>
+              ContractScriptImpl(stdLibVersion, ContractScriptCompactor.compact(expr))
+
+            case _ => script
+          }
+
+          val resultJson = Json.obj(
+            "script"               -> compactedScript.bytes().base64,
+            "complexity"           -> maxComplexity,
+            "verifierComplexity"   -> verifierComplexity,
+            "callableComplexities" -> callableComplexities,
+            "extraFee"             -> extraFee
+          )
+          complete(resultJson)
       }
 
     }

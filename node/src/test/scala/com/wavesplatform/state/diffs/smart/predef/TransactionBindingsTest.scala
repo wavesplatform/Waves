@@ -372,6 +372,7 @@ class TransactionBindingsTest
            |""".stripMargin
 
       val blockchain = stub[Blockchain]
+      (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
       (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
       (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
 

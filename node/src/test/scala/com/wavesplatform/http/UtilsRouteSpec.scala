@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
 import scala.concurrent.duration._
+
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKey
@@ -25,7 +26,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
+import com.wavesplatform.protobuf.dapp.DAppMeta.{CallableFuncSignature, CompactNameAndOriginalNamePair}
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, IntegerDataEntry}
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.TxHelpers
@@ -34,10 +35,11 @@ import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
+import org.scalatest.Inside
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
-class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory {
+class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory with Inside {
   implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
   implicit val timeout          = routeTestTimeout.duration
 
@@ -247,6 +249,15 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       |{-# STDLIB_VERSION 3 #-}
       |{-# CONTENT_TYPE DAPP #-}
       |{-# SCRIPT_TYPE ACCOUNT #-}
+    """.stripMargin
+
+  val dAppWithNonCallable =
+    """
+      |{-# STDLIB_VERSION 3 #-}
+      |{-# CONTENT_TYPE DAPP #-}
+      |{-# SCRIPT_TYPE ACCOUNT #-}
+      |
+      |func test() = true
     """.stripMargin
 
   val dAppWithPaidVerifier =
@@ -499,6 +510,22 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   routePath("/script/compileCode") in {
+    Post(routePath("/script/compileCode?compact=true"), dAppWithNonCallable) ~> route ~> check {
+      responseAs[JsValue] should matchJson("""{
+                                             |  "script" : "base64:AAIDAAAAAAAAAA0IARoJCgFhEgR0ZXN0AAAAAQEAAAABYQAAAAAGAAAAAAAAAAA00atG",
+                                             |  "complexity" : 0,
+                                             |  "verifierComplexity" : 0,
+                                             |  "callableComplexities" : { },
+                                             |  "extraFee" : 400000
+                                             |}""".stripMargin)
+
+      val script = (responseAs[JsValue] \ "script").as[String]
+      inside(Script.fromBase64String(script).explicitGet()) {
+        case ContractScript.ContractScriptImpl(_, expr) =>
+          expr.meta.compactNameAndOriginalNamePairList shouldBe Seq(CompactNameAndOriginalNamePair("a", "test"))
+      }
+    }
+
     Post(routePath("/script/compileCode"), "{-# STDLIB_VERSION 2 #-}\n(1 == 2)") ~> route ~> check {
       val json           = responseAs[JsValue]
       val expectedScript = ExprScript(V2, script).explicitGet()
