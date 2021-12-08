@@ -124,7 +124,7 @@ object FunctionalitySettings {
     checkTotalDataEntriesBytesHeight = 2771954,
     syncDAppCheckTransfersHeight = 2792473,
     estimationOverflowFixHeight = 2858710,
-    estimatorSumOverflowFixHeight = 2877433
+    estimatorSumOverflowFixHeight = 2890000
   )
 
   val TESTNET = apply(

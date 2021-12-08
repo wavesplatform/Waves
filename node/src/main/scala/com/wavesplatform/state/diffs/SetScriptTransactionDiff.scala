@@ -36,7 +36,7 @@ object SetScriptTransactionDiff {
         scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
       )
 
-  private def estimate(
+  def estimate(
       blockchain: Blockchain,
       version: StdLibVersion,
       dApp: DApp,
@@ -46,7 +46,7 @@ object SetScriptTransactionDiff {
     val actualComplexities =
       for {
         currentComplexity <- ContractScript.estimateComplexity(version, callables, blockchain.estimator, blockchain.useReducedVerifierComplexityLimit)
-        nextComplexities  <- estimateNext(blockchain, version, callables, checkOverflow)
+        nextComplexities  <- estimateNext(blockchain, version, callables)
         complexitiesByEstimator = (currentComplexity :: nextComplexities).mapWithIndex {
           case ((_, complexitiesByCallable), i) => (i + blockchain.estimator.version, complexitiesByCallable)
         }.toMap
@@ -58,8 +58,7 @@ object SetScriptTransactionDiff {
   private def estimateNext(
       blockchain: Blockchain,
       version: StdLibVersion,
-      dApp: DApp,
-      checkOverflow: Boolean
+      dApp: DApp
   ): Either[String, List[(Long, Map[String, Long])]] =
     ScriptEstimator.all(fixOverflow = blockchain.checkEstimationOverflow)
       .drop(blockchain.estimator.version)

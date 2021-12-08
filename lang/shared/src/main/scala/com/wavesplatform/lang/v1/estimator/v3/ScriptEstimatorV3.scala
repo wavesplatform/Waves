@@ -64,7 +64,10 @@ case class ScriptEstimatorV3(fixOverflow: Boolean) extends ScriptEstimator {
 
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[Long] =
     for {
-      startCtx    <- get[Id, EstimatorContext, ExecutionError]
+      startCtx <- get[Id, EstimatorContext, ExecutionError]
+      _ <- if (fixOverflow && startCtx.funcs.contains(FunctionHeader.User(func.name)))
+        raiseError(s"Function '${func.name}${func.args.mkString("(", ", ", ")")}' shadows preceding declaration"): EvalM[Long]
+      else const(0L)
       funcCost    <- evalHoldingFuncs(func.body)
       bodyEvalCtx <- get[Id, EstimatorContext, ExecutionError]
       usedRefsInBody = bodyEvalCtx.usedRefs diff startCtx.usedRefs

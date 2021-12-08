@@ -4,9 +4,10 @@ import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.User
-import com.wavesplatform.lang.v1.compiler.Terms.{BLOCK, FUNC, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.test._
 
 class RecursiveFunctionTest
     extends ScriptEstimatorTestBase(
@@ -48,5 +49,24 @@ class RecursiveFunctionTest
       )
 
     estimate(functionCosts(V3), expr) shouldBe Symbol("left")
+  }
+
+  property("actual recursion which tricks unfixed estimators") {
+    /*
+        func a1() = true
+        func a1() = if (a1()) then a1() else a1()
+
+        a1()
+    */
+    val expr = BLOCK(
+      FUNC("a1", Nil, CONST_BOOLEAN(true)),
+      BLOCK(
+        FUNC("a1", Nil, IF(FUNCTION_CALL(User("a1"), Nil), FUNCTION_CALL(User("a1"), Nil), FUNCTION_CALL(User("a1"), Nil))),
+        FUNCTION_CALL(User("a1"), Nil)
+      )
+    )
+
+    ScriptEstimatorV3(false)(Set.empty, Map.empty, expr) shouldBe Right(3)
+    ScriptEstimatorV3(true)(Set.empty, Map.empty, expr) should produce("shadows preceding declaration")
   }
 }

@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs
 
+import com.google.common.primitives.Ints
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
@@ -16,7 +18,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test.{PropSpec, _}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import org.scalacheck.Gen
@@ -266,7 +268,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
        """.stripMargin
     )
 
-    def t       = System.currentTimeMillis()
+    def t: Long = System.currentTimeMillis()
     val sender  = accountGen.sample.get
     val genesis = GenesisTransaction.create(sender.toAddress, ENOUGH_AMT, t).explicitGet()
 
@@ -305,5 +307,85 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       (dAppVerifier, "Unexpected negative verifier complexity"),
       (dAppCallable, "Unexpected negative callable `call` complexity")
     ).foreach { case (script, message) => assert(script, message) }
+  }
+
+  property("illegal recursion in scripts is allowed before sumOverflow height") {
+    /*
+      func a1() = true
+
+      @Verifier(tx)
+      func a1() = a1()
+     */
+    val verifier = "AAIFAAAAAAAAAA0IAhoJCgJhMRIDYTExAAAAAQEAAAACYTEAAAAABgAAAAAAAAABAAAAAnR4AQAAAAJhMQAAAAAJAQAAAAJhMQAAAAA1A+Ee"
+
+    /*
+      func a1() = true
+      func a1() = a1()
+
+      @Verifier(tx)
+      func a2() = a1()
+     */
+    val userFunctions = "AAIFAAAAAAAAAA0IAhoJCgJhMRIDYTExAAAAAgEAAAACYTEAAAAABgEAAAACYTEAAAAACQEAAAACYTEAAAAAAAAAAAAAAAEAAAACdHgBAAAAAmEyAAAAAAkBAAAAAmExAAAAAIGVAL4="
+
+    /*
+      func a1() = true
+      func a2() = {
+        func a3() = {
+          func a11() = a1()
+          a11()
+        }
+
+        a3()
+      }
+
+      @Verifier(tx)
+      func a4() = a2()
+     */
+    val innerOverlapWithVerifier = "AAIFAAAAAAAAAA0IAhoJCgJhMRIDYTExAAAAAgEAAAACYTEAAAAABgEAAAACYTIAAAAACgEAAAACYTMAAAAACgEAAAACYTEAAAAACQEAAAACYTEAAAAACQEAAAACYTEAAAAACQEAAAACYTMAAAAAAAAAAAAAAAEAAAACdHgBAAAAAmE0AAAAAAkBAAAAAmEyAAAAAEjFcsE="
+
+    /*
+      func a1() = true
+      func a2() = {
+        func a3() = {
+          func a11() = a1()
+          a11()
+        }
+
+        a3()
+      }
+
+      @Callable(i)
+      func a4() = {
+        strict a0 = a2()
+        []
+      }
+     */
+    val innerOverlapWithCallable = "AAIFAAAAAAAAAA8IAhIAGgkKAmExEgNhMTEAAAACAQAAAAJhMQAAAAAGAQAAAAJhMgAAAAAKAQAAAAJhMwAAAAAKAQAAAAJhMQAAAAAJAQAAAAJhMQAAAAAJAQAAAAJhMQAAAAAJAQAAAAJhMwAAAAAAAAABAAAAAWkBAAAAAmE0AAAAAAQAAAACYTAJAQAAAAJhMgAAAAADCQAAAAAAAAIFAAAAAmEwBQAAAAJhMAUAAAADbmlsCQAAAgAAAAECAAAAJFN0cmljdCB2YWx1ZSBpcyBub3QgZXF1YWwgdG8gaXRzZWxmLgAAAABEHCSy"
+    val keyPairs = Vector.tabulate(8)(i => KeyPair(Ints.toByteArray(i)))
+
+    def setScript(keyPairIndex: Int, script: String): SetScriptTransaction =
+      SetScriptTransaction.selfSigned(2.toByte, keyPairs(keyPairIndex), Script.fromBase64String(script).toOption, 0.01.waves, System.currentTimeMillis()).explicitGet()
+
+    val settings =
+      DomainPresets.RideV5.copy(blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
+        functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(
+          estimatorSumOverflowFixHeight = 3
+        )
+      ))
+
+    withDomain(settings) { d =>
+      d.appendBlock(keyPairs.map(kp => GenesisTransaction.create(kp.toAddress, 10.waves, System.currentTimeMillis()).explicitGet()): _*)
+      d.appendBlock(
+        setScript(0, verifier),
+        setScript(1, userFunctions),
+        setScript(2, innerOverlapWithVerifier),
+        setScript(3, innerOverlapWithCallable)
+      )
+
+      d.appendBlockE(setScript(4, verifier)) should produce("shadows preceding declaration")
+      d.appendBlockE(setScript(5, userFunctions)) should produce("shadows preceding declaration")
+      d.appendBlockE(setScript(6, innerOverlapWithVerifier)) should produce("shadows preceding declaration")
+      d.appendBlockE(setScript(7, innerOverlapWithCallable)) should produce("shadows preceding declaration")
+    }
   }
 }
