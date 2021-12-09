@@ -15,6 +15,7 @@ case class CompilerContext(
     varDefs: VariableTypes,
     functionDefs: FunctionTypes,
     tmpArgsIdx: Int = 0,
+    foldIdx: Int = 0,
     arbitraryDeclarations: Boolean = false
 ) {
   private lazy val allFuncDefs: FunctionTypes =

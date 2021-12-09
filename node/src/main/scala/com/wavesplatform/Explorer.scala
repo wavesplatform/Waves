@@ -297,6 +297,7 @@ object Explorer extends ScorexLogging {
                 SetScriptTransactionDiff.estimate(reader, stdLibVersion, expr, checkOverflow = true)
               case script: ExprScript =>
                 DiffsCommon.countVerifierComplexity(Some(script), reader, isAsset = false)
+              case _ => ???
             }
 
             estimationResult.left.foreach { error =>

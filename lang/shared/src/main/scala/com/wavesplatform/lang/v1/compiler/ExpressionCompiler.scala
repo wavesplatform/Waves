@@ -698,7 +698,8 @@ object ExpressionCompiler {
           Left(Generic(p.start, p.end, s"Can't find suitable function $funcName(a: $accTypeStr, b: $listInnerTypeStr) for FOLD"))
         }
         .toCompileM
-      r <- Right(CompilerMacro.unwrapFold(limit, list, acc, function.header)).toCompileM
+      _ <- set[Id, CompilerContext, CompilationError](ctx.copy(foldIdx = ctx.foldIdx + 1))
+      r <- Right(CompilerMacro.unwrapFold(ctx.foldIdx, limit, list, acc, function.header)).toCompileM
     } yield CompilationStepResultExpr(ctx, r, function.args.head._2.asInstanceOf[FINAL], accRaw)
 
   private def matchFuncOverload(
