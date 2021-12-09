@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs
 
 import scala.util.{Right, Try}
-
 import cats.instances.map._
 import cats.kernel.Monoid
 import cats.syntax.either._
@@ -12,6 +11,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
+import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.AssetDecimals
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
 
 object ExchangeTransactionDiff {
@@ -37,8 +37,10 @@ object ExchangeTransactionDiff {
         }.toEither.leftMap(x => GenericError(x.getMessage))
 
       def orderPrice(order: Order, amountDecimals: Int, priceDecimals: Int) =
-        if (tx.version >= TxVersion.V3 && order.version < Order.V4) convertPrice(order.price, amountDecimals, priceDecimals)
-        else Right(order.price)
+        if (tx.version >= TxVersion.V3 && (order.version < Order.V4 || order.priceMode == AssetDecimals))
+          convertPrice(order.price, amountDecimals, priceDecimals)
+        else
+          Right(order.price)
 
       for {
         _              <- Either.cond(tx.price != 0L, (), GenericError("price should be > 0"))

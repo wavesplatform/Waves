@@ -1,13 +1,13 @@
 package com.wavesplatform.transaction.assets.exchange
 
 import scala.util.{Failure, Success}
-
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.transaction.{Asset, Proofs, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.{AssetDecimals, FixedDecimals}
 import com.wavesplatform.utils.EthEncoding
 import play.api.libs.json._
 
@@ -65,7 +65,7 @@ object OrderJson {
         .getOrElse(Proofs.empty)
 
     val vrsn: Byte = version.getOrElse(if (eproofs.proofs.size == 1 && eproofs.proofs.head.arr.length == SignatureLength) 1 else 2)
-    Order(vrsn, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs = eproofs)
+    Order(vrsn, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, priceMode = AssetDecimals, proofs = eproofs)
   }
 
   def readOrderV3V4(
@@ -82,7 +82,8 @@ object OrderJson {
       proofs: Option[Array[Array[Byte]]],
       version: TxVersion,
       matcherFeeAssetId: Asset,
-      eip712Signature: Option[Array[Byte]]
+      eip712Signature: Option[Array[Byte]],
+      priceMode: OrderPriceMode
   ): Order = {
 
     val eproofs =
@@ -104,7 +105,8 @@ object OrderJson {
       matcherFee,
       matcherFeeAssetId,
       eproofs,
-      eip712Signature.map(ByteStr(_))
+      eip712Signature.map(ByteStr(_)),
+      priceMode
     )
   }
 
@@ -126,6 +128,13 @@ object OrderJson {
 
   implicit val orderTypeReads: Reads[OrderType] =
     JsPath.read[String].map(OrderType.apply)
+
+  implicit val priceModeReads: Reads[OrderPriceMode] =
+    JsPath.read[String].flatMapResult {
+      case "assetDecimals" => JsSuccess(AssetDecimals)
+      case "fixedDecimals" => JsSuccess(FixedDecimals)
+      case other           => JsError(s"Unexpected order price mode: $other")
+    }
 
   private val orderV1V2Reads: Reads[Order] = {
     val r = (JsPath \ "senderPublicKey").read[PublicKey](accountPublicKeyReads) and
@@ -161,7 +170,10 @@ object OrderJson {
         .map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_)))) and
       (JsPath \ "eip712Signature")
         .readNullable[String]
-        .map(_.map(EthEncoding.toBytes))
+        .map(_.map(EthEncoding.toBytes)) and
+      (JsPath \ "priceMode")
+        .readNullable[OrderPriceMode]
+        .map(_.getOrElse(FixedDecimals))
 
     r(readOrderV3V4 _)
   }

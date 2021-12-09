@@ -3,12 +3,12 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import scala.util.Try
-
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.protobuf.transaction.PBOrders
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.AssetDecimals
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.utils.EthEncoding
 import play.api.libs.json.{JsObject, Json}
@@ -105,7 +105,7 @@ object OrderSerializer {
       val timestamp  = buf.getLong
       val expiration = buf.getLong
       val matcherFee = buf.getLong
-      Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee)
+      Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, priceMode = AssetDecimals)
     }
 
     version match {
