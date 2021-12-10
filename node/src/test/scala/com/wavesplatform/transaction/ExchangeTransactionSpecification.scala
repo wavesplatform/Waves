@@ -82,6 +82,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
         |    "timestamp" : 4783213297262394015,
         |    "expiration" : 1574375493134,
         |    "matcherFee" : 20077042828423,
+        |    "priceMode":"fixedDecimals",
         |    "signature" : "B22PFqHfHPxXesjvqQBmjd4BRd2KCNXveMutM5WEvrQ8P6WW7BcDGoC3jfEZ92Bj25dBgem9KbbDijXGrm8WXRf",
         |    "proofs" : [ "B22PFqHfHPxXesjvqQBmjd4BRd2KCNXveMutM5WEvrQ8P6WW7BcDGoC3jfEZ92Bj25dBgem9KbbDijXGrm8WXRf" ]
         |  },
@@ -101,6 +102,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
         |    "timestamp" : 4783213297262394015,
         |    "expiration" : 1574375493134,
         |    "matcherFee" : 20077042828423,
+        |    "priceMode":"fixedDecimals",
         |    "signature" : "5tLNaVttbCwLLSmSfZkVRxvE6HML3DPrFmXXJm7Y9TsfAgZ4cNRpxxkkVcAHNnJRJtQZHtALmetSAbLMmsivhmWK",
         |    "proofs" : [ "5tLNaVttbCwLLSmSfZkVRxvE6HML3DPrFmXXJm7Y9TsfAgZ4cNRpxxkkVcAHNnJRJtQZHtALmetSAbLMmsivhmWK" ]
         |  },
@@ -150,6 +152,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
         |    "price" : 1375940418789,
         |    "proofs" : [ "2wDh9Jgf42R9ahTE4Sg2pVChPX9Yti5epKBFsrphEG96RQEJriptHUyofgxy6Hz8CuTrGAKyPMjPQmUEQwd41k6i" ],
         |    "matcherPublicKey" : "3ZJUiWs5xiuZqYBHBthdgH4U6tYxLy5fHNKxMApEMJ6V",
+        |    "priceMode":"fixedDecimals",
         |    "expiration" : 1576146863327,
         |    "id" : "ARayJvx7uq9gLnXoMYAbUqE13LD7a367hsR58ALUMu86",
         |    "timestamp" : 6484538259240088210
@@ -169,6 +172,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
         |    "price" : 1375940418789,
         |    "proofs" : [ "2h6XD9GHUh1Cmy65pdFrVvJkqRD3hQehnR7ysGQwH3kUoh7oD7eQaJWNL9fENfrSXgqjV7uESrPDeYwFi5aD2A49" ],
         |    "matcherPublicKey" : "3ZJUiWs5xiuZqYBHBthdgH4U6tYxLy5fHNKxMApEMJ6V",
+        |    "priceMode":"fixedDecimals",
         |    "expiration" : 1576146863327,
         |    "id" : "7zS6RWD9BAogytjd3mMtVxDubFbR97gnFzKT7TifRU4y",
         |    "timestamp" : 6484538259240088210
@@ -423,6 +427,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
             "timestamp":1526992336241,
             "expiration":1529584336241,
             "matcherFee":1,
+            "priceMode":"fixedDecimals",
             "signature":"2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs",
             "proofs":["2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs"]
          },
@@ -439,6 +444,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
             "timestamp":1526992336241,
             "expiration":1529584336241,
             "matcherFee":2,
+            "priceMode":"fixedDecimals",
             "signature":"2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq",
             "proofs":["2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq"]
          },
@@ -519,6 +525,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
             "timestamp":1526992336241,
             "expiration":1529584336241,
             "matcherFee":1,
+            "priceMode":"fixedDecimals",
             "signature":"2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs",
             "proofs":["2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs"]
          },
@@ -535,6 +542,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
             "timestamp":1526992336241,
             "expiration":1529584336241,
             "matcherFee":2,
+            "priceMode":"fixedDecimals",
             "signature":"2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq",
             "proofs":["2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq"]
          },
@@ -614,6 +622,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
             "amount":2,
             "timestamp":1526992336241,
             "expiration":1529584336241,
+            "priceMode":"fixedDecimals",
             "matcherFee":1,
             "matcherFeeAssetId":"9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy",
             "signature":"2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs",
@@ -632,6 +641,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
             "timestamp":1526992336241,
             "expiration":1529584336241,
             "matcherFee":2,
+            "priceMode":"fixedDecimals",
             "signature":"2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq",
             "proofs":["2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq"]
          },
