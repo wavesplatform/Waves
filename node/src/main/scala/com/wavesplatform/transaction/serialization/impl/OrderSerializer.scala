@@ -113,7 +113,7 @@ object OrderSerializer {
       val timestamp  = buf.getLong
       val expiration = buf.getLong
       val matcherFee = buf.getLong
-      Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, priceMode = AssetDecimals)
+      Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, priceMode = FixedDecimals)
     }
 
     version match {
