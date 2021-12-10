@@ -2,16 +2,17 @@ package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
 
-import scala.util.Try
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.protobuf.transaction.PBOrders
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.AssetDecimals
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.{AssetDecimals, FixedDecimals}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderPriceMode, OrderType}
 import com.wavesplatform.utils.EthEncoding
 import play.api.libs.json.{JsObject, Json}
+
+import scala.util.Try
 
 object OrderSerializer {
   def toJson(order: Order): JsObject = {
@@ -29,11 +30,18 @@ object OrderSerializer {
       "timestamp"        -> timestamp,
       "expiration"       -> expiration,
       "matcherFee"       -> matcherFee,
+      "priceMode"        -> toJsonStr(priceMode),
       "signature"        -> proofs.toSignature.toString,
       "proofs"           -> proofs.proofs.map(_.toString)
     ) ++ (if (version >= Order.V3) Json.obj("matcherFeeAssetId" -> matcherFeeAssetId) else JsObject.empty) ++
       (if (version >= Order.V4) Json.obj("eip712Signature"         -> eip712Signature.map(bs => EthEncoding.toHexString(bs.arr))) else JsObject.empty) // TODO: Should it be hex or base58?
   }
+
+  private def toJsonStr(priceMode: OrderPriceMode) =
+    priceMode match {
+      case AssetDecimals => "assetDecimals"
+      case FixedDecimals => "fixedDecimals"
+    }
 
   def bodyBytes(order: Order): Array[Byte] = {
     import order._
