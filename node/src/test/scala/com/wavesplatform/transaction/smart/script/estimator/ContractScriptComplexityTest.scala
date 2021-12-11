@@ -234,7 +234,7 @@ class ContractScriptComplexityTest(estimator: ScriptEstimator) extends PropSpec 
       )
     )
 
-    ContractScript.estimateUserFunctions(V3, contract, estimator) shouldBe Right(List("g" -> 87, "f" -> 42))
-    ContractScript.estimateGlobalVariables(V3, contract, estimator) shouldBe Right(List("y" -> 44, "z" -> 44, "w" -> 33))
+    ContractScript.estimateUserFunctions(V3, contract, estimator) shouldBe Right(List("g" -> 82, "f" -> 37))
+    ContractScript.estimateGlobalVariables(V3, contract, estimator) shouldBe Right(List("y" -> 39, "z" -> 39, "w" -> 28))
   }
 }

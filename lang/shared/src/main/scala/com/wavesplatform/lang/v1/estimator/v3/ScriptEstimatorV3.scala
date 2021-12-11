@@ -105,7 +105,9 @@ case class ScriptEstimatorV3(fixOverflow: Boolean) extends ScriptEstimator {
         .get(ctx)
         .get(header)
         .map(const)
-        .getOrElse(raiseError[Id, EstimatorContext, ExecutionError, (Coeval[Long], Set[String])](s"function '$header' not found"))
+        .getOrElse(
+          raiseError[Id, EstimatorContext, ExecutionError, (Coeval[Long], Set[String])](s"function '$header' not found")
+        )
       _ <- update(
         (funcs ~ usedRefs).modify(_) {
           case (funcs, usedRefs) =>
