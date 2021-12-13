@@ -8,7 +8,6 @@ import com.wavesplatform.lang.directives.values.{Account, Expression, V5}
 import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BIGINT, FUNCTION_CALL}
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.BIGINT_TO_STRING
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import org.openjdk.jmh.annotations.{State, _}
@@ -22,7 +21,7 @@ import org.openjdk.jmh.infra.Blackhole
 @Measurement(iterations = 10, time = 1)
 class BigIntToStringBenchmark {
   @Benchmark
-  def toString(bh: Blackhole, s: BigIntToStringSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr, V5))
+  def toString(bh: Blackhole, s: BigIntToStringSt): Unit = bh.consume(eval(s.ctx, s.expr, V5))
 }
 
 @State(Scope.Benchmark)

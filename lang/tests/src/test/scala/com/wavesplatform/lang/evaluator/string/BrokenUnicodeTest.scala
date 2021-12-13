@@ -1,6 +1,8 @@
-package com.wavesplatform.lang.evaluator
+package com.wavesplatform.lang.evaluator.string
+
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4, V5}
+import com.wavesplatform.lang.evaluator.EvaluatorSpec
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_LONG, CONST_STRING}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 

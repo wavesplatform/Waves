@@ -15,9 +15,9 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, FunctionIds, Log}
+import com.wavesplatform.lang.v1.evaluator.{FunctionIds, Log}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{Common, ExecutionError}
+import com.wavesplatform.lang.{Common, ExecutionError, v1}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
@@ -222,10 +222,10 @@ object PureFunctionsRebenchmark {
       .evaluationContext(Common.emptyBlockchainEnvironment())
 
   val eval: EXPR => (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    EvaluatorV2.applyCompleted(context, _, V4)
+    v1.eval(context, _, V4)
 
   val evalV5: EXPR => (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    EvaluatorV2.applyCompleted(context, _, V5)
+    v1.eval(context, _, V5)
 
   def randomBytes(length: Int): Array[Byte] = {
     val bytes = new Array[Byte](length)

@@ -1,5 +1,7 @@
-package com.wavesplatform.lang.evaluator
+package com.wavesplatform.lang.evaluator.math
+
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V5, V6}
+import com.wavesplatform.lang.evaluator.EvaluatorSpec
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 import com.wavesplatform.test.produce
 

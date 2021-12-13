@@ -12,8 +12,48 @@ import play.api.libs.json.Json
 
 //noinspection NotImplementedCode
 class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with EthHelpers with JsonMatchers {
+  "Failed ethereum invoke" should "preserve meta with payload" in withDomain(DomainPresets.RideV6) { d =>
+    val dApp = TxHelpers.secondSigner
+
+    d.helpers.creditWavesToDefaultSigner()
+    d.helpers.creditWavesFromDefaultSigner(dApp.toAddress, 1_000_000)
+    d.helpers.setScript(
+      dApp,
+      TxHelpers.scriptV5(s"""@Callable(i)
+                            |func deposit() = {
+                            |  if ((${(1 to 15).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}) || true) then throw("err")
+                            |  else [StringEntry("test", "foo")]
+                            |}""".stripMargin)
+    )
+
+    val invoke = EthTxGenerator.generateEthInvoke(
+      TxHelpers.defaultEthSigner,
+      dApp.toAddress,
+      "deposit",
+      Nil,
+      Seq(InvokeScriptTransaction.Payment(100, Waves))
+    )
+
+    d.appendAndAssertFailed(invoke)
+    d.commonApi.transactionMeta(invoke.id()) match {
+      case e: TransactionMeta.Ethereum =>
+        withClue("meta should be defined")(e.meta should not be empty)
+        e.meta.get.toProtoString shouldBe """invocation {
+                                            |  function_call: "\t\001\000\000\000\adeposit\000\000\000\000"
+                                            |  payments {
+                                            |    asset_id: ""
+                                            |    amount: 100
+                                            |  }
+                                            |}
+                                            |""".stripMargin
+
+      case _ =>
+        ???
+    }
+  }
+
   "Ethereum invoke with complexity>1000" should "handle error" in withDomain(DomainPresets.RideV6) { d =>
-    val dApp = TxHelpers.signer(10)
+    val dApp = TxHelpers.secondSigner
 
     d.helpers.creditWavesToDefaultSigner()
     d.helpers.creditWavesFromDefaultSigner(dApp.toAddress, 1_000_000)

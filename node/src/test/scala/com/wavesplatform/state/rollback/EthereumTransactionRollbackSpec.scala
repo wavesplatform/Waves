@@ -8,8 +8,6 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.EthHelpers
 
 class EthereumTransactionRollbackSpec extends FlatSpec with WithDomain with EthHelpers {
-  // KeyTags.values.foreach(v => println(v.toString + " " + v.id.toHexString))
-
   "Ethereum transfer" should "rollback" in withDomain(DomainPresets.RideV6) { d =>
     val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 1, Waves)
 

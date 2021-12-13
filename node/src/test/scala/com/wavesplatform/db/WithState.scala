@@ -3,11 +3,10 @@ package com.wavesplatform.db
 import java.nio.file.Files
 
 import cats.Monoid
-import com.wavesplatform.{NTPTime, TestHelpers}
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{loadActiveLeases, LevelDBFactory, LevelDBWriter, TestStorageFactory}
+import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.history.Domain
@@ -15,14 +14,15 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{loadConfig, BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, TestFunctionalitySettings => TFS}
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
 import com.wavesplatform.test._
-import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.{NTPTime, TestHelpers}
 import monix.reactive.Observer
 import monix.reactive.subjects.{PublishSubject, Subject}
 import org.iq80.leveldb.{DB, Options}
@@ -168,10 +168,28 @@ trait WithDomain extends WithState { _: Suite =>
       val functionalitySettings = ws.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = newFeatures)
       ws.copy(blockchainSettings = ws.blockchainSettings.copy(functionalitySettings = functionalitySettings))
     }
+
+    def withActivationPeriod(period: Int): WavesSettings = {
+      ws.copy(
+        blockchainSettings = ws.blockchainSettings.copy(
+          functionalitySettings = ws.blockchainSettings.functionalitySettings
+            .copy(featureCheckBlocksPeriod = period, blocksForFeatureActivation = period, doubleFeaturesPeriodsAfterHeight = 10000)
+        )
+      )
+    }
+
+    def noFeatures(): WavesSettings = {
+      ws.copy(
+        blockchainSettings = ws.blockchainSettings.copy(
+          functionalitySettings = ws.blockchainSettings.functionalitySettings
+            .copy(preActivatedFeatures = Map.empty)
+        ),
+        featuresSettings = ws.featuresSettings.copy(supported = Nil)
+      )
+    }
   }
 
-  lazy val SettingsFromDefaultConfig: WavesSettings =
-    WavesSettings.fromRootConfig(loadConfig(None))
+  lazy val SettingsFromDefaultConfig: WavesSettings =  WavesSettings.fromRootConfig(loadConfig(None))
 
   def domainSettingsWithFS(fs: FunctionalitySettings): WavesSettings =
     SettingsFromDefaultConfig.copy(
@@ -181,11 +199,18 @@ trait WithDomain extends WithState { _: Suite =>
   def domainSettingsWithPreactivatedFeatures(fs: BlockchainFeature*): WavesSettings =
     domainSettingsWithFeatures(fs.map(_ -> 0): _*)
 
-  def domainSettingsWithFeatures(fs: (BlockchainFeature, Int)*): WavesSettings =
-    domainSettingsWithFS(SettingsFromDefaultConfig.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map {
+  def domainSettingsWithFeatures(fs: (BlockchainFeature, Int)*): WavesSettings = {
+    val defaultFS = SettingsFromDefaultConfig
+      .noFeatures()
+      .blockchainSettings
+      .functionalitySettings
+
+    domainSettingsWithFS(defaultFS.copy(preActivatedFeatures = fs.map {
       case (f, h) => f.id -> h
     }.toMap))
+  }
 
+  //noinspection TypeAnnotation
   object DomainPresets {
     val NG = domainSettingsWithPreactivatedFeatures(
       BlockchainFeatures.MassTransfer, // Removes limit of 100 transactions per block
@@ -200,7 +225,20 @@ trait WithDomain extends WithState { _: Suite =>
       BlockchainFeatures.SmartAssets
     )
 
-    val RideV4 = RideV3.addFeatures(BlockchainFeatures.BlockV5)
+    val ScriptsAndSponsorship = NG.addFeatures(
+      BlockchainFeatures.SmartAccounts,
+      BlockchainFeatures.SmartAccountTrading,
+      BlockchainFeatures.OrderV3,
+      BlockchainFeatures.FeeSponsorship,
+      BlockchainFeatures.DataTransaction,
+      BlockchainFeatures.SmartAssets
+    )
+
+    val RideV4 = ScriptsAndSponsorship.addFeatures(
+      BlockchainFeatures.Ride4DApps,
+      BlockchainFeatures.BlockV5
+    )
+
     val RideV5 = RideV4.addFeatures(BlockchainFeatures.SynchronousCalls)
     val RideV6 = RideV5.addFeatures(BlockchainFeatures.RideV6)
 

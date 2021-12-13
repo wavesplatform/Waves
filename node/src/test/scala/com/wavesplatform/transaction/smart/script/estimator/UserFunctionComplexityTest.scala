@@ -32,7 +32,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V1, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V1, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V1).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -64,16 +64,16 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     )
     est(exprIsDefined).explicitGet() shouldBe 43
 
-    val exprDropRightBytes = FUNCTION_CALL(PureContext.dropRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
+    val exprDropRightBytes = FUNCTION_CALL(User("dropRightBytes"), List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
     est(exprDropRightBytes).explicitGet() shouldBe 21
 
-    val exprTakeRightBytes = FUNCTION_CALL(PureContext.takeRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
+    val exprTakeRightBytes = FUNCTION_CALL(User("takeRightBytes"), List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
     est(exprTakeRightBytes).explicitGet() shouldBe 21
 
-    val exprDropRightString = FUNCTION_CALL(PureContext.dropRightString, List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
+    val exprDropRightString = FUNCTION_CALL(User("dropRight"), List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
     est(exprDropRightString).explicitGet() shouldBe 21
 
-    val exprTakeRightString = FUNCTION_CALL(PureContext.takeRightString, List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
+    val exprTakeRightString = FUNCTION_CALL(User("takeRight"), List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
     est(exprTakeRightString).explicitGet() shouldBe 21
 
     val exprUMinus = FUNCTION_CALL(PureContext.uMinus, List(CONST_LONG(1)))
@@ -97,7 +97,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V2, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V2, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V2).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -129,16 +129,16 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     )
     est(exprIsDefined).explicitGet() shouldBe 43
 
-    val exprDropRightBytes = FUNCTION_CALL(PureContext.dropRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
+    val exprDropRightBytes = FUNCTION_CALL(User("dropRightBytes"), List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
     est(exprDropRightBytes).explicitGet() shouldBe 21
 
-    val exprTakeRightBytes = FUNCTION_CALL(PureContext.takeRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
+    val exprTakeRightBytes = FUNCTION_CALL(User("takeRightBytes"), List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
     est(exprTakeRightBytes).explicitGet() shouldBe 21
 
-    val exprDropRightString = FUNCTION_CALL(PureContext.dropRightString, List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
+    val exprDropRightString = FUNCTION_CALL(User("dropRight"), List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
     est(exprDropRightString).explicitGet() shouldBe 21
 
-    val exprTakeRightString = FUNCTION_CALL(PureContext.takeRightString, List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
+    val exprTakeRightString = FUNCTION_CALL(User("takeRight"), List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
     est(exprTakeRightString).explicitGet() shouldBe 21
 
     val exprUMinus = FUNCTION_CALL(PureContext.uMinus, List(CONST_LONG(1)))
@@ -162,7 +162,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -194,16 +194,16 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     )
     est(exprIsDefined).explicitGet() shouldBe 9
 
-    val exprDropRightBytes = FUNCTION_CALL(PureContext.dropRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
+    val exprDropRightBytes = FUNCTION_CALL(User("dropRightBytes"), List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
     est(exprDropRightBytes).explicitGet() shouldBe 21
 
-    val exprTakeRightBytes = FUNCTION_CALL(PureContext.takeRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
+    val exprTakeRightBytes = FUNCTION_CALL(User("takeRightBytes"), List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
     est(exprTakeRightBytes).explicitGet() shouldBe 21
 
-    val exprDropRightString = FUNCTION_CALL(PureContext.dropRightString, List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
+    val exprDropRightString = FUNCTION_CALL(User("dropRight"), List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
     est(exprDropRightString).explicitGet() shouldBe 21
 
-    val exprTakeRightString = FUNCTION_CALL(PureContext.takeRightString, List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
+    val exprTakeRightString = FUNCTION_CALL(User("takeRight"), List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
     est(exprTakeRightString).explicitGet() shouldBe 21
 
     val exprUMinus = FUNCTION_CALL(PureContext.uMinus, List(CONST_LONG(1)))

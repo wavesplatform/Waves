@@ -15,12 +15,16 @@ import monix.eval.Coeval
 package object estimator {
   private val version = V3
   private val ctx =
-    PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+    PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
     WavesContext.build(Global, DirectiveSet.contractDirectiveSet)
 
   private val environment = Common.emptyBlockchainEnvironment()
   private val evaluator =
-    new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), ctx.evaluationContext(environment)), version)
+    new EvaluatorV2(
+      LoggedEvaluationContext(_ => _ => (), ctx.evaluationContext(environment)),
+      version,
+      correctFunctionCallScope = true
+    )
 
   val evaluatorV2AsEstimator = new ScriptEstimator {
     override val version: Int = 0

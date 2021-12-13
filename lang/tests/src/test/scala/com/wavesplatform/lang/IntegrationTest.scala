@@ -83,7 +83,7 @@ class IntegrationTest extends PropSpec with Inside {
     val ctx: CTX[C] =
       Monoid.combineAll(
         Seq(
-          PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[C],
+          PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[C],
           CryptoContext.build(Global, version).withEnvironment[C],
           addCtx.withEnvironment[C],
           CTX[C](sampleTypes, stringToTuple, Array(f, f2)),
@@ -96,7 +96,7 @@ class IntegrationTest extends PropSpec with Inside {
       .asInstanceOf[LoggedEvaluationContext[Environment, Id]]
     typed.flatMap(
       v =>
-        Try(new EvaluatorV2(loggedCtx, version).apply(v._1, Int.MaxValue)._1.asInstanceOf[T]).toEither
+        Try(new EvaluatorV2(loggedCtx, version, correctFunctionCallScope = true)(v._1, Int.MaxValue)._1.asInstanceOf[T]).toEither
           .leftMap(_.getMessage)
     )
   }
@@ -430,7 +430,7 @@ class IntegrationTest extends PropSpec with Inside {
     }
 
     val context = Monoid.combine(
-      PureContext.build(V1, fixUnicodeFunctions = true).evaluationContext[Id],
+      PureContext.build(V1, fixUnicodeFunctions = true, useNewPowPrecision = true).evaluationContext[Id],
       EvaluationContext.build(
         typeDefs = Map.empty,
         letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3L))),
@@ -444,7 +444,7 @@ class IntegrationTest extends PropSpec with Inside {
 
   property("context won't change after execution of an inner block") {
     val context = Monoid.combine(
-      PureContext.build(V1, fixUnicodeFunctions = true).evaluationContext[Id],
+      PureContext.build(V1, fixUnicodeFunctions = true, useNewPowPrecision = true).evaluationContext[Id],
       EvaluationContext.build(
         typeDefs = Map.empty,
         letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3L))),
