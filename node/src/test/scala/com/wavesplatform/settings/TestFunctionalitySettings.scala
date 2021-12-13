@@ -18,6 +18,9 @@ object TestFunctionalitySettings {
   def withFeatures(features: BlockchainFeature*): FunctionalitySettings =
     Enabled.copy(preActivatedFeatures = Enabled.preActivatedFeatures ++ features.map(_.id -> 0))
 
+  def withFeaturesByHeight(features: (BlockchainFeature, Int)*): FunctionalitySettings =
+    Enabled.copy(preActivatedFeatures = Enabled.preActivatedFeatures ++ features.map { case (f, height) => f.id -> height })
+
   val Stub: FunctionalitySettings = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)
 
   val EmptyFeaturesSettings: FeaturesSettings =
