@@ -53,6 +53,54 @@ class ContractCompilerTest extends PropSpec {
       )
       .compilerContext
 
+  property("contract compiles with comment in function body") {
+    val ctx = Monoid.combine(
+      compilerContext,
+      WavesContext
+        .build(
+          Global,
+          DirectiveSet(V5, Account, DAppType).explicitGet()
+        )
+        .compilerContext
+    )
+    val expr = {
+      val script =
+        """
+          |func foo() = {
+          |  #comment
+          |  strict a = 1
+          |  a
+          |}
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    val expectedResult = Right(
+      DApp(
+        DAppMeta(
+          version = 2,
+          List()
+        ),
+        List(
+          FUNC(
+            "foo",
+            List(),
+            LET_BLOCK(
+              LET("a", CONST_LONG(1)),
+              IF(
+                FUNCTION_CALL(Native(0), List(REF("a"), REF("a"))),
+                REF("a"),
+                FUNCTION_CALL(Native(2), List(CONST_STRING("Strict value is not equal to itself.").explicitGet()))
+              )
+            )
+          )
+        ),
+        List(),
+        None
+      )
+    )
+    compiler.ContractCompiler(ctx, expr, V5) shouldBe expectedResult
+  }
+
   property("contract compiles when uses annotation bindings and correct return type") {
     val ctx = Monoid.combine(
       compilerContext,
