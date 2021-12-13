@@ -28,6 +28,8 @@ case class MicroBlock(
   override val signatureValid: Coeval[Boolean]        = Coeval.evalOnce(crypto.verify(signature, bytesWithoutSignature(), sender))
   override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
+  override protected def signatureValid(checkPk: Boolean): Boolean =
+    (!checkPk || !crypto.isWeakPublicKey(sender.arr)) && signatureValid()
 
   override def toString: String = s"MicroBlock(... -> ${reference.trim}, txs=${transactionData.size}"
 

@@ -6,6 +6,7 @@ import cats.syntax.functor._
 import com.google.common.base.Throwables
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values.V6
@@ -50,7 +51,7 @@ object Verifier extends ScorexLogging {
       (pt, blockchain.accountScript(pt.sender.toAddress)) match {
         case (stx: PaymentTransaction, None) =>
           stats.signatureVerification
-            .measureForType(stx.tpe)(stx.signaturesValid())
+            .measureForType(stx.tpe)(stx.signaturesValid(blockchain.isFeatureActivated(BlockchainFeatures.RideV6)))
             .as(0)
         case (et: ExchangeTransaction, scriptOpt) =>
           verifyExchange(et, blockchain, scriptOpt, if (limitedExecution) ContractLimits.FailFreeInvokeComplexity else Int.MaxValue)
@@ -66,7 +67,7 @@ object Verifier extends ScorexLogging {
             .measureForType(pt.tpe)(verifyTx(blockchain, script.script, script.verifierComplexity.toInt, pt, None))
         case _ =>
           stats.signatureVerification
-            .measureForType(tx.tpe)(verifyAsEllipticCurveSignature(pt))
+            .measureForType(tx.tpe)(verifyAsEllipticCurveSignature(pt, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)))
             .as(0)
       }
   }
@@ -242,7 +243,7 @@ object Verifier extends ScorexLogging {
             TracedResult(Left(GenericError("Can't process transaction with signature from scripted account")))
           }
         }
-        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(et).as(0)))
+        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(et, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).as(0)))
 
     def orderVerification(order: Order): TracedResult[ValidationError, Int] = {
       val verificationResult = blockchain
@@ -254,7 +255,7 @@ object Verifier extends ScorexLogging {
             Left(GenericError("Can't process order with signature from scripted account"))
           }
         }
-        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyOrderSignature(order).as(0)))
+        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyOrderSignature(order, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).as(0)))
 
       TracedResult(verificationResult)
     }
@@ -266,19 +267,19 @@ object Verifier extends ScorexLogging {
     } yield matcherComplexity + sellerComplexity + buyerComplexity
   }
 
-  def verifyOrderSignature(order: Order): Either[GenericError, Order] =
+  def verifyOrderSignature(order: Order, checkWeakPk: Boolean): Either[GenericError, Order] =
     order.eip712Signature match {
       case Some(ethSignature) =>
         val signerKey = EthOrders.recoverEthSignerKey(order, ethSignature.arr)
         Either.cond(signerKey == order.senderPublicKey, order, GenericError(s"Ethereum signature invalid for $order"))
 
-      case _ => verifyAsEllipticCurveSignature(order)
+      case _ => verifyAsEllipticCurveSignature(order, checkWeakPk)
     }
 
-  def verifyAsEllipticCurveSignature[T <: Proven with Authorized](pt: T): Either[GenericError, T] =
+  def verifyAsEllipticCurveSignature[T <: Proven with Authorized](pt: T, checkWeakPk: Boolean): Either[GenericError, T] =
     pt.proofs.proofs match {
       case p +: Nil =>
-        Either.cond(crypto.verify(p, pt.bodyBytes(), pt.sender), pt, GenericError(s"Proof doesn't validate as signature for $pt"))
+        Either.cond(crypto.verify(p, pt.bodyBytes(), pt.sender, checkWeakPk), pt, GenericError(s"Proof doesn't validate as signature for $pt"))
       case _ => Left(GenericError("Transactions from non-scripted accounts must have exactly 1 proof"))
     }
 

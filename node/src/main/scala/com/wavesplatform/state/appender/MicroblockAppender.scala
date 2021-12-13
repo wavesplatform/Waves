@@ -3,6 +3,7 @@ package com.wavesplatform.state.appender
 import cats.data.EitherT
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.MicroBlock
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{BlockStats, _}
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
@@ -48,7 +49,7 @@ object MicroblockAppender extends ScorexLogging {
     import md.microBlock
     val microblockTotalResBlockSig = microBlock.totalResBlockSig
     (for {
-      _ <- EitherT(Task.now(microBlock.signaturesValid()))
+      _ <- EitherT(Task.now(microBlock.signaturesValid(blockchainUpdater.isFeatureActivated(BlockchainFeatures.RideV6))))
       _ <- EitherT(apply(blockchainUpdater, utxStorage, scheduler)(microBlock))
     } yield ()).value.map {
       case Right(_) =>

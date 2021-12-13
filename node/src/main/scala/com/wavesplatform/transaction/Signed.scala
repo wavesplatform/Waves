@@ -8,16 +8,17 @@ import monix.eval.Coeval
 
 trait Signed extends Authorized {
   protected val signatureValid: Coeval[Boolean]
+  protected def signatureValid(checkPk: Boolean): Boolean
 
   protected val signedDescendants: Coeval[Seq[Signed]] =
     Coeval(Nil)
 
-  val signaturesValid: Coeval[Either[InvalidSignature, this.type]] = Coeval.evalOnce {
+  def signaturesValid(checkPk: Boolean): Either[InvalidSignature, this.type] =
     (this +: signedDescendants())
       .to(LazyList)
       .map(
         entity =>
-          if (entity.signatureValid()) {
+          if (entity.signatureValid(checkPk)) {
             Right(entity)
           } else {
             Left(InvalidSignature(entity, None))
@@ -30,5 +31,4 @@ trait Signed extends Authorized {
         else InvalidSignature(this, Some(is))
       }
       .map(_ => this)
-  }
 }

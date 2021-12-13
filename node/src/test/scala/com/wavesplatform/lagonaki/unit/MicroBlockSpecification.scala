@@ -36,8 +36,8 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
     val microBlock  = MicroBlock.buildAndSign(3.toByte, sender, transactions, prevResBlockSig, totalResBlockSig).explicitGet()
     val parsedBlock = MicroBlock.parseBytes(MicroBlockSerializer.toBytes(microBlock)).get
 
-    assert(microBlock.signaturesValid().isRight)
-    assert(parsedBlock.signaturesValid().isRight)
+    assert(microBlock.signaturesValid(false).isRight)
+    assert(parsedBlock.signaturesValid(false).isRight)
 
     assert(microBlock.signature == parsedBlock.signature)
     assert(microBlock.sender == parsedBlock.sender)

@@ -498,7 +498,7 @@ class BlockchainUpdaterImpl(
             Left(MicroBlockAppendError("It doesn't reference last known microBlock(which exists)", microBlock))
           case _ =>
             for {
-              _ <- microBlock.signaturesValid()
+              _ <- microBlock.signaturesValid(leveldb.isFeatureActivated(BlockchainFeatures.RideV6))
               totalSignatureValid <- ng
                 .totalDiffOf(microBlock.reference)
                 .toRight(GenericError(s"No referenced block exists: $microBlock"))

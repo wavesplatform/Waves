@@ -274,7 +274,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       lastBlockInfo.map(_.id),
       microblockInvs,
       microblockResponses,
-      microblockSynchronizerScheduler
+      microblockSynchronizerScheduler,
+      blockchainUpdater.isFeatureActivated(BlockchainFeatures.RideV6)
     )
     val (newBlocks, extLoaderState, _) = RxExtensionLoader(
       settings.synchronizationSettings.synchronizationTimeout,

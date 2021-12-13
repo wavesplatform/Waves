@@ -26,7 +26,8 @@ object MicroBlockSynchronizer extends ScorexLogging {
       lastBlockIdEvents: Observable[ByteStr],
       microblockInvs: ChannelObservable[MicroBlockInv],
       microblockResponses: ChannelObservable[MicroBlockResponse],
-      scheduler: SchedulerService
+      scheduler: SchedulerService,
+      rideV6Activated: Boolean
   ): (Observable[(Channel, MicroblockData)], Coeval[CacheSizes]) = {
 
     implicit val schdlr: SchedulerService = scheduler
@@ -93,7 +94,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
       .mapEval {
         case (ch, mbInv @ MicroBlockInv(_, totalBlockId, reference, _)) =>
           Task.evalAsync {
-            val sig = try mbInv.signaturesValid()
+            val sig = try mbInv.signaturesValid(rideV6Activated)
             catch {
               case t: Throwable =>
                 log.error(s"Error validating signature", t)

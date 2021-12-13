@@ -146,7 +146,7 @@ class OrderJsonSpecification extends PropSpec {
         case s: JsSuccess[Order] =>
           val o = s.get
           o.json().toString() should be(json.toString())
-          Verifier.verifyAsEllipticCurveSignature(o).explicitGet()
+          Verifier.verifyAsEllipticCurveSignature(o, checkWeakPk = false).explicitGet()
       }
     }
   }
