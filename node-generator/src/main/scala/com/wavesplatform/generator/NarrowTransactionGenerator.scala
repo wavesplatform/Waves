@@ -4,12 +4,8 @@ import java.nio.file.{Files, Paths}
 import java.util.UUID
 import java.util.concurrent.ThreadLocalRandom
 
-import scala.concurrent.duration._
-import scala.util.Random
-import scala.util.Random._
-
 import cats.Show
-import com.wavesplatform.account.{Alias, KeyPair}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.generator.utils.{Gen, Universe}
@@ -17,22 +13,26 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.state.DataEntry.{MaxValueSize, Type}
-import com.wavesplatform.transaction._
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TransactionType.TransactionType
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
-import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.utils.{LoggerFacade, NTP}
 import org.slf4j.LoggerFactory
 import org.web3j.crypto.Bip32ECKeyPair
+
+import scala.concurrent.duration._
+import scala.util.Random
+import scala.util.Random._
 
 //noinspection ScalaStyle, TypeAnnotation
 class NarrowTransactionGenerator(
@@ -226,7 +226,7 @@ class NarrowTransactionGenerator(
             val sender      = randomFrom(accounts).get
             val aliasString = NarrowTransactionGenerator.generateAlias()
             logOption(
-              CreateAliasTransaction.selfSigned(correctVersion(TxVersion.V2), sender, Alias.create(aliasString).explicitGet(), 500000L, timestamp)
+              CreateAliasTransaction.selfSigned(correctVersion(TxVersion.V2), sender, aliasString, 500000L, timestamp)
             )
 
           case TransactionType.MassTransfer =>
