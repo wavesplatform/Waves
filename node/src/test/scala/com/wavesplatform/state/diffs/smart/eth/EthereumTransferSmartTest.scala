@@ -4,7 +4,8 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.lang.directives.values.V6
+import com.wavesplatform.lang.directives.DirectiveDictionary
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -26,12 +27,13 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
 
   private val transferAmount = 1234
 
-  private def script(tx: EthereumTransaction, recipient: Address) = TestCompiler(V6).compileExpression(
-    s"""
-       | let t = transferTransactionById(base58'${tx.id()}').value()
-       | ${checkEthTransfer(tx, "unit", recipient)}
+  private def accountScript(version: StdLibVersion, getTx: String, tx: EthereumTransaction, recipient: Address) =
+    TestCompiler(version).compileExpression(
+      s"""
+       | let t = $getTx(base58'${tx.id()}').${if (version >= V3) "value" else "extract"}()
+       | ${if (version >= V3) checkEthTransfer(tx, "unit", recipient) else "t == t"}
      """.stripMargin
-  )
+    )
 
   private def assetScript(tx: EthereumTransaction, recipient: Address) = TestCompiler(V6).compileAsset {
     s"""
@@ -63,30 +65,46 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
        | ${assertProvenPart("t", proofs = false)} && amount && assetId && feeAssetId && recipient && attachment
      """.stripMargin
 
-  property("transferTransactionById") {
+  property("access to Ethereum transfer from RIDE script") {
     val fee         = ciFee().sample.get
     val recipient   = accountGen.sample.get
     val transfer    = EthereumTransaction.Transfer(None, transferAmount, recipient.toAddress)
     val ethTransfer = EthereumTransaction(transfer, TestEthUnderlying, TestEthSignature, 'T'.toByte)
-    val gTx1        = GenesisTransaction.create(ethTransfer.senderAddress(), ENOUGH_AMT, ts).explicitGet()
-    val gTx2        = GenesisTransaction.create(recipient.toAddress, ENOUGH_AMT, ts).explicitGet()
-    val verifier    = Some(script(ethTransfer, recipient.toAddress))
-    val setVerifier = () => SetScriptTransaction.selfSigned(1.toByte, recipient, verifier, fee, ts).explicitGet()
+    val genesis1    = GenesisTransaction.create(ethTransfer.senderAddress(), ENOUGH_AMT, ts).explicitGet()
+    val genesis2    = GenesisTransaction.create(recipient.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-    withDomain(RideV6) { d =>
-      d.appendBlock(gTx1, gTx2, setVerifier())
-      d.appendBlock(ethTransfer)
+    DirectiveDictionary[StdLibVersion].all
+      .foreach { version =>
+        withDomain(RideV6) { d =>
+          val function    = if (version >= V3) "transferTransactionById" else "transactionById"
+          val verifier    = Some(accountScript(version, function, ethTransfer, recipient.toAddress))
+          val setVerifier = () => SetScriptTransaction.selfSigned(1.toByte, recipient, verifier, fee, ts).explicitGet()
 
-      d.liquidDiff.portfolios(recipient.toAddress) shouldBe Portfolio.waves(transferAmount)
-      d.liquidDiff.portfolios(ethTransfer.senderAddress()) shouldBe Portfolio.waves(-ethTransfer.underlying.getGasPrice.longValue() - transferAmount)
+          d.appendBlock(genesis1, genesis2, setVerifier())
+          d.appendBlock(ethTransfer)
 
-      d.appendBlock()
-      d.appendBlock(setVerifier())
-      d.liquidDiff.scriptsRun shouldBe 1
-    }
+          d.liquidDiff.portfolios(recipient.toAddress) shouldBe Portfolio.waves(transferAmount)
+          d.liquidDiff.portfolios(ethTransfer.senderAddress()) shouldBe Portfolio.waves(
+            -ethTransfer.underlying.getGasPrice.longValue() - transferAmount)
+
+          d.appendBlock()
+
+          if (version >= V6) {
+            d.appendBlock(setVerifier()) // just for account script execution
+            d.liquidDiff.scriptsRun shouldBe 1
+          } else if (version >= V3) {
+            (the[Exception] thrownBy d.appendBlock(setVerifier())).getMessage should include(
+              "value() called on unit value on function 'transferTransactionById' call"
+            )
+          } else
+            (the[Exception] thrownBy d.appendBlock(setVerifier())).getMessage should include(
+              s"t = Left(extract() called on unit value)"
+            )
+        }
+      }
   }
 
-  property("scripted asset") {
+  property("transfer scripted asset via Ethereum transaction") {
     val fee       = ciFee().sample.get
     val recipient = accountGen.sample.get
 
