@@ -182,7 +182,7 @@ class UtxPriorityPoolSpecification
         val utx =
           new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
         utx.setPriorityTxs(Seq(tx1, tx2))
-        utx.cleanUnconfirmed() shouldBe Nil
+        utx.cleanUnconfirmed()
         utx.all shouldBe Seq(tx1, tx2)
     }
 

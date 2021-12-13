@@ -11,7 +11,7 @@ import scala.util.{Left, Right}
 import cats.Monoid
 import cats.syntax.monoid._
 import com.wavesplatform.ResponsivenessLogs
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.events.UtxEvent
@@ -25,7 +25,6 @@ import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -72,7 +71,7 @@ class UtxPoolImpl(
 
     val checks = if (verify) PoolMetrics.putTimeStats.measure {
       object LimitChecks {
-        def checkScripted(tx: Transaction, skipSizeCheck: Boolean): Either[GenericError, Transaction] =
+        def checkScripted(tx: Transaction, skipSizeCheck: () => Boolean): Either[GenericError, Transaction] =
           PoolMetrics.checkScripted.measure(
             if (!TxCheck.isScripted(tx)) Right(tx)
             else
@@ -83,7 +82,7 @@ class UtxPoolImpl(
                   GenericError("transactions from scripted accounts are denied from UTX pool")
                 )
                 _ <- Either.cond(
-                  skipSizeCheck || transactions.values().asScala.count(TxCheck.isScripted) < utxSettings.maxScriptedSize,
+                  transactions.values().asScala.count(TxCheck.isScripted) < utxSettings.maxScriptedSize || skipSizeCheck(),
                   (),
                   GenericError("Transaction pool scripted txs size limit is reached")
                 )
@@ -127,7 +126,7 @@ class UtxPoolImpl(
         }
       }
 
-      val skipSizeCheck = LimitChecks.checkWhitelisted(tx) || (utxSettings.allowSkipChecks && LimitChecks.checkIsMostProfitable(tx))
+      lazy val skipSizeCheck = LimitChecks.checkWhitelisted(tx) || (utxSettings.allowSkipChecks && LimitChecks.checkIsMostProfitable(tx))
 
       lazy val transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
         .map(_.bytes().length)
@@ -135,19 +134,18 @@ class UtxPoolImpl(
 
       for {
         _ <- Either.cond(
-          skipSizeCheck || transactions.size
-            < utxSettings.maxSize,
+          transactions.size < utxSettings.maxSize || skipSizeCheck,
           (),
           GenericError("Transaction pool size limit is reached")
         )
         _ <- Either.cond(
-          skipSizeCheck || (transactionsBytes + tx.bytesSize) <= utxSettings.maxBytesSize,
+          (transactionsBytes + tx.bytesSize) <= utxSettings.maxBytesSize || skipSizeCheck,
           (),
           GenericError("Transaction pool bytes size limit is reached")
         )
 
         _ <- LimitChecks.checkNotBlacklisted(tx)
-        _ <- LimitChecks.checkScripted(tx, skipSizeCheck)
+        _ <- LimitChecks.checkScripted(tx, () => skipSizeCheck)
       } yield ()
     } else Right(())
 
@@ -256,29 +254,23 @@ class UtxPoolImpl(
     pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()))(initialConstraint, strategy, cancelled)
   }
 
-  def cleanUnconfirmed(): Seq[Transaction] = {
+  def cleanUnconfirmed(): Unit = {
     log.trace(s"Starting UTX cleanup at height ${blockchain.height}")
 
-    val removedTransactions = this.transactions
+    this.transactions
       .values()
       .asScala
-      .toVector // Should be strict
-      .flatMap { tx =>
+      .foreach { tx =>
         if (TxCheck.isExpired(tx)) {
           TxStateActions.removeExpired(tx)
-          Some(tx)
         } else {
           val differ = TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, _)
           val diffEi = differ(tx).resultE
-          diffEi.left.toOption.map { error =>
+          diffEi.left.foreach { error =>
             TxStateActions.removeInvalid(tx, error)
-            tx
           }
         }
       }
-
-    priorityPool.invalidateTxs(removedTransactions.map(_.id()).toSet)
-    removedTransactions
   }
 
   private def pack(differ: (Blockchain, Transaction) => TracedResult[ValidationError, Diff])(
@@ -484,14 +476,9 @@ class UtxPoolImpl(
         case a: AuthorizedTransaction   => blockchain.hasAccountScript(a.sender.toAddress)
         case _                          => false
       }
-
-    def canCreateAlias(alias: Alias): Boolean =
-      blockchain.canCreateAlias(alias)
-
-    def canReissue(asset: IssuedAsset): Boolean =
-      blockchain.assetDescription(asset).forall(_.reissuable)
   }
 
+  //noinspection NameBooleanParameters
   private[this] object TxCleanup {
     private[this] val scheduled = AtomicBoolean(false)
 
@@ -541,8 +528,6 @@ class UtxPoolImpl(
     val packTimeStats   = Kamon.timer("utx.pack-unconfirmed").withoutTags()
 
     val checkIsMostProfitable = Kamon.timer("utx.check.is-most-profitable").withoutTags()
-    val checkAlias            = Kamon.timer("utx.check.alias").withoutTags()
-    val checkCanReissue       = Kamon.timer("utx.check.can-reissue").withoutTags()
     val checkNotBlacklisted   = Kamon.timer("utx.check.not-blacklisted").withoutTags()
     val checkScripted         = Kamon.timer("utx.check.scripted").withoutTags()
     val checkWhitelisted      = Kamon.timer("utx.check.whitelisted").withoutTags()
