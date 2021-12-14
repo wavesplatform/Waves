@@ -30,6 +30,7 @@ object TxHelpers {
   def defaultAddress: Address = defaultSigner.toAddress
   def secondSigner: KeyPair   = signer(1)
   def secondAddress: Address  = secondSigner.toAddress
+  def voidAddress: Address    = Address(new Array[Byte](20))
 
   val matcher: KeyPair = defaultSigner
 

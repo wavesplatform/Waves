@@ -6,7 +6,7 @@ import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 import cats.syntax.option._
-import com.wavesplatform.{database, Application}
+import com.wavesplatform.{database, Application, TestValues}
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common._
@@ -50,6 +50,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   lazy val wallet: Wallet       = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
+
     /**
       * @return Tuple of (asset, feeInAsset, feeInWaves)
       * @see [[com.wavesplatform.state.diffs.FeeValidation#getMinFee(com.wavesplatform.state.Blockchain, com.wavesplatform.transaction.Transaction)]]
@@ -63,7 +64,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     }
 
     def transactionMeta(transactionId: ByteStr): TransactionMeta =
-      transactions.transactionById(transactionId)
+      transactions
+        .transactionById(transactionId)
         .getOrElse(throw new NoSuchElementException(s"No meta for $transactionId"))
 
     def invokeScriptResult(transactionId: ByteStr): InvokeScriptResult =
@@ -95,9 +97,11 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def liquidAndSolidAssert(doCheck: () => Unit): Unit = {
     require(liquidState.isDefined, "No liquid state is present")
-    try doCheck() catch { case NonFatal(err) => throw new RuntimeException("Liquid check failed", err) }
+    try doCheck()
+    catch { case NonFatal(err) => throw new RuntimeException("Liquid check failed", err) }
     makeStateSolid()
-    try doCheck() catch { case NonFatal(err) => throw new RuntimeException("Solid check failed", err) }
+    try doCheck()
+    catch { case NonFatal(err) => throw new RuntimeException("Solid check failed", err) }
   }
 
   def makeStateSolid(): (Int, SortedMap[String, String]) = {
@@ -172,6 +176,12 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     lastBlock
   }
 
+  def appendAndCatchError(txs: Transaction*): ValidationError = {
+    val block = createBlock(Block.PlainBlockVersion, txs)
+    val result = blockchainUpdater.processBlock(block)
+    result.left.getOrElse(throw new RuntimeException(s"Block appended successfully: $txs"))
+  }
+
   def appendAndAssertFailed(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
     appendBlock(block)
@@ -227,10 +237,12 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def createBlock(version: Byte, txs: Seq[Transaction], ref: Option[ByteStr] = blockchainUpdater.lastBlockId, strictTime: Boolean = false): Block = {
     val reference = ref.getOrElse(randomSig)
-    val parent = ref.flatMap { bs =>
-      val height = blockchain.heightOf(bs)
-      height.flatMap(blockchain.blockHeader).map(_.header)
-    }.getOrElse(lastBlock.header)
+    val parent = ref
+      .flatMap { bs =>
+        val height = blockchain.heightOf(bs)
+        height.flatMap(blockchain.blockHeader).map(_.header)
+      }
+      .getOrElse(lastBlock.header)
 
     val grandParent = ref.flatMap { bs =>
       val height = blockchain.heightOf(bs)
@@ -310,6 +322,18 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
     def setScript(account: KeyPair, script: Script): Unit = {
       appendBlock(TxHelpers.setScript(account, script))
+    }
+
+    def transfer(account: KeyPair, to: Address, amount: TxAmount, asset: Asset): Unit = {
+      appendBlock(TxHelpers.transfer(account, to, amount, asset))
+    }
+
+    def transferAll(account: KeyPair, to: Address, asset: Asset): Unit = {
+      val balanceMinusFee = {
+        val balance = blockchain.balance(account.toAddress, asset)
+        if (asset == Waves) balance - TestValues.fee else balance
+      }
+      transfer(account, to, balanceMinusFee, asset)
     }
   }
 

@@ -26,7 +26,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.DiffsCommon
+import com.wavesplatform.state.diffs.{BalanceDiffValidation, DiffsCommon}
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -42,7 +42,6 @@ import com.wavesplatform.transaction.validation.impl.{LeaseCancelTxValidator, Le
 import com.wavesplatform.transaction.{Asset, AssetIdLength, ERC20Address, PBSince, TransactionType}
 import com.wavesplatform.utils._
 import shapeless.Coproduct
-
 import scala.util.{Failure, Right, Success, Try}
 
 object InvokeDiffsCommon {
@@ -593,7 +592,7 @@ object InvokeDiffsCommon {
                 )
             }
 
-          val diff = action match {
+          val baseDiff = action match {
             case t: AssetTransfer =>
               applyTransfer(t, if (blockchain.isFeatureActivated(BlockV5)) {
                 pk
@@ -608,6 +607,20 @@ object InvokeDiffsCommon {
             case l: Lease        => applyLease(l).leftMap(FailedTransactionError.asFailedScriptError)
             case lc: LeaseCancel => applyLeaseCancel(lc).leftMap(FailedTransactionError.asFailedScriptError)
           }
+
+          val diff = for {
+            baseDiff <- baseDiff
+
+            // Check temporary negative balance
+            _ <- TracedResult(
+              if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
+                BalanceDiffValidation(blockchain)(baseDiff)
+                  .leftMap(FailedTransactionError.asFailedScriptError)
+              else
+                Right(())
+            )
+          } yield baseDiff
+
           diffAcc |+| diff.leftMap(_.addComplexity(curDiff.scriptsComplexity))
 
         case _ => diffAcc

@@ -54,7 +54,7 @@ import org.scalatest.{EitherValues, Inside}
 class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCacheSettings with EitherValues with Inside with MockFactory {
   import DomainPresets._
 
-  private val fs = settingsForRide(V3).blockchainSettings.functionalitySettings
+  private val fs       = settingsForRide(V3).blockchainSettings.functionalitySettings
   private val fsWithV5 = settingsForRide(V5).blockchainSettings.functionalitySettings
 
   val assetAllowed: Script = ExprScript(
@@ -318,22 +318,23 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         List.fill(invocationParamsCount)(FALSE)
       )
       ci = Signed.invokeScript(
-          1.toByte,
-          invoker,
-          master.toAddress,
-          Some(fc),
-          payment.toSeq,
-          if (sponsored) {
-            sponsorTx.minSponsoredAssetFee.get * 5
-          } else {
-            fee
-          },
-          if (sponsored) {
-            IssuedAsset(issueTx.id())
-          } else {
-            Waves
-          },
-          ts)
+        1.toByte,
+        invoker,
+        master.toAddress,
+        Some(fc),
+        payment.toSeq,
+        if (sponsored) {
+          sponsorTx.minSponsoredAssetFee.get * 5
+        } else {
+          fee
+        },
+        if (sponsored) {
+          IssuedAsset(issueTx.id())
+        } else {
+          Waves
+        },
+        ts
+      )
     } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
   }
 
@@ -386,14 +387,15 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       else
         None
       ci = Signed.invokeScript(
-          txVersion,
-          invoker,
-          master.toAddress,
-          fc,
-          payment.toSeq,
-          if (sponsored) sponsoredFee else fee,
-          if (sponsored) sponsorTx.asset else Waves,
-          ts + 3)
+        txVersion,
+        invoker,
+        master.toAddress,
+        fc,
+        payment.toSeq,
+        if (sponsored) sponsoredFee else fee,
+        if (sponsored) sponsorTx.asset else Waves,
+        ts + 3
+      )
     } yield (if (selfSend) List(genesis) else List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
 
   def preconditionsAndSetContractWithVerifier(
@@ -427,22 +429,23 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       else
         None
       ci = Signed.invokeScript(
-          1.toByte,
-          invoker,
-          master.toAddress,
-          fc,
-          payment.toSeq,
-          if (sponsored) {
-            sponsorTx.minSponsoredAssetFee.get * 5
-          } else {
-            fee
-          },
-          if (sponsored) {
-            IssuedAsset(issueTx.id())
-          } else {
-            Waves
-          },
-          ts + 3)
+        1.toByte,
+        invoker,
+        master.toAddress,
+        fc,
+        payment.toSeq,
+        if (sponsored) {
+          sponsorTx.minSponsoredAssetFee.get * 5
+        } else {
+          fee
+        },
+        if (sponsored) {
+          IssuedAsset(issueTx.id())
+        } else {
+          Waves
+        },
+        ts + 3
+      )
     } yield (List(genesis, genesis2), setVerifier, setContract, ci, master, issueTx, sponsorTx)
 
   def preconditionsAndSetContractWithAlias(
@@ -475,40 +478,92 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       else
         None
       ciWithAlias = Signed.invokeScript(
-          1.toByte,
-          invoker,
-          masterAlias,
-          fc,
-          payment.toSeq,
-          if (sponsored) {
-            sponsorTx.minSponsoredAssetFee.get * 5
-          } else {
-            fee
-          },
-          if (sponsored) {
-            IssuedAsset(issueTx.id())
-          } else {
-            Waves
-          },
-          ts + 3)
+        1.toByte,
+        invoker,
+        masterAlias,
+        fc,
+        payment.toSeq,
+        if (sponsored) {
+          sponsorTx.minSponsoredAssetFee.get * 5
+        } else {
+          fee
+        },
+        if (sponsored) {
+          IssuedAsset(issueTx.id())
+        } else {
+          Waves
+        },
+        ts + 3
+      )
       ciWithFakeAlias = Signed.invokeScript(
-          1.toByte,
-          invoker,
-          fakeAlias,
-          fc,
-          payment.toSeq,
-          if (sponsored) {
-            sponsorTx.minSponsoredAssetFee.get * 5
-          } else {
-            fee
-          },
-          if (sponsored) {
-            IssuedAsset(issueTx.id())
-          } else {
-            Waves
-          },
-          ts + 3)
+        1.toByte,
+        invoker,
+        fakeAlias,
+        fc,
+        payment.toSeq,
+        if (sponsored) {
+          sponsorTx.minSponsoredAssetFee.get * 5
+        } else {
+          fee
+        },
+        if (sponsored) {
+          IssuedAsset(issueTx.id())
+        } else {
+          Waves
+        },
+        ts + 3
+      )
     } yield (List(genesis, genesis2), master, setContract, ciWithAlias, ciWithFakeAlias, aliasTx)
+
+  property("doesnt validate intermediate action balance before V6")(withDomain(DomainPresets.RideV5) { d =>
+    val dApp = TxHelpers.defaultSigner
+
+    d.helpers.creditWavesToDefaultSigner()
+    val asset = d.helpers.issueAsset()
+    d.helpers.transferAll(dApp, TxHelpers.voidAddress, asset)
+    d.helpers.setScript(
+      dApp,
+      TxHelpers.scriptV5(s"""
+        |@Callable(i)
+        |func test(asset: ByteVector) = {
+        |   [
+        |     ScriptTransfer(Address(base58'${TxHelpers.secondAddress}'), 100, asset),
+        |     Reissue(asset, 100, true)
+        |   ]
+        |}
+        |""".stripMargin)
+    )
+
+    val invoke = TxHelpers.invoke(dApp.toAddress, "test", Seq(CONST_BYTESTR(asset.id).explicitGet()))
+    d.appendAndAssertSucceed(invoke)
+    d.blockchain.balance(dApp.toAddress, asset) shouldBe 0L
+    d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 100L
+  })
+
+  property("validates intermediate action balance after V6")(withDomain(DomainPresets.RideV6) { d =>
+    val dApp = TxHelpers.defaultSigner
+
+    d.helpers.creditWavesToDefaultSigner()
+    val asset = d.helpers.issueAsset()
+    d.helpers.transferAll(dApp, TxHelpers.voidAddress, asset)
+    d.helpers.setScript(
+      dApp,
+      TxHelpers.scriptV5(s"""
+         |@Callable(i)
+         |func test(asset: ByteVector) = {
+         |   [
+         |     ScriptTransfer(Address(base58'${TxHelpers.secondAddress}'), 100, asset),
+         |     Reissue(asset, 100, true)
+         |   ]
+         |}
+         |""".stripMargin)
+    )
+
+    val invoke = TxHelpers.invoke(dApp.toAddress, "test", Seq(CONST_BYTESTR(asset.id).explicitGet()))
+    d.appendAndAssertFailed(invoke)
+    d.blockchain.balance(dApp.toAddress, asset) shouldBe 0L
+    d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 0L
+  })
 
   property("invoking contract results contract's state") {
     forAll(for {
@@ -1108,7 +1163,18 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       funcBinding <- validAliasStringGen
       fee         <- ciFee(1)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
-      ci = InvokeScriptTransaction.create(1.toByte, invoker.publicKey, master.toAddress, Some(fc), Seq(Payment(-1, Waves)), fee, Waves, ts, Proofs.empty, AddressScheme.current.chainId)
+      ci = InvokeScriptTransaction.create(
+        1.toByte,
+        invoker.publicKey,
+        master.toAddress,
+        Some(fc),
+        Seq(Payment(-1, Waves)),
+        fee,
+        Waves,
+        ts,
+        Proofs.empty,
+        AddressScheme.current.chainId
+      )
     } yield ci) { _ should produceRejectOrFailedDiff("NonPositiveAmount") }
   }
 
@@ -1573,7 +1639,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         contract = issueContract(funcBinding)
         script   = ContractScript(V4, contract)
 
-        fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
+        fc       = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
         invokeTx = Signed.invokeScript(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
       } yield (assetTx, invokeTx, master, script, funcBinding)
 
@@ -1662,7 +1728,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       script      = ContractScript(V4, contract)
       setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
-      invokeTx = Signed.invokeScript(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
+      invokeTx    = Signed.invokeScript(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
     } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, assetTx, setScriptTx))
 
   property("Reissuing unreissued asset should produce error") {
@@ -1713,7 +1779,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       script      = ContractScript(V4, contract)
       setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
-      invokeTx = Signed.invokeScript(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
+      invokeTx    = Signed.invokeScript(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
     } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
 
   property("issued asset can be transfered") {
@@ -1764,7 +1830,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       script      = ContractScript(V4, contract)
       setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
-      invokeTx = Signed.invokeScript(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
+      invokeTx    = Signed.invokeScript(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
     } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
 
   property("nonissued asset cann't be transfered") {
@@ -1815,7 +1881,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       script      = ContractScript(V4, contract)
       setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
-      invokeTx = Signed.invokeScript(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
+      invokeTx    = Signed.invokeScript(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
     } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
 
   property("duplicate issuing asset should produce diff error") {
@@ -1888,9 +1954,9 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
           .explicitGet()
         funcBinding                     <- funcNameGen
         (fee, feeAsset, contract, args) <- failInvariant(funcBinding, sTx, i2Tx)
-        script = ContractScript(V4, contract)
-        ssTx   = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
-        fc     = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), args)
+        script   = ContractScript(V4, contract)
+        ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
+        fc       = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), args)
         invokeTx = Signed.invokeScript(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, feeAsset, ts + 3)
       } yield (invokeTx, (ENOUGH_AMT - enoughFee, i1Tx.quantity), Seq(g1Tx, g2Tx, g3Tx, i1Tx, i2Tx, sTx, tTx, ssTx))
 
@@ -1928,9 +1994,9 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         funcBinding     <- funcNameGen
         arg             <- genBoundedStringBytes(1, 32)
         contract        <- paymentContractGen(invoker.toAddress, fee, List(feeAsset), V4)(funcBinding)
-        script = ContractScript(V4, contract)
-        ssTx   = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
-        fc     = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
+        script   = ContractScript(V4, contract)
+        ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
+        fc       = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
         invokeTx = Signed.invokeScript(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, feeAsset, ts + 3)
       } yield (invokeTx, Seq(g1Tx, g2Tx, iTx, sTx, tTx, ssTx))
 
@@ -2094,7 +2160,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 5).explicitGet()
         fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments   = iTxs.takeRight(2).map(tx => Payment(10, IssuedAsset(tx.assetId)))
-        invokeTx = Signed.invokeScript(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+        invokeTx   = Signed.invokeScript(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
       } yield (Seq(gTx1, gTx2) ++ invokerScriptTx ++ iTxs ++ tTxs ++ saTxs :+ ssTx, invokeTx, master.toAddress, complexity)
 
     forAll(scenario) {
@@ -2502,7 +2568,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
             diff.scriptResults(invokeTx.id()).error shouldBe None
             val l  = diff.scriptResults(invokeTx.id()).leases(0)
             val l1 = diff.scriptResults(invokeTx.id()).leases(1)
-            val l2                                                        = diff.scriptResults(invokeTx.id()).leaseCancels(0)
+            val l2 = diff.scriptResults(invokeTx.id()).leaseCancels(0)
             l.amount shouldBe 13
             l.recipient shouldBe service
             l1.amount shouldBe 23
@@ -3636,7 +3702,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         setServiceDApp    = SetScriptTransaction.selfSigned(1.toByte, serviceDAppAcc, serviceDAppScript.toOption, fee, ts + 5).explicitGet()
         fc                = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments          = List(Payment(paymentFromInvokerAmount, Waves))
-        invokeTx = Signed.invokeScript(TxVersion.V3, invoker, clientDAppAcc.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+        invokeTx          = Signed.invokeScript(TxVersion.V3, invoker, clientDAppAcc.toAddress, Some(fc), payments, fee, Waves, ts + 6)
       } yield (
         Seq(gTx1, gTx2, gTx3, setServiceDApp, setClientDApp, paymentIssue, transferIssue),
         invokeTx,
