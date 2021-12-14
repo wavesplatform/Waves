@@ -24,7 +24,6 @@ import com.wavesplatform.transaction.transfer._
 import scala.util.{Left, Right}
 
 object CommonValidation {
-
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= blockchain.settings.functionalitySettings.allowTemporaryNegativeUntil) {
       def checkTransfer(

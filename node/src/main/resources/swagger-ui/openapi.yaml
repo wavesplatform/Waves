@@ -1601,6 +1601,12 @@ paths:
             schema:
               type: string
         required: true
+      parameters:
+        - name: compact
+          in: query
+          description: 'If true, compacts the contract. False by default'
+          schema:
+            type: boolean
       responses:
         '200':
           description: successful operation

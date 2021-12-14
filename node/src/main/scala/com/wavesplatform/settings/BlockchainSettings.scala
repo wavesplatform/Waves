@@ -75,7 +75,9 @@ case class FunctionalitySettings(
     delayDelta: Int = 8,
     syncDAppCheckPaymentsHeight: Int = 0,
     checkTotalDataEntriesBytesHeight: Int = 0,
-    syncDAppCheckTransfersHeight: Int = 0
+    syncDAppCheckTransfersHeight: Int = 0,
+    estimationOverflowFixHeight: Int = 0,
+    estimatorSumOverflowFixHeight: Int = 0
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int        = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil                       = lastTimeBasedForkParameter
@@ -120,7 +122,9 @@ object FunctionalitySettings {
     estimatorPreCheckHeight = 1847610,
     syncDAppCheckPaymentsHeight = 2746200,
     checkTotalDataEntriesBytesHeight = 2771954,
-    syncDAppCheckTransfersHeight = 2792473
+    syncDAppCheckTransfersHeight = 2792473,
+    estimationOverflowFixHeight = 2858710,
+    estimatorSumOverflowFixHeight = 2897510
   )
 
   val TESTNET = apply(
@@ -132,7 +136,9 @@ object FunctionalitySettings {
     estimatorPreCheckHeight = 817380,
     syncDAppCheckPaymentsHeight = 1698800,
     checkTotalDataEntriesBytesHeight = 1711600,
-    syncDAppCheckTransfersHeight = 1727461
+    syncDAppCheckTransfersHeight = 1727461,
+    estimationOverflowFixHeight = 1793770,
+    estimatorSumOverflowFixHeight = 1832520
   )
 
   val STAGENET = apply(
@@ -143,7 +149,9 @@ object FunctionalitySettings {
     minAssetInfoUpdateInterval = 10,
     syncDAppCheckPaymentsHeight = 967300,
     checkTotalDataEntriesBytesHeight = 991912,
-    syncDAppCheckTransfersHeight = 1012439
+    syncDAppCheckTransfersHeight = 1012439,
+    estimationOverflowFixHeight = 1078680,
+    estimatorSumOverflowFixHeight = 1097419
   )
 
   val configPath = "waves.blockchain.custom.functionality"
