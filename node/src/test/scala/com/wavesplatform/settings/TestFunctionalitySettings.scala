@@ -12,7 +12,8 @@ object TestFunctionalitySettings {
       BlockchainFeatures.FairPoS.id       -> 0,
       BlockchainFeatures.Ride4DApps.id    -> 0
     ),
-    doubleFeaturesPeriodsAfterHeight = Int.MaxValue
+    doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
+    estimatorSumOverflowFixHeight = Int.MaxValue
   )
 
   def withFeatures(features: BlockchainFeature*): FunctionalitySettings =

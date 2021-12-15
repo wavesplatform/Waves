@@ -691,6 +691,7 @@ object ExpressionCompiler {
           Left(Generic(p.start, p.end, s"Can't find suitable function $funcName(a: $accTypeStr, b: $listInnerTypeStr) for $name"))
         }
         .toCompileM
+      _ <- set[Id, CompilerContext, CompilationError](ctx.copy(foldIdx = ctx.foldIdx + 1))
       resultType = compiledFunc.args.head._2.asInstanceOf[FINAL]
       compiledFold <- if (isNative)
         compileFunctionCall(
@@ -701,7 +702,7 @@ object ExpressionCompiler {
           allowIllFormedStrings = false
         ).map(_.copy(t = resultType))
       else {
-        val unwrapped = CompilerMacro.unwrapFold(limit, compiledList, compiledAcc, compiledFunc.header)
+        val unwrapped = CompilerMacro.unwrapFold(ctx.foldIdx, limit, compiledList, compiledAcc, compiledFunc.header)
         CompilationStepResultExpr(ctx, unwrapped, resultType, accRaw)
           .asRight[CompilationError]
           .toCompileM
