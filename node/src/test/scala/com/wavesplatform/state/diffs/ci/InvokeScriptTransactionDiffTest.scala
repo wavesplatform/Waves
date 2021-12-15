@@ -546,23 +546,47 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     d.helpers.creditWavesToDefaultSigner()
     val asset = d.helpers.issueAsset()
     d.helpers.transferAll(dApp, TxHelpers.voidAddress, asset)
-    d.helpers.setScript(
-      dApp,
-      TxHelpers.scriptV5(s"""
-         |@Callable(i)
-         |func test(asset: ByteVector) = {
-         |   [
-         |     ScriptTransfer(Address(base58'${TxHelpers.secondAddress}'), 100, asset),
-         |     Reissue(asset, 100, true)
-         |   ]
-         |}
-         |""".stripMargin)
-    )
 
-    val invoke = TxHelpers.invoke(dApp.toAddress, "test", Seq(CONST_BYTESTR(asset.id).explicitGet()))
-    d.appendAndAssertFailed(invoke)
-    d.blockchain.balance(dApp.toAddress, asset) shouldBe 0L
-    d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 0L
+    withClue("simple script") {
+      d.helpers.setScript(
+        dApp,
+        TxHelpers.scriptV5(s"""
+                              |@Callable(i)
+                              |func test(asset: ByteVector) = {
+                              |   [
+                              |     ScriptTransfer(Address(base58'${TxHelpers.secondAddress}'), 100, asset),
+                              |     Reissue(asset, 100, true)
+                              |   ]
+                              |}
+                              |""".stripMargin)
+      )
+
+      val invoke = TxHelpers.invoke(dApp.toAddress, "test", Seq(CONST_BYTESTR(asset.id).explicitGet()))
+      d.appendAndCatchError(invoke).toString should include("negative asset balance")
+      d.blockchain.balance(dApp.toAddress, asset) shouldBe 0L
+      d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 0L
+    }
+
+    withClue("complex script") {
+      d.helpers.setScript(
+        dApp,
+        TxHelpers.scriptV5(s"""
+                              |@Callable(i)
+                              |func test(asset: ByteVector) = {
+                              |   strict test1 = ${"sigVerify(base58'', base58'', base58'') ||" * 16} true
+                              |   [
+                              |     ScriptTransfer(Address(base58'${TxHelpers.secondAddress}'), 100, asset),
+                              |     Reissue(asset, 100, true)
+                              |   ]
+                              |}
+                              |""".stripMargin)
+      )
+
+      val invoke = TxHelpers.invoke(dApp.toAddress, "test", Seq(CONST_BYTESTR(asset.id).explicitGet()))
+      d.appendAndAssertFailed(invoke)
+      d.blockchain.balance(dApp.toAddress, asset) shouldBe 0L
+      d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 0L
+    }
   })
 
   property("invoking contract results contract's state") {

@@ -180,7 +180,10 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def appendAndCatchError(txs: Transaction*): ValidationError = {
     val block = createBlock(Block.PlainBlockVersion, txs)
-    val result = blockchainUpdater.processBlock(block)
+    val result = appendBlockE(block)
+    txs.foreach { tx =>
+      require(blockchain.transactionInfo(tx.id()).isEmpty, s"should not pass: $tx")
+    }
     result.left.getOrElse(throw new RuntimeException(s"Block appended successfully: $txs"))
   }
 

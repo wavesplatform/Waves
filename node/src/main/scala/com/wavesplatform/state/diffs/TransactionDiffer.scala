@@ -76,7 +76,7 @@ object TransactionDiffer {
       transactionDiff <- transactionDiff(blockchain, tx, verifierDiff, currentBlockTimestamp, limitedExecution)
       remainingComplexity = if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - transactionDiff.scriptsComplexity.toInt else Int.MaxValue
       _ <- validateBalance(blockchain, tx.tpe, transactionDiff).traced.leftMap { err =>
-        def acceptFailedByBalance() =
+        def acceptFailedByBalance(): Boolean =
           acceptFailed(blockchain) && blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
 
         if (transactionDiff.scriptsComplexity > ContractLimits.FailFreeInvokeComplexity && transactionMayFail(tx) && acceptFailedByBalance())
@@ -86,7 +86,15 @@ object TransactionDiffer {
       }
       diff <- assetsVerifierDiff(blockchain, tx, verifyAssets, transactionDiff, remainingComplexity)
     } yield diff
-    result.leftMap(TransactionValidationError(_, tx))
+
+    result.leftMap {
+      // Force reject
+      case fte: FailedTransactionError
+          if fte.spentComplexity <= ContractLimits.FailFreeInvokeComplexity && blockchain.isFeatureActivated(BlockchainFeatures.RideV6) =>
+        TransactionValidationError(ScriptExecutionError(fte.message, fte.log, fte.assetId), tx)
+
+      case err => TransactionValidationError(err, tx)
+    }
   }
 
   // validation related
