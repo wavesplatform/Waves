@@ -498,7 +498,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
            |  ]
            |}
            |""".stripMargin,
-          ScriptEstimatorV3
+          ScriptEstimatorV3(fixOverflow = true)
         )
         .explicitGet()
       val invoke = Signed.invokeScript(
