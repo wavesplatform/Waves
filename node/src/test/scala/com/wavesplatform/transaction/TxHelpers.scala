@@ -10,7 +10,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.state.StringDataEntry
+import com.wavesplatform.state.{DataEntry, StringDataEntry}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
@@ -63,8 +63,11 @@ object TxHelpers {
       .selfSigned(TxVersion.V2, defaultSigner, asset, amount, reissuable = true, TestValues.fee, timestamp)
       .explicitGet()
 
+  def dataEntry(account: KeyPair, value: DataEntry[_]): DataTransaction =
+    DataTransaction.selfSigned(TxVersion.V1, account, Seq(value), TestValues.fee * 3, timestamp).explicitGet()
+
   def data(account: KeyPair = defaultSigner, key: String = "test", value: String = "test"): DataTransaction =
-    DataTransaction.selfSigned(TxVersion.V1, account, Seq(StringDataEntry(key, value)), TestValues.fee * 3, timestamp).explicitGet()
+    dataEntry(account, StringDataEntry(key, value))
 
   def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {
     orderV3(orderType, asset, Waves, feeAsset)

@@ -12,13 +12,11 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test._
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import org.scalatest.Ignore
 
-@Ignore
 class SyncDAppPaymentBalanceCheckTest extends PropSpec with WithDomain with TransactionGenBase {
 
   private val time = new TestTime
@@ -68,10 +66,9 @@ class SyncDAppPaymentBalanceCheckTest extends PropSpec with WithDomain with Tran
 
   private val settings =
     TestFunctionalitySettings
-      .withFeatures(BlockV5, SynchronousCalls)
-      .copy(syncDAppCheckPaymentsHeight = 4, syncDAppCheckTransfersHeight = 5)
+      .withFeatures(BlockV5, SynchronousCalls, RideV6)
 
-  property("negative balance produces error after syncDAppCheckPaymentsHeight and always rejects tx after syncDAppCheckTransfersHeight") {
+  property("negative balance rejects or fails") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)
@@ -82,23 +79,11 @@ class SyncDAppPaymentBalanceCheckTest extends PropSpec with WithDomain with Tran
         d.appendBlock(preparingTxs: _*)
 
         val invoke1 = invoke()
-        val error   = s"Sync call leads to temporary negative balance = -100 for address ${invoke1.dApp}"
-        d.appendBlock(invoke1)
-        d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
-
-        d.appendBlock()
-
-        val invoke2 = invoke()
-        if (bigComplexityDApp1) {
-          d.appendBlock(invoke2)
-          d.liquidDiff.errorMessage(invoke2.txId).get.text should include(error)
+        if (!bigComplexityDApp1 && !bigComplexityDApp2) {
+          d.appendAndCatchError(invoke1).toString should include("negative waves balance")
         } else {
-          (the[RuntimeException] thrownBy d.appendBlock(invoke2)).getMessage should include(error)
-          d.appendBlock()
+          d.appendAndAssertFailed(invoke1)
         }
-
-        val invoke3 = invoke()
-        (the[RuntimeException] thrownBy d.appendBlock(invoke3)).getMessage should include(error)
       }
     }
   }

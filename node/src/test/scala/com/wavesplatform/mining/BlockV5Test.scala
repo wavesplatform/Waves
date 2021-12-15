@@ -375,13 +375,11 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
 
     forAll(preconditions) {
       case (acc, genesis) =>
-        val fs = TestFunctionalitySettings.Stub.copy(
-          preActivatedFeatures = Map(
+        val fs = TestFunctionalitySettings.Stub.copy(preActivatedFeatures = Map(
             BlockchainFeatures.NG.id            -> 0,
             BlockchainFeatures.BlockV5.id       -> 2,
             BlockchainFeatures.SmartAccounts.id -> 0
-          )
-        )
+          ))
 
         withDomain(WavesSettings.default().copy(blockchainSettings = WavesSettings.default().blockchainSettings.copy(functionalitySettings = fs))) {
           d =>
@@ -489,32 +487,23 @@ object BlockV5Test {
   private val defaultSettings = WavesSettings.fromRootConfig(ConfigFactory.load())
   private val testSettings = defaultSettings.copy(
     blockchainSettings = defaultSettings.blockchainSettings.copy(
-      functionalitySettings = FunctionalitySettings(
-        blockVersion3AfterHeight = NGActivationHeight,
-        featureCheckBlocksPeriod = 10,
-        blocksForFeatureActivation = 1,
-        doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-        preActivatedFeatures = Map(
+      functionalitySettings = FunctionalitySettings(featureCheckBlocksPeriod = 10, blocksForFeatureActivation = 1, blockVersion3AfterHeight = NGActivationHeight, preActivatedFeatures = Map(
           BlockchainFeatures.BlockV5.id     -> BlockV5ActivationHeight,
           BlockchainFeatures.BlockReward.id -> BlockRewardActivationHeight,
           BlockchainFeatures.NG.id          -> NGActivationHeight,
           BlockchainFeatures.FairPoS.id     -> FairPoSActivationHeight
-        )
-      )
+        ), doubleFeaturesPeriodsAfterHeight = Int.MaxValue)
     ),
     minerSettings = defaultSettings.minerSettings.copy(quorum = 0)
   )
   private val preActivatedTestSettings = testSettings.copy(
     blockchainSettings = testSettings.blockchainSettings.copy(
-      functionalitySettings = testSettings.blockchainSettings.functionalitySettings.copy(
-        blockVersion3AfterHeight = 0,
-        preActivatedFeatures = Map(
+      functionalitySettings = testSettings.blockchainSettings.functionalitySettings.copy(blockVersion3AfterHeight = 0, preActivatedFeatures = Map(
           BlockchainFeatures.BlockV5.id     -> 0,
           BlockchainFeatures.BlockReward.id -> 0,
           BlockchainFeatures.NG.id          -> 0,
           BlockchainFeatures.FairPoS.id     -> 0
-        )
-      )
+        ))
     )
   )
 }

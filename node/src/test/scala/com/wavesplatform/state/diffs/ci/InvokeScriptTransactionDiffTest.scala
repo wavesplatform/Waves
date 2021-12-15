@@ -515,7 +515,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       )
     } yield (List(genesis, genesis2), master, setContract, ciWithAlias, ciWithFakeAlias, aliasTx)
 
-  property("doesnt validate intermediate action balance before V6")(withDomain(DomainPresets.RideV5) { d =>
+  property("doesnt validate intermediate action balance before V5")(withDomain(DomainPresets.RideV4) { d =>
     val dApp = TxHelpers.defaultSigner
 
     d.helpers.creditWavesToDefaultSigner()
@@ -523,7 +523,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     d.helpers.transferAll(dApp, TxHelpers.voidAddress, asset)
     d.helpers.setScript(
       dApp,
-      TxHelpers.scriptV5(s"""
+      TxHelpers.script(s"""
+        |{-# STDLIB_VERSION 4 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
         |@Callable(i)
         |func test(asset: ByteVector) = {
         |   [
@@ -538,6 +541,34 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     d.appendAndAssertSucceed(invoke)
     d.blockchain.balance(dApp.toAddress, asset) shouldBe 0L
     d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 100L
+  })
+
+  property("validates intermediate action balance after V5")(withDomain(DomainPresets.RideV5) { d =>
+    val dApp = TxHelpers.defaultSigner
+
+    d.helpers.creditWavesToDefaultSigner()
+    val asset = d.helpers.issueAsset()
+    d.helpers.transferAll(dApp, TxHelpers.voidAddress, asset)
+
+    withClue("simple script") {
+      d.helpers.setScript(
+        dApp,
+        TxHelpers.scriptV5(s"""
+                              |@Callable(i)
+                              |func test(asset: ByteVector) = {
+                              |   [
+                              |     ScriptTransfer(Address(base58'${TxHelpers.secondAddress}'), 100, asset),
+                              |     Reissue(asset, 100, true)
+                              |   ]
+                              |}
+                              |""".stripMargin)
+      )
+
+      val invoke = TxHelpers.invoke(dApp.toAddress, "test", Seq(CONST_BYTESTR(asset.id).explicitGet()))
+      d.appendAndAssertFailed(invoke)
+      d.blockchain.balance(dApp.toAddress, asset) shouldBe 0L
+      d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 0L
+    }
   })
 
   property("validates intermediate action balance after V6")(withDomain(DomainPresets.RideV6) { d =>
@@ -1600,9 +1631,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
       case (acc, amount, genesis, setScript, ci, asset, master) =>
-        val features = fs.copy(
-          preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
-        )
+        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(asset, ci), Block.ProtoBlockVersion), features) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 3
@@ -1759,9 +1788,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     forAll(reissueAssetIdScenario) {
       case (invoke, genesisTxs) =>
         tempDb { _ =>
-          val features = fs.copy(
-            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
-          )
+          val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
 
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
             ei should produceRejectOrFailedDiff("Asset is not reissuable")
@@ -1810,9 +1837,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     forAll(transferAssetIdScenario) {
       case (invoke, genesisTxs) =>
         tempDb { _ =>
-          val features = fs.copy(
-            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
-          )
+          val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
 
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
             ei.explicitGet()
@@ -1861,9 +1886,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     forAll(transferNonAssetIdScenario) {
       case (invoke, genesisTxs) =>
         tempDb { _ =>
-          val features = fs.copy(
-            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
-          )
+          val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
 
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
             ei should produceRejectOrFailedDiff("negative asset balance")
@@ -1912,10 +1935,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     forAll(doubleAssetIdScenario) {
       case (invoke, genesisTxs) =>
         tempDb { _ =>
-          val features = fs.copy(
-            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0),
-            syncDAppCheckTransfersHeight = 999
-          )
+          val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
             inside(ei) {
               case Right(diff) => diff.scriptResults(invoke.id()).error.get.text should include("is already issued")

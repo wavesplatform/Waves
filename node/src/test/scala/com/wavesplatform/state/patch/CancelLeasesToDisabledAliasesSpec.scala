@@ -18,13 +18,11 @@ class CancelLeasesToDisabledAliasesSpec extends FlatSpec with PathMockFactory wi
     SettingsFromDefaultConfig.copy(
       blockchainSettings = SettingsFromDefaultConfig.blockchainSettings.copy(
         addressSchemeCharacter = 'W',
-        functionalitySettings = fs.copy(
-          preActivatedFeatures = fs.preActivatedFeatures ++ Map(
+        functionalitySettings = fs.copy(preActivatedFeatures = fs.preActivatedFeatures ++ Map(
             BlockchainFeatures.NG.id               -> 0,
             BlockchainFeatures.SmartAccounts.id    -> 0,
             BlockchainFeatures.SynchronousCalls.id -> 2
-          )
-        )
+          ))
       )
     )
   }

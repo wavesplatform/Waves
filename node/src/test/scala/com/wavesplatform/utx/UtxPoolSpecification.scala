@@ -86,13 +86,11 @@ class UtxPoolSpecification
     val settings = origSettings.copy(
       blockchainSettings = BlockchainSettings(
         'T',
-        FunctionalitySettings.TESTNET.copy(
-          preActivatedFeatures = Map(
+        FunctionalitySettings.TESTNET.copy(preActivatedFeatures = Map(
             BlockchainFeatures.MassTransfer.id  -> 0,
             BlockchainFeatures.SmartAccounts.id -> 0,
             BlockchainFeatures.Ride4DApps.id    -> 0
-          )
-        ),
+          )),
         genesisSettings,
         RewardsSettings.TESTNET
       ),

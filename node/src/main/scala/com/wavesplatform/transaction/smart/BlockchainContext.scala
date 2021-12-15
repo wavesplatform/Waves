@@ -41,7 +41,7 @@ object BlockchainContext {
     ).map { ds =>
       val environment         = new WavesEnvironment(nByte, in, h, blockchain, address, ds, txId)
       val fixUnicodeFunctions = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
-      val useNewPowPrecision  = blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight
+      val useNewPowPrecision  = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
       build(ds, environment, fixUnicodeFunctions, useNewPowPrecision)
     }
 

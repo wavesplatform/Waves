@@ -83,13 +83,11 @@ class TransferDiffTest extends PropSpec with WithState {
 
     val rdEnabled = TestFunctionalitySettings.Stub
 
-    val rdDisabled = rdEnabled.copy(
-      preActivatedFeatures = Map(
+    val rdDisabled = rdEnabled.copy(preActivatedFeatures = Map(
         BlockchainFeatures.SmartAccounts.id -> 0,
         BlockchainFeatures.SmartAssets.id   -> 0,
         BlockchainFeatures.FairPoS.id       -> 0
-      )
-    )
+      ))
 
     forAll(precs) {
       case (genesis, issue, transfer) =>

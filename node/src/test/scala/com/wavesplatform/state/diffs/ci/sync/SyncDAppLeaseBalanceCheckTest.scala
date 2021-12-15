@@ -69,7 +69,6 @@ class SyncDAppLeaseBalanceCheckTest extends PropSpec with WithDomain with Transa
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(syncDAppCheckTransfersHeight = 100)
 
   property("negative balance always rejects tx after syncDAppCheckTransfersHeight") {
     for {

@@ -401,14 +401,12 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
          | }
        """.stripMargin)
 
-  private val features = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Seq(
+  private val features = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Seq(
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.SmartAssets,
       BlockchainFeatures.Ride4DApps,
       BlockchainFeatures.BlockV5
-    ).map(_.id -> 0).toMap
-  )
+    ).map(_.id -> 0).toMap)
 
   private def issuePreconditions(
       assetScript: Option[Script] = None,

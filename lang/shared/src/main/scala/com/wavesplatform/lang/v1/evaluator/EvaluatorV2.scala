@@ -209,7 +209,7 @@ class EvaluatorV2(
                       update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks
-                  )
+                    )
                 )
               case FALSE if unused > 0 =>
                 update(i.ifFalse).flatMap(
@@ -219,7 +219,7 @@ class EvaluatorV2(
                       update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks
-                  )
+                    )
                 )
               case _: EVALUATED => throw EvaluationException("Non-boolean result in cond", unused)
               case _            => Coeval.now(unused)
@@ -282,8 +282,8 @@ class EvaluatorV2(
               let.value match {
                 case e: EVALUATED => ctx.log(let, Right(e))
                 case _            =>
-            }
-        ),
+              }
+          ),
       limit = limit,
       parentBlocks = nextParentBlocks
     ).flatMap { unused =>
@@ -292,12 +292,12 @@ class EvaluatorV2(
           case _                           => Coeval.now(unused)
         }
       }
-      .onErrorHandle { e =>
-        val error = if (e.getMessage != null) e.getMessage else e.toString
+      .onErrorHandle { throwable =>
+        val error = if (throwable.getMessage != null) throwable.getMessage else throwable.toString
         ctx.log(let, Left(error))
-        throw e match {
-          case _: EvaluationException | _: RejectException => e
-          case _                                           => EvaluationException(e.getMessage, limit)
+        throw throwable match {
+          case evalExc: EvaluationException => evalExc
+          case other                        => EvaluationException(other.getMessage, limit)
         }
       }
   }

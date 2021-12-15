@@ -22,10 +22,7 @@ object TestHelpers {
   }
 
   def enableNG(settings: FunctionalitySettings): FunctionalitySettings =
-    settings.copy(
-      blockVersion3AfterHeight = 0,
-      preActivatedFeatures = settings.preActivatedFeatures ++ Map(BlockchainFeatures.NG.id -> 0)
-    )
+    settings.copy(blockVersion3AfterHeight = 0, preActivatedFeatures = settings.preActivatedFeatures ++ Map(BlockchainFeatures.NG.id -> 0))
 
   def enableNG(settings: WavesSettings): WavesSettings =
     settings.copy(

@@ -961,8 +961,7 @@ class DebugApiRouteSpec
 
     "txs with empty and small verifier" in {
       val blockchain = createBlockchainStub { blockchain =>
-        val settings = TestFunctionalitySettings.Enabled.copy(
-          preActivatedFeatures = Map(
+        val settings = TestFunctionalitySettings.Enabled.copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = Map(
             BlockchainFeatures.SmartAccounts.id    -> 0,
             BlockchainFeatures.SmartAssets.id      -> 0,
             BlockchainFeatures.Ride4DApps.id       -> 0,
@@ -971,10 +970,7 @@ class DebugApiRouteSpec
             BlockchainFeatures.BlockReward.id      -> 0,
             BlockchainFeatures.BlockV5.id          -> 0,
             BlockchainFeatures.SynchronousCalls.id -> 0
-          ),
-          featureCheckBlocksPeriod = 1,
-          blocksForFeatureActivation = 1
-        )
+          ))
         (() => blockchain.settings).when().returns(WavesSettings.default().blockchainSettings.copy(functionalitySettings = settings))
         (() => blockchain.activatedFeatures).when().returns(settings.preActivatedFeatures)
         (blockchain.balance _).when(*, *).returns(ENOUGH_AMT)

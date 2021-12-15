@@ -192,21 +192,19 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
     }
   }
 
-  property("insufficient fee for issue leading to fail") {
+  property("insufficient fee for issue leading to reject") {
     val (genesisTxs, invoke) = scenario(enoughFee = false)
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
-      d.appendBlock(invoke)
-      d.liquidDiff.errorMessage(invoke.txId).get.text shouldBe feeErrorMessage(invoke, issue = true)
+      d.appendAndCatchError(invoke).toString should include(feeErrorMessage(invoke, issue = true))
     }
   }
 
-  property("insufficient fee for big verifier leading to fail") {
+  property("insufficient fee for big verifier leading to reject") {
     val (genesisTxs, invoke) = scenario(issue = false, verifier = Some(bigVerifier))
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
-      d.appendBlock(invoke)
-      d.liquidDiff.errorMessage(invoke.txId).get.text shouldBe feeErrorMessage(invoke, verifier = true)
+      d.appendAndCatchError(invoke).toString should include(feeErrorMessage(invoke, verifier = true))
     }
   }
 
@@ -314,8 +312,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
     val (genesisTxs, invoke) = scenario(transfersCount = 30)
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs: _*)
-      d.appendBlock(invoke)
-      d.liquidDiff.errorMessage(invoke.txId).get.text shouldBe "Actions count limit is exceeded"
+      d.appendAndCatchError(invoke).toString should include("Actions count limit is exceeded")
     }
   }
 

@@ -52,8 +52,7 @@ class NegativeSponsorFeeTest extends PropSpec with WithDomain with TransactionGe
 
   private val settings =
     TestFunctionalitySettings
-      .withFeatures(BlockV5, SynchronousCalls)
-      .copy(syncDAppCheckTransfersHeight = 3)
+      .withFeatures(BlockV5, SynchronousCalls, RideV6)
 
   property("negative sponsor amount") {
     for(bigComplexity <- Seq(false, true)) {
@@ -62,11 +61,11 @@ class NegativeSponsorFeeTest extends PropSpec with WithDomain with TransactionGe
         d.appendBlock(preparingTxs: _*)
 
         val invoke1 = invoke()
-        d.appendBlock(invoke1)
-        d.blockchain.bestLiquidDiff.get.errorMessage(invoke1.txId).get.text shouldBe "NegativeMinFee(-1,asset)"
-
-        val invoke2 = invoke()
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include ("Negative sponsor amount = -1")
+        if (!bigComplexity) {
+          d.appendAndCatchError(invoke1).toString should include("Negative sponsor amount")
+        } else {
+          d.appendAndAssertFailed(invoke1)
+        }
       }
     }
   }

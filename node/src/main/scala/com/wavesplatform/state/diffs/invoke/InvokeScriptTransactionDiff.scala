@@ -111,16 +111,15 @@ object InvokeScriptTransactionDiff {
               paymentsComplexity,
               blockchain
             )
-          } yield
-            MainScriptResult(
-              environment.currentDiff,
-              result,
-              log,
-              environment.availableActions,
-              environment.availableData,
-              environment.availableDataSize,
-              fullLimit - paymentsComplexity
-            )
+          } yield MainScriptResult(
+            environment.currentDiff,
+            result,
+            log,
+            environment.availableActions,
+            environment.availableData,
+            environment.availableDataSize,
+            fullLimit - paymentsComplexity
+          )
         }
 
         TracedResult(
@@ -335,7 +334,12 @@ object InvokeScriptTransactionDiff {
           } else
             ScriptExecutionError.dAppExecution(error, log)
       }
-      .map { r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1); r }
+      .flatMap {
+        case (result, log) =>
+          val usedComplexity = startLimit - result.unusedComplexity.max(0)
+          (for (_ <- InvokeDiffsCommon.checkScriptResultFields(blockchain, result)) yield (result, log))
+            .leftMap(err => FailedTransactionError.dAppExecution(err.toString, usedComplexity, log))
+      }
   }
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {

@@ -37,8 +37,7 @@ class DiffComplexityCountTest
 
   private val activationHeight = 3
 
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
+  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id    -> 0,
       BlockchainFeatures.SmartAssets.id      -> 0,
       BlockchainFeatures.Ride4DApps.id       -> 0,
@@ -47,9 +46,7 @@ class DiffComplexityCountTest
       BlockchainFeatures.BlockReward.id      -> 0,
       BlockchainFeatures.BlockV5.id          -> 0,
       BlockchainFeatures.SynchronousCalls.id -> activationHeight
-    ),
-    estimatorPreCheckHeight = Int.MaxValue
-  )
+    ), estimatorPreCheckHeight = Int.MaxValue)
 
   // ~1900 complexity
   val groth: String =

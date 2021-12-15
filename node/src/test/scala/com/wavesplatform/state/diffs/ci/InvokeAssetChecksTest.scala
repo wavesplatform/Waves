@@ -117,16 +117,12 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
       val fs = TestFunctionalitySettings.Enabled
       val features =
         if (activated)
-          TestFunctionalitySettings.Enabled.copy(
-            preActivatedFeatures = fs.preActivatedFeatures ++ Map(
+          TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = fs.preActivatedFeatures ++ Map(
               BlockchainFeatures.BlockV5.id          -> 0,
               BlockchainFeatures.SynchronousCalls.id -> 0
-            )
-          )
+            ))
         else
-          TestFunctionalitySettings.Enabled.copy(
-            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
-          )
+          TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
 
       assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke)), features)(
         _ shouldBe Right(expectedResult)
@@ -168,8 +164,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
        """.stripMargin
     )
 
-    val features = TestFunctionalitySettings.Enabled.copy(
-      preActivatedFeatures = Map(
+    val features = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
         BlockchainFeatures.SmartAccounts.id    -> 0,
         BlockchainFeatures.SmartAssets.id      -> 0,
         BlockchainFeatures.Ride4DApps.id       -> 0,
@@ -178,8 +173,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         BlockchainFeatures.BlockReward.id      -> 0,
         BlockchainFeatures.BlockV5.id          -> 0,
         BlockchainFeatures.SynchronousCalls.id -> 0
-      )
-    )
+      ))
 
     val preconditions =
       for {

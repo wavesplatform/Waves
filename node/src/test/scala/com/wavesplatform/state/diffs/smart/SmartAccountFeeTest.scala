@@ -62,8 +62,7 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
     | func default() = []
     |""".stripMargin)
 
-  private val features = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
+  private val features = TestFunctionalitySettings.Enabled.copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id    -> 0,
       BlockchainFeatures.SmartAssets.id      -> 0,
       BlockchainFeatures.Ride4DApps.id       -> 0,
@@ -72,10 +71,7 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
       BlockchainFeatures.BlockReward.id      -> 0,
       BlockchainFeatures.BlockV5.id          -> 0,
       BlockchainFeatures.SynchronousCalls.id -> activationHeight
-    ),
-    featureCheckBlocksPeriod = 1,
-    blocksForFeatureActivation = 1
-  )
+    ))
 
   private val preconditions =
     for {

@@ -179,7 +179,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   }
 
   def appendAndCatchError(txs: Transaction*): ValidationError = {
-    val block = createBlock(Block.PlainBlockVersion, txs)
+    val block  = createBlock(Block.PlainBlockVersion, txs)
     val result = appendBlockE(block)
     txs.foreach { tx =>
       require(blockchain.transactionInfo(tx.id()).isEmpty, s"should not pass: $tx")
@@ -189,9 +189,14 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def appendAndAssertFailed(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
-    appendBlock(block)
-    txs.foreach(tx => require(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx"))
-    lastBlock
+    appendBlockE(block) match {
+      case Left(err) =>
+        throw new RuntimeException(s"Should be success: $err")
+
+      case Right(_) =>
+        txs.foreach(tx => require(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx"))
+        lastBlock
+    }
   }
 
   def appendBlockE(txs: Transaction*): Either[ValidationError, Seq[Diff]] =
@@ -330,6 +335,10 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
     def setScript(account: KeyPair, script: Script): Unit = {
       appendBlock(TxHelpers.setScript(account, script))
+    }
+
+    def setData(account: KeyPair, entries: DataEntry[_]*): Unit = {
+      appendBlock(entries.map(TxHelpers.dataEntry(account, _)): _*)
     }
 
     def transfer(account: KeyPair, to: Address, amount: TxAmount, asset: Asset): Unit = {
