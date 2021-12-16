@@ -18,6 +18,7 @@ object PBDApps {
       case ARR(v) => PBEvaluated.Value.Arr(PBArr(v.map(pbEvaluated)))
       case CaseObj(caseType, fields) => PBEvaluated.Value.CaseObj(PBCaseObj(caseType.name, fields.view.mapValues(pbEvaluated).toMap))
       case FAIL(v) => PBEvaluated.Value.Fail(v)
+      case _ => PBEvaluated.Value.Empty
     }
     PBEvaluated(internalValue)
   }
