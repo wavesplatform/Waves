@@ -53,6 +53,35 @@ object ContractSerDe {
       }
     } yield out.toByteArray
 
+  def serializeOptimized(c: DApp): Either[String, Array[Byte]] =
+    for {
+      out <- tryEi {
+        val out = new ByteArrayOutputStream()
+
+        val metaBytes = c.meta.toByteArray
+
+        // version byte
+        out.write(0)
+
+        out.writeShort(metaBytes.length.toShort)
+        out.write(metaBytes)
+
+        out.writeShort(c.decs.size.toShort)
+        c.decs.foreach(dec => serializeDeclarationOptimized(out, dec))
+
+        out.writeShort(c.callableFuncs.size.toShort)
+        c.callableFuncs.foreach(cFunc => serializeAnnotatedFunctionOptimized(out, cFunc.u, cFunc.annotation.invocationArgName))
+
+        c.verifierFuncOpt match {
+          case None     => out.write(0)
+          case Some(vf) =>
+            out.write(1)
+            serializeAnnotatedFunctionOptimized(out, vf.u, vf.annotation.invocationArgName)
+        }
+        out
+      }
+    } yield out.toByteArray
+
   def deserialize(arr: Array[Byte]): Either[String, DApp] = {
     val bb = ByteBuffer.wrap(arr)
     for {
@@ -78,6 +107,10 @@ object ContractSerDe {
     Serde.serializeDeclaration(out, dec, Serde.serAux(out, Coeval.now(()), _)).value()
   }
 
+  private[lang]  def serializeDeclarationOptimized(out: ByteArrayOutputStream, dec: DECLARATION): Unit = {
+    Serde.serializeDeclarationOptimized(out, dec, Serde.serAuxOptimized(out, Coeval.now(()), _)).value()
+  }
+
   private[lang]  def deserializeDeclaration(bb: ByteBuffer): Either[String, DECLARATION] = {
     val decType = bb.get()
     Serde.deserializeDeclaration(bb, desAux(bb), decType).attempt.value().leftMap(_.getMessage)
@@ -87,9 +120,18 @@ object ContractSerDe {
     out.writeString(invocationName)
   }
 
+  private[lang] def serializeAnnotationOptimized(out: ByteArrayOutputStream, invocationName: String): Unit = {
+    out.writeStringOptimized(invocationName)
+  }
+
   private[lang] def serializeAnnotatedFunction(out: ByteArrayOutputStream, func: FUNC, annotationInvocName: String): Unit = {
     serializeAnnotation(out, annotationInvocName)
     serializeDeclaration(out, func)
+  }
+
+  private[lang] def serializeAnnotatedFunctionOptimized(out: ByteArrayOutputStream, func: FUNC, annotationInvocName: String): Unit = {
+    serializeAnnotationOptimized(out, annotationInvocName)
+    serializeDeclarationOptimized(out, func)
   }
 
   private[lang] def deserializeCallableAnnotation(bb: ByteBuffer): Either[String, CallableAnnotation] =

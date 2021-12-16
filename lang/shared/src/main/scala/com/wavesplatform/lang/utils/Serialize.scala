@@ -48,6 +48,13 @@ object Serialize {
       self
     }
 
+    def writeStringOptimized(x: String): ByteArrayOutputStream = {
+      val bytes = x.getBytes(StandardCharsets.UTF_8)
+      self.writeShort(bytes.length.toShort)
+      self.write(bytes)
+      self
+    }
+
     def writeFunctionHeader(h: FunctionHeader): ByteArrayOutputStream = h match {
       case FunctionHeader.Native(id) =>
         self.write(FH_NATIVE)
@@ -55,6 +62,15 @@ object Serialize {
       case FunctionHeader.User(internalName, _) =>
         self.write(FH_USER)
         self.writeString(internalName)
+    }
+
+    def writeFunctionHeaderOptimized(h: FunctionHeader): ByteArrayOutputStream = h match {
+      case FunctionHeader.Native(id) =>
+        self.write(FH_NATIVE)
+        self.writeShort(id)
+      case FunctionHeader.User(internalName, _) =>
+        self.write(FH_USER)
+        self.writeStringOptimized(internalName)
     }
   }
 }
