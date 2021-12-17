@@ -27,11 +27,11 @@ object Dependencies {
   val googleGuava        = "com.google.guava" % "guava" % "31.0.1-jre"
   val kamonCore          = kamonModule("core")
   val machinist          = "org.typelevel" %% "machinist" % "0.6.8"
-  val logback            = "ch.qos.logback" % "logback-classic" % "1.2.6"
+  val logback            = "ch.qos.logback" % "logback-classic" % "1.2.9"
   val janino             = "org.codehaus.janino" % "janino" % "3.1.6"
   val asyncHttpClient    = "org.asynchttpclient" % "async-http-client" % "2.12.3"
   val curve25519         = "com.wavesplatform" % "curve25519-java" % "0.6.4"
-  val nettyHandler       = "io.netty" % "netty-handler" % "4.1.69.Final"
+  val nettyHandler       = "io.netty" % "netty-handler" % "4.1.72.Final"
 
   val catsEffect = catsModule("effect", "2.1.3")
   val catsCore   = catsModule("core")
