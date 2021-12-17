@@ -33,10 +33,10 @@ object Serialize {
   implicit class CodedOutputStreamOps(val self: CodedOutputStream) extends AnyVal {
     def writeFunctionHeaderOptimized(h: FunctionHeader): Unit = h match {
       case FunctionHeader.Native(id) =>
-        self.write(FH_NATIVE)
+        self.writeRawByte(FH_NATIVE)
         self.writeUInt32NoTag(id)
       case FunctionHeader.User(internalName, _) =>
-        self.write(FH_USER)
+        self.writeRawByte(FH_USER)
         self.writeStringNoTag(internalName)
     }
   }
