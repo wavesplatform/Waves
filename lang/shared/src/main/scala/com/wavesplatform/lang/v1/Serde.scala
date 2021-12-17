@@ -289,12 +289,12 @@ object Serde {
       case CONST_LONG(n) =>
         Coeval.now {
           out.write(E_LONG)
-          out.writeLong(n)
+          out.writeSignedVarLong(n)
         }
       case CONST_BYTESTR(bs) =>
         Coeval.now {
           out.write(E_BYTES)
-          out.writeShort(bs.arr.length.toShort).write(bs.arr)
+          out.writeUnsignedVarInt(bs.arr.length).write(bs.arr)
         }
       case CONST_STRING(s) =>
         Coeval.now {
@@ -343,7 +343,7 @@ object Serde {
       case ARR(elements) =>
         val dataInfo = Coeval.now[Unit] {
           out.write(E_ARR)
-          out.writeShort(elements.size.toShort)
+          out.writeUnsignedVarInt(elements.size)
         }
         elements.foldLeft(dataInfo)((acc, element) => serAuxOptimized(out, acc, element, allowObjects))
 

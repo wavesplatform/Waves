@@ -63,13 +63,13 @@ object ContractSerDe {
         // version byte
         out.write(0)
 
-        out.writeShort(metaBytes.length.toShort)
+        out.writeUnsignedVarInt(metaBytes.length)
         out.write(metaBytes)
 
-        out.writeShort(c.decs.size.toShort)
+        out.writeUnsignedVarInt(c.decs.size)
         c.decs.foreach(dec => serializeDeclarationOptimized(out, dec))
 
-        out.writeShort(c.callableFuncs.size.toShort)
+        out.writeUnsignedVarInt(c.callableFuncs.size)
         c.callableFuncs.foreach(cFunc => serializeAnnotatedFunctionOptimized(out, cFunc.u, cFunc.annotation.invocationArgName))
 
         c.verifierFuncOpt match {
