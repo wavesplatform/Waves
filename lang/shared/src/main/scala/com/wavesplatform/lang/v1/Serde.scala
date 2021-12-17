@@ -2,13 +2,12 @@ package com.wavesplatform.lang.v1
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
-
 import scala.util.Try
-
 import cats.instances.lazyList._
 import cats.instances.list._
 import cats.syntax.apply._
 import cats.syntax.traverse._
+import com.google.protobuf.CodedOutputStream
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.utils.Serialize._
@@ -57,19 +56,19 @@ object Serde {
     }
   }
 
-  def serializeDeclarationOptimized(out: ByteArrayOutputStream, dec: DECLARATION, aux: EXPR => Coeval[Unit]): Coeval[Unit] = {
+  def serializeDeclarationOptimized(out: CodedOutputStream, dec: DECLARATION, aux: EXPR => Coeval[Unit]): Coeval[Unit] = {
     dec match {
       case LET(name, value) =>
         Coeval.now {
           out.write(DEC_LET)
-          out.writeStringOptimized(name)
+          out.writeStringNoTag(name)
         } *> aux(value)
       case FUNC(name, args, body) =>
         Coeval.now {
           out.write(DEC_FUNC)
-          out.writeStringOptimized(name)
-          out.write(args.size)
-          args.foreach(out.writeStringOptimized)
+          out.writeStringNoTag(name)
+          out.write(args.size.toByte)
+          args.foreach(out.writeStringNoTag)
         } *> aux(body)
       case _: FAILED_DEC =>
         Coeval.raiseError(new Exception("Attempt to serialize failed declaration."))
@@ -284,29 +283,29 @@ object Serde {
     }
   }
 
-  def serAuxOptimized(out: ByteArrayOutputStream, acc: Coeval[Unit], expr: EXPR, allowObjects: Boolean = false): Coeval[Unit] = acc.flatMap { _ =>
+  def serAuxOptimized(out: CodedOutputStream, acc: Coeval[Unit], expr: EXPR, allowObjects: Boolean = false): Coeval[Unit] = acc.flatMap { _ =>
     expr match {
       case CONST_LONG(n) =>
         Coeval.now {
           out.write(E_LONG)
-          out.writeSignedVarLong(n)
+          out.writeInt64NoTag(n)
         }
       case CONST_BYTESTR(bs) =>
         Coeval.now {
           out.write(E_BYTES)
-          out.writeUnsignedVarInt(bs.arr.length).write(bs.arr)
+          out.writeByteArrayNoTag(bs.arr)
         }
       case CONST_STRING(s) =>
         Coeval.now {
           out.write(E_STRING)
-          out.writeStringOptimized(s)
+          out.writeStringNoTag(s)
         }
       case IF(cond, ifTrue, ifFalse) =>
         List(cond, ifTrue, ifFalse).foldLeft(Coeval.now(out.write(E_IF)))((acc, expr) => serAuxOptimized(out, acc, expr, allowObjects))
       case LET_BLOCK(LET(name, value), body) =>
         val n = Coeval.now[Unit] {
           out.write(E_BLOCK)
-          out.writeStringOptimized(name)
+          out.writeStringNoTag(name)
         }
         List(value, body).foldLeft(n)((acc, expr) => serAuxOptimized(out, acc, expr, allowObjects))
       case BLOCK(dec, body) =>
@@ -317,7 +316,7 @@ object Serde {
       case REF(key) =>
         Coeval.now {
           out.write(E_REF)
-          out.writeStringOptimized(key)
+          out.writeStringNoTag(key)
         }
       case CONST_BOOLEAN(b) =>
         Coeval.now(
@@ -330,33 +329,33 @@ object Serde {
         )
       case GETTER(obj, field) =>
         serAuxOptimized(out, Coeval.now[Unit](out.write(E_GETTER)), obj, allowObjects).map { _ =>
-          out.writeStringOptimized(field)
+          out.writeStringNoTag(field)
         }
       case FUNCTION_CALL(header, args) =>
         val n = Coeval.now[Unit] {
           out.write(E_FUNCALL)
           out.writeFunctionHeaderOptimized(header)
-          out.write(args.size)
+          out.write(args.size.toByte)
         }
         args.foldLeft(n)((acc, arg) => serAuxOptimized(out, acc, arg, allowObjects))
 
       case ARR(elements) =>
         val dataInfo = Coeval.now[Unit] {
           out.write(E_ARR)
-          out.writeUnsignedVarInt(elements.size)
+          out.writeUInt32NoTag(elements.size)
         }
         elements.foldLeft(dataInfo)((acc, element) => serAuxOptimized(out, acc, element, allowObjects))
 
       case CaseObj(caseType, fields) if allowObjects =>
         val dataInfo = Coeval.now[Unit] {
           out.write(E_CASE_OBJ)
-          out.writeStringOptimized(caseType.name)
-          out.write(fields.size)
+          out.writeStringNoTag(caseType.name)
+          out.write(fields.size.toByte)
         }
         fields.foldLeft(dataInfo) {
           case (acc, (fieldName, fieldValue)) =>
             for {
-              _ <- Coeval.now(out.writeStringOptimized(fieldName))
+              _ <- Coeval.now(out.writeStringNoTag(fieldName))
               r <- serAuxOptimized(out, acc, fieldValue, allowObjects)
             } yield r
         }

@@ -1,13 +1,13 @@
 package com.wavesplatform.lang.utils
 
+import com.google.protobuf.CodedOutputStream
+
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.Serde.{FH_NATIVE, FH_USER}
-
-import scala.annotation.tailrec
 
 object Serialize {
   implicit class ByteBufferOps(val self: ByteBuffer) extends AnyVal {
@@ -30,6 +30,17 @@ object Serialize {
     }
   }
 
+  implicit class CodedOutputStreamOps(val self: CodedOutputStream) extends AnyVal {
+    def writeFunctionHeaderOptimized(h: FunctionHeader): Unit = h match {
+      case FunctionHeader.Native(id) =>
+        self.write(FH_NATIVE)
+        self.writeUInt32NoTag(id)
+      case FunctionHeader.User(internalName, _) =>
+        self.write(FH_USER)
+        self.writeStringNoTag(internalName)
+    }
+  }
+
   implicit class ByteArrayOutputStreamOps(val self: ByteArrayOutputStream) extends AnyVal {
     def writeShort(value: Short): ByteArrayOutputStream = writeNumber(value, 2)
     def writeInt(value: Int): ByteArrayOutputStream     = writeNumber(value, 4)
@@ -42,54 +53,9 @@ object Serialize {
       self
     }
 
-    def writeSignedVarInt(x: Int): ByteArrayOutputStream = {
-      writeUnsignedVarInt((x << 1) ^ (x >> 31))
-    }
-
-    def writeUnsignedVarInt(v: Int): ByteArrayOutputStream = {
-      @tailrec
-      def rec(v: Int, acc: List[Byte]): List[Byte] = {
-        if ((v & 0xFFFFF80) == 0L) {
-          ((v & 0x7F).toByte :: acc).reverse
-        } else {
-          rec(v >>> 7, ((v & 0x7F) | 0x80).toByte :: acc)
-        }
-      }
-
-      val bytes = rec(v, List.empty)
-      bytes.foreach(self.write(_))
-      self
-    }
-
-    def writeSignedVarLong(x: Long): ByteArrayOutputStream = {
-      writeUnsignedVarLong((x << 1) ^ (x >> 63))
-    }
-
-    def writeUnsignedVarLong(v: Long): ByteArrayOutputStream = {
-      @tailrec
-      def rec(v: Long, acc: List[Byte]): List[Byte] = {
-        if ((v & 0xFFFFFFFFFFFFFF80L) == 0L) {
-          ((v & 0x7F).toByte :: acc).reverse
-        } else {
-          rec(v >>> 7, ((v & 0x7F) | 0x80).toByte :: acc)
-        }
-      }
-
-      val bytes = rec(v, List.empty)
-      bytes.foreach(self.write(_))
-      self
-    }
-
     def writeString(x: String): ByteArrayOutputStream = {
       val bytes = x.getBytes(StandardCharsets.UTF_8)
       self.writeInt(bytes.length)
-      self.write(bytes)
-      self
-    }
-
-    def writeStringOptimized(x: String): ByteArrayOutputStream = {
-      val bytes = x.getBytes(StandardCharsets.UTF_8)
-      self.writeUnsignedVarInt(bytes.length)
       self.write(bytes)
       self
     }
@@ -101,15 +67,6 @@ object Serialize {
       case FunctionHeader.User(internalName, _) =>
         self.write(FH_USER)
         self.writeString(internalName)
-    }
-
-    def writeFunctionHeaderOptimized(h: FunctionHeader): ByteArrayOutputStream = h match {
-      case FunctionHeader.Native(id) =>
-        self.write(FH_NATIVE)
-        self.writeUnsignedVarInt(id)
-      case FunctionHeader.User(internalName, _) =>
-        self.write(FH_USER)
-        self.writeStringOptimized(internalName)
     }
   }
 }

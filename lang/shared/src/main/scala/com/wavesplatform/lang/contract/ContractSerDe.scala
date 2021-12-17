@@ -3,12 +3,12 @@ package com.wavesplatform.lang.contract
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-
 import cats.syntax.either._
 import cats.syntax.traverse._
 import cats.instances.either._
 import cats.syntax.option._
 import cats.instances.list._
+import com.google.protobuf.CodedOutputStream
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.utils.Serialize._
 import com.wavesplatform.lang.v1.Serde.desAux
@@ -56,29 +56,30 @@ object ContractSerDe {
   def serializeOptimized(c: DApp): Either[String, Array[Byte]] =
     for {
       out <- tryEi {
-        val out = new ByteArrayOutputStream()
+        val internalOut = new ByteArrayOutputStream()
+        val out = CodedOutputStream.newInstance(internalOut)
 
         val metaBytes = c.meta.toByteArray
 
         // version byte
-        out.write(0)
+        out.writeRawByte(0)
 
-        out.writeUnsignedVarInt(metaBytes.length)
-        out.write(metaBytes)
+        out.writeByteArrayNoTag(metaBytes)
 
-        out.writeUnsignedVarInt(c.decs.size)
+        out.writeUInt32NoTag(c.decs.size)
         c.decs.foreach(dec => serializeDeclarationOptimized(out, dec))
 
-        out.writeUnsignedVarInt(c.callableFuncs.size)
+        out.writeUInt32NoTag(c.callableFuncs.size)
         c.callableFuncs.foreach(cFunc => serializeAnnotatedFunctionOptimized(out, cFunc.u, cFunc.annotation.invocationArgName))
 
         c.verifierFuncOpt match {
-          case None     => out.write(0)
+          case None     => out.writeRawByte(0)
           case Some(vf) =>
-            out.write(1)
+            out.writeRawByte(1)
             serializeAnnotatedFunctionOptimized(out, vf.u, vf.annotation.invocationArgName)
         }
-        out
+        out.flush()
+        internalOut
       }
     } yield out.toByteArray
 
@@ -107,7 +108,7 @@ object ContractSerDe {
     Serde.serializeDeclaration(out, dec, Serde.serAux(out, Coeval.now(()), _)).value()
   }
 
-  private[lang]  def serializeDeclarationOptimized(out: ByteArrayOutputStream, dec: DECLARATION): Unit = {
+  private[lang]  def serializeDeclarationOptimized(out: CodedOutputStream, dec: DECLARATION): Unit = {
     Serde.serializeDeclarationOptimized(out, dec, Serde.serAuxOptimized(out, Coeval.now(()), _)).value()
   }
 
@@ -120,8 +121,8 @@ object ContractSerDe {
     out.writeString(invocationName)
   }
 
-  private[lang] def serializeAnnotationOptimized(out: ByteArrayOutputStream, invocationName: String): Unit = {
-    out.writeStringOptimized(invocationName)
+  private[lang] def serializeAnnotationOptimized(out: CodedOutputStream, invocationName: String): Unit = {
+    out.writeStringNoTag(invocationName)
   }
 
   private[lang] def serializeAnnotatedFunction(out: ByteArrayOutputStream, func: FUNC, annotationInvocName: String): Unit = {
@@ -129,7 +130,7 @@ object ContractSerDe {
     serializeDeclaration(out, func)
   }
 
-  private[lang] def serializeAnnotatedFunctionOptimized(out: ByteArrayOutputStream, func: FUNC, annotationInvocName: String): Unit = {
+  private[lang] def serializeAnnotatedFunctionOptimized(out: CodedOutputStream, func: FUNC, annotationInvocName: String): Unit = {
     serializeAnnotationOptimized(out, annotationInvocName)
     serializeDeclarationOptimized(out, func)
   }
