@@ -15,7 +15,6 @@ import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.ContractScriptCompactor
-import com.wavesplatform.protobuf.dapp.PBDApps.pbDApp
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.{DiffsCommon, SetScriptTransactionDiff}
 import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio}
@@ -305,7 +304,7 @@ object Explorer extends ScorexLogging {
 
         case "DS" =>
           Using.resource(new FileWriter("test-dapp-serialization.csv")) { writer =>
-            writer.write("old;new;pb;old_compacted;new_compacted;pb_compacted\n")
+            writer.write("old;new;old_compacted;new_compacted\n")
 
             db.iterateOver(KeyTags.AddressScript) { e =>
               val asi = readAccountScriptInfo(e.getValue)
@@ -315,13 +314,11 @@ object Explorer extends ScorexLogging {
 
                   val oldSize = ContractSerDe.serialize(expr).explicitGet().length
                   val newSize = ContractSerDe.serializeOptimized(expr).explicitGet().length
-                  val pbSize = pbDApp(expr).serializedSize
 
                   val oldCompSize = ContractSerDe.serialize(compactedExpr).explicitGet().length
                   val newCompSize = ContractSerDe.serializeOptimized(compactedExpr).explicitGet().length
-                  val pbCompSize = pbDApp(ContractScriptCompactor.compact(expr)).serializedSize
 
-                  writer.write(s"$oldSize;$newSize;$pbSize;$oldCompSize;$newCompSize;$pbCompSize\n")
+                  writer.write(s"$oldSize;$newSize;$oldCompSize;$newCompSize\n")
                 case _ => ()
               }
             }
