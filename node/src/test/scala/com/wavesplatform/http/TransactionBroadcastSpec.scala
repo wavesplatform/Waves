@@ -54,7 +54,7 @@ class TransactionBroadcastSpec
       val blockchain = createBlockchainStub { blockchain =>
         val sh = StubHelpers(blockchain)
         sh.creditBalance(TxHelpers.matcher.toAddress, *)
-        sh.creditBalance(TestEthPublicKey.toAddress, *)
+        sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
         sh.issueAsset(ByteStr(EthStubBytes32))
       }
 
@@ -64,7 +64,7 @@ class TransactionBroadcastSpec
 
       val ethBuyOrder = Order(
         Order.V4,
-        TestEthPublicKey,
+        TestEthOrdersPublicKey,
         TxHelpers.matcher.publicKey,
         AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
         OrderType.BUY,
@@ -81,7 +81,7 @@ class TransactionBroadcastSpec
 
       val ethSellOrder = Order(
         Order.V4,
-        TestEthPublicKey,
+        TestEthOrdersPublicKey,
         TxHelpers.matcher.publicKey,
         AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
         OrderType.SELL,
