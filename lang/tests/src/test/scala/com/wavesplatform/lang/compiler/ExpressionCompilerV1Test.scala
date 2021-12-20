@@ -6,6 +6,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -316,7 +317,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       )
       .compilerContext
 
-    Global.compileExpression(expr, ctx, V4, Account, ScriptEstimatorV3) should produce("Script is too large: 8756 bytes > 8192 bytes")
+    Global.compileExpression(expr, ctx, V4, Account, ScriptEstimatorV3(fixOverflow = true)) should produce("Script is too large: 8756 bytes > 8192 bytes")
   }
 
   property("extract() removed from V4") {
@@ -963,19 +964,17 @@ class ExpressionCompilerV1Test extends PropSpec {
     }
   )
 
-  private val dropRightFunctionName: String = dropRightBytes.name
-
   treeTypeTest("user function overloading 1")(
     ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(
       AnyPos,
-      Expressions.PART.VALID(AnyPos, dropRightFunctionName),
+      Expressions.PART.VALID(AnyPos, "dropRight"),
       List(Expressions.CONST_BYTESTR(AnyPos, Expressions.PART.VALID(AnyPos, ByteStr.empty)), Expressions.CONST_LONG(AnyPos, 1))
     ),
     expectedResult = { res: Either[String, (EXPR, TYPE)] =>
       res shouldBe Right(
         (
-          FUNCTION_CALL(dropRightBytes.header, List(CONST_BYTESTR(ByteStr.empty).explicitGet(), CONST_LONG(1))),
+          FUNCTION_CALL(User("dropRightBytes"), List(CONST_BYTESTR(ByteStr.empty).explicitGet(), CONST_LONG(1))),
           BYTESTR
         )
       )
@@ -986,13 +985,13 @@ class ExpressionCompilerV1Test extends PropSpec {
     ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(
       AnyPos,
-      Expressions.PART.VALID(AnyPos, dropRightFunctionName),
+      Expressions.PART.VALID(AnyPos, "dropRight"),
       List(Expressions.CONST_STRING(AnyPos, Expressions.PART.VALID(AnyPos, "")), Expressions.CONST_LONG(AnyPos, 1))
     ),
     expectedResult = { res: Either[String, (EXPR, TYPE)] =>
       res shouldBe Right(
         (
-          FUNCTION_CALL(dropRightString.header, List(CONST_STRING("").explicitGet(), CONST_LONG(1))),
+          FUNCTION_CALL(User("dropRight"), List(CONST_STRING("").explicitGet(), CONST_LONG(1))),
           STRING
         )
       )
@@ -1003,7 +1002,7 @@ class ExpressionCompilerV1Test extends PropSpec {
     ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(
       AnyPos,
-      Expressions.PART.VALID(AnyPos, dropRightFunctionName),
+      Expressions.PART.VALID(AnyPos, "dropRight"),
       List(Expressions.TRUE(AnyPos), Expressions.CONST_LONG(AnyPos, 1))
     ),
     expectedResult = { res: Either[String, (EXPR, TYPE)] =>

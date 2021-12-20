@@ -13,15 +13,17 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{RideV6, SynchronousCalls}
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.RideVersionProvider.RideVersionBlockchainExt
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -133,7 +135,7 @@ case class UtilsApiRoute(
   }
 
   def compileCode: Route = path("script" / "compileCode") {
-    (post & entity(as[String])) { code =>
+    (post & entity(as[String]) & parameter("compact".as[Boolean] ? false)) { (code, compact) =>
       val version               = blockchain.actualRideVersion
       val fixEstimateOfVerifier = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
       executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), version, fixEstimateOfVerifier)) { result =>
@@ -142,12 +144,25 @@ case class UtilsApiRoute(
             .fold(
               e => ScriptCompilerError(e), {
                 case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
+                  val extraFee =
+                    if (verifierComplexity <= ContractLimits.FreeVerifierComplexity && blockchain
+                          .isFeatureActivated(BlockchainFeatures.SynchronousCalls))
+                      0
+                    else
+                      FeeValidation.ScriptExtraFee
+
+                  val compactedScript = script match {
+                    case ContractScript.ContractScriptImpl(stdLibVersion, expr) if compact =>
+                      ContractScriptImpl(stdLibVersion, ContractScriptCompactor.compact(expr))
+
+                    case _ => script
+                  }
                   Json.obj(
-                    "script"               -> script.bytes().base64,
+                    "script"               -> compactedScript.bytes().base64,
                     "complexity"           -> maxComplexity,
                     "verifierComplexity"   -> verifierComplexity,
                     "callableComplexities" -> callableComplexities,
-                    "extraFee"             -> extraFee(verifierComplexity)
+                    "extraFee"             -> extraFee
                   )
               }
             )
@@ -370,7 +385,14 @@ object UtilsApiRoute {
           )
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
         limitedResult <- EvaluatorV2
-          .applyLimitedCoeval(call, limit, ctx, script.stdLibVersion, checkConstructorArgsTypes = true)
+          .applyLimitedCoeval(
+            call,
+            limit,
+            ctx,
+            script.stdLibVersion,
+            correctFunctionCallScope = blockchain.checkEstimatorSumOverflow,
+            checkConstructorArgsTypes = true
+          )
           .value()
           .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err, log) }
         result <- limitedResult match {
