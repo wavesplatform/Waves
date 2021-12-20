@@ -7,7 +7,7 @@ import cats.instances.lazyList._
 import cats.instances.list._
 import cats.syntax.apply._
 import cats.syntax.traverse._
-import com.google.protobuf.CodedOutputStream
+import com.google.protobuf.{CodedInputStream, CodedOutputStream}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.utils.Serialize._
@@ -98,8 +98,32 @@ object Serde {
     }
   }
 
+  def deserializeDeclarationOptimized(in: CodedInputStream, aux: => Coeval[EXPR], decType: Byte): Coeval[DECLARATION] = {
+    (decType: @unchecked) match {
+      case DEC_LET =>
+        for {
+          name <- Coeval.now(in.readString())
+          body <- aux
+        } yield LET(name, body)
+      case DEC_FUNC =>
+        for {
+          name <- Coeval.now(in.readString())
+          args <- {
+            val argsCnt = in.readRawByte()
+            Coeval {
+              (1 to argsCnt).toList.map(_ => in.readString())
+            }
+          }
+          body <- aux
+        } yield FUNC(name, args, body)
+    }
+  }
+
   def desAux(bb: ByteBuffer, allowObjects: Boolean = false, acc: Coeval[Unit] = Coeval.now(())): Coeval[EXPR] =
     desAuxR(bb, allowObjects, acc)
+
+  def desAuxOptimized(in: CodedInputStream, allowObjects: Boolean = false, acc: Coeval[Unit] = Coeval.now(())): Coeval[EXPR] =
+    desAuxROptimized(in, allowObjects, acc)
 
   private def desAuxR(bb: ByteBuffer, allowObjects: Boolean, acc: Coeval[Unit]): Coeval[EXPR] = acc.flatMap { _ =>
     (bb.get(): @unchecked) match {
@@ -163,6 +187,66 @@ object Serde {
                   fieldValue <- evaluatedOnly(desAuxR(bb, allowObjects, acc))
                 } yield (fieldName, fieldValue)
             )
+        } yield CaseObj(CASETYPEREF(typeName, Nil), fields.toMap)
+    }
+  }
+
+  private def desAuxROptimized(in: CodedInputStream, allowObjects: Boolean, acc: Coeval[Unit]): Coeval[EXPR] = acc.flatMap { _ =>
+    (in.readRawByte(): @unchecked) match {
+      case E_LONG   => Coeval.now(CONST_LONG(in.readInt64()))
+      case E_BYTES  => Coeval.now(CONST_BYTESTR(ByteStr(in.readByteArray())).explicitGet())
+      case E_STRING => Coeval.now(CONST_STRING(in.readString()).explicitGet())
+      case E_IF     => (desAuxROptimized(in, allowObjects, acc), desAuxROptimized(in, allowObjects, acc), desAuxROptimized(in, allowObjects, acc)).mapN(IF)
+      case E_BLOCK =>
+        for {
+          name     <- Coeval.now(in.readString())
+          letValue <- desAuxROptimized(in, allowObjects, acc)
+          body     <- desAuxROptimized(in, allowObjects, acc)
+        } yield LET_BLOCK(
+          let = LET(name, letValue),
+          body = body
+        )
+      case E_BLOCK_V2 =>
+        for {
+          decType <- Coeval.now(in.readRawByte())
+          dec     <- deserializeDeclarationOptimized(in, desAuxROptimized(in, allowObjects, acc), decType)
+          body    <- desAuxROptimized(in, allowObjects, acc)
+        } yield BLOCK(dec, body)
+      case E_REF    => Coeval.now(REF(in.readString()))
+      case E_TRUE   => Coeval.now(TRUE)
+      case E_FALSE  => Coeval.now(FALSE)
+      case E_GETTER => desAuxROptimized(in, allowObjects, acc).map(GETTER(_, field = in.readString()))
+      case E_FUNCALL =>
+        Coeval
+          .now((in.getFunctionHeader, in.readRawByte()))
+          .flatMap {
+            case (header, argc) =>
+              (1 to argc)
+                .map(_ => desAuxROptimized(in, allowObjects, acc))
+                .toList
+                .sequence
+                .map(FUNCTION_CALL(header, _))
+          }
+      case E_ARR =>
+        Coeval
+          .now(in.readUInt32())
+          .flatMap { argsCount =>
+            (1 to argsCount)
+              .to(LazyList)
+              .traverse(_ => evaluatedOnly(desAuxROptimized(in, allowObjects, acc)))
+              .map(elements => ARR(elements.toIndexedSeq, limited = false).explicitGet())
+          }
+      case E_CASE_OBJ if allowObjects =>
+        for {
+          (typeName, fieldsNumber) <- Coeval((in.readString(), in.readRawByte()))
+          fields <- (1 to fieldsNumber)
+            .to(LazyList)
+            .traverse { _ =>
+              for {
+                fieldName <- Coeval.now(in.readString())
+                fieldValue <- evaluatedOnly(desAuxROptimized(in, allowObjects, acc))
+              } yield (fieldName, fieldValue)
+            }
         } yield CaseObj(CASETYPEREF(typeName, Nil), fields.toMap)
     }
   }

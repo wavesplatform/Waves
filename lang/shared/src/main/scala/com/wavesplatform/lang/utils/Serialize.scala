@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.utils
 
-import com.google.protobuf.CodedOutputStream
+import com.google.protobuf.{CodedInputStream, CodedOutputStream}
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -26,6 +26,14 @@ object Serialize {
     def getFunctionHeader: FunctionHeader = self.get() match {
       case FH_NATIVE => Native(self.getShort)
       case FH_USER   => User(getString)
+      case x         => throw new RuntimeException(s"Unknown function header type: $x")
+    }
+  }
+
+  implicit class CodedInputStreamOps(val self: CodedInputStream) extends AnyVal {
+    def getFunctionHeader: FunctionHeader = self.readRawByte() match {
+      case FH_NATIVE => Native(self.readUInt32().toShort)
+      case FH_USER   => User(self.readString())
       case x         => throw new RuntimeException(s"Unknown function header type: $x")
     }
   }
