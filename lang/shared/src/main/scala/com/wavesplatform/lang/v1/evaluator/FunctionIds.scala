@@ -5,6 +5,7 @@ object FunctionIds {
   val EQ: Short           = 0
   val ISINSTANCEOF: Short = 1
   val THROW: Short        = 2
+  val GET_TYPE: Short     = 3
 
   val SUM_LONG: Short = 100
   val SUB_LONG: Short = 101
@@ -23,15 +24,19 @@ object FunctionIds {
   val POW_BIGINT: Short = 118
   val LOG_BIGINT: Short = 119
 
-  val SIZE_BYTES: Short = 200
-  val TAKE_BYTES: Short = 201
-  val DROP_BYTES: Short = 202
-  val SUM_BYTES: Short  = 203
+  val SIZE_BYTES: Short       = 200
+  val TAKE_BYTES: Short       = 201
+  val DROP_BYTES: Short       = 202
+  val SUM_BYTES: Short        = 203
+  val TAKE_RIGHT_BYTES: Short = 204
+  val DROP_RIGHT_BYTES: Short = 205
 
-  val SUM_STRING: Short  = 300
-  val TAKE_STRING: Short = 303
-  val DROP_STRING: Short = 304
-  val SIZE_STRING: Short = 305
+  val SUM_STRING: Short        = 300
+  val TAKE_STRING: Short       = 303
+  val DROP_STRING: Short       = 304
+  val SIZE_STRING: Short       = 305
+  val TAKE_RIGHT_STRING: Short = 306
+  val DROP_RIGHT_STRING: Short = 307
 
   val TO_BIGINT: Short              = 310
   val SUM_BIGINT: Short             = 311

@@ -76,7 +76,9 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .crossType(CrossType.Full)
   .settings(
-    libraryDependencies ++= Dependencies.protobuf.value ++ Dependencies.langCompilerPlugins.value,
+    libraryDependencies ++= Dependencies.protobuf.value ++
+      Dependencies.langCompilerPlugins.value ++
+      Dependencies.circe.value,
     inConfig(Compile)(
       Seq(
         PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,

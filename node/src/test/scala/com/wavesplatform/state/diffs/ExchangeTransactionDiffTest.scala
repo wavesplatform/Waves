@@ -1,12 +1,16 @@
 package com.wavesplatform.state.diffs
 
+import scala.util.{Random, Try}
+
 import cats.{Order => _, _}
+import com.wavesplatform.{crypto, TestValues}
 import com.wavesplatform.account.{Address, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
+import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -20,27 +24,21 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ExchangeTransactionDiff.getOrderFeePortfolio
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.test._
+import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.assets.exchange.{Order, _}
+import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.utils._
-import com.wavesplatform.{TestValues, crypto}
 import org.scalacheck.Gen
 import org.scalatest.{EitherValues, Inside}
 
-import scala.util.Random
-
-class ExchangeTransactionDiffTest
-    extends PropSpec
-    with Inside
-    with WithDomain
-    with EitherValues {
+class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain with EitherValues {
 
   private def wavesPortfolio(amt: Long) = Portfolio.waves(amt)
 
@@ -67,6 +65,122 @@ class ExchangeTransactionDiffTest
     )
 
   private val estimator = ScriptEstimatorV2
+
+  property("Not enough order sender balance and failed script") {
+    val buyer  = TxHelpers.signer(10)
+    val seller = TxHelpers.signer(11)
+
+    val issue = TxHelpers.issue()
+
+    def withReadyDomain(f: (Domain, Boolean) => Unit): Unit = {
+      val simpleScript  = TxHelpers.script("""{-# STDLIB_VERSION 5 #-}
+                                            |{-# CONTENT_TYPE DAPP #-}
+                                            |{-# SCRIPT_TYPE ACCOUNT #-}
+                                            |
+                                            |@Verifier(tx)
+                                            |func verify () = match(tx) {
+                                            |    case _ => if (sigVerify(base58'', base58'', base58'')) then true else true
+                                            |}""".stripMargin)
+      val complexScript = TxHelpers.script(s"""{-# STDLIB_VERSION 5 #-}
+                                             |{-# CONTENT_TYPE DAPP #-}
+                                             |{-# SCRIPT_TYPE ACCOUNT #-}
+                                             |
+                                             |@Verifier(tx)
+                                             |func verify () = match(tx) {
+                                             |    case _ =>
+                                             |      if (
+                                             |        ${(1 to 9).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || \n")}
+                                             |      ) then true else true
+                                             |}""".stripMargin)
+
+      for {
+        (accName, account) <- ("matcher" -> TxHelpers.defaultSigner) :: ("buyer" -> buyer) :: Nil
+
+        (scriptType, script) <- ("simple" -> simpleScript) :: ("complex" -> complexScript) :: Nil
+        setScript = TxHelpers.setScript(account, script)
+      } withClue(s"$scriptType script on $accName") {
+        val isScriptSimple = scriptType == "simple"
+
+        withClue("without fix")(withDomain(DomainPresets.RideV5) { d =>
+          d.appendAndAssertSucceed(TxHelpers.genesis(TxHelpers.defaultAddress))
+          d.appendAndAssertSucceed(issue, TxHelpers.transfer(TxHelpers.defaultSigner, setScript.sender.toAddress, TestValues.fee), setScript)
+          f(d, isScriptSimple)
+        })
+
+        withClue("with fix")(withDomain(DomainPresets.RideV5.withFS(_.copy(estimatorSumOverflowFixHeight = 4))) { d =>
+          d.appendAndAssertSucceed(TxHelpers.genesis(TxHelpers.defaultAddress))
+          d.appendAndAssertSucceed(issue, TxHelpers.transfer(TxHelpers.defaultSigner, setScript.sender.toAddress, TestValues.fee), setScript)
+          f(d, true)
+        })
+      }
+    }
+
+    def doExchangeTest(d: Domain, shouldThrowBalanceError: Boolean)(exchange: ExchangeTransaction): Unit = {
+      if (shouldThrowBalanceError) intercept[RuntimeException](d.appendBlock(exchange)).toString should include("AccountBalanceError")
+      else Try(d.appendAndAssertFailed(exchange)) shouldBe Symbol("success")
+    }
+
+    withClue("insufficient balance of buyer")(withReadyDomain {
+      case (d, shouldThrowBalanceError) =>
+        d.appendAndAssertSucceed(
+          TxHelpers.transfer(TxHelpers.defaultSigner, buyer.toAddress, 1, Waves),
+          TxHelpers.transfer(TxHelpers.defaultSigner, seller.toAddress, 1, Waves),
+          TxHelpers.transfer(TxHelpers.defaultSigner, seller.toAddress, 1, issue.asset)
+        )
+
+        val exchange = TxHelpers.exchange(
+          TxHelpers.orderV3(OrderType.BUY, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, buyer),
+          TxHelpers.orderV3(OrderType.SELL, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, seller)
+        )
+        doExchangeTest(d, shouldThrowBalanceError)(exchange)
+    })
+
+    withClue("insufficient balance of seller")(withReadyDomain {
+      case (d, shouldThrowBalanceError) =>
+        d.appendAndAssertSucceed(
+          TxHelpers.transfer(TxHelpers.defaultSigner, buyer.toAddress, 2, Waves),
+          TxHelpers.transfer(TxHelpers.defaultSigner, seller.toAddress, 1, Waves)
+          // TxHelpers.transfer(TxHelpers.defaultSigner, seller.toAddress, 1, issue.asset)
+        )
+
+        val exchange = TxHelpers.exchange(
+          TxHelpers.orderV3(OrderType.BUY, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, buyer),
+          TxHelpers.orderV3(OrderType.SELL, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, seller)
+        )
+        doExchangeTest(d, shouldThrowBalanceError)(exchange)
+    })
+
+    withClue("insufficient balance of matcher")(withReadyDomain {
+      case (d, _) =>
+        d.appendAndAssertSucceed(
+          TxHelpers.transfer(TxHelpers.defaultSigner, buyer.toAddress, 2, Waves),
+          TxHelpers.transfer(TxHelpers.defaultSigner, seller.toAddress, 1, Waves),
+          TxHelpers.transfer(TxHelpers.defaultSigner, seller.toAddress, 1, issue.asset)
+        )
+
+        val exchange = TxHelpers.exchange(
+          TxHelpers.orderV3(OrderType.BUY, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, buyer, TxHelpers.secondSigner),
+          TxHelpers.orderV3(OrderType.SELL, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, seller, TxHelpers.secondSigner),
+          matcher = TxHelpers.secondSigner
+        )
+        doExchangeTest(d, shouldThrowBalanceError = true)(exchange)
+    })
+
+    withClue("insufficient balance for two orders")(withReadyDomain {
+      case (d, shouldThrowBalanceError) =>
+        val buyerAndSeller = buyer
+
+        d.appendAndAssertSucceed(
+          TxHelpers.transfer(TxHelpers.defaultSigner, buyerAndSeller.toAddress, 1, Waves) // fee for a single order
+        )
+
+        val exchange = TxHelpers.exchange(
+          TxHelpers.orderV3(OrderType.BUY, issue.asset, Waves, Waves, 2L, 1_0000_0000L, 1L, buyerAndSeller),
+          TxHelpers.orderV3(OrderType.SELL, issue.asset, Waves, Waves, 2L, 1_0000_0000L, 1L, buyerAndSeller)
+        )
+        doExchangeTest(d, shouldThrowBalanceError)(exchange)
+    })
+  }
 
   property("Validation fails when Order feature is not activation yet") {
 
@@ -1118,7 +1232,11 @@ class ExchangeTransactionDiffTest
             diff.portfolios.get(exchange.buyOrder.sender.toAddress) shouldBe None
             diff.portfolios.get(exchange.sellOrder.sender.toAddress) shouldBe None
 
-            diff.scriptsComplexity shouldBe DiffsCommon.countVerifierComplexity(Some(throwingScript), state, isAsset = true).explicitGet().get._2
+            diff.scriptsComplexity shouldBe DiffsCommon
+              .countVerifierComplexity(Some(throwingScript), state, isAsset = true)
+              .explicitGet()
+              .get
+              ._2
 
             buyerBalance.foreach {
               case (asset, balance) =>
@@ -1175,7 +1293,9 @@ class ExchangeTransactionDiffTest
       ) { d =>
         d.appendBlock(Seq(amountAssetIssue, priceAssetIssue, order1FeeAssetIssue, order2FeeAssetIssue).distinct*)
         val newBlock = d.createBlock(2.toByte, Seq(exchange))
-        val diff     = BlockDiffer.fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited, newBlock.header.generationSignature).explicitGet()
+        val diff = BlockDiffer
+          .fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited, newBlock.header.generationSignature)
+          .explicitGet()
         diff.diff.scriptsComplexity shouldBe complexity
       }
     }
@@ -1248,7 +1368,9 @@ class ExchangeTransactionDiffTest
       ) { d =>
         d.appendBlock(Seq(tradeableAssetIssue, feeAssetIssue).distinct*)
         val newBlock = d.createBlock(2.toByte, Seq(exchange))
-        val diff     = BlockDiffer.fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited, newBlock.header.generationSignature).explicitGet()
+        val diff = BlockDiffer
+          .fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited, newBlock.header.generationSignature)
+          .explicitGet()
         diff.diff.scriptsComplexity shouldBe complexity
 
         val feeUnits = FeeValidation.getMinFee(d.blockchainUpdater, exchange).explicitGet().minFeeInWaves / FeeValidation.FeeUnit

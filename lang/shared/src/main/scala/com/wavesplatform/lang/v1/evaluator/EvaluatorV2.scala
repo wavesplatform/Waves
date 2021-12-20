@@ -1,9 +1,9 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.Id
+import cats.instances.lazyList._
 import cats.syntax.either._
 import cats.syntax.foldable._
-import cats.instances.lazyList._
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -22,6 +22,7 @@ import scala.collection.mutable.ListBuffer
 class EvaluatorV2(
     val ctx: LoggedEvaluationContext[Environment, Id],
     val stdLibVersion: StdLibVersion,
+    val correctFunctionCallScope: Boolean,
     val checkConstructorArgsTypes: Boolean = false
 ) {
   def apply(expr: EXPR, limit: Int): (EXPR, Int) =
@@ -107,20 +108,27 @@ class EvaluatorV2(
     def evaluateUserFunction(fc: FUNCTION_CALL, limit: Int, name: String, startArgs: List[EXPR]): Option[Coeval[Int]] = {
       ctx.ec.functions
         .get(fc.function)
-        .map(_.asInstanceOf[UserFunction[Environment]])
-        .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment, startArgs)))
+        .map { f =>
+          val body = f.asInstanceOf[UserFunction[Environment]].ev[Id](ctx.ec.environment, startArgs)
+          val decl = FUNC(f.name, f.args.toList, body)
+          (decl, parentBlocks)
+        }
         .orElse(findUserFunction(name, parentBlocks))
-        .map { signature =>
-          val argsWithExpr =
-            (signature.args zip fc.args)
-              .foldRight(signature.body.deepCopy.value) {
-                case ((argName, argValue), argsWithExpr) =>
-                  BLOCK(LET(argName, argValue), argsWithExpr)
-              }
-          update(argsWithExpr)
-            .flatMap(
-              _ => root(argsWithExpr, update, limit, parentBlocks)
-            )
+        .map {
+          case (signature, functionScopeBlocks) =>
+            val argsWithExpr =
+              (signature.args zip fc.args)
+                .foldRight(signature.body.deepCopy.value) {
+                  case ((argName, argValue), argsWithExpr) =>
+                    BLOCK(LET(argName, argValue), argsWithExpr)
+                }
+            update(argsWithExpr)
+              .flatMap(
+                _ => {
+                  val blocks = if (correctFunctionCallScope) functionScopeBlocks else parentBlocks
+                  root(argsWithExpr, update, limit, blocks)
+                }
+              )
         }
     }
 
@@ -201,7 +209,7 @@ class EvaluatorV2(
                       update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks
-                    )
+                  )
                 )
               case FALSE if unused > 0 =>
                 update(i.ifFalse).flatMap(
@@ -211,7 +219,7 @@ class EvaluatorV2(
                       update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks
-                    )
+                  )
                 )
               case _: EVALUATED => throw EvaluationException("Non-boolean result in cond", unused)
               case _            => Coeval.now(unused)
@@ -274,8 +282,8 @@ class EvaluatorV2(
               let.value match {
                 case e: EVALUATED => ctx.log(let, Right(e))
                 case _            =>
-              }
-          ),
+            }
+        ),
       limit = limit,
       parentBlocks = nextParentBlocks
     ).flatMap { unused =>
@@ -303,37 +311,27 @@ class EvaluatorV2(
       }
 
   @tailrec
-  private def findUserFunction(name: String, parentBlocks: List[BLOCK_DEF]): Option[FUNC] =
+  private def findUserFunction(name: String, parentBlocks: List[BLOCK_DEF]): Option[(FUNC, List[BLOCK_DEF])] =
     parentBlocks match {
-      case (_: LET_BLOCK) :: xs                  => findUserFunction(name, xs)
-      case BLOCK(f @ FUNC(`name`, _, _), _) :: _ => Some(f)
-      case _ :: xs                               => findUserFunction(name, xs)
-      case Nil                                   => None
+      case (_: LET_BLOCK) :: xs                            => findUserFunction(name, xs)
+      case BLOCK(f @ FUNC(`name`, _, _), _) :: scopeBlocks => Some((f, scopeBlocks))
+      case _ :: xs                                         => findUserFunction(name, xs)
+      case Nil                                             => None
     }
 }
 
 object EvaluatorV2 {
-  def applyLimited(
-      expr: EXPR,
-      limit: Int,
-      ctx: EvaluationContext[Environment, Id],
-      stdLibVersion: StdLibVersion,
-      checkConstructorArgsTypes: Boolean = false
-  ): Either[(ExecutionError, Log[Id]), (EXPR, Int, Log[Id])] =
-    applyLimitedCoeval(expr, limit, ctx, stdLibVersion, checkConstructorArgsTypes)
-      .value()
-      .leftMap { case (e, _, unused) => (e, unused) }
-
   def applyLimitedCoeval(
       expr: EXPR,
       limit: Int,
       ctx: EvaluationContext[Environment, Id],
       stdLibVersion: StdLibVersion,
+      correctFunctionCallScope: Boolean,
       checkConstructorArgsTypes: Boolean = false
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (EXPR, Int, Log[Id])]] = {
     val log       = ListBuffer[LogItem[Id]]()
     val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
-    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion, checkConstructorArgsTypes)
+    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion, correctFunctionCallScope, checkConstructorArgsTypes)
     evaluator
       .applyCoeval(expr, limit)
       .redeem(
@@ -349,10 +347,11 @@ object EvaluatorV2 {
       expr: EXPR,
       stdLibVersion: StdLibVersion,
       complexityLimit: Int,
+      correctFunctionCallScope: Boolean,
       handleExpr: EXPR => Either[ExecutionError, EVALUATED]
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
     EvaluatorV2
-      .applyLimitedCoeval(expr, complexityLimit, ctx, stdLibVersion)
+      .applyLimitedCoeval(expr, complexityLimit, ctx, stdLibVersion, correctFunctionCallScope)
       .value()
       .fold(
         { case (error, complexity, log) => (log, complexity, Left(error)) }, {
@@ -367,9 +366,10 @@ object EvaluatorV2 {
   def applyCompleted(
       ctx: EvaluationContext[Environment, Id],
       expr: EXPR,
-      stdLibVersion: StdLibVersion
+      stdLibVersion: StdLibVersion,
+      correctFunctionCallScope: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, incomplete)
+    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, correctFunctionCallScope, incomplete)
 
   private def incomplete(expr: EXPR): Either[ExecutionError, Nothing] =
     Left(s"Unexpected incomplete evaluation result $expr")

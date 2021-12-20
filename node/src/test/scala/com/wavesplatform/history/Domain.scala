@@ -62,8 +62,12 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       feeInWaves
     }
 
+    def transactionMeta(transactionId: ByteStr): TransactionMeta =
+      transactions.transactionById(transactionId)
+        .getOrElse(throw new NoSuchElementException(s"No meta for $transactionId"))
+
     def invokeScriptResult(transactionId: ByteStr): InvokeScriptResult =
-      transactions.transactionById(transactionId).get match {
+      transactionMeta(transactionId) match {
         case hsc: TransactionMeta.HasStateChanges => hsc.invokeScriptResult.get
         case _                                    => ???
       }
@@ -129,6 +133,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def appendBlock(b: Block): Seq[Diff] = blockchainUpdater.processBlock(b).explicitGet()
 
+  def appendBlockE(b: Block): Either[ValidationError, Seq[Diff]] = blockchainUpdater.processBlock(b)
+
   def rollbackTo(blockId: ByteStr): DiscardedBlocks = blockchainUpdater.removeAfter(blockId).explicitGet()
 
   def appendMicroBlock(b: MicroBlock): BlockId = blockchainUpdater.processMicroBlock(b).explicitGet()
@@ -174,6 +180,9 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     txs.foreach(tx => require(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx"))
     lastBlock
   }
+
+  def appendBlockE(txs: Transaction*): Either[ValidationError, Seq[Diff]] =
+    appendBlockE(createBlock(blockchainUpdater.nextBlockVersion, txs))
 
   def appendBlock(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)

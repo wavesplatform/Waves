@@ -50,6 +50,8 @@ object JsAPI {
   private def buildContractContext(v: StdLibVersion): CTX[Environment] =
     Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, false, true)))
 
+  private val allEstimators: Seq[ScriptEstimator] = ScriptEstimator.all(fixOverflow = true)
+
   @JSExportTopLevel("getTypes")
   def getTypes(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     buildScriptContext(DirectiveDictionary[StdLibVersion].idMap(ver), isTokenContext, isContract).types
@@ -134,14 +136,14 @@ object JsAPI {
   ): js.Dynamic = {
     val r = for {
       estimatorVer <- Either.cond(
-        estimatorVersion > 0 && estimatorVersion <= ScriptEstimator.all.length,
+        estimatorVersion > 0 && estimatorVersion <= allEstimators.length,
         estimatorVersion,
-        s"Version of estimator must be not greater than ${ScriptEstimator.all.length}"
+        s"Version of estimator must be not greater than ${allEstimators.length}"
       )
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
-      compiled    <- parseAndCompileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode)
+      compiled    <- parseAndCompileScript(ds, linkedInput, allEstimators.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode)
     } yield compiled
     r.fold(
       e => js.Dynamic.literal("error" -> e),
@@ -217,14 +219,14 @@ object JsAPI {
   ): js.Dynamic = {
     val r = for {
       estimatorVer <- Either.cond(
-        estimatorVersion > 0 && estimatorVersion <= ScriptEstimator.all.length,
+        estimatorVersion > 0 && estimatorVersion <= allEstimators.length,
         estimatorVersion,
-        s"Version of estimator must be not greater than ${ScriptEstimator.all.length}"
+        s"Version of estimator must be not greater than ${allEstimators.length}"
       )
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
-      compiled    <- compileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode)
+      compiled    <- compileScript(ds, linkedInput, allEstimators.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode)
     } yield compiled
     r.fold(
       e => js.Dynamic.literal("error" -> e),

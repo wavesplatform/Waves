@@ -8,7 +8,6 @@ import com.wavesplatform.lang.directives.values.{Account, Expression, V5}
 import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
 import org.openjdk.jmh.annotations.{State, _}
 import org.openjdk.jmh.infra.Blackhole
 
@@ -20,10 +19,10 @@ import org.openjdk.jmh.infra.Blackhole
 @Measurement(iterations = 10, time = 1)
 class SqrtIntBenchmark {
   @Benchmark
-  def sqrt1(bh: Blackhole, s: SqrtIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr1, V5))
+  def sqrt1(bh: Blackhole, s: SqrtIntSt): Unit = bh.consume(eval(s.ctx, s.expr1, V5))
 
   @Benchmark
-  def sqrt2(bh: Blackhole, s: SqrtIntSt): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr2, V5))
+  def sqrt2(bh: Blackhole, s: SqrtIntSt): Unit = bh.consume(eval(s.ctx, s.expr2, V5))
 }
 
 @State(Scope.Benchmark)
