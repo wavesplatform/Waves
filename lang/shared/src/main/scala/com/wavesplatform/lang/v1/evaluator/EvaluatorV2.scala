@@ -1,9 +1,9 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.Id
+import cats.instances.lazyList._
 import cats.syntax.either._
 import cats.syntax.foldable._
-import cats.instances.lazyList._
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader

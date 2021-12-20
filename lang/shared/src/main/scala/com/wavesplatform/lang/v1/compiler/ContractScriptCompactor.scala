@@ -1,13 +1,15 @@
 package com.wavesplatform.lang.v1.compiler
 
+import scala.annotation.tailrec
+
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.protobuf.dapp.DAppMeta.CompactNameAndOriginalNamePair
-
 import scala.collection._
 
 object ContractScriptCompactor {
+  private[this] val CharRange: scala.IndexedSeq[Char] = ('a' to 'z') ++ ('A' to 'Z')
 
   def compact(
       dApp: DApp,
@@ -15,29 +17,30 @@ object ContractScriptCompactor {
       saveNameMapToMeta: Boolean = true
   ): DApp = {
 
-    val originalToCompactedNameMap: mutable.Map[String, String] = nameMap.to(mutable.Map)
+    var counter                    = 0
+    val originalToCompactedNameMap = nameMap.to(mutable.Map)
 
-    var currentNameCharIdx = 0
-    var currentNameNum     = 1
-    val charRange          = 'a' to 'z'
     def createCompName(oldName: String): String = {
-      val compName = originalToCompactedNameMap.getOrElse(
-        oldName,
-        {
-          if (oldName.length <= 2 && !originalToCompactedNameMap.values.exists(_ == oldName)) {
-            oldName
-          } else {
-            val cName = s"${charRange(currentNameCharIdx)}${currentNameNum}"
-            originalToCompactedNameMap += oldName -> cName
-            currentNameNum += 1
-            if (currentNameCharIdx < 25) {
-              if (currentNameNum > 9) {
-                currentNameCharIdx += 1
-                currentNameNum = 1
-              }
-            }
-            cName
+      val compName = originalToCompactedNameMap.getOrElseUpdate(
+        oldName, {
+          def hasConflict(compactName: String) =
+            dApp.callableFuncs.exists(_.u.name == compactName)
+
+          @tailrec
+          def generateName(n: Int, seed: String = ""): String = {
+            if (n < CharRange.length) String.valueOf(CharRange(n)) + seed
+            else generateName(n / CharRange.length - 1, String.valueOf(CharRange(n % CharRange.length)) + seed)
           }
+
+          var compactName = generateName(counter)
+          while (hasConflict(compactName)) {
+            counter += 1
+            compactName = generateName(counter)
+          }
+
+          assert(!hasConflict(compactName))
+          counter += 1
+          compactName
         }
       )
 
@@ -112,10 +115,9 @@ object ContractScriptCompactor {
     }
 
     val resultNamePairList = if (saveNameMapToMeta) {
-      originalToCompactedNameMap
-        .toSeq
+      originalToCompactedNameMap.toSeq
         .sortBy(_._2) //sort by compactName
-        .map{
+        .map {
           case (k, v) => CompactNameAndOriginalNamePair(v, k)
         }
     } else {
@@ -144,13 +146,13 @@ object ContractScriptCompactor {
 
     def getUsedNames(expr: EXPR): Seq[String] = {
       expr match {
-        case BLOCK(dec, body) => getUsedNames(dec.asInstanceOf[LET].value) ++ getUsedNames(body)
-        case LET_BLOCK(dec, body) => getUsedNames(dec.value) ++ getUsedNames(body)
+        case BLOCK(dec, body)       => getUsedNames(dec.asInstanceOf[LET].value) ++ getUsedNames(body)
+        case LET_BLOCK(dec, body)   => getUsedNames(dec.value) ++ getUsedNames(body)
         case FUNCTION_CALL(f, args) => f.funcName +: args.flatMap(getUsedNames)
-        case GETTER(gExpr, _) => getUsedNames(gExpr)
-        case IF(cond, ifT, ifF) => getUsedNames(cond) ++ getUsedNames(ifT) ++ getUsedNames(ifF)
-        case REF(key) => List(key)
-        case _ => List.empty
+        case GETTER(gExpr, _)       => getUsedNames(gExpr)
+        case IF(cond, ifT, ifF)     => getUsedNames(cond) ++ getUsedNames(ifT) ++ getUsedNames(ifF)
+        case REF(key)               => List(key)
+        case _                      => List.empty
       }
     }
 
@@ -159,7 +161,7 @@ object ContractScriptCompactor {
       if (nextNameList.nonEmpty) {
         val nextExprList: Seq[EXPR] = dApp.decs.collect {
           case FUNC(name, _, body) if nextNameList.contains(name) => body
-          case LET(name, value) if nextNameList.contains(name) => value
+          case LET(name, value) if nextNameList.contains(name)    => value
         }
         getUsedNamesFromList(nextExprList, prevNamesList ++ nextNameList)
       } else {

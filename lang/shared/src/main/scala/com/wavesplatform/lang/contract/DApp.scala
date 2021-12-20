@@ -25,7 +25,7 @@ case class DApp(
 
   @tailrec private def containsSyncCall(e: List[EXPR]): Boolean = {
     def funcBody(header: FunctionHeader): List[EXPR] =
-      decs.collect { case FUNC(header.funcName, _, body) => body }
+      decs.collectFirst { case FUNC(header.funcName, _, body) => body }.toList
 
     def refBody(key: String): List[EXPR] =
       decs.collect { case LET(`key`, body) => body }

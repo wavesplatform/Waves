@@ -15,22 +15,26 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 
-class EvaluatorFunctionCallScopeTest extends PropSpec with WithDomain with TransactionGenBase {
+class OverheadCallableCallTest extends PropSpec with WithDomain with TransactionGenBase {
   private val time = new TestTime
   private def ts   = time.getTimestamp()
+
+  private val body = {
+    val n = 65
+    s"""
+       | func f0() = true
+       | ${(0 until n).map(i => s"func f${i + 1}() = if (f$i()) then f$i() else f$i()").mkString("\n")}
+       | f$n()
+       """.stripMargin
+  }
 
   private val dApp1Script: Script =
     TestCompiler(V5).compileContract(
       s"""
          | @Callable(i)
          | func default() = {
-         |   let a = 4
-         |   func g(b: Int) = a
-         |   func f(a: Int) = g(a)
-         |   let r = f(1)
-         |   [
-         |     IntegerEntry("key", r)
-         |   ]
+         |   strict r = $body
+         |   []
          | }
        """.stripMargin
     )
@@ -44,24 +48,20 @@ class EvaluatorFunctionCallScopeTest extends PropSpec with WithDomain with Trans
       gTx2     = GenesisTransaction.create(dApp1.toAddress, ENOUGH_AMT, ts).explicitGet()
       ssTx1    = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script), fee, ts).explicitGet()
       invokeTx = () => Signed.invokeScript(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts)
-    } yield (Seq(gTx1, gTx2, ssTx1), invokeTx, dApp1.toAddress)
+    } yield (Seq(gTx1, gTx2, ssTx1), invokeTx)
 
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(estimatorSumOverflowFixHeight = 3)
+      .copy(estimationOverflowFixHeight = 999, estimatorSumOverflowFixHeight = 3)
 
-  property("arg of the first function should NOT overlap var accessed from body of the second function AFTER fix") {
-    val (preparingTxs, invoke, dApp) = scenario.sample.get
-    withDomain(domainSettingsWithFS(settings)) { d =>
-      d.appendBlock(preparingTxs: _*)
-
-      d.appendBlock(invoke())
-      d.blockchain.accountData(dApp, "key").get.value shouldBe 1
-
-      val transaction = invoke()
-      d.appendBlock(transaction)
-      d.blockchain.accountData(dApp, "key").get.value shouldBe 4
-    }
+  property("overhead callable call should be safe both before and after fix") {
+      val (preparingTxs, invoke) = scenario.sample.get
+      withDomain(domainSettingsWithFS(settings)) { d =>
+        d.appendBlock(preparingTxs: _*)
+        (the[Exception] thrownBy d.appendBlock(invoke())).getMessage should include("Evaluation was uncompleted with unused complexity = 0")
+        d.appendBlock()
+        (the[Exception] thrownBy d.appendBlock(invoke())).getMessage should include("Evaluation was uncompleted with unused complexity = 0")
+      }
   }
 }

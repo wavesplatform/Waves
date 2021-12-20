@@ -4,7 +4,12 @@ import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 
-class ScriptEstimatorV2V3Test extends ScriptEstimatorTestBase(ScriptEstimatorV2, ScriptEstimatorV3) {
+class ScriptEstimatorV2V3Test
+    extends ScriptEstimatorTestBase(
+      ScriptEstimatorV2,
+      ScriptEstimatorV3(fixOverflow = true),
+      ScriptEstimatorV3(fixOverflow = false)
+    ) {
   property("transitive ref usage") {
     def refUsage(ref: String): EXPR =
       compile(
