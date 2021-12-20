@@ -54,7 +54,10 @@ object EthTxGenerator {
 
   def signRawTransaction(keyPair: ECKeyPair, chainId: Byte)(raw: RawTransaction): EthereumTransaction = {
     val signedTx =
-      new SignedRawTransaction(raw.getTransaction, Sign.signMessage(TransactionEncoder.encode(raw, chainId.toLong), keyPair, true))
+      new SignedRawTransaction(
+        raw.getTransaction,
+        TransactionEncoder.createEip155SignatureData(Sign.signMessage(TransactionEncoder.encode(raw, chainId.toLong), keyPair, true), chainId.toLong)
+      )
     EthereumTransaction(signedTx).explicitGet()
   }
 
@@ -84,11 +87,11 @@ object EthTxGenerator {
 
       signRawTransaction(keyPair, recipient.chainId)(
         RawTransaction.createTransaction(
-          BigInt(System.currentTimeMillis()).bigInteger,
+          BigInt(System.currentTimeMillis()).bigInteger, // nonce
           EthereumTransaction.GasPrice,
           BigInt(100000).bigInteger,                     // fee
-          EthEncoding.toHexString(assetId.arr.take(20)), // asset erc20 "contract" address
-          FunctionEncoder.encode(function)
+          EthEncoding.toHexString(assetId.arr.take(20)), // to (asset erc20 "contract" address)
+          FunctionEncoder.encode(function)               // data
         )
       )
   }
