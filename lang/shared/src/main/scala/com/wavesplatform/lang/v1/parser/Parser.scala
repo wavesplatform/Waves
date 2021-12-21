@@ -15,6 +15,7 @@ import com.wavesplatform.lang.v1.parser.UnaryOperation._
 import fastparse.MultiLineWhitespace._
 import fastparse._
 
+//noinspection ScalaStyle,TypeAnnotation
 object Parser {
 
   private val Global                                        = com.wavesplatform.lang.hacks.Global // Hack for IDEA
@@ -255,7 +256,7 @@ object Parser {
     def argWithType(implicit c: fastparse.P[Any]) = anyVarName ~ ":" ~ unionTypeP ~ comment
     def args(implicit c: fastparse.P[Any])        = "(" ~ comment ~ argWithType.rep(0, "," ~ comment) ~ ")" ~ comment
     def funcHeader(implicit c: fastparse.P[Any]) =
-      Index ~~ "func" ~ funcname ~ comment ~ args ~ "=" ~ P(singleBaseExpr | ("{" ~ baseExpr ~ "}")) ~~ Index
+      Index ~~ "func" ~ funcname ~ comment ~ args ~ "=" ~ P(singleBaseExpr | ("{" ~ comment ~ baseExpr ~ "}")) ~~ Index
     funcHeader.map {
       case (start, name, args, expr, end) => FUNC(Pos(start, end), expr, name, args)
     }
