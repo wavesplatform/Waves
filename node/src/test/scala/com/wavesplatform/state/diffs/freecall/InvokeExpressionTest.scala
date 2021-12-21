@@ -9,167 +9,74 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, NewAssetInfo}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, NewAssetInfo}
 import com.wavesplatform.test.{PropSpec, TestTime}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
+import com.wavesplatform.utils.JsonMatchers
 import org.scalatest.{Assertion, EitherValues}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import play.api.libs.json.Json
 
-class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with TransactionGen with WithDomain with EitherValues {
+class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with WithDomain with EitherValues with JsonMatchers {
+  import DomainPresets.{RideV5, RideV6}
+  import InvokeExpressionTest._
 
-  import DomainPresets._
+  property("can call another contract") {
+    val dAppScript  = TxHelpers.scriptV5("""
+        |@Callable(i)
+        |func test() = ([], 123)
+        |""".stripMargin)
+    val dAppAccount = TxHelpers.secondSigner
 
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
+    val freeCall = TestCompiler(V6).compileFreeCall(s"""strict test = invoke(Address(base58'${dAppAccount.toAddress}'), "test", [], [])
+                                                       |if (test == 123) then [] else throw("err")""".stripMargin)
 
-  private val assetName         = "name"
-  private val assetDescription  = "description"
-  private val assetVolume       = 1000
-  private val assetDecimals     = 4
-  private val assetIsReissuable = true
+    val invoke = InvokeExpressionTransaction
+      .selfSigned(TxVersion.V1, TxHelpers.defaultSigner, freeCall, 1000000L, Waves, System.currentTimeMillis())
+      .explicitGet()
+    withDomain(RideV6) { d =>
+      d.helpers.creditWavesToDefaultSigner()
+      d.helpers.creditWavesFromDefaultSigner(dAppAccount.toAddress)
+      d.helpers.setScript(dAppAccount, dAppScript)
+      d.appendAndAssertSucceed(invoke)
 
-  private def expr(
-      invoker: KeyPair,
-      fee: Long,
-      issue: Boolean,
-      transfersCount: Int,
-      receiver: Address,
-      sigVerifyCount: Int,
-      raiseError: Boolean
-  ): ExprScript =
-    TestCompiler(V6).compileFreeCall(
-      s"""
-         | ${(1 to sigVerifyCount).map(i => s"strict r$i = sigVerify(base58'', base58'', base58'')").mkString("\n")}
-         | ${if (raiseError) "strict f = throw()" else ""}
-         | let address   = Address(base58'${invoker.toAddress}')
-         | let publicKey = base58'${invoker.publicKey}'
-         | let check =
-         |   this                    == address   &&
-         |   i.caller                == address   &&
-         |   i.originCaller          == address   &&
-         |   i.callerPublicKey       == publicKey &&
-         |   i.originCallerPublicKey == publicKey &&
-         |   i.fee                   == $fee      &&
-         |   i.payments              == []        &&
-         |   i.feeAssetId            == unit
-         | [
-         |   BooleanEntry("check", check),
-         |   BinaryEntry("transactionId", i.transactionId)
-         |   ${if (issue) s""", Issue("$assetName", "$assetDescription", $assetVolume, $assetDecimals, $assetIsReissuable, unit, 0) """ else ""}
-         |   ${if (transfersCount > 0) "," else ""}
-         |   ${(1 to transfersCount).map(_ => s"ScriptTransfer(Address(base58'$receiver'), 1, unit)").mkString(",")}
-         | ]
-       """.stripMargin
-    )
-
-  private def verifier(version: StdLibVersion): Script =
-    TestCompiler(version).compileExpression(
-      s"""
-         | match tx {
-         |   case _ => true
-         | }
-       """.stripMargin
-    )
-
-  private def dAppVerifier(version: StdLibVersion): Script =
-    TestCompiler(version).compileContract(
-      s"""
-         | @Verifier(tx)
-         | func verify() =
-         |   match tx {
-         |     case _ => true
-         |   }
-       """.stripMargin
-    )
-
-  private def dAppWithNoVerifier(version: StdLibVersion): Script =
-    TestCompiler(version).compileContract(
-      s"""
-         | @Callable(i)
-         | func default() = if (true) then throw() else throw()
-       """.stripMargin
-    )
-
-  private val forbidByTypeVerifier: Script =
-    TestCompiler(V6).compileExpression(
-      s"""
-         | match tx {
-         |   case _: InvokeExpressionTransaction => false
-         |   case _                              => true
-         | }
-       """.stripMargin
-    )
-
-  private val forbidAllVerifier: Script =
-    TestCompiler(V6).compileExpression(
-      s"""
-         | match tx {
-         |   case _ => false
-         | }
-       """.stripMargin
-    )
-
-  private val bigVerifier: Script =
-    TestCompiler(V6).compileExpression(
-      s"""
-         | strict r = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" && ")}
-         | true
-       """.stripMargin
-    )
-
-  private def scenario(
-      enoughFee: Boolean = true,
-      issue: Boolean = true,
-      verifier: Option[Script] = None,
-      sponsor: Boolean = false,
-      version: Byte = 1,
-      transfersCount: Int = 0,
-      sigVerifyCount: Int = 0,
-      bigVerifier: Boolean = false,
-      raiseError: Boolean = false
-  ): (Seq[Transaction], InvokeExpressionTransaction) = {
-    val invoker  = accountGen.sample.get
-    val receiver = accountGen.sample.get
-    val fee      = ciFee(freeCall = enoughFee, nonNftIssue = if (issue) 1 else 0, sc = if (bigVerifier) 1 else 0).sample.get
-
-    val genesis     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-    val setVerifier = SetScriptTransaction.selfSigned(TxVersion.V2, invoker, verifier, fee, ts).explicitGet()
-
-    val sponsorIssueTx = IssueTransaction.selfSigned(TxVersion.V2, invoker, "name", "", 1000, 1, true, None, fee, ts).explicitGet()
-    val sponsorAsset   = IssuedAsset(sponsorIssueTx.id.value())
-    val sponsorTx      = SponsorFeeTransaction.selfSigned(TxVersion.V2, invoker, sponsorAsset, Some(1000L), fee, ts).explicitGet()
-    val feeAsset       = if (sponsor) sponsorAsset else Waves
-
-    val call   = expr(invoker, fee, issue, transfersCount, receiver.toAddress, sigVerifyCount, raiseError)
-    val invoke = InvokeExpressionTransaction.selfSigned(version, invoker, call, fee, feeAsset, ts).explicitGet()
-
-    (Seq(genesis, sponsorIssueTx, sponsorTx, setVerifier), invoke)
-  }
-
-  private def feeErrorMessage(invoke: InvokeExpressionTransaction, issue: Boolean = false, verifier: Boolean = false) = {
-    val expectingFee = FeeConstants(invoke.tpe) * FeeUnit + (if (issue) 1 else 0) * MinIssueFee + (if (verifier) 1 else 0) * ScriptExtraFee
-    val issueErr     = if (issue) " with 1 assets issued" else ""
-    val verifierErr  = if (verifier) " with 1 total scripts invoked" else ""
-    s"Fee in WAVES for InvokeExpressionTransaction (${invoke.fee} in WAVES)$issueErr$verifierErr does not exceed minimal value of $expectingFee WAVES."
-  }
-
-  private def checkAsset(
-      invoke: InvokeExpressionTransaction,
-      asset: NewAssetInfo
-  ): Assertion = {
-    asset.dynamic.name.toStringUtf8 shouldBe assetName
-    asset.dynamic.description.toStringUtf8 shouldBe assetDescription
-    asset.volume.volume shouldBe assetVolume
-    asset.volume.isReissuable shouldBe assetIsReissuable
-    asset.static.decimals shouldBe assetDecimals
-    asset.static.nft shouldBe false
-    asset.static.issuer shouldBe invoke.sender
+      val result = d.commonApi.invokeScriptResult(invoke.id())
+      Json.toJson(result) should matchJson("""{
+                                             |  "data" : [ ],
+                                             |  "transfers" : [ ],
+                                             |  "issues" : [ ],
+                                             |  "reissues" : [ ],
+                                             |  "burns" : [ ],
+                                             |  "sponsorFees" : [ ],
+                                             |  "leases" : [ ],
+                                             |  "leaseCancels" : [ ],
+                                             |  "invokes" : [ {
+                                             |    "dApp" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                                             |    "call" : {
+                                             |      "function" : "test",
+                                             |      "args" : [ ]
+                                             |    },
+                                             |    "payment" : [ ],
+                                             |    "stateChanges" : {
+                                             |      "data" : [ ],
+                                             |      "transfers" : [ ],
+                                             |      "issues" : [ ],
+                                             |      "reissues" : [ ],
+                                             |      "burns" : [ ],
+                                             |      "sponsorFees" : [ ],
+                                             |      "leases" : [ ],
+                                             |      "leaseCancels" : [ ],
+                                             |      "invokes" : [ ]
+                                             |    }
+                                             |  } ]
+                                             |}""".stripMargin)
+    }
   }
 
   property("successful applying to the state") {
@@ -340,4 +247,151 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with T
       d.liquidDiff.errorMessage(invoke.id.value()).get.text should include("Explicit script termination")
     }
   }
+
+  private[this] def checkAsset(
+      invoke: InvokeExpressionTransaction,
+      asset: NewAssetInfo
+  ): Assertion = {
+    asset.dynamic.name.toStringUtf8 shouldBe TestAssetName
+    asset.dynamic.description.toStringUtf8 shouldBe TestAssetDesc
+    asset.volume.volume shouldBe TestAssetVolume
+    asset.volume.isReissuable shouldBe TestAssetReissuable
+    asset.static.decimals shouldBe TestAssetDecimals
+    asset.static.nft shouldBe false
+    asset.static.issuer shouldBe invoke.sender
+  }
+}
+
+private object InvokeExpressionTest {
+  val TestAssetName       = "name"
+  val TestAssetDesc       = "description"
+  val TestAssetVolume     = 1000
+  val TestAssetDecimals   = 4
+  val TestAssetReissuable = true
+
+  def makeExpression(
+      invoker: KeyPair,
+      fee: Long,
+      issue: Boolean,
+      transfersCount: Int,
+      receiver: Address,
+      sigVerifyCount: Int,
+      raiseError: Boolean
+  ): ExprScript =
+    TestCompiler(V6).compileFreeCall(
+      s"""
+         | ${(1 to sigVerifyCount).map(i => s"strict r$i = sigVerify(base58'', base58'', base58'')").mkString("\n")}
+         | ${if (raiseError) "strict f = throw()" else ""}
+         | let address   = Address(base58'${invoker.toAddress}')
+         | let publicKey = base58'${invoker.publicKey}'
+         | let check =
+         |   this                    == address   &&
+         |   i.caller                == address   &&
+         |   i.originCaller          == address   &&
+         |   i.callerPublicKey       == publicKey &&
+         |   i.originCallerPublicKey == publicKey &&
+         |   i.fee                   == $fee      &&
+         |   i.payments              == []        &&
+         |   i.feeAssetId            == unit
+         | [
+         |   BooleanEntry("check", check),
+         |   BinaryEntry("transactionId", i.transactionId)
+         |   ${if (issue) s""", Issue("$TestAssetName", "$TestAssetDesc", $TestAssetVolume, $TestAssetDecimals, $TestAssetReissuable, unit, 0) """
+         else ""}
+         |   ${if (transfersCount > 0) "," else ""}
+         |   ${(1 to transfersCount).map(_ => s"ScriptTransfer(Address(base58'$receiver'), 1, unit)").mkString(",")}
+         | ]
+       """.stripMargin
+    )
+
+  def scenario(
+      enoughFee: Boolean = true,
+      issue: Boolean = true,
+      verifier: Option[Script] = None,
+      sponsor: Boolean = false,
+      version: Byte = 1,
+      transfersCount: Int = 0,
+      sigVerifyCount: Int = 0,
+      bigVerifier: Boolean = false,
+      raiseError: Boolean = false
+  ): (Seq[Transaction], InvokeExpressionTransaction) = {
+    val invoker  = TxHelpers.signer(1)
+    val receiver = TxHelpers.signer(2)
+    val fee      = ciFee(freeCall = enoughFee, nonNftIssue = if (issue) 1 else 0, sc = if (bigVerifier) 1 else 0).sample.get
+
+    val genesis     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, TxHelpers.timestamp).explicitGet()
+    val setVerifier = SetScriptTransaction.selfSigned(TxVersion.V2, invoker, verifier, fee, TxHelpers.timestamp).explicitGet()
+
+    val sponsorIssueTx = IssueTransaction.selfSigned(TxVersion.V2, invoker, "name", "", 1000, 1, true, None, fee, TxHelpers.timestamp).explicitGet()
+    val sponsorAsset   = IssuedAsset(sponsorIssueTx.id.value())
+    val sponsorTx      = SponsorFeeTransaction.selfSigned(TxVersion.V2, invoker, sponsorAsset, Some(1000L), fee, TxHelpers.timestamp).explicitGet()
+    val feeAsset       = if (sponsor) sponsorAsset else Waves
+
+    val call   = makeExpression(invoker, fee, issue, transfersCount, receiver.toAddress, sigVerifyCount, raiseError)
+    val invoke = InvokeExpressionTransaction.selfSigned(version, invoker, call, fee, feeAsset, TxHelpers.timestamp).explicitGet()
+
+    (Seq(genesis, sponsorIssueTx, sponsorTx, setVerifier), invoke)
+  }
+
+  def feeErrorMessage(invoke: InvokeExpressionTransaction, issue: Boolean = false, verifier: Boolean = false): String = {
+    val expectingFee = FeeConstants(invoke.tpe) * FeeUnit + (if (issue) 1 else 0) * 1_0000_0000L + (if (verifier) 1 else 0) * FeeValidation.ScriptExtraFee
+    val issueErr     = if (issue) " with 1 assets issued" else ""
+    val verifierErr  = if (verifier) " with 1 total scripts invoked" else ""
+    s"Fee in WAVES for InvokeExpressionTransaction (${invoke.fee} in WAVES)$issueErr$verifierErr does not exceed minimal value of $expectingFee WAVES."
+  }
+
+  def verifier(version: StdLibVersion): Script =
+    TestCompiler(version).compileExpression(
+      s"""
+         | match tx {
+         |   case _ => true
+         | }
+       """.stripMargin
+    )
+
+  def dAppVerifier(version: StdLibVersion): Script =
+    TestCompiler(version).compileContract(
+      s"""
+         | @Verifier(tx)
+         | func verify() =
+         |   match tx {
+         |     case _ => true
+         |   }
+       """.stripMargin
+    )
+
+  def dAppWithNoVerifier(version: StdLibVersion): Script =
+    TestCompiler(version).compileContract(
+      s"""
+         | @Callable(i)
+         | func default() = if (true) then throw() else throw()
+       """.stripMargin
+    )
+
+  def forbidByTypeVerifier: Script =
+    TestCompiler(V6).compileExpression(
+      s"""
+         | match tx {
+         |   case _: InvokeExpressionTransaction => false
+         |   case _                              => true
+         | }
+       """.stripMargin
+    )
+
+  def forbidAllVerifier: Script =
+    TestCompiler(V6).compileExpression(
+      s"""
+         | match tx {
+         |   case _ => false
+         | }
+       """.stripMargin
+    )
+
+  def bigVerifier: Script =
+    TestCompiler(V6).compileExpression(
+      s"""
+         | strict r = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" && ")}
+         | true
+       """.stripMargin
+    )
 }
