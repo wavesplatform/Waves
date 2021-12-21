@@ -1,7 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import scala.collection.immutable.VectorMap
-
 import cats.instances.either._
 import cats.instances.map._
 import cats.kernel.Monoid
@@ -16,19 +14,22 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.transaction._
+import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
 import com.wavesplatform.transaction.smart._
-import com.wavesplatform.transaction.smart.script.trace.{TracedResult, TraceStep}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json
+
+import scala.collection.immutable.VectorMap
+import scala.util.control.NonFatal
 
 object TransactionDiffer {
   def apply(prevBlockTs: Option[Long], currentBlockTs: Long, verify: Boolean = true)(
@@ -120,6 +121,13 @@ object TransactionDiffer {
             for {
               _ <- validateOrder(blockchain, etx.buyOrder, etx.buyMatcherFee)
               _ <- validateOrder(blockchain, etx.sellOrder, etx.sellMatcherFee)
+
+              // Balance overflow check
+              _ <- if (blockchain.height >= blockchain.settings.functionalitySettings.estimatorSumOverflowFixHeight) {
+                ExchangeTransactionDiff
+                  .getPortfolios(blockchain, etx)
+                  .flatMap(pfs => validateBalance(blockchain, etx.tpe, Diff(portfolios = pfs)))
+              } else Right(())
             } yield ()
           case itx: InvokeScriptTransaction => validatePayments(blockchain, itx)
           case _                            => Right(())
@@ -159,9 +167,14 @@ object TransactionDiffer {
     stats.transactionDiffValidation
       .measureForType(tx.tpe) {
         tx match {
-          case gtx: GenesisTransaction           => GenesisTransactionDiff(blockchain.height)(gtx).traced
-          case ptx: PaymentTransaction           => PaymentTransactionDiff(blockchain)(ptx).traced
-          case ci: InvokeTransaction             => InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(ci)
+          case gtx: GenesisTransaction => GenesisTransactionDiff(blockchain.height)(gtx).traced
+          case ptx: PaymentTransaction => PaymentTransactionDiff(blockchain)(ptx).traced
+          case ci: InvokeTransaction =>
+            try {
+              InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(ci)
+            } catch {
+              case NonFatal(e) => TracedResult(Left(GenericError(s"${e.getMessage}")))
+            }
           case etx: ExchangeTransaction          => ExchangeTransactionDiff(blockchain)(etx).traced
           case itx: IssueTransaction             => AssetTransactionsDiff.issue(blockchain)(itx).traced
           case rtx: ReissueTransaction           => AssetTransactionsDiff.reissue(blockchain, currentBlockTs)(rtx).traced

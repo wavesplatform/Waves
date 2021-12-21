@@ -27,13 +27,6 @@ class DocExportTest extends PropSpec {
       val ctx = buildFullContext(ds)
       val totalFuncDocs = funcDoc(ctx, ds.stdLibVersion)
 
-      totalFuncDocs.filter(_._1.isEmpty).foreach { v =>
-        ctx.functions
-        .filter(_.name == v._2)
-        .foreach { f =>
-          println((f.name, f.signature.args.map(_._2.toString).toList))
-        }
-      }
       val funcsWithoutDocInfo = totalFuncDocs.filter(_._1.isEmpty).map(_._2).mkString(", ")
       funcsWithoutDocInfo shouldBe ""
     }

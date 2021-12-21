@@ -772,7 +772,7 @@ class UtxPoolSpecification
                  |    }
                  | }
                """.stripMargin,
-              ScriptEstimatorV3
+              ScriptEstimatorV3(fixOverflow = true)
             )
             .explicitGet()
             ._1
