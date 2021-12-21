@@ -82,7 +82,6 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
       gTx4     = GenesisTransaction.create(dApp3.toAddress, ENOUGH_AMT, ts).explicitGet()
       gTx5     = GenesisTransaction.create(dApp4.toAddress, ENOUGH_AMT, ts).explicitGet()
       limit    = ContractLimits.MaxWriteSetSizeInBytes - 9
-      _        = ContractLimits.MaxTotalWriteSetSizeInBytes - 9
       size     = if (exceed5Kb) limit + 1 else limit
       ssTx1    = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script(dApp2.toAddress, size, sync)), fee, ts).explicitGet()
       ssTx2    = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp2Script(dApp3.toAddress, size)), fee, ts).explicitGet()
