@@ -51,6 +51,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
 
+//noinspection RedundantDefaultArgument
 class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCacheSettings with EitherValues with Inside with MockFactory {
   import DomainPresets._
 
@@ -619,6 +620,45 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 0L
     }
   })
+
+  property("nested script failure") {
+    val firstDApp = TxHelpers.defaultSigner
+    val secondDApp = TxHelpers.secondSigner
+
+    val firstScript =
+      s"""
+         |@Callable(i)
+         |func test() = {
+         |  strict r = invoke(Address(base58'${secondDApp.toAddress}'), "test", [], [])
+         |  ([], r)
+         |}
+         |""".stripMargin
+    val secondScript =
+      """
+        |@Callable(i)
+        |func test() = throw("test error")
+        |""".stripMargin
+
+    withClue("before V6")(withDomain(DomainPresets.RideV5) { d =>
+      d.helpers.creditWavesToDefaultSigner()
+      d.helpers.creditWavesFromDefaultSigner(secondDApp.toAddress)
+      d.helpers.setScript(firstDApp, TxHelpers.scriptV5(firstScript))
+      d.helpers.setScript(secondDApp, TxHelpers.scriptV5(secondScript))
+
+      val invoke = TxHelpers.invoke(firstDApp.toAddress, "test")
+      d.appendAndCatchError(invoke).toString should include("test error")
+    })
+
+    withClue("after V6")(withDomain(DomainPresets.RideV6) { d =>
+      d.helpers.creditWavesToDefaultSigner()
+      d.helpers.creditWavesFromDefaultSigner(secondDApp.toAddress)
+      d.helpers.setScript(firstDApp, TxHelpers.scriptV5(firstScript))
+      d.helpers.setScript(secondDApp, TxHelpers.scriptV5(secondScript))
+
+      val invoke = TxHelpers.invoke(firstDApp.toAddress, "test")
+      d.appendAndCatchError(invoke).toString should include("test error")
+    })
+  }
 
   property("invoking contract results contract's state") {
     forAll(for {
