@@ -3,7 +3,8 @@ package com.wavesplatform.lang
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.DApp._
-import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.serialization.ContractSerDe
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.protobuf.dapp.DAppMeta

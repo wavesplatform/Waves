@@ -3,8 +3,9 @@ package com.wavesplatform.lang.v1
 import cats.syntax.either._
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.meta.{FunctionSignatures, MetaMapper, ParsedMeta}
-import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
-import com.wavesplatform.lang.directives.values.{Asset, Call, Expression, ScriptType, StdLibVersion, V1, V2, DApp => DAppType}
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.serialization.{LegacyContractSerDe, OptimizedContractSerDe}
+import com.wavesplatform.lang.directives.values.{Asset, Call, Expression, ScriptType, StdLibVersion, V1, V2, V6, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.ScriptReader.FreeCallHeader
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -23,6 +24,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding._
+import com.wavesplatform.lang.v1.serialization.{LegacySerde, OptimizedSerde}
 
 import scala.annotation.tailrec
 import scala.util.Random
@@ -80,15 +82,27 @@ trait BaseGlobal {
 
   def serializeExpression(expr: EXPR, stdLibVersion: StdLibVersion, isFreeCall: Boolean): Array[Byte] = {
     val header = if (isFreeCall) Array(FreeCallHeader) else Array()
-    val s      = header ++ Array(stdLibVersion.id.toByte) ++ Serde.serialize(expr)
+    val serde = if (stdLibVersion < V6) {
+      LegacySerde
+    } else {
+      OptimizedSerde
+    }
+    val s      = header ++ Array(stdLibVersion.id.toByte) ++ serde.serialize(expr)
     s ++ checksum(s)
   }
 
-  def serializeContract(c: DApp, stdLibVersion: StdLibVersion): Either[String, Array[Byte]] =
-    ContractSerDe
+  def serializeContract(c: DApp, stdLibVersion: StdLibVersion): Either[String, Array[Byte]] = {
+    val contractSerDe = if (stdLibVersion < V6) {
+      LegacyContractSerDe
+    } else {
+      OptimizedContractSerDe
+    }
+
+    contractSerDe
       .serialize(c)
       .map(Array(0: Byte, DAppType.id.toByte, stdLibVersion.id.toByte) ++ _)
       .map(r => r ++ checksum(r))
+  }
 
   def parseAndCompileExpression(
       input: String,

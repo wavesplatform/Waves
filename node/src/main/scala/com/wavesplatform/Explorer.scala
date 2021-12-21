@@ -3,14 +3,12 @@ package com.wavesplatform
 import java.io.{File, FileWriter}
 import java.nio.ByteBuffer
 import java.util
-
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressPortfolio
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.database._
-import com.wavesplatform.lang.contract.ContractSerDe
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -312,13 +310,13 @@ object Explorer extends ScorexLogging {
                 case ContractScriptImpl(_, expr) =>
                   val compactedExpr = ContractScriptCompactor.compact(expr)
 
-                  val oldSize = ContractSerDe.serialize(expr).explicitGet().length
-                  val newSize = ContractSerDe.serializeOptimized(expr).explicitGet().length
+//                  val oldSize = ContractSerDe.serialize(expr).explicitGet().length
+//                  val newSize = ContractSerDe.serializeOptimized(expr).explicitGet().length
+//
+//                  val oldCompSize = ContractSerDe.serialize(compactedExpr).explicitGet().length
+//                  val newCompSize = ContractSerDe.serializeOptimized(compactedExpr).explicitGet().length
 
-                  val oldCompSize = ContractSerDe.serialize(compactedExpr).explicitGet().length
-                  val newCompSize = ContractSerDe.serializeOptimized(compactedExpr).explicitGet().length
-
-                  writer.write(s"$oldSize;$newSize;$oldCompSize;$newCompSize\n")
+                 // writer.write(s"$oldSize;$newSize;$oldCompSize;$newCompSize\n")
                 case _ => ()
               }
             }

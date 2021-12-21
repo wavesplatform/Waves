@@ -1,9 +1,9 @@
 package com.wavesplatform.lang.v1
 
 import java.util.concurrent.TimeUnit
-
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.LangSerdeBenchmark.St
+import com.wavesplatform.lang.v1.serialization.Serde
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 

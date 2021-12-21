@@ -1,11 +1,12 @@
 package com.wavesplatform.lang.script
 
 import com.wavesplatform.lang.ValidationError.ScriptParseError
-import com.wavesplatform.lang.contract.ContractSerDe
+import com.wavesplatform.lang.contract.serialization.{LegacyContractSerDe, OptimizedContractSerDe}
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.{BaseGlobal, Serde}
+import com.wavesplatform.lang.v1.BaseGlobal
+import com.wavesplatform.lang.v1.serialization.{LegacySerde, OptimizedSerde}
 
 object ScriptReader {
   val FreeCallHeader: Byte = -1
@@ -43,13 +44,23 @@ object ScriptReader {
       _ <- Either.cond(java.util.Arrays.equals(checkSum, computedCheckSum), (), ScriptParseError("Invalid checksum"))
       s <- (scriptType match {
         case Expression | Library =>
+          val serde = if (stdLibVersion < V6) {
+            LegacySerde
+          } else {
+            OptimizedSerde
+          }
           for {
-            bytes <- Serde.deserialize(scriptBytes).map(_._1)
+            bytes <- serde.deserialize(scriptBytes).map(_._1)
             s     <- ExprScript(stdLibVersion, bytes, isFreeCall, checkSize = false)
           } yield s
         case DApp =>
+          val contractSerDe = if (stdLibVersion < V6) {
+            LegacyContractSerDe
+          } else {
+            OptimizedContractSerDe
+          }
           for {
-            dapp <- ContractSerDe.deserialize(scriptBytes)
+            dapp <- contractSerDe.deserialize(scriptBytes)
             s    <- ContractScript(stdLibVersion, dapp)
           } yield s
       }).left

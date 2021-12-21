@@ -5,8 +5,8 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.{ContractScript, ScriptReader}
-import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.serialization.Serde
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.test._
 import com.wavesplatform.test.PropSpec

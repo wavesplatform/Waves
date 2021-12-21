@@ -7,7 +7,7 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.Serde.{FH_NATIVE, FH_USER}
+import com.wavesplatform.lang.v1.serialization.Serde.{FH_NATIVE, FH_USER}
 
 object Serialize {
   implicit class ByteBufferOps(val self: ByteBuffer) extends AnyVal {

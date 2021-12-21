@@ -1,7 +1,6 @@
 package com.wavesplatform.api.http
 
 import java.security.SecureRandom
-
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.syntax.either._
 import cats.syntax.semigroup._
@@ -28,9 +27,10 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
+import com.wavesplatform.lang.v1.serialization.LegacySerde
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
@@ -323,7 +323,7 @@ object UtilsApiRoute {
     }
 
     def parseBinaryCall(bs: ByteStr): Either[ValidationError, EXPR] = {
-      Serde
+      LegacySerde
         .deserialize(bs.arr)
         .left
         .map(GenericError(_))

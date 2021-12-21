@@ -16,7 +16,6 @@ import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, _}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.RestAPISettings
@@ -34,8 +33,8 @@ import play.api.libs.json._
 
 import scala.concurrent.Future
 import scala.util.Success
-
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
+import com.wavesplatform.lang.v1.serialization.LegacySerde
 
 case class TransactionsApiRoute(
     settings: RestAPISettings,
@@ -311,7 +310,7 @@ object TransactionsApiRoute {
             .map(_.payload)
             .collect {
               case Payload.Invocation(i) =>
-                val functionCallEi = Serde.deserializeFunctionCall(i.functionCall.toByteArray).map(InvokeScriptTxSerializer.functionCallToJson)
+                val functionCallEi = LegacySerde.deserializeFunctionCall(i.functionCall.toByteArray).map(InvokeScriptTxSerializer.functionCallToJson)
                 val payments       = i.payments.map(p => InvokeScriptTransaction.Payment(p.amount, PBAmounts.toVanillaAssetId(p.assetId)))
                 Json.obj(
                   "type"         -> "invocation",
