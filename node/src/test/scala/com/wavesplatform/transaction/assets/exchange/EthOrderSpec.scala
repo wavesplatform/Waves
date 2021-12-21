@@ -20,9 +20,10 @@ class EthOrderSpec
     with EthHelpers
     with EthSetChainId
     with DiffMatchers {
+
   val ethBuyOrder = Order(
     Order.V4,
-    TestEthPublicKey,
+    TestEthOrdersPublicKey,
     TxHelpers.matcher.publicKey,
     AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
     OrderType.BUY,
@@ -39,7 +40,7 @@ class EthOrderSpec
 
   val ethSellOrder = Order(
     Order.V4,
-    TestEthPublicKey,
+    TestEthOrdersPublicKey,
     TxHelpers.matcher.publicKey,
     AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
     OrderType.SELL,
@@ -75,8 +76,8 @@ class EthOrderSpec
       )
 
     val result = EthOrders.recoverEthSignerKey(testOrder, signature)
-    result shouldBe TestEthPublicKey
-    result.toAddress shouldBe TestEthPublicKey.toAddress
+    result shouldBe TestEthOrdersPublicKey
+    result.toAddress shouldBe TestEthOrdersPublicKey.toAddress
   }
 
   it should "be of version 4" in {
@@ -126,7 +127,7 @@ class EthOrderSpec
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      sh.creditBalance(TestEthPublicKey.toAddress, *)
+      sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
@@ -140,7 +141,7 @@ class EthOrderSpec
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      sh.creditBalance(TestEthPublicKey.toAddress, *)
+      sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
@@ -168,7 +169,7 @@ class EthOrderSpec
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      sh.creditBalance(TestEthPublicKey.toAddress, *)
+      sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
@@ -192,7 +193,7 @@ class EthOrderSpec
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      sh.creditBalance(TestEthPublicKey.toAddress, *)
+      sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
 
       // TODO: something more smart ?
       val script = TxHelpers.script("""
@@ -228,7 +229,7 @@ class EthOrderSpec
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      sh.creditBalance(TestEthPublicKey.toAddress, *)
+      sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(

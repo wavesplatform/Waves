@@ -31,12 +31,13 @@ object InvokeScriptTxSerializer {
     )
   }
 
-  private def mapSingleArg(arg: EXPR) =
+  private def mapSingleArg(arg: EXPR): JsObject =
     arg match {
       case Terms.CONST_LONG(num)      => Json.obj("type" -> "integer", "value" -> num)
       case Terms.CONST_BOOLEAN(bool)  => Json.obj("type" -> "boolean", "value" -> bool)
       case Terms.CONST_BYTESTR(bytes) => Json.obj("type" -> "binary", "value" -> bytes.base64)
       case Terms.CONST_STRING(str)    => Json.obj("type" -> "string", "value" -> str)
+      case Terms.ARR(_)               => Json.obj("type" -> "list", "value" -> "unsupported") // should not be shown on normal cases, added only to avoid NotImplementedError while constructing error for illegal callable argument type
       case arg                        => throw new NotImplementedError(s"Not supported: $arg")
     }
 
