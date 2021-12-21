@@ -1057,7 +1057,7 @@ class ContractCompilerTest extends PropSpec {
         |
       """.stripMargin
 
-    Global.compileContract(dApp, dAppV4Ctx, V4, ScriptEstimatorV3, false, false) should produce("Script is too large: 37551 bytes > 32768 bytes")
+    Global.compileContract(dApp, dAppV4Ctx, V4, ScriptEstimatorV3(fixOverflow = true), false, false) should produce("Script is too large: 37551 bytes > 32768 bytes")
   }
 
   property("@Callable Invoke") {
@@ -1175,5 +1175,46 @@ class ContractCompilerTest extends PropSpec {
         | }
       """.stripMargin
     ) should produce("Non-matching types: expected: ByteVector, actual: ByteVector|Unit")
+  }
+
+  property("JsAPI compiles dApp with no errors") {
+    Global.compileContract(
+      """
+        |
+        |func xxx() = {
+        |  let some = 1 + 2
+        |  some
+        |}
+        |
+        |func yyy() = {
+        |  xxx()
+        |}
+        |
+        |let z1 = 1
+        |let z2 = xxx() + yyy()
+        |let z3 = z1 + z2
+        |
+        |@Callable(i)
+        |func call() = {
+        |  let a = xxx()
+        |  let b = yyy()
+        |  let c = z3
+        |  []
+        |}
+        |
+        |@Verifier(t)
+        |func v() = {
+        |  let a = xxx()
+        |  let b = yyy()
+        |  let c = z3
+        |  true
+        |}
+      """.stripMargin,
+      getTestContext(V4).compilerContext,
+      V4,
+      ScriptEstimatorV3(fixOverflow = true),
+      false,
+      false
+    ) shouldBe Symbol("right")
   }
 }

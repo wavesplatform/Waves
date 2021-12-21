@@ -9,8 +9,11 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressPortfolio
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.database.{AddressId, DBExt, KeyTags, Keys, LevelDBWriter, loadTransactions, openDB, readTransactionHNSeqAndType}
+import com.wavesplatform.database._
+import com.wavesplatform.lang.script.ContractScript
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.settings.Constants
+import com.wavesplatform.state.diffs.{DiffsCommon, SetScriptTransactionDiff}
 import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
@@ -218,7 +221,7 @@ object Explorer extends ScorexLogging {
           }
 
         case "TXBH" =>
-          val h = Height(argument(1, "height").toInt)
+          val h   = Height(argument(1, "height").toInt)
           val txs = db.readOnly(loadTransactions(h, _))
 
           println(txs.length)
@@ -259,7 +262,23 @@ object Explorer extends ScorexLogging {
             case (count, id) =>
               log.info(s"${db.get(Keys.idToAddress(AddressId(id.toLong)))}: $count")
           }
+        case "ES" =>
+          db.iterateOver(KeyTags.AddressScript) { e =>
+            val asi = readAccountScriptInfo(e.getValue)
+            val estimationResult = asi.script match {
+              case ContractScript.ContractScriptImpl(stdLibVersion, expr) =>
+                SetScriptTransactionDiff.estimate(reader, stdLibVersion, expr, checkOverflow = true)
+              case script: ExprScript =>
+                DiffsCommon.countVerifierComplexity(Some(script), reader, isAsset = false)
+              case _ => ???
+            }
 
+            estimationResult.left.foreach { error =>
+              val addressId = Longs.fromByteArray(e.getKey.drop(2).dropRight(4))
+              val address   = db.get(Keys.idToAddress(AddressId(addressId)))
+              log.info(s"$address: $error")
+            }
+          }
 
         case "CSAI" =>
           val PrefixLength = argument(1, "prefix").toInt

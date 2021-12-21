@@ -123,7 +123,7 @@ class RemoveEntrySuite extends BaseFreeSpec {
     val compiledScript = ScriptCompiler
       .compile(
         script,
-        ScriptEstimatorV3
+        ScriptEstimatorV3(fixOverflow = true)
       )
       .explicitGet()
       ._1
