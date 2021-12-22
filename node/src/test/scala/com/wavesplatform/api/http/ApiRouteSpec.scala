@@ -11,8 +11,8 @@ import play.api.libs.json.JsObject
 
 import scala.concurrent.Future
 
-class ApiRouteSpec extends RouteSpec("/test") with RestAPISettingsHelper {
-  import akka.http.scaladsl.server.Directives._
+class ApiRouteSpec extends RouteSpec("/test") with RestAPISettingsHelper with ApiMarshallers {
+  import akka.http.scaladsl.server.Directives.*
   implicit val scheduler: Scheduler = monix.execution.Scheduler.Implicits.global
 
   class ApiRouteWithSettings(prefix: String, action: => ToResponseMarshallable, val settings: RestAPISettings = restAPISettings)
@@ -25,14 +25,14 @@ class ApiRouteSpec extends RouteSpec("/test") with RestAPISettingsHelper {
   private val compositeRoute = concat(
     new ApiRouteWithSettings("soe", throw new StackOverflowError()).route,
     new ApiRouteWithSettings("re", throw new RuntimeException()).route,
-    new ApiRouteWithSettings("taskSoe", Task(throw new StackOverflowError()).runToFuture).route,
-    new ApiRouteWithSettings("taskRe", Task(throw new RuntimeException()).runToFuture).route,
+    new ApiRouteWithSettings("taskSoe", Task[ToResponseMarshallable](throw new StackOverflowError()).runToFuture).route,
+    new ApiRouteWithSettings("taskRe", Task[ToResponseMarshallable](throw new RuntimeException()).runToFuture).route,
     new ApiRouteWithSettings("coevalSoe", Coeval[ToResponseMarshallable](throw new StackOverflowError()).value()).route,
     new ApiRouteWithSettings("coevalRe", Coeval[ToResponseMarshallable](throw new RuntimeException()).value()).route,
-    new ApiRouteWithSettings("futureRe", Future(throw new RuntimeException())).route,
-    new ApiRouteWithSettings("taskExecuteAsyncRe", Task(throw new RuntimeException()).executeAsync.runToFuture).route,
-    new ApiRouteWithSettings("taskEvalAsyncRe", Task.evalAsync(throw new RuntimeException()).runToFuture).route,
-    new ApiRouteWithSettings("taskFromFutureRe", Task.deferFuture(Future(throw new RuntimeException())).runToFuture).route
+    new ApiRouteWithSettings("futureRe", Future[ToResponseMarshallable](throw new RuntimeException())).route,
+    new ApiRouteWithSettings("taskExecuteAsyncRe", Task[ToResponseMarshallable](throw new RuntimeException()).executeAsync.runToFuture).route,
+    new ApiRouteWithSettings("taskEvalAsyncRe", Task.evalAsync[ToResponseMarshallable](throw new RuntimeException()).runToFuture).route,
+    new ApiRouteWithSettings("taskFromFutureRe", Task.deferFuture(Future[ToResponseMarshallable](throw new RuntimeException())).runToFuture).route
   )
 
   "StackOverflowError in API should be caught" in {

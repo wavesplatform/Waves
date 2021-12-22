@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1.estimator
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.test._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.FunctionHeader.Native
@@ -9,8 +8,15 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
+import com.wavesplatform.test._
 
-class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
+import scala.collection.immutable.ArraySeq
+
+class ScriptEstimatorV3Test
+    extends ScriptEstimatorTestBase(
+      ScriptEstimatorV3(fixOverflow = true),
+      ScriptEstimatorV3(fixOverflow = false)
+    ) {
   property("multiple func calls") {
     val script =
       """
@@ -35,13 +41,13 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
       cost(cond) = cost(h) + cost(f) + cost(g) + 5 = 43
       cost(then) = cost(h) + cost(f) + cost(g) + 5 = 43
       cost(else) = cost(h) + cost(f) + cost(g) + 7 = 45
-    */
+     */
     estimate(functionCosts(V3), compile(script)) shouldBe Right(
       43 /* cond         */ +
-      45 /* else         */ +
-      1  /* if-then-else */ +
-      1  /* let a        */ +
-      3  /* let b        */
+        45 /* else         */ +
+        1 /* if-then-else */ +
+        1 /* let a        */ +
+        3 /* let b        */
     )
   }
 
@@ -67,23 +73,23 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
 
     estimate(functionCosts(V3), compile(script)) shouldBe Right(
       1 /* if-then-else                      */ +
-      3 /* a == b    condition               */ +
-      5 /* d + y + 1 expr inside else block  */ +
-      1 /* let y     decl inside else block  */ +
-      3 /* let a     decl used in condition  */ +
-      1 /* let b     decl used in condition  */ +
-      7 /* let c     decl used in then       */ +
-      1 /* let d     decl used in else       */
-        /* let e     unused decl             */
+        3 /* a == b    condition               */ +
+        5 /* d + y + 1 expr inside else block  */ +
+        1 /* let y     decl inside else block  */ +
+        3 /* let a     decl used in condition  */ +
+        1 /* let b     decl used in condition  */ +
+        7 /* let c     decl used in then       */ +
+        1 /* let d     decl used in else       */
+      /* let e     unused decl             */
     )
   }
 
   property("big function call tree") {
     val n = 100
     val script =
-     s"""
+      s"""
         | func f0() = 0
-        | ${(0 until n).map(i => s"func f${i + 1}() = if (true) then f$i() else f$i()").mkString("\n") }
+        | ${(0 until n).map(i => s"func f${i + 1}() = if (true) then f$i() else f$i()").mkString("\n")}
         | f$n()
       """.stripMargin
 
@@ -93,7 +99,7 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
       cost(f1) = cost(cond) + cost(true) + cost(f0) = 1 + 1 + 1 = 1 * 2 + 1
       cost(f2) = cost(cond) + cost(true) + cost(f1) = 1 + 1 + 3 = 2 * 2 + 1
       cost(fn) = n * 2 + 1
-    */
+   */
   }
 
   property("overlapped func") {
@@ -132,7 +138,7 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
       """.stripMargin
 
     estimate(functionCosts(V3), compile(script)) shouldBe Right(
-        1 /* let a                      */ +
+      1 /* let a                      */ +
         1 /* let b                      */ +
         1 /* if-then-else               */ +
         3 /* a == 1         condition   */ +
@@ -148,15 +154,15 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
   }
 
   property("groth16Verify_Ninputs") {
-    implicit val version : StdLibVersion = V4
-    val c = Array(1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500, 2600)
+    implicit val version: StdLibVersion = V4
+    val c                               = Array(1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500, 2600)
     for { (c, n) <- c.zipWithIndex } {
-      estimate(functionCosts(V4), compile(s"groth16Verify_${n+1}inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')")) shouldBe Right(c + 3)
+      estimate(functionCosts(V4), compile(s"groth16Verify_${n + 1}inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')")) shouldBe Right(c + 3)
     }
   }
 
   property("groth16Verify") {
-    implicit val version : StdLibVersion = V4
+    implicit val version: StdLibVersion = V4
     estimate(functionCosts(V4), compile("groth16Verify(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')")) shouldBe Right(2703)
   }
 
@@ -194,5 +200,19 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
     estimate(functionCosts(V5), expr(FunctionIds.CALLDAPPREENTRANT)) should produce("not found")
     estimate(functionCosts(V5, DApp), expr(FunctionIds.CALLDAPP)) shouldBe Right(79)
     estimate(functionCosts(V5, DApp), expr(FunctionIds.CALLDAPPREENTRANT)) shouldBe Right(79)
+  }
+
+  property("overflow on sum of function args costs") {
+    val n = 62
+    val script =
+      s"""
+         | func f0() = true
+         | ${(0 until n).map(i => s"func f${i + 1}() = if (f$i()) then f$i() else f$i()").mkString("\n")}
+         |
+         | func g(a: Boolean, b: Boolean, c: Boolean) = true
+         |
+         | g(f$n(), f$n(), true)
+       """.stripMargin
+    estimate(functionCosts(V3), compile(script)) shouldBe Left(s"Estimators discrepancy: ${ArraySeq(Left("Illegal script"), Right(0))}")
   }
 }

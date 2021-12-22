@@ -15,7 +15,7 @@ import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
@@ -26,10 +26,9 @@ import com.wavesplatform.utx.UtxPool
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
-import play.api.libs.json._
+import play.api.libs.json.*
 
 class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestAPISettingsHelper with MockFactory with OptionValues with TestWallet {
-  import com.wavesplatform.api.http.ApiMarshallers._
 
   private val MinFee: Long            = (0.001 * Constants.UnitsInWave).toLong
   private val DataTxFee: Long         = 15000000

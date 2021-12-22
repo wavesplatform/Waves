@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.lang.{Common, Global}
-import com.wavesplatform.settings.TestSettings
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ci._
 import com.wavesplatform.test._
@@ -346,8 +346,9 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
            |""".stripMargin
 
       val blockchain = stub[Blockchain]
+      (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
       (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
-      (() => blockchain.settings).when().returning(TestSettings.Default.blockchainSettings)
+      (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
 
       val result = runScriptWithCustomContext(script, t, V4, blockchain)
       result shouldBe evaluated(true)

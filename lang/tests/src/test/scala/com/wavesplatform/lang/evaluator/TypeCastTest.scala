@@ -92,4 +92,15 @@ class TypeCastTest extends EvaluatorSpec {
   property("generic function error") {
     eval("func f(a: Any) = a.some[Int]") should produce("Can't find a generic function some[T]")
   }
+
+  property("type casts in one scope") {
+    eval(
+      """
+        |func f() = true
+        |func g() = f().as[Boolean]
+        |let a    = g().exactAs[Boolean] && f().exactAs[Boolean]
+        |a.as[Boolean]
+      """.stripMargin
+    ) shouldBe Right(CONST_BOOLEAN(true))
+  }
 }

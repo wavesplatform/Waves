@@ -48,7 +48,7 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: M
 
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[F, C, (EvaluationContext[C, F], EVALUATED)] = {
     val funcHeader = FunctionHeader.User(func.name)
-    val function = UserFunction(func.name, 0, NOTHING, func.args.map(n => (n, NOTHING)): _*)(func.body)
+    val function = UserFunction(func.name, 0, NOTHING, func.args.map(n => (n, NOTHING))*)(func.body)
         .asInstanceOf[UserFunction[C]]
     local {
       modify[F, LoggedEvaluationContext[C, F], ExecutionError](funcs.modify(_)(_.updated(funcHeader, function)))

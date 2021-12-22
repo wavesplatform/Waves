@@ -51,7 +51,7 @@ class IsDataStorageUntouchedTest extends PropSpec with WithDomain {
   property("isDataStorageUntouched true") {
     val (genesisTxs, _, _, invokeTx, dApp) = scenario.sample.get
     withDomain(RideV5) { d =>
-      d.appendBlock(genesisTxs: _*)
+      d.appendBlock(genesisTxs*)
       d.appendBlock(invokeTx)
       d.blockchain.accountData(dApp, "virgin") shouldBe Some(BooleanDataEntry("virgin", true))
     }
@@ -60,7 +60,7 @@ class IsDataStorageUntouchedTest extends PropSpec with WithDomain {
   property("isDataStorageUntouched false") {
     val (genesisTxs, dataTx, _, invokeTx, dApp) = scenario.sample.get
     withDomain(RideV5) { d =>
-      val genesis = d.appendBlock(genesisTxs: _*).id()
+      val genesis = d.appendBlock(genesisTxs*).id()
 
       d.appendBlock(dataTx)
       d.appendBlock(invokeTx)
@@ -75,7 +75,7 @@ class IsDataStorageUntouchedTest extends PropSpec with WithDomain {
   property("isDataStorageUntouched false after delete") {
     val (genesisTxs, dataTx, deleteDataTx, invokeTx, dApp) = scenario.sample.get
     withDomain(RideV5) { d =>
-      val genesis = d.appendBlock(genesisTxs: _*).id()
+      val genesis = d.appendBlock(genesisTxs*).id()
 
       d.appendBlock(dataTx, deleteDataTx)
       d.appendBlock(invokeTx)
@@ -122,7 +122,7 @@ class IsDataStorageUntouchedTest extends PropSpec with WithDomain {
 
     val (genesisTxs, invokeTx) = scenario.sample.get
     withDomain(RideV5) { d =>
-      d.appendBlock(genesisTxs: _*).id()
+      d.appendBlock(genesisTxs*).id()
       d.appendBlock(invokeTx)
       d.blockchain.accountData(invokeTx.dApp.asInstanceOf[Address], "start") shouldBe Some(BooleanDataEntry("start", true))
       d.blockchain.accountData(invokeTx.dApp.asInstanceOf[Address], "end") shouldBe Some(BooleanDataEntry("end", false))

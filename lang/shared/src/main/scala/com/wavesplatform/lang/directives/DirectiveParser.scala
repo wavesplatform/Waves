@@ -11,20 +11,20 @@ object DirectiveParser {
   val start = "{-#"
   val end   = "#-}"
 
-  private def space[_: P]: P[Unit] =
+  private def space[A: P]: P[Unit] =
     P(CharIn(" ", "\t", "\r", "\n").rep)
 
-  private def directiveKeyP[_: P]: P[String] =
+  private def directiveKeyP[A: P]: P[String] =
     P(CharIn("a-zA-Z0-9_"))
       .repX(1)
       .!
 
-  private def directiveValueP[_: P]: P[String] =
+  private def directiveValueP[A: P]: P[String] =
     P(CharIn("a-zA-Z0-9/\\., "))
       .repX(1)
       .!
 
-  private def parser[_: P]: P[Either[ExecutionError, Directive]] =
+  private def parser[A: P]: P[Either[ExecutionError, Directive]] =
     P(space ~ start ~ directiveKeyP ~ directiveValueP ~ end ~ space)
       .map {
         case (parsedKey, parsedValue) => {

@@ -12,14 +12,14 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.diffs.smart.predef.{assertProvenPart, provenPart}
 import com.wavesplatform.test.{PropSpec, TestTime}
+import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, GenesisTransaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, GenesisTransaction}
-import com.wavesplatform.utils.EthHelpers
+import com.wavesplatform.utils.{EthHelpers, EthSetChainId}
 
-class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers {
+class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers with EthSetChainId {
   import DomainPresets._
 
   private val time = new TestTime
@@ -79,7 +79,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
       token   <- Seq(None, Some(ERC20Address(asset.id.take(20))))
     } {
       val transfer    = EthereumTransaction.Transfer(token, transferAmount, recipient.toAddress)
-      val ethTransfer = EthereumTransaction(transfer, TestEthUnderlying, TestEthSignature, 'T'.toByte)
+      val ethTransfer = EthereumTransaction(transfer, TestEthRawTransaction, TestEthSignature, 'E'.toByte)
       val ethSender   = ethTransfer.senderAddress()
       val preTransfer = TransferTransaction.selfSigned(2.toByte, recipient, ethSender, asset, ENOUGH_AMT, Waves, fee, ByteStr.empty, ts).explicitGet()
 
@@ -120,7 +120,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
     val recipient = accountGen.sample.get
 
     val dummyTransfer    = EthereumTransaction.Transfer(None, transferAmount, recipient.toAddress)
-    val dummyEthTransfer = EthereumTransaction(dummyTransfer, TestEthUnderlying, TestEthSignature, 'T'.toByte) // needed to pass into asset script
+    val dummyEthTransfer = EthereumTransaction(dummyTransfer, TestEthRawTransaction, TestEthSignature, 'E'.toByte) // needed to pass into asset script
     val ethSender        = dummyEthTransfer.senderAddress()
 
     val genesis1 = GenesisTransaction.create(ethSender, ENOUGH_AMT, ts).explicitGet()

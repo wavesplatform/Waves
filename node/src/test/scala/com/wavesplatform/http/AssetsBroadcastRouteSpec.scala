@@ -3,24 +3,23 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.RequestGen
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
-import com.wavesplatform.api.http.ApiError._
-import com.wavesplatform.api.http._
-import com.wavesplatform.api.http.assets._
+import com.wavesplatform.api.http.ApiError.*
+import com.wavesplatform.api.http.assets.*
 import com.wavesplatform.api.http.requests.{SignedTransferV1Request, SignedTransferV2Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.test._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
-import com.wavesplatform.utils.{Time, _}
+import com.wavesplatform.utils.{Time, *}
 import com.wavesplatform.wallet.Wallet
-import org.scalacheck.{Gen => G}
+import org.scalacheck.Gen as G
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json._
+import play.api.libs.json.*
 
 class AssetsBroadcastRouteSpec
     extends RouteSpec("/assets/broadcast/")
@@ -48,7 +47,7 @@ class AssetsBroadcastRouteSpec
   } yield tx
 
   "returns StateCheckFailed" - {
-    val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
+    val vt = Table[String, G[? <: Transaction], JsValue => JsValue](
       ("url", "generator", "transform"),
       ("issue", fixedIssueGen, identity),
       ("reissue", reissueGen.retryUntil(_.version == 1), identity),
@@ -236,7 +235,7 @@ class AssetsBroadcastRouteSpec
   }
 
   protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferV1Request = {
-    import tx._
+    import tx.*
     SignedTransferV1Request(
       Base58.encode(tx.sender.arr),
       assetId.maybeBase58Repr,
@@ -251,7 +250,7 @@ class AssetsBroadcastRouteSpec
   }
 
   protected def createSignedVersionedTransferRequest(tx: TransferTransaction): SignedTransferV2Request = {
-    import tx._
+    import tx.*
     SignedTransferV2Request(
       Base58.encode(tx.sender.arr),
       assetId.maybeBase58Repr,

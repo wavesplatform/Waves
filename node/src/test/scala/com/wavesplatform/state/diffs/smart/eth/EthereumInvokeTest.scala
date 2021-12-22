@@ -19,14 +19,14 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.diffs.smart.predef.{assertProvenPart, provenPart}
 import com.wavesplatform.test.{PropSpec, TestTime}
+import com.wavesplatform.transaction.{ABIConverter, Asset, EthereumTransaction, GenesisTransaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{ABIConverter, Asset, EthereumTransaction, GenesisTransaction}
-import com.wavesplatform.utils.EthHelpers
+import com.wavesplatform.utils.{EthHelpers, EthSetChainId}
 
-class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
+class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with EthSetChainId {
   import DomainPresets._
 
   private val time = new TestTime
@@ -109,7 +109,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
     val dApp2 = accountGen.sample.get
 
     val dummyInvoke    = EthereumTransaction.Invocation(dApp.toAddress, "")
-    val dummyEthInvoke = EthereumTransaction(dummyInvoke, TestEthUnderlying, TestEthSignature, 'T'.toByte) // needed to pass into asset script
+    val dummyEthInvoke = EthereumTransaction(dummyInvoke, TestEthRawTransaction, TestEthSignature, 'E'.toByte) // needed to pass into asset script
     val invoker        = dummyEthInvoke.senderAddress()
     val invokerPk      = dummyEthInvoke.signerPublicKey()
 
