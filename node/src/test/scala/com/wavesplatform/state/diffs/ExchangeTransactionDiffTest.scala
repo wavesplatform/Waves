@@ -1291,7 +1291,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           )
         )
       ) { d =>
-        d.appendBlock(Seq(amountAssetIssue, priceAssetIssue, order1FeeAssetIssue, order2FeeAssetIssue).distinct: _*)
+        d.appendBlock(Seq(amountAssetIssue, priceAssetIssue, order1FeeAssetIssue, order2FeeAssetIssue).distinct*)
         val newBlock = d.createBlock(2.toByte, Seq(exchange))
         val diff = BlockDiffer
           .fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited, newBlock.header.generationSignature)
@@ -1366,7 +1366,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           TestFunctionalitySettings.withFeatures(BlockchainFeatures.SmartAssets, BlockchainFeatures.SmartAccountTrading, BlockchainFeatures.OrderV3)
         )
       ) { d =>
-        d.appendBlock(Seq(tradeableAssetIssue, feeAssetIssue).distinct: _*)
+        d.appendBlock(Seq(tradeableAssetIssue, feeAssetIssue).distinct*)
         val newBlock = d.createBlock(2.toByte, Seq(exchange))
         val diff = BlockDiffer
           .fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited, newBlock.header.generationSignature)

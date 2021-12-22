@@ -24,7 +24,7 @@ case class PlayJsonException(
     with NoStackTrace
 
 trait ApiMarshallers extends JsonFormats {
-  import akka.http.scaladsl.marshalling.PredefinedToResponseMarshallers._
+  import akka.http.scaladsl.marshalling.PredefinedToResponseMarshallers.*
 
   implicit lazy val ApiErrorMarshaller: ToResponseMarshaller[ApiError] =
     fromStatusCodeAndValue[StatusCode, JsValue].compose(ae => (ae.code, ae.json))

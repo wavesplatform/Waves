@@ -230,7 +230,7 @@ class EthereumTransactionSpec
     val blockchain = createBlockchainStub { blockchain =>
       // Activate all features except ride v6
       val features = BlockchainFeatures.implemented.collect { case id if id != BlockchainFeatures.RideV6.id => BlockchainFeatures.feature(id) }.flatten
-      blockchain.stub.activateFeatures(features.toSeq: _*)
+      blockchain.stub.activateFeatures(features.toSeq*)
     }
     val differ = blockchain.stub.transactionDiffer().andThen(_.resultE)
 

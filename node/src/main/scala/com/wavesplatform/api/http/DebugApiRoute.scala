@@ -104,9 +104,9 @@ case class DebugApiRoute(
           .runToFuture
           .map {
             case l if accept.exists(_.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings)) =>
-              Json.obj(l.map { case (address, balance) => address.toString -> (balance.toString: JsValueWrapper) }: _*)
+              Json.obj(l.map { case (address, balance) => address.toString -> (balance.toString: JsValueWrapper) }*)
             case l =>
-              Json.obj(l.map { case (address, balance) => address.toString -> (balance: JsValueWrapper) }: _*)
+              Json.obj(l.map { case (address, balance) => address.toString -> (balance: JsValueWrapper) }*)
           }
       )
     }

@@ -38,7 +38,7 @@ object Functions {
       Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 10L),
       internalName,
       UNION(dataType.innerType, UNIT),
-      args: _*
+      args*
     ) {
       def getData[F[_]: Monad](env: Environment[F], addressOrAlias: CaseObj, key: String) = {
         val environmentFunctions = new EnvironmentFunctions[F](env)
@@ -643,7 +643,7 @@ object Functions {
       ExtractedFuncPrefix ++ f.header.toString,
       f.costByLibVersionMap,
       f.signature.result.asInstanceOf[UNION].typeList.find(_ != UNIT).get,
-      args: _*
+      args*
     ) {
       val extractF = if (version >= V4) PureContext.value else PureContext.extract
       FUNCTION_CALL(extractF, List(FUNCTION_CALL(f.header, args.map(a => REF(a._1)).toList)))

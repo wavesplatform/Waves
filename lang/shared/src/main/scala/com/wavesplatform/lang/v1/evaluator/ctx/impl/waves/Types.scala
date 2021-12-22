@@ -215,7 +215,7 @@ object Types {
     ) ::: callableTypes(version)
 
   private val callableV3ReturnType =
-    UNION(callableV3Results: _*)
+    UNION(callableV3Results*)
 
   private val callableV4ReturnType = {
     val actions = LIST(UNION.create(commonDataEntryType(V4) :: deleteDataEntry :: scriptTransfer :: callableV4Actions))

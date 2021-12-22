@@ -312,9 +312,9 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     val keys      = Seq("int", "bool", "int", "blob", "?&$#^123\\/.a:;'\"\r\n\t\u0000|%è&", "str", "inexisted_key", tooBigKey)
     val values    = Seq[Any](-127, false, -127, ByteStr(Array[Byte](127.toByte, 0, 1, 1)), "specïal", "BBBB")
 
-    val list     = sender.getDataList(secondAddress, keys: _*).map(_.value)
-    val jsonList = sender.getDataListJson(secondAddress, keys: _*).map(_.value)
-    val postList = sender.getDataListPost(secondAddress, keys: _*).map(_.value)
+    val list     = sender.getDataList(secondAddress, keys*).map(_.value)
+    val jsonList = sender.getDataListJson(secondAddress, keys*).map(_.value)
+    val postList = sender.getDataListPost(secondAddress, keys*).map(_.value)
 
     list shouldBe values
     jsonList shouldBe list

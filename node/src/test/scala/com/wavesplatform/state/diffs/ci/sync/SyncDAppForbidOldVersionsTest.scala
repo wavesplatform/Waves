@@ -6,13 +6,13 @@ import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, ci}
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, ci}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -26,7 +26,7 @@ class SyncDAppForbidOldVersionsTest
     with MockFactory
     with WithDomain
     with EitherValues {
-  import DomainPresets._
+  import DomainPresets.*
 
   private val time = new TestTime
   private def ts   = time.getTimestamp()
@@ -81,7 +81,7 @@ class SyncDAppForbidOldVersionsTest
       val (preparingTxs, invoke, proxyDApp, callingDApp) = scenario(callingDAppVersion, invokeExpression).sample.get
       val (settings, source, target)                     = if (invokeExpression) (RideV6, invoke.sender.toAddress, callingDApp) else (RideV5, proxyDApp, callingDApp)
       withDomain(settings) { d =>
-        d.appendBlock(preparingTxs: _*)
+        d.appendBlock(preparingTxs*)
         (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include(
           s"DApp $source invoked DApp $target that uses RIDE $callingDAppVersion, " +
             s"but dApp-to-dApp invocation requires version 5 or higher"

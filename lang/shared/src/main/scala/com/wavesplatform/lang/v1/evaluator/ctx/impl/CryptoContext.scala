@@ -59,7 +59,7 @@ object CryptoContext {
     )(body: List[EVALUATED] => Either[ExecutionError, EVALUATED]): Array[BaseFunction[NoContext]] = {
       lim.zipWithIndex.map { n =>
         val (sname, iname) = name(n)
-        NativeFunction[NoContext](sname, complexity(n._1), iname, ret, args: _*) { a =>
+        NativeFunction[NoContext](sname, complexity(n._1), iname, ret, args*) { a =>
           check(n._1)(a).flatMap(_ => body(a))
         }
       }
