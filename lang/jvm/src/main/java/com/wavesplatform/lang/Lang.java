@@ -1,7 +1,6 @@
 package com.wavesplatform.lang;
 
-import com.wavesplatform.lang.v1.serialization.OptimizedSerde;
-import com.wavesplatform.lang.v1.serialization.Serde;
+import com.wavesplatform.lang.v1.serialization.SerdeV2;
 import com.wavesplatform.lang.v1.compiler.Terms;
 
 /**
@@ -27,6 +26,6 @@ public class Lang {
      * @return the resulting byte array
      */
     public static byte[] serialize(Terms.EXPR expr) {
-        return OptimizedSerde.serialize(expr, false);
+        return SerdeV2.serialize(expr, false);
     }
 }

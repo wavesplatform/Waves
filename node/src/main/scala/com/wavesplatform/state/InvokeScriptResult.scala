@@ -20,7 +20,7 @@ import play.api.libs.json._
 import PBInvokeScriptResult.Call.Argument
 import PBInvokeScriptResult.Call.Argument.Value
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.serialization.LegacySerde
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 
 final case class InvokeScriptResult(
     data: Seq[R.DataEntry] = Nil,
@@ -290,7 +290,7 @@ object InvokeScriptResult {
     }
 
     val args = if (i.argsBytes.nonEmpty) i.argsBytes.map { bytes =>
-      val (value, _) = LegacySerde.deserialize(bytes.toByteArray, allowObjects = true).explicitGet()
+      val (value, _) = SerdeV1.deserialize(bytes.toByteArray, allowObjects = true).explicitGet()
       value.asInstanceOf[EVALUATED]
     } else i.args.map(a => toVanillaTerm(a.value))
     Call(i.function, args)

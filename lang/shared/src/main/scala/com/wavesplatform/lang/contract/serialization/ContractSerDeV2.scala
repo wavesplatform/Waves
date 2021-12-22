@@ -9,14 +9,14 @@ import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.{DECLARATION, FUNC}
-import com.wavesplatform.lang.v1.serialization.OptimizedSerde
+import com.wavesplatform.lang.v1.serialization.SerdeV2
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import monix.eval.Coeval
 
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
 
-object OptimizedContractSerDe extends ContractSerDe {
+object ContractSerDeV2 extends ContractSerDe {
 
   def serialize(c: DApp): Either[String, Array[Byte]] =
     for {
@@ -63,12 +63,12 @@ object OptimizedContractSerDe extends ContractSerDe {
     tryEi(DAppMeta.parseFrom(in.readByteArray()))
 
   private[lang] def serializeDeclaration(out: CodedOutputStream, dec: DECLARATION): Unit = {
-    OptimizedSerde.serializeDeclaration(out, dec, OptimizedSerde.serAux(out, Coeval.now(()), _)).value()
+    SerdeV2.serializeDeclaration(out, dec, SerdeV2.serAux(out, Coeval.now(()), _)).value()
   }
 
   private[lang] def deserializeDeclaration(in: CodedInputStream): Either[String, DECLARATION] = {
     val decType = in.readRawByte()
-    OptimizedSerde.deserializeDeclaration(in, OptimizedSerde.desAux(in), decType).attempt.value().leftMap(_.getMessage)
+    SerdeV2.deserializeDeclaration(in, SerdeV2.desAux(in), decType).attempt.value().leftMap(_.getMessage)
   }
 
   private[lang] def serializeAnnotation(out: CodedOutputStream, invocationName: String): Unit = {

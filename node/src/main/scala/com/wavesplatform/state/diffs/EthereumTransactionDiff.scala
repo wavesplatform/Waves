@@ -4,7 +4,7 @@ import cats.syntax.semigroup._
 import com.google.protobuf.ByteString
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.serialization.LegacySerde
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients}
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
@@ -37,7 +37,7 @@ object EthereumTransactionDiff {
             e.id() -> EthereumTransactionMeta(
               EthereumTransactionMeta.Payload.Invocation(
                 EthereumTransactionMeta.Invocation(
-                  ByteString.copyFrom(LegacySerde.serialize(invocation.funcCall)),
+                  ByteString.copyFrom(SerdeV1.serialize(invocation.funcCall)),
                   invocation.payments.map(p => PBAmounts.fromAssetAndAmount(p.assetId, p.amount))
                 )
               )

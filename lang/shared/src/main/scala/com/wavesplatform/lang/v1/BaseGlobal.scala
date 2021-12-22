@@ -4,10 +4,9 @@ import cats.syntax.either._
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.meta.{FunctionSignatures, MetaMapper, ParsedMeta}
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.serialization.{LegacyContractSerDe, OptimizedContractSerDe}
+import com.wavesplatform.lang.contract.serialization.{ContractSerDeV1, ContractSerDeV2}
 import com.wavesplatform.lang.directives.values.{Asset, Call, Expression, ScriptType, StdLibVersion, V1, V2, V6, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
-import com.wavesplatform.lang.script.ScriptReader.FreeCallHeader
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
@@ -24,7 +23,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding._
-import com.wavesplatform.lang.v1.serialization.{LegacySerde, OptimizedSerde}
+import com.wavesplatform.lang.v1.serialization.{SerdeV1, SerdeV2}
 
 import scala.annotation.tailrec
 import scala.util.Random
@@ -81,27 +80,27 @@ trait BaseGlobal {
   def checksum(arr: Array[Byte]): Array[Byte] = secureHash(arr).take(4)
 
   def serializeExpression(expr: EXPR, stdLibVersion: StdLibVersion, isFreeCall: Boolean): Array[Byte] = {
-    val header = if (isFreeCall) Array(FreeCallHeader) else Array()
-    val serde = if (stdLibVersion < V6) {
-      LegacySerde
+    val serialized = if (stdLibVersion < V6) {
+      stdLibVersion.id.toByte +: SerdeV1.serialize(expr)
     } else {
-      OptimizedSerde
+      Array(stdLibVersion.id.toByte, Expression.id.toByte) ++ SerdeV2.serialize(expr)
     }
-    val s      = header ++ Array(stdLibVersion.id.toByte) ++ serde.serialize(expr)
-    s ++ checksum(s)
+
+    serialized ++ checksum(serialized)
   }
 
   def serializeContract(c: DApp, stdLibVersion: StdLibVersion): Either[String, Array[Byte]] = {
-    val contractSerDe = if (stdLibVersion < V6) {
-      LegacyContractSerDe
+    val serialized = if (stdLibVersion < V6) {
+      ContractSerDeV1
+        .serialize(c)
+        .map(Array(0: Byte, DAppType.id.toByte, stdLibVersion.id.toByte) ++ _)
     } else {
-      OptimizedContractSerDe
+      ContractSerDeV2
+        .serialize(c)
+        .map(Array(stdLibVersion.id.toByte, DAppType.id.toByte) ++ _)
     }
 
-    contractSerDe
-      .serialize(c)
-      .map(Array(0: Byte, DAppType.id.toByte, stdLibVersion.id.toByte) ++ _)
-      .map(r => r ++ checksum(r))
+    serialized.map(r => r ++ checksum(r))
   }
 
   def parseAndCompileExpression(

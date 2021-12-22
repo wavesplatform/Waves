@@ -8,7 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.serialization.LegacySerde
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -48,7 +48,7 @@ object InvokeScriptTxSerializer {
           Array(tpe.id.toByte, version, chainId),
           sender.arr,
           dApp.bytes,
-          Deser.serializeOption(funcCallOpt)(LegacySerde.serialize(_)),
+          Deser.serializeOption(funcCallOpt)(SerdeV1.serialize(_)),
           Deser.serializeArrays(payments.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
           Longs.toByteArray(fee),
           feeAssetId.byteRepr,
@@ -79,7 +79,7 @@ object InvokeScriptTxSerializer {
 
     val sender       = buf.getPublicKey
     val dApp         = buf.getAddressOrAlias
-    val functionCall = Deser.parseOption(buf)(LegacySerde.deserializeFunctionCall(_).explicitGet())
+    val functionCall = Deser.parseOption(buf)(SerdeV1.deserializeFunctionCall(_).explicitGet())
     val payments     = Deser.parseArrays(buf).map(parsePayment)
     val fee          = buf.getLong
     val feeAssetId   = buf.getAsset

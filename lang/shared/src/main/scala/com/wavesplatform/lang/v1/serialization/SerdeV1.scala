@@ -16,7 +16,7 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import scala.util.Try
 
-object LegacySerde extends Serde[ByteBuffer, ByteArrayOutputStream] {
+object SerdeV1 extends Serde[ByteBuffer, ByteArrayOutputStream] {
 
   def serializeDeclaration(out: ByteArrayOutputStream, dec: DECLARATION, aux: EXPR => Coeval[Unit]): Coeval[Unit] = {
     dec match {

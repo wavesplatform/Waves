@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.testing
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.serialization.LegacyContractSerDe
+import com.wavesplatform.lang.contract.serialization.ContractSerDeV1
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -61,7 +61,7 @@ trait TypedScriptGen {
       defaultFunc <- Gen.option(defaultFuncGen)
       verifier    <- Gen.option(verifierGen)
       c = DApp(DAppMeta(), lets ++ funcs, callables ++ defaultFunc, verifier)
-      if LegacyContractSerDe.serialize(c).explicitGet().size < Short.MaxValue - 3 - 4
+      if ContractSerDeV1.serialize(c).explicitGet().size < Short.MaxValue - 3 - 4
     } yield c
 
   def BOOLEANgen(gas: Int): Gen[EXPR] =

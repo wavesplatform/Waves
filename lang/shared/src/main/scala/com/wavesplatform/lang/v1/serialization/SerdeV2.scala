@@ -16,7 +16,7 @@ import monix.eval.Coeval
 import java.io.ByteArrayOutputStream
 import scala.util.Try
 
-object OptimizedSerde extends Serde[CodedInputStream, CodedOutputStream] {
+object SerdeV2 extends Serde[CodedInputStream, CodedOutputStream] {
 
   def serializeDeclaration(out: CodedOutputStream, dec: DECLARATION, aux: EXPR => Coeval[Unit]): Coeval[Unit] = {
     dec match {

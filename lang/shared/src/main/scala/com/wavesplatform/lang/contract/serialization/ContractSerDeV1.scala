@@ -9,7 +9,7 @@ import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunctio
 import com.wavesplatform.lang.v1.compiler.Terms.{DECLARATION, FUNC}
 import com.wavesplatform.lang.utils.Serialize._
 import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.lang.v1.serialization.LegacySerde
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import monix.eval.Coeval
 
@@ -17,7 +17,7 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
-object LegacyContractSerDe extends ContractSerDe {
+object ContractSerDeV1 extends ContractSerDe {
 
   def serialize(c: DApp): Either[String, Array[Byte]] =
     for {
@@ -70,12 +70,12 @@ object LegacyContractSerDe extends ContractSerDe {
     } yield meta
 
   private[lang] def serializeDeclaration(out: ByteArrayOutputStream, dec: DECLARATION): Unit = {
-    LegacySerde.serializeDeclaration(out, dec, LegacySerde.serAux(out, Coeval.now(()), _)).value()
+    SerdeV1.serializeDeclaration(out, dec, SerdeV1.serAux(out, Coeval.now(()), _)).value()
   }
 
   private[lang] def deserializeDeclaration(bb: ByteBuffer): Either[String, DECLARATION] = {
     val decType = bb.get()
-    LegacySerde.deserializeDeclaration(bb, LegacySerde.desAux(bb), decType).attempt.value().leftMap(_.getMessage)
+    SerdeV1.deserializeDeclaration(bb, SerdeV1.desAux(bb), decType).attempt.value().leftMap(_.getMessage)
   }
 
   private[lang] def serializeAnnotation(out: ByteArrayOutputStream, invocationName: String): Unit = {

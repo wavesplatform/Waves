@@ -11,7 +11,7 @@ import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.serialization.LegacySerde
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.protobuf.utils.PBImplicitConversions._
@@ -265,7 +265,7 @@ object PBTransactions {
           dApp <- PBRecipients.toAddressOrAlias(dappAddress, chainId)
 
           fcOpt <- Deser
-            .parseOption(functionCall.asReadOnlyByteBuffer())(LegacySerde.deserializeFunctionCall)
+            .parseOption(functionCall.asReadOnlyByteBuffer())(SerdeV1.deserializeFunctionCall)
             .sequence
             .left
             .map(e => GenericError(s"Invalid InvokeScript function call: $e"))
@@ -502,7 +502,7 @@ object PBTransactions {
           sender,
           PBRecipients.toAddressOrAlias(dappAddress, chainId).explicitGet(),
           Deser
-            .parseOption(functionCall.asReadOnlyByteBuffer())(LegacySerde.deserializeFunctionCall)
+            .parseOption(functionCall.asReadOnlyByteBuffer())(SerdeV1.deserializeFunctionCall)
             .map(_.explicitGet()),
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
           feeAmount,
@@ -656,7 +656,7 @@ object PBTransactions {
   def toPBInvokeScriptData(dAppAddress: AddressOrAlias, exprOpt: Option[EXPR], payment: Seq[Payment]): InvokeScriptTransactionData = {
     InvokeScriptTransactionData(
       Some(PBRecipients.create(dAppAddress)),
-      ByteString.copyFrom(Deser.serializeOption(exprOpt)(LegacySerde.serialize(_))),
+      ByteString.copyFrom(Deser.serializeOption(exprOpt)(SerdeV1.serialize(_))),
       payment.map(p => (p.assetId, p.amount): Amount)
     )
   }
