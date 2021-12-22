@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.assets.exchange
 
 import scala.util.Try
+
 import com.wavesplatform.account.{Address, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -47,7 +48,8 @@ case class Order(
     (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves" &&
     (eip712Signature.isEmpty || version >= Order.V4) :| "eip712Signature available only in V4" &&
     eip712Signature.forall(es => es.size == 65 || es.size == 129) :| "eip712Signature should be of length 65 or 129" &&
-    (eip712Signature.isEmpty || proofs.isEmpty) :| "eip712Signature excludes proofs"
+    (eip712Signature.isEmpty || proofs.isEmpty) :| "eip712Signature excludes proofs" &&
+    (version >= Order.V4 || priceMode == OrderPriceMode.AssetDecimals) :| s"price mode should be AssetDecimals for V$version"
   }
 
   def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {

@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import scala.util.{Right, Try}
+
 import cats.instances.map._
 import cats.kernel.Monoid
 import cats.syntax.either._
@@ -11,8 +12,8 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderPriceMode, OrderType}
 import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.AssetDecimals
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
 
 object ExchangeTransactionDiff {
 
@@ -31,7 +32,7 @@ object ExchangeTransactionDiff {
         _ <- Right(())
         smartTradesEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading)
         smartAssetsEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets)
-        assetsScripted      = assets.values.count(_.flatMap(_.script).isDefined)
+        assetsScripted     = assets.values.count(_.flatMap(_.script).isDefined)
         _ <- Either.cond(
           smartAssetsEnabled || assetsScripted == 0,
           (),
@@ -52,12 +53,13 @@ object ExchangeTransactionDiff {
       } yield (assetsScripted, buyerScripted, sellerScripted)
 
     for {
-      buyerAndSellerScripted          <- smartFeaturesChecks()
-      portfolios <- getPortfolios(blockchain, tx)
-      tx         <- enoughVolume(tx, blockchain)
+      buyerAndSellerScripted <- smartFeaturesChecks()
+      portfolios             <- getPortfolios(blockchain, tx)
+      _                      <- enoughVolume(tx, blockchain)
+      _                      <- checkOrderPriceModes(tx, blockchain)
       scripts = {
         val (assetsScripted, buyerScripted, sellerScripted) = buyerAndSellerScripted
-        val matcherScripted = Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
+        val matcherScripted                                 = Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
         // Don't count before Ride4DApps activation
         val ordersScripted = Seq(buyerScripted, sellerScripted)
@@ -150,7 +152,16 @@ object ExchangeTransactionDiff {
     } yield Monoid.combineAll(Seq(feeDiff, priceDiff, amountDiff))
   }
 
-  private def enoughVolume(exTrans: ExchangeTransaction, blockchain: Blockchain): Either[ValidationError, ExchangeTransaction] = {
+  private[this] def checkOrderPriceModes(tx: ExchangeTransaction, blockchain: Blockchain): Either[GenericError, Unit] = {
+    def isLegacyModeOrder(order: Order) = order.version >= Order.V4 && order.priceMode == OrderPriceMode.AssetDecimals
+    Either.cond(
+      !Seq(tx.order1, tx.order2).exists(isLegacyModeOrder) || blockchain.isFeatureActivated(BlockchainFeatures.RideV6),
+      (),
+      GenericError("Legacy price mode is only available after RideV6 activation")
+    )
+  }
+
+  private def enoughVolume(exTrans: ExchangeTransaction, blockchain: Blockchain): Either[ValidationError, Unit] = {
 
     val filledBuy  = blockchain.filledVolumeAndFee(exTrans.buyOrder.id())
     val filledSell = blockchain.filledVolumeAndFee(exTrans.sellOrder.id())
@@ -191,7 +202,7 @@ object ExchangeTransactionDiff {
       Left(OrderValidationError(exTrans.sellOrder, s"Too much sell. Already filled volume for the order: ${filledSell.volume}"))
     else if (!buyFeeValid) Left(OrderValidationError(exTrans.buyOrder, s"Insufficient buy fee"))
     else if (!sellFeeValid) Left(OrderValidationError(exTrans.sellOrder, s"Insufficient sell fee"))
-    else Right(exTrans)
+    else Right(())
   }
 
   private[diffs] def getSpendAmount(

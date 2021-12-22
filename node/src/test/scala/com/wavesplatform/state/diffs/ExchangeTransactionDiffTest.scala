@@ -19,18 +19,17 @@ import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.THROW
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
+import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ExchangeTransactionDiff.getOrderFeePortfolio
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.test._
-import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
 import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.{AssetDecimals, FixedDecimals}
-import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
@@ -186,7 +185,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
   property("Validation fails when Order feature is not activation yet") {
 
     val preconditionsAndExchange
-      : Gen[(GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
+        : Gen[(GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
       buyer   <- accountGen
       seller  <- accountGen
       matcher <- accountGen
@@ -251,7 +250,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
   property("Preserves assets invariant (matcher's fee in one of the assets of the pair or in Waves), stores match info, rewards matcher") {
 
     val preconditionsAndExchange
-      : Gen[(GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
+        : Gen[(GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
       buyer   <- accountGen
       seller  <- accountGen
       matcher <- accountGen
@@ -308,7 +307,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
   property("Validation fails when received amount of asset is less than fee in that asset (Orders V3 are used)") {
     val preconditionsAndExchange
-      : Gen[(GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
+        : Gen[(GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
       buyer   <- accountGen
       seller  <- accountGen
       matcher <- accountGen
@@ -323,8 +322,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       exchange <- exchangeV2GeneratorP(
         buyer = buyer,
         seller = seller,
-        amountAssetId = sellerIssuedAsset, // buyer buys sellerIssuedAsset (received asset)
-        priceAssetId = buyerIssuedAsset, // buyer sells buyerIssuedAsset
+        amountAssetId = sellerIssuedAsset,        // buyer buys sellerIssuedAsset (received asset)
+        priceAssetId = buyerIssuedAsset,          // buyer sells buyerIssuedAsset
         buyMatcherFeeAssetId = sellerIssuedAsset, // buyer pays fee in sellerIssuedAsset (received asset)
         sellMatcherFeeAssetId = buyerIssuedAsset,
         fixedMatcher = Some(matcher),
@@ -404,7 +403,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
   property("Validation fails in case of attempt to pay fee in unissued asset (Orders V3 are used)") {
 
     val preconditionsAndExchange
-      : Gen[(GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
+        : Gen[(GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
       buyer   <- accountGen
       seller  <- accountGen
       matcher <- accountGen
@@ -542,7 +541,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     val preconditions =
       oneBuyFewSellsPreconditions(
         totalBuyMatcherFeeBoundaries = (bigBuyOrderMatcherFee: Long) => (bigBuyOrderMatcherFee - 10000L, bigBuyOrderMatcherFee), // correct total buyMatcherFee in ex trs
-        sellersTotalAmount = (bigBuyOrderAmount: Long) => bigBuyOrderAmount + 10000L // sell orders overfill buy order
+        sellersTotalAmount = (bigBuyOrderAmount: Long) => bigBuyOrderAmount + 10000L                                             // sell orders overfill buy order
       )
 
     forAll(preconditions) {
@@ -992,6 +991,75 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
   }
 
+  property("Legacy price mode is only allowed in Order V4 after RideV6") {
+    val issue = TxHelpers.issue()
+    val asset = issue.asset
+
+    def generateTx(version: TxVersion, mode: OrderPriceMode = AssetDecimals): ExchangeTransaction = {
+      val pair = AssetPair(asset, Waves)
+
+      val buyOrder =
+        Order.buy(
+          version,
+          TxHelpers.secondSigner,
+          MATCHER.publicKey,
+          pair,
+          1L,
+          1_0000_0000L,
+          ntpTime.correctedTime(),
+          ntpTime.getTimestamp() + 1000,
+          TestValues.fee,
+          priceMode = mode
+        )
+      val sellOrder =
+        Order.sell(
+          version,
+          TxHelpers.defaultSigner,
+          MATCHER.publicKey,
+          pair,
+          1L,
+          1L,
+          ntpTime.correctedTime(),
+          ntpTime.getTimestamp() + 1000,
+          TestValues.fee,
+          priceMode = mode
+        )
+
+      ExchangeTransaction
+        .signed(
+          TxVersion.V3,
+          MATCHER.privateKey,
+          buyOrder,
+          sellOrder,
+          1L,
+          1L,
+          TestValues.fee,
+          TestValues.fee,
+          TestValues.fee,
+          ntpTime.correctedTime()
+        )
+        .explicitGet()
+    }
+
+    def generateAndAppendTx(orderVersion: TxVersion, mode: OrderPriceMode, settings: WavesSettings = DomainPresets.RideV5): Unit = {
+      withDomain(settings) { d =>
+        d.helpers.creditWavesToDefaultSigner()
+        d.helpers.creditWavesFromDefaultSigner(TxHelpers.secondAddress)
+        d.appendAndAssertSucceed(issue)
+        d.appendAndAssertSucceed(generateTx(orderVersion, mode))
+      }
+    }
+
+    intercept[RuntimeException](generateAndAppendTx(Order.V1, FixedDecimals)).getMessage should include("price mode should be AssetDecimals")
+    intercept[RuntimeException](generateAndAppendTx(Order.V2, FixedDecimals)).getMessage should include("price mode should be AssetDecimals")
+    intercept[RuntimeException](generateAndAppendTx(Order.V3, FixedDecimals)).getMessage should include("price mode should be AssetDecimals")
+    intercept[RuntimeException](generateAndAppendTx(Order.V4, AssetDecimals)).getMessage should include(
+      "Legacy price mode is only available after RideV6 activation"
+    )
+    generateAndAppendTx(Order.V4, FixedDecimals, DomainPresets.RideV6)
+    generateAndAppendTx(Order.V4, AssetDecimals, DomainPresets.RideV6)
+  }
+
   property("ExchangeTransaction with Orders V4 uses asset decimals for price calculation") {
     val enoughFee = 100000000L
     val buyer     = accountGen.sample.get
@@ -1021,38 +1089,44 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       (Seq(TestBlock.create(genesisTxs), TestBlock.create(Seq(usdnTx, tidexTx, liquidTx), Block.ProtoBlockVersion)), usdn, tidex, liquid)
     }
 
-    def mkExchange(txv: Byte,
-                   bov: Byte,
-                   sov: Byte,
-                   amount: Long,
-                   txPrice: Long,
-                   boPrice: Long,
-                   boMode: OrderPriceMode,
-                   soPrice: Long,
-                   soMode: OrderPriceMode,
-                   pair: AssetPair): ExchangeTransaction = {
+    def mkExchange(
+        txv: Byte,
+        bov: Byte,
+        sov: Byte,
+        amount: Long,
+        txPrice: Long,
+        boPrice: Long,
+        boMode: OrderPriceMode,
+        soPrice: Long,
+        soMode: OrderPriceMode,
+        pair: AssetPair
+    ): ExchangeTransaction = {
       val buyOrder =
-        Order.buy(bov,
-                  buyer,
-                  MATCHER.publicKey,
-                  pair,
-                  amount,
-                  boPrice,
-                  ntpTime.correctedTime(),
-                  ntpTime.getTimestamp() + 1000,
-                  enoughFee,
-                  priceMode = boMode)
+        Order.buy(
+          bov,
+          buyer,
+          MATCHER.publicKey,
+          pair,
+          amount,
+          boPrice,
+          ntpTime.correctedTime(),
+          ntpTime.getTimestamp() + 1000,
+          enoughFee,
+          priceMode = boMode
+        )
       val sellOrder =
-        Order.sell(sov,
-                   seller,
-                   MATCHER.publicKey,
-                   pair,
-                   amount,
-                   soPrice,
-                   ntpTime.correctedTime(),
-                   ntpTime.getTimestamp() + 1000,
-                   enoughFee,
-                   priceMode = soMode)
+        Order.sell(
+          sov,
+          seller,
+          MATCHER.publicKey,
+          pair,
+          amount,
+          soPrice,
+          ntpTime.correctedTime(),
+          ntpTime.getTimestamp() + 1000,
+          enoughFee,
+          priceMode = soMode
+        )
       ExchangeTransaction
         .signed(txv, MATCHER.privateKey, buyOrder, sellOrder, amount, txPrice, enoughFee, enoughFee, enoughFee, ntpTime.correctedTime())
         .explicitGet()
@@ -1079,10 +1153,21 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         mkExchange(TxVersion.V3, Order.V3, Order.V4, 55768188998L, 59260000L, 592600L, FixedDecimals, 592600L, AssetDecimals, wavesUsdn),
         mkExchange(TxVersion.V3, Order.V3, Order.V4, 55768188998L, 59260000L, 592600L, FixedDecimals, 59260000L, FixedDecimals, wavesUsdn),
         mkExchange(TxVersion.V3, Order.V4, Order.V3, 55768188998L, 59260000L, 592600L, AssetDecimals, 592600L, FixedDecimals, wavesUsdn),
-        mkExchange(TxVersion.V3, Order.V4, Order.V3, 55768188998L, 59260000L, 59260000L, FixedDecimals, 592600L, FixedDecimals, wavesUsdn),
+        mkExchange(TxVersion.V3, Order.V4, Order.V3, 55768188998L, 59260000L, 59260000L, FixedDecimals, 592600L, FixedDecimals, wavesUsdn)
       ),
       (
-        mkExchange(TxVersion.V2, Order.V3, Order.V3, 213L, 35016774000000L, 35016774000000L, FixedDecimals, 35016774000000L, FixedDecimals, tidexWaves),
+        mkExchange(
+          TxVersion.V2,
+          Order.V3,
+          Order.V3,
+          213L,
+          35016774000000L,
+          35016774000000L,
+          FixedDecimals,
+          35016774000000L,
+          FixedDecimals,
+          tidexWaves
+        ),
         mkExchange(TxVersion.V3, Order.V4, Order.V4, 213L, 35016774L, 35016774000000L, AssetDecimals, 35016774000000L, AssetDecimals, tidexWaves),
         mkExchange(TxVersion.V3, Order.V4, Order.V4, 213L, 35016774L, 35016774, FixedDecimals, 35016774L, FixedDecimals, tidexWaves),
         mkExchange(TxVersion.V3, Order.V3, Order.V4, 213L, 35016774L, 35016774000000L, FixedDecimals, 35016774000000L, AssetDecimals, tidexWaves),
@@ -1240,15 +1325,15 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
               sellAmount <- Gen.choose(1, quantity)
               buyAmount  <- Gen.choose(1, quantity)
               amount     <- Gen.choose(Math.min(sellAmount, buyAmount) / 2000, Math.min(sellAmount, buyAmount) / 1000)
-            } yield
-              tx.copy(
-                  amount = amount,
-                  order1 = tx.buyOrder.copy(amount = sellAmount).signWith(buyer.privateKey),
-                  order2 = tx.sellOrder.copy(amount = buyAmount).signWith(seller.privateKey),
-                  buyMatcherFee = (BigInt(tx.fee) * amount / buyAmount).toLong,
-                  sellMatcherFee = (BigInt(tx.fee) * amount / sellAmount).toLong
-                )
-                .signWith(MATCHER.privateKey)
+            } yield tx
+              .copy(
+                amount = amount,
+                order1 = tx.buyOrder.copy(amount = sellAmount).signWith(buyer.privateKey),
+                order2 = tx.sellOrder.copy(amount = buyAmount).signWith(seller.privateKey),
+                buyMatcherFee = (BigInt(tx.fee) * amount / buyAmount).toLong,
+                sellMatcherFee = (BigInt(tx.fee) * amount / sellAmount).toLong
+              )
+              .signWith(MATCHER.privateKey)
           }
         buyerBalance   = Map(Waves -> ENOUGH_AMT, asset         -> 0L)
         sellerBalance  = Map(Waves -> (ENOUGH_AMT - fee), asset -> iTx.quantity)
