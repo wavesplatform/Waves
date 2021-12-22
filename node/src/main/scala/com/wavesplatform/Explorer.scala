@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import java.io.{File, FileWriter}
+import java.io.File
 import java.nio.ByteBuffer
 import java.util
 import com.google.common.primitives.Longs
@@ -10,9 +10,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.database._
 import com.wavesplatform.lang.script.ContractScript
-import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.ContractScriptCompactor
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.{DiffsCommon, SetScriptTransactionDiff}
 import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio}
@@ -23,7 +21,6 @@ import org.iq80.leveldb.DB
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
-import scala.util.Using
 
 //noinspection ScalaStyle
 object Explorer extends ScorexLogging {
@@ -299,28 +296,6 @@ object Explorer extends ScorexLogging {
             prevAssetId = thisAssetId
           }
           log.info(s"Checked $assetCounter asset(s)")
-
-        case "DS" =>
-          Using.resource(new FileWriter("test-dapp-serialization.csv")) { writer =>
-            writer.write("old;new;old_compacted;new_compacted\n")
-
-            db.iterateOver(KeyTags.AddressScript) { e =>
-              val asi = readAccountScriptInfo(e.getValue)
-              asi.script match {
-                case ContractScriptImpl(_, expr) =>
-                  val compactedExpr = ContractScriptCompactor.compact(expr)
-
-//                  val oldSize = ContractSerDe.serialize(expr).explicitGet().length
-//                  val newSize = ContractSerDe.serializeOptimized(expr).explicitGet().length
-//
-//                  val oldCompSize = ContractSerDe.serialize(compactedExpr).explicitGet().length
-//                  val newCompSize = ContractSerDe.serializeOptimized(compactedExpr).explicitGet().length
-
-                 // writer.write(s"$oldSize;$newSize;$oldCompSize;$newCompSize\n")
-                case _ => ()
-              }
-            }
-          }
       }
     } finally db.close()
   }

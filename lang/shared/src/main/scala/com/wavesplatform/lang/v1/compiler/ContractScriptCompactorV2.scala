@@ -1,51 +1,73 @@
 package com.wavesplatform.lang.v1.compiler
 
 import scala.annotation.tailrec
-
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.protobuf.dapp.DAppMeta.CompactNameAndOriginalNamePair
-import scala.collection._
 
-object ContractScriptCompactor {
+import scala.collection._
+import scala.collection.mutable.ListBuffer
+
+object ContractScriptCompactorV2 {
   private[this] val CharRange: scala.IndexedSeq[Char] = ('a' to 'z') ++ ('A' to 'Z')
 
   def compact(dApp: DApp,
-              nameMap: immutable.Map[String, String] = immutable.Map[String, String](),
+              names: Seq[String] = Seq.empty,
               saveNameMapToMeta: Boolean = true): DApp = {
 
-    var counter                    = 0
-    val originalToCompactedNameMap = nameMap.to(mutable.Map)
+    var counter       = 0
+    val originalNames = names.to(ListBuffer)
+
+    @tailrec
+    def idxToName(n: Int, seed: String = ""): String = {
+      if (n < CharRange.length) String.valueOf(CharRange(n)) + seed
+      else idxToName(n / CharRange.length - 1, String.valueOf(CharRange(n % CharRange.length)) + seed)
+    }
+
+    @tailrec
+    def nameToIdx(name: String, acc: Int = 0): Int = {
+      name.headOption match {
+        case Some(v) => nameToIdx(name.drop(1), acc * CharRange.length + CharRange.indexOf(v) + 1)
+        case None => acc - 1
+      }
+    }
 
     def createCompName(oldName: String): String = {
-      val compName = originalToCompactedNameMap.getOrElseUpdate(
-        oldName, {
+      if (saveNameMapToMeta) {
+        val compNameIdx = originalNames.indexOf(oldName)
+        if (compNameIdx != -1) {
+          idxToName(compNameIdx)
+        } else {
           def hasConflict(compactName: String) =
             dApp.callableFuncs.exists(_.u.name == compactName)
 
-          @tailrec
-          def generateName(n: Int, seed: String = ""): String = {
-            if (n < CharRange.length) String.valueOf(CharRange(n)) + seed
-            else generateName(n / CharRange.length - 1, String.valueOf(CharRange(n % CharRange.length)) + seed)
-          }
-
-          var compactName = generateName(counter)
+          var compactName = idxToName(counter)
           while (hasConflict(compactName)) {
+            originalNames.addOne("")
             counter += 1
-            compactName = generateName(counter)
+            compactName = idxToName(counter)
           }
 
           assert(!hasConflict(compactName))
           counter += 1
+          originalNames.addOne(oldName)
           compactName
         }
-      )
-
-      compName
+      } else {
+        val originalName = originalNames.applyOrElse[Int, String](nameToIdx(oldName), _ => oldName)
+        if (originalName.isEmpty) oldName else originalName
+      }
     }
 
-    def getReplacedName(oldName: String): String = originalToCompactedNameMap.getOrElse(oldName, oldName)
+    def getReplacedName(oldName: String): String = {
+      if (saveNameMapToMeta) {
+        val compNameIdx = originalNames.indexOf(oldName)
+        if (compNameIdx != -1) idxToName(compNameIdx) else oldName
+      } else {
+        val originalName = originalNames.applyOrElse[Int, String](nameToIdx(oldName), _ => oldName)
+        if (originalName.isEmpty) oldName else originalName
+      }
+    }
 
     def compactDec(dec: DECLARATION): DECLARATION = {
       dec match {
@@ -112,19 +134,15 @@ object ContractScriptCompactor {
       )
     }
 
-    val resultNamePairList = if (saveNameMapToMeta) {
-      originalToCompactedNameMap.toSeq
-        .sortBy(_._2) //sort by compactName
-        .map {
-          case (k, v) => CompactNameAndOriginalNamePair(v, k)
-        }
+    val resultOriginalNames = if (saveNameMapToMeta) {
+      originalNames.to(immutable.Seq)
     } else {
-      immutable.Seq.empty[CompactNameAndOriginalNamePair]
+      immutable.Seq.empty
     }
-    val metaWithNameMap = dApp.meta.withCompactNameAndOriginalNamePairList(resultNamePairList)
+    val metaWithOriginalNames = dApp.meta.withOriginalNames(resultOriginalNames)
 
     dApp.copy(
-      meta = metaWithNameMap,
+      meta = metaWithOriginalNames,
       decs = compDecs,
       callableFuncs = compCallableFuncs,
       verifierFuncOpt = comVerifierFuncOpt
@@ -132,9 +150,8 @@ object ContractScriptCompactor {
   }
 
   def decompact(dApp: DApp): DApp = {
-    if (dApp.meta.compactNameAndOriginalNamePairList.nonEmpty) {
-      val compactNameToOriginalNameMap = dApp.meta.compactNameAndOriginalNamePairList.map(pair => pair.compactName -> pair.originalName).toMap
-      compact(dApp, compactNameToOriginalNameMap, false)
+    if (dApp.meta.originalNames.nonEmpty) {
+      compact(dApp, dApp.meta.originalNames, false)
     } else {
       dApp
     }
@@ -175,4 +192,3 @@ object ContractScriptCompactor {
     dApp.copy(decs = dApp.decs.filter(dec => usedNames.contains(dec.name)))
   }
 }
-

@@ -10,7 +10,7 @@ import cats.{Id, Show}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.meta.{MetaMapper, V1, V2}
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, WrongArgumentType}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.{VariableInfo, vars}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
@@ -219,7 +219,13 @@ object ContractCompiler {
         var resultDApp = DApp(metaWithErr._1.get, decs, callableFuncs, verifierFuncOptWithErr._1.get)
 
         if (removeUnusedCode) resultDApp = ContractScriptCompactor.removeUnusedCode(resultDApp)
-        if (needCompaction) resultDApp = ContractScriptCompactor.compact(resultDApp)
+        if (needCompaction) {
+          if (version < V6) {
+            resultDApp = ContractScriptCompactor.compact(resultDApp)
+          } else {
+            resultDApp = ContractScriptCompactorV2.compact(resultDApp)
+          }
+        }
 
         (Some(resultDApp), parsedDappResult, subExprErrorList)
       } else {
