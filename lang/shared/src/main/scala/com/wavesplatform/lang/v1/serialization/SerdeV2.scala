@@ -231,6 +231,7 @@ object SerdeV2 extends Serde[CodedInputStream, CodedOutputStream] {
     val internalOut = new ByteArrayOutputStream()
     val out = CodedOutputStream.newInstance(internalOut)
     serAux(out, acc = Coeval.now(()), expr, allowObjects).value()
+    out.flush()
     internalOut.toByteArray
   }
 }

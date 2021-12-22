@@ -1,19 +1,29 @@
-package com.wavesplatform.lang.v1.compiler
-
-import scala.annotation.tailrec
+package com.wavesplatform.lang.v1.compiler.compaction
 
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
+import com.wavesplatform.lang.v1.compiler.compaction.ContractScriptCompactor._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.protobuf.dapp.DAppMeta.CompactNameAndOriginalNamePair
-import scala.collection._
 
-object ContractScriptCompactor {
-  private[this] val CharRange: scala.IndexedSeq[Char] = ('a' to 'z') ++ ('A' to 'Z')
+import scala.annotation.tailrec
+import scala.collection.{immutable, mutable}
 
-  def compact(dApp: DApp,
-              nameMap: immutable.Map[String, String] = immutable.Map[String, String](),
-              saveNameMapToMeta: Boolean = true): DApp = {
+object ContractScriptCompactorV1 extends ContractScriptCompactor {
+
+  def compact(dApp: DApp): DApp =
+    compact(dApp, immutable.Map[String, String](), saveNameMapToMeta = true)
+
+  def decompact(dApp: DApp): DApp = {
+    if (dApp.meta.compactNameAndOriginalNamePairList.nonEmpty) {
+      val compactNameToOriginalNameMap = dApp.meta.compactNameAndOriginalNamePairList.map(pair => pair.compactName -> pair.originalName).toMap
+      compact(dApp, compactNameToOriginalNameMap, saveNameMapToMeta = false)
+    } else {
+      dApp
+    }
+  }
+
+  private def compact(dApp: DApp, nameMap: immutable.Map[String, String], saveNameMapToMeta: Boolean): DApp = {
 
     var counter                    = 0
     val originalToCompactedNameMap = nameMap.to(mutable.Map)
@@ -130,49 +140,4 @@ object ContractScriptCompactor {
       verifierFuncOpt = comVerifierFuncOpt
     )
   }
-
-  def decompact(dApp: DApp): DApp = {
-    if (dApp.meta.compactNameAndOriginalNamePairList.nonEmpty) {
-      val compactNameToOriginalNameMap = dApp.meta.compactNameAndOriginalNamePairList.map(pair => pair.compactName -> pair.originalName).toMap
-      compact(dApp, compactNameToOriginalNameMap, false)
-    } else {
-      dApp
-    }
-  }
-
-  def removeUnusedCode(dApp: DApp): DApp = {
-
-    def getUsedNames(expr: EXPR): Seq[String] = {
-      expr match {
-        case BLOCK(dec, body)       => getUsedNames(dec.asInstanceOf[LET].value) ++ getUsedNames(body)
-        case LET_BLOCK(dec, body)   => getUsedNames(dec.value) ++ getUsedNames(body)
-        case FUNCTION_CALL(f, args) => f.funcName +: args.flatMap(getUsedNames)
-        case GETTER(gExpr, _)       => getUsedNames(gExpr)
-        case IF(cond, ifT, ifF)     => getUsedNames(cond) ++ getUsedNames(ifT) ++ getUsedNames(ifF)
-        case REF(key)               => List(key)
-        case _                      => List.empty
-      }
-    }
-
-    def getUsedNamesFromList(exprList: Seq[EXPR], prevNamesList: Seq[String]): Seq[String] = {
-      val nextNameList = exprList.flatMap(getUsedNames).diff(prevNamesList)
-      if (nextNameList.nonEmpty) {
-        val nextExprList: Seq[EXPR] = dApp.decs.collect {
-          case FUNC(name, _, body) if nextNameList.contains(name) => body
-          case LET(name, value) if nextNameList.contains(name)    => value
-        }
-        getUsedNamesFromList(nextExprList, prevNamesList ++ nextNameList)
-      } else {
-        prevNamesList
-      }
-    }
-
-    val usedNames = getUsedNamesFromList(
-      dApp.callableFuncs.map(_.u.body) ++ dApp.verifierFuncOpt.map(f => List(f.u.body)).getOrElse(List.empty),
-      Seq.empty
-    )
-
-    dApp.copy(decs = dApp.decs.filter(dec => usedNames.contains(dec.name)))
-  }
 }
-

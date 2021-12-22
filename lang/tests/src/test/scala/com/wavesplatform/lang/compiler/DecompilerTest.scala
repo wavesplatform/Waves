@@ -280,7 +280,7 @@ class DecompilerTest extends PropSpec {
       ),
       Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
-    Decompiler(contract: DApp, decompilerContextV3) shouldEq
+    Decompiler(contract: DApp, decompilerContextV3, V3) shouldEq
       """|func foo () = false
          |
          |
@@ -322,7 +322,7 @@ class DecompilerTest extends PropSpec {
       ),
       None
     )
-    Decompiler(contract, decompilerContextV3) shouldEq
+    Decompiler(contract, decompilerContextV3, V3) shouldEq
       """func foo (bar,buz) = true
         |
         |
@@ -355,7 +355,7 @@ class DecompilerTest extends PropSpec {
       ),
       None
     )
-    Decompiler(contract, decompilerContextV3) shouldEq
+    Decompiler(contract, decompilerContextV3, V3) shouldEq
       """func foo (bar,buz) = true
         |
         |
@@ -811,7 +811,7 @@ class DecompilerTest extends PropSpec {
       )
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4).explicitGet()
-    val res  = Decompiler(dApp, decompilerContextV4)
+    val res  = Decompiler(dApp, decompilerContextV4, V4)
     res shouldEq script
   }
 
@@ -874,7 +874,7 @@ class DecompilerTest extends PropSpec {
       )
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4).explicitGet()
-    val res  = Decompiler(dApp, ctx.decompilerContext)
+    val res  = Decompiler(dApp, ctx.decompilerContext, V4)
     res shouldEq script
   }
 
@@ -915,7 +915,7 @@ class DecompilerTest extends PropSpec {
       )
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4).explicitGet()
-    val res  = Decompiler(dApp, ctx.decompilerContext)
+    val res  = Decompiler(dApp, ctx.decompilerContext, V4)
     res shouldEq script("")
   }
 
@@ -947,7 +947,7 @@ class DecompilerTest extends PropSpec {
       )
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V5).explicitGet()
-    val res  = Decompiler(dApp, ctx.decompilerContext)
+    val res  = Decompiler(dApp, ctx.decompilerContext, V5)
     res shouldEq script
   }
 
@@ -981,7 +981,7 @@ class DecompilerTest extends PropSpec {
       )
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V5).explicitGet()
-    val res  = Decompiler(dApp, ctx.decompilerContext)
+    val res  = Decompiler(dApp, ctx.decompilerContext, V5)
     res shouldEq script("")
   }
 
@@ -1026,7 +1026,7 @@ class DecompilerTest extends PropSpec {
       )
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V5, needCompaction = true).explicitGet()
-    val res  = Decompiler(dApp, ctx.decompilerContext)
+    val res  = Decompiler(dApp, ctx.decompilerContext, V5)
     res shouldEq scriptWithoutTypes
   }
 

@@ -79,7 +79,7 @@ trait BaseGlobal {
 
   def checksum(arr: Array[Byte]): Array[Byte] = secureHash(arr).take(4)
 
-  def serializeExpression(expr: EXPR, stdLibVersion: StdLibVersion, isFreeCall: Boolean): Array[Byte] = {
+  def serializeExpression(expr: EXPR, stdLibVersion: StdLibVersion): Array[Byte] = {
     val serialized = if (stdLibVersion < V6) {
       stdLibVersion.id.toByte +: SerdeV1.serialize(expr)
     } else {
@@ -116,7 +116,7 @@ trait BaseGlobal {
       (compExpr, exprScript, compErrorList) = compRes
       illegalBlockVersionUsage              = letBlockOnly && com.wavesplatform.lang.v1.compiler.containsBlockV2(compExpr)
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
-      bytes = if (compErrorList.isEmpty) serializeExpression(compExpr, stdLibVersion, isFreeCall) else Array.empty[Byte]
+      bytes = if (compErrorList.isEmpty) serializeExpression(compExpr, stdLibVersion) else Array.empty[Byte]
 
       vars  = utils.varNames(stdLibVersion, Expression)
       costs = utils.functionCosts(stdLibVersion, DAppType)
@@ -165,7 +165,7 @@ trait BaseGlobal {
     val isFreeCall = scriptType == Call
     for {
       expr <- if (isFreeCall) ContractCompiler.compileFreeCall(input, context, version) else compiler(input, context)
-      bytes = serializeExpression(expr, version, isFreeCall)
+      bytes = serializeExpression(expr, version)
       _ <- ExprScript.validateBytes(bytes, isFreeCall)
       complexity <- ExprScript.estimateExact(expr, version, isFreeCall, estimator)
     } yield (bytes, expr, complexity)

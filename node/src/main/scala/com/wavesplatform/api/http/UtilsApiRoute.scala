@@ -22,7 +22,8 @@ import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
-import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ContractScriptCompactorV2, ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.compiler.compaction.{ContractScriptCompactorV1, ContractScriptCompactorV2}
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -154,7 +155,7 @@ case class UtilsApiRoute(
                   val compactedScript = script match {
                     case ContractScript.ContractScriptImpl(stdLibVersion, expr) if compact =>
                       val compacted = if (stdLibVersion < V6) {
-                        ContractScriptCompactor.compact(expr)
+                        ContractScriptCompactorV1.compact(expr)
                       } else {
                         ContractScriptCompactorV2.compact(expr)
                       }

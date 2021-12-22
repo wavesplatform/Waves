@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1
 import java.util.concurrent.TimeUnit
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.LangSerdeBenchmark.St
-import com.wavesplatform.lang.v1.serialization.Serde
+import com.wavesplatform.lang.v1.serialization.{Serde, SerdeV1, SerdeV2}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
@@ -16,10 +16,16 @@ import org.openjdk.jmh.infra.Blackhole
 class LangSerdeBenchmark {
 
   @Benchmark
-  def serialize_test(st: St, bh: Blackhole): Unit = bh.consume(Serde.serialize(st.expr))
+  def serializeTestV1(st: St, bh: Blackhole): Unit = bh.consume(SerdeV1.serialize(st.expr))
 
   @Benchmark
-  def deserialize_test(st: St, bh: Blackhole): Unit = bh.consume(Serde.deserialize(st.serializedExpr).explicitGet())
+  def deserializeTestV1(st: St, bh: Blackhole): Unit = bh.consume(SerdeV1.deserialize(st.serializedExprV1).explicitGet())
+
+  @Benchmark
+  def serializeTestV2(st: St, bh: Blackhole): Unit = bh.consume(SerdeV2.serialize(st.expr))
+
+  @Benchmark
+  def deserializeTestV2(st: St, bh: Blackhole): Unit = bh.consume(SerdeV2.deserialize(st.serializedExprV2).explicitGet())
 
 }
 
@@ -27,7 +33,8 @@ object LangSerdeBenchmark {
 
   @State(Scope.Benchmark)
   class St extends BigSum {
-    val serializedExpr: Array[Byte] = Serde.serialize(expr)
+    val serializedExprV1: Array[Byte] = SerdeV1.serialize(expr)
+    val serializedExprV2: Array[Byte] = SerdeV2.serialize(expr)
   }
 
 }

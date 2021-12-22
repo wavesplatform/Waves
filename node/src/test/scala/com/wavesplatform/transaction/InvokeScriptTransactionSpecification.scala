@@ -9,7 +9,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BIGINT, CONST_LONG, CaseObj}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
-import com.wavesplatform.lang.v1.serialization.Serde
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.{Amount, transaction}
@@ -54,7 +54,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
         transaction.PBTransaction.Data.InvokeScript(
           InvokeScriptTransactionData(
             Some(PBRecipients.create(tx.dApp)),
-            ByteString.copyFrom(Deser.serializeOption(tx.funcCallOpt)(Serde.serialize(_))),
+            ByteString.copyFrom(Deser.serializeOption(tx.funcCallOpt)(SerdeV1.serialize(_))),
             tx.payments.map(p => Amount.of(PBAmounts.toPBAssetId(p.assetId), p.amount))
           )
         )

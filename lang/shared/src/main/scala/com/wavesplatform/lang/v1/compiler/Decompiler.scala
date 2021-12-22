@@ -8,6 +8,7 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V6}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.compaction.{ContractScriptCompactorV1, ContractScriptCompactorV2}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{ExtractedFuncPostfix, ExtractedFuncPrefix}
 import monix.eval.Coeval
@@ -254,7 +255,7 @@ object Decompiler {
     def intersperse(s: Seq[Coeval[String]]): Coeval[String] = s.toVector.sequence.map(v => v.mkString(NEWLINE + NEWLINE))
 
     val dApp = if (stdLibVersion < V6) {
-      ContractScriptCompactor.decompact(e)
+      ContractScriptCompactorV1.decompact(e)
     } else {
       ContractScriptCompactorV2.decompact(e)
     }

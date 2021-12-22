@@ -14,7 +14,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{Script => Scr}
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
-import com.wavesplatform.lang.v1.serialization.Serde
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.serialization.Deser
@@ -400,7 +400,7 @@ object AsyncGrpcApi {
         PBTransaction.Data.InvokeScript(
           InvokeScriptTransactionData(
             Some(dApp),
-            ByteString.copyFrom(Deser.serializeOption(functionCall)(Serde.serialize(_))),
+            ByteString.copyFrom(Deser.serializeOption(functionCall)(SerdeV1.serialize(_))),
             payments
           )
         )

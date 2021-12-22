@@ -17,6 +17,7 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
 import com.wavesplatform.lang.v1.compiler.ScriptResultSource.FreeCall
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, LONG, STRING}
+import com.wavesplatform.lang.v1.compiler.compaction.{ContractScriptCompactorV1, ContractScriptCompactorV2}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
@@ -218,10 +219,10 @@ object ContractCompiler {
 
         var resultDApp = DApp(metaWithErr._1.get, decs, callableFuncs, verifierFuncOptWithErr._1.get)
 
-        if (removeUnusedCode) resultDApp = ContractScriptCompactor.removeUnusedCode(resultDApp)
+        if (removeUnusedCode) resultDApp = ContractScriptCompactorV1.removeUnusedCode(resultDApp)
         if (needCompaction) {
           if (version < V6) {
-            resultDApp = ContractScriptCompactor.compact(resultDApp)
+            resultDApp = ContractScriptCompactorV1.compact(resultDApp)
           } else {
             resultDApp = ContractScriptCompactorV2.compact(resultDApp)
           }
