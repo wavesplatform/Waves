@@ -1,6 +1,6 @@
 package com.wavesplatform.features
 
-case class BlockchainFeature private (id: Short, description: String)
+case class BlockchainFeature(id: Short, description: String)
 
 object BlockchainFeatures {
 

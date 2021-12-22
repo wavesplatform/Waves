@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.validation.{TxConstraints, TxValidator}
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-case class GenesisTransaction private (recipient: Address, amount: TxAmount, timestamp: TxTimestamp, signature: ByteStr, chainId: Byte)
+case class GenesisTransaction(recipient: Address, amount: TxAmount, timestamp: TxTimestamp, signature: ByteStr, chainId: Byte)
     extends Transaction(TransactionType.Genesis) {
   override val assetFee: (Asset, Long) = (Waves, 0)
   override val id: Coeval[ByteStr]     = Coeval.evalOnce(signature)

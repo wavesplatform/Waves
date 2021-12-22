@@ -61,7 +61,7 @@ object CryptoContext {
         case ((limit, cost), i) =>
           val name = nameByLimit(limit)
           val id   = (startId + i).toShort
-          NativeFunction[NoContext](name, cost, id, returnType, args: _*)(args => body(limit, args))
+          NativeFunction[NoContext](name, cost, id, returnType, args*)(args => body(limit, args))
       }.toArray
 
     def hashFunction(name: String, internalName: Short, cost: Long)(h: Array[Byte] => Array[Byte]): BaseFunction[NoContext] =

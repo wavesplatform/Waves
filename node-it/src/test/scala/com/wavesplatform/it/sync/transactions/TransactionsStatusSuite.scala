@@ -1,23 +1,23 @@
 package com.wavesplatform.it.sync.transactions
 
-import scala.util.Random
-
 import com.wavesplatform.api.http.ApiError.InvalidIds
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NTPTime
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{TransactionInfo, TransactionStatus}
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import play.api.libs.json._
+import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
+import play.api.libs.json.*
+
+import scala.util.Random
 
 class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
-  import TransactionsStatusSuite._
+  import TransactionsStatusSuite.*
 
   test("/transactions/status should return correct data") {
 
@@ -44,7 +44,7 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
     val postJsonResult = notMiner.transactionStatus(txIds)
     val postFormResult =
-      Json.parse(notMiner.postForm("/transactions/status", txIds.map(("id", _)): _*).getResponseBody).as[List[TransactionStatus]]
+      Json.parse(notMiner.postForm("/transactions/status", txIds.map(("id", _))*).getResponseBody).as[List[TransactionStatus]]
     val getResult =
       Json.parse(notMiner.get(s"/transactions/status?${txIds.map(id => s"id=$id").mkString("&")}").getResponseBody).as[List[TransactionStatus]]
 
@@ -75,7 +75,7 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
     notFound should contain theSameElementsAs data.notFound
   }
 
-  private def mkTransactions: List[Transaction with ProvenTransaction] =
+  private def mkTransactions: List[Transaction & ProvenTransaction] =
     (1001 to 1020).map { amount =>
       TransferTransaction
         .selfSigned(
