@@ -701,7 +701,7 @@ object Functions {
   def transferTxByIdF(proofsEnabled: Boolean, version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "transferTransactionById",
-      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 60L),
+      Map[StdLibVersion, Long](V3 -> 100L, V4 -> 60L),
       TRANSFERTRANSACTIONBYID,
       UNION(buildTransferTransactionType(proofsEnabled, version), UNIT),
       ("id", BYTESTR)
@@ -716,7 +716,7 @@ object Functions {
             case CONST_BYTESTR(id: ByteStr) :: Nil =>
               env
                 .transferTransactionById(id.arr)
-                .map(_.map(transactionObject(_, proofsEnabled, version)))
+                .map(_.filter(version >= V6 || _.p.h.version > 0).map(transactionObject(_, proofsEnabled, version)))
                 .map(fromOptionCO)
                 .map(_.asRight[String])
             case xs =>
