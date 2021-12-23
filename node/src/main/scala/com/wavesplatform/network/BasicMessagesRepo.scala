@@ -97,7 +97,7 @@ trait SignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
   }
 
   override def serializeData(v: A): Array[Byte] = {
-    Bytes.concat(Ints.toByteArray(unwrap(v).length) +: unwrap(v): _*)
+    Bytes.concat((Ints.toByteArray(unwrap(v).length) +: unwrap(v))*)
   }
 }
 

@@ -1492,7 +1492,7 @@ object PureContext {
       1,
       (CREATE_TUPLE + resultSize - 2).toShort,
       PARAMETERIZEDTUPLE(typeParams),
-      typeParams.mapWithIndex { case (typeParam, i) => (s"element${i + 1}", typeParam) }: _*
+      typeParams.mapWithIndex { case (typeParam, i) => (s"element${i + 1}", typeParam) }*
     ) {
       case elements if elements.length == resultSize =>
         val fields = elements.mapWithIndex { case (element, i) => (s"_${i + 1}", element) }.toMap

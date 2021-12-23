@@ -1,6 +1,6 @@
 package com.wavesplatform.features
 
-case class BlockchainFeature private (id: Short, description: String)
+case class BlockchainFeature(id: Short, description: String)
 
 object BlockchainFeatures {
 
@@ -20,7 +20,7 @@ object BlockchainFeatures {
   val BlockReward                     = BlockchainFeature(14, "Block Reward and Community Driven Monetary Policy")
   val BlockV5                         = BlockchainFeature(15, "Ride V4, VRF, Protobuf, Failed transactions")
   val SynchronousCalls                = BlockchainFeature(16, "Ride V5, dApp-to-dApp invocations")
-  val RideV6                          = BlockchainFeature(17, "Ride V6")
+  val RideV6                          = BlockchainFeature(17, "Ride V6, MetaMask support, Invoke Expression")
   
   // Not exposed
   val ContinuationTransaction         = BlockchainFeature(18, "Continuation Transaction")

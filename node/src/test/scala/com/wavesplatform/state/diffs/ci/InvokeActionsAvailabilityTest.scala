@@ -4,17 +4,17 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -27,7 +27,7 @@ class InvokeActionsAvailabilityTest
     with MockFactory
     with WithDomain
     with EitherValues {
-  import DomainPresets._
+  import DomainPresets.*
 
   private val time = new TestTime
   private def ts   = time.getTimestamp()
@@ -128,7 +128,7 @@ class InvokeActionsAvailabilityTest
   property("actions availability in sync call") {
     val (preparingTxs, invoke, proxyDApp, callingDApp) = scenario.sample.get
     withDomain(RideV5) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs*)
 
       val startProxyDAppBalance   = d.blockchain.balance(proxyDApp)
       val startCallingDAppBalance = d.blockchain.balance(callingDApp)

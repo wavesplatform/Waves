@@ -12,8 +12,8 @@ import org.openjdk.jmh.infra.Blackhole
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(1)
 @Fork(1)
-@Warmup(iterations = 30)
-@Measurement(iterations = 30)
+@Warmup(iterations = 30, time = 1)
+@Measurement(iterations = 30, time = 1)
 class SigVerifyBenchmark {
   @Benchmark
   def sigVerify_128b(st: CurveSt128b, bh: Blackhole): Unit =

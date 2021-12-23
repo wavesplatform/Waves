@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.test.produce
 
-class NativeFoldEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
+class NativeFoldEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV3(true)) {
   property("fold costs") {
     val expectingCostByLimit = Map(20 -> 3, 50 -> 7, 100 -> 9, 200 -> 20, 500 -> 56, 1000 -> 115)
     PureContext.folds

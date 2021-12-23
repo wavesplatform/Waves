@@ -4,18 +4,17 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util.concurrent.ConcurrentHashMap
 
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
-import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.PeersApiRoute
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import io.netty.channel.Channel
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks as PropertyChecks
 import play.api.libs.json.{Format, JsObject, JsValue, Json}
 
 class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with PropertyChecks with MockFactory {
 
-  import PeersRouteSpec._
+  import PeersRouteSpec.*
 
   private val peerDatabase   = mock[PeerDatabase]
   private val connectToPeer  = mockFunction[InetSocketAddress, Unit]
