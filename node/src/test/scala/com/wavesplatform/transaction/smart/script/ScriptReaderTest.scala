@@ -31,6 +31,13 @@ class ScriptReaderTest extends PropSpec with TypedScriptGen with Inside with Eit
     }
   }
 
+  property("should parse all bytes for V6") {
+    forAll(contractGen) { sc =>
+      val allBytes = ContractScript.apply(V6, sc).explicitGet().bytes().arr
+      ScriptReader.fromBytes(allBytes).explicitGet().expr shouldBe sc
+    }
+  }
+
   property("should parse expression with all supported std lib version") {
     val scriptEthList =
       DirectiveDictionary[StdLibVersion].all.map { version =>
