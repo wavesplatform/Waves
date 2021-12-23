@@ -48,7 +48,7 @@ class SubInvokeStateChangesSpec extends FlatSpec with WithDomain with JsonMatche
         TxHelpers.setScript(addr2s, script2alt),
         TxHelpers.setScript(addr3s, script3alt)
       )
-      d.appendBlock(genesis ++ setScripts: _*)
+      d.appendBlock((genesis ++ setScripts)*)
     }
 
     // Actual test

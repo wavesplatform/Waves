@@ -6,7 +6,6 @@ import scala.util.Random
 import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._

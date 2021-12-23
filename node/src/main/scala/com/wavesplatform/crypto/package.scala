@@ -2,16 +2,16 @@ package com.wavesplatform
 
 import java.lang.reflect.Constructor
 
-import scala.util.Try
-
 import com.wavesplatform.account.{PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.utils._
+import com.wavesplatform.utils.*
 import org.whispersystems.curve25519.OpportunisticCurve25519Provider
 
-package object crypto extends ScorexLogging {
+import scala.util.Try
+
+package object crypto {
   // Constants
   val SignatureLength: Int   = Curve25519.SignatureLength // 64
   val KeyLength: Int         = Curve25519.KeyLength // 32
@@ -23,9 +23,7 @@ package object crypto extends ScorexLogging {
     val constructor = classOf[OpportunisticCurve25519Provider].getDeclaredConstructors.head
       .asInstanceOf[Constructor[OpportunisticCurve25519Provider]]
     constructor.setAccessible(true)
-    val p = constructor.newInstance()
-    log.info(s"Native provider used: ${p.isNative}")
-    p
+    constructor.newInstance()
   }
 
   // Digests

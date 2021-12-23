@@ -1,8 +1,8 @@
 package com.wavesplatform.http
 
+import com.wavesplatform.RequestGen
 import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.http.ApiError._
-import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.alias.AliasApiRoute
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
@@ -10,10 +10,9 @@ import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.RequestGen
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json.Json._
-import play.api.libs.json._
+import play.api.libs.json.*
+import play.api.libs.json.Json.*
 
 class AliasBroadcastRouteSpec
     extends RouteSpec("/alias/broadcast/")
