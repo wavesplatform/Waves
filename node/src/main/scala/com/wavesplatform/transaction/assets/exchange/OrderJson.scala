@@ -66,7 +66,7 @@ object OrderJson {
         .getOrElse(Proofs.empty)
 
     val vrsn: Byte = version.getOrElse(if (eproofs.proofs.size == 1 && eproofs.proofs.head.arr.length == SignatureLength) 1 else 2)
-    Order(vrsn, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, priceMode = FixedDecimals, proofs = eproofs)
+    Order(vrsn, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, priceMode = AssetDecimals, proofs = eproofs)
   }
 
   def readOrderV3V4(

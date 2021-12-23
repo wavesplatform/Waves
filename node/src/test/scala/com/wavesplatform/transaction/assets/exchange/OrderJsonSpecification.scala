@@ -5,11 +5,12 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.OrderJson._
+import com.wavesplatform.transaction.assets.exchange.OrderJson.*
 import com.wavesplatform.transaction.smart.Verifier
-import play.api.libs.json._
+import com.wavesplatform.utils.JsonMatchers
+import play.api.libs.json.*
 
-class OrderJsonSpecification extends PropSpec {
+class OrderJsonSpecification extends PropSpec with JsonMatchers {
 
   property("Read Order from json") {
     val keyPair   = KeyPair("123".getBytes("UTF-8"))
@@ -143,9 +144,9 @@ class OrderJsonSpecification extends PropSpec {
       json.validate[Order] match {
         case e: JsError =>
           fail("Error: " + JsError.toJson(e).toString())
-        case s: JsSuccess[Order] =>
-          val o = s.get
-          o.json().toString() should be(json.toString())
+          
+        case JsSuccess(o: Order, _) =>
+          o.json() should matchJson(json)
           Verifier.verifyAsEllipticCurveSignature(o).explicitGet()
       }
     }
