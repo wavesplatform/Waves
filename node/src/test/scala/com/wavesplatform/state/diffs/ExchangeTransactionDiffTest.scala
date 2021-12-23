@@ -995,7 +995,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     val issue = TxHelpers.issue()
     val asset = issue.asset
 
-    def generateTx(version: TxVersion, mode: OrderPriceMode = AssetDecimals): ExchangeTransaction = {
+    def generateTx(version: TxVersion, mode: OrderPriceMode): ExchangeTransaction = {
       val pair = AssetPair(asset, Waves)
 
       val buyOrder =
@@ -1147,42 +1147,31 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         "transaction with orders v4 and v3"
       ),
       (
-        mkExchange(TxVersion.V2, Order.V3, Order.V3, 55768188998L, 592600L, 592600L, FixedDecimals, 592600L, FixedDecimals, wavesUsdn),
+        mkExchange(TxVersion.V2, Order.V3, Order.V3, 55768188998L, 592600L, 592600L, AssetDecimals, 592600L, AssetDecimals, wavesUsdn),
         mkExchange(TxVersion.V3, Order.V4, Order.V4, 55768188998L, 59260000L, 592600L, AssetDecimals, 592600L, AssetDecimals, wavesUsdn),
         mkExchange(TxVersion.V3, Order.V4, Order.V4, 55768188998L, 59260000L, 59260000L, FixedDecimals, 59260000L, FixedDecimals, wavesUsdn),
-        mkExchange(TxVersion.V3, Order.V3, Order.V4, 55768188998L, 59260000L, 592600L, FixedDecimals, 592600L, AssetDecimals, wavesUsdn),
-        mkExchange(TxVersion.V3, Order.V3, Order.V4, 55768188998L, 59260000L, 592600L, FixedDecimals, 59260000L, FixedDecimals, wavesUsdn),
-        mkExchange(TxVersion.V3, Order.V4, Order.V3, 55768188998L, 59260000L, 592600L, AssetDecimals, 592600L, FixedDecimals, wavesUsdn),
-        mkExchange(TxVersion.V3, Order.V4, Order.V3, 55768188998L, 59260000L, 59260000L, FixedDecimals, 592600L, FixedDecimals, wavesUsdn)
+        mkExchange(TxVersion.V3, Order.V3, Order.V4, 55768188998L, 59260000L, 592600L, AssetDecimals, 592600L, AssetDecimals, wavesUsdn),
+        mkExchange(TxVersion.V3, Order.V3, Order.V4, 55768188998L, 59260000L, 592600L, AssetDecimals, 59260000L, FixedDecimals, wavesUsdn),
+        mkExchange(TxVersion.V3, Order.V4, Order.V3, 55768188998L, 59260000L, 592600L, AssetDecimals, 592600L, AssetDecimals, wavesUsdn),
+        mkExchange(TxVersion.V3, Order.V4, Order.V3, 55768188998L, 59260000L, 59260000L, FixedDecimals, 592600L, AssetDecimals, wavesUsdn)
       ),
       (
-        mkExchange(
-          TxVersion.V2,
-          Order.V3,
-          Order.V3,
-          213L,
-          35016774000000L,
-          35016774000000L,
-          FixedDecimals,
-          35016774000000L,
-          FixedDecimals,
-          tidexWaves
-        ),
+        mkExchange(TxVersion.V2, Order.V3, Order.V3, 213L, 35016774000000L, 35016774000000L, AssetDecimals, 35016774000000L, AssetDecimals, tidexWaves),
         mkExchange(TxVersion.V3, Order.V4, Order.V4, 213L, 35016774L, 35016774000000L, AssetDecimals, 35016774000000L, AssetDecimals, tidexWaves),
         mkExchange(TxVersion.V3, Order.V4, Order.V4, 213L, 35016774L, 35016774, FixedDecimals, 35016774L, FixedDecimals, tidexWaves),
-        mkExchange(TxVersion.V3, Order.V3, Order.V4, 213L, 35016774L, 35016774000000L, FixedDecimals, 35016774000000L, AssetDecimals, tidexWaves),
-        mkExchange(TxVersion.V3, Order.V3, Order.V4, 213L, 35016774L, 35016774000000L, FixedDecimals, 35016774L, FixedDecimals, tidexWaves),
-        mkExchange(TxVersion.V3, Order.V4, Order.V3, 213L, 35016774L, 35016774000000L, AssetDecimals, 35016774000000L, FixedDecimals, tidexWaves),
-        mkExchange(TxVersion.V3, Order.V4, Order.V3, 213L, 35016774L, 35016774L, FixedDecimals, 35016774000000L, FixedDecimals, tidexWaves)
+        mkExchange(TxVersion.V3, Order.V3, Order.V4, 213L, 35016774L, 35016774000000L, AssetDecimals, 35016774000000L, AssetDecimals, tidexWaves),
+        mkExchange(TxVersion.V3, Order.V3, Order.V4, 213L, 35016774L, 35016774000000L, AssetDecimals, 35016774L, FixedDecimals, tidexWaves),
+        mkExchange(TxVersion.V3, Order.V4, Order.V3, 213L, 35016774L, 35016774000000L, AssetDecimals, 35016774000000L, AssetDecimals, tidexWaves),
+        mkExchange(TxVersion.V3, Order.V4, Order.V3, 213L, 35016774L, 35016774L, FixedDecimals, 35016774000000L, AssetDecimals, tidexWaves)
       ),
       (
-        mkExchange(TxVersion.V2, Order.V3, Order.V3, 2000000000L, 13898832L, 13898832L, FixedDecimals, 13898832L, FixedDecimals, liquidWaves),
+        mkExchange(TxVersion.V2, Order.V3, Order.V3, 2000000000L, 13898832L, 13898832L, AssetDecimals, 13898832L, AssetDecimals, liquidWaves),
         mkExchange(TxVersion.V3, Order.V4, Order.V4, 2000000000L, 13898832L, 13898832L, AssetDecimals, 13898832L, AssetDecimals, liquidWaves),
         mkExchange(TxVersion.V3, Order.V4, Order.V4, 2000000000L, 13898832L, 13898832L, FixedDecimals, 13898832L, FixedDecimals, liquidWaves),
-        mkExchange(TxVersion.V3, Order.V3, Order.V4, 2000000000L, 13898832L, 13898832L, FixedDecimals, 13898832L, AssetDecimals, liquidWaves),
-        mkExchange(TxVersion.V3, Order.V3, Order.V4, 2000000000L, 13898832L, 13898832L, FixedDecimals, 13898832L, FixedDecimals, liquidWaves),
-        mkExchange(TxVersion.V3, Order.V4, Order.V3, 2000000000L, 13898832L, 13898832L, AssetDecimals, 13898832L, FixedDecimals, liquidWaves),
-        mkExchange(TxVersion.V3, Order.V4, Order.V3, 2000000000L, 13898832L, 13898832L, FixedDecimals, 13898832L, FixedDecimals, liquidWaves)
+        mkExchange(TxVersion.V3, Order.V3, Order.V4, 2000000000L, 13898832L, 13898832L, AssetDecimals, 13898832L, AssetDecimals, liquidWaves),
+        mkExchange(TxVersion.V3, Order.V3, Order.V4, 2000000000L, 13898832L, 13898832L, AssetDecimals, 13898832L, FixedDecimals, liquidWaves),
+        mkExchange(TxVersion.V3, Order.V4, Order.V3, 2000000000L, 13898832L, 13898832L, AssetDecimals, 13898832L, AssetDecimals, liquidWaves),
+        mkExchange(TxVersion.V3, Order.V4, Order.V3, 2000000000L, 13898832L, 13898832L, FixedDecimals, 13898832L, AssetDecimals, liquidWaves)
       )
     )
 
@@ -1192,7 +1181,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
         Seq(txWithV3, txWithV4AsV3, txWithV4, txWithV3V4AsV3, txWithV3V4, txWithV4AsV3V3, txWithV4V3)
           .foreach { tx =>
-            assertDiffAndState(preconditions, TestBlock.create(Seq(tx), Block.ProtoBlockVersion), fsWithBlockV5) {
+            assertDiffAndState(preconditions, TestBlock.create(Seq(tx), Block.ProtoBlockVersion), DomainPresets.RideV6.blockchainSettings.functionalitySettings) {
               case (blockDiff, _) => portfolios += blockDiff.portfolios
             }
           }
@@ -1275,8 +1264,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             buyMatcherFee = fee,
             sellMatcherFee = fee,
             fee = fee,
-            order1 = tx.order1.copy(version = Order.V4, matcherFee = fee).signWith(buyer.privateKey),
-            order2 = tx.order2.copy(version = Order.V4, matcherFee = fee).signWith(seller.privateKey)
+            order1 = tx.order1.copy(version = Order.V4, priceMode = FixedDecimals, matcherFee = fee).signWith(buyer.privateKey),
+            order2 = tx.order2.copy(version = Order.V4, priceMode = FixedDecimals, matcherFee = fee).signWith(seller.privateKey)
           )
           .signWith(MATCHER.privateKey)
         reversed = fixed

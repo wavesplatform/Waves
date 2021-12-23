@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.FixedDecimals
+import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.AssetDecimals
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.serialization.impl.OrderSerializer
 import monix.eval.Coeval
@@ -17,20 +17,20 @@ import play.api.libs.json.{Format, JsObject}
   * Order to matcher service for asset exchange
   */
 case class Order(
-                  version: Order.Version,
-                  senderPublicKey: PublicKey,
-                  matcherPublicKey: PublicKey,
-                  assetPair: AssetPair,
-                  orderType: OrderType,
-                  amount: TxAmount,
-                  price: TxAmount,
-                  timestamp: TxTimestamp,
-                  expiration: TxTimestamp,
-                  matcherFee: TxAmount,
-                  matcherFeeAssetId: Asset = Waves,
-                  proofs: Proofs = Proofs.empty,
-                  eip712Signature: Option[ByteStr] = None,
-                  priceMode: OrderPriceMode = FixedDecimals
+    version: Order.Version,
+    senderPublicKey: PublicKey,
+    matcherPublicKey: PublicKey,
+    assetPair: AssetPair,
+    orderType: OrderType,
+    amount: TxAmount,
+    price: TxAmount,
+    timestamp: TxTimestamp,
+    expiration: TxTimestamp,
+    matcherFee: TxAmount,
+    matcherFeeAssetId: Asset = Waves,
+    proofs: Proofs = Proofs.empty,
+    eip712Signature: Option[ByteStr] = None,
+    priceMode: OrderPriceMode = AssetDecimals
 ) extends Proven {
   import Order._
 
@@ -77,8 +77,8 @@ case class Order(
 
   override def toString: String = {
     val matcherFeeAssetIdStr = if (version == 3) s" matcherFeeAssetId=${matcherFeeAssetId.fold("Waves")(_.toString)}," else ""
-    s"OrderV$version(id=${idStr()}, sender=$senderPublicKey, matcher=$matcherPublicKey, pair=$assetPair, tpe=$orderType, amount=$amount, " +
-      s"price=$price, ts=$timestamp, exp=$expiration, fee=$matcherFee,$matcherFeeAssetIdStr proofs=$proofs)"
+    s"OrderV$version(id=${idStr()}, sender=$senderPublicKey, matcher=$matcherPublicKey, pair=$assetPair, type=$orderType, amount=$amount, " +
+      s"price=$price, priceMode=$priceMode, ts=$timestamp, exp=$expiration, fee=$matcherFee,$matcherFeeAssetIdStr, proofs=$proofs)"
   }
 }
 
@@ -112,10 +112,22 @@ object Order {
       expiration: TxTimestamp,
       matcherFee: TxAmount,
       matcherFeeAssetId: Asset = Asset.Waves,
-      priceMode: OrderPriceMode = FixedDecimals
+      priceMode: OrderPriceMode = AssetDecimals
   ): Order =
-    Order(version, sender.publicKey, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, priceMode = priceMode)
-      .signWith(sender.privateKey)
+    Order(
+      version,
+      sender.publicKey,
+      matcher,
+      assetPair,
+      orderType,
+      amount,
+      price,
+      timestamp,
+      expiration,
+      matcherFee,
+      matcherFeeAssetId,
+      priceMode = priceMode
+    ).signWith(sender.privateKey)
 
   def buy(
       version: TxVersion,
@@ -128,7 +140,7 @@ object Order {
       expiration: TxTimestamp,
       matcherFee: TxAmount,
       matcherFeeAssetId: Asset = Waves,
-      priceMode: OrderPriceMode = FixedDecimals
+      priceMode: OrderPriceMode = AssetDecimals
   ): Order = {
     Order.selfSigned(version, sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, priceMode)
   }
@@ -144,7 +156,7 @@ object Order {
       expiration: TxTimestamp,
       matcherFee: TxAmount,
       matcherFeeAssetId: Asset = Waves,
-      priceMode: OrderPriceMode = FixedDecimals
+      priceMode: OrderPriceMode = AssetDecimals
   ): Order = {
     Order.selfSigned(version, sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, priceMode)
   }

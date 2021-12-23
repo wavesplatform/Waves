@@ -20,6 +20,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.AssetDecimals
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -704,8 +705,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     } yield {
       val matcherFee = fixedMatcherFee.getOrElse(genMatcherFee)
       val matcher    = fixedMatcher.getOrElse(genMatcher)
-      val o1         = Order.buy(1: Byte, buyer, matcher.publicKey, assetPair, amount1, price, timestamp, expiration, matcherFee)
-      val o2         = Order.sell(1: Byte, seller, matcher.publicKey, assetPair, amount2, price, timestamp, expiration, matcherFee)
+      val o1         = Order.buy(1: Byte, buyer, matcher.publicKey, assetPair, amount1, price, timestamp, expiration, matcherFee, priceMode = AssetDecimals)
+      val o2         = Order.sell(1: Byte, seller, matcher.publicKey, assetPair, amount2, price, timestamp, expiration, matcherFee, priceMode = AssetDecimals)
       val buyFee     = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue
       val sellFee    = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue
       val trans =

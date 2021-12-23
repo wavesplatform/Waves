@@ -8,52 +8,14 @@ import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.common.utils._
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{Proofs, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.FixedDecimals
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, EthSetChainId}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
+import play.api.libs.json.{JsObject, Json}
 
-class EthOrderSpec
-    extends FlatSpec
-    with BeforeAndAfterAll
-    with PathMockFactory
-    with BlockchainStubHelpers
-    with EthHelpers
-    with EthSetChainId
-    with DiffMatchers {
-
-  val ethBuyOrder = Order(
-    Order.V4,
-    TestEthOrdersPublicKey,
-    TxHelpers.matcher.publicKey,
-    AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
-    OrderType.BUY,
-    1,
-    100L,
-    1,
-    123,
-    100000,
-    Waves,
-    eip712Signature = EthSignature(
-      "0xe5ff562bfb0296e95b631365599c87f1c5002597bf56a131f289765275d2580f5344c62999404c37cd858ea037328ac91eca16ad1ce69c345ebb52fde70b66251c"
-    )
-  )
-
-  val ethSellOrder = Order(
-    Order.V4,
-    TestEthOrdersPublicKey,
-    TxHelpers.matcher.publicKey,
-    AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
-    OrderType.SELL,
-    1,
-    100L,
-    1,
-    123,
-    100000,
-    Waves,
-    eip712Signature = EthSignature(
-      "0xc8ba2bdafd27742546b3be34883efc51d6cdffbb235798d7b51876c6854791f019b0522d7a39b6f2087cba46ae86919b71a2d9d7920dfc8e00246d8f02a258f21b"
-    )
-  )
+class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with PathMockFactory with BlockchainStubHelpers with EthSetChainId with DiffMatchers {
+  import EthOrderSpec.{ethBuyOrder, ethSellOrder}
 
   "ETH signed order" should "recover signer public key correctly" in {
     val testOrder = Order(
@@ -78,6 +40,18 @@ class EthOrderSpec
     val result = EthOrders.recoverEthSignerKey(testOrder, signature)
     result shouldBe TestEthOrdersPublicKey
     result.toAddress shouldBe TestEthOrdersPublicKey.toAddress
+  }
+
+  it should "recover public key at json parse stage" in {
+    import com.wavesplatform.transaction.assets.exchange.OrderJson.orderReads
+
+    val json  = Json.toJson(ethBuyOrder).as[JsObject] - "senderPublicKey"
+    val order = Json.fromJson[Order](json).get
+    order.senderPublicKey shouldBe ethBuyOrder.senderPublicKey
+
+    intercept[IllegalArgumentException](Json.fromJson[Order](json - "eip712Signature")).getMessage should include(
+      "Either senderPublicKey or eip712Signature should be provided"
+    )
   }
 
   it should "be of version 4" in {
@@ -253,4 +227,42 @@ class EthOrderSpec
     val diff        = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
   }
+}
+
+object EthOrderSpec extends EthHelpers {
+  val ethBuyOrder: Order = Order(
+    Order.V4,
+    TestEthOrdersPublicKey,
+    TxHelpers.matcher.publicKey,
+    AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
+    OrderType.BUY,
+    1,
+    100L,
+    1,
+    123,
+    100000,
+    Waves,
+    eip712Signature = EthSignature(
+      "0xe5ff562bfb0296e95b631365599c87f1c5002597bf56a131f289765275d2580f5344c62999404c37cd858ea037328ac91eca16ad1ce69c345ebb52fde70b66251c"
+    ),
+    priceMode = FixedDecimals
+  )
+
+  val ethSellOrder: Order = Order(
+    Order.V4,
+    TestEthOrdersPublicKey,
+    TxHelpers.matcher.publicKey,
+    AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
+    OrderType.SELL,
+    1,
+    100L,
+    1,
+    123,
+    100000,
+    Waves,
+    eip712Signature = EthSignature(
+      "0xc8ba2bdafd27742546b3be34883efc51d6cdffbb235798d7b51876c6854791f019b0522d7a39b6f2087cba46ae86919b71a2d9d7920dfc8e00246d8f02a258f21b"
+    ),
+    priceMode = FixedDecimals
+  )
 }

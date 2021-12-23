@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.assets.exchange
 
 import scala.util.{Failure, Success}
+
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
@@ -69,7 +70,7 @@ object OrderJson {
   }
 
   def readOrderV3V4(
-      sender: PublicKey,
+      sender: Option[PublicKey],
       matcher: PublicKey,
       assetPair: AssetPair,
       orderType: OrderType,
@@ -92,9 +93,9 @@ object OrderJson {
         .orElse(signature.map(s => Proofs(ByteStr(s))))
         .getOrElse(Proofs.empty)
 
-    Order(
+    val orderWithoutSender = Order(
       version,
-      sender,
+      null,
       matcher,
       assetPair,
       orderType,
@@ -108,6 +109,12 @@ object OrderJson {
       eip712Signature.map(ByteStr(_)),
       priceMode
     )
+
+    val realSender = sender
+      .orElse(eip712Signature.map(EthOrders.recoverEthSignerKey(orderWithoutSender, _)))
+      .getOrElse(throw new IllegalArgumentException("Either senderPublicKey or eip712Signature should be provided"))
+
+    orderWithoutSender.copy(senderPublicKey = realSender)
   }
 
   private val assetReads: Reads[Asset] = {
@@ -153,7 +160,7 @@ object OrderJson {
   }
 
   private val orderV3V4Reads: Reads[Order] = {
-    val r = (JsPath \ "senderPublicKey").read[PublicKey](accountPublicKeyReads) and
+    val r = (JsPath \ "senderPublicKey").readNullable[PublicKey](accountPublicKeyReads) and
       (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
       (JsPath \ "assetPair").read[AssetPair] and
       (JsPath \ "orderType").read[OrderType] and
@@ -173,7 +180,7 @@ object OrderJson {
         .map(_.map(EthEncoding.toBytes)) and
       (JsPath \ "priceMode")
         .readNullable[OrderPriceMode]
-        .map(_.getOrElse(FixedDecimals))
+        .map(_.getOrElse(AssetDecimals))
 
     r(readOrderV3V4 _)
   }
@@ -181,8 +188,9 @@ object OrderJson {
   implicit val orderReads: Reads[Order] = {
     case jsOrder @ JsObject(map) =>
       map.getOrElse("version", JsNumber(1)) match {
-        case JsNumber(x) if x.byteValue >= Order.V3 => orderV3V4Reads.reads(jsOrder)
-        case _                                      => orderV1V2Reads.reads(jsOrder)
+        case JsNumber(n) if n == 1 || n == 2 => orderV1V2Reads.reads(jsOrder)
+        case JsNumber(n) if n >= 3           => orderV3V4Reads.reads(jsOrder)
+        case v                               => JsError(s"Invalid version: $v")
       }
     case invalidOrder => JsError(s"Can't parse invalid order $invalidOrder")
   }

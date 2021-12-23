@@ -2,17 +2,17 @@ package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
 
+import scala.util.Try
+
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.protobuf.transaction.PBOrders
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.{AssetDecimals, FixedDecimals}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderPriceMode, OrderType}
+import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.{AssetDecimals, FixedDecimals}
 import com.wavesplatform.utils.EthEncoding
 import play.api.libs.json.{JsObject, Json}
-
-import scala.util.Try
 
 object OrderSerializer {
   def toJson(order: Order): JsObject = {
@@ -113,7 +113,7 @@ object OrderSerializer {
       val timestamp  = buf.getLong
       val expiration = buf.getLong
       val matcherFee = buf.getLong
-      Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, priceMode = FixedDecimals)
+      Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, priceMode = AssetDecimals)
     }
 
     version match {
