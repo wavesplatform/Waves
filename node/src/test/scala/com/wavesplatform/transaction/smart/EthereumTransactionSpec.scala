@@ -69,6 +69,18 @@ class EthereumTransactionSpec
     )
     a[RuntimeException] should be thrownBy(EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(rawTransaction))
   }
+       
+  it should "fail with invalid to field" in {
+    val rawTransaction = RawTransaction.createTransaction(
+      BigInt(System.currentTimeMillis()).bigInteger,
+      EthereumTransaction.GasPrice,
+      BigInt(100000).bigInteger, // fee
+      "0xffffffff", // invalid "to"
+      (BigInt(1) * EthereumTransaction.AmountMultiplier).bigInteger,
+      ""
+    )
+    a[RuntimeException] should be thrownBy(EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(rawTransaction))
+  }
 
   it should "use chainId in signer key recovery" in {
     val senderAccount    = TxHelpers.defaultSigner.toEthKeyPair
