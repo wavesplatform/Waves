@@ -14,12 +14,19 @@ import com.wavesplatform.transaction.serialization.impl.OrderSerializer
 import monix.eval.Coeval
 import play.api.libs.json.{Format, JsObject}
 
-/**
-  * Order to matcher service for asset exchange
+sealed trait OrderSender
+object OrderSender {
+  final case class SenderPublicKey(key: PublicKey)     extends OrderSender
+  final case class Eip712Signature(signature: ByteStr) extends OrderSender
+
+  def apply(pk: PublicKey): SenderPublicKey = SenderPublicKey(pk)
+}
+
+/** Order to matcher service for asset exchange
   */
 case class Order(
     version: Version,
-    senderPublicKey: PublicKey,
+    senderCredentials: OrderSender,
     matcherPublicKey: PublicKey,
     assetPair: AssetPair,
     orderType: OrderType,
@@ -30,11 +37,20 @@ case class Order(
     matcherFee: TxAmount,
     matcherFeeAssetId: Asset = Waves,
     proofs: Proofs = Proofs.empty,
-    eip712Signature: Option[ByteStr] = None,
     priceMode: OrderPriceMode = AssetDecimals,
     explicitMode: Boolean = false
 ) extends Proven {
   import Order.*
+
+  lazy val senderPublicKey: PublicKey = senderCredentials match {
+    case OrderSender.SenderPublicKey(key)       => key
+    case OrderSender.Eip712Signature(signature) => EthOrders.recoverEthSignerKey(this, signature.arr)
+  }
+
+  val eip712Signature: Option[ByteStr] = senderCredentials match {
+    case OrderSender.SenderPublicKey(key)       => None
+    case OrderSender.Eip712Signature(signature) => Some(signature)
+  }
 
   val sender: PublicKey      = senderPublicKey
   def senderAddress: Address = sender.toAddress
@@ -118,7 +134,7 @@ object Order {
   ): Order =
     Order(
       version,
-      sender.publicKey,
+      OrderSender(sender.publicKey),
       matcher,
       assetPair,
       orderType,

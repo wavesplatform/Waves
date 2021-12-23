@@ -7,17 +7,18 @@ import com.wavesplatform.protobuf.order.AssetPair
 import com.wavesplatform.protobuf.order.Order.{PriceMode, Sender}
 import com.wavesplatform.protobuf.order.Order.PriceMode.{ASSET_DECIMALS, DEFAULT, FIXED_DECIMALS}
 import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.{AssetDecimals, FixedDecimals}
-import vt.assets.exchange.EthOrders
+import vt.assets.exchange.OrderSender
 
 object PBOrders {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions.*
 
   def vanilla(order: PBOrder): VanillaOrder = {
-    val vOrder = VanillaOrder(
+    VanillaOrder(
       order.version.toByte,
       order.sender match {
-        case Sender.SenderPublicKey(value) => PublicKey(value.toByteArray)
-        case _                             => null
+        case Sender.SenderPublicKey(value) => OrderSender(PublicKey(value.toByteStr))
+        case Sender.Eip712Signature(sig)   => OrderSender.Eip712Signature(sig.toByteStr)
+        case Sender.Empty                  => throw new IllegalArgumentException("Order should have either senderPublicKey or eip712Signature")
       },
       PublicKey(order.matcherPublicKey.toByteArray),
       vt.assets.exchange
@@ -34,7 +35,6 @@ object PBOrders {
       order.getMatcherFee.longAmount,
       PBAmounts.toVanillaAssetId(order.getMatcherFee.assetId),
       order.proofs.map(_.toByteStr),
-      Some(order.getEip712Signature.toByteStr).filterNot(_.isEmpty),
       order.priceMode match {
         case DEFAULT if order.version >= 4 => FixedDecimals
         case DEFAULT                       => AssetDecimals
@@ -44,12 +44,6 @@ object PBOrders {
       },
       explicitMode = order.priceMode != DEFAULT
     )
-
-    if (vOrder.senderPublicKey == null) {
-      require(!order.getEip712Signature.isEmpty, "Order should have either senderPublicKey or eip712Signature")
-      val senderPublicKey = EthOrders.recoverEthSignerKey(vOrder, order.getEip712Signature.toByteArray)
-      vOrder.copy(senderPublicKey = senderPublicKey)
-    } else vOrder
   }
 
   def protobuf(order: VanillaOrder): PBOrder = {
@@ -73,9 +67,9 @@ object PBOrders {
         case FixedDecimals if order.explicitMode => FIXED_DECIMALS
         case _                                   => DEFAULT
       },
-      order.eip712Signature match {
-        case Some(value) => Sender.Eip712Signature(value.toByteString)
-        case None        => Sender.SenderPublicKey(order.senderPublicKey.toByteString)
+      order.senderCredentials match {
+        case OrderSender.SenderPublicKey(key)       => Sender.SenderPublicKey(key.toByteString)
+        case OrderSender.Eip712Signature(signature) => Sender.Eip712Signature(signature.toByteString)
       }
     )
   }

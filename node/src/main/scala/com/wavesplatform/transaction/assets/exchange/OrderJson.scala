@@ -66,7 +66,20 @@ object OrderJson {
         .getOrElse(Proofs.empty)
 
     val vrsn: Byte = version.getOrElse(if (eproofs.proofs.size == 1 && eproofs.proofs.head.arr.length == SignatureLength) 1 else 2)
-    Order(vrsn, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs = eproofs, priceMode = AssetDecimals)
+    Order(
+      vrsn,
+      OrderSender(sender),
+      matcher,
+      assetPair,
+      orderType,
+      amount,
+      price,
+      timestamp,
+      expiration,
+      matcherFee,
+      proofs = eproofs,
+      priceMode = AssetDecimals
+    )
   }
 
   def readOrderV3V4(
@@ -93,13 +106,29 @@ object OrderJson {
         .orElse(signature.map(s => Proofs(ByteStr(s))))
         .getOrElse(Proofs.empty)
 
-    val orderWithoutSender = Order(version, null, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, eproofs, eip712Signature.map(ByteStr(_)), priceMode)
+    val senderCredentials = eip712Signature match {
+      case Some(value) => OrderSender.Eip712Signature(ByteStr(value))
+      case None =>
+        OrderSender.SenderPublicKey(
+          sender.getOrElse(throw new IllegalArgumentException("Either senderPublicKey or eip712Signature should be provided"))
+        )
+    }
 
-    val realSender = sender
-      .orElse(eip712Signature.map(EthOrders.recoverEthSignerKey(orderWithoutSender, _)))
-      .getOrElse(throw new IllegalArgumentException("Either senderPublicKey or eip712Signature should be provided"))
-
-    orderWithoutSender.copy(senderPublicKey = realSender)
+    Order(
+      version,
+      senderCredentials,
+      matcher,
+      assetPair,
+      orderType,
+      amount,
+      price,
+      timestamp,
+      expiration,
+      matcherFee,
+      matcherFeeAssetId,
+      eproofs,
+      priceMode
+    )
   }
 
   private val assetReads: Reads[Asset] = {
