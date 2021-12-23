@@ -1264,8 +1264,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             buyMatcherFee = fee,
             sellMatcherFee = fee,
             fee = fee,
-            order1 = tx.order1.copy(version = Order.V4, priceMode = FixedDecimals, matcherFee = fee).signWith(buyer.privateKey),
-            order2 = tx.order2.copy(version = Order.V4, priceMode = FixedDecimals, matcherFee = fee).signWith(seller.privateKey)
+            order1 = tx.order1.copy(version = Order.V4, matcherFee = fee, priceMode = FixedDecimals).signWith(buyer.privateKey),
+            order2 = tx.order2.copy(version = Order.V4, matcherFee = fee, priceMode = FixedDecimals).signWith(seller.privateKey)
           )
           .signWith(MATCHER.privateKey)
         reversed = fixed

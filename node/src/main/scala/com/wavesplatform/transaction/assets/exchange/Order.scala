@@ -5,8 +5,9 @@ import scala.util.Try
 import com.wavesplatform.account.{Address, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.exchange.Order.Version
 import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.AssetDecimals
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.serialization.impl.OrderSerializer
@@ -17,7 +18,7 @@ import play.api.libs.json.{Format, JsObject}
   * Order to matcher service for asset exchange
   */
 case class Order(
-    version: Order.Version,
+    version: Version,
     senderPublicKey: PublicKey,
     matcherPublicKey: PublicKey,
     assetPair: AssetPair,
@@ -30,9 +31,10 @@ case class Order(
     matcherFeeAssetId: Asset = Waves,
     proofs: Proofs = Proofs.empty,
     eip712Signature: Option[ByteStr] = None,
-    priceMode: OrderPriceMode = AssetDecimals
+    priceMode: OrderPriceMode = AssetDecimals,
+    explicitMode: Boolean = false
 ) extends Proven {
-  import Order._
+  import Order.*
 
   val sender: PublicKey      = senderPublicKey
   def senderAddress: Address = sender.toAddress
@@ -49,7 +51,7 @@ case class Order(
     (eip712Signature.isEmpty || version >= Order.V4) :| "eip712Signature available only in V4" &&
     eip712Signature.forall(es => es.size == 65 || es.size == 129) :| "eip712Signature should be of length 65 or 129" &&
     (eip712Signature.isEmpty || proofs.isEmpty) :| "eip712Signature excludes proofs" &&
-    (version >= Order.V4 || priceMode == OrderPriceMode.AssetDecimals) :| s"price mode should be AssetDecimals for V$version"
+    (version >= Order.V4 || (priceMode == OrderPriceMode.AssetDecimals && !explicitMode)) :| s"price mode should be AssetDecimals for V$version"
   }
 
   def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {

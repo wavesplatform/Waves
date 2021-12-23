@@ -66,7 +66,7 @@ object OrderJson {
         .getOrElse(Proofs.empty)
 
     val vrsn: Byte = version.getOrElse(if (eproofs.proofs.size == 1 && eproofs.proofs.head.arr.length == SignatureLength) 1 else 2)
-    Order(vrsn, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, priceMode = AssetDecimals, proofs = eproofs)
+    Order(vrsn, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs = eproofs, priceMode = AssetDecimals)
   }
 
   def readOrderV3V4(
@@ -93,22 +93,7 @@ object OrderJson {
         .orElse(signature.map(s => Proofs(ByteStr(s))))
         .getOrElse(Proofs.empty)
 
-    val orderWithoutSender = Order(
-      version,
-      null,
-      matcher,
-      assetPair,
-      orderType,
-      amount,
-      price,
-      timestamp,
-      expiration,
-      matcherFee,
-      matcherFeeAssetId,
-      eproofs,
-      eip712Signature.map(ByteStr(_)),
-      priceMode
-    )
+    val orderWithoutSender = Order(version, null, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, eproofs, eip712Signature.map(ByteStr(_)), priceMode)
 
     val realSender = sender
       .orElse(eip712Signature.map(EthOrders.recoverEthSignerKey(orderWithoutSender, _)))
