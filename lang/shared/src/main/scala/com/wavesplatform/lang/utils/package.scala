@@ -1,6 +1,7 @@
 package com.wavesplatform.lang
 
 import cats.Id
+import cats.syntax.traverse._
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -116,7 +117,12 @@ package object utils {
       functionCosts(DirectiveSet(version, scriptType, contentType).explicitGet())
 
   def functionCosts(ds: DirectiveSet): Map[FunctionHeader, Coeval[Long]] =
-    lazyFunctionCosts(ds)()
+    lazyFunctionCosts.filter { case (directiveSet, _) =>
+      directiveSet.stdLibVersion == ds.stdLibVersion && directiveSet.contentType == ds.contentType
+    }.values
+      .toList
+      .sequence
+      .map(_.foldLeft(Map.empty[FunctionHeader, Coeval[Long]])(_ ++ _))()
 
   def estimate(version: StdLibVersion, ctx: EvaluationContext[Environment, Id]): Map[FunctionHeader, Coeval[Long]] = {
     val costs: mutable.Map[FunctionHeader, Coeval[Long]] = mutable.Map.from(ctx.typeDefs.collect {
@@ -138,9 +144,17 @@ package object utils {
 
   def compilerContext(ds: DirectiveSet): CompilerContext = lazyContexts(ds.copy(imports = Imports()))().compilerContext
 
-  def getDecompilerContext(v: StdLibVersion, cType: ContentType, scriptType: ScriptType = Account): DecompilerContext =
-    lazyContexts(DirectiveSet(v, scriptType, cType).explicitGet())().decompilerContext
+  def combinedContext(v: StdLibVersion, cType: ContentType): CTX[Environment] =
+    lazyContexts.filter { case (ds, _) =>
+      ds.stdLibVersion == v && ds.contentType == cType
+    }.values
+      .toList
+      .sequence
+      .map(Monoid.combineAll[CTX[Environment]])()
+
+  def getDecompilerContext(v: StdLibVersion, cType: ContentType): DecompilerContext =
+    combinedContext(v, cType).decompilerContext
 
   def varNames(version: StdLibVersion, cType: ContentType): Set[String] =
-    compilerContext(version, cType, isAssetScript = false).varDefs.keySet
+    combinedContext(version, cType).compilerContext.varDefs.keySet
 }

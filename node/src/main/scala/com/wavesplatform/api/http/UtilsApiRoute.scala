@@ -219,7 +219,7 @@ case class UtilsApiRoute(
           }
       ) { result =>
         complete(
-          checkInvokeExpression(result)
+          result
             .fold(
               e => ScriptCompilerError(e), {
                 case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>

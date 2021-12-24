@@ -54,9 +54,8 @@ object Script {
       case _: ExprScript => Expression
       case _             => DAppType
     }
-    val ctx = getDecompilerContext(s.stdLibVersion, cType, if (s.isFreeCall) Call else Account)
+    val ctx = getDecompilerContext(s.stdLibVersion, cType)
     val (scriptText, directives) = (s: @unchecked) match {
-      case e: ExprScript if e.isFreeCall   => (Decompiler(e.expr, ctx), List(s.stdLibVersion, Expression, Call))
       case e: ExprScript                   => (Decompiler(e.expr, ctx), List(s.stdLibVersion, Expression))
       case ContractScriptImpl(_, contract) => (Decompiler(contract, ctx, s.stdLibVersion), List(s.stdLibVersion, Account, DAppType))
     }

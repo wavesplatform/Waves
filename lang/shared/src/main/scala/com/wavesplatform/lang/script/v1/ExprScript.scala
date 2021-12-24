@@ -43,7 +43,11 @@ object ExprScript {
       isFreeCall: Boolean,
       estimator: ScriptEstimator
   ): Either[String, Long] = {
-    val modifiedExpr = if (isFreeCall) BLOCK(LET(ContractCompiler.FreeCallInvocationArg, TRUE), expr) else expr
+    val modifiedExpr = if (version < V6) {
+      expr
+    } else {
+      BLOCK(LET(ContractCompiler.FreeCallInvocationArg, TRUE), expr)
+    }
     estimator(varNames(version, Expression), functionCosts(version, Expression, if (isFreeCall) Call else Account), modifiedExpr)
   }
 
