@@ -47,7 +47,7 @@ class RideCreateMerkleRootTestSuite
         | BinaryEntry("root", createMerkleRoot(proof, id, index))
         |]
         """.stripMargin
-    val cscript = ScriptCompiler.compile(script, ScriptEstimatorV3(overhead = false)).explicitGet()._1.bytes().base64
+    val cscript = ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64
     val node    = nodes.head
     nodes.waitForHeightArise()
     val tx1   = node.broadcastTransfer(node.keyPair, sender.address, setScriptFee, minFee, None, None, version = TxVersion.V3, waitForTx = false)

@@ -6,44 +6,7 @@ import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.database.{DBExt, DBResource, Keys}
 import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, TransactionId, TxMeta, TxNum}
 import com.wavesplatform.transaction.{Authorized, EthereumTransaction, GenesisTransaction, Transaction, TransactionType}
-import monix.eval.Task
-import monix.reactive.Observable
 import org.iq80.leveldb.DB
-
-trait AddressTransactions {
-  import AddressTransactions._
-
-  def addressTransactions(
-      db: DB,
-      maybeDiff: Option[(Height, Diff)],
-      subject: Address,
-      sender: Option[Address],
-      types: Set[Transaction.Type],
-      fromId: Option[ByteStr]
-  ): Observable[TransactionMeta] =
-    Observable
-      .fromIterator(Task(allAddressTransactions(db, maybeDiff, subject, sender, types, fromId).map {
-        case (m, transaction) =>
-          def loadISR(t: Transaction) =
-            maybeDiff
-              .flatMap { case (_, diff) => diff.scriptResults.get(t.id()) }
-              .orElse(loadInvokeScriptResult(db, t.id()))
-
-          def loadETM(t: Transaction) =
-            maybeDiff
-              .flatMap { case (_, diff) => diff.ethereumTransactionMeta.get(t.id()) }
-              .orElse(loadEthereumMetadata(db, t.id()))
-
-          TransactionMeta.create(
-            m.height,
-            transaction,
-            m.succeeded,
-            m.spentComplexity,
-            loadISR,
-            loadETM
-          )
-      }))
-}
 
 object AddressTransactions {
   private def loadTransaction(db: DB, height: Height, txNum: TxNum, sender: Option[Address]): Option[(TxMeta, Transaction)] =
@@ -51,7 +14,7 @@ object AddressTransactions {
       case Some((m, tx: Authorized)) if sender.forall(_ == tx.sender.toAddress)         => Some(m -> tx)
       case Some((m, gt: GenesisTransaction)) if sender.isEmpty                          => Some(m -> gt)
       case Some((m, et: EthereumTransaction)) if sender.forall(_ == et.senderAddress()) => Some(m -> et)
-      case _                                                                                 => None
+      case _                                                                            => None
     }
 
   private def loadInvokeScriptResult(resource: DBResource, txId: ByteStr): Option[InvokeScriptResult] =

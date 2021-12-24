@@ -46,7 +46,7 @@ class FunctionComplexityTest extends PropSpec {
             val arg  = CONST_STRING("throw").explicitGet()
             val expr = FUNCTION_CALL(function.header, List.fill(function.args.size)(arg))
             val estimation =
-              ScriptEstimatorV3(overhead = false)(
+              ScriptEstimatorV3(fixOverflow = true, overhead = false)(
                 varNames(ds.stdLibVersion, ds.contentType),
                 functionCosts(ds.stdLibVersion, ds.contentType),
                 expr

@@ -6,8 +6,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures._
-import com.wavesplatform.features._
+import com.wavesplatform.features.*
+import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.history
 import com.wavesplatform.history.Domain
 import com.wavesplatform.it.util.AddressOrAliasExt
@@ -20,13 +20,13 @@ import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.traits.domain.Lease
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.utils.StringBytes
@@ -865,7 +865,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
       "leaseCancel with lease action" in forAll(scenario) {
         case (dApp, invoker, genesis, setScript, useInvokeExpression, leaseRecipientAddress) =>
           withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SmartAccounts -> 0, SynchronousCalls -> 0, RideV6 -> 0)) { d =>
-            d.appendBlock(genesis.transactionData :+ setScript: _*)
+            d.appendBlock((genesis.transactionData :+ setScript)*)
 
             val (setScriptToConvert, leaseSender) =
               if (useInvokeExpression)

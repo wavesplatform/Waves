@@ -11,7 +11,13 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.test._
 
-class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(overhead = true)) {
+import scala.collection.immutable.ArraySeq
+
+class ScriptEstimatorV3Test
+    extends ScriptEstimatorTestBase(
+      ScriptEstimatorV3(fixOverflow = true, overflow = true),
+      ScriptEstimatorV3(fixOverflow = false, overflow = true)
+    ) {
   private def estimateNoOverhead(script: String): Either[ExecutionError, Long] =
     ScriptEstimatorV3(overhead = false)(lets, functionCosts(V6), compile(script)(V6))
 
@@ -39,13 +45,13 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(ov
       cost(cond) = cost(h) + cost(f) + cost(g) + 5 = 43
       cost(then) = cost(h) + cost(f) + cost(g) + 5 = 43
       cost(else) = cost(h) + cost(f) + cost(g) + 7 = 45
-    */
+     */
     estimate(script) shouldBe Right(
       43 /* cond         */ +
-      45 /* else         */ +
-      1  /* if-then-else */ +
-      1  /* let a        */ +
-      3  /* let b        */
+        45 /* else         */ +
+        1 /* if-then-else */ +
+        1 /* let a        */ +
+        3 /* let b        */
     )
 
     /*
@@ -87,14 +93,14 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(ov
 
     estimate(script) shouldBe Right(
       1 /* if-then-else                      */ +
-      3 /* a == b    condition               */ +
-      5 /* d + y + 1 expr inside else block  */ +
-      1 /* let y     decl inside else block  */ +
-      3 /* let a     decl used in condition  */ +
-      1 /* let b     decl used in condition  */ +
-      7 /* let c     decl used in then       */ +
-      1 /* let d     decl used in else       */
-        /* let e     unused decl             */
+        3 /* a == b    condition               */ +
+        5 /* d + y + 1 expr inside else block  */ +
+        1 /* let y     decl inside else block  */ +
+        3 /* let a     decl used in condition  */ +
+        1 /* let b     decl used in condition  */ +
+        7 /* let c     decl used in then       */ +
+        1 /* let d     decl used in else       */
+      /* let e     unused decl             */
     )
 
     estimateNoOverhead(script) shouldBe Right(
@@ -112,9 +118,9 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(ov
   property("big function call tree") {
     val n = 750
     val script =
-     s"""
+      s"""
         | func f0() = 0
-        | ${(0 until n).map(i => s"func f${i + 1}() = if (true) then f$i() else f$i()").mkString("\n") }
+        | ${(0 until n).map(i => s"func f${i + 1}() = if (true) then f$i() else f$i()").mkString("\n")}
         | f$n()
       """.stripMargin
 
@@ -123,7 +129,7 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(ov
       cost(f1) = cost(cond) + cost(true) + cost(f0) = 1 + 1 + 1 = 1 * 2 + 1
       cost(f2) = cost(cond) + cost(true) + cost(f1) = 1 + 1 + 3 = 2 * 2 + 1
       cost(fn) = n * 2 + 1
-    */
+   */
     estimate(script) shouldBe Right(n * 2 + 1)
 
     /*
@@ -170,7 +176,7 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(ov
       """.stripMargin
 
     estimate(script) shouldBe Right(
-        1 /* let a                      */ +
+      1 /* let a                      */ +
         1 /* let b                      */ +
         1 /* if-then-else               */ +
         3 /* a == 1         condition   */ +
@@ -241,5 +247,19 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3(ov
     estimate(functionCosts(V5), expr(FunctionIds.CALLDAPPREENTRANT)) should produce("not found")
     estimate(functionCosts(V5, DApp), expr(FunctionIds.CALLDAPP)) shouldBe Right(79)
     estimate(functionCosts(V5, DApp), expr(FunctionIds.CALLDAPPREENTRANT)) shouldBe Right(79)
+  }
+
+  property("overflow on sum of function args costs") {
+    val n = 62
+    val script =
+      s"""
+         | func f0() = true
+         | ${(0 until n).map(i => s"func f${i + 1}() = if (f$i()) then f$i() else f$i()").mkString("\n")}
+         |
+         | func g(a: Boolean, b: Boolean, c: Boolean) = true
+         |
+         | g(f$n(), f$n(), true)
+       """.stripMargin
+    estimate(functionCosts(V3), compile(script)) shouldBe Left(s"Estimators discrepancy: ${ArraySeq(Left("Illegal script"), Right(0))}")
   }
 }

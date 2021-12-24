@@ -29,6 +29,7 @@ import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.metrics.{TxProcessingStats => Stats}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.TransactionBase
 import com.wavesplatform.transaction.TxValidationError._
@@ -339,21 +340,13 @@ object InvokeScriptTransactionDiff {
   }
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {
-    val (check, expectedTypes) =
-      if (blockchain.callableListArgumentsAllowed)
-        (
-          fc.args.forall(arg => arg.isInstanceOf[EVALUATED] && !arg.isInstanceOf[CaseObj]),
-          ContractCompiler.allowedCallableTypesV4
-        )
+    val policy =
+      if (blockchain.callableListArgumentsCorrected)
+        CallArgumentPolicy.PrimitivesAndListsOfPrimitives
+      else if (blockchain.callableListArgumentsAllowed)
+        CallArgumentPolicy.PrimitivesAndLists
       else
-        (
-          fc.args.forall(arg => arg.isInstanceOf[EVALUATED] && !arg.isInstanceOf[CaseObj] && !arg.isInstanceOf[ARR]),
-          ContractCompiler.primitiveCallableTypes
-        )
-    Either.cond(
-      check,
-      (),
-      s"All arguments of InvokeScript must be one of the types: ${expectedTypes.mkString(", ")}"
-    )
+        CallArgumentPolicy.OnlyPrimitives
+    fc.check(policy)
   }
 }

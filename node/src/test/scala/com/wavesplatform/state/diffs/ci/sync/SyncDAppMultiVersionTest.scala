@@ -59,7 +59,7 @@ class SyncDAppMultiVersionTest extends PropSpec with WithDomain {
         case (version1, version2) =>
           val (preparingTxs, invoke) = scenario(version1, version2).sample.get
           withDomain(RideV6) { d =>
-            d.appendBlock(preparingTxs: _*)
+            d.appendBlock(preparingTxs*)
             d.appendBlock(invoke)
             d.blockchain.transactionSucceeded(invoke.txId) shouldBe true
           }

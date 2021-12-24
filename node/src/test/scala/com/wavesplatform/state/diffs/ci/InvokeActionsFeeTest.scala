@@ -11,15 +11,15 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TransactionType}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TransactionType}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
@@ -57,7 +57,7 @@ class InvokeActionsFeeTest extends PropSpec with Inside with WithState with DBCa
                     |  )
                     |
                     """.stripMargin
-    ScriptCompiler.compile(script, ScriptEstimatorV3(overhead = true)).explicitGet()._1
+    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()._1
   }
 
   private def dApp(asset: IssuedAsset): Script =
@@ -111,7 +111,7 @@ class InvokeActionsFeeTest extends PropSpec with Inside with WithState with DBCa
   property(s"fee for asset scripts is not required after activation ${BlockchainFeatures.SynchronousCalls}") {
     val (preparingTxs, invokeFromScripted, invokeFromNonScripted) = paymentPreconditions.sample.get
     withDomain(domainSettingsWithFS(fsWithV5)) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs*)
 
       val invokeFromScripted1    = invokeFromScripted()
       val invokeFromNonScripted1 = invokeFromNonScripted()

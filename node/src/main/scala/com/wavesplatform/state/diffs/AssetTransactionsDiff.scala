@@ -7,7 +7,9 @@ import cats.syntax.semigroup._
 import com.google.common.base.Utf8
 import com.google.protobuf.ByteString
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue, SponsorFee}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Asset, ERC20Address}
@@ -42,6 +44,7 @@ object AssetTransactionsDiff extends ScorexLogging {
       _ <- Either.cond(requireUnique(), (), GenericError(s"Asset ${tx.asset} is already issued"))
       result <- DiffsCommon
         .countVerifierComplexity(tx.script, blockchain, isAsset = true)
+        .flatTap(checkEstimationOverflow(blockchain, _))
         .map(
           script =>
             Diff(
@@ -49,33 +52,35 @@ object AssetTransactionsDiff extends ScorexLogging {
               issuedAssets = Map(asset             -> NewAssetInfo(staticInfo, info, volumeInfo)),
               assetScripts = Map(asset             -> script.map(AssetScriptInfo.tupled)),
               scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
-            )
+          )
         )
     } yield result
   }
 
   def setAssetScript(blockchain: Blockchain)(tx: SetAssetScriptTransaction): Either[ValidationError, Diff] =
-    DiffsCommon.validateAsset(blockchain, tx.asset, tx.sender.toAddress, issuerOnly = true).flatMap { _ =>
-      if (blockchain.hasAssetScript(tx.asset)) {
-        DiffsCommon
-          .countVerifierComplexity(tx.script, blockchain, isAsset = true)
-          .map { script =>
-            Diff(
-              portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-              assetScripts = Map(tx.asset          -> script.map(AssetScriptInfo.tupled)),
-              scriptsRun =
-                // Asset script doesn't count before Ride4DApps activation
-                if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
-                  DiffsCommon.countScriptRuns(blockchain, tx)
-                } else {
-                  Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
-                }
-            )
-          }
-      } else {
+    for {
+      _      <- DiffsCommon.validateAsset(blockchain, tx.asset, tx.sender.toAddress, issuerOnly = true)
+      script <- DiffsCommon.countVerifierComplexity(tx.script, blockchain, isAsset = true)
+      _ <- if (!blockchain.hasAssetScript(tx.asset))
         Left(GenericError("Cannot set script on an asset issued without a script"))
-      }
-    }
+      else
+        checkEstimationOverflow(blockchain, script)
+      scriptsRun = if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps))
+        DiffsCommon.countScriptRuns(blockchain, tx)
+      else
+        Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
+    } yield
+      Diff(
+        portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
+        assetScripts = Map(tx.asset          -> script.map(AssetScriptInfo.tupled)),
+        scriptsRun = scriptsRun
+      )
+
+  private def checkEstimationOverflow(blockchain: Blockchain, script: Option[(Script, Long)]): Either[GenericError, Unit] =
+    if (blockchain.checkEstimationOverflow && script.exists(_._2 < 0))
+      Left(GenericError(s"Unexpected negative complexity"))
+    else
+      Right(())
 
   def reissue(blockchain: Blockchain, blockTime: Long)(tx: ReissueTransaction): Either[ValidationError, Diff] =
     DiffsCommon
@@ -116,10 +121,11 @@ object AssetTransactionsDiff extends ScorexLogging {
           )
         )
         updatedInfo = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
-      } yield Diff(
-        portfolios = Map(tx.sender.toAddress -> portfolioUpdate),
-        updatedAssets = Map(tx.assetId       -> updatedInfo.leftIor),
-        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
-      )
+      } yield
+        Diff(
+          portfolios = Map(tx.sender.toAddress -> portfolioUpdate),
+          updatedAssets = Map(tx.assetId       -> updatedInfo.leftIor),
+          scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
+        )
     }
 }

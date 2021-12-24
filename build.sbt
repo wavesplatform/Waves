@@ -76,7 +76,9 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .crossType(CrossType.Full)
   .settings(
-    libraryDependencies ++= Dependencies.protobuf.value ++ Dependencies.langCompilerPlugins.value,
+    libraryDependencies ++= Dependencies.protobuf.value ++
+      Dependencies.langCompilerPlugins.value ++
+      Dependencies.circe.value,
     inConfig(Compile)(
       Seq(
         PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
@@ -119,13 +121,14 @@ lazy val root = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion := "2.13.6",
+    scalaVersion := "2.13.7",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
     V.fallback := (1, 4, 1),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     scalacOptions ++= Seq(
+      "-Xsource:3",
       "-feature",
       "-deprecation",
       "-unchecked",

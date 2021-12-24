@@ -62,7 +62,7 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
       |${Seq.fill(16)("sigVerify(message, sig, pub)").mkString(" && ")}
       |""".stripMargin,
       isAssetScript = true,
-      ScriptEstimatorV3(overhead = true)
+      ScriptEstimatorV3(fixOverflow = true, overhead = true)
     ).explicitGet()
 
   private[this] val settings = domainSettingsWithFS(
@@ -86,7 +86,7 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
 
         d.appendBlock(
           Seq(invoker.toAddress, dApp0KP.toAddress, dApp1KP.toAddress)
-            .map(addr => GenesisTransaction.create(addr, 10000.waves, ntpTime.getTimestamp()).explicitGet()): _*
+            .map(addr => GenesisTransaction.create(addr, 10000.waves, ntpTime.getTimestamp()).explicitGet())*
         )
         val issueTx = IssueTransaction
           .selfSigned(TxVersion.V3, dApp1KP, "DAPP1", "", 1000_00, 2, false, Some(smartAssetScript), 1.waves, ntpTime.getTimestamp())

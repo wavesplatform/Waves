@@ -14,7 +14,9 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
+import com.wavesplatform.settings.{
+  BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS
+}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
@@ -158,25 +160,21 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
 
 trait WithDomain extends WithState { _: Suite =>
   implicit class WavesSettingsOps(ws: WavesSettings) {
-    def withFeatures(fs: BlockchainFeature*): WavesSettings = {
-      val functionalitySettings = ws.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap)
+    def withFS(transformF: FunctionalitySettings => FunctionalitySettings): WavesSettings = {
+      val functionalitySettings = transformF(ws.blockchainSettings.functionalitySettings)
       ws.copy(blockchainSettings = ws.blockchainSettings.copy(functionalitySettings = functionalitySettings))
     }
 
-    def addFeatures(fs: BlockchainFeature*): WavesSettings = {
-      val newFeatures           = ws.blockchainSettings.functionalitySettings.preActivatedFeatures ++ fs.map(_.id -> 0)
-      val functionalitySettings = ws.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = newFeatures)
-      ws.copy(blockchainSettings = ws.blockchainSettings.copy(functionalitySettings = functionalitySettings))
+    def withFeatures(fs: BlockchainFeature*): WavesSettings =
+      withFS(_.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap))
+
+    def addFeatures(fs: BlockchainFeature*): WavesSettings =  withFS { functionalitySettings =>
+      val newFeatures           = functionalitySettings.preActivatedFeatures ++ fs.map(_.id -> 0)
+      functionalitySettings.copy(preActivatedFeatures = newFeatures)
     }
 
-    def withActivationPeriod(period: Int): WavesSettings = {
-      ws.copy(
-        blockchainSettings = ws.blockchainSettings.copy(
-          functionalitySettings = ws.blockchainSettings.functionalitySettings
-            .copy(featureCheckBlocksPeriod = period, blocksForFeatureActivation = period, doubleFeaturesPeriodsAfterHeight = 10000)
-        )
-      )
-    }
+    def withActivationPeriod(period: Int): WavesSettings =
+      withFS(_.copy(featureCheckBlocksPeriod = period, blocksForFeatureActivation = period, doubleFeaturesPeriodsAfterHeight = 10000))
 
     def noFeatures(): WavesSettings = {
       ws.copy(
@@ -197,7 +195,7 @@ trait WithDomain extends WithState { _: Suite =>
     )
 
   def domainSettingsWithPreactivatedFeatures(fs: BlockchainFeature*): WavesSettings =
-    domainSettingsWithFeatures(fs.map(_ -> 0): _*)
+    domainSettingsWithFeatures(fs.map(_ -> 0)*)
 
   def domainSettingsWithFeatures(fs: (BlockchainFeature, Int)*): WavesSettings = {
     val defaultFS = SettingsFromDefaultConfig
@@ -253,9 +251,9 @@ trait WithDomain extends WithState { _: Suite =>
       }
   }
 
-  def withDomain[A](settings: WavesSettings = SettingsFromDefaultConfig)(
-      test: Domain => A
-  ): A =
+  def withDomain[A](
+      settings: WavesSettings = SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts) // SmartAccounts to allow V2 transfers by default
+  )(test: Domain => A): A =
     withLevelDBWriter(settings) { blockchain =>
       var domain: Domain = null
       val bcu = new BlockchainUpdaterImpl(

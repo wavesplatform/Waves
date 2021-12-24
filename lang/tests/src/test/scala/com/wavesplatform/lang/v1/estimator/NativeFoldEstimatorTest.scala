@@ -11,9 +11,9 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.test.produce
 
-class NativeFoldEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV3(overhead = true)) {
+class NativeFoldEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV3(fixOverflow = true, overhead = true)) {
   private def estimateNoOverhead(script: String): Either[ExecutionError, Long] =
-    ScriptEstimatorV3(overhead = false)(lets, functionCosts(V6), compile(script)(V6))
+    ScriptEstimatorV3(fixOverflow = true, overhead = false)(lets, functionCosts(V6), compile(script)(V6))
 
   property("fold costs") {
     val foldCostByLimit = Map(20 -> 3, 50 -> 7, 100 -> 9, 200 -> 20, 500 -> 56, 1000 -> 115)

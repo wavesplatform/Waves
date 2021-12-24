@@ -63,7 +63,7 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
                |}
                |
                |""".stripMargin,
-        ScriptEstimatorV3(overhead = false)
+        ScriptEstimatorV3(fixOverflow = true, overhead = false)
       )
       .explicitGet()
       ._1
@@ -79,7 +79,7 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
                |
                | false
                |""".stripMargin,
-        ScriptEstimatorV3(overhead = false)
+        ScriptEstimatorV3(fixOverflow = true, overhead = false)
       )
       .explicitGet()
       ._1

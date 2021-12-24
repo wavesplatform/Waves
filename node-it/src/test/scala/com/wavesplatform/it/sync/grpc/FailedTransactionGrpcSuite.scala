@@ -58,7 +58,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
             reissuable = true,
             issueFee,
             description = "Description",
-            script = Right(ScriptCompiler.compile("true", ScriptEstimatorV3(overhead = false)).toOption.map(_._1)),
+            script = Right(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).toOption.map(_._1)),
             waitForTx = true
           )
       )
@@ -128,7 +128,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
          |}
          |
         """.stripMargin
-    val script = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3(overhead = false)).explicitGet()._1
+    val script = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1
     sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
   }
 
@@ -214,7 +214,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
             assetAmount,
             8,
             reissuable = true,
-            script = Right(ScriptCompiler.compile("true", ScriptEstimatorV3(overhead = false)).toOption.map(_._1)),
+            script = Right(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).toOption.map(_._1)),
             fee = issueFee + smartFee,
             waitForTx = true
           )
@@ -374,7 +374,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
                    |case _ => true
                    |}
                    |""".stripMargin,
-                ScriptEstimatorV3(overhead = false)
+                ScriptEstimatorV3(fixOverflow = true, overhead = false)
               )
               .toOption
               .map(_._1)
@@ -398,7 +398,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     waitForTxs(init)
 
     val quantity                                        = 1000000000L
-    val initScript: Either[Array[Byte], Option[Script]] = Right(ScriptCompiler.compile("true", ScriptEstimatorV3(overhead = false)).toOption.map(_._1))
+    val initScript: Either[Array[Byte], Option[Script]] = Right(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).toOption.map(_._1))
     val amountAsset                                     = sender.broadcastIssue(seller, "Amount asset", quantity, 8, reissuable = true, issueFee, script = initScript)
     val priceAsset                                      = sender.broadcastIssue(buyer, "Price asset", quantity, 8, reissuable = true, issueFee, script = initScript)
     val sellMatcherFeeAsset                             = sender.broadcastIssue(matcher, "Seller fee asset", quantity, 8, reissuable = true, issueFee, script = initScript)

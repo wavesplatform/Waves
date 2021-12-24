@@ -5,15 +5,15 @@ import java.security.SecureRandom
 import com.google.common.base.Charsets
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.state.ByteStr._
+import com.wavesplatform.common.state.ByteStr.*
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import org.apache.commons.lang3.time.DurationFormatUtils
-import play.api.libs.json._
+import play.api.libs.json.*
 
 import scala.annotation.tailrec
 
-package object utils extends ScorexLogging {
+package object utils {
 
   private val BytesMaxValue  = 256
   private val Base58MaxValue = 58
@@ -81,17 +81,17 @@ package object utils extends ScorexLogging {
     def toByteString: ByteString = ByteString.copyFromUtf8(s)
   }
 
-  implicit val evaluatedWrites: Writes[EVALUATED] = new Writes[EVALUATED] {
-    import com.wavesplatform.api.http.ApiError
-    override def writes(o: EVALUATED): JsValue = (o: @unchecked) match {
-        case CONST_LONG(num)   => Json.obj("type" -> "Int", "value"        -> num)
-        case CONST_BYTESTR(bs) => Json.obj("type" -> "ByteVector", "value" -> bs.toString)
-        case CONST_STRING(str) => Json.obj("type" -> "String", "value"     -> str)
-        case CONST_BOOLEAN(b)  => Json.obj("type" -> "Boolean", "value"    -> b)
-        case CaseObj(caseType, fields) =>
-          Json.obj("type" -> caseType.name, "value" -> JsObject(fields.view.mapValues(writes).toSeq))
-        case ARR(xs)      => Json.obj("type"  -> "Array", "value" -> xs.map(writes))
-        case FAIL(reason) => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "error" -> reason)
+  import com.wavesplatform.api.http.ApiError
+
+  implicit val evaluatedWrites: Writes[EVALUATED] = (o: EVALUATED) =>
+    (o: @unchecked) match {
+      case CONST_LONG(num)   => Json.obj("type" -> "Int", "value"        -> num)
+      case CONST_BYTESTR(bs) => Json.obj("type" -> "ByteVector", "value" -> bs.toString)
+      case CONST_STRING(str) => Json.obj("type" -> "String", "value"     -> str)
+      case CONST_BOOLEAN(b)  => Json.obj("type" -> "Boolean", "value"    -> b)
+      case CaseObj(caseType, fields) =>
+        Json.obj("type" -> caseType.name, "value" -> JsObject(fields.view.mapValues(evaluatedWrites.writes).toSeq))
+      case ARR(xs)      => Json.obj("type"  -> "Array", "value"                          -> xs.map(evaluatedWrites.writes))
+      case FAIL(reason) => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "error" -> reason)
     }
-  }
 }
