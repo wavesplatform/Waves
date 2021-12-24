@@ -34,7 +34,7 @@ class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with PathMockFactory 
 
     val signature =
       EthEncoding.toBytes(
-        "0x54119bc5b24d9363b7a1a31a71a2e6194dfeedc5e9644893b0a04bb57004e5b14342c1ce29ee00877da49180fd6d7fb332ff400231f809da7ed0dcb07c504e2d1c"
+        "0xae7cb5b5e9713862fdbfb6b5f1518d89b4f1cc29a865a9248ad72a36044e2a90683092c2fe49fd5e00d6ce734e6ee623b9206f7ad05e587dfe9b45cbd586d5fd1b"
       )
 
     val result = EthOrders.recoverEthSignerKey(testOrder, signature)
@@ -157,7 +157,7 @@ class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with PathMockFactory 
       )
 
     differ(transaction).resultE should matchPattern {
-      case Left(err) if err.toString.contains("Proof doesn't validate as signature") =>
+      case Left(err) if err.toString.contains("negative waves balance") =>
     }
   }
 
@@ -228,10 +228,19 @@ class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with PathMockFactory 
 }
 
 object EthOrderSpec extends EthHelpers {
+  /**
+    * Use for create a hardcoded signature for a test order
+    * @param order Order parameters
+    */
+  def signOrder(order: Order): Unit = {
+    val signature = EthOrders.signOrder(order, TxHelpers.defaultEthSigner)
+    println(EthEncoding.toHexString(signature))
+  }
+
   val ethBuyOrder: Order = Order(
     Order.V4,
     EthSignature(
-      "0xe5ff562bfb0296e95b631365599c87f1c5002597bf56a131f289765275d2580f5344c62999404c37cd858ea037328ac91eca16ad1ce69c345ebb52fde70b66251c"
+      "0x0a897d382e4e4a066e1d98e5c3c1051864a557c488571ff71e036c0f5a2c7204274cb293cd4aa7ad40f8c2f650e1a2770ecca6aa14a1da883388fa3b5b9fa8b71c"
     ),
     TxHelpers.matcher.publicKey,
     AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
@@ -248,7 +257,7 @@ object EthOrderSpec extends EthHelpers {
   val ethSellOrder: Order = Order(
     Order.V4,
     EthSignature(
-      "0xe5ff562bfb0296e95b631365599c87f1c5002597bf56a131f289765275d2580f5344c62999404c37cd858ea037328ac91eca16ad1ce69c345ebb52fde70b66251c"
+      "0x6c4385dd5f6f1200b4d0630c9076104f34c801c16a211e505facfd743ba242db4429b966ffa8d2a9aff9037dafda78cfc8f7c5ef1c94493f5954bc7ebdb649281b"
     ),
     TxHelpers.matcher.publicKey,
     AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),

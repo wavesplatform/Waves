@@ -8,7 +8,7 @@ import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.network.TransactionPublisher
@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
-import com.wavesplatform.utils.EthHelpers
+import com.wavesplatform.utils.{EthEncoding, EthHelpers}
 import com.wavesplatform.wallet.Wallet
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.{JsObject, Json, JsValue}
@@ -77,8 +77,8 @@ class TransactionBroadcastSpec
            |  "order1" : {
            |    "version" : 4,
            |    "id" : "${ethBuyOrder.id()}",
-           |    "sender" : "3FzoJXUesFqzf4nmMYejpUDYmFJvkwEiQG6",
-           |    "senderPublicKey" : "5BQPcwDXaZexgonPb8ipDrLRXY3RHn1kFLP9fqp1s6M6xiRhC4LvsAq2HueXCMzkpuXsrLnuBA3SdkJyuhNZXMCd",
+           |    "sender" : "${ethBuyOrder.senderPublicKey.toAddress}",
+           |    "senderPublicKey" : "${ethBuyOrder.senderPublicKey}",
            |    "matcherPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
            |    "assetPair" : {
            |      "amountAsset" : "5fQPsn8hoaVddFG26cWQ5QFdqxWtUPNaZ9zH2E6LYzFn",
@@ -94,13 +94,13 @@ class TransactionBroadcastSpec
            |    "signature" : "",
            |    "proofs" : [ ],
            |    "matcherFeeAssetId" : null,
-           |    "eip712Signature" : "0xe5ff562bfb0296e95b631365599c87f1c5002597bf56a131f289765275d2580f5344c62999404c37cd858ea037328ac91eca16ad1ce69c345ebb52fde70b66251c"
+           |    "eip712Signature" : "${EthEncoding.toHexString(ethBuyOrder.eip712Signature.get.arr)}"
            |  },
            |  "order2" : {
            |    "version" : 4,
            |    "id" : "${ethSellOrder.id()}",
-           |    "sender" : "3FzoJXUesFqzf4nmMYejpUDYmFJvkwEiQG6",
-           |    "senderPublicKey" : "5BQPcwDXaZexgonPb8ipDrLRXY3RHn1kFLP9fqp1s6M6xiRhC4LvsAq2HueXCMzkpuXsrLnuBA3SdkJyuhNZXMCd",
+           |    "sender" : "${ethSellOrder.senderPublicKey.toAddress}",
+           |    "senderPublicKey" : "${ethSellOrder.senderPublicKey}",
            |    "matcherPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
            |    "assetPair" : {
            |      "amountAsset" : "5fQPsn8hoaVddFG26cWQ5QFdqxWtUPNaZ9zH2E6LYzFn",
@@ -116,7 +116,7 @@ class TransactionBroadcastSpec
            |    "signature" : "",
            |    "proofs" : [ ],
            |    "matcherFeeAssetId" : null,
-           |    "eip712Signature" : "0xc8ba2bdafd27742546b3be34883efc51d6cdffbb235798d7b51876c6854791f019b0522d7a39b6f2087cba46ae86919b71a2d9d7920dfc8e00246d8f02a258f21b"
+           |    "eip712Signature" : "${EthEncoding.toHexString(ethSellOrder.eip712Signature.get.arr)}"
            |  },
            |  "amount" : 1,
            |  "price" : 100,

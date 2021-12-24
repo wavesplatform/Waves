@@ -19,9 +19,7 @@ trait EthHelpers {
   }
 
   val TestEthOrdersPublicKey: PublicKey = PublicKey(
-    EthEncoding.toBytes(
-      "0xd10a150ba9a535125481e017a09c2ac6a1ab43fc43f7ab8f0d44635106672dd7de4f775c06b730483862cbc4371a646d86df77b3815593a846b7272ace008c42"
-    )
+    EthEncoding.toBytes(TxHelpers.defaultEthSigner.getPublicKey.toString(16))
   )
 
   val TestEthRawTransaction: RawTransaction =
