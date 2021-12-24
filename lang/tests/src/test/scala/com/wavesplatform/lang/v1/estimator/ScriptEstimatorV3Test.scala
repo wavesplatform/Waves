@@ -8,7 +8,6 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
-import com.wavesplatform.test._
 
 import scala.collection.immutable.ArraySeq
 
@@ -186,8 +185,8 @@ class ScriptEstimatorV3Test
     ) shouldBe Right(1)
   }
 
-  property("sync invoke functions are allowed only for dApps") {
-    def expr(id: Short) = FUNCTION_CALL(
+  property("sync invoke functions are allowed for expressions and dApps") {
+    def expr(id: Short): FUNCTION_CALL = FUNCTION_CALL(
       Native(id),
       List(
         CaseObj(CASETYPEREF("Address", Nil), Map()),
@@ -196,8 +195,8 @@ class ScriptEstimatorV3Test
         REF("nil")
       )
     )
-    estimate(functionCosts(V5), expr(FunctionIds.CALLDAPP)) should produce("not found")
-    estimate(functionCosts(V5), expr(FunctionIds.CALLDAPPREENTRANT)) should produce("not found")
+    estimate(functionCosts(V5), expr(FunctionIds.CALLDAPP)) shouldBe Right(79)
+    estimate(functionCosts(V5), expr(FunctionIds.CALLDAPPREENTRANT)) shouldBe Right(79)
     estimate(functionCosts(V5, DApp), expr(FunctionIds.CALLDAPP)) shouldBe Right(79)
     estimate(functionCosts(V5, DApp), expr(FunctionIds.CALLDAPPREENTRANT)) shouldBe Right(79)
   }
