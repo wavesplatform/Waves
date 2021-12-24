@@ -113,7 +113,7 @@ object BlockDiffer extends ScorexLogging {
           ActivationError(s"MicroBlocks are not yet activated")
         )
       )
-      _ <- TracedResult(micro.signaturesValid(blockchain.isFeatureActivated(BlockchainFeatures.RideV6)))
+      _ <- TracedResult(micro.signaturesValid())
       r <- apply(
         blockchain,
         constraint,

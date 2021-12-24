@@ -1,8 +1,8 @@
 package com.wavesplatform.transaction.smart
 
 import cats.Id
-import cats.syntax.either._
-import cats.syntax.functor._
+import cats.syntax.either.*
+import cats.syntax.functor.*
 import com.google.common.base.Throwables
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -19,11 +19,11 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
-import com.wavesplatform.metrics._
-import com.wavesplatform.state._
+import com.wavesplatform.metrics.*
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.assets.exchange.{EthOrders, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
@@ -51,7 +51,7 @@ object Verifier extends ScorexLogging {
       (pt, blockchain.accountScript(pt.sender.toAddress)) match {
         case (stx: PaymentTransaction, None) =>
           stats.signatureVerification
-            .measureForType(stx.tpe)(stx.signaturesValid(blockchain.isFeatureActivated(BlockchainFeatures.RideV6)))
+            .measureForType(stx.tpe)(stx.signaturesValid())
             .as(0)
         case (et: ExchangeTransaction, scriptOpt) =>
           verifyExchange(et, blockchain, scriptOpt, if (limitedExecution) ContractLimits.FailFreeInvokeComplexity else Int.MaxValue)
@@ -136,7 +136,7 @@ object Verifier extends ScorexLogging {
   }
 
   private def logIfNecessary(
-      result: Either[ValidationError, _],
+      result: Either[ValidationError, ?],
       id: String,
       execLog: Log[Id],
       execResult: Either[String, EVALUATED]
@@ -276,7 +276,7 @@ object Verifier extends ScorexLogging {
       case _ => verifyAsEllipticCurveSignature(order, checkWeakPk)
     }
 
-  def verifyAsEllipticCurveSignature[T <: Proven with Authorized](pt: T, checkWeakPk: Boolean): Either[GenericError, T] =
+  def verifyAsEllipticCurveSignature[T <: Proven & Authorized](pt: T, checkWeakPk: Boolean): Either[GenericError, T] =
     pt.proofs.proofs match {
       case p +: Nil =>
         Either.cond(crypto.verify(p, pt.bodyBytes(), pt.sender, checkWeakPk), pt, GenericError(s"Proof doesn't validate as signature for $pt"))

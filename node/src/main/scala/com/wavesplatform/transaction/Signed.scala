@@ -1,24 +1,23 @@
 package com.wavesplatform.transaction
 
-import cats.instances.either._
-import cats.instances.lazyList._
-import cats.syntax.traverse._
+import cats.instances.either.*
+import cats.instances.lazyList.*
+import cats.syntax.traverse.*
 import com.wavesplatform.transaction.TxValidationError.InvalidSignature
 import monix.eval.Coeval
 
 trait Signed extends Authorized {
   protected val signatureValid: Coeval[Boolean]
-  protected def signatureValid(checkPk: Boolean): Boolean
 
   protected val signedDescendants: Coeval[Seq[Signed]] =
     Coeval(Nil)
 
-  def signaturesValid(checkPk: Boolean): Either[InvalidSignature, this.type] =
+  val signaturesValid: Coeval[Either[InvalidSignature, this.type]] = Coeval.evalOnce {
     (this +: signedDescendants())
       .to(LazyList)
       .map(
         entity =>
-          if (entity.signatureValid(checkPk)) {
+          if (entity.signatureValid()) {
             Right(entity)
           } else {
             Left(InvalidSignature(entity, None))
@@ -31,4 +30,5 @@ trait Signed extends Authorized {
         else InvalidSignature(this, Some(is))
       }
       .map(_ => this)
+  }
 }

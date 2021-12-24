@@ -9,13 +9,13 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
 import com.wavesplatform.utils.ScorexLogging
-import io.netty.channel._
+import io.netty.channel.*
 import monix.eval.{Coeval, Task}
 import monix.execution.CancelableFuture
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 
-import scala.collection.mutable.{Set => MSet}
+import scala.collection.mutable.Set as MSet
 import scala.concurrent.duration.FiniteDuration
 
 object MicroBlockSynchronizer extends ScorexLogging {
@@ -27,7 +27,6 @@ object MicroBlockSynchronizer extends ScorexLogging {
       microblockInvs: ChannelObservable[MicroBlockInv],
       microblockResponses: ChannelObservable[MicroBlockResponse],
       scheduler: SchedulerService,
-      rideV6Activated: Boolean
   ): (Observable[(Channel, MicroblockData)], Coeval[CacheSizes]) = {
 
     implicit val schdlr: SchedulerService = scheduler
@@ -94,7 +93,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
       .mapEval {
         case (ch, mbInv @ MicroBlockInv(_, totalBlockId, reference, _)) =>
           Task.evalAsync {
-            val sig = try mbInv.signaturesValid(rideV6Activated)
+            val sig = try mbInv.signaturesValid()
             catch {
               case t: Throwable =>
                 log.error(s"Error validating signature", t)

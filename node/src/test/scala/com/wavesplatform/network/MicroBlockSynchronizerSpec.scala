@@ -25,7 +25,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec with RxScheduler with BlockGen
     val lastBlockIds   = PS[ByteStr]()
     val microInvs      = PS[(Channel, MicroBlockInv)]()
     val microResponses = PS[(Channel, MicroBlockResponse)]()
-    val (r, _)         = MicroBlockSynchronizer(defaultSettings, peers, lastBlockIds, microInvs, microResponses, testScheduler, rideV6Activated = false)
+    val (r, _)         = MicroBlockSynchronizer(defaultSettings, peers, lastBlockIds, microInvs, microResponses, testScheduler)
     try {
       f(lastBlockIds, microInvs, microResponses, r)
     } finally {

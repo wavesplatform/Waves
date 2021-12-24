@@ -6,8 +6,8 @@ import com.wavesplatform.block.serialization.MicroBlockSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state._
-import com.wavesplatform.transaction._
+import com.wavesplatform.state.*
+import com.wavesplatform.transaction.*
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 
@@ -27,9 +27,6 @@ case class MicroBlock(
 
   override val signatureValid: Coeval[Boolean]        = Coeval.evalOnce(crypto.verify(signature, bytesWithoutSignature(), sender))
   override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
-
-  override protected def signatureValid(checkPk: Boolean): Boolean =
-    (!checkPk || !crypto.isWeakPublicKey(sender.arr)) && signatureValid()
 
   override def toString: String = s"MicroBlock(... -> ${reference.trim}, txs=${transactionData.size}"
 

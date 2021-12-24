@@ -3,11 +3,10 @@ package com.wavesplatform.state.appender
 import cats.data.EitherT
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.MicroBlock
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.metrics.{BlockStats, _}
+import com.wavesplatform.metrics.*
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
-import com.wavesplatform.network._
+import com.wavesplatform.network.*
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.InvalidSignature
@@ -22,7 +21,7 @@ import monix.execution.Scheduler
 import scala.util.{Left, Right}
 
 object MicroblockAppender extends ScorexLogging {
-  def apply(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPool, scheduler: Scheduler, verify: Boolean = true)(
+  def apply(blockchainUpdater: BlockchainUpdater & Blockchain, utxStorage: UtxPool, scheduler: Scheduler, verify: Boolean = true)(
       microBlock: MicroBlock
   ): Task[Either[ValidationError, BlockId]] = {
 
@@ -40,7 +39,7 @@ object MicroblockAppender extends ScorexLogging {
   }
 
   def apply(
-      blockchainUpdater: BlockchainUpdater with Blockchain,
+      blockchainUpdater: BlockchainUpdater & Blockchain,
       utxStorage: UtxPool,
       allChannels: ChannelGroup,
       peerDatabase: PeerDatabase,
@@ -49,7 +48,7 @@ object MicroblockAppender extends ScorexLogging {
     import md.microBlock
     val microblockTotalResBlockSig = microBlock.totalResBlockSig
     (for {
-      _ <- EitherT(Task.now(microBlock.signaturesValid(blockchainUpdater.isFeatureActivated(BlockchainFeatures.RideV6))))
+      _ <- EitherT(Task.now(microBlock.signaturesValid()))
       _ <- EitherT(apply(blockchainUpdater, utxStorage, scheduler)(microBlock))
     } yield ()).value.map {
       case Right(_) =>

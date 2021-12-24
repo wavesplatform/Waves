@@ -31,9 +31,6 @@ case class PaymentTransaction(
 
   protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), sender))
 
-  override protected def signatureValid(checkPk: Boolean): Boolean =
-    (!checkPk || !crypto.isWeakPublicKey(sender.arr)) && signatureValid()
-
   override val id: Coeval[ByteStr] = Coeval.evalOnce(signature)
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(PaymentTxSerializer.toBytes(this))
