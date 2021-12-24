@@ -1,12 +1,12 @@
 package com.wavesplatform.lang.evaluator
 
 import cats.Id
-import cats.syntax.semigroup._
+import cats.syntax.semigroup.*
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, _}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, *}
 import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.EvaluationException
 import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext
@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, FunctionIds}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{Common, Global}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import org.scalatest.Inside
 
 import scala.annotation.tailrec
@@ -31,8 +31,8 @@ class EvaluatorV2Test extends PropSpec with Inside {
   private val environment = Common.emptyBlockchainEnvironment()
   private val evalCtx     = LoggedEvaluationContext[Environment, Id](_ => _ => (), ctx.evaluationContext(environment))
 
-  private val oldEvaluator = new EvaluatorV2(evalCtx, version, newMode = false)
-  private val newEvaluator = new EvaluatorV2(evalCtx, version, newMode = true)
+  private val oldEvaluator = new EvaluatorV2(evalCtx, version, correctFunctionCallScope = true, newMode = false)
+  private val newEvaluator = new EvaluatorV2(evalCtx, version, correctFunctionCallScope = true, newMode = true)
 
   private def evalBoth(expr: EXPR, limit: Int): (EXPR, String, Int) = {
     val (result, unusedComplexity)   = newEvaluator(expr, limit)
@@ -702,7 +702,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
         x                # 1
       }
       y + x              # 1 (y ref) + 1 (+) + 1 (x ref) + 2 (x value) + 1 (y value)
-    */
+     */
 
     val (_, result, cost) = evalOld(expr, limit = 6)
     cost shouldBe 6
@@ -755,7 +755,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
         x
       }
       f() + x
-    */
+     */
 
     (the[EvaluationException] thrownBy evalBoth(expr, limit = 100)).getMessage shouldBe "A definition of 'x' not found"
 
@@ -776,7 +776,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
         g()
       }
       f() + g()
-    */
+     */
 
     (the[NoSuchElementException] thrownBy evalBoth(expr2, limit = 100)).getMessage shouldBe "Function or type 'g' not found"
   }
@@ -971,11 +971,13 @@ class EvaluatorV2Test extends PropSpec with Inside {
                   LET("c", REF("a")),
                   FUNCTION_CALL(
                     FunctionHeader.Native(FunctionIds.SUM_LONG),
-                    List(REF("c"),
-                         FUNCTION_CALL(
-                           FunctionHeader.Native(FunctionIds.SUM_LONG),
-                           List(REF("b"), REF("a"))
-                         ))
+                    List(
+                      REF("c"),
+                      FUNCTION_CALL(
+                        FunctionHeader.Native(FunctionIds.SUM_LONG),
+                        List(REF("b"), REF("a"))
+                      )
+                    )
                   )
                 )
               )
@@ -1072,7 +1074,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
       a = (a(1) + ... + a(n))
       a(i) = random from (0, a - (a1 + ... + a(i-1)) - n + i]
       a(n) = a - (a1 + ... + a(i-1))
-    */
+     */
     @tailrec def randomPieces(
         expectedSum: Int,
         piecesNumber: Int,
@@ -1235,7 +1237,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
         | f(1)
       """.stripMargin
 
-    evalOld(script, 1000)._1 shouldBe CONST_LONG(1)
+    evalOld(script, 1000)._1 shouldBe CONST_LONG(4)
     evalNew(script, 1000)._1 shouldBe CONST_LONG(4)
   }
 

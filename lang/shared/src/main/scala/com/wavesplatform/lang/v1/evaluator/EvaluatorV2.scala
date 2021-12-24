@@ -1,14 +1,14 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.Id
-import cats.instances.lazyList._
-import cats.syntax.either._
-import cats.syntax.foldable._
+import cats.instances.lazyList.*
+import cats.syntax.either.*
+import cats.syntax.foldable.*
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.User
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, Simple}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.{EvaluationException, incomplete}
@@ -22,6 +22,7 @@ import scala.collection.mutable.ListBuffer
 class EvaluatorV2(
     val ctx: LoggedEvaluationContext[Environment, Id],
     val stdLibVersion: StdLibVersion,
+    val correctFunctionCallScope: Boolean,
     val newMode: Boolean,
     val checkConstructorArgsTypes: Boolean = false
 ) {
@@ -144,7 +145,7 @@ class EvaluatorV2(
                 }
             update(argsWithExpr)
               .flatMap { _ =>
-                val blocks = if (newMode) functionScopeBlocks else parentBlocks
+                val blocks = if (correctFunctionCallScope) functionScopeBlocks else parentBlocks
                 root(argsWithExpr, update, precalculatedLimitOpt.getOrElse(limit), blocks)
               }
               .map(r => precalculatedLimitOpt.getOrElse(r))
@@ -227,7 +228,7 @@ class EvaluatorV2(
                       update = update,
                       limit = unused - overheadCost,
                       parentBlocks = parentBlocks
-                  )
+                    )
                 )
               case FALSE if unused > 0 =>
                 update(i.ifFalse).flatMap(
@@ -237,7 +238,7 @@ class EvaluatorV2(
                       update = update,
                       limit = unused - overheadCost,
                       parentBlocks = parentBlocks
-                  )
+                    )
                 )
               case _: EVALUATED => throw EvaluationException("Non-boolean result in cond", unused)
               case _            => Coeval.now(unused)
@@ -295,8 +296,8 @@ class EvaluatorV2(
               let.value match {
                 case e: EVALUATED => ctx.log(let, Right(e))
                 case _            =>
-            }
-        ),
+              }
+          ),
       limit = limit,
       parentBlocks = nextParentBlocks
     ).flatMap { unused =>
@@ -339,12 +340,13 @@ object EvaluatorV2 {
       limit: Int,
       ctx: EvaluationContext[Environment, Id],
       stdLibVersion: StdLibVersion,
+      correctFunctionCallScope: Boolean,
       newMode: Boolean,
       checkConstructorArgsTypes: Boolean = false
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (EXPR, Int, Log[Id])]] = {
     val log       = ListBuffer[LogItem[Id]]()
     val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
-    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion, newMode, checkConstructorArgsTypes)
+    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion, correctFunctionCallScope, newMode, checkConstructorArgsTypes)
     evaluator
       .applyCoeval(expr, limit)
       .redeem(
@@ -360,11 +362,12 @@ object EvaluatorV2 {
       expr: EXPR,
       stdLibVersion: StdLibVersion,
       complexityLimit: Int,
+      correctFunctionCallScope: Boolean,
       newMode: Boolean,
       handleExpr: EXPR => Either[ExecutionError, EVALUATED]
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
     EvaluatorV2
-      .applyLimitedCoeval(expr, complexityLimit, ctx, stdLibVersion, newMode)
+      .applyLimitedCoeval(expr, complexityLimit, ctx, stdLibVersion, correctFunctionCallScope, newMode)
       .value()
       .fold(
         { case (error, complexity, log) => (log, complexity, Left(error)) }, {
@@ -380,9 +383,10 @@ object EvaluatorV2 {
       ctx: EvaluationContext[Environment, Id],
       expr: EXPR,
       stdLibVersion: StdLibVersion,
+      correctFunctionCallScope: Boolean,
       newMode: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, newMode, incomplete)
+    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, correctFunctionCallScope, newMode, incomplete)
 
   private def incomplete(expr: EXPR): Either[ExecutionError, Nothing] =
     Left(s"Unexpected incomplete evaluation result $expr")
