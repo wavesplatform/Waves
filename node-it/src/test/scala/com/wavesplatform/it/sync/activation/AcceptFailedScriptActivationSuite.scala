@@ -6,22 +6,23 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionStatus
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.sync.transactions.OverflowBlock
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.{NTPTime, NodeConfigs}
+import com.wavesplatform.it.{NodeConfigs, NTPTime}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import play.api.libs.json.JsObject
+import scala.concurrent.duration.*
 
-import scala.concurrent.duration._
+import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.FixedDecimals
 
 class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTime with OverflowBlock {
   import AcceptFailedScriptActivationSuite._
@@ -373,7 +374,8 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         ts,
         ts + Order.MaxLiveTime,
         smartMatcherFee,
-        matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
+        matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get),
+        FixedDecimals
       )
       val sell =
         Order.sell(
@@ -386,7 +388,8 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           ts,
           ts + Order.MaxLiveTime,
           smartMatcherFee,
-          matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
+          matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get),
+          FixedDecimals
         )
       (buy, sell)
     }

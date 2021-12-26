@@ -4,18 +4,19 @@ import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, StateCheckFailed}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.{NodeConfigs, NTPTime}
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.sync.smartcontract.exchangeTx
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.{NTPTime, NodeConfigs}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.utils._
-import play.api.libs.json.{JsNumber, JsObject, JsString, Json}
+import com.wavesplatform.transaction.assets.exchange.*
+import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.FixedDecimals
+import com.wavesplatform.utils.*
+import play.api.libs.json.{JsNumber, JsObject, Json, JsString}
 
 class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
   private lazy val exchAsset: IssueTransaction = IssueTransaction(
@@ -99,10 +100,12 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     if (sender.findTransactionInfo(exchAsset.id().toString).isEmpty) sender.postJson("/transactions/broadcast", exchAsset.json())
     val pair = AssetPair.createAssetPair("WAVES", exchAsset.id().toString).get
 
-    for ((o1ver, o2ver) <- Seq(
-           (2: Byte, 1: Byte),
-           (2: Byte, 3: Byte)
-         )) {
+    for (
+      (o1ver, o2ver) <- Seq(
+        (2: Byte, 1: Byte),
+        (2: Byte, 3: Byte)
+      )
+    ) {
       val tx        = exchangeTx(pair, matcherFee, orderFee, ntpTime, o1ver, o2ver, acc1, acc0, acc2)
       val sig       = (Json.parse(tx.toString()) \ "proofs").as[Seq[JsString]].head
       val changedTx = tx + ("version" -> JsNumber(1)) + ("signature" -> sig)
@@ -137,14 +140,16 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     sender.transfer(firstKeyPair, secondKeyPair.toAddress.toString, IssueTx.quantity / 2, assetId = Some(assetId.toString), waitForTx = true)
 
-    for ((o1ver, o2ver, matcherFeeOrder1, matcherFeeOrder2) <- Seq(
-           (1: Byte, 3: Byte, Waves, IssuedAsset(assetId)),
-           (1: Byte, 3: Byte, Waves, Waves),
-           (2: Byte, 3: Byte, Waves, IssuedAsset(assetId)),
-           (3: Byte, 1: Byte, IssuedAsset(assetId), Waves),
-           (2: Byte, 3: Byte, Waves, Waves),
-           (3: Byte, 2: Byte, IssuedAsset(assetId), Waves)
-         )) {
+    for (
+      (o1ver, o2ver, matcherFeeOrder1, matcherFeeOrder2) <- Seq(
+        (1: Byte, 3: Byte, Waves, IssuedAsset(assetId)),
+        (1: Byte, 3: Byte, Waves, Waves),
+        (2: Byte, 3: Byte, Waves, IssuedAsset(assetId)),
+        (3: Byte, 1: Byte, IssuedAsset(assetId), Waves),
+        (2: Byte, 3: Byte, Waves, Waves),
+        (3: Byte, 2: Byte, IssuedAsset(assetId), Waves)
+      )
+    ) {
 
       val matcher                  = thirdKeyPair
       val ts                       = ntpTime.correctedTime()
@@ -161,9 +166,9 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val buyAmount  = 40000000
       val sellAmount = 40000000
       val assetPair  = AssetPair.createAssetPair("WAVES", assetId.toString).get
-      val buy        = Order.buy(o1ver, buyer, matcher.publicKey, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder1)
-      val sell       = Order.sell(o2ver, seller, matcher.publicKey, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder2)
-      val amount     = 40000000
+      val buy  = Order.buy(o1ver, buyer, matcher.publicKey, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder1)
+      val sell = Order.sell(o2ver, seller, matcher.publicKey, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder2)
+      val amount = 40000000
 
       val tx =
         ExchangeTransaction
@@ -239,14 +244,38 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     val nftOtherAssetPair = AssetPair.createAssetPair(nftAsset, dec6AssetId).get
 
     val sellNftForWaves =
-      Order.sell(4.toByte, seller, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves)
+      Order.sell(4.toByte, seller, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves, FixedDecimals)
     val buyNftForWaves =
-      Order.buy(4.toByte, buyer, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves)
+      Order.buy(4.toByte, buyer, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves, FixedDecimals)
 
     val sellNftForOtherAsset =
-      Order.sell(4.toByte, buyer, matcher.publicKey, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves)
+      Order.sell(
+        4.toByte,
+        buyer,
+        matcher.publicKey,
+        nftOtherAssetPair,
+        amount,
+        nftForAssetPrice,
+        ts,
+        expirationTimestamp,
+        matcherFee,
+        Waves,
+        FixedDecimals
+      )
     val buyNftForOtherAsset =
-      Order.buy(4.toByte, seller, matcher.publicKey, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves)
+      Order.buy(
+        4.toByte,
+        seller,
+        matcher.publicKey,
+        nftOtherAssetPair,
+        amount,
+        nftForAssetPrice,
+        ts,
+        expirationTimestamp,
+        matcherFee,
+        Waves,
+        FixedDecimals
+      )
 
     val sellerAddress = sellerKeyPair.toAddress.toString
     val sellerBalance = sender.balanceDetails(sellerAddress).regular
