@@ -153,7 +153,7 @@ object ExchangeTransactionDiff {
   }
 
   private[this] def checkOrderPriceModes(tx: ExchangeTransaction, blockchain: Blockchain): Either[GenericError, Unit] = {
-    def isLegacyModeOrder(order: Order) = order.version >= Order.V4 && order.priceMode == OrderPriceMode.AssetDecimals
+    def isLegacyModeOrder(order: Order) = order.version >= Order.V4 && (order.priceMode == OrderPriceMode.AssetDecimals || order.explicitMode)
     Either.cond(
       !Seq(tx.order1, tx.order2).exists(isLegacyModeOrder) || blockchain.isFeatureActivated(BlockchainFeatures.RideV6),
       (),
