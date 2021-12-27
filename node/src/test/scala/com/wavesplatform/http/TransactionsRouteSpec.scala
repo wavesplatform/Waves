@@ -1,16 +1,15 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.*
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
-import com.wavesplatform.api.http.ApiError._
-import com.wavesplatform.api.http.ApiMarshallers._
+import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, _}
+import com.wavesplatform.common.utils.{Base58, *}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.{BlockchainFeatures => BF}
 import com.wavesplatform.history.{Domain, settingsWithFeatures}
@@ -35,12 +34,12 @@ import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTran
 import com.wavesplatform.utils.{EthEncoding, EthHelpers}
 import com.wavesplatform.{BlockGen, BlockchainStubHelpers, TestValues, TestWallet}
 import monix.reactive.Observable
-import org.scalacheck.Gen._
+import org.scalacheck.Gen.*
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
+import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
-import play.api.libs.json._
 
 import scala.concurrent.Future
 import scala.util.Random
@@ -786,10 +785,10 @@ class TransactionsRouteSpec
       }
 
       Get(routePath(s"/info?${txs.map("id=" + _.id()).mkString("&")}")) ~> route ~> check(checkResponse())
-      Post(routePath("/info"), FormData(txs.map("id" -> _.id().toString): _*)) ~> route ~> check(checkResponse())
+      Post(routePath("/info"), FormData(txs.map("id" -> _.id().toString)*)) ~> route ~> check(checkResponse())
       Post(
         routePath("/info"),
-        HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(txs.map(_.id().toString: JsValueWrapper): _*)).toString())
+        HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(txs.map(_.id().toString: JsValueWrapper)*)).toString())
       ) ~> route ~> check(
         checkResponse()
       )

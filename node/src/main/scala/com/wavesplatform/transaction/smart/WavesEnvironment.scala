@@ -29,7 +29,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TransactionBase}
+import com.wavesplatform.transaction.{Asset, TransactionBase, TransactionType}
 import monix.eval.Coeval
 import shapeless._
 
@@ -61,7 +61,7 @@ class WavesEnvironment(
     blockchain
       .transactionInfo(ByteStr(id))
       .filter(_._1.succeeded)
-      .map(_._2)
+      .collect { case (_, tx) if tx.t.tpe != TransactionType.Ethereum => tx }
       .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
 
   override def inputEntity: InputEntity = in()

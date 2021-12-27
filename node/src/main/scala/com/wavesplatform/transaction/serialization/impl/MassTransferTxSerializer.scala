@@ -40,7 +40,7 @@ object MassTransferTxSerializer {
           sender.arr,
           assetId.byteRepr,
           Shorts.toByteArray(transfers.size.toShort),
-          Bytes.concat(transferBytes: _*),
+          Bytes.concat(transferBytes*),
           Longs.toByteArray(timestamp),
           Longs.toByteArray(fee),
           Deser.serializeArrayWithLength(attachment.arr)

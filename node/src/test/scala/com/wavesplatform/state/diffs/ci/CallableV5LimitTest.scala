@@ -79,13 +79,13 @@ class CallableV5LimitTest
   property("callable limit is 10000 from V5") {
     val (genesisTxs, setAcceptable, setProhibitedScript, setProhibitedV4Script, setSyncDApp, invoke, syncInvoke) = scenario.sample.get
     withDomain(RideV4) { d =>
-      d.appendBlock(genesisTxs: _*)
+      d.appendBlock(genesisTxs*)
       (the[RuntimeException] thrownBy d.appendBlock(setProhibitedV4Script)).getMessage should include(
         "Contract function (default) is too complex: 9528 > 4000"
       )
     }
     withDomain(RideV5) { d =>
-      d.appendBlock(genesisTxs: _*)
+      d.appendBlock(genesisTxs*)
       (the[RuntimeException] thrownBy d.appendBlock(setProhibitedV4Script)).getMessage should include(
         "Contract function (default) is too complex: 9528 > 4000"
       )

@@ -65,7 +65,7 @@ class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with Transaction
         .withFeatures(BlockV5, SynchronousCalls)
 
     withDomain(domainSettingsWithFS(settings)) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs*)
 
       val invoke1 = invoke()
       d.appendAndCatchError(invoke1).toString should include("negative waves balance")

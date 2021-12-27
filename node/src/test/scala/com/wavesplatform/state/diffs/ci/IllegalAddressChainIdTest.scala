@@ -6,13 +6,13 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 
 class IllegalAddressChainIdTest extends PropSpec with WithDomain {
-  import DomainPresets._
+  import DomainPresets.*
 
   private[this] def sigVerify(c: Boolean): String =
     s""" strict c = ${if (c) (1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ") else "true"} """
@@ -44,7 +44,7 @@ class IllegalAddressChainIdTest extends PropSpec with WithDomain {
   property("no fail before fix") {
     withDomain(RideV5) { d =>
       val (genesisTxs, invokeTx) = scenario(fail = true).sample.get
-      d.appendBlock(genesisTxs: _*)
+      d.appendBlock(genesisTxs*)
       intercept[Exception](d.appendBlock(invokeTx)).getMessage should include(error)
     }
   }
@@ -52,7 +52,7 @@ class IllegalAddressChainIdTest extends PropSpec with WithDomain {
   property("reject after fix") {
     withDomain(RideV6) { d =>
       val (genesisTxs, invokeTx) = scenario(fail = true).sample.get
-      d.appendBlock(genesisTxs: _*)
+      d.appendBlock(genesisTxs*)
       d.appendAndCatchError(invokeTx).toString should include(error)
     }
   }

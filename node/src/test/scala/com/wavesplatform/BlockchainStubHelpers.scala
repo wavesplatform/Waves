@@ -68,7 +68,7 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
     }
 
     def activateAllFeatures(): Unit = {
-      this.activateFeatures(BlockchainFeatures.implemented.flatMap(BlockchainFeatures.feature).toSeq: _*)
+      this.activateFeatures(BlockchainFeatures.implemented.flatMap(BlockchainFeatures.feature).toSeq*)
     }
 
     def creditBalance(address: MockParameter[Address], asset: MockParameter[Asset], amount: Long = Long.MaxValue / 3): Unit = {

@@ -99,7 +99,7 @@ class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettin
   property(s"fee multiplier is disabled after activation ${BlockchainFeatures.SynchronousCalls}") {
     val (preparingTxs, invoke1, data2, invoke2) = paymentPreconditions(lambordini).sample.get
     withDomain(domainSettingsWithFS(fsWithV5)) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs*)
       d.appendBlock(invoke1)
 
       d.appendBlock(data2)

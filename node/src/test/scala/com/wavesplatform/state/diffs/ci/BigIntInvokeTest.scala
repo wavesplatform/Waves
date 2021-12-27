@@ -95,7 +95,7 @@ class BigIntInvokeTest
     def assert(action: EXPR => FUNCTION_CALL, message: String) = {
       val (preparingTxs, invoke) = paymentPreconditions(action).sample.get
       withDomain(domainSettingsWithFS(fsWithV5)) { d =>
-        d.appendBlock(preparingTxs: _*)
+        d.appendBlock(preparingTxs*)
         (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include(message)
       }
     }
