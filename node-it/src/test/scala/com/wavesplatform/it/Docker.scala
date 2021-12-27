@@ -27,6 +27,7 @@ import com.typesafe.config.ConfigFactory.*
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.AsyncHttpApi.*
 import com.wavesplatform.it.util.GlobalTimer.instance as timer
 import com.wavesplatform.settings.*
@@ -72,7 +73,7 @@ class Docker(
     close()
   }
 
-  private def genesisOverride = Docker.genesisOverride
+  private val genesisTs = System.currentTimeMillis()
 
   // a random network in 10.x.x.x range
   val networkSeed = Random.nextInt(0x100000) << 4 | 0x0A000000
@@ -87,6 +88,9 @@ class Docker(
     Files.createDirectories(r)
     r
   }
+
+  private def genesisOverride(featuresConfig: Option[Config]) =
+    Docker.genesisOverride(genesisTs, featuresConfig)
 
   private def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
 
@@ -213,7 +217,7 @@ class Docker(
       val overrides = peersOverrides
         .withFallback(nodeConfig)
         .withFallback(suiteConfig)
-        .withFallback(genesisOverride)
+        .withFallback(genesisOverride(Some(nodeConfig)))
         .withFallback(configTemplate)
 
       val actualConfig = overrides
@@ -557,8 +561,7 @@ object Docker {
   private val propsMapper = new JavaPropsMapper
 
   val configTemplate: Config = parseResources("template.conf")
-  def genesisOverride: Config = {
-    val genesisTs = System.currentTimeMillis()
+  def genesisOverride(genesisTs: Long = System.currentTimeMillis(), featuresConfig: Option[Config] = None): Config = {
 
     val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
                                             |  timestamp = $genesisTs
@@ -569,7 +572,15 @@ object Docker {
     val genesisConfig     = timestampOverrides.withFallback(configTemplate)
     val gs                = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
 
-    val genesisSignature  = Block.genesis(gs, rideV6Activated = false).explicitGet().id()
+    val isRideV6Activated = featuresConfig.map(_.withFallback(configTemplate))
+      .getOrElse(configTemplate)
+      .resolve()
+      .as[FunctionalitySettings]("waves.blockchain.custom.functionality")
+      .preActivatedFeatures
+      .get(BlockchainFeatures.RideV6.id)
+      .contains(0)
+
+    val genesisSignature  = Block.genesis(gs, rideV6Activated = isRideV6Activated).explicitGet().id()
 
     parseString(s"waves.blockchain.custom.genesis.signature = $genesisSignature").withFallback(timestampOverrides)
   }
