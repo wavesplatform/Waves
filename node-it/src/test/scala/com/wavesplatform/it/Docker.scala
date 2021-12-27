@@ -86,7 +86,8 @@ class Docker(
     r
   }
 
-  private val genesisOverride = Docker.genesisOverride
+  private val genesisTs: Long = System.currentTimeMillis()
+  private def genesisOverride = Docker.genesisOverride(genesisTs)
 
   private def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
 
@@ -557,9 +558,7 @@ object Docker {
   private val propsMapper = new JavaPropsMapper
 
   val configTemplate: Config = parseResources("template.conf")
-  def genesisOverride: Config = {
-    val genesisTs = System.currentTimeMillis()
-
+  def genesisOverride(genesisTs: Long): Config = {
     val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
                                             |  timestamp = $genesisTs
                                             |  block-timestamp = $genesisTs

@@ -19,7 +19,7 @@ import net.ceedubs.ficus.Ficus._
 object BaseTargetChecker {
   def main(args: Array[String]): Unit = {
     implicit val reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.default
-    val sharedConfig = Docker.genesisOverride
+    val sharedConfig = Docker.genesisOverride(System.currentTimeMillis())
       .withFallback(Docker.configTemplate)
       .withFallback(defaultApplication())
       .withFallback(defaultReference())
