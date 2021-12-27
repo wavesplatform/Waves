@@ -7,12 +7,12 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry}
-import com.wavesplatform.state.DataEntry._
+import com.wavesplatform.state.DataEntry.*
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest._
+import org.scalatest.*
 import play.api.libs.json.Json
 
 class DataTransactionSpecification extends PropSpec {
@@ -117,7 +117,7 @@ class DataTransactionSpecification extends PropSpec {
             case BinaryDataEntry(k, v) =>
               k shouldEqual te.key
               v shouldEqual te.value
-            case _: DataEntry[_] =>
+            case _: DataEntry[?] =>
               re shouldEqual te
             case _ => fail()
           }
@@ -127,10 +127,11 @@ class DataTransactionSpecification extends PropSpec {
 
   property("positive validation cases") {
     import DataTransaction.MaxEntryCount
-    import com.wavesplatform.state._
+    import com.wavesplatform.state.*
+
     forAll(dataTransactionGen, dataEntryGen(500)) {
       case (DataTransaction(version, sender, _, fee, timestamp, proofs, chainId), _) =>
-        def check(data: List[DataEntry[_]]): Assertion = {
+        def check(data: List[DataEntry[?]]): Assertion = {
           val txEi = DataTransaction.create(version, sender, data, fee, timestamp, proofs)
           txEi shouldBe Right(DataTransaction(version, sender, data, fee, timestamp, proofs, chainId))
           checkSerialization(txEi.explicitGet())
@@ -154,15 +155,6 @@ class DataTransactionSpecification extends PropSpec {
         val emptyKey   = List(IntegerDataEntry("", 2))
         val emptyKeyEi = DataTransaction.create(version, sender, emptyKey, fee, timestamp, proofs)
         emptyKeyEi shouldBe Left(TxValidationError.EmptyDataKey)
-
-        val maxKeySize   = if (tx.isProtobufVersion) MaxPBKeySize else MaxKeySize
-        val keyTooLong   = data :+ BinaryDataEntry("a" * (maxKeySize + 1), ByteStr(Array(1, 2)))
-        val keyTooLongEi = DataTransaction.create(version, sender, keyTooLong, fee, timestamp, proofs)
-        keyTooLongEi shouldBe Left(TxValidationError.TooBigArray)
-
-        val valueTooLong   = data :+ BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1: Byte)))
-        val valueTooLongEi = DataTransaction.create(version, sender, valueTooLong, fee, timestamp, proofs)
-        valueTooLongEi shouldBe Left(TxValidationError.TooBigArray)
 
         val e               = BooleanDataEntry("dupe", value = true)
         val duplicateKeys   = e +: data.drop(3) :+ e
