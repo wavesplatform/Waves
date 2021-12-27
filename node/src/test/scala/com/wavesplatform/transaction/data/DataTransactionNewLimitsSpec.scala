@@ -9,13 +9,13 @@ import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.{DataTransaction, TxHelpers}
 
 class DataTransactionNewLimitsSpec extends FlatSpec with WithDomain {
-  def generateMaxAllowed(limit: Int): (BooleanDataEntry, IntegerDataEntry, StringDataEntry, Seq[BinaryDataEntry]) = {
-    val KeySize = 1
+  def generateMaxAllowed(limit: Int, overLimit: Boolean = false): (BooleanDataEntry, IntegerDataEntry, StringDataEntry, Seq[BinaryDataEntry]) = {
+    val KeySize               = 1
     val ArbitraryEntriesCount = 10
-    val bool    = BooleanDataEntry("1", value = true)
-    val int     = IntegerDataEntry("2", Long.MaxValue)
+    val bool                  = BooleanDataEntry("1", value = true)
+    val int                   = IntegerDataEntry("2", Long.MaxValue)
 
-    val bytesOrStrEntryLimit = (limit - KeySize * 2 - 8 - 1 - (KeySize * ArbitraryEntriesCount)) / ArbitraryEntriesCount
+    val bytesOrStrEntryLimit = (limit - KeySize * 2 - 8 - 1 - (KeySize * ArbitraryEntriesCount)) / ArbitraryEntriesCount + (if (overLimit) 1 else 0)
     val str                  = StringDataEntry("3", String.valueOf(Array.fill(bytesOrStrEntryLimit)('A')))
     val bytes                = (1 until ArbitraryEntriesCount).map(i => BinaryDataEntry((3 + i).toString, ByteStr(Array.fill(bytesOrStrEntryLimit)('A'.toByte))))
     (bool, int, str, bytes)
@@ -24,25 +24,63 @@ class DataTransactionNewLimitsSpec extends FlatSpec with WithDomain {
   "Data transaction" should "handle new limits" in withDomain(DomainPresets.RideV6) { d =>
     d.helpers.creditWavesToDefaultSigner()
 
-    val (bool, int, str, bytes) = generateMaxAllowed(DataTransaction.MaxBytes)
+    val (bool, int, str, bytes) = generateMaxAllowed(DataTransaction.MaxRideV6Bytes)
     val dataEntries             = Seq(bool, int, str) ++ bytes
     val dataTransaction         = TxHelpers.dataWithMultipleEntries(TxHelpers.defaultSigner, dataEntries)
     d.appendAndAssertSucceed(dataTransaction)
-    
+
     val networkMessage = network.TransactionSpec.serializeData(dataTransaction)
-    networkMessage.length shouldBe <= (network.TransactionSpec.maxLength)
+    networkMessage.length shouldBe <=(network.TransactionSpec.maxLength)
 
     val protoNetworkMessage = network.PBTransactionSpec.serializeData(dataTransaction)
-    protoNetworkMessage.length shouldBe <= (network.PBTransactionSpec.maxLength)
+    protoNetworkMessage.length shouldBe <=(network.PBTransactionSpec.maxLength)
+  }
+
+  it should "not handle over limits" in withDomain(DomainPresets.RideV6) { d =>
+    d.helpers.creditWavesToDefaultSigner()
+
+    val (bool, int, str, bytes) = generateMaxAllowed(DataTransaction.MaxRideV6Bytes, overLimit = true)
+    val dataEntries             = Seq(bool, int, str) ++ bytes
+    val dataTransaction         = TxHelpers.dataWithMultipleEntries(TxHelpers.defaultSigner, dataEntries)
+    intercept[RuntimeException](d.appendBlock(dataTransaction))
   }
 
   it should "handle 400 bytes key" in withDomain(DomainPresets.RideV6) { d =>
-    val dataEntry = StringDataEntry("a" * 400, "test")
+    val dataEntry       = StringDataEntry("a" * 400, "test")
     val dataTransaction = TxHelpers.dataWithMultipleEntries(TxHelpers.defaultSigner, Seq(dataEntry))
 
     d.helpers.creditWavesToDefaultSigner()
     d.appendAndAssertSucceed(dataTransaction)
     d.blockchain.accountData(TxHelpers.defaultAddress, "a" * 400) shouldBe Some(dataEntry)
+  }
+
+  it should "not handle 401 bytes key" in withDomain(DomainPresets.RideV6) { d =>
+    val dataEntry       = StringDataEntry("a" * 401, "test")
+    val dataTransaction = TxHelpers.dataWithMultipleEntries(TxHelpers.defaultSigner, Seq(dataEntry))
+
+    d.helpers.creditWavesToDefaultSigner()
+    intercept[RuntimeException](d.appendBlock(dataTransaction)).toString should include("TooBigArray")
+    d.blockchain.accountData(TxHelpers.defaultAddress, "a" * 401) shouldBe None
+  }
+
+  it should "not handle 32768 bytes binary value" in withDomain(DomainPresets.RideV6) { d =>
+    val dataEntry = BinaryDataEntry("test", ByteStr(("a" * 32768).getBytes("ASCII")))
+    d.helpers.creditWavesToDefaultSigner()
+
+    intercept[RuntimeException](d.appendBlock(TxHelpers.dataWithMultipleEntries(TxHelpers.defaultSigner, Seq(dataEntry)))).toString should include(
+      "exceeds MaxShort(32767)"
+    )
+    d.blockchain.accountData(TxHelpers.defaultAddress, "test") shouldBe None
+  }
+
+  it should "not handle 32768 bytes string value" in withDomain(DomainPresets.RideV6) { d =>
+    val dataEntry = StringDataEntry("test", "a" * 32768)
+
+    d.helpers.creditWavesToDefaultSigner()
+    intercept[RuntimeException](d.appendBlock(TxHelpers.dataWithMultipleEntries(TxHelpers.defaultSigner, Seq(dataEntry)))).toString should include(
+      "exceeds MaxShort(32767)"
+    )
+    d.blockchain.accountData(TxHelpers.defaultAddress, "test") shouldBe None
   }
 
   "Invoke transaction with data entries" should "handle new limits" in withDomain(DomainPresets.RideV6) { d =>
