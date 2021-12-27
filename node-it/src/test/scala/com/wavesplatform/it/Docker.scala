@@ -27,7 +27,6 @@ import com.typesafe.config.ConfigFactory.*
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.AsyncHttpApi.*
 import com.wavesplatform.it.util.GlobalTimer.instance as timer
 import com.wavesplatform.settings.*
@@ -73,7 +72,7 @@ class Docker(
     close()
   }
 
-  private def genesisOverride(featuresConfig: Option[Config]) = Docker.genesisOverride(featuresConfig)
+  private def genesisOverride = Docker.genesisOverride
 
   // a random network in 10.x.x.x range
   val networkSeed = Random.nextInt(0x100000) << 4 | 0x0A000000
@@ -214,7 +213,7 @@ class Docker(
       val overrides = peersOverrides
         .withFallback(nodeConfig)
         .withFallback(suiteConfig)
-        .withFallback(genesisOverride(Some(nodeConfig)))
+        .withFallback(genesisOverride)
         .withFallback(configTemplate)
 
       val actualConfig = overrides
@@ -558,7 +557,7 @@ object Docker {
   private val propsMapper = new JavaPropsMapper
 
   val configTemplate: Config = parseResources("template.conf")
-  def genesisOverride(featuresConfig: Option[Config] = None): Config = {
+  def genesisOverride: Config = {
     val genesisTs = System.currentTimeMillis()
 
     val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
@@ -569,12 +568,8 @@ object Docker {
 
     val genesisConfig     = timestampOverrides.withFallback(configTemplate)
     val gs                = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
-    val isRideV6Activated = featuresConfig.exists { config =>
-      config.getAs[Map[Short, Int]]("waves.blockchain.custom.functionality.pre-activated-features")
-        .exists(_.get(BlockchainFeatures.RideV6.id).contains(0))
-    }
 
-    val genesisSignature  = Block.genesis(gs, rideV6Activated = isRideV6Activated).explicitGet().id()
+    val genesisSignature  = Block.genesis(gs, rideV6Activated = false).explicitGet().id()
 
     parseString(s"waves.blockchain.custom.genesis.signature = $genesisSignature").withFallback(timestampOverrides)
   }
