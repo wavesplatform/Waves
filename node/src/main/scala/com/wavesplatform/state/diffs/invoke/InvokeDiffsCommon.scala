@@ -613,7 +613,7 @@ object InvokeDiffsCommon {
             // Check temporary negative balance
             _ <- TracedResult(
               BalanceDiffValidation
-                .cond(blockchain, _.isFeatureActivated(BlockchainFeatures.SynchronousCalls))(baseDiff)
+                .cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(baseDiff)
                 .leftMap(FailedTransactionError.asFailedScriptError(_).addComplexity(baseDiff.scriptsComplexity))
             )
           } yield baseDiff
