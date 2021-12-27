@@ -5,13 +5,13 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
@@ -113,7 +113,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
   property("exceeding 15 Kb with RideV6") {
     withDomain(DomainPresets.RideV6) { d =>
       val (preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true).sample.get
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs *)
 
       val invoke1 = invoke()
       d.appendAndCatchError(invoke1).toString should include("Storing data size should not exceed 15360")
