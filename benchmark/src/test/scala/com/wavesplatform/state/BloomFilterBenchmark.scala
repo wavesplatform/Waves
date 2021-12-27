@@ -51,7 +51,7 @@ object BloomFilterBenchmark {
           (0 until txCount).flatMap(
             txNum =>
               db.get(Keys.transactionAt(Height(h), TxNum(txNum.toShort)))
-                .collect { case (tx: ExchangeTransaction, true) => tx }
+                .collect { case (m, tx: ExchangeTransaction) if m.succeeded => tx }
           )
       }
 

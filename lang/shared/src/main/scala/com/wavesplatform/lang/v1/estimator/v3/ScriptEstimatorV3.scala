@@ -17,7 +17,9 @@ import monix.eval.Coeval
 
 import scala.util.Try
 
-case class ScriptEstimatorV3(fixOverflow: Boolean) extends ScriptEstimator {
+case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean) extends ScriptEstimator {
+  private val overheadCost: Long = if (overhead) 1 else 0
+
   override val version: Int = 3
 
   override def apply(
@@ -39,7 +41,7 @@ case class ScriptEstimatorV3(fixOverflow: Boolean) extends ScriptEstimator {
         case BLOCK(f: FUNC, inner)       => evalFuncBlock(f, inner)
         case BLOCK(_: FAILED_DEC, _)     => const(0)
         case REF(str)                    => markRef(str)
-        case _: EVALUATED                => const(1L)
+        case _: EVALUATED                => const(overheadCost)
         case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
         case GETTER(expr, _)             => evalGetter(expr)
         case FUNCTION_CALL(header, args) => evalFuncCall(header, args)
@@ -93,14 +95,14 @@ case class ScriptEstimatorV3(fixOverflow: Boolean) extends ScriptEstimator {
       right <- evalHoldingFuncs(ifTrue)
       left  <- evalHoldingFuncs(ifFalse)
       r1    <- sum(cond, Math.max(right, left))
-      r2    <- sum(r1, 1)
+      r2    <- sum(r1, overheadCost)
     } yield r2
 
   private def markRef(key: String): EvalM[Long] =
-    update(usedRefs.modify(_)(_ + key)).map(_ => 1)
+    update(usedRefs.modify(_)(_ + key)).map(_ => overheadCost)
 
   private def evalGetter(expr: EXPR): EvalM[Long] =
-    evalExpr(expr).flatMap(sum(_, 1))
+    evalExpr(expr).flatMap(sum(_, overheadCost))
 
   private def evalFuncCall(header: FunctionHeader, args: List[EXPR]): EvalM[Long] =
     for {
@@ -124,7 +126,9 @@ case class ScriptEstimatorV3(fixOverflow: Boolean) extends ScriptEstimator {
       )
       argsCosts    <- args.traverse(evalHoldingFuncs)
       argsCostsSum <- argsCosts.foldM(0L)(sum)
-      bodyWithArgs <- sum(argsCostsSum, bodyCost.value())
+      bodyCostV         = bodyCost.value()
+      correctedBodyCost = if (!overhead && bodyCostV == 0) 1 else bodyCostV
+      bodyWithArgs <- sum(argsCostsSum, correctedBodyCost)
       result <- sum(internalCallsCost, bodyWithArgs)
     } yield result
 
@@ -155,7 +159,7 @@ case class ScriptEstimatorV3(fixOverflow: Boolean) extends ScriptEstimator {
                   .toRight(s"$errorPrefix'$function' is not found in the scope")
               case expr =>
                 Left(s"${errorPrefix}expression '$expr' is passed as function reference")
-            }
+          }
       )
       .getOrElse(Right(0L))
     liftEither(r)

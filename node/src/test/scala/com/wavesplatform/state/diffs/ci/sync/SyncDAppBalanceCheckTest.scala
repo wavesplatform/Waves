@@ -68,7 +68,7 @@ class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with Transaction
         .copy(syncDAppCheckPaymentsHeight = 4)
 
     withDomain(domainSettingsWithFS(settings)) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs*)
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)

@@ -5,32 +5,32 @@ import java.nio.ByteBuffer
 import cats.Id
 import cats.data.EitherT
 import cats.kernel.Monoid
-import cats.syntax.bifunctor._
+import cats.syntax.bifunctor.*
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.crypto._
-import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.crypto.*
+import com.wavesplatform.lang.Common.*
+import com.wavesplatform.lang.Testing.*
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
-import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
+import com.wavesplatform.lang.v1.evaluator.ctx.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, EnvironmentFunctions, PureContext, _}
 import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, EvaluatorV2, FunctionIds, Log}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.{Common, EvalF, ExecutionError, Global}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.EitherValues
 
@@ -65,7 +65,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     defaultEvaluator[T](context, expr)
 
   private def evalV2[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] =
-    EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion], correctFunctionCallScope = true)._3
+    EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion], correctFunctionCallScope = true, newMode = true)._3
       .asInstanceOf[Either[ExecutionError, T]]
 
   private def eval[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] = {
@@ -81,7 +81,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   private def evalWithLogging(context: EvaluationContext[Environment, Id], expr: EXPR): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
     val evaluatorV1Result                      = defaultEvaluator.applyWithLogging[EVALUATED](context, expr)
-    val (evaluatorV2Log, _, evaluatorV2Result) = EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion], correctFunctionCallScope = true)
+    val (evaluatorV2Log, _, evaluatorV2Result) = EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion], correctFunctionCallScope = true, newMode = true)
 
     evaluatorV2Result.bimap((_, evaluatorV2Log), (_, evaluatorV2Log)) shouldBe evaluatorV1Result
     evaluatorV1Result
@@ -260,8 +260,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     forAll(blockBuilder) { block =>
       var functionEvaluated = 0
 
-      val f = NativeFunction[NoContext]("F", 1: Long, 258: Short, LONG: TYPE, Seq(("_", LONG)): _*) {
-        case _ =>
+      val f = NativeFunction[NoContext]("F", 1: Long, 258: Short, LONG: TYPE, Seq(("_", LONG))*) {
+        _ =>
           functionEvaluated = functionEvaluated + 1
           evaluated(1L)
       }
@@ -306,10 +306,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   property("successful on function call getter evaluation") {
     val fooType = CASETYPEREF("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction[NoContext]("createFoo", 1: Long, 259: Short, fooType, List.empty: _*) {
-      case _ =>
-        evaluated(CaseObj(fooType, Map("bar" -> "bAr", "buz" -> 1L)))
-    }
+    val fooCtor = NativeFunction[NoContext]("createFoo", 1: Long, 259: Short, fooType, List.empty*)(_ =>
+      evaluated(CaseObj(fooType, Map("bar" -> "bAr", "buz" -> 1L))))
 
     val context = EvaluationContext.build(
       typeDefs = Map.empty,
@@ -324,8 +322,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   property("successful on block getter evaluation") {
     val fooType = CASETYPEREF("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction[NoContext]("createFoo", 1: Long, 259: Short, fooType, List.empty: _*) {
-      case _ =>
+    val fooCtor = NativeFunction[NoContext]("createFoo", 1: Long, 259: Short, fooType, List.empty*) {
+      _ =>
         evaluated(
           CaseObj(
             fooType,
@@ -338,7 +336,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     }
     val fooTransform =
       NativeFunction[NoContext]("transformFoo", 1: Long, 260: Short, fooType, ("foo", fooType)) {
-        case (fooObj: CaseObj) :: Nil => evaluated(fooObj.copy(fields = fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
+        case (fooObj: CaseObj) :: Nil => evaluated(CaseObj(fooObj.caseType, fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
         case _                        => ???
       }
 
@@ -562,7 +560,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   }
 
   property("fromBase58String(String) input is 100 chars max") {
-    import Global.{MaxBase58String => Max}
+    import Global.MaxBase58String as Max
     val gen = for {
       len <- Gen.choose(Max + 1, Max * 2)
       xs  <- Gen.containerOfN[Array, Byte](len, Arbitrary.arbByte.arbitrary)

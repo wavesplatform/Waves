@@ -71,7 +71,7 @@ object AsyncGrpcApi {
         address: ByteString = ByteString.EMPTY
     ): Future[Seq[(com.wavesplatform.transaction.Transaction, StateChangesDetails)]] = {
       val ids = txIds.map(id => ByteString.copyFrom(Base58.decode(id)))
-      stateChanges(TransactionsRequest().addTransactionIds(ids: _*).withSender(address))
+      stateChanges(TransactionsRequest().addTransactionIds(ids*).withSender(address))
     }
 
     def broadcastIssue(

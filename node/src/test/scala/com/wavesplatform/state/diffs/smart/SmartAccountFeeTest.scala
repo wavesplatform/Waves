@@ -228,7 +228,7 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
     forAll(preconditions) {
       case (preparingTxs, paidVerifierTxs, freeVerifierTxs) =>
         withDomain(domainSettingsWithFS(features)) { d =>
-          d.appendBlock(preparingTxs: _*)
+          d.appendBlock(preparingTxs*)
 
           (paidVerifierTxs ::: freeVerifierTxs).foreach(tx => appendAndAssertNotEnoughFee(tx(), d))
 
@@ -238,7 +238,7 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
           d.blockchain.bestLiquidDiff.get.scriptsRun shouldBe 0
 
           paidVerifierTxs.foreach(tx => appendAndAssertNotEnoughFee(tx(), d))
-          d.appendBlock(freeVerifierTxs.map(_()): _*)
+          d.appendBlock(freeVerifierTxs.map(_())*)
           freeVerifierTxs.foreach(tx => assertNoError(tx(), d))
           d.blockchain.bestLiquidDiff.get.scriptsRun shouldBe freeVerifierTxs.size
         }

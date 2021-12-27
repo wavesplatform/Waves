@@ -42,19 +42,22 @@ object EthTxGenerator {
     case Arg.List(listType, elements) =>
       val ethTypedXs = elements.map(toEthType)
       val arrayClass = toEthType(listType)
-      new ethTypes.DynamicArray(arrayClass.getClass.asInstanceOf[Class[ethTypes.Type[_]]], ethTypedXs: _*) {
+      new ethTypes.DynamicArray(arrayClass.getClass.asInstanceOf[Class[ethTypes.Type[_]]], ethTypedXs*) {
         override def getTypeAsString: String =
           (if (classOf[StructType].isAssignableFrom(arrayClass.getClass)) arrayClass.getTypeAsString else AbiTypes.getTypeAString(getComponentType)) + "[]"
       }
     case Arg.Union(index, fields) =>
-      new ethTypes.DynamicStruct(toEthType(Arg.Integer(index, "uint8")) +: fields.map(toEthType): _*)
+      new ethTypes.DynamicStruct((toEthType(Arg.Integer(index, "uint8")) +: fields.map(toEthType))*)
 
-    case Arg.Struct(values @ _*) => new ethTypes.StaticStruct(values.map(toEthType): _*)
+    case Arg.Struct(values*) => new ethTypes.StaticStruct(values.map(toEthType)*)
   }
 
   def signRawTransaction(keyPair: ECKeyPair, chainId: Byte)(raw: RawTransaction): EthereumTransaction = {
     val signedTx =
-      new SignedRawTransaction(raw.getTransaction, Sign.signMessage(TransactionEncoder.encode(raw, chainId.toLong), keyPair, true))
+      new SignedRawTransaction(
+        raw.getTransaction,
+        TransactionEncoder.createEip155SignatureData(Sign.signMessage(TransactionEncoder.encode(raw, chainId.toLong), keyPair, true), chainId.toLong)
+      )
     EthereumTransaction(signedTx).explicitGet()
   }
 
@@ -84,11 +87,11 @@ object EthTxGenerator {
 
       signRawTransaction(keyPair, recipient.chainId)(
         RawTransaction.createTransaction(
-          BigInt(System.currentTimeMillis()).bigInteger,
+          BigInt(System.currentTimeMillis()).bigInteger, // nonce
           EthereumTransaction.GasPrice,
           BigInt(100000).bigInteger,                     // fee
-          EthEncoding.toHexString(assetId.arr.take(20)), // asset erc20 "contract" address
-          FunctionEncoder.encode(function)
+          EthEncoding.toHexString(assetId.arr.take(20)), // to (asset erc20 "contract" address)
+          FunctionEncoder.encode(function)               // data
         )
       )
   }

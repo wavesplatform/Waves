@@ -1,39 +1,41 @@
 package com.wavesplatform.state.diffs.invoke
 
 import cats.Id
-import cats.instances.list._
-import cats.syntax.either._
-import cats.syntax.semigroup._
-import cats.syntax.traverseFilter._
-import com.wavesplatform.account._
+import cats.instances.list.*
+import cats.syntax.either.*
+import cats.syntax.semigroup.*
+import cats.syntax.traverseFilter.*
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
-import com.wavesplatform.lang._
+import com.wavesplatform.features.EvaluatorFixProvider.*
+import com.wavesplatform.features.FunctionCallPolicyProvider.*
+import com.wavesplatform.lang.*
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, RejectException, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
-import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient, _}
-import com.wavesplatform.metrics._
-import com.wavesplatform.state._
+import com.wavesplatform.lang.v1.traits.domain.{Recipient as RideRecipient, *}
+import com.wavesplatform.metrics.*
+import com.wavesplatform.state.*
+import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, CoevalR, TracedResult}
-import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
+import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
 import com.wavesplatform.transaction.{Asset, TransactionType, TxValidationError}
 import monix.eval.Coeval
 import shapeless.Coproduct
-import com.wavesplatform.features.EvaluatorFixProvider._
 
 import scala.util.Right
 
@@ -62,6 +64,12 @@ object InvokeScriptDiff {
     val result = blockchain.accountScript(dAppAddress) match {
       case Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities)) =>
         for {
+          _ <- traced {
+            if (blockchain.checkSyncCallArgumentsTypes)
+              tx.funcCall.check(CallArgumentPolicy.PrimitivesAndListsOfPrimitives).leftMap(GenericError(_))
+            else
+              Right(())
+          }
           _ <- traced(
             Either.cond(
               version >= V5,
@@ -144,8 +152,7 @@ object InvokeScriptDiff {
           paymentsComplexity = checkedPayments.map(_._1.complexity).sum.toInt
 
           tthis = Coproduct[Environment.Tthis](RideRecipient.Address(ByteStr(dAppAddress.bytes)))
-          input <- traced(
-            buildThisValue(Coproduct[TxOrd](tx.root), blockchain, directives, tthis).leftMap(GenericError.apply))
+          input <- traced(buildThisValue(Coproduct[TxOrd](tx.root), blockchain, directives, tthis).leftMap(GenericError(_)))
 
           result <- for {
             (diff, (scriptResult, log), availableActions, availableData, availableDataSize) <- {
@@ -337,7 +344,7 @@ object InvokeScriptDiff {
   ): Coeval[Either[ValidationError, (ScriptResult, Log[Id])]] = {
     val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     ContractEvaluator
-      .applyV2Coeval(evaluationCtx, contract, invocation, version, limit, blockchain.correctFunctionCallScope)
+      .applyV2Coeval(evaluationCtx, contract, invocation, version, limit, blockchain.correctFunctionCallScope, blockchain.newEvaluatorMode)
       .map(
         _.leftMap(
           {

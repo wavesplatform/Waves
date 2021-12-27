@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.validation.impl.PaymentTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-case class PaymentTransaction private (
+case class PaymentTransaction(
     sender: PublicKey,
     recipient: Address,
     amount: TxAmount,
