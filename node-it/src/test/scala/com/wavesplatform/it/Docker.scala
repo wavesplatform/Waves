@@ -569,28 +569,10 @@ object Docker {
 
     val genesisConfig     = timestampOverrides.withFallback(configTemplate)
     val gs                = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
-    val defaultFeaturesConfig = parseString(
-      s"""
-         |waves.blockchain.custom.functionality.pre-activated-features = {
-         |  2 = 0
-         |  3 = 0
-         |  4 = 0
-         |  5 = 0
-         |  6 = 0
-         |  7 = 0
-         |  9 = 0
-         |  10 = 0
-         |  11 = 0
-         |  12 = 0
-         |  13 = 0
-         |  14 = 0
-         |  15 = 0
-         |}
-         |""".stripMargin)
-    val isRideV6Activated = featuresConfig.map(_.withFallback(defaultFeaturesConfig))
-      .getOrElse(defaultFeaturesConfig)
-      .getAs[Map[Short, Int]]("waves.blockchain.custom.functionality.pre-activated-features")
-      .exists(_.get(BlockchainFeatures.RideV6.id).contains(0))
+    val isRideV6Activated = featuresConfig.exists { config =>
+      config.getAs[Map[Short, Int]]("waves.blockchain.custom.functionality.pre-activated-features")
+        .exists(_.get(BlockchainFeatures.RideV6.id).contains(0))
+    }
 
     val genesisSignature  = Block.genesis(gs, rideV6Activated = isRideV6Activated).explicitGet().id()
 
