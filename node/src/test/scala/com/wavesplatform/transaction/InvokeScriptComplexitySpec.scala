@@ -62,7 +62,7 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
       |${Seq.fill(16)("sigVerify(message, sig, pub)").mkString(" && ")}
       |""".stripMargin,
       isAssetScript = true,
-      ScriptEstimatorV3(fixOverflow = true)
+      ScriptEstimatorV3(fixOverflow = true, overhead = true)
     ).explicitGet()
 
   private[this] val settings = domainSettingsWithFS(

@@ -1,28 +1,28 @@
 package com.wavesplatform.lang.compiler
 
 import cats.kernel.Monoid
-import cats.syntax.semigroup._
+import cats.syntax.semigroup.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.DApp._
+import com.wavesplatform.lang.contract.DApp.*
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
-import com.wavesplatform.lang.v1.{compiler, ContractLimits}
+import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ScriptResultSource, Terms, TestCompiler}
-import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types, WavesContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 
 class ContractCompilerTest extends PropSpec {
   private val dAppV3Ctx: CompilerContext =
@@ -85,7 +85,7 @@ class ContractCompilerTest extends PropSpec {
           FUNC(
             "foo",
             List(),
-            LET_BLOCK(
+            /**/LET_BLOCK(
               LET("a", CONST_LONG(1)),
               IF(
                 FUNCTION_CALL(Native(0), List(REF("a"), REF("a"))),
@@ -328,7 +328,7 @@ class ContractCompilerTest extends PropSpec {
   }
 
   property("contract compiles fails when incorrect return type") {
-    import com.wavesplatform.lang.v1.evaluator.ctx.impl._
+    import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
 
     val ctx = compilerContext
     val expr = {
@@ -1057,7 +1057,7 @@ class ContractCompilerTest extends PropSpec {
         |
       """.stripMargin
 
-    Global.compileContract(dApp, dAppV4Ctx, V4, ScriptEstimatorV3(fixOverflow = true), false, false) should produce("Script is too large: 37551 bytes > 32768 bytes")
+    Global.compileContract(dApp, dAppV4Ctx, V4, ScriptEstimatorV3(fixOverflow = true, overhead = true), false, false) should produce("Script is too large: 37551 bytes > 32768 bytes")
   }
 
   property("@Callable Invoke") {
@@ -1212,7 +1212,7 @@ class ContractCompilerTest extends PropSpec {
       """.stripMargin,
       getTestContext(V4).compilerContext,
       V4,
-      ScriptEstimatorV3(fixOverflow = true),
+      ScriptEstimatorV3(fixOverflow = true, overhead = true),
       false,
       false
     ) shouldBe Symbol("right")

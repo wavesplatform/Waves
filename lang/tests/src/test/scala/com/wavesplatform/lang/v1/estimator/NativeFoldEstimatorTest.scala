@@ -1,35 +1,48 @@
 package com.wavesplatform.lang.v1.estimator
 
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.directives.values.StdLibVersion.{V3, V6}
+import com.wavesplatform.lang.directives.values.StdLibVersion.V3
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V6}
 import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONST_STRING, FUNCTION_CALL, REF}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.test.produce
 
-class NativeFoldEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV3(true)) {
+class NativeFoldEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV3(fixOverflow = true, overhead = true)) {
+  private def estimateNoOverhead(script: String): Either[ExecutionError, Long] =
+    ScriptEstimatorV3(fixOverflow = true, overhead = false)(lets, functionCosts(V6), compile(script)(V6))
+
   property("fold costs") {
-    val expectingCostByLimit = Map(20 -> 3, 50 -> 7, 100 -> 9, 200 -> 20, 500 -> 56, 1000 -> 115)
+    val foldCostByLimit = Map(20 -> 3, 50 -> 7, 100 -> 9, 200 -> 20, 500 -> 56, 1000 -> 115)
+    def script(limit: Int) =
+      s"""
+         | func sum(a:Int, b:Int) = a + b
+         | fold_$limit([], 0, sum)
+       """.stripMargin
+
     PureContext.folds
       .foreach {
         case (limit, _) =>
-          estimate(
-            s"""
-             | func sum(a:Int, b:Int) = a + b
-             | fold_$limit([], 0, sum)
-           """.stripMargin,
-            V6
-          ) shouldBe Right(3 * (limit + 1) + expectingCostByLimit(limit))
         /*
           cost(sum)   = 3
           cost([])    = 1
           cost("sum") = 1
           cost(0)     = 1
           total = limit * cost(sum) + cost([]) + cost("sum") + cost(0) + cost(fold) = 3 * (limit + 1) + cost(fold)
-       */
+        */
+        estimate(script(limit)) shouldBe Right(3 * (limit + 1) + foldCostByLimit(limit))
+
+        /*
+          cost(sum)   = 1
+          cost([])    = 0
+          cost("sum") = 0
+          cost(0)     = 0
+          total = limit * cost(sum) + cost(fold) = limit + cost(fold)
+        */
+        estimateNoOverhead(script(limit)) shouldBe Right(limit + foldCostByLimit(limit))
       }
   }
 
