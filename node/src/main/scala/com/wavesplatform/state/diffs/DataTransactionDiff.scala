@@ -11,7 +11,7 @@ object DataTransactionDiff {
     val sender = tx.sender.toAddress
     for {
       // Validate data size
-      _ <- DataTxValidator.entrySizeValidation(blockchain, tx).toEither.leftMap(_.head)
+      _ <- DataTxValidator.payloadSizeValidation(blockchain, tx).toEither.leftMap(_.head)
     } yield Diff(
       portfolios = Map(sender  -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
       accountData = Map(sender -> AccountDataInfo(tx.data.map(item => item.key -> item).toMap)),

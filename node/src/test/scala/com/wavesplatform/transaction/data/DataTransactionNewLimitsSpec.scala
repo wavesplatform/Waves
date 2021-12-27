@@ -36,6 +36,15 @@ class DataTransactionNewLimitsSpec extends FlatSpec with WithDomain {
     protoNetworkMessage.length shouldBe <= (network.PBTransactionSpec.maxLength)
   }
 
+  it should "handle 400 bytes key" in withDomain(DomainPresets.RideV6) { d =>
+    val dataEntry = StringDataEntry("a" * 400, "test")
+    val dataTransaction = TxHelpers.dataWithMultipleEntries(TxHelpers.defaultSigner, Seq(dataEntry))
+
+    d.helpers.creditWavesToDefaultSigner()
+    d.appendAndAssertSucceed(dataTransaction)
+    d.blockchain.accountData(TxHelpers.defaultAddress, "a" * 400) shouldBe Some(dataEntry)
+  }
+
   "Invoke transaction with data entries" should "handle new limits" in withDomain(DomainPresets.RideV6) { d =>
     val (bool, int, str, bytes) = generateMaxAllowed(ContractLimits.MaxWriteSetSizeInBytes)
 

@@ -13,10 +13,10 @@ import com.wavesplatform.utils.StringBytes
 
 object DataTxValidator extends TxValidator[DataTransaction] {
   override def validate(tx: DataTransaction): ValidatedV[DataTransaction] = {
-    import tx._
+    import tx.*
 
     V.seq(tx)(
-      V.cond(data.length <= MaxEntryCount && data.forall(_.isValid(version)), TxValidationError.TooBigArray),
+      V.cond(data.length <= MaxEntryCount, TxValidationError.TooBigArray),
       V.cond(data.forall(_.key.nonEmpty), TxValidationError.EmptyDataKey),
       V.cond(data.map(_.key) == data.map(_.key).distinct, TxValidationError.DuplicatedDataKeys),
       V.cond(tx.version > TxVersion.V1 || tx.data.forall(!_.isEmpty), GenericError("Empty data is not allowed in V1")),
@@ -24,8 +24,25 @@ object DataTxValidator extends TxValidator[DataTransaction] {
     )
   }
 
-  def entrySizeValidation(blockchain: Blockchain, tx: DataTransaction): ValidatedV[DataTransaction] = {
-    if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6)) {
+  private[this] def entrySizeIsValid(blockchain: Blockchain, version: TxVersion)(entry: DataEntry[?]): Boolean = {
+    import DataEntry.{MaxKeySize, MaxPBKeySize, MaxValueSize}
+
+    def keyIsValid(key: String): Boolean = version match {
+      case TxVersion.V1 if !blockchain.isFeatureActivated(BlockchainFeatures.RideV6) => key.length <= MaxKeySize
+      case _                                                                         => key.utf8Bytes.length <= MaxPBKeySize
+    }
+
+    def valueIsValid(v: DataEntry[?]): Boolean = v match {
+      case BinaryDataEntry(_, value) => value.arr.length <= MaxValueSize
+      case StringDataEntry(_, value) => value.utf8Bytes.length <= MaxValueSize
+      case _                         => true
+    }
+
+    keyIsValid(entry.key) && valueIsValid(entry)
+  }
+
+  def payloadSizeValidation(blockchain: Blockchain, tx: DataTransaction): ValidatedV[DataTransaction] = {
+    val fullPayloadIsValid = if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6)) {
       val payloadSize = realUserPayloadSize(tx.data)
       V.cond(payloadSize <= DataTransaction.MaxRideV6Bytes, TxValidationError.TooBigArray).map(_ => tx)
     } else
@@ -37,14 +54,19 @@ object DataTxValidator extends TxValidator[DataTransaction] {
           V.cond(Try(tx.protoDataPayload.length <= DataTransaction.MaxProtoBytes).getOrElse(false), TxValidationError.TooBigArray)
         }
       )
+
+    V.seq(tx)(
+      fullPayloadIsValid,
+      V.cond(tx.data.forall(entrySizeIsValid(blockchain, tx.version)), TxValidationError.TooBigArray)
+    )
   }
 
   // For invokes
-  def invokeWriteSetSize(blockchain: Blockchain, entries: Seq[DataEntry[_]]): Int =
+  def invokeWriteSetSize(blockchain: Blockchain, entries: Seq[DataEntry[?]]): Int =
     if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6)) realUserPayloadSize(entries)
     else entries.map(_.toBytes.length).sum // Legacy behavior
 
-  def verifyInvokeWriteSet(blockchain: Blockchain, entries: Seq[DataEntry[_]]): Either[String, Unit] = {
+  def verifyInvokeWriteSet(blockchain: Blockchain, entries: Seq[DataEntry[?]]): Either[String, Unit] = {
     val totalDataBytes = invokeWriteSetSize(blockchain, entries)
     Either.cond(
       totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes,
@@ -53,7 +75,7 @@ object DataTxValidator extends TxValidator[DataTransaction] {
     )
   }
 
-  private[this] def realUserPayloadSize(entries: Seq[DataEntry[_]]): Int = {
+  private[this] def realUserPayloadSize(entries: Seq[DataEntry[?]]): Int = {
     entries
       .flatMap(
         e =>
