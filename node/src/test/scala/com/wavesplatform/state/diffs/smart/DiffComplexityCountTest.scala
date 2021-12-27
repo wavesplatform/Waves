@@ -71,7 +71,7 @@ class DiffComplexityCountTest
                     |   else ($groth)
                     |
                   """.stripMargin
-    ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()._1
   }
 
   private def dApp(asset: IssuedAsset): Script = TestCompiler(V4).compileContract(
@@ -119,7 +119,7 @@ class DiffComplexityCountTest
   property(s"evaluated complexity is used for diff instead of estimated one after activation ${BlockchainFeatures.SynchronousCalls}") {
     val (preparingTxs, invoke) = paymentPreconditions.sample.get
     withDomain(domainSettingsWithFS(fsWithV5)) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs*)
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)

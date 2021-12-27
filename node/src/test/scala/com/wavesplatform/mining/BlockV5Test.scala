@@ -38,12 +38,7 @@ import org.scalatest.enablers.Length
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
-class BlockV5Test
-    extends FlatSpec
-    with WithDomain
-    with OptionValues
-    with EitherValues
-    with BlocksTransactionsHelpers {
+class BlockV5Test extends FlatSpec with WithDomain with OptionValues with EitherValues with BlocksTransactionsHelpers {
   import BlockV5Test._
 
   private val testTime = new TestTime(1)
@@ -382,8 +377,9 @@ class BlockV5Test
       case (acc, genesis) =>
         val fs = TestFunctionalitySettings.Stub.copy(
           preActivatedFeatures = Map(
-            BlockchainFeatures.NG.id      -> 0,
-            BlockchainFeatures.BlockV5.id -> 2
+            BlockchainFeatures.NG.id            -> 0,
+            BlockchainFeatures.BlockV5.id       -> 2,
+            BlockchainFeatures.SmartAccounts.id -> 0
           )
         )
 
@@ -419,7 +415,14 @@ class BlockV5Test
             block3.id() should have length crypto.DigestLength
 
             val (keyBlock, microBlocks) =
-              UnsafeBlocks.unsafeChainBaseAndMicro(block3.id(), Nil, Seq(Seq(TxHelpers.transfer()), Seq(TxHelpers.transfer())), acc, Block.ProtoBlockVersion, System.currentTimeMillis())
+              UnsafeBlocks.unsafeChainBaseAndMicro(
+                block3.id(),
+                Nil,
+                Seq(Seq(TxHelpers.transfer()), Seq(TxHelpers.transfer())),
+                acc,
+                Block.ProtoBlockVersion,
+                System.currentTimeMillis()
+              )
             d.appendBlock(keyBlock)
             microBlocks.foreach(d.appendMicroBlock)
 

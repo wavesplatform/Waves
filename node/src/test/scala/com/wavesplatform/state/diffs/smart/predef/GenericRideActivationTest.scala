@@ -7,7 +7,7 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -16,7 +16,7 @@ import org.scalatest.EitherValues
 
 class GenericRideActivationTest extends PropSpec with WithDomain with EitherValues {
 
-  import DomainPresets._
+  import DomainPresets.*
 
   private val time = new TestTime
   private def ts   = time.getTimestamp()
@@ -50,13 +50,13 @@ class GenericRideActivationTest extends PropSpec with WithDomain with EitherValu
         case (currentVersion, nextVersion) =>
           val (genesisTxs, setScriptTxs, invoke) = scenario(currentVersion).sample.get
           withDomain(settingsForRide(currentVersion)) { d =>
-            d.appendBlock(genesisTxs: _*)
-            d.appendBlock(setScriptTxs: _*)
+            d.appendBlock(genesisTxs*)
+            d.appendBlock(setScriptTxs*)
             d.appendBlock(invoke)
             d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
             nextVersion.foreach { v =>
               val (_, setScriptTxs, _) = scenario(v).sample.get
-              (the[RuntimeException] thrownBy d.appendBlock(setScriptTxs: _*)).getMessage should include("ActivationError")
+              (the[RuntimeException] thrownBy d.appendBlock(setScriptTxs*)).getMessage should include("ActivationError")
             }
           }
       }

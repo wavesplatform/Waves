@@ -4,7 +4,6 @@ import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity}
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
-import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -18,7 +17,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Diff, Height, TxMeta}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -52,7 +51,7 @@ class LeaseRouteSpec
     )
 
   private def withRoute(f: (Domain, Route) => Unit): Unit =
-    withDomain(domainSettingsWithPreactivatedFeatures(BlockchainFeatures.implemented.flatMap(BlockchainFeatures.feature).toSeq: _*)) { d =>
+    withDomain(domainSettingsWithPreactivatedFeatures(BlockchainFeatures.implemented.flatMap(BlockchainFeatures.feature).toSeq*)) { d =>
       f(d, route(d).route)
     }
 
@@ -321,7 +320,7 @@ class LeaseRouteSpec
     "created by nested invocations" in forAll(nestedInvocation) {
       case ((proxy, target, recipient), genesisTransactions) =>
         withRoute { (d, r) =>
-          d.appendBlock(genesisTransactions: _*)
+          d.appendBlock(genesisTransactions*)
           val ist = Signed.invokeScript(
             TxVersion.V2,
             proxy,

@@ -1,23 +1,18 @@
 package com.wavesplatform.state
 
-import scala.util.{Left, Right}
-
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.metrics._
-import com.wavesplatform.network._
-import com.wavesplatform.transaction._
+import com.wavesplatform.metrics.*
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPoolImpl
-import io.netty.channel.Channel
 import kamon.Kamon
-import monix.eval.Task
 
-package object appender extends ScorexLogging {
+package object appender {
 
   val MaxTimeDrift: Long = 100 // millis
 
@@ -27,27 +22,8 @@ package object appender extends ScorexLogging {
     813207 -> ByteStr.decodeBase58("5uZoDnRKeWZV9Thu2nvJVZ5dBvPB7k2gvpzFD618FMXCbBVBMN2rRyvKBZBhAGnGdgeh2LXEeSr9bJqruJxngsE7").get
   )
 
-  private[appender] def processAndBlacklistOnFailure[A, B](
-      ch: Channel,
-      peerDatabase: PeerDatabase,
-      start: => String,
-      success: => String,
-      errorPrefix: String
-  )(f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
-    log.debug(start)
-    f map {
-      case Right(maybeNewScore) =>
-        log.debug(success)
-        Right(maybeNewScore)
-      case Left(ve) =>
-        log.warn(s"$errorPrefix: $ve")
-        peerDatabase.blacklistAndClose(ch, s"$errorPrefix: $ve")
-        Left(ve)
-    }
-  }
-
   private[appender] def appendKeyBlock(
-      blockchainUpdater: BlockchainUpdater with Blockchain,
+      blockchainUpdater: BlockchainUpdater & Blockchain,
       utx: UtxPoolImpl,
       pos: PoSSelector,
       time: Time,
@@ -68,7 +44,7 @@ package object appender extends ScorexLogging {
     } yield newHeight
 
   private[appender] def appendExtensionBlock(
-      blockchainUpdater: BlockchainUpdater with Blockchain,
+      blockchainUpdater: BlockchainUpdater & Blockchain,
       pos: PoSSelector,
       time: Time,
       verify: Boolean

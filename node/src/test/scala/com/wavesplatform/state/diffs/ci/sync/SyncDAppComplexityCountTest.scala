@@ -66,7 +66,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
                     |
                     | groth16Verify_8inputs(key, proof, input)
                   """.stripMargin
-    ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()._1
   }
 
   // ~2700 complexity
@@ -91,7 +91,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
                     | $condition
                     |
                   """.stripMargin
-    ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()._1
   }
 
   private def scenario(

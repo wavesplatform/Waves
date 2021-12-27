@@ -12,7 +12,7 @@ abstract class Key[V](prefix: Short, val name: String, val suffix: Array[Byte]) 
   override lazy val toString: String = s"$name($prefix,${BaseEncoding.base16().encode(suffix)})"
 
   override def equals(obj: Any): Boolean = obj match {
-    case that: Key[V] => java.util.Arrays.equals(this.keyBytes, that.keyBytes)
+    case that: Key[_] => java.util.Arrays.equals(this.keyBytes, that.keyBytes)
     case _            => false
   }
 

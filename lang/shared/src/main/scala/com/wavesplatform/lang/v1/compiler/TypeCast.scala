@@ -46,11 +46,15 @@ object TypeCast {
       case LIST(t) if t != ANY =>
         expr.copy(errors = Seq(TypeCastAllowedOnlyForGenericList(p.start, p.end)))
       case _ =>
-        val r = IF(
-          FUNCTION_CALL(_isInstanceOf.header, List(expr.expr, CONST_STRING(expectingType.name).explicitGet())),
-          expr.expr,
-          onError
-        )
+        val r =
+          BLOCK(
+            LET("@", expr.expr),
+            IF(
+              FUNCTION_CALL(_isInstanceOf.header, List(REF("@"), CONST_STRING(expectingType.name).explicitGet())),
+              REF("@"),
+              onError
+            )
+          )
         expr.copy(t = resultType, expr = r)
     }
   }

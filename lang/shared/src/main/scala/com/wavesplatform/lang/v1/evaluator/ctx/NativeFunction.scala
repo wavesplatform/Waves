@@ -66,7 +66,7 @@ object NativeFunction {
   def apply[C[_[_]]](name: String, cost: Long, internalName: Short, resultType: TYPE, args: (String, TYPE)*)(
     evl: List[EVALUATED] => Either[ExecutionError, EVALUATED]
   ): NativeFunction[C] =
-    withEnvironment[C](name, cost, internalName, resultType, args: _*)(new ContextfulNativeFunction.Simple[C](name, resultType, args.toSeq) {
+    withEnvironment[C](name, cost, internalName, resultType, args*)(new ContextfulNativeFunction.Simple[C](name, resultType, args.toSeq) {
       override def evaluate[F[_]: Monad](env: C[F], args: List[EVALUATED]): F[Either[ExecutionError, EVALUATED]] =
         evl(args).pure[F]
     })
@@ -74,7 +74,7 @@ object NativeFunction {
   def apply[C[_[_]]](name: String, costByLibVersion: Map[StdLibVersion, Long], internalName: Short, resultType: TYPE, args: (String, TYPE)*)(
     evl: List[EVALUATED] => Either[ExecutionError, EVALUATED]
   ): NativeFunction[C] =
-    withEnvironment[C](name, costByLibVersion, internalName, resultType, args: _*)(new ContextfulNativeFunction.Simple[C](name, resultType, args.toSeq) {
+    withEnvironment[C](name, costByLibVersion, internalName, resultType, args*)(new ContextfulNativeFunction.Simple[C](name, resultType, args.toSeq) {
       override def evaluate[F[_]: Monad](env: C[F], args: List[EVALUATED]): F[Either[ExecutionError, EVALUATED]] =
         evl(args).pure[F]
     })
@@ -97,24 +97,24 @@ object UserFunction {
       internalName = name,
       DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap,
       resultType,
-      args: _*
+      args*
     )(ev)
 
   def apply[C[_[_]]](name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: EXPR): UserFunction[C] =
-    UserFunction.withEnvironment[C](name, cost, resultType, args: _ *)(new ContextfulUserFunction[C] {
+    UserFunction.withEnvironment[C](name, cost, resultType, args*)(new ContextfulUserFunction[C] {
       override def apply[F[_] : Monad](context: C[F], startArgs: List[EXPR]): EXPR = ev
     })
 
   def deprecated[C[_[_]]](name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: EXPR): UserFunction[C] =
-    UserFunction.deprecated(name, name, DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap, resultType, args: _*)(ev)
+    UserFunction.deprecated(name, name, DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap, resultType, args*)(ev)
 
   def apply[C[_[_]]](name: String, costByLibVersion: Map[StdLibVersion, Long], resultType: TYPE, args: (String, TYPE)*)(
       ev: EXPR): UserFunction[C] =
-    UserFunction(name, name, costByLibVersion, resultType, args: _*)(ev)
+    UserFunction(name, name, costByLibVersion, resultType, args*)(ev)
 
   def apply[C[_[_]]](name: String, internalName: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(
       ev: EXPR): UserFunction[C] =
-    UserFunction.withEnvironment[C](name, internalName, DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap, resultType, args: _*)(
+    UserFunction.withEnvironment[C](name, internalName, DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap, resultType, args*)(
       ContextfulUserFunction.pure[C](ev)
     )
 
@@ -141,7 +141,7 @@ object UserFunction {
     resultType: TYPE,
     args: (String, TYPE)*
   )(ev: EXPR): UserFunction[C] =
-    withEnvironment[C](name, internalName, costByLibVersion, resultType, args: _*)(
+    withEnvironment[C](name, internalName, costByLibVersion, resultType, args*)(
       ContextfulUserFunction.pure[C](ev)
     )
 
