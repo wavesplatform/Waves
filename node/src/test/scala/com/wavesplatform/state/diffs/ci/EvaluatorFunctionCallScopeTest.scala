@@ -3,13 +3,13 @@ package com.wavesplatform.state.diffs.ci
 import com.wavesplatform.TransactionGenBase
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures._
+import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
@@ -54,7 +54,7 @@ class EvaluatorFunctionCallScopeTest extends PropSpec with WithDomain with Trans
   property("arg of the first function should NOT overlap var accessed from body of the second function AFTER fix") {
     val (preparingTxs, invoke, dApp) = scenario.sample.get
     withDomain(domainSettingsWithFS(settings)) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs *)
 
       d.appendBlock(invoke())
       d.blockchain.accountData(dApp, "key").get.value shouldBe 1
