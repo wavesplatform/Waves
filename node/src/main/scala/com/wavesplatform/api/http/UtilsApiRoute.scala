@@ -13,7 +13,8 @@ import com.wavesplatform.common.utils.*
 import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{RideV6, SynchronousCalls}
-import com.wavesplatform.features.EstimatorProvider._
+import com.wavesplatform.features.EstimatorProvider.*
+import com.wavesplatform.features.EvaluatorFixProvider.*
 import com.wavesplatform.features.RideVersionProvider.RideVersionBlockchainExt
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -391,6 +392,7 @@ object UtilsApiRoute {
             ctx,
             script.stdLibVersion,
             correctFunctionCallScope = blockchain.checkEstimatorSumOverflow,
+            newMode = blockchain.newEvaluatorMode,
             checkConstructorArgsTypes = true
           )
           .value()

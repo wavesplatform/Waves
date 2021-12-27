@@ -1,42 +1,42 @@
 package com.wavesplatform.state.diffs.invoke
 
 import cats.Id
-import cats.syntax.either._
-import cats.syntax.semigroup._
-import com.wavesplatform.account._
+import cats.syntax.either.*
+import cats.syntax.semigroup.*
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.RideV6
-import com.wavesplatform.features.EstimatorProvider._
-import com.wavesplatform.features.FunctionCallPolicyProvider._
-import com.wavesplatform.features.EvaluatorFixProvider._
-import com.wavesplatform.lang._
+import com.wavesplatform.features.EstimatorProvider.*
+import com.wavesplatform.features.EvaluatorFixProvider.*
+import com.wavesplatform.features.FunctionCallPolicyProvider.*
+import com.wavesplatform.lang.*
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.ContractCompiler
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.evaluator._
+import com.wavesplatform.lang.v1.evaluator.*
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient, _}
+import com.wavesplatform.lang.v1.traits.domain.{Recipient as RideRecipient, *}
+import com.wavesplatform.metrics.TxProcessingStats as Stats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
-import com.wavesplatform.metrics.{TxProcessingStats => Stats}
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy._
+import com.wavesplatform.state.*
+import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.TransactionBase
-import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.smart.InvokeTransaction.DefaultCall
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
-import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
+import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -323,7 +323,7 @@ object InvokeScriptTransactionDiff {
     val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     val startLimit    = limit - paymentsComplexity
     ContractEvaluator
-      .applyV2Coeval(evaluationCtx, contract, invocation, version, startLimit, blockchain.correctFunctionCallScope)
+      .applyV2Coeval(evaluationCtx, contract, invocation, version, startLimit, blockchain.correctFunctionCallScope, blockchain.newEvaluatorMode)
       .runAttempt()
       .leftMap(error => (error.getMessage: ExecutionError, 0, Nil: Log[Id]))
       .flatten

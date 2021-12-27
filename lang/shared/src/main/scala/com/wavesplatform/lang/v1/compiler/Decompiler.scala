@@ -202,8 +202,8 @@ object Decompiler {
             val name = extractFunctionName(ctx, header)
             argsCoeval.map(as => out(s"$name(${as.mkString(", ")})", i))
         }
-      case _: Terms.ARR       => ??? // never happens
-      case obj: Terms.CaseObj => pureOut(obj.toString, i) // never happens
+      case a: Terms.ARR       => pureOut(a.toString, i)
+      case obj: Terms.CaseObj => pureOut(obj.toString, i)
     })
   }
 

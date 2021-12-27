@@ -116,7 +116,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |    if (check) then false else $result
                    |}
                    |""".stripMargin,
-                ScriptEstimatorV3(fixOverflow = true)
+                ScriptEstimatorV3(fixOverflow = true, overhead = false)
               )
               .explicitGet()
               ._1
@@ -147,7 +147,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |    if (check) then false else $r
                    |}
                    |""".stripMargin,
-                ScriptEstimatorV3(fixOverflow = true)
+                ScriptEstimatorV3(fixOverflow = true, overhead = false)
               )
               .explicitGet()
               ._1
@@ -214,14 +214,14 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
               ScriptCompiler
                 .compile(
                   s"""
-                     |match tx {
-                     |  case _: SetAssetScriptTransaction => true
-                     |  case _ =>
-                     |    let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} false
-                     |    if (check) then false else $result
-                     |}
-                     |""".stripMargin,
-                  ScriptEstimatorV3(fixOverflow = true)
+                   |match tx {
+                   |  case _: SetAssetScriptTransaction => true
+                   |  case _ =>
+                   |    let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} false
+                   |    if (check) then false else $result
+                   |}
+                   |""".stripMargin,
+                  ScriptEstimatorV3(fixOverflow = true, overhead = false)
                 )
                 .explicitGet()
                 ._1
@@ -241,16 +241,16 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
               ScriptCompiler
                 .compile(
                   s"""
-                     |{-# STDLIB_VERSION 3 #-}
-                     |{-# CONTENT_TYPE EXPRESSION #-}
-                     |{-# SCRIPT_TYPE ACCOUNT #-}
-                     |
-                     |match (tx) {
-                     |  case _: SetScriptTransaction => true
-                     |  case _ => $r
-                     |}
-                     |""".stripMargin,
-                  ScriptEstimatorV3(fixOverflow = true)
+                   |{-# STDLIB_VERSION 3 #-}
+                   |{-# CONTENT_TYPE EXPRESSION #-}
+                   |{-# SCRIPT_TYPE ACCOUNT #-}
+                   |
+                   |match (tx) {
+                   |  case _: SetScriptTransaction => true
+                   |  case _ => $r
+                   |}
+                   |""".stripMargin,
+                  ScriptEstimatorV3(fixOverflow = true, overhead = false)
                 )
                 .toOption
                 .map(_._1)

@@ -12,8 +12,8 @@ class FuncOverlapEstimatorTest
     extends ScriptEstimatorTestBase(
       ScriptEstimatorV1,
       ScriptEstimatorV2,
-      ScriptEstimatorV3(fixOverflow = false),
-      evaluatorV2AsEstimator
+      ScriptEstimatorV3(fixOverflow = false, overhead = true),
+      evaluatorV2AsEstimator(true)
     ) {
   property("func forward reference") {
     val expr = BLOCK(

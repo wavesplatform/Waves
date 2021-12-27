@@ -30,5 +30,5 @@ package object v1 {
       expr: EXPR,
       stdLibVersion: StdLibVersion
   ): (Log[Id], Int, Either[ExecutionError, Terms.EVALUATED]) =
-    EvaluatorV2.applyCompleted(ctx, expr, stdLibVersion, correctFunctionCallScope = true)
+    EvaluatorV2.applyCompleted(ctx, expr, stdLibVersion, newMode = true)
 }
