@@ -1,16 +1,16 @@
 package com.wavesplatform.lang.v1.serialization
 
-import cats.instances.lazyList._
-import cats.instances.list._
-import cats.syntax.apply._
-import cats.syntax.traverse._
+import cats.instances.lazyList.*
+import cats.instances.list.*
+import cats.syntax.apply.*
+import cats.syntax.traverse.*
 import com.google.protobuf.{CodedInputStream, CodedOutputStream}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
-import com.wavesplatform.lang.v1.serialization.Serde._
-import com.wavesplatform.lang.utils.Serialize._
+import com.wavesplatform.lang.v1.serialization.Serde.*
+import com.wavesplatform.lang.utils.Serialize.*
 import monix.eval.Coeval
 
 import java.io.ByteArrayOutputStream
@@ -45,18 +45,21 @@ object SerdeV2 extends Serde[CodedInputStream, CodedOutputStream] {
           body <- aux
         } yield LET(name, body)
       case DEC_FUNC =>
-        for {
-          name <- Coeval.now(in.readString())
-          args <- {
-            val argsCnt = in.readRawByte()
-            Coeval {
-              (1 to argsCnt).toList.map(_ => in.readString())
-            }
-          }
-          body <- aux
-        } yield FUNC(name, args, body)
+        deserializeFunction(in, aux)
     }
   }
+
+  def deserializeFunction(in: CodedInputStream, aux: => Coeval[EXPR]): Coeval[FUNC] =
+    for {
+      name <- Coeval.now(in.readString())
+      args <- {
+        val argsCnt = in.readRawByte()
+        Coeval {
+          (1 to argsCnt).toList.map(_ => in.readString())
+        }
+      }
+      body <- aux
+    } yield FUNC(name, args, body)
 
   def desAux(in: CodedInputStream, allowObjects: Boolean = false, acc: Coeval[Unit] = Coeval.now(())): Coeval[EXPR] =
     desAuxR(in, allowObjects, acc)

@@ -1,21 +1,22 @@
 package com.wavesplatform.lang.compiler
 
-import cats.syntax.semigroup._
+import cats.syntax.semigroup.*
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.{Directive, DirectiveParser, DirectiveSet}
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.script.{Script, ScriptPreprocessor}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.v1.compiler.ContractScriptCompactor
 import com.wavesplatform.lang.v1.{CTX, compiler}
-import com.wavesplatform.lang.v1.compiler.compaction.{ContractScriptCompactorV1, ContractScriptCompactorV2}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.test._
+import com.wavesplatform.protobuf.dapp.DAppMeta.CompactNameAndOriginalNamePair
+import com.wavesplatform.test.*
 import org.scalatest.Assertion
 
 class ContractCompilerCompactorTest extends PropSpec {
@@ -94,13 +95,9 @@ class ContractCompilerCompactorTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
 
-    val stdLibVer = V3
-    val ctx =
-      PureContext.build(stdLibVer, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(stdLibVer, Account, DAppType).explicitGet())
 
     val compilationResult =
-      compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVer, needCompaction = true).explicitGet().compactedSource(stdLibVer)
+      compiler.ContractCompiler(ctxForV(V3).compilerContext, expr, V3, needCompaction = true).explicitGet().compactedSource(V3)
     compilationResult shouldBe """{-# STDLIB_VERSION 3 #-}
                                  |{-# SCRIPT_TYPE ACCOUNT #-}
                                  |{-# CONTENT_TYPE DAPP #-}
@@ -210,7 +207,7 @@ class ContractCompilerCompactorTest extends PropSpec {
     checkForV(V6)
   }
 
-  property("contract script decompaction - decompacted result equal to common compiled result fo RIDE V5") {
+  property("contract script decompaction - decompacted result equal to common compiled result") {
     def exprForV(version: StdLibVersion): Expressions.DAPP = {
       val script =
         s"""
@@ -235,10 +232,8 @@ class ContractCompilerCompactorTest extends PropSpec {
     }
 
     def checkForV(version: StdLibVersion): Assertion = {
-      val compactor = if (version < V6) ContractScriptCompactorV1 else ContractScriptCompactorV2
-
       val compilationCompactedResult = compiler.ContractCompiler(ctxForV(version).compilerContext, exprForV(version), version, needCompaction = true)
-      val decompactedResult          = compactor.decompact(compilationCompactedResult.explicitGet())
+      val decompactedResult          = ContractScriptCompactor.decompact(compilationCompactedResult.explicitGet())
 
       //noinspection RedundantDefaultArgument
       val compilationResult = compiler.ContractCompiler(ctxForV(version).compilerContext, exprForV(version), version, needCompaction = false)
@@ -248,6 +243,75 @@ class ContractCompilerCompactorTest extends PropSpec {
 
     checkForV(V5)
     checkForV(V6)
+  }
+
+  property("contract script decompaction - ContractScriptCompactor must decompact scripts compacted by old compaction algorithm") {
+    def expr: Expressions.DAPP = {
+      val script =
+        s"""
+           | {-# STDLIB_VERSION 5 #-}
+           | {-# CONTENT_TYPE DAPP #-}
+           |
+           | let fooVar = 42
+           |
+           | func barFunc(barFuncArg1: Int) = 100500 + barFuncArg1
+           |
+           | @Callable(invocation)
+           | func bazCallableFunc(bazCallableFuncArg1: Int, bazCallableFuncArg2: String) = {
+           |   let result = barFunc(fooVar) + bazCallableFuncArg1
+           |   [
+           |     IntegerEntry("integerEntryKey", result),
+           |     StringEntry("stringEntryKey", bazCallableFuncArg2)
+           |   ]
+           | }
+           |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    def compactedExpr: Expressions.DAPP = {
+      val script =
+        s"""
+           | {-# STDLIB_VERSION 5 #-}
+           | {-# CONTENT_TYPE DAPP #-}
+           |
+           | let a = 42
+           |
+           | func b(c: Int) = 100500 + c
+           |
+           | @Callable(d)
+           | func bazCallableFunc(e: Int, f: String) = {
+           |   let g = b(a) + e
+           |   [
+           |     IntegerEntry("integerEntryKey", g),
+           |     StringEntry("stringEntryKey", f)
+           |   ]
+           | }
+           |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    val oldCompOriginalNames = Seq(
+      "a" -> "fooVar",
+      "b" -> "barFunc",
+      "c" -> "barFuncArg1",
+      "d" -> "invocation",
+      "e" -> "bazCallableFuncArg1",
+      "f" -> "bazCallableFuncArg2",
+      "g" -> "result"
+    ).map(p => CompactNameAndOriginalNamePair(p._1, p._2))
+
+    val compilationNotCompactedResult = compiler.ContractCompiler(ctxForV(V5).compilerContext, expr, V5).explicitGet()
+    val compilationCompactedResultNoMeta = compiler.ContractCompiler(ctxForV(V5).compilerContext, compactedExpr, V5).explicitGet()
+    val oldCompactedResult = compilationCompactedResultNoMeta.copy(
+      meta = compilationCompactedResultNoMeta.meta
+        .withCompactNameAndOriginalNamePairList(oldCompOriginalNames)
+        .withFuncs(compilationNotCompactedResult.meta.funcs)
+    )
+    val decompactedResult = ContractScriptCompactor.decompact(oldCompactedResult)
+
+    decompactedResult shouldBe compilationNotCompactedResult
   }
 
   property("contract script compaction - remove unused code") {

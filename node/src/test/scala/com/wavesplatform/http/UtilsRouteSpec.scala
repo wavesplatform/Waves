@@ -24,7 +24,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.{Global, contract}
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.protobuf.dapp.DAppMeta.{CallableFuncSignature, CompactNameAndOriginalNamePair}
+import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.settings.TestSettings
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, IntegerDataEntry}
 import com.wavesplatform.state.diffs.FeeValidation
@@ -547,7 +547,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   routePath("/script/compileCode") in {
     Post(routePath("/script/compileCode?compact=true"), dAppWithNonCallable) ~> route ~> check {
       responseAs[JsValue] should matchJson("""{
-                                             |  "script" : "base64:AAIDAAAAAAAAAA0IARoJCgFhEgR0ZXN0AAAAAQEAAAABYQAAAAAGAAAAAAAAAAA00atG",
+                                             |  "script" : "base64:AAIDAAAAAAAAAAgIASIEdGVzdAAAAAEBAAAAAWEAAAAABgAAAAAAAAAAyF8thg==",
                                              |  "complexity" : 0,
                                              |  "verifierComplexity" : 0,
                                              |  "callableComplexities" : { },
@@ -557,7 +557,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       val script = (responseAs[JsValue] \ "script").as[String]
       inside(Script.fromBase64String(script).explicitGet()) {
         case ContractScript.ContractScriptImpl(_, expr) =>
-          expr.meta.compactNameAndOriginalNamePairList shouldBe Seq(CompactNameAndOriginalNamePair("a", "test"))
+          expr.meta.originalNames shouldBe Vector("test")
       }
     }
 
