@@ -85,7 +85,7 @@ class InvokePaymentsAvailabilityTest extends PropSpec with Inside with DBCacheSe
   property("payments availability in usual call") {
     val (preparingTxs, invoke, callingDApp, _, asset) = scenario(syncCall = false).sample.get
     withDomain(RideV5) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs*)
       d.appendBlock(invoke)
 
       d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
@@ -104,7 +104,7 @@ class InvokePaymentsAvailabilityTest extends PropSpec with Inside with DBCacheSe
   property("payments availability in sync call") {
     val (preparingTxs, invoke, callingDApp, proxyDApp, asset) = scenario(syncCall = true).sample.get
     withDomain(RideV5) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs*)
       d.appendBlock(invoke)
 
       d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true

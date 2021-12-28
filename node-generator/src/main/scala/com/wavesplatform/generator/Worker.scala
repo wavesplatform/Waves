@@ -6,7 +6,7 @@ import java.time.temporal.ChronoUnit
 
 import cats.Show
 import cats.effect.concurrent.Ref
-import cats.syntax.flatMap._
+import cats.syntax.flatMap.*
 import com.wavesplatform.generator.Worker.{EmptyState, Settings, SkipState, State}
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.transaction.Transaction
@@ -53,7 +53,7 @@ class Worker(
     } yield ()
 
   private[this] val nodeUTXTransactionsToSendCount: Task[Int] = Task.defer {
-    import org.asynchttpclient.Dsl._
+    import org.asynchttpclient.Dsl.*
     val request = get(s"$nodeRestAddress/transactions/unconfirmed/size").build()
     Task
       .fromFuture(FutureConverters.toScala(httpClient.executeRequest(request).toCompletableFuture))
@@ -63,7 +63,7 @@ class Worker(
   private[this] val balanceOfRichAccount: Task[Map[String, Long]] =
     Task
       .defer {
-        import org.asynchttpclient.Dsl._
+        import org.asynchttpclient.Dsl.*
         val results = richAccountAddresses.map { address =>
           val request = get(s"$nodeRestAddress/addresses/balance/$address").build()
           Task
@@ -91,7 +91,7 @@ class Worker(
         validChannel <- validateChannel(channel)
         _            <- logInfo(s"Sending initial transactions to $validChannel")
         cntToSend    <- calcAndSaveCntToSend(state)
-        _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend): _*))
+        _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend) *))
         r <- if (cntToSend >= txs.size) sleepOrWaitEmptyUtx(settings.tailInitialDelay) *> writeTailInitial(validChannel, state)
         else sleep(settings.delay) *> Task.defer(writeInitial(channel, state, txs.drop(cntToSend)))
       } yield r
@@ -114,7 +114,7 @@ class Worker(
         validChannel <- validateChannel(channel)
         _            <- logInfo(s"Sending tail initial transactions to $validChannel")
         cntToSend    <- calcAndSaveCntToSend(state)
-        _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend): _*))
+        _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend) *))
         r <- if (cntToSend >= txs.size) sleepOrWaitEmptyUtx(settings.initialDelay) *> Task.now(validChannel)
         else sleep(settings.delay) *> Task.defer(writeTailInitial(validChannel, state, txs.drop(cntToSend)))
       } yield r
@@ -130,7 +130,7 @@ class Worker(
         _            <- logInfo(s"Sending $cntToSend transactions to $validChannel")
         txs          <- Task(transactionSource.take(cntToSend).to(LazyList))
         _            <- txs.headOption.fold(Task.unit)(tx => logInfo(s"Head transaction id: ${tx.id()}"))
-        _            <- Task.deferFuture(networkSender.send(validChannel, txs: _*))
+        _            <- Task.deferFuture(networkSender.send(validChannel, txs *))
         _            <- sleep(settings.delay)
         r            <- Task.defer(pullAndWrite(validChannel, state, (cnt + 1) % 10))
       } yield r
@@ -224,7 +224,7 @@ object Worker {
   }
 
   implicit val toPrintable: Show[Settings] = { x =>
-    import x._
+    import x.*
 
     s"""initial delay: $initialDelay
        |delay between iterations: $delay

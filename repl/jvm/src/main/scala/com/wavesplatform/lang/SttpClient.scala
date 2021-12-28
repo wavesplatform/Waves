@@ -1,7 +1,7 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
-import sttp.client3._
+import sttp.client3.*
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future

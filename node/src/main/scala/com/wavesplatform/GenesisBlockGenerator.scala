@@ -223,7 +223,7 @@ object GenesisBlockGenerator extends App {
     def getHit(account: KeyPair): BigInt = {
       val gs = if (settings.preActivated(BlockchainFeatures.BlockV5)) {
         val vrfProof = crypto.signVRF(account.privateKey, hitSource.arr)
-        crypto.verifyVRF(vrfProof, hitSource.arr, account.publicKey).map(_.arr).explicitGet()
+        crypto.verifyVRF(vrfProof, hitSource.arr, account.publicKey, settings.preActivated(BlockchainFeatures.RideV6)).map(_.arr).explicitGet()
       } else generationSignature(hitSource, account.publicKey)
 
       hit(gs)

@@ -1,19 +1,20 @@
 package com.wavesplatform.api.http
 
 import akka.NotUsed
-import cats.syntax.traverse._
-import cats.instances.option._
+import cats.syntax.traverse.*
+import cats.instances.option.*
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.server.{Directive0, Route}
 import akka.stream.scaladsl.Source
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.common.CommonAccountsApi
-import com.wavesplatform.api.http.ApiError._
+import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.requests.DataRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
-import com.wavesplatform.features.EstimatorProvider._
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.meta.FunctionSignatures
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
@@ -25,10 +26,10 @@ import com.wavesplatform.state.{Blockchain, DataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{Asset, TransactionFactory}
-import com.wavesplatform.utils.{Time, _}
+import com.wavesplatform.utils.{Time, *}
 import com.wavesplatform.wallet.Wallet
 import monix.execution.Scheduler
-import play.api.libs.json._
+import play.api.libs.json.*
 
 import scala.util.{Success, Try}
 
@@ -199,7 +200,7 @@ case class AddressApiRoute(
                 _ => complete(accountData(address, matches))
               )
           } ~ anyParam("key").filter(_.nonEmpty) { keys =>
-            complete(accountDataList(address, keys.toSeq: _*))
+            complete(accountDataList(address, keys.toSeq*))
           } ~ get {
             complete(accountData(address))
           }
@@ -315,7 +316,8 @@ case class AddressApiRoute(
     (msg, ByteStr.decodeBase58(signature), Base58.tryDecodeWithLimit(publicKey)) match {
       case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
         val account = PublicKey(pubKeyBytes)
-        val isValid = account.toAddress == address && crypto.verify(signatureBytes, msgBytes, PublicKey(pubKeyBytes))
+        val isValid = account.toAddress == address &&
+          crypto.verify(signatureBytes, msgBytes, PublicKey(pubKeyBytes), blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
         Right(Json.obj("valid" -> isValid))
       case _ => Left(InvalidMessage)
     }
@@ -330,7 +332,7 @@ object AddressApiRoute {
   case class Signed(message: String, publicKey: String, signature: String)
 
   object Signed {
-    import play.api.libs.functional.syntax._
+    import play.api.libs.functional.syntax.*
 
     implicit val signedFormat: Format[Signed] = Format(
       ((JsPath \ "message").read[String] and
@@ -350,7 +352,7 @@ object AddressApiRoute {
 
   case class AccountScriptMeta(address: String, meta: Option[FunctionSignatures])
 
-  object AccountScriptMeta {
+  object AccountScriptMeta extends JsonFormats {
     implicit lazy val accountScriptMetaWrites: Writes[AccountScriptMeta] = Json.writes[AccountScriptMeta]
   }
 }

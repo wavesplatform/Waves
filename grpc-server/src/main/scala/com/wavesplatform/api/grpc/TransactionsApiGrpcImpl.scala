@@ -82,7 +82,7 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
 
   override def getStateChanges(request: TransactionsRequest, responseObserver: StreamObserver[InvokeScriptResultResponse]): Unit =
     responseObserver.interceptErrors {
-      val result = Observable(request.transactionIds: _*)
+      val result = Observable(request.transactionIds*)
         .flatMap(txId => Observable.fromIterable(commonApi.transactionById(txId.toByteStr)))
         .collect {
           case TransactionMeta.Invoke(_, transaction, _, _, invokeScriptResult) =>
@@ -94,7 +94,7 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
 
   override def getStatuses(request: TransactionsByIdRequest, responseObserver: StreamObserver[TransactionStatus]): Unit =
     responseObserver.interceptErrors {
-      val result = Observable(request.transactionIds: _*).map { txId =>
+      val result = Observable(request.transactionIds*).map { txId =>
         commonApi
           .unconfirmedTransactionById(txId.toByteStr)
           .map(_ => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED))

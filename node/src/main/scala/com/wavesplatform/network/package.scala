@@ -4,10 +4,10 @@ import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
 import cats.Eq
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture}
 import io.netty.channel.local.LocalAddress
 import io.netty.channel.socket.nio.NioSocketChannel
@@ -18,11 +18,14 @@ import kamon.Kamon
 import monix.eval.Coeval
 import monix.execution.Scheduler
 import monix.reactive.Observable
+import org.slf4j.LoggerFactory
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-package object network extends ScorexLogging {
+package object network {
   private val broadcastTimeStats = Kamon.timer("network-broadcast-time")
+  private lazy val logger: Logger =
+    Logger(LoggerFactory.getLogger(getClass.getName))
 
   def inetSocketAddress(addr: String, defaultPort: Int): InetSocketAddress = {
     val uri = new URI(s"node://$addr")
@@ -31,7 +34,7 @@ package object network extends ScorexLogging {
   }
 
   implicit class EventExecutorGroupExt(val e: EventExecutorGroup) extends AnyVal {
-    def scheduleWithFixedDelay(initialDelay: FiniteDuration, delay: FiniteDuration)(f: => Unit): ScheduledFuture[_] =
+    def scheduleWithFixedDelay(initialDelay: FiniteDuration, delay: FiniteDuration)(f: => Unit): ScheduledFuture[?] =
       e.scheduleWithFixedDelay((() => f): Runnable, initialDelay.toNanos, delay.toNanos, NANOSECONDS)
 
     def schedule[A](delay: FiniteDuration)(f: => A): ScheduledFuture[A] =
@@ -63,7 +66,7 @@ package object network extends ScorexLogging {
     def remoteAddress: Option[InetSocketAddress] = ctx.channel() match {
       case x: NioSocketChannel => Option(x.remoteAddress())
       case x =>
-        log.debug(s"Doesn't know how to get a remoteAddress from ${id(ctx)}, $x")
+        logger.debug(s"Doesn't know how to get a remoteAddress from ${id(ctx)}, $x")
         None
     }
   }
@@ -86,7 +89,7 @@ package object network extends ScorexLogging {
     private def logBroadcast(message: AnyRef, except: Set[Channel]): Unit = message match {
       case RawBytes(TransactionSpec.messageCode | PBTransactionSpec.messageCode, _) =>
       case _ =>
-        log.trace {
+        logger.trace {
           val exceptMsg = if (except.isEmpty) "" else s" (except ${except.map(id(_)).mkString(", ")})"
           val msgString = message match {
             case t: Transaction => s"transaction ${t.id()}"

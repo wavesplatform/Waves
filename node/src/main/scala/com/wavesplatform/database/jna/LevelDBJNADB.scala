@@ -63,7 +63,7 @@ private[jna] class LevelDBJNADB(levelDB: LevelDB) extends DB {
 
   override def getApproximateSizes(ranges: org.iq80.leveldb.Range*): Array[Long] = {
     val jnaRanges = ranges.map(r => new com.protonail.leveldb.jna.Range(r.start(), r.limit()))
-    levelDB.approximateSizes(jnaRanges: _*)
+    levelDB.approximateSizes(jnaRanges*)
   }
 
   override def getProperty(name: String): String =

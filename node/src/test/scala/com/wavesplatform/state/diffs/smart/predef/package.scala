@@ -221,7 +221,7 @@ package object predef {
        | let fee = t.fee == ${t.fee}
        | let timestamp = t.timestamp == ${t.timestamp}
        | let bodyBytes = $bodyBytesCheck
-       | let sender = t.sender == addressFromPublicKey(base58'${t.sender}')
+       | let sender = t.sender == Address(base58'${t.sender.toAddress}')
        | let senderPublicKey = t.senderPublicKey == base58'${t.sender}'
        | let version = t.version == $version
        | ${ if (checkProofs) Range(0, 8).map(letProof(proofs, "t")).mkString("\n") else ""}
