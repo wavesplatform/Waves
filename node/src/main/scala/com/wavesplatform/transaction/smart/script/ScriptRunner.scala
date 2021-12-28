@@ -140,7 +140,7 @@ object ScriptRunner {
               _ => ???
             )
           )
-        (Nil, 0, Verifier.verifyAsEllipticCurveSignature(proven).bimap(_.err, _ => TRUE))
+        (Nil, 0, Verifier.verifyAsEllipticCurveSignature(proven, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).bimap(_.err, _ => TRUE))
 
       case other =>
         (Nil, 0, s"$other: Unsupported script version".asLeft[EVALUATED])

@@ -1,7 +1,7 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto._
+import com.wavesplatform.crypto.*
 import com.wavesplatform.test.FreeSpec
 import org.scalacheck.Gen
 
@@ -14,7 +14,7 @@ class MicroBlockInvSpecSpec extends FreeSpec {
   } yield MicroBlockInv(acc, ByteStr(totalSig), ByteStr(prevBlockSig))
 
   "MicroBlockInvMessageSpec" - {
-    import MicroBlockInvSpec._
+    import MicroBlockInvSpec.*
 
     "deserializeData(serializedData(data)) == data" in forAll(microBlockInvGen) { inv =>
       inv.signaturesValid() should beRight
