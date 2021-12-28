@@ -624,7 +624,7 @@ object Functions {
                   availableComplexity,
                   reentrant
                 )
-                .map(_.map { case (result, complexity) => (result.leftMap(_.toString), complexity) })
+                .map(_.map { case (result, complexity) => (result.leftMap(_.toString), availableComplexity - complexity) })
             case xs =>
               val err = notImplemented[F, EVALUATED](s"invoke(dApp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
               Coeval.now(err.map((_, 0)))

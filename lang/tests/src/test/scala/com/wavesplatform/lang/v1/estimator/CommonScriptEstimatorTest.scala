@@ -10,10 +10,14 @@ class CommonScriptEstimatorTest
     extends ScriptEstimatorTestBase(
       ScriptEstimatorV1,
       ScriptEstimatorV2,
-      ScriptEstimatorV3(fixOverflow = true),
-      ScriptEstimatorV3(fixOverflow = false),
-      evaluatorV2AsEstimator
+      ScriptEstimatorV3(fixOverflow = true, overhead = true),
+      ScriptEstimatorV3(fixOverflow = true, overhead = false),
+      ScriptEstimatorV3(fixOverflow = false, overhead = true),
+      ScriptEstimatorV3(fixOverflow = false, overhead = false),
+      evaluatorV2AsEstimator(overhead = true),
+      evaluatorV2AsEstimator(overhead = false)
     ) {
+
   property("context leak") {
     def script(ref: String) =
       compile {

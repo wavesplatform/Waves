@@ -458,7 +458,7 @@ object AcceptFailedScriptActivationSuite {
   private val UpdateInterval     = 3
   private val MaxTxsInMicroBlock = 2
 
-  private val estimator = ScriptEstimatorV3(fixOverflow = true)
+  private val estimator = ScriptEstimatorV3(overhead = false, fixOverflow = true)
 
   private val priorityFee  = 5.waves
   private val minInvokeFee = invokeFee + smartFee // invoke fee + transfer action fee

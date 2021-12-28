@@ -29,13 +29,13 @@ object Validators {
       _ <- Either.cond(b.header.featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
     } yield b).leftMap(GenericError(_))
 
-  def validateGenesisBlock(block: Block, genesisSettings: GenesisSettings): Validation[Block] =
+  def validateGenesisBlock(block: Block, genesisSettings: GenesisSettings, rideV6Activated: Boolean): Validation[Block] =
     for {
       // Common validation
       _ <- validateBlock(block)
       // Verify signature
       _ <- Either.cond(
-        crypto.verify(block.signature, block.bodyBytes(), block.header.generator),
+        crypto.verify(block.signature, block.bodyBytes(), block.header.generator, rideV6Activated),
         (),
         GenericError("Passed genesis signature is not valid")
       )

@@ -138,7 +138,7 @@ class FoldTest extends EvaluatorSpec {
         |
         |FOLD<3>(src, "F1", f1) != FOLD<3>(src, "F2", f1)
         |""".stripMargin).asInstanceOf[ExprScript].expr
-    ScriptEstimatorV3(true).apply(Set.empty, functionCosts(V5), script).isRight shouldBe true
+    ScriptEstimatorV3(fixOverflow = true, overhead = true).apply(Set.empty, functionCosts(V5), script).isRight shouldBe true
   }
 
   property("unique names are used for folds inside foldFunc") {
@@ -162,7 +162,7 @@ class FoldTest extends EvaluatorSpec {
         |
         |FOLD<3>(src, "", f2) == "STEP01v1_1v1_2STEP02v2_1v2_2STEP03v3_1v3_2"
         |""".stripMargin).asInstanceOf[ExprScript].expr
-    ScriptEstimatorV3(true).apply(Set.empty, functionCosts(V5), script).isRight shouldBe true
+    ScriptEstimatorV3(fixOverflow = true, overhead = true).apply(Set.empty, functionCosts(V5), script).isRight shouldBe true
   }
 
   property("unique names are used for native fold") {
@@ -176,7 +176,7 @@ class FoldTest extends EvaluatorSpec {
         |
         |FOLD<3>(FOLD<3>([1, 2, 3], [], f1), "F1", add) == "F1321"
         |""".stripMargin).asInstanceOf[ExprScript].expr
-    ScriptEstimatorV3(true).apply(Set.empty, functionCosts(V5), script).isRight shouldBe true
+    ScriptEstimatorV3(fixOverflow = true, overhead = true).apply(Set.empty, functionCosts(V5), script).isRight shouldBe true
   }
 
   property("multiple scopes") {
@@ -193,6 +193,6 @@ class FoldTest extends EvaluatorSpec {
         |
         |f(10) > 0
         |""".stripMargin).asInstanceOf[ExprScript].expr
-    ScriptEstimatorV3(true).apply(Set.empty, functionCosts(V5), script).isRight shouldBe true
+    ScriptEstimatorV3(fixOverflow = true, overhead = true).apply(Set.empty, functionCosts(V5), script).isRight shouldBe true
   }
 }

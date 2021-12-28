@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.BlockchainUpdateTriggers
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.settings._
 import com.wavesplatform.transaction.Asset.Waves
@@ -18,7 +19,7 @@ import net.ceedubs.ficus.Ficus._
 object BaseTargetChecker {
   def main(args: Array[String]): Unit = {
     implicit val reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.default
-    val sharedConfig = Docker.genesisOverride
+    val sharedConfig = Docker.genesisOverride()
       .withFallback(Docker.configTemplate)
       .withFallback(defaultApplication())
       .withFallback(defaultReference())
@@ -31,7 +32,7 @@ object BaseTargetChecker {
     val poSSelector       = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
 
     try {
-      val genesisBlock = Block.genesis(settings.blockchainSettings.genesisSettings).explicitGet()
+      val genesisBlock = Block.genesis(settings.blockchainSettings.genesisSettings, blockchainUpdater.isFeatureActivated(BlockchainFeatures.RideV6)).explicitGet()
       blockchainUpdater.processBlock(genesisBlock, genesisBlock.header.generationSignature)
 
       NodeConfigs.Default.map(_.withFallback(sharedConfig)).collect {
