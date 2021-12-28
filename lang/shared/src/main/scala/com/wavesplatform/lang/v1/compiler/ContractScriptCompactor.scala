@@ -124,24 +124,30 @@ object ContractScriptCompactor {
   private def hasConflict(compactName: String, dApp: DApp): Boolean =
     dApp.callableFuncs.exists(_.u.name == compactName)
 
-  private def processDec[C](dec: DECLARATION, state: State, replaceNameF: ReplaceNameF): CompactionResult[DECLARATION] = {
+  private def processLet(let: LET, state: State, replaceNameF: ReplaceNameF): CompactionResult[LET] = {
+    val compNameRes  = replaceNameF(let.name, state)
+    val compValueRes = processExpr(let.value, compNameRes.state, replaceNameF)
+
+    CompactionResult(let.copy(name = compNameRes.value, value = compValueRes.value), compValueRes.state)
+  }
+
+  private def processFunc(func: FUNC, state: State, replaceNameF: ReplaceNameF): CompactionResult[FUNC] = {
+    val compNameRes = replaceNameF(func.name, state)
+    val compArgsRes = processList(func.args, compNameRes.state, replaceNameF)
+    val compBodyRes = processExpr(func.body, compArgsRes.state, replaceNameF)
+
+    CompactionResult(func.copy(name = compNameRes.value, args = compArgsRes.value, body = compBodyRes.value), compBodyRes.state)
+  }
+
+  private def processDec(dec: DECLARATION, state: State, replaceNameF: ReplaceNameF): CompactionResult[DECLARATION] = {
     dec match {
-      case l: LET =>
-        val compNameRes  = replaceNameF(l.name, state)
-        val compValueRes = processExpr(l.value, compNameRes.state, replaceNameF)
-
-        CompactionResult(l.copy(name = compNameRes.value, value = compValueRes.value), compValueRes.state)
-      case f: FUNC =>
-        val compNameRes = replaceNameF(f.name, state)
-        val compArgsRes = processList(f.args, compNameRes.state, replaceNameF)
-        val compBodyRes = processExpr(f.body, compArgsRes.state, replaceNameF)
-
-        CompactionResult(f.copy(name = compNameRes.value, args = compArgsRes.value, body = compBodyRes.value), compBodyRes.state)
+      case l: LET => processLet(l, state, replaceNameF)
+      case f: FUNC => processFunc(f, state, replaceNameF)
       case other => CompactionResult(other, state)
     }
   }
 
-  private def processExpr[C](expr: EXPR, state: State, replaceNameF: ReplaceNameF): CompactionResult[EXPR] = {
+  private def processExpr(expr: EXPR, state: State, replaceNameF: ReplaceNameF): CompactionResult[EXPR] = {
     expr match {
       case b: BLOCK =>
         val compDecRes  = processDec(b.dec, state, replaceNameF)
@@ -149,10 +155,10 @@ object ContractScriptCompactor {
 
         CompactionResult(b.copy(dec = compDecRes.value, body = compBodyRes.value), compBodyRes.state)
       case lb: LET_BLOCK =>
-        val compLetRes  = processDec(lb.let, state, replaceNameF)
+        val compLetRes  = processLet(lb.let, state, replaceNameF)
         val compBodyRes = processExpr(lb.body, compLetRes.state, replaceNameF)
 
-        CompactionResult(lb.copy(let = compLetRes.value.asInstanceOf[LET], body = compBodyRes.value), compBodyRes.state)
+        CompactionResult(lb.copy(let = compLetRes.value, body = compBodyRes.value), compBodyRes.state)
       case fc: FUNCTION_CALL =>
         val newFunction = fc.function match {
           case User(internalName, _) => User(getReplacedName(internalName, state))
@@ -196,10 +202,10 @@ object ContractScriptCompactor {
     val compVerifierFuncOptRes = dApp.verifierFuncOpt
       .fold[CompactionResult[Option[DApp.VerifierFunction]]](CompactionResult(None, compCallableFuncsRes.state)) { vFunc =>
         val compInvArgNameRes = replaceNameF(vFunc.annotation.invocationArgName, compCallableFuncsRes.state)
-        val compFuncRes       = processDec(vFunc.u, compInvArgNameRes.state, replaceNameF)
+        val compFuncRes       = processFunc(vFunc.u, compInvArgNameRes.state, replaceNameF)
         val newVFunc = vFunc.copy(
           annotation = vFunc.annotation.copy(invocationArgName = compInvArgNameRes.value),
-          u = compFuncRes.value.asInstanceOf[FUNC]
+          u = compFuncRes.value
         )
         CompactionResult(Some(newVFunc), compFuncRes.state)
       }
@@ -238,5 +244,5 @@ object ContractScriptCompactor {
   }
 
   case class State(counter: Int, originalNames: Map[String, String])
-  case class CompactionResult[A](value: A, state: State)
+  case class CompactionResult[+A](value: A, state: State)
 }
