@@ -56,7 +56,7 @@ case class Block(
 
   val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
     val publicKey = header.generator
-    !crypto.isWeakPublicKey(publicKey.arr) && crypto.verify(signature, bodyBytes(), publicKey)
+    crypto.verify(signature, bodyBytes(), publicKey, checkWeakPk = true)
   }
 
   protected val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
@@ -139,7 +139,7 @@ object Block extends ScorexLogging {
           Failure(t)
       }
 
-  def genesis(genesisSettings: GenesisSettings): Either[ValidationError, Block] = {
+  def genesis(genesisSettings: GenesisSettings, rideV6Activated: Boolean): Either[ValidationError, Block] = {
     import cats.instances.either._
     import cats.instances.list._
     import cats.syntax.traverse._
@@ -158,7 +158,7 @@ object Block extends ScorexLogging {
         case None             => block.sign(GenesisGenerator.privateKey)
         case Some(predefined) => block.copy(signature = predefined)
       }
-      validBlock <- signedBlock.validateGenesis(genesisSettings)
+      validBlock <- signedBlock.validateGenesis(genesisSettings, rideV6Activated)
     } yield validBlock
   }
 

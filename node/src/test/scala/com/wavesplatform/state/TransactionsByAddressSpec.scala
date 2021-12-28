@@ -45,7 +45,8 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
           Seq(GenesisTransactionSettings(sender.toAddress.toString, Constants.TotalWaves)),
           1000,
           1.minute
-        )
+        ),
+        rideV6Activated = false
       )
       .explicitGet()
     recipient1    <- accountGen

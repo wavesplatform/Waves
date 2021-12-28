@@ -46,7 +46,7 @@ class ChainIdSpecification extends PropSpec {
     val recoveredTx = recoveredTxEi.explicitGet().asInstanceOf[ProvenTransaction]
 
     recoveredTx shouldBe tx
-    Verifier.verifyAsEllipticCurveSignature(recoveredTx).explicitGet()
+    Verifier.verifyAsEllipticCurveSignature(recoveredTx, checkWeakPk = false).explicitGet()
   }
 
   property("TransferTransaction validation") {
