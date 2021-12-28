@@ -516,7 +516,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       )
     } yield (List(genesis, genesis2), master, setContract, ciWithAlias, ciWithFakeAlias, aliasTx)
 
-  property("doesnt validate intermediate action balance before V5")(withDomain(DomainPresets.RideV4) { d =>
+  property("doesnt validate intermediate action balance before V6")(withDomain(DomainPresets.RideV5) { d =>
     val dApp = TxHelpers.defaultSigner
 
     d.helpers.creditWavesToDefaultSigner()
@@ -542,34 +542,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     d.appendAndAssertSucceed(invoke)
     d.blockchain.balance(dApp.toAddress, asset) shouldBe 0L
     d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 100L
-  })
-
-  property("validates intermediate action balance after V5")(withDomain(DomainPresets.RideV5) { d =>
-    val dApp = TxHelpers.defaultSigner
-
-    d.helpers.creditWavesToDefaultSigner()
-    val asset = d.helpers.issueAsset()
-    d.helpers.transferAll(dApp, TxHelpers.voidAddress, asset)
-
-    withClue("simple script") {
-      d.helpers.setScript(
-        dApp,
-        TxHelpers.scriptV5(s"""
-                              |@Callable(i)
-                              |func test(asset: ByteVector) = {
-                              |   [
-                              |     ScriptTransfer(Address(base58'${TxHelpers.secondAddress}'), 100, asset),
-                              |     Reissue(asset, 100, true)
-                              |   ]
-                              |}
-                              |""".stripMargin)
-      )
-
-      val invoke = TxHelpers.invoke(dApp.toAddress, "test", Seq(CONST_BYTESTR(asset.id).explicitGet()))
-      d.appendAndAssertFailed(invoke)
-      d.blockchain.balance(dApp.toAddress, asset) shouldBe 0L
-      d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 0L
-    }
   })
 
   property("validates intermediate action balance after V6")(withDomain(DomainPresets.RideV6) { d =>
