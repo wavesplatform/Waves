@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.freecall
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -13,7 +12,7 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, NewAssetInfo}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.test.{PropSpec, TestTime}
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
