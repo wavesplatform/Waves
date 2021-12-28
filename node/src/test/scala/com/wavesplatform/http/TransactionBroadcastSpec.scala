@@ -90,11 +90,11 @@ class TransactionBroadcastSpec
            |    "timestamp" : 1,
            |    "expiration" : 123,
            |    "matcherFee" : 100000,
-           |    "priceMode" : "fixedDecimals",
            |    "signature" : "",
            |    "proofs" : [ ],
            |    "matcherFeeAssetId" : null,
-           |    "eip712Signature" : "${EthEncoding.toHexString(ethBuyOrder.eip712Signature.get.arr)}"
+           |    "eip712Signature" : "${EthEncoding.toHexString(ethBuyOrder.eip712Signature.get.arr)}",
+           |    "priceMode" : null
            |  },
            |  "order2" : {
            |    "version" : 4,
@@ -112,11 +112,11 @@ class TransactionBroadcastSpec
            |    "timestamp" : 1,
            |    "expiration" : 123,
            |    "matcherFee" : 100000,
-           |    "priceMode" : "fixedDecimals",
            |    "signature" : "",
            |    "proofs" : [ ],
            |    "matcherFeeAssetId" : null,
-           |    "eip712Signature" : "${EthEncoding.toHexString(ethSellOrder.eip712Signature.get.arr)}"
+           |    "eip712Signature" : "${EthEncoding.toHexString(ethSellOrder.eip712Signature.get.arr)}",
+           |    "priceMode" : null
            |  },
            |  "amount" : 1,
            |  "price" : 100,

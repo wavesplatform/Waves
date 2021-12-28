@@ -1,15 +1,18 @@
 package com.wavesplatform
 
+import scala.concurrent.duration.*
+import scala.util.Random
+
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values.V3
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.testing.{ScriptGen, TypedScriptGen}
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -17,19 +20,15 @@ import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.*
-import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.AssetDecimals
 import com.wavesplatform.transaction.lease.*
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
 import com.wavesplatform.transaction.utils.Signed
-import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import org.scalatest.Suite
-
-import scala.concurrent.duration.*
-import scala.util.Random
 
 trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _: Suite =>
 
@@ -705,8 +704,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     } yield {
       val matcherFee = fixedMatcherFee.getOrElse(genMatcherFee)
       val matcher    = fixedMatcher.getOrElse(genMatcher)
-      val o1         = Order.buy(1: Byte, buyer, matcher.publicKey, assetPair, amount1, price, timestamp, expiration, matcherFee, priceMode = AssetDecimals)
-      val o2         = Order.sell(1: Byte, seller, matcher.publicKey, assetPair, amount2, price, timestamp, expiration, matcherFee, priceMode = AssetDecimals)
+      val o1         = Order.buy(1: Byte, buyer, matcher.publicKey, assetPair, amount1, price, timestamp, expiration, matcherFee, priceMode = OrderPriceMode.Default)
+      val o2         = Order.sell(1: Byte, seller, matcher.publicKey, assetPair, amount2, price, timestamp, expiration, matcherFee, priceMode = OrderPriceMode.Default)
       val buyFee     = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue
       val sellFee    = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue
       val trans =

@@ -5,7 +5,7 @@ import java.math.BigInteger
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.{EthereumTransaction, TxHelpers}
-import com.wavesplatform.transaction.assets.exchange.OrderSender
+import com.wavesplatform.transaction.assets.exchange.OrderAuthentication
 import com.wavesplatform.transaction.utils.EthTxGenerator
 import org.scalatest.{BeforeAndAfterEach, Suite}
 import org.web3j.crypto.{Bip32ECKeyPair, RawTransaction, SignedRawTransaction}
@@ -15,7 +15,7 @@ trait EthHelpers {
   val EthStubBytes32: Array[Byte] = Array.fill(32)(EthChainId.byte)
 
   object EthSignature {
-    def apply(str: String): OrderSender.Eip712Signature = OrderSender.Eip712Signature(ByteStr(EthEncoding.toBytes(str)))
+    def apply(str: String): OrderAuthentication.Eip712Signature = OrderAuthentication.Eip712Signature(ByteStr(EthEncoding.toBytes(str)))
   }
 
   val TestEthOrdersPublicKey: PublicKey = PublicKey(

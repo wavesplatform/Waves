@@ -27,6 +27,12 @@ object EthOrders extends App {
       case OrderType.SELL => "SELL"
     }
 
+    val priceMode = order.priceMode match {
+      case OrderPriceMode.Default if order.version < Order.V4 => OrderPriceMode.AssetDecimals
+      case OrderPriceMode.Default                             => OrderPriceMode.FixedDecimals
+      case other                                              => other
+    }
+
     val message = Json.obj(
       "version"           -> order.version.toInt,
       "matcherPublicKey"  -> order.matcherPublicKey.toString,
@@ -39,7 +45,7 @@ object EthOrders extends App {
       "expiration"        -> order.expiration,
       "matcherFee"        -> order.matcherFee,
       "matcherFeeAssetId" -> encodeAsset(order.matcherFeeAssetId),
-      "priceMode"         -> toSnakeCase.convert(order.priceMode.toString)
+      "priceMode"         -> toSnakeCase.convert(priceMode.toString)
     )
 
     Json.parse(orderDomainJson).as[JsObject] ++ Json.obj("message" -> message)

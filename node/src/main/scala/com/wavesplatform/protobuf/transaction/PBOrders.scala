@@ -5,9 +5,9 @@ import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.order.AssetPair
 import com.wavesplatform.protobuf.order.Order.{PriceMode, Sender}
-import com.wavesplatform.protobuf.order.Order.PriceMode.{ASSET_DECIMALS, DEFAULT, FIXED_DECIMALS}
-import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.{AssetDecimals, FixedDecimals}
-import vt.assets.exchange.OrderSender
+import com.wavesplatform.protobuf.order.Order.PriceMode.{ASSET_DECIMALS, FIXED_DECIMALS, DEFAULT as DEFAULT_PRICE_MODE}
+import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.{AssetDecimals, FixedDecimals, Default as DefaultPriceMode}
+import vt.assets.exchange.OrderAuthentication
 
 object PBOrders {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions.*
@@ -16,8 +16,8 @@ object PBOrders {
     VanillaOrder(
       order.version.toByte,
       order.sender match {
-        case Sender.SenderPublicKey(value) => OrderSender(PublicKey(value.toByteStr))
-        case Sender.Eip712Signature(sig)   => OrderSender.Eip712Signature(sig.toByteStr)
+        case Sender.SenderPublicKey(value) => OrderAuthentication.OrderProofs(PublicKey(value.toByteStr), order.proofs.map(_.toByteStr))
+        case Sender.Eip712Signature(sig)   => OrderAuthentication.Eip712Signature(sig.toByteStr)
         case Sender.Empty                  => throw new IllegalArgumentException("Order should have either senderPublicKey or eip712Signature")
       },
       PublicKey(order.matcherPublicKey.toByteArray),
@@ -34,15 +34,12 @@ object PBOrders {
       order.expiration,
       order.getMatcherFee.longAmount,
       PBAmounts.toVanillaAssetId(order.getMatcherFee.assetId),
-      order.proofs.map(_.toByteStr),
       order.priceMode match {
-        case DEFAULT if order.version >= 4 => FixedDecimals
-        case DEFAULT                       => AssetDecimals
-        case ASSET_DECIMALS                => AssetDecimals
-        case FIXED_DECIMALS                => FixedDecimals
-        case PriceMode.Unrecognized(v)     => throw new IllegalArgumentException(s"Unknown order price mode: $v")
-      },
-      explicitMode = order.priceMode != DEFAULT
+        case DEFAULT_PRICE_MODE        => DefaultPriceMode
+        case ASSET_DECIMALS            => AssetDecimals
+        case FIXED_DECIMALS            => FixedDecimals
+        case PriceMode.Unrecognized(v) => throw new IllegalArgumentException(s"Unknown order price mode: $v")
+      }
     )
   }
 
@@ -63,13 +60,13 @@ object PBOrders {
       order.version,
       order.proofs.map(_.toByteString),
       order.priceMode match {
-        case AssetDecimals if order.explicitMode => ASSET_DECIMALS
-        case FixedDecimals if order.explicitMode => FIXED_DECIMALS
-        case _                                   => DEFAULT
+        case DefaultPriceMode => DEFAULT_PRICE_MODE
+        case AssetDecimals    => ASSET_DECIMALS
+        case FixedDecimals    => FIXED_DECIMALS
       },
-      order.senderCredentials match {
-        case OrderSender.SenderPublicKey(key)       => Sender.SenderPublicKey(key.toByteString)
-        case OrderSender.Eip712Signature(signature) => Sender.Eip712Signature(signature.toByteString)
+      order.orderAuthentication match {
+        case OrderAuthentication.OrderProofs(key, _)        => Sender.SenderPublicKey(key.toByteString)
+        case OrderAuthentication.Eip712Signature(signature) => Sender.Eip712Signature(signature.toByteString)
       }
     )
   }

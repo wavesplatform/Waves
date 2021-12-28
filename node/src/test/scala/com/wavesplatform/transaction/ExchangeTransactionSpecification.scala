@@ -8,15 +8,17 @@ import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
-import com.wavesplatform.transaction.assets.exchange.{Order, _}
+import com.wavesplatform.transaction.assets.exchange.{Order, *}
 import com.wavesplatform.transaction.serialization.impl.ExchangeTxSerializer
-import com.wavesplatform.{NTPTime, crypto}
+import com.wavesplatform.{crypto, NTPTime}
 import org.scalacheck.Gen
 import play.api.libs.json.Json
-
 import scala.math.pow
 
-class ExchangeTransactionSpecification extends PropSpec with NTPTime {
+import com.wavesplatform.utils.JsonMatchers
+
+//noinspection ScalaStyle
+class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMatchers {
   val versionsGen: Gen[(Byte, Byte, Byte)] = Gen.oneOf(
     (1.toByte, 1.toByte, 1.toByte),
     (1.toByte, 2.toByte, 2.toByte),
@@ -82,7 +84,6 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
         |    "timestamp" : 4783213297262394015,
         |    "expiration" : 1574375493134,
         |    "matcherFee" : 20077042828423,
-        |    "priceMode":"assetDecimals",
         |    "signature" : "B22PFqHfHPxXesjvqQBmjd4BRd2KCNXveMutM5WEvrQ8P6WW7BcDGoC3jfEZ92Bj25dBgem9KbbDijXGrm8WXRf",
         |    "proofs" : [ "B22PFqHfHPxXesjvqQBmjd4BRd2KCNXveMutM5WEvrQ8P6WW7BcDGoC3jfEZ92Bj25dBgem9KbbDijXGrm8WXRf" ]
         |  },
@@ -102,7 +103,6 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
         |    "timestamp" : 4783213297262394015,
         |    "expiration" : 1574375493134,
         |    "matcherFee" : 20077042828423,
-        |    "priceMode":"assetDecimals",
         |    "signature" : "5tLNaVttbCwLLSmSfZkVRxvE6HML3DPrFmXXJm7Y9TsfAgZ4cNRpxxkkVcAHNnJRJtQZHtALmetSAbLMmsivhmWK",
         |    "proofs" : [ "5tLNaVttbCwLLSmSfZkVRxvE6HML3DPrFmXXJm7Y9TsfAgZ4cNRpxxkkVcAHNnJRJtQZHtALmetSAbLMmsivhmWK" ]
         |  },
@@ -113,7 +113,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
     )
 
     val tx = ExchangeTxSerializer.parseBytes(bytes).get
-    tx.json() shouldBe json
+    tx.json() should matchJson(json)
     assert(crypto.verify(tx.sellOrder.signature, tx.sellOrder.bodyBytes(), tx.sellOrder.sender), "sellOrder signature should be valid")
     assert(crypto.verify(tx.buyOrder.signature, tx.buyOrder.bodyBytes(), tx.buyOrder.sender), "buyOrder signature should be valid")
     assert(crypto.verify(tx.signature, tx.bodyBytes(), tx.sender), "signature should be valid")
@@ -152,7 +152,6 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
         |    "price" : 1375940418789,
         |    "proofs" : [ "2wDh9Jgf42R9ahTE4Sg2pVChPX9Yti5epKBFsrphEG96RQEJriptHUyofgxy6Hz8CuTrGAKyPMjPQmUEQwd41k6i" ],
         |    "matcherPublicKey" : "3ZJUiWs5xiuZqYBHBthdgH4U6tYxLy5fHNKxMApEMJ6V",
-        |    "priceMode":"assetDecimals",
         |    "expiration" : 1576146863327,
         |    "id" : "ARayJvx7uq9gLnXoMYAbUqE13LD7a367hsR58ALUMu86",
         |    "timestamp" : 6484538259240088210
@@ -172,7 +171,6 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
         |    "price" : 1375940418789,
         |    "proofs" : [ "2h6XD9GHUh1Cmy65pdFrVvJkqRD3hQehnR7ysGQwH3kUoh7oD7eQaJWNL9fENfrSXgqjV7uESrPDeYwFi5aD2A49" ],
         |    "matcherPublicKey" : "3ZJUiWs5xiuZqYBHBthdgH4U6tYxLy5fHNKxMApEMJ6V",
-        |    "priceMode":"assetDecimals",
         |    "expiration" : 1576146863327,
         |    "id" : "7zS6RWD9BAogytjd3mMtVxDubFbR97gnFzKT7TifRU4y",
         |    "timestamp" : 6484538259240088210
@@ -246,7 +244,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
         if (version == 1) {
           ExchangeTransaction.signed(
             1.toByte,
-            matcher = sender1.privateKey,
+            matcher = matcher.privateKey,
             order1 = buyOrder,
             order2 = sellOrder,
             amount = amount,
@@ -259,7 +257,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
         } else {
           ExchangeTransaction.signed(
             version,
-            matcher = sender1.privateKey,
+            matcher = matcher.privateKey,
             order1 = buyOrder,
             order2 = sellOrder,
             amount = amount,
@@ -425,7 +423,6 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
             "timestamp":1526992336241,
             "expiration":1529584336241,
             "matcherFee":1,
-            "priceMode":"assetDecimals",
             "signature":"2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs",
             "proofs":["2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs"]
          },
@@ -442,7 +439,6 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
             "timestamp":1526992336241,
             "expiration":1529584336241,
             "matcherFee":2,
-            "priceMode":"assetDecimals",
             "signature":"2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq",
             "proofs":["2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq"]
          },
@@ -455,7 +451,10 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
 
     val buy = Order(
       Order.V1,
-      OrderSender(PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet()),
+      OrderAuthentication.OrderProofs(
+        PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(),
+        Proofs(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
+      ),
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.BUY,
@@ -463,13 +462,15 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       6000000000L,
       1526992336241L,
       1529584336241L,
-      1,
-      proofs = Proofs(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
+      1
     )
 
     val sell = Order(
       Order.V1,
-      OrderSender(PublicKey.fromBase58String("7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV").explicitGet()),
+      OrderAuthentication.OrderProofs(
+        PublicKey.fromBase58String("7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV").explicitGet(),
+        Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
+      ),
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.SELL,
@@ -477,8 +478,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       5000000000L,
       1526992336241L,
       1529584336241L,
-      2,
-      proofs = Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
+      2
     )
 
     val tx = ExchangeTransaction
@@ -496,7 +496,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       )
       .explicitGet()
 
-    js shouldEqual tx.json()
+    js should matchJson(tx.json())
   }
 
   property("JSON format validation V2") {
@@ -523,7 +523,6 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
             "timestamp":1526992336241,
             "expiration":1529584336241,
             "matcherFee":1,
-            "priceMode":"assetDecimals",
             "signature":"2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs",
             "proofs":["2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs"]
          },
@@ -540,7 +539,6 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
             "timestamp":1526992336241,
             "expiration":1529584336241,
             "matcherFee":2,
-            "priceMode":"assetDecimals",
             "signature":"2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq",
             "proofs":["2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq"]
          },
@@ -553,7 +551,10 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
 
     val buy = Order(
       Order.V2,
-      OrderSender(PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet()),
+      OrderAuthentication.OrderProofs(
+        PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(),
+        Proofs(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
+      ),
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.BUY,
@@ -561,13 +562,15 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       6000000000L,
       1526992336241L,
       1529584336241L,
-      1,
-      proofs = Proofs(Seq(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get))
+      1
     )
 
     val sell = Order(
       Order.V1,
-      OrderSender(PublicKey.fromBase58String("7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV").explicitGet()),
+      OrderAuthentication.OrderProofs(
+        PublicKey.fromBase58String("7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV").explicitGet(),
+        Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
+      ),
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.SELL,
@@ -575,8 +578,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       5000000000L,
       1526992336241L,
       1529584336241L,
-      2,
-      proofs = Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
+      2
     )
 
     val tx = ExchangeTransaction
@@ -594,7 +596,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       )
       .explicitGet()
 
-    js shouldEqual tx.json()
+    js should matchJson(tx.json())
   }
 
   property("JSON format validation V2 OrderV3") {
@@ -620,7 +622,6 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
             "amount":2,
             "timestamp":1526992336241,
             "expiration":1529584336241,
-            "priceMode":"assetDecimals",
             "matcherFee":1,
             "matcherFeeAssetId":"9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy",
             "signature":"2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs",
@@ -639,7 +640,6 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
             "timestamp":1526992336241,
             "expiration":1529584336241,
             "matcherFee":2,
-            "priceMode":"assetDecimals",
             "signature":"2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq",
             "proofs":["2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq"]
          },
@@ -652,7 +652,10 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
 
     val buy = Order(
       Order.V3,
-      OrderSender(PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet()),
+      OrderAuthentication.OrderProofs(
+        PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(),
+        Proofs(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
+      ),
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.BUY,
@@ -661,13 +664,15 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       1526992336241L,
       1529584336241L,
       1,
-      extractAssetId("9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
-      Proofs(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
+      extractAssetId("9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get
     )
 
     val sell = Order(
       Order.V1,
-      OrderSender(PublicKey.fromBase58String("7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV").explicitGet()),
+      OrderAuthentication.OrderProofs(
+        PublicKey.fromBase58String("7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV").explicitGet(),
+        Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
+      ),
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.SELL,
@@ -675,8 +680,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       5000000000L,
       1526992336241L,
       1529584336241L,
-      2,
-      proofs = Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
+      2
     )
 
     val tx = ExchangeTransaction
@@ -694,6 +698,6 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       )
       .explicitGet()
 
-    js shouldEqual tx.json()
+    js should matchJson(tx.json())
   }
 }

@@ -5,10 +5,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.test.{FlatSpec, TestTime}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.BlockchainStubHelpers
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.{Proofs, TxHelpers, TxVersion}
-import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.FixedDecimals
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, EthSetChainId}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
@@ -19,9 +18,9 @@ class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with PathMockFactory 
 
   "ETH signed order" should "recover signer public key correctly" in {
     val testOrder = Order(
-      Order.V1,
-      OrderSender(PublicKey(EthStubBytes32)),
-      PublicKey(EthStubBytes32),
+      Order.V4,
+      OrderAuthentication(TestEthOrdersPublicKey),
+      TestEthOrdersPublicKey,
       AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), IssuedAsset(ByteStr(EthStubBytes32))),
       OrderType.BUY,
       1,
@@ -34,7 +33,7 @@ class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with PathMockFactory 
 
     val signature =
       EthEncoding.toBytes(
-        "0xae7cb5b5e9713862fdbfb6b5f1518d89b4f1cc29a865a9248ad72a36044e2a90683092c2fe49fd5e00d6ce734e6ee623b9206f7ad05e587dfe9b45cbd586d5fd1b"
+        "0xe4b329ea85ab9b82fda55f6bf063170864fbb66651dbf5d7e8278a79df2a46d26400f966b49c5a46c82cea590538569dc058facaa43b6246b3dce0d37fae6b4a1b"
       )
 
     val result = EthOrders.recoverEthSignerKey(testOrder, signature)
@@ -72,27 +71,6 @@ class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with PathMockFactory 
     )
 
     testOrder.isValid(123).labels shouldBe Set("eip712Signature available only in V4")
-  }
-
-  it should "be not contain proofs" in {
-    val testOrder = Order(
-      Order.V4,
-      EthSignature(
-        "0xb557dae4c614146dd35ba6fd80e4702a75d33ffcb8af09e80e0c1a7386b8ffcb5b76bd8037f6484de809a80a5b39a224301c76e8bad9b1a9e7ada53ba6fa7e361c"
-      ),
-      PublicKey(EthStubBytes32),
-      AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
-      OrderType.BUY,
-      1,
-      1,
-      123,
-      321,
-      1,
-      Waves,
-      Proofs(ByteStr.empty)
-    )
-
-    testOrder.isValid(123).labels shouldBe Set("eip712Signature excludes proofs")
   }
 
   it should "work in exchange transaction" in {
@@ -149,7 +127,7 @@ class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with PathMockFactory 
     val transaction = TxHelpers
       .exchange(ethBuyOrder, ethSellOrder, TxVersion.V3, 100)
       .copy(
-        order2 = ethSellOrder.copy(senderCredentials =
+        order2 = ethSellOrder.copy(orderAuthentication =
           EthSignature(
             "0x1717804a1d60149988821546732442eabc69f46b2764e231eaeef48351d9f36577278c3f29fe3d61500932190dba8c045b19acda117a4690bfd3d2c28bb67bf91c"
           )
@@ -228,9 +206,10 @@ class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with PathMockFactory 
 }
 
 object EthOrderSpec extends EthHelpers {
-  /**
-    * Use for create a hardcoded signature for a test order
-    * @param order Order parameters
+
+  /** Use for create a hardcoded signature for a test order
+    * @param order
+    *   Order parameters
     */
   def signOrder(order: Order): Unit = {
     val signature = EthOrders.signOrder(order, TxHelpers.defaultEthSigner)
@@ -250,8 +229,7 @@ object EthOrderSpec extends EthHelpers {
     1,
     123,
     100000,
-    Waves,
-    priceMode = FixedDecimals
+    Waves
   )
 
   val ethSellOrder: Order = Order(
@@ -267,7 +245,6 @@ object EthOrderSpec extends EthHelpers {
     1,
     123,
     100000,
-    Waves,
-    priceMode = FixedDecimals
+    Waves
   )
 }

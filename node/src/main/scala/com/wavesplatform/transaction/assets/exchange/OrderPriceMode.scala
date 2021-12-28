@@ -10,15 +10,21 @@ sealed trait OrderPriceMode {
 }
 
 object OrderPriceMode {
+  case object Default       extends OrderPriceMode
   case object AssetDecimals extends OrderPriceMode
   case object FixedDecimals extends OrderPriceMode
 
+  private[this] val byJsonName = Seq(Default, AssetDecimals, FixedDecimals).map(v => v.jsonName -> v).toMap
+
   implicit val jsonFormat: Format[OrderPriceMode] = Format(
     Reads {
-      case JsString(AssetDecimals.jsonName) => JsSuccess(AssetDecimals)
-      case JsString(FixedDecimals.jsonName) => JsSuccess(FixedDecimals)
-      case other                            => JsError(s"Invalid mode: $other")
+      case JsNull                                      => JsSuccess(Default)
+      case JsString(mode) if byJsonName.contains(mode) => JsSuccess(byJsonName(mode))
+      case other                                       => JsError(s"Invalid mode: $other")
     },
-    Writes(mode => JsString(mode.jsonName))
+    Writes {
+      case Default => JsNull
+      case other   => JsString(other.jsonName)
+    }
   )
 }

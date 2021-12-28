@@ -8,25 +8,24 @@ import com.wavesplatform.crypto
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.Order.Version
-import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.AssetDecimals
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.serialization.impl.OrderSerializer
 import monix.eval.Coeval
 import play.api.libs.json.{Format, JsObject}
 
-sealed trait OrderSender
-object OrderSender {
-  final case class SenderPublicKey(key: PublicKey)     extends OrderSender
-  final case class Eip712Signature(signature: ByteStr) extends OrderSender
+sealed trait OrderAuthentication
+object OrderAuthentication {
+  final case class OrderProofs(key: PublicKey, proofs: Proofs) extends OrderAuthentication
+  final case class Eip712Signature(signature: ByteStr)         extends OrderAuthentication
 
-  def apply(pk: PublicKey): SenderPublicKey = SenderPublicKey(pk)
+  def apply(pk: PublicKey): OrderProofs = OrderProofs(pk, Proofs.empty)
 }
 
 /** Order to matcher service for asset exchange
   */
 case class Order(
     version: Version,
-    senderCredentials: OrderSender,
+    orderAuthentication: OrderAuthentication,
     matcherPublicKey: PublicKey,
     assetPair: AssetPair,
     orderType: OrderType,
@@ -36,24 +35,31 @@ case class Order(
     expiration: TxTimestamp,
     matcherFee: TxAmount,
     matcherFeeAssetId: Asset = Waves,
-    proofs: Proofs = Proofs.empty,
-    priceMode: OrderPriceMode = AssetDecimals,
-    explicitMode: Boolean = false
+    priceMode: OrderPriceMode = OrderPriceMode.Default
 ) extends Proven {
   import Order.*
 
-  lazy val senderPublicKey: PublicKey = senderCredentials match {
-    case OrderSender.SenderPublicKey(key)       => key
-    case OrderSender.Eip712Signature(signature) => EthOrders.recoverEthSignerKey(this, signature.arr)
+  lazy val senderPublicKey: PublicKey = orderAuthentication match {
+    case OrderAuthentication.OrderProofs(publicKey, _)  => publicKey
+    case OrderAuthentication.Eip712Signature(signature) => EthOrders.recoverEthSignerKey(this, signature.arr)
   }
 
-  val eip712Signature: Option[ByteStr] = senderCredentials match {
-    case OrderSender.SenderPublicKey(key)       => None
-    case OrderSender.Eip712Signature(signature) => Some(signature)
+  val eip712Signature: Option[ByteStr] = orderAuthentication match {
+    case OrderAuthentication.Eip712Signature(signature) => Some(signature)
+    case OrderAuthentication.OrderProofs(_, _)          => None
+  }
+
+  val proofs: Proofs = orderAuthentication match {
+    case OrderAuthentication.OrderProofs(_, proofs) => proofs
+    case OrderAuthentication.Eip712Signature(_)     => Proofs.empty
   }
 
   val sender: PublicKey      = senderPublicKey
   def senderAddress: Address = sender.toAddress
+
+  def withProofs(proofs: Proofs): Order = {
+    copy(orderAuthentication = OrderAuthentication.OrderProofs(senderPublicKey, proofs))
+  }
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(amount, price) &&
@@ -66,8 +72,7 @@ case class Order(
     (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves" &&
     (eip712Signature.isEmpty || version >= Order.V4) :| "eip712Signature available only in V4" &&
     eip712Signature.forall(es => es.size == 65 || es.size == 129) :| "eip712Signature should be of length 65 or 129" &&
-    (eip712Signature.isEmpty || proofs.isEmpty) :| "eip712Signature excludes proofs" &&
-    (version >= Order.V4 || (priceMode == OrderPriceMode.AssetDecimals && !explicitMode)) :| s"price mode should be AssetDecimals for V$version"
+    (version >= Order.V4 || priceMode == OrderPriceMode.Default) :| s"price mode should be default for V$version"
   }
 
   def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {
@@ -116,7 +121,7 @@ object Order {
   val V4: Version = 4.toByte
 
   implicit def sign(order: Order, privateKey: PrivateKey): Order =
-    order.copy(proofs = Proofs(crypto.sign(privateKey, order.bodyBytes())))
+    order.withProofs(Proofs(crypto.sign(privateKey, order.bodyBytes())))
 
   def selfSigned(
       version: TxVersion,
@@ -130,11 +135,11 @@ object Order {
       expiration: TxTimestamp,
       matcherFee: TxAmount,
       matcherFeeAssetId: Asset = Asset.Waves,
-      priceMode: OrderPriceMode = AssetDecimals
+      priceMode: OrderPriceMode = OrderPriceMode.Default
   ): Order =
     Order(
       version,
-      OrderSender(sender.publicKey),
+      OrderAuthentication(sender.publicKey),
       matcher,
       assetPair,
       orderType,
@@ -158,7 +163,7 @@ object Order {
       expiration: TxTimestamp,
       matcherFee: TxAmount,
       matcherFeeAssetId: Asset = Waves,
-      priceMode: OrderPriceMode = AssetDecimals
+      priceMode: OrderPriceMode = OrderPriceMode.Default
   ): Order = {
     Order.selfSigned(version, sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, priceMode)
   }
@@ -174,7 +179,7 @@ object Order {
       expiration: TxTimestamp,
       matcherFee: TxAmount,
       matcherFeeAssetId: Asset = Waves,
-      priceMode: OrderPriceMode = AssetDecimals
+      priceMode: OrderPriceMode = OrderPriceMode.Default
   ): Order = {
     Order.selfSigned(version, sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, priceMode)
   }

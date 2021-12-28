@@ -59,16 +59,16 @@ object OrderJson {
       version: Option[Byte]
   ): Order = {
 
-    val eproofs =
+    val proofsValue =
       proofs
         .map(p => Proofs(p.map(ByteStr.apply).toList))
         .orElse(signature.map(s => Proofs(List(ByteStr(s)))))
         .getOrElse(Proofs.empty)
 
-    val vrsn: Byte = version.getOrElse(if (eproofs.proofs.size == 1 && eproofs.proofs.head.arr.length == SignatureLength) 1 else 2)
+    val versionValue: Byte = version.getOrElse(if (proofsValue.proofs.size == 1 && proofsValue.proofs.head.arr.length == SignatureLength) 1 else 2)
     Order(
-      vrsn,
-      OrderSender(sender),
+      versionValue,
+      OrderAuthentication.OrderProofs(sender, proofsValue),
       matcher,
       assetPair,
       orderType,
@@ -77,8 +77,7 @@ object OrderJson {
       timestamp,
       expiration,
       matcherFee,
-      proofs = eproofs,
-      priceMode = AssetDecimals
+      priceMode = OrderPriceMode.Default
     )
   }
 
@@ -99,36 +98,23 @@ object OrderJson {
       eip712Signature: Option[Array[Byte]],
       priceMode: OrderPriceMode
   ): Order = {
-
-    val eproofs =
-      proofs
-        .map(p => Proofs(p.map(ByteStr.apply).toIndexedSeq))
-        .orElse(signature.map(s => Proofs(ByteStr(s))))
-        .getOrElse(Proofs.empty)
-
     val senderCredentials = eip712Signature match {
-      case Some(value) => OrderSender.Eip712Signature(ByteStr(value))
+      case Some(value) =>
+        OrderAuthentication.Eip712Signature(ByteStr(value))
+
       case None =>
-        OrderSender.SenderPublicKey(
-          sender.getOrElse(throw new IllegalArgumentException("Either senderPublicKey or eip712Signature should be provided"))
+        val proofsValue = proofs
+          .map(p => Proofs(p.map(ByteStr.apply).toIndexedSeq))
+          .orElse(signature.map(s => Proofs(ByteStr(s))))
+          .getOrElse(Proofs.empty)
+
+        OrderAuthentication.OrderProofs(
+          sender.getOrElse(throw new IllegalArgumentException("Either senderPublicKey or eip712Signature should be provided")),
+          proofsValue
         )
     }
 
-    Order(
-      version,
-      senderCredentials,
-      matcher,
-      assetPair,
-      orderType,
-      amount,
-      price,
-      timestamp,
-      expiration,
-      matcherFee,
-      matcherFeeAssetId,
-      eproofs,
-      priceMode
-    )
+    Order(version, senderCredentials, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, priceMode)
   }
 
   private val assetReads: Reads[Asset] = {
@@ -194,7 +180,7 @@ object OrderJson {
         .map(_.map(EthEncoding.toBytes)) and
       (JsPath \ "priceMode")
         .readNullable[OrderPriceMode]
-        .map(_.getOrElse(AssetDecimals))
+        .map(_.getOrElse(OrderPriceMode.Default))
 
     r(readOrderV3V4 _)
   }
@@ -206,9 +192,8 @@ object OrderJson {
         case JsNumber(n) if n >= 3           => orderV3V4Reads.reads(jsOrder)
         case v                               => JsError(s"Invalid version: $v")
       }
-    case invalidOrder => JsError(s"Can't parse invalid order $invalidOrder")
+    case invalidOrder => JsError(s"Order object expected: $invalidOrder")
   }
 
   implicit val orderFormat: Format[Order] = Format(orderReads, Writes[Order](_.json()))
-
 }

@@ -22,8 +22,13 @@ object ExchangeTransactionDiff {
     val seller = tx.sellOrder.senderAddress
 
     val assetIds =
-      List(tx.buyOrder.assetPair.amountAsset, tx.buyOrder.assetPair.priceAsset, tx.sellOrder.assetPair.amountAsset, tx.sellOrder.assetPair.priceAsset).collect {
-        case asset: IssuedAsset => asset
+      List(
+        tx.buyOrder.assetPair.amountAsset,
+        tx.buyOrder.assetPair.priceAsset,
+        tx.sellOrder.assetPair.amountAsset,
+        tx.sellOrder.assetPair.priceAsset
+      ).collect { case asset: IssuedAsset =>
+        asset
       }.distinct
     val assets = assetIds.map(id => id -> blockchain.assetDescription(id)).toMap
 
@@ -105,8 +110,13 @@ object ExchangeTransactionDiff {
     }
 
     val assetIds =
-      List(tx.buyOrder.assetPair.amountAsset, tx.buyOrder.assetPair.priceAsset, tx.sellOrder.assetPair.amountAsset, tx.sellOrder.assetPair.priceAsset).collect {
-        case asset: IssuedAsset => asset
+      List(
+        tx.buyOrder.assetPair.amountAsset,
+        tx.buyOrder.assetPair.priceAsset,
+        tx.sellOrder.assetPair.amountAsset,
+        tx.sellOrder.assetPair.priceAsset
+      ).collect { case asset: IssuedAsset =>
+        asset
       }.distinct
     val assets = assetIds.map(id => id -> blockchain.assetDescription(id)).toMap
 
@@ -153,7 +163,7 @@ object ExchangeTransactionDiff {
   }
 
   private[this] def checkOrderPriceModes(tx: ExchangeTransaction, blockchain: Blockchain): Either[GenericError, Unit] = {
-    def isLegacyModeOrder(order: Order) = order.version >= Order.V4 && (order.priceMode == OrderPriceMode.AssetDecimals || order.explicitMode)
+    def isLegacyModeOrder(order: Order) = order.version >= Order.V4 && order.priceMode != OrderPriceMode.Default
     Either.cond(
       !Seq(tx.order1, tx.order2).exists(isLegacyModeOrder) || blockchain.isFeatureActivated(BlockchainFeatures.RideV6),
       (),
@@ -236,8 +246,7 @@ object ExchangeTransactionDiff {
       }
     }.toEither.left.map(x => GenericError(x.getMessage))
 
-  /**
-    * Calculates fee portfolio from the order (taking into account that in OrderV3 fee can be paid in asset != Waves)
+  /** Calculates fee portfolio from the order (taking into account that in OrderV3 fee can be paid in asset != Waves)
     */
   private[diffs] def getOrderFeePortfolio(order: Order, fee: Long): Portfolio =
     Portfolio.build(order.matcherFeeAssetId, fee)
