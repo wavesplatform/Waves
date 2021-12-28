@@ -155,7 +155,7 @@ class DataTransactionSpecification extends PropSpec {
         val emptyKeyEi = DataTransaction.create(version, sender, emptyKey, fee, timestamp, proofs)
         emptyKeyEi shouldBe Left(TxValidationError.EmptyDataKey)
 
-        val maxKeySize   = if (tx.isProtobufVersion) MaxPBKeySize else MaxKeySize
+        val maxKeySize   = MaxPBKeySize
         val keyTooLong   = data :+ BinaryDataEntry("a" * (maxKeySize + 1), ByteStr(Array(1, 2)))
         val keyTooLongEi = DataTransaction.create(version, sender, keyTooLong, fee, timestamp, proofs)
         keyTooLongEi shouldBe Left(TxValidationError.TooBigArray)
