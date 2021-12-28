@@ -1,14 +1,14 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.Id
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.VerifierFunction
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.traits.Environment
@@ -107,25 +107,27 @@ object ContractEvaluator {
       i: Invocation,
       version: StdLibVersion,
       limit: Int,
-      correctFunctionCallScope: Boolean
+      correctFunctionCallScope: Boolean,
+      newMode: Boolean
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])]] =
     Coeval
       .now(buildExprFromInvocation(dApp, i, version).leftMap((_, limit, Nil)))
       .flatMap {
-        case Right(value) => applyV2Coeval(ctx, value, version, i.transactionId, limit, correctFunctionCallScope)
+        case Right(value) => applyV2Coeval(ctx, value, version, i.transactionId, limit, correctFunctionCallScope, newMode)
         case Left(error)  => Coeval.now(Left(error))
       }
 
-  def applyV2Coeval(
+  private def applyV2Coeval(
       ctx: EvaluationContext[Environment, Id],
       expr: EXPR,
       version: StdLibVersion,
       transactionId: ByteStr,
       limit: Int,
-      correctFunctionCallScope: Boolean
+      correctFunctionCallScope: Boolean,
+      newMode: Boolean
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])]] =
     EvaluatorV2
-      .applyLimitedCoeval(expr, limit, ctx, version, correctFunctionCallScope)
+      .applyLimitedCoeval(expr, limit, ctx, version, correctFunctionCallScope, newMode)
       .map(_.flatMap {
         case (expr, unusedComplexity, log) =>
           val result =

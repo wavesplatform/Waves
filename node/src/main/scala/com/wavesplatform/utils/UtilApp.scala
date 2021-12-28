@@ -8,7 +8,7 @@ import com.google.common.io.ByteStreams
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, FastBase58}
-import com.wavesplatform.features.EstimatorProvider._
+import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.TransactionFactory
@@ -46,17 +46,19 @@ object UtilApp {
     final case class Str(str: String)   extends Input
   }
 
-  case class Command(mode: Command.Mode = null,
-                     configFile: Option[String] = None,
-                     inputData: Input = Input.StdIn,
-                     outputFile: Option[String] = None,
-                     inFormat: String = "plain",
-                     outFormat: String = "plain",
-                     compileOptions: CompileOptions = CompileOptions(),
-                     signOptions: SignOptions = SignOptions(),
-                     verifyOptions: VerifyOptions = VerifyOptions(),
-                     hashOptions: HashOptions = HashOptions(),
-                     signTxOptions: SignTxOptions = SignTxOptions())
+  case class Command(
+      mode: Command.Mode = null,
+      configFile: Option[String] = None,
+      inputData: Input = Input.StdIn,
+      outputFile: Option[String] = None,
+      inFormat: String = "plain",
+      outFormat: String = "plain",
+      compileOptions: CompileOptions = CompileOptions(),
+      signOptions: SignOptions = SignOptions(),
+      verifyOptions: VerifyOptions = VerifyOptions(),
+      hashOptions: HashOptions = HashOptions(),
+      signTxOptions: SignTxOptions = SignTxOptions()
+  )
 
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, Command()) match {
@@ -90,7 +92,7 @@ object UtilApp {
     import scopt.OParser
 
     val builder = OParser.builder[Command]
-    import builder._
+    import builder.*
 
     OParser.sequence(
       programName("waves util"),
