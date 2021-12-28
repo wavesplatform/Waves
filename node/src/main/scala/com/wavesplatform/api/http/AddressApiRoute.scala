@@ -13,6 +13,7 @@ import com.wavesplatform.api.http.requests.DataRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.meta.FunctionSignatures
@@ -315,7 +316,8 @@ case class AddressApiRoute(
     (msg, ByteStr.decodeBase58(signature), Base58.tryDecodeWithLimit(publicKey)) match {
       case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
         val account = PublicKey(pubKeyBytes)
-        val isValid = account.toAddress == address && crypto.verify(signatureBytes, msgBytes, PublicKey(pubKeyBytes))
+        val isValid = account.toAddress == address &&
+          crypto.verify(signatureBytes, msgBytes, PublicKey(pubKeyBytes), blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
         Right(Json.obj("valid" -> isValid))
       case _ => Left(InvalidMessage)
     }

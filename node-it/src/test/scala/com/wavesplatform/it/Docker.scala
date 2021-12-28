@@ -5,41 +5,40 @@ import java.net.{InetAddress, InetSocketAddress, URL}
 import java.nio.file.{Files, Path, Paths}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.{Properties, List => JList, Map => JMap}
-import java.util.Collections._
+import java.util.{Properties, List as JList, Map as JMap}
+import java.util.Collections.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
-
 import scala.annotation.tailrec
-import scala.concurrent.{blocking, Await, Future}
+import scala.concurrent.{Await, Future, blocking}
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
+import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 import scala.util.{Random, Try}
 import scala.util.control.NonFatal
-
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
-import com.google.common.primitives.Ints._
+import com.google.common.primitives.Ints.*
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
-import com.spotify.docker.client.messages._
+import com.spotify.docker.client.messages.*
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
-import com.typesafe.config.ConfigFactory._
+import com.typesafe.config.ConfigFactory.*
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
-import com.wavesplatform.settings._
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.it.api.AsyncHttpApi.*
+import com.wavesplatform.it.util.GlobalTimer.instance as timer
+import com.wavesplatform.settings.*
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.Ficus.*
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.io.IOUtils
-import org.asynchttpclient.Dsl._
+import org.asynchttpclient.Dsl.*
 
 class Docker(
     suiteConfig: Config = empty,
@@ -74,8 +73,6 @@ class Docker(
     close()
   }
 
-  private val genesisOverride = Docker.genesisOverride
-
   // a random network in 10.x.x.x range
   val networkSeed = Random.nextInt(0x100000) << 4 | 0x0A000000
   // 10.x.x.x/28 network will accommodate up to 13 nodes
@@ -89,6 +86,8 @@ class Docker(
     Files.createDirectories(r)
     r
   }
+
+  private val genesisOverride = Docker.genesisOverride(Some(suiteConfig))
 
   private def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
 
@@ -559,8 +558,8 @@ object Docker {
   private val propsMapper = new JavaPropsMapper
 
   val configTemplate: Config = parseResources("template.conf")
-  def genesisOverride: Config = {
-    val genesisTs = System.currentTimeMillis()
+  def genesisOverride(featuresConfig: Option[Config] = None): Config = {
+    val genesisTs: Long = System.currentTimeMillis()
 
     val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
                                             |  timestamp = $genesisTs
@@ -568,9 +567,15 @@ object Docker {
                                             |  signature = null # To calculate it in Block.genesis
                                             |}""".stripMargin)
 
-    val genesisConfig    = timestampOverrides.withFallback(configTemplate)
-    val gs               = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
-    val genesisSignature = Block.genesis(gs).explicitGet().id()
+    val genesisConfig     = timestampOverrides.withFallback(configTemplate)
+    val gs                = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
+    val isRideV6Activated = featuresConfig.map(_.withFallback(configTemplate))
+      .getOrElse(configTemplate)
+      .resolve()
+      .getAs[Map[Short, Int]]("waves.blockchain.custom.functionality.pre-activated-features")
+      .exists(_.get(BlockchainFeatures.RideV6.id).contains(0))
+
+    val genesisSignature  = Block.genesis(gs, rideV6Activated = isRideV6Activated).explicitGet().id()
 
     parseString(s"waves.blockchain.custom.genesis.signature = $genesisSignature").withFallback(timestampOverrides)
   }

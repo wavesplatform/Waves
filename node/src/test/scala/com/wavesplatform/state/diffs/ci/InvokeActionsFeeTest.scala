@@ -54,7 +54,7 @@ class InvokeActionsFeeTest extends PropSpec with Inside with WithState with DBCa
                     |  )
                     |
                     """.stripMargin
-    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()._1
+    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()._1
   }
 
   private def dApp(asset: IssuedAsset): Script =

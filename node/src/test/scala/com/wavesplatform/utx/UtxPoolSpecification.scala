@@ -99,7 +99,7 @@ class UtxPoolSpecification
 
     val dbContext            = TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)
     val (bcu, _) = TestStorageFactory(settings, dbContext.db, new TestTime, ignoreSpendableBalanceChanged, ignoreBlockchainUpdateTriggers)
-    bcu.processBlock(Block.genesis(genesisSettings).explicitGet()) should beRight
+    bcu.processBlock(Block.genesis(genesisSettings, bcu.isFeatureActivated(BlockchainFeatures.RideV6)).explicitGet()) should beRight
     bcu
   }
 
@@ -770,7 +770,7 @@ class UtxPoolSpecification
                  |    }
                  | }
                """.stripMargin,
-              ScriptEstimatorV3(fixOverflow = true)
+              ScriptEstimatorV3(fixOverflow = true, overhead = true)
             )
             .explicitGet()
             ._1

@@ -66,7 +66,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
                     |
                     | groth16Verify_8inputs(key, proof, input)
                   """.stripMargin
-    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()._1
+    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()._1
   }
 
   // ~2700 complexity
@@ -91,7 +91,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
                     | $condition
                     |
                   """.stripMargin
-    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()._1
+    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()._1
   }
 
   private def scenario(
@@ -250,52 +250,52 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
 
   property("complexity border") {
     Seq(true, false).foreach { b =>
-      assert(1, 2706, invokeExpression = b)
-      assert(2, 5494, invokeExpression = b)
-      assert(9, 25010, invokeExpression = b)
-      assert(10, 25041, exceeding = true, invokeExpression = b)
-      assert(100, 25041, exceeding = true, invokeExpression = b)
+      assert(1, 2700, invokeExpression = b)
+      assert(2, 5477, invokeExpression = b)
+      assert(9, 24916, invokeExpression = b)
+      assert(10, 24985, exceeding = true, invokeExpression = b)
+      assert(100, 24985, exceeding = true, invokeExpression = b)
 
-      assert(2, 8201, withThroughPayment = true, invokeExpression = b)
-      assert(5, 24686, withThroughPayment = true, invokeExpression = b)
-      assert(6, 24733, withThroughPayment = true, exceeding = true, invokeExpression = b)
-      assert(100, 24733, withThroughPayment = true, exceeding = true, invokeExpression = b)
+      assert(2, 8179, withThroughPayment = true, invokeExpression = b)
+      assert(5, 24616, withThroughPayment = true, invokeExpression = b)
+      assert(6, 24692, withThroughPayment = true, exceeding = true, invokeExpression = b)
+      assert(100, 24692, withThroughPayment = true, exceeding = true, invokeExpression = b)
 
-      assert(1, 4609, withVerifier = true, invokeExpression = b)
-      assert(9, 26913, withVerifier = true, invokeExpression = b)
-      assert(10, 26944, withVerifier = true, exceeding = true, invokeExpression = b)
-      assert(100, 26944, withVerifier = true, exceeding = true, invokeExpression = b)
+      assert(1, 4600, withVerifier = true, invokeExpression = b)
+      assert(9, 26816, withVerifier = true, invokeExpression = b)
+      assert(10, 26885, withVerifier = true, exceeding = true, invokeExpression = b)
+      assert(100, 26885, withVerifier = true, exceeding = true, invokeExpression = b)
     }
 
-    assert(1, 5409, withPayment = true)
-    assert(2, 8197, withPayment = true)
-    assert(8, 24925, withPayment = true)
-    assert(9, 24965, withPayment = true, exceeding = true)
-    assert(100, 24965, withPayment = true, exceeding = true)
+    assert(1, 5400, withPayment = true)
+    assert(2, 8177, withPayment = true)
+    assert(8, 24839, withPayment = true)
+    assert(9, 24909, withPayment = true, exceeding = true)
+    assert(100, 24909, withPayment = true, exceeding = true)
 
-    assert(1, 5412, withThroughTransfer = true)
-    assert(2, 10906, withThroughTransfer = true)
-    assert(4, 21894, withThroughTransfer = true)
-    assert(5, 24685, withThroughTransfer = true, exceeding = true)
-    assert(100, 25041, withThroughTransfer = true, exceeding = true)
+    assert(1, 5402, withThroughTransfer = true)
+    assert(2, 10881, withThroughTransfer = true)
+    assert(4, 21839, withThroughTransfer = true)
+    assert(5, 24618, withThroughTransfer = true, exceeding = true)
+    assert(100, 24985, withThroughTransfer = true, exceeding = true)
 
-    assert(1, 10018, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true)
-    assert(100, 26556, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true, exceeding = true)
+    assert(1, 10002, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true)
+    assert(100, 26513, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true, exceeding = true)
   }
 
   property("fail-free complexity border") {
     Seq(true, false).foreach { b =>
-      assert(13, 0, raiseError = true, reject = true, invokeExpression = b)
-      assert(14, 1029, raiseError = true, invokeExpression = b)
+      assert(14, 0, raiseError = true, reject = true, invokeExpression = b)
+      assert(15, 1065, raiseError = true, invokeExpression = b)
 
-      assert(12, 0, raiseError = true, sequentialCalls = true, reject = true, invokeExpression = b)
-      assert(13, 1005, raiseError = true, sequentialCalls = true, invokeExpression = b)
+      assert(13, 0, raiseError = true, sequentialCalls = true, reject = true, invokeExpression = b)
+      assert(14, 1013, raiseError = true, sequentialCalls = true, invokeExpression = b)
 
       assert(7, 0, raiseError = true, withThroughPayment = true, reject = true, invokeExpression = b)
-      assert(8, 1066, raiseError = true, withThroughPayment = true, invokeExpression = b)
+      assert(8, 1044, raiseError = true, withThroughPayment = true, invokeExpression = b)
 
-      assert(13, 0, raiseError = true, withThroughTransfer = true, reject = true, invokeExpression = b)
-      assert(14, 1029, raiseError = true, withThroughTransfer = true, invokeExpression = b)
+      assert(14, 0, raiseError = true, withThroughTransfer = true, reject = true, invokeExpression = b)
+      assert(15, 1065, raiseError = true, withThroughTransfer = true, invokeExpression = b)
     }
   }
 }

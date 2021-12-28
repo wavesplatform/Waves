@@ -29,7 +29,7 @@ case class PaymentTransaction(
 
   def proofs: Proofs = Proofs(signature)
 
-  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), sender))
+  protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), sender))
 
   override val id: Coeval[ByteStr] = Coeval.evalOnce(signature)
 

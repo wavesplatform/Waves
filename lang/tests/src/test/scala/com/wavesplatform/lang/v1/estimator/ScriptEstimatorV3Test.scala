@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.estimator
 
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.FunctionHeader.Native
@@ -14,9 +15,12 @@ import scala.collection.immutable.ArraySeq
 
 class ScriptEstimatorV3Test
     extends ScriptEstimatorTestBase(
-      ScriptEstimatorV3(fixOverflow = true),
-      ScriptEstimatorV3(fixOverflow = false)
+      ScriptEstimatorV3(fixOverflow = true, overhead = true),
+      ScriptEstimatorV3(fixOverflow = false, overhead = true)
     ) {
+  private def estimateNoOverhead(script: String): Either[ExecutionError, Long] =
+    ScriptEstimatorV3(fixOverflow = true, overhead = false)(lets, functionCosts(V6), compile(script)(V6))
+
   property("multiple func calls") {
     val script =
       """
@@ -30,24 +34,40 @@ class ScriptEstimatorV3Test
         |   then h(a) + f(a) + g(a)
         |   else h(b) + f(b) + g(b) + 1
         |
-        |""".stripMargin
+      """.stripMargin
 
     /*
       cost(f) = 3
       cost(g) = 2 * cost(f) + 3 = 9
       cost(h) = 2 * cost(g) + cost(f) + 5 = 18 + 3 + 5 = 26
       cost(a) = 1
-      cost(b) = 1
+      cost(b) = 3
       cost(cond) = cost(h) + cost(f) + cost(g) + 5 = 43
       cost(then) = cost(h) + cost(f) + cost(g) + 5 = 43
       cost(else) = cost(h) + cost(f) + cost(g) + 7 = 45
      */
-    estimate(functionCosts(V3), compile(script)) shouldBe Right(
+    estimate(script) shouldBe Right(
       43 /* cond         */ +
         45 /* else         */ +
         1 /* if-then-else */ +
         1 /* let a        */ +
         3 /* let b        */
+    )
+
+    /*
+      cost(f) = 1
+      cost(g) = 2 * cost(f) + 1 = 3
+      cost(h) = 2 * cost(g) + cost(f) + 2 = 9
+      cost(a) = 0
+      cost(b) = 1
+      cost(cond) = cost(h) + cost(f) + cost(g) + 2 = 15
+      cost(then) = cost(h) + cost(f) + cost(g) + 2 = 15
+      cost(else) = cost(h) + cost(f) + cost(g) + 3 = 16
+    */
+    estimateNoOverhead(script) shouldBe Right(
+      15 /* cond */  +
+      16 /* else */  +
+      1  /* b    */
     )
   }
 
@@ -71,7 +91,7 @@ class ScriptEstimatorV3Test
         | }
       """.stripMargin
 
-    estimate(functionCosts(V3), compile(script)) shouldBe Right(
+    estimate(script) shouldBe Right(
       1 /* if-then-else                      */ +
         3 /* a == b    condition               */ +
         5 /* d + y + 1 expr inside else block  */ +
@@ -82,10 +102,21 @@ class ScriptEstimatorV3Test
         1 /* let d     decl used in else       */
       /* let e     unused decl             */
     )
+
+    estimateNoOverhead(script) shouldBe Right(
+      1 /* a == b    condition               */ +
+      2 /* d + y + 1 expr inside else block  */ +
+      0 /* let y     decl inside else block  */ +
+      1 /* let a     decl used in condition  */ +
+      0 /* let b     decl used in condition  */ +
+      3 /* let c     decl used in then       */ +
+      0 /* let d     decl used in else       */ +
+      0 /* let e     unused decl             */
+    )
   }
 
   property("big function call tree") {
-    val n = 100
+    val n = 750
     val script =
       s"""
         | func f0() = 0
@@ -93,13 +124,19 @@ class ScriptEstimatorV3Test
         | f$n()
       """.stripMargin
 
-    estimate(functionCosts(V3), compile(script)) shouldBe Right(n * 2 + 1)
     /*
       cost(f0) = 1
       cost(f1) = cost(cond) + cost(true) + cost(f0) = 1 + 1 + 1 = 1 * 2 + 1
       cost(f2) = cost(cond) + cost(true) + cost(f1) = 1 + 1 + 3 = 2 * 2 + 1
       cost(fn) = n * 2 + 1
    */
+    estimate(script) shouldBe Right(n * 2 + 1)
+
+    /*
+      cost(f0) = 1
+      cost(fn) = 1
+    */
+    estimateNoOverhead(script) shouldBe Right(1)
   }
 
   property("overlapped func") {
@@ -118,7 +155,8 @@ class ScriptEstimatorV3Test
         |
         |""".stripMargin
 
-    estimate(functionCosts(V3), compile(script)) shouldBe Right(1)
+    estimate(script) shouldBe Right(1)
+    estimateNoOverhead(script) shouldBe Right(1)
   }
 
   property("different if branches") {
@@ -137,7 +175,7 @@ class ScriptEstimatorV3Test
         |}
       """.stripMargin
 
-    estimate(functionCosts(V3), compile(script)) shouldBe Right(
+    estimate(script) shouldBe Right(
       1 /* let a                      */ +
         1 /* let b                      */ +
         1 /* if-then-else               */ +
@@ -146,44 +184,53 @@ class ScriptEstimatorV3Test
         3 /* a > 1          condition   */ +
         3 /* b == "a"       condition   */
     )
+
+    estimateNoOverhead(script) shouldBe Right(
+        0 /* let a                      */ +
+        0 /* let b                      */ +
+        1 /* a == 1         condition   */ +
+        1 /* a > 1          condition   */ +
+        1 /* b == "a"       condition   */
+    )
   }
 
   property("getter") {
     val script = "lastBlock.height"
-    estimate(functionCosts(V3), compile(script)) shouldBe Right(2) /* ref eval and field access */
+    estimate(script) shouldBe Right(2) /* ref eval and field access */
+    estimateNoOverhead(script) shouldBe Right(0)
   }
 
   property("groth16Verify_Ninputs") {
-    implicit val version: StdLibVersion = V4
-    val c                               = Array(1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500, 2600)
+    val c = Array(1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500, 2600)
     for { (c, n) <- c.zipWithIndex } {
-      estimate(functionCosts(V4), compile(s"groth16Verify_${n + 1}inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')")) shouldBe Right(c + 3)
+      val script = s"groth16Verify_${n + 1}inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')"
+      estimate(script) shouldBe Right(c + 3)
+      estimateNoOverhead(script) shouldBe Right(c)
     }
   }
 
   property("groth16Verify") {
-    implicit val version: StdLibVersion = V4
-    estimate(functionCosts(V4), compile("groth16Verify(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')")) shouldBe Right(2703)
+    estimate("groth16Verify(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')") shouldBe Right(2703)
+    estimateNoOverhead("groth16Verify(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')") shouldBe Right(2700)
   }
 
   property("free declarations") {
-    estimate(
-      functionCosts(V4),
-      compile(
-        """
-          |
-          | let a = 1 + 1 + 1 + 1 + 1
-          | func f() = a
-          | func g() = f()
-          | let b = g()
-          | let c = a
-          | func h() = a + b + c
-          |
-          | 1
-          |
-        """.stripMargin
-      )
-    ) shouldBe Right(1)
+    val script =
+      """
+        |
+        | let a = 1 + 1 + 1 + 1 + 1
+        | func f() = a
+        | func g() = f()
+        | let b = g()
+        | let c = a
+        | func h() = a + b + c
+        |
+        | 1
+        |
+      """.stripMargin
+
+    estimate(script) shouldBe Right(1)
+    estimateNoOverhead(script) shouldBe Right(0)
   }
 
   property("sync invoke functions are allowed only for dApps") {
