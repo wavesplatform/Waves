@@ -56,10 +56,9 @@ class DataTransactionNewLimitsSpec extends FlatSpec with WithDomain {
 
   it should "not handle 401 bytes key" in withDomain(DomainPresets.RideV6) { d =>
     val dataEntry       = StringDataEntry("a" * 401, "test")
-    val dataTransaction = TxHelpers.dataWithMultipleEntries(TxHelpers.defaultSigner, Seq(dataEntry))
-
     d.helpers.creditWavesToDefaultSigner()
-    intercept[RuntimeException](d.appendBlock(dataTransaction)).toString should include("TooBigArray")
+    
+    intercept[RuntimeException](d.appendBlock(TxHelpers.dataWithMultipleEntries(TxHelpers.defaultSigner, Seq(dataEntry)))).toString should include("TooBigArray")
     d.blockchain.accountData(TxHelpers.defaultAddress, "a" * 401) shouldBe None
   }
 
@@ -68,7 +67,7 @@ class DataTransactionNewLimitsSpec extends FlatSpec with WithDomain {
     d.helpers.creditWavesToDefaultSigner()
 
     intercept[RuntimeException](d.appendBlock(TxHelpers.dataWithMultipleEntries(TxHelpers.defaultSigner, Seq(dataEntry)))).toString should include(
-      "exceeds MaxShort(32767)"
+      "TooBigArray"
     )
     d.blockchain.accountData(TxHelpers.defaultAddress, "test") shouldBe None
   }
@@ -78,7 +77,7 @@ class DataTransactionNewLimitsSpec extends FlatSpec with WithDomain {
 
     d.helpers.creditWavesToDefaultSigner()
     intercept[RuntimeException](d.appendBlock(TxHelpers.dataWithMultipleEntries(TxHelpers.defaultSigner, Seq(dataEntry)))).toString should include(
-      "exceeds MaxShort(32767)"
+      "TooBigArray"
     )
     d.blockchain.accountData(TxHelpers.defaultAddress, "test") shouldBe None
   }

@@ -17,6 +17,7 @@ object DataTxValidator extends TxValidator[DataTransaction] {
 
     V.seq(tx)(
       V.cond(data.length <= MaxEntryCount, TxValidationError.TooBigArray),
+      V.cond(tx.data.forall(entrySizeIsValidStatic), TxValidationError.TooBigArray),
       V.cond(data.forall(_.key.nonEmpty), TxValidationError.EmptyDataKey),
       V.cond(data.map(_.key) == data.map(_.key).distinct, TxValidationError.DuplicatedDataKeys),
       V.cond(tx.version > TxVersion.V1 || tx.data.forall(!_.isEmpty), GenericError("Empty data is not allowed in V1")),
@@ -24,21 +25,29 @@ object DataTxValidator extends TxValidator[DataTransaction] {
     )
   }
 
+  private[this] def entrySizeIsValidStatic(entry: DataEntry[?]): Boolean = {
+    import DataEntry.{MaxPBKeySize, MaxValueSize}
+
+    val keyIsValid = entry.key.utf8Bytes.length <= MaxPBKeySize
+
+    val valueIsValid = entry match {
+      case BinaryDataEntry(_, value) => value.arr.length <= MaxValueSize
+      case StringDataEntry(_, value) => value.utf8Bytes.length <= MaxValueSize
+      case _                         => true
+    }
+
+    keyIsValid && valueIsValid
+  }
+
   private[this] def entrySizeIsValid(blockchain: Blockchain, version: TxVersion)(entry: DataEntry[?]): Boolean = {
-    import DataEntry.{MaxKeySize, MaxPBKeySize, MaxValueSize}
+    import DataEntry.{MaxKeySize, MaxPBKeySize}
 
     def keyIsValid(key: String): Boolean = version match {
       case TxVersion.V1 if !blockchain.isFeatureActivated(BlockchainFeatures.RideV6) => key.length <= MaxKeySize
       case _                                                                         => key.utf8Bytes.length <= MaxPBKeySize
     }
 
-    def valueIsValid(v: DataEntry[?]): Boolean = v match {
-      case BinaryDataEntry(_, value) => value.arr.length <= MaxValueSize
-      case StringDataEntry(_, value) => value.utf8Bytes.length <= MaxValueSize
-      case _                         => true
-    }
-
-    keyIsValid(entry.key) && valueIsValid(entry)
+    keyIsValid(entry.key) && entrySizeIsValidStatic(entry)
   }
 
   def payloadSizeValidation(blockchain: Blockchain, tx: DataTransaction): ValidatedV[DataTransaction] = {
