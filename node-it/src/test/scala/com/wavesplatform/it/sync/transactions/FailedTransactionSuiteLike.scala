@@ -116,7 +116,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |    if (check) then false else $result
                    |}
                    |""".stripMargin,
-                ScriptEstimatorV3(fixOverflow = true)
+                ScriptEstimatorV3(fixOverflow = true, overhead = false)
               )
               .explicitGet()
               ._1
@@ -147,7 +147,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |    if (check) then false else $r
                    |}
                    |""".stripMargin,
-                ScriptEstimatorV3(fixOverflow = true)
+                ScriptEstimatorV3(fixOverflow = true, overhead = false)
               )
               .explicitGet()
               ._1
@@ -221,7 +221,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                      |    if (check) then false else $result
                      |}
                      |""".stripMargin,
-                  ScriptEstimatorV3(fixOverflow = true)
+                  ScriptEstimatorV3(fixOverflow = true, overhead = false)
                 )
                 .explicitGet()
                 ._1
@@ -250,7 +250,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                      |  case _ => $r
                      |}
                      |""".stripMargin,
-                  ScriptEstimatorV3(fixOverflow = true)
+                  ScriptEstimatorV3(fixOverflow = true, overhead = false)
                 )
                 .toOption
                 .map(_._1)

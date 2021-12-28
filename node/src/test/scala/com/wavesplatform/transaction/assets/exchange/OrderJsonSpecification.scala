@@ -144,10 +144,10 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers {
       json.validate[Order] match {
         case e: JsError =>
           fail("Error: " + JsError.toJson(e).toString())
-          
+
         case JsSuccess(o: Order, _) =>
           o.json() should matchJson(json)
-          Verifier.verifyAsEllipticCurveSignature(o).explicitGet()
+          Verifier.verifyAsEllipticCurveSignature(o, checkWeakPk = false).explicitGet()
       }
     }
   }

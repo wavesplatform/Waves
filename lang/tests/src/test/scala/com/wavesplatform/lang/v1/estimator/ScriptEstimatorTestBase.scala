@@ -51,7 +51,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*) extends PropSpec {
   }
 
   private val env = Common.emptyBlockchainEnvironment()
-  private val lets: Set[String] =
+  protected val lets: Set[String] =
     ctx.evaluationContext(env).letDefs.keySet
 
   protected def compile(code: String)(implicit version: StdLibVersion): EXPR = {
@@ -70,9 +70,9 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*) extends PropSpec {
       Left(s"Estimators discrepancy: ${results.toString}")
   }
 
-  protected def estimate(script: String, version: StdLibVersion): Either[String, Long] = {
-    val expr = compile(script)(version)
-    val results = estimators.map(_(lets, functionCosts(version), expr))
+  protected def estimate(script: String): Either[String, Long] = {
+    val expr = compile(script)(V6)
+    val results = estimators.map(_(lets, functionCosts(V6), expr))
     if (results.distinct.length == 1)
       results.head
     else

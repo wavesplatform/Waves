@@ -81,24 +81,25 @@ class OrderSpecification extends PropSpec with ValidationMatcher with NTPTime {
 
       Random.nextBytes(rndAsset)
 
-      Verifier.verifyAsEllipticCurveSignature(order) shouldBe an[Right[_, _]]
-      Verifier.verifyAsEllipticCurveSignature(order.copy(senderCredentials = OrderSender(pka.publicKey))) should produce(err)
-      Verifier.verifyAsEllipticCurveSignature(order.copy(matcherPublicKey = pka.publicKey)) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order, checkWeakPk = false) shouldBe an[Right[_, _]]
+      Verifier.verifyAsEllipticCurveSignature(order.copy(senderCredentials = OrderSender(pka.publicKey), checkWeakPk = false)) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order.copy(matcherPublicKey = pka.publicKey), checkWeakPk = false) should produce(err)
       val assetPair = order.assetPair
       Verifier.verifyAsEllipticCurveSignature(
         order
-          .copy(assetPair = assetPair.copy(amountAsset = IssuedAsset(ByteStr(rndAsset))))
+          .copy(assetPair = assetPair.copy(amountAsset = IssuedAsset(ByteStr(rndAsset)))),
+          checkWeakPk = false
       ) should produce(err)
       Verifier.verifyAsEllipticCurveSignature(
         order
-          .copy(assetPair = assetPair.copy(priceAsset = IssuedAsset(ByteStr(rndAsset))))
-      ) should produce(err)
-      Verifier.verifyAsEllipticCurveSignature(order.copy(orderType = OrderType.reverse(order.orderType))) should produce(err)
-      Verifier.verifyAsEllipticCurveSignature(order.copy(price = order.price + 1)) should produce(err)
-      Verifier.verifyAsEllipticCurveSignature(order.copy(amount = order.amount + 1)) should produce(err)
-      Verifier.verifyAsEllipticCurveSignature(order.copy(expiration = order.expiration + 1)) should produce(err)
-      Verifier.verifyAsEllipticCurveSignature(order.copy(matcherFee = order.matcherFee + 1)) should produce(err)
-      Verifier.verifyAsEllipticCurveSignature(order.copy(proofs = Proofs(Seq(ByteStr(pka.publicKey.arr ++ pka.publicKey.arr))))) should produce(err)
+          .copy(assetPair = assetPair.copy(priceAsset = IssuedAsset(ByteStr(rndAsset)))),
+      checkWeakPk = false) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order.copy(orderType = OrderType.reverse(order.orderType)), checkWeakPk = false) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order.copy(price = order.price + 1), checkWeakPk = false) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order.copy(amount = order.amount + 1), checkWeakPk = false) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order.copy(expiration = order.expiration + 1), checkWeakPk = false) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order.copy(matcherFee = order.matcherFee + 1), checkWeakPk = false) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order.copy(proofs = Proofs(Seq(ByteStr(pka.publicKey.arr ++ pka.publicKey.arr)))), checkWeakPk = false) should produce(err)
     }
   }
 
