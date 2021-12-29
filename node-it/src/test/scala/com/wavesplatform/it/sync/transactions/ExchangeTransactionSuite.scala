@@ -14,7 +14,6 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.*
-import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.FixedDecimals
 import com.wavesplatform.utils.*
 import play.api.libs.json.{JsNumber, JsObject, Json, JsString}
 
@@ -244,9 +243,9 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     val nftOtherAssetPair = AssetPair.createAssetPair(nftAsset, dec6AssetId).get
 
     val sellNftForWaves =
-      Order.sell(4.toByte, seller, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves, FixedDecimals)
+      Order.sell(4.toByte, seller, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves, OrderPriceMode.Default)
     val buyNftForWaves =
-      Order.buy(4.toByte, buyer, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves, FixedDecimals)
+      Order.buy(4.toByte, buyer, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves, OrderPriceMode.Default)
 
     val sellNftForOtherAsset =
       Order.sell(
@@ -260,7 +259,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
         expirationTimestamp,
         matcherFee,
         Waves,
-        FixedDecimals
+        OrderPriceMode.Default
       )
     val buyNftForOtherAsset =
       Order.buy(
@@ -274,7 +273,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
         expirationTimestamp,
         matcherFee,
         Waves,
-        FixedDecimals
+        OrderPriceMode.Default
       )
 
     val sellerAddress = sellerKeyPair.toAddress.toString

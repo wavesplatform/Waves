@@ -1,5 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
+import scala.concurrent.duration.*
+
 import com.google.protobuf.ByteString
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
@@ -7,19 +9,16 @@ import com.wavesplatform.api.grpc.{ApplicationStatus, TransactionsByIdRequest, T
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.it.{Node, NodeConfigs}
+import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.JsObject
-import scala.concurrent.duration.*
-
-import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.FixedDecimals
 
 trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
   protected def waitForHeightArise(): Unit
@@ -46,7 +45,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
   }
 
   object restApi {
-    import com.wavesplatform.it.api.SyncHttpApi.{NodeExtSync, assertApiError}
+    import com.wavesplatform.it.api.SyncHttpApi.{assertApiError, NodeExtSync}
 
     /** Checks that transactions contain failed and returns them.
       */
@@ -163,7 +162,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
   }
 
   object grpcApi {
-    import com.wavesplatform.it.api.SyncGrpcApi._
+    import com.wavesplatform.it.api.SyncGrpcApi.*
 
     /** Checks that transactions contain failed and returns them.
       */
@@ -262,7 +261,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
   }
 
   def waitForEmptyUtx(): Unit = {
-    import com.wavesplatform.it.api.SyncHttpApi._
+    import com.wavesplatform.it.api.SyncHttpApi.*
 
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
   }
@@ -280,11 +279,31 @@ object FailedTransactionSuiteLike {
       buyMatcherFee: Long,
       sellMatcherFee: Long
   ): ExchangeTransaction = {
-    val ts   = System.currentTimeMillis()
-    val bmfa = Asset.fromString(Some(buyMatcherFeeAsset))
-    val smfa = Asset.fromString(Some(sellMatcherFeeAsset))
-    val buy  = Order.buy(Order.V4, buyer, matcher.publicKey, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, buyMatcherFee, bmfa, FixedDecimals)
-    val sell = Order.sell(Order.V4, seller, matcher.publicKey, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, sellMatcherFee, smfa, FixedDecimals)
+    val timestamp = System.currentTimeMillis()
+    val buy = Order.buy(
+      Order.V4,
+      buyer,
+      matcher.publicKey,
+      assetPair,
+      100,
+      100,
+      timestamp,
+      timestamp + Order.MaxLiveTime,
+      buyMatcherFee,
+      Asset.fromString(Some(buyMatcherFeeAsset))
+    )
+    val sell = Order.sell(
+      Order.V4,
+      seller,
+      matcher.publicKey,
+      assetPair,
+      100,
+      100,
+      timestamp,
+      timestamp + Order.MaxLiveTime,
+      sellMatcherFee,
+      Asset.fromString(Some(sellMatcherFeeAsset))
+    )
     ExchangeTransaction
       .signed(
         TxVersion.V3,
@@ -296,7 +315,7 @@ object FailedTransactionSuiteLike {
         buy.matcherFee,
         sell.matcherFee,
         fee,
-        ts
+        timestamp
       )
       .explicitGet()
   }

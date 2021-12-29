@@ -1,17 +1,19 @@
 package com.wavesplatform.it.sync.activation
 
+import scala.concurrent.duration.*
+
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.it.{NodeConfigs, NTPTime}
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.sync.transactions.OverflowBlock
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.{NodeConfigs, NTPTime}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -20,12 +22,9 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import play.api.libs.json.JsObject
-import scala.concurrent.duration.*
-
-import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.FixedDecimals
 
 class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTime with OverflowBlock {
-  import AcceptFailedScriptActivationSuite._
+  import AcceptFailedScriptActivationSuite.*
 
   private lazy val (dApp, dAppKP)               = (firstAddress, firstKeyPair)
   private lazy val (caller, callerKP)           = (secondAddress, secondKeyPair)
@@ -374,8 +373,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         ts,
         ts + Order.MaxLiveTime,
         smartMatcherFee,
-        matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get),
-        FixedDecimals
+        matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
       )
       val sell =
         Order.sell(
@@ -388,8 +386,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           ts,
           ts + Order.MaxLiveTime,
           smartMatcherFee,
-          matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get),
-          FixedDecimals
+          matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
         )
       (buy, sell)
     }
