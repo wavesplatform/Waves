@@ -97,7 +97,7 @@ class DAppDataEntryTypeTest
   private def assert(constructor: String) = {
     val (preparingTxs, invoke) = paymentPreconditions(constructor).sample.get
     withDomain(domainSettingsWithFS(fsWithV5)) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs*)
       val value = if (constructor == "BooleanEntry") "1" else "true"
       (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include(
         s"can't reconstruct $constructor from Map(key -> key, value -> $value)"

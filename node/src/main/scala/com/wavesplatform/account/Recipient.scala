@@ -19,7 +19,7 @@ sealed trait AddressOrAlias {
   def bytes: Array[Byte]
 }
 
-final class Address private(val chainId: Byte, val publicKeyHash: Array[Byte], checksum: Array[Byte]) extends AddressOrAlias {
+final class Address private (val chainId: Byte, val publicKeyHash: Array[Byte], checksum: Array[Byte]) extends AddressOrAlias {
   override lazy val bytes: Array[Byte] = Bytes.concat(Array(1.toByte, chainId), publicKeyHash, checksum)
   override lazy val toString: String   = ByteStr(bytes).toString
 
@@ -27,7 +27,7 @@ final class Address private(val chainId: Byte, val publicKeyHash: Array[Byte], c
     case a: Address => java.util.Arrays.equals(publicKeyHash, a.publicKeyHash) && chainId == a.chainId
     case _          => false
   }
-  
+
   override def hashCode(): Int = (ByteStr(publicKeyHash), chainId).hashCode()
 }
 
@@ -75,13 +75,15 @@ object Address {
     .maximumSize(200000)
     .build()
 
-  def apply(publicKeyHash: Array[Byte], chainId: Byte = AddressScheme.current.chainId): Address = new Address(
-    chainId,
-    publicKeyHash,
-    crypto.secureHash(Array(1.toByte, AddressScheme.current.chainId) ++ publicKeyHash).take(4)
-  )
+  def apply(publicKeyHash: Array[Byte], chainId: Byte = AddressScheme.current.chainId): Address = {
+    require(publicKeyHash.length == HashLength, "Public key hash should be 20 bytes long")
+    val checksumPayload = Bytes.concat(Array(1.toByte, AddressScheme.current.chainId), publicKeyHash)
+    val checksum        = crypto.secureHash(checksumPayload)
+    new Address(chainId, publicKeyHash, checksum.take(4))
+  }
 
-  def fromHexString(hexString: String): Address = Address(EthEncoding.toBytes(hexString))
+  def fromHexString(hexString: String): Address =
+    Address(EthEncoding.toBytes(hexString))
 
   def fromPublicKey(publicKey: PublicKey, chainId: Byte = scheme.chainId): Address = {
     publicKeyBytesCache.get(

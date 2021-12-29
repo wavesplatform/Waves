@@ -4,7 +4,6 @@ import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
-import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.UtilsApiRoute
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.state.ByteStr
@@ -17,16 +16,17 @@ import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunctio
 import com.wavesplatform.lang.directives.values.{V2, V3, V5, V6}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
 import com.wavesplatform.lang.{Global, contract}
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.protobuf.dapp.DAppMeta.{CallableFuncSignature, CompactNameAndOriginalNamePair}
+import com.wavesplatform.settings.TestSettings
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, IntegerDataEntry}
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -34,12 +34,13 @@ import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json._
+import org.scalatest.Inside
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks as PropertyChecks
+import play.api.libs.json.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory {
+class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory with Inside {
   implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
   implicit val timeout          = routeTestTimeout.duration
 
@@ -249,6 +250,15 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       |{-# STDLIB_VERSION 3 #-}
       |{-# CONTENT_TYPE DAPP #-}
       |{-# SCRIPT_TYPE ACCOUNT #-}
+    """.stripMargin
+
+  val dAppWithNonCallable =
+    """
+      |{-# STDLIB_VERSION 3 #-}
+      |{-# CONTENT_TYPE DAPP #-}
+      |{-# SCRIPT_TYPE ACCOUNT #-}
+      |
+      |func test() = true
     """.stripMargin
 
   val dAppWithPaidVerifier =
@@ -535,6 +545,22 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   routePath("/script/compileCode") in {
+    Post(routePath("/script/compileCode?compact=true"), dAppWithNonCallable) ~> route ~> check {
+      responseAs[JsValue] should matchJson("""{
+                                             |  "script" : "base64:AAIDAAAAAAAAAA0IARoJCgFhEgR0ZXN0AAAAAQEAAAABYQAAAAAGAAAAAAAAAAA00atG",
+                                             |  "complexity" : 0,
+                                             |  "verifierComplexity" : 0,
+                                             |  "callableComplexities" : { },
+                                             |  "extraFee" : 400000
+                                             |}""".stripMargin)
+
+      val script = (responseAs[JsValue] \ "script").as[String]
+      inside(Script.fromBase64String(script).explicitGet()) {
+        case ContractScript.ContractScriptImpl(_, expr) =>
+          expr.meta.compactNameAndOriginalNamePairList shouldBe Seq(CompactNameAndOriginalNamePair("a", "test"))
+      }
+    }
+
     Post(routePath("/script/compileCode"), "{-# STDLIB_VERSION 2 #-}\n(1 == 2)") ~> route ~> check {
       val json           = responseAs[JsValue]
       val expectedScript = ExprScript(V2, script).explicitGet()
@@ -588,6 +614,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     val blockchain = stub[Blockchain]("blockchain")
     val route      = seal(utilsApi.copy(blockchain = blockchain).route)
     (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0))
+    (() => blockchain.settings).when().returning(TestSettings.Default.blockchainSettings)
 
     Post(routePath("/script/compileCode"), dAppWithoutVerifier) ~> route ~> check {
       val json = responseAs[JsValue]
@@ -783,6 +810,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     val api        = utilsApi.copy(blockchain = blockchain)
     val route      = seal(api.route)
     (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0))
+    (() => blockchain.settings).when().returning(TestSettings.Default.blockchainSettings)
 
     val letFromContract = 1000
     val testScript = {
@@ -844,6 +872,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
 
     (blockchain.hasAccountScript _).when(dAppAddress).returning(false).once()
+    (() => utilsApi.blockchain.settings).when().returning(DefaultBlockchainSettings).anyNumberOfTimes()
 
     evalScript("testNone()") ~> route ~> check {
       responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> s"Address $dAppAddress is not dApp")

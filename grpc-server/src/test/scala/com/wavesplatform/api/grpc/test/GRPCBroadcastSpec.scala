@@ -41,7 +41,7 @@ class GRPCBroadcastSpec
   "GRPC broadcast" should "accept Exchange with ETH orders" in {
     val ethBuyOrder = Order(
       Order.V4,
-      TestEthPublicKey,
+      TestEthOrdersPublicKey,
       TxHelpers.matcher.publicKey,
       AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
       OrderType.BUY,
@@ -58,7 +58,7 @@ class GRPCBroadcastSpec
 
     val ethSellOrder = Order(
       Order.V4,
-      TestEthPublicKey,
+      TestEthOrdersPublicKey,
       TxHelpers.matcher.publicKey,
       AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
       OrderType.SELL,
@@ -76,7 +76,7 @@ class GRPCBroadcastSpec
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      sh.creditBalance(TestEthPublicKey.toAddress, *)
+      sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 

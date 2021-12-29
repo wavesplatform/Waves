@@ -1,34 +1,37 @@
 package com.wavesplatform
 
-import scala.concurrent.duration._
-import scala.util.Random
-
-import com.wavesplatform.account._
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.directives.values.V3
-import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.directives.values.{V3, V6}
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.testing.{ScriptGen, TypedScriptGen}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings}
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.assets.*
+import com.wavesplatform.transaction.assets.exchange.*
+import com.wavesplatform.transaction.lease.*
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
-import com.wavesplatform.transaction.utils.Signed
-import org.scalacheck.{Arbitrary, Gen}
+import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
+import com.wavesplatform.transaction.utils.EthConverters.*
+import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
 import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
+import org.web3j.crypto.ECKeyPair
+
+import scala.concurrent.duration.*
+import scala.util.Random
 
 trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _: Suite =>
 
@@ -61,6 +64,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   val accountGen: Gen[KeyPair] = bytes32gen.map(seed =>
     KeyPair(seed)
   )
+
+  val ethAccountGen: Gen[ECKeyPair] = accountGen.map(_.toEthKeyPair)
 
   val aliasSymbolChar: Gen[Char] = Gen.oneOf('.', '@', '_', '-')
 
@@ -825,7 +830,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
         .explicitGet()
     }
 
-  val randomTransactionGen: Gen[Transaction with ProvenTransaction] = (for {
+  val randomTransactionGen: Gen[Transaction & ProvenTransaction] = (for {
     tr <- transferV1Gen
     (is, ri, bu) <- issueReissueBurnGen.retryUntil {
       case (i, r, b) => i.version == 1 && r.version == 1 && b.version == 1
@@ -891,14 +896,14 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   def emptyEntryGen(keyGen: Gen[String] = dataKeyGen): Gen[EmptyDataEntry] =
     for (key <- keyGen) yield EmptyDataEntry(key)
 
-  def dataEntryGen(maxSize: Int, keyGen: Gen[String] = dataKeyGen, withDeleteEntry: Boolean = false): Gen[DataEntry[_]] =
+  def dataEntryGen(maxSize: Int, keyGen: Gen[String] = dataKeyGen, withDeleteEntry: Boolean = false): Gen[DataEntry[?]] =
     Gen.oneOf(
       longEntryGen(keyGen),
       booleanEntryGen(keyGen),
-      Seq(
+      (Seq(
         binaryEntryGen(maxSize, keyGen),
         stringEntryGen(maxSize, keyGen)
-      ) ++ (if (withDeleteEntry) Seq(emptyEntryGen(keyGen)) else Seq()): _*
+      ) ++ (if (withDeleteEntry) Seq(emptyEntryGen(keyGen)) else Seq()))*
     )
 
   val dataTransactionGen: Gen[DataTransaction] = dataTransactionGen(DataTransaction.MaxEntryCount)
@@ -916,13 +921,13 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       maxEntrySize = if (useForScript) 200 else (DataTransaction.MaxBytes - 122) / (size max 1) min DataEntry.MaxValueSize
       data <- if (useForScript) Gen.listOfN(size, dataEntryGen(maxEntrySize, dataScriptsKeyGen, withDeleteEntry))
       else Gen.listOfN(size, dataEntryGen(maxEntrySize))
-      uniq = data.foldRight(List.empty[DataEntry[_]]) { (e, es) =>
+      uniq = data.foldRight(List.empty[DataEntry[?]]) { (e, es) =>
         if (es.exists(_.key == e.key)) es else e :: es
       }
     } yield DataTransaction.selfSigned(if (withDeleteEntry) 2.toByte else 1.toByte, sender, uniq, 15000000, timestamp).explicitGet())
       .label("DataTransaction")
 
-  def dataTransactionGenP(sender: KeyPair, data: List[DataEntry[_]]): Gen[DataTransaction] =
+  def dataTransactionGenP(sender: KeyPair, data: List[DataEntry[?]]): Gen[DataTransaction] =
     (for {
       timestamp <- timestampGen
     } yield DataTransaction.selfSigned(1.toByte, sender, data, 15000000, timestamp).explicitGet())
@@ -971,6 +976,21 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       .signWith(sender.privateKey)
 
   val invalidChainIdGen: Gen[Byte] = Arbitrary.arbitrary[Byte].filterNot(_ == AddressScheme.current.chainId)
+
+  def invokeExpressionTransactionGen(sender: KeyPair, expr: EXPR, feeAmount: TxAmount): Gen[InvokeExpressionTransaction] =
+    invokeExpressionTransactionGen(sender, ExprScript(V6, expr, isFreeCall = true).explicitGet(), feeAmount)
+
+  def invokeExpressionTransactionGen(sender: KeyPair, script: ExprScript, feeAmount: TxAmount): Gen[InvokeExpressionTransaction] =
+    InvokeExpressionTransaction.selfSigned(1, sender, script, feeAmount, Waves, ntpTime.getTimestamp()).explicitGet()
+
+  def ethereumInvokeTransactionGen(sender: ECKeyPair, dApp: KeyPair, funcName: String, args: Seq[Arg]): Gen[EthereumTransaction] =
+    EthTxGenerator.generateEthInvoke(
+      keyPair = sender,
+      address = dApp.toAddress,
+      funcName = funcName,
+      args = args,
+      payments = Seq.empty
+    )
 }
 
 trait TransactionGen extends TransactionGenBase { _: Suite =>

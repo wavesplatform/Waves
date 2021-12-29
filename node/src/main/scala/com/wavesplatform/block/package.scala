@@ -1,7 +1,6 @@
 package com.wavesplatform
 
 import scala.util.Try
-
 import cats.syntax.either._
 import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.block.Block.{TransactionProof, TransactionsMerkleTree}
@@ -18,7 +17,7 @@ package object block {
   private[block] implicit class BlockValidationOps(val block: Block) extends AnyVal {
     def validate: Validation[Block]                             = validateBlock(block)
     def validateToTry: Try[Block]                               = toTry(validateBlock(block))
-    def validateGenesis(gs: GenesisSettings): Validation[Block] = validateGenesisBlock(block, gs)
+    def validateGenesis(gs: GenesisSettings, rideV6Activated: Boolean): Validation[Block] = validateGenesisBlock(block, gs, rideV6Activated)
   }
 
   private[block] implicit class MicroBlockValidationOps(val microBlock: MicroBlock) extends AnyVal  {

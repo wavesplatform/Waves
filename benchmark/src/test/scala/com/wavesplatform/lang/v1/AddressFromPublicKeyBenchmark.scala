@@ -33,5 +33,5 @@ class PkSt extends EthHelpers {
 
   val wavesPk   = ByteStr(curve25519.generateKeypair._2)
   val exprWaves = TestCompiler(V6).compileExpression(s"addressFromPublicKey(base58'$wavesPk')").expr.asInstanceOf[EXPR]
-  val exprEth   = TestCompiler(V6).compileExpression(s"addressFromPublicKey(base58'$TestEthPublicKey')").expr.asInstanceOf[EXPR]
+  val exprEth   = TestCompiler(V6).compileExpression(s"addressFromPublicKey(base58'$TestEthOrdersPublicKey')").expr.asInstanceOf[EXPR]
 }

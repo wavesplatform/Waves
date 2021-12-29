@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.validation.impl.PaymentTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-case class PaymentTransaction private (
+case class PaymentTransaction(
     sender: PublicKey,
     recipient: Address,
     amount: TxAmount,
@@ -29,7 +29,7 @@ case class PaymentTransaction private (
 
   def proofs: Proofs = Proofs(signature)
 
-  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), sender))
+  protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), sender))
 
   override val id: Coeval[ByteStr] = Coeval.evalOnce(signature)
 

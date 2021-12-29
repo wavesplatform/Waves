@@ -12,7 +12,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.it.Node
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry}
@@ -26,13 +26,13 @@ import io.grpc.Status.Code
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, matchers}
+import play.api.libs.json.*
 import play.api.libs.json.Json.parse
-import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{Await, Awaitable, Future}
-import scala.util._
+import scala.util.*
 import scala.util.control.NonFatal
 
 object SyncHttpApi extends Assertions with matchers.should.Matchers {
@@ -43,9 +43,9 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
   case class GenericApiError(id: Int, message: String, statusCode: Int, json: JsObject)
 
   object GenericApiError {
-    import play.api.libs.functional.syntax._
-    import play.api.libs.json.Reads._
-    import play.api.libs.json._
+    import play.api.libs.functional.syntax.*
+    import play.api.libs.json.*
+    import play.api.libs.json.Reads.*
 
     def apply(id: Int, message: String, code: StatusCode, json: JsObject): GenericApiError =
       new GenericApiError(id, message, code.intValue(), json)
@@ -119,7 +119,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
   def assertApiError[R](f: => R, expectedError: ApiError): Assertion =
     Try(f) match {
       case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, statusCode, responseBody))) =>
-        import play.api.libs.json._
+        import play.api.libs.json.*
         parse(responseBody).validate[JsObject] match {
           case JsSuccess(json, _) => (json - "trace") shouldBe expectedError.json
           case JsError(_)         => Assertions.fail(s"Expecting error: ${expectedError.json}, but handle $responseBody")
@@ -150,7 +150,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
   //noinspection ScalaStyle
   implicit class NodeExtSync(n: Node) extends Assertions with matchers.should.Matchers {
-    import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
+    import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi as async
 
     private def maybeWaitForTransaction(tx: Transaction, wait: Boolean): Transaction = {
       if (wait) waitForTransaction(tx.id)
@@ -194,7 +194,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def blockHeaderForId(id: String, amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).blockHeaderForId(id, amountsAsStrings))
 
     def postForm(path: String, params: (String, String)*): Response =
-      sync(async(n).postForm(path, params: _*))
+      sync(async(n).postForm(path, params*))
 
     def postJson[A: Writes](path: String, body: A): Response =
       sync(async(n).postJson(path, body))
@@ -502,7 +502,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def putData(
         sender: KeyPair,
-        data: List[DataEntry[_]],
+        data: List[DataEntry[?]],
         fee: Long,
         waitForTx: Boolean = false,
         version: TxVersion = 1.toByte,
@@ -512,7 +512,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def broadcastData(
         sender: KeyPair,
-        data: List[DataEntry[_]],
+        data: List[DataEntry[?]],
         fee: Long,
         version: TxVersion = TxVersion.V2,
         timestamp: Option[Long] = None,
@@ -523,27 +523,27 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def removeData(sender: KeyPair, data: Seq[String], fee: Long, version: Byte = 2): Transaction =
       sync(async(n).removeData(sender, data, fee, version))
 
-    def getData(sourceAddress: String, amountsAsStrings: Boolean = false): List[DataEntry[_]] =
+    def getData(sourceAddress: String, amountsAsStrings: Boolean = false): List[DataEntry[?]] =
       sync(async(n).getData(sourceAddress, amountsAsStrings))
 
-    def getData(sourceAddress: String, regexp: String): List[DataEntry[_]] =
+    def getData(sourceAddress: String, regexp: String): List[DataEntry[?]] =
       sync(async(n).getData(sourceAddress, regexp))
 
-    def getDataByKey(sourceAddress: String, key: String): DataEntry[_] =
+    def getDataByKey(sourceAddress: String, key: String): DataEntry[?] =
       sync(async(n).getDataByKey(sourceAddress, key))
 
-    def getDataList(sourceAddress: String, keys: String*): Seq[DataEntry[_]] =
-      sync(async(n).getDataList(sourceAddress, keys: _*))
+    def getDataList(sourceAddress: String, keys: String*): Seq[DataEntry[?]] =
+      sync(async(n).getDataList(sourceAddress, keys*))
 
-    def getDataListJson(sourceAddress: String, keys: String*): Seq[DataEntry[_]] =
-      sync(async(n).getDataListJson(sourceAddress, keys: _*))
+    def getDataListJson(sourceAddress: String, keys: String*): Seq[DataEntry[?]] =
+      sync(async(n).getDataListJson(sourceAddress, keys*))
 
-    def getDataListPost(sourceAddress: String, keys: String*): Seq[DataEntry[_]] =
-      sync(async(n).getDataListPost(sourceAddress, keys: _*))
+    def getDataListPost(sourceAddress: String, keys: String*): Seq[DataEntry[?]] =
+      sync(async(n).getDataListPost(sourceAddress, keys*))
 
-    def getMerkleProof(ids: String*): Seq[MerkleProofResponse] = sync(async(n).getMerkleProof(ids: _*))
+    def getMerkleProof(ids: String*): Seq[MerkleProofResponse] = sync(async(n).getMerkleProof(ids*))
 
-    def getMerkleProofPost(ids: String*): Seq[MerkleProofResponse] = sync(async(n).getMerkleProofPost(ids: _*))
+    def getMerkleProofPost(ids: String*): Seq[MerkleProofResponse] = sync(async(n).getMerkleProofPost(ids*))
 
     def broadcastRequest[A: Writes](req: A): Transaction =
       sync(async(n).broadcastRequest(req))
@@ -749,7 +749,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
 
-    import com.wavesplatform.it.api.AsyncHttpApi.{NodesAsyncHttpApi => async}
+    import com.wavesplatform.it.api.AsyncHttpApi.NodesAsyncHttpApi as async
 
     private val TxInBlockchainAwaitTime = 8 * nodes.head.blockDelay
     private val ConditionAwaitTime      = 5.minutes
