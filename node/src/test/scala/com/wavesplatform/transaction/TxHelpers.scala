@@ -21,6 +21,8 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.utils.EthConverters._
+import org.web3j.crypto.ECKeyPair
 
 object TxHelpers {
   def signer(i: Int): KeyPair  = KeyPair(Ints.toByteArray(i))
@@ -30,6 +32,8 @@ object TxHelpers {
   def defaultAddress: Address = defaultSigner.toAddress
   def secondSigner: KeyPair   = signer(1)
   def secondAddress: Address  = secondSigner.toAddress
+
+  def defaultEthSigner: ECKeyPair = defaultSigner.toEthKeyPair
 
   val matcher: KeyPair = defaultSigner
 
