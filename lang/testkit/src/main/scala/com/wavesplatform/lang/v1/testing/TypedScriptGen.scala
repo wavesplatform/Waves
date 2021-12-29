@@ -113,5 +113,4 @@ trait TypedScriptGen {
       name  <- Gen.identifier
       value <- BOOLEANgen((gas - 3) / 3)
     } yield LET(name, value)
-
 }
