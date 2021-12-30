@@ -4,10 +4,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import monix.eval.Coeval

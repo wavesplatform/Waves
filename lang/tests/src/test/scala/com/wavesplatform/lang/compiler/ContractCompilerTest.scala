@@ -23,35 +23,25 @@ import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.test.*
+import org.scalatest.Assertion
 
 class ContractCompilerTest extends PropSpec {
-  private val dAppV3Ctx: CompilerContext =
+  private def dAppCtxForV(version: StdLibVersion) =
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
+          CryptoContext.build(com.wavesplatform.lang.Global, version).withEnvironment[Environment],
           WavesContext.build(
             Global,
-            DirectiveSet(V3, Account, DAppType).explicitGet()
+            DirectiveSet(version, Account, DAppType).explicitGet()
           )
         )
       )
       .compilerContext
 
-  private val dAppV4Ctx: CompilerContext =
-    Monoid
-      .combineAll(
-        Seq(
-          PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
-          WavesContext.build(
-            Global,
-            DirectiveSet(V4, Account, DAppType).explicitGet()
-          )
-        )
-      )
-      .compilerContext
+  private val dAppV3Ctx: CompilerContext = dAppCtxForV(V3)
+  private val dAppV4Ctx: CompilerContext = dAppCtxForV(V4)
 
   property("contract compiles with comment in function body") {
     val ctx = Monoid.combine(
@@ -1217,4 +1207,32 @@ class ContractCompilerTest extends PropSpec {
       false
     ) shouldBe Symbol("right")
   }
+
+  property("union as @Callable argument is allowed in V4,V5") {
+    def checkForV(version: StdLibVersion): Assertion =
+      TestCompiler(version).compile(scriptWithUnionArg(version)) shouldBe Symbol("right")
+
+    checkForV(V4)
+    checkForV(V5)
+  }
+
+  property("union as @Callable argument forbidden in V6") {
+    TestCompiler(V6).compile(scriptWithUnionArg(V6)) should
+      produce("Union type is not allowed for callable function arguments in 107-108; Union type is not allowed for callable function arguments in 156-157")
+  }
+
+  private def scriptWithUnionArg(version: StdLibVersion): String =
+    s"""
+      |
+      | {-# STDLIB_VERSION ${version.id} #-}
+      | {-# CONTENT_TYPE DAPP #-}
+      | {-# SCRIPT_TYPE ACCOUNT #-}
+      |
+      | @Callable(i)
+      | func f(a: List[Int|String]) = []
+      |
+      | @Callable(i)
+      | func g(a: Int|String) = []
+      |
+        """.stripMargin
 }
