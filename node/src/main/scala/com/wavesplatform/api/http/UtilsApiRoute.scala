@@ -29,7 +29,7 @@ import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.{ContractLimits, Serde}
-import com.wavesplatform.lang.{Global, ValidationError}
+import com.wavesplatform.lang.{API, Global, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
@@ -115,42 +115,24 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String]) & parameter("compact".as[Boolean] ? false)) { (code, compact) =>
-      val v5Activated = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
-      def stdLib: StdLibVersion = {
-        if (v5Activated) {
-          V5
-        } else if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps)) {
-          V4
-        } else {
-          StdLibVersion.VersionDic.default
-        }
-      }
-      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), defaultStdLib = stdLib)) {
+      executeLimited(API.parseAndCompile(code, blockchain.estimator.version, compact)) {
         case Left(e) =>
           complete(ScriptCompilerError(e))
 
-        case Right((script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity))) =>
+        case Right(cr) =>
           val extraFee =
             if (verifierComplexity <= ContractLimits.FreeVerifierComplexity && v5Activated)
               0
             else
               FeeValidation.ScriptExtraFee
 
-          val compactedScript = script match {
-            case ContractScript.ContractScriptImpl(stdLibVersion, expr) if compact =>
-              ContractScriptImpl(stdLibVersion, ContractScriptCompactor.compact(expr))
-
-            case _ => script
-          }
-
-          val resultJson = Json.obj(
+          complete(Json.obj(
             "script"               -> compactedScript.bytes().base64,
             "complexity"           -> maxComplexity,
             "verifierComplexity"   -> verifierComplexity,
             "callableComplexities" -> callableComplexities,
             "extraFee"             -> extraFee
-          )
-          complete(resultJson)
+          ))
       }
 
     }

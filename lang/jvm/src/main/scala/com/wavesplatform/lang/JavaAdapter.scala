@@ -16,7 +16,8 @@ object JavaAdapter {
         CryptoContext.compilerContext(Global, version),
         WavesContext.build(Global, ???).compilerContext,
         PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).compilerContext
-      ))
+      )
+    )
 
   def compile(input: String): EXPR = {
     ExpressionCompiler
@@ -26,4 +27,12 @@ object JavaAdapter {
         res => res
       )
   }
+
+  def parseAndCompile(input: String, needCompaction: Boolean, removeUnusedCode: Boolean): CompileAndParseResult =
+    API
+      .parseAndCompile(input, 3, needCompaction, removeUnusedCode, Map.empty)
+      .fold(
+        error => throw new IllegalArgumentException(error),
+        res => res
+      )
 }

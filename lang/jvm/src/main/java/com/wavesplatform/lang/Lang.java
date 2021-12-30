@@ -28,4 +28,8 @@ public class Lang {
     public static byte[] serialize(Terms.EXPR expr) {
         return Serde.serialize(expr, false);
     }
+
+    public static CompileAndParseResult parseAndCompile(String program, boolean needCompaction, boolean removeUnusedCode) {
+        return JavaAdapter.parseAndCompile(program, needCompaction, removeUnusedCode);
+    }
 }
