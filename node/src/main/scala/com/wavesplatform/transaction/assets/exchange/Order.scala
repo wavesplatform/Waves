@@ -84,6 +84,10 @@ case class Order(
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.bodyBytes(this))
   val id: Coeval[ByteStr]            = Coeval.evalOnce(ByteStr(crypto.fastHash(bodyBytes())))
   val idStr: Coeval[String]          = Coeval.evalOnce(id().toString)
+
+  /**
+    * @note Shouldn't be used for orders >= V4
+    */
   val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(OrderSerializer.toBytes(this))
 
   def getReceiveAssetId: Asset = orderType match {

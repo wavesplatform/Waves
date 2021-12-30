@@ -83,15 +83,20 @@ object OrderSerializer {
         )
 
       case _ =>
-        PBUtils.encodeDeterministic(PBOrders.protobuf(order.withProofs(Proofs.empty)))
+        val orderWithoutProofs = order.orderAuthentication match {
+          case OrderAuthentication.OrderProofs(_, _)  => order.withProofs(Proofs.empty)
+          case OrderAuthentication.Eip712Signature(_) => order // Keep original signature
+        }
+        PBUtils.encodeDeterministic(PBOrders.protobuf(orderWithoutProofs))
     }
   }
 
   def toBytes(ord: Order): Array[Byte] = {
     import ord.*
-    (version: @unchecked) match {
+    version match {
       case Order.V1            => Bytes.concat(this.bodyBytes(ord), proofs.toSignature.arr)
       case Order.V2 | Order.V3 => Bytes.concat(this.bodyBytes(ord), proofs.bytes())
+      case other => throw new IllegalArgumentException(s"Couldn't serialize OrderV$other")
     }
   }
 
