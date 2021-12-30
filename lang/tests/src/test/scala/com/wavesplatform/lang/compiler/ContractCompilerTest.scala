@@ -1218,21 +1218,35 @@ class ContractCompilerTest extends PropSpec {
 
   property("union as @Callable argument forbidden in V6") {
     TestCompiler(V6).compile(scriptWithUnionArg(V6)) should
-      produce("Union type is not allowed for callable function arguments in 107-108; Union type is not allowed for callable function arguments in 156-157")
+      produce("Union type is not allowed for callable function arguments in 101-102; Union type is not allowed for callable function arguments in 148-149")
+  }
+
+  property("union as argument of non-@Callable function is allowed in V6") {
+    val script =
+      """
+        |{-# STDLIB_VERSION 6 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |func test(a: List[Int|String], b: Int|String) = []
+        |
+        |@Callable(i)
+        |func f(a: Int) = []
+        |""".stripMargin
+
+    TestCompiler(V6).compile(script) shouldBe Symbol("right")
   }
 
   private def scriptWithUnionArg(version: StdLibVersion): String =
     s"""
+      |{-# STDLIB_VERSION ${version.id} #-}
+      |{-# CONTENT_TYPE DAPP #-}
+      |{-# SCRIPT_TYPE ACCOUNT #-}
       |
-      | {-# STDLIB_VERSION ${version.id} #-}
-      | {-# CONTENT_TYPE DAPP #-}
-      | {-# SCRIPT_TYPE ACCOUNT #-}
+      |@Callable(i)
+      |func f(a: List[Int|String]) = []
       |
-      | @Callable(i)
-      | func f(a: List[Int|String]) = []
-      |
-      | @Callable(i)
-      | func g(a: Int|String) = []
-      |
-        """.stripMargin
+      |@Callable(i)
+      |func g(a: Int|String) = []
+      |""".stripMargin
 }
