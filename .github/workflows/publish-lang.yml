@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - lang/**
+      - project/**
     branches:
       - master
       - version-[0-9].[0-9]+.x
@@ -12,6 +13,7 @@ on:
   pull_request:
     paths:
       - lang/**
+      - project/**
 
 jobs:
   publish:
@@ -48,10 +50,12 @@ jobs:
             else
               sbt_version=$sbt_version-SNAPSHOT
             fi
-            echo "version := \"$sbt_version\"" >> version.sbt
+            echo "ThisBuild / version := \"$sbt_version\"" >> version.sbt
             echo Setting version to $sbt_version
           fi
-      - name: Publish package
-        id: sbt-publish
-        run: |
-          sbt ";lang/publishSigned;lang/sonatypeRelease"
+      - run: sbt ci-release
+        env:
+          PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
+          PGP_SECRET: ${{ secrets.OSSRH_GPG_KEY_BASE64 }}
+          SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+          SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}

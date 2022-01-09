@@ -12,12 +12,10 @@ Seq(
   "com.eed3si9n"       % "sbt-assembly"             % "1.0.0",
   "com.github.sbt"     % "sbt-native-packager"      % "1.9.7",
   "se.marcuslonnberg"  % "sbt-docker"               % "1.8.2",
-  "com.typesafe.sbt"   % "sbt-git"                  % "1.0.1",
   "org.scala-js"       % "sbt-scalajs"              % "1.7.0",
   "org.portable-scala" % "sbt-scalajs-crossproject" % "1.1.0",
   "pl.project13.scala" % "sbt-jmh"                  % "0.4.3",
-  "org.xerial.sbt"     % "sbt-sonatype"             % "3.9.10",
-  "com.github.sbt"     % "sbt-pgp"                  % "2.1.2"
+  "com.github.sbt"     % "sbt-ci-release"           % "1.5.10"
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(

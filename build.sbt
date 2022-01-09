@@ -115,6 +115,7 @@ lazy val root = (project in file("."))
 
 inScope(Global)(
   Seq(
+    publish / skip := true,
     scalaVersion := "2.13.6",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
