@@ -2,12 +2,16 @@ name: Publish packages to OSSRH
 
 on:
   push:
+    paths:
+      - lang/**
     branches:
       - master
       - version-[0-9].[0-9]+.x
     tags:
       - v[0-9].[0-9]+.[0-9]+
   pull_request:
+    paths:
+      - lang/**
 
 jobs:
   publish:
@@ -28,30 +32,26 @@ jobs:
           path: ~/.cache/coursier
           key: coursier-cache
       - name: Prepare version
-        id: maven-version
+        id: sbt-version
         run: |
-          mvn_version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          sbt_version=$(cut -d\" -f2 version.sbt)
           git_ref=${GITHUB_REF##*/}
           pr_number=${{ github.event.number }}
           if [[ $git_ref =~ v[0-9]+\.[0-9]+\.[0-9]+$ ]] ; then
-            if [[ v$mvn_version != $git_ref ]] ; then
-              echo Maven version $mvn_version does not match tag $git_ref
+            if [[ v$sbt_version != $git_ref ]] ; then
+              echo SBT version $sbt_version does not match tag $git_ref
               exit 1
             fi
-          elif [[ $pr_number != "" && $mvn_version =~ -SNAPSHOT$ ]] ; then
-            pattern="s/(.+)-SNAPSHOT/\1-"$pr_number"-SNAPSHOT/g"
-            mvn_version=$(echo $mvn_version | sed -E $pattern)
-            mvn versions:set -DnewVersion=$mvn_version -DgenerateBackupPoms=false -q -DforceStdout
-            echo Setting version to $mvn_version
-          elif [[ ! $mvn_version =~ -SNAPSHOT$ ]] ; then
-            echo Refusing to publish non-snapshot version $mvn_version
-            echo '::set-output name=skip-publish::true'
+          else
+            if [[ $pr_number != "" ]] ; then
+              sbt_version=$sbt_version-$pr_number-SNAPSHOT
+            else
+              sbt_version=$sbt_version-SNAPSHOT
+            fi
+            echo "version := \"$sbt_version\"" >> version.sbt
+            echo Setting version to $sbt_version
           fi
-      - uses: samuelmeuli/action-maven-publish@v1.4.0
-        if:
-          ${{ steps.maven-version.outputs.skip-publish != 'true' }}
-        with:
-          gpg_private_key: ${{ secrets.OSSRH_GPG_KEY_ASCII }}
-          gpg_passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
-          nexus_username: ${{ secrets.OSSRH_USERNAME }}
-          nexus_password: ${{ secrets.OSSRH_PASSWORD }}
+      - name: Publish package
+        id: sbt-publish
+        run: |
+          sbt ";lang/publishSigned;lang/sonatypeRelease"

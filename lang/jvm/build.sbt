@@ -1,0 +1,1 @@
+ThisProject / publishTo := sonatypePublishToBundle.value
