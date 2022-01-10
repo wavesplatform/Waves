@@ -43,6 +43,10 @@ object TxHelpers {
     lastTimestamp
   }
 
+  @throws[IllegalArgumentException]
+  def signature(sig: String): Proofs =
+    Proofs(ByteStr.decodeBase58(sig).get)
+
   def genesis(address: Address, amount: Long = 100000000.waves): GenesisTransaction =
     GenesisTransaction.create(address, amount, timestamp).explicitGet()
 

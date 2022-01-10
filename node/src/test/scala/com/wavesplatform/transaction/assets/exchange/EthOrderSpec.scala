@@ -8,12 +8,19 @@ import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
-import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, EthSetChainId}
+import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, EthSetChainId, JsonMatchers}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
 import play.api.libs.json.{JsObject, Json}
 
-class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with PathMockFactory with BlockchainStubHelpers with EthSetChainId with DiffMatchers {
+class EthOrderSpec
+    extends FlatSpec
+    with BeforeAndAfterAll
+    with PathMockFactory
+    with BlockchainStubHelpers
+    with EthSetChainId
+    with DiffMatchers
+    with JsonMatchers {
   import EthOrderSpec.{ethBuyOrder, ethSellOrder}
 
   "ETH signed order" should "recover signer public key correctly" in {
@@ -87,7 +94,7 @@ class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with PathMockFactory 
     diff should containAppliedTx(transaction.id())
   }
 
-  it should "work in exchange transaction with old order" in {
+  it should "work in exchange transaction with an old order" in {
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
@@ -113,6 +120,106 @@ class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with PathMockFactory 
     val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, TxVersion.V3, 100)
     val diff        = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
+  }
+
+  it should "recover valid ids of exchange tx" in {
+    val blockchain = createBlockchainStub { blockchain =>
+      val sh = StubHelpers(blockchain)
+      sh.creditBalance(TxHelpers.matcher.toAddress, *)
+      sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
+      sh.issueAsset(ByteStr(EthStubBytes32))
+    }
+
+    val buyOrder = Order
+      .selfSigned(
+        Order.V3,
+        TxHelpers.defaultSigner,
+        TxHelpers.matcher.publicKey,
+        AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
+        OrderType.BUY,
+        1,
+        100L,
+        1,
+        123,
+        100000,
+        Waves
+      )
+      .withProofs(TxHelpers.signature("2Bi5YFCeAUvQqWFJYUTzaDUfAdoHmQ4RC6nviBwvQgUYJLKrsa4T5eESGr5Er261kdeyNgHVJUGai8mALtLLWDoQ"))
+
+    val sellOrder = ethSellOrder.copy(orderAuthentication =
+      EthSignature(
+        "0x6c4385dd5f6f1200b4d0630c9076104f34c801c16a211e505facfd743ba242db4429b966ffa8d2a9aff9037dafda78cfc8f7c5ef1c94493f5954bc7ebdb649281b"
+      )
+    )
+
+    StubHelpers(blockchain).creditBalance(sellOrder.senderAddress, *)
+
+    val transaction = TxHelpers
+      .exchange(buyOrder, sellOrder, TxVersion.V3, 100)
+      .copy(proofs = TxHelpers.signature("4WrABDgkk9JraBLNQK4LTq7LWqVLgLzAEv8fr1rjr4ovca7224EBzLrEgcHdtHscGpQbLsk39ttQfqHMVLr9tXcB"))
+
+    transaction.json() should matchJson("""{
+                                          |  "type": 7,
+                                          |  "id": "GNz9EGRPNroTXhQ4Kjz2Qb4u3oBoRdteRTYwsHfDHJW5",
+                                          |  "fee": 1000000,
+                                          |  "feeAssetId": null,
+                                          |  "timestamp": 100,
+                                          |  "version": 3,
+                                          |  "chainId": 69,
+                                          |  "sender": "3FrCwv8uFRxQazhX6Lno45aZ68Bof6ScaeF",
+                                          |  "senderPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                          |  "proofs": [
+                                          |    "4WrABDgkk9JraBLNQK4LTq7LWqVLgLzAEv8fr1rjr4ovca7224EBzLrEgcHdtHscGpQbLsk39ttQfqHMVLr9tXcB"
+                                          |  ],
+                                          |  "order1": {
+                                          |    "version": 3,
+                                          |    "id": "75YqwVQbiQmLMQBE61W1aLcsaAUnWbzM5Udh9Z4mXUBf",
+                                          |    "sender": "3FrCwv8uFRxQazhX6Lno45aZ68Bof6ScaeF",
+                                          |    "senderPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                          |    "matcherPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                          |    "assetPair": {
+                                          |      "amountAsset": "5fQPsn8hoaVddFG26cWQ5QFdqxWtUPNaZ9zH2E6LYzFn",
+                                          |      "priceAsset": null
+                                          |    },
+                                          |    "orderType": "buy",
+                                          |    "amount": 1,
+                                          |    "price": 100,
+                                          |    "timestamp": 1,
+                                          |    "expiration": 123,
+                                          |    "matcherFee": 100000,
+                                          |    "signature": "2Bi5YFCeAUvQqWFJYUTzaDUfAdoHmQ4RC6nviBwvQgUYJLKrsa4T5eESGr5Er261kdeyNgHVJUGai8mALtLLWDoQ",
+                                          |    "proofs": [
+                                          |      "2Bi5YFCeAUvQqWFJYUTzaDUfAdoHmQ4RC6nviBwvQgUYJLKrsa4T5eESGr5Er261kdeyNgHVJUGai8mALtLLWDoQ"
+                                          |    ],
+                                          |    "matcherFeeAssetId": null
+                                          |  },
+                                          |  "order2": {
+                                          |    "version": 4,
+                                          |    "id": "8274Mc8WiNQdP3YhinBGkEX79AcZe5th51DJCTW8rEUZ",
+                                          |    "sender": "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
+                                          |    "senderPublicKey": "5vwTDMooR7Hp57MekN7qHz7fHNVrkn2Nx4CiWdq4cyBR4LNnZWYAr7UfBbzhmSvtNkv6e45aJ4Q4aKCSinyHVw33",
+                                          |    "matcherPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                          |    "assetPair": {
+                                          |      "amountAsset": "5fQPsn8hoaVddFG26cWQ5QFdqxWtUPNaZ9zH2E6LYzFn",
+                                          |      "priceAsset": null
+                                          |    },
+                                          |    "orderType": "sell",
+                                          |    "amount": 1,
+                                          |    "price": 100,
+                                          |    "timestamp": 1,
+                                          |    "expiration": 123,
+                                          |    "matcherFee": 100000,
+                                          |    "signature": "",
+                                          |    "proofs": [],
+                                          |    "matcherFeeAssetId": null,
+                                          |    "eip712Signature": "0x6c4385dd5f6f1200b4d0630c9076104f34c801c16a211e505facfd743ba242db4429b966ffa8d2a9aff9037dafda78cfc8f7c5ef1c94493f5954bc7ebdb649281b",
+                                          |    "priceMode": null
+                                          |  },
+                                          |  "amount": 1,
+                                          |  "price": 100,
+                                          |  "buyMatcherFee": 100000,
+                                          |  "sellMatcherFee": 100000
+                                          |}""".stripMargin)
   }
 
   it should "not work in exchange transaction with changed signature" in {
