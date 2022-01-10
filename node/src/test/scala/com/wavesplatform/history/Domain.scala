@@ -4,6 +4,7 @@ import scala.collection.immutable.SortedMap
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
+import scala.util.Try
 
 import cats.syntax.option._
 import com.wavesplatform.{database, Application}
@@ -32,6 +33,7 @@ import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import monix.execution.Scheduler.Implicits.global
 import org.iq80.leveldb.DB
+import play.api.libs.json.{JsNull, Json, JsValue}
 
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter, settings: WavesSettings) {
   import Domain._
@@ -50,6 +52,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   lazy val wallet: Wallet       = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
+
     /**
       * @return Tuple of (asset, feeInAsset, feeInWaves)
       * @see [[com.wavesplatform.state.diffs.FeeValidation#getMinFee(com.wavesplatform.state.Blockchain, com.wavesplatform.transaction.Transaction)]]
@@ -63,7 +66,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     }
 
     def transactionMeta(transactionId: ByteStr): TransactionMeta =
-      transactions.transactionById(transactionId)
+      transactions
+        .transactionById(transactionId)
         .getOrElse(throw new NoSuchElementException(s"No meta for $transactionId"))
 
     def invokeScriptResult(transactionId: ByteStr): InvokeScriptResult =
@@ -95,9 +99,11 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def liquidAndSolidAssert(doCheck: () => Unit): Unit = {
     require(liquidState.isDefined, "No liquid state is present")
-    try doCheck() catch { case NonFatal(err) => throw new RuntimeException("Liquid check failed", err) }
+    try doCheck()
+    catch { case NonFatal(err) => throw new RuntimeException("Liquid check failed", err) }
     makeStateSolid()
-    try doCheck() catch { case NonFatal(err) => throw new RuntimeException("Solid check failed", err) }
+    try doCheck()
+    catch { case NonFatal(err) => throw new RuntimeException("Solid check failed", err) }
   }
 
   def makeStateSolid(): (Int, SortedMap[String, String]) = {
@@ -170,7 +176,12 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   def appendAndAssertSucceed(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
     appendBlock(block)
-    txs.foreach(tx => require(blockchain.transactionSucceeded(tx.id()), s"should succeed: $tx"))
+    txs.foreach { tx =>
+      if (!blockchain.transactionSucceeded(tx.id())) {
+        val stateChanges = Try(commonApi.invokeScriptResult(tx.id())).toOption.flatMap(_.error).fold(JsNull: JsValue)(Json.toJson(_))
+        throw new AssertionError(s"Should succeed: ${tx.id()}, script error: ${Json.prettyPrint(stateChanges)}")
+      }
+    }
     lastBlock
   }
 
@@ -232,10 +243,12 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def createBlock(version: Byte, txs: Seq[Transaction], ref: Option[ByteStr] = blockchainUpdater.lastBlockId, strictTime: Boolean = false): Block = {
     val reference = ref.getOrElse(randomSig)
-    val parent = ref.flatMap { bs =>
-      val height = blockchain.heightOf(bs)
-      height.flatMap(blockchain.blockHeader).map(_.header)
-    }.getOrElse(lastBlock.header)
+    val parent = ref
+      .flatMap { bs =>
+        val height = blockchain.heightOf(bs)
+        height.flatMap(blockchain.blockHeader).map(_.header)
+      }
+      .getOrElse(lastBlock.header)
 
     val grandParent = ref.flatMap { bs =>
       val height = blockchain.heightOf(bs)

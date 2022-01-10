@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
+import scala.util.Right
+
 import cats.Id
 import cats.syntax.either.*
 import cats.syntax.semigroup.*
@@ -37,10 +39,9 @@ import com.wavesplatform.transaction.smart.InvokeTransaction.DefaultCall
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
+import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import monix.eval.Coeval
 import shapeless.Coproduct
-
-import scala.util.Right
 
 object InvokeScriptTransactionDiff {
 
@@ -112,16 +113,15 @@ object InvokeScriptTransactionDiff {
               paymentsComplexity,
               blockchain
             )
-          } yield
-            MainScriptResult(
-              environment.currentDiff,
-              result,
-              log,
-              environment.availableActions,
-              environment.availableData,
-              environment.availableDataSize,
-              fullLimit - paymentsComplexity
-            )
+          } yield MainScriptResult(
+            environment.currentDiff,
+            result,
+            log,
+            environment.availableActions,
+            environment.availableData,
+            environment.availableDataSize,
+            fullLimit - paymentsComplexity
+          )
         }
 
         TracedResult(
@@ -161,9 +161,9 @@ object InvokeScriptTransactionDiff {
         process = (actions: List[CallableAction], unusedComplexity: Long) => {
           val storingComplexity = if (blockchain.storeEvaluatedComplexity) limit - unusedComplexity else fixedInvocationComplexity
 
-          val dataItems    = actions.collect { case d: DataOp => InvokeDiffsCommon.dataItemToEntry(d) }
-          val dataCount    = dataItems.length
-          val dataSize     = dataItems.map(_.toBytes.length).sum
+          val dataEntries  = actions.collect { case d: DataOp => InvokeDiffsCommon.dataItemToEntry(d) }
+          val dataCount    = dataEntries.length
+          val dataSize     = DataTxValidator.invokeWriteSetSize(blockchain, dataEntries)
           val actionsCount = actions.length - dataCount
 
           for {
@@ -336,7 +336,9 @@ object InvokeScriptTransactionDiff {
           } else
             ScriptExecutionError.dAppExecution(error, log)
       }
-      .map { r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1); r }
+      .map { r =>
+        InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1); r
+      }
   }
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {

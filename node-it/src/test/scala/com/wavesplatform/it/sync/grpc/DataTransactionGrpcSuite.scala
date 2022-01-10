@@ -251,14 +251,14 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         Code.INVALID_ARGUMENT
       )
       val largeBinData =
-        List.tabulate(5)(n => DataEntry(tooBigKey, DataEntry.Value.BinaryValue(ByteString.copyFrom(Array.fill(maxValueSize)(n.toByte)))))
+        List.tabulate(5)(n => DataEntry(tooBigKey + n.toString, DataEntry.Value.BinaryValue(ByteString.copyFrom(Array.fill(maxValueSize)(n.toByte)))))
       assertGrpcError(
         sender.putData(firstAcc, largeBinData, calcDataFee(largeBinData, v), version = v),
         "Too big sequence requested",
         Code.INVALID_ARGUMENT
       )
 
-      val largeStrData = List.tabulate(5)(n => DataEntry(tooBigKey, DataEntry.Value.StringValue("A" * maxValueSize)))
+      val largeStrData = List.tabulate(5)(n => DataEntry(tooBigKey + n.toString, DataEntry.Value.StringValue("A" * maxValueSize)))
       assertGrpcError(
         sender.putData(firstAcc, largeStrData, calcDataFee(largeStrData, v), version = v),
         "Too big sequence requested",
@@ -297,7 +297,10 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val txIds = dataSet
         .grouped(100)
         .map(_.toList)
-        .map(data => PBTransactions.vanilla(sender.putData(fourthAcc, data, calcDataFee(data, v), version = v), unsafe = false).explicitGet().id().toString)
+        .map(
+          data =>
+            PBTransactions.vanilla(sender.putData(fourthAcc, data, calcDataFee(data, v), version = v), unsafe = false).explicitGet().id().toString
+        )
       txIds.foreach(tx => sender.waitForTransaction(tx))
       val r = scala.util.Random.nextInt(199)
       sender.getDataByKey(fourthAddress, s"int$r") shouldBe List(DataEntry(s"int$r", DataEntry.Value.IntValue(1000 + r)))
