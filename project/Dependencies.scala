@@ -1,6 +1,6 @@
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
-import sbt.{Def, _}
 import sbt.Keys._
+import sbt.{Def, _}
 
 //noinspection TypeAnnotation
 object Dependencies {
@@ -79,7 +79,8 @@ object Dependencies {
       catsCore.value,
       catsModule("kernel").value,
       catsModule("macros", "2.1.1").value,
-      shapeless.value
+      shapeless.value,
+      "com.google.protobuf" % "protobuf-java" % "3.19.2" // TODO: remove in NODE-2414
     )
   )
 
