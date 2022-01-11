@@ -27,12 +27,13 @@ import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TransactionFactory
+import com.wavesplatform.transaction.EthereumTransaction.Invocation
+import com.wavesplatform.transaction.{EthereumTransaction, TransactionFactory}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import io.netty.util.concurrent.DefaultThreadFactory
@@ -342,13 +343,15 @@ object AssetsApiRoute {
         tt <- blockchain
           .transactionInfo(id)
           .filter { case (tm, _) => tm.succeeded }
-          .toRight("Failed to find issue/invokeScript transaction by ID")
+          .toRight("Failed to find issue/invokeScript/invokeExpression transaction by ID")
         (txm, tx) = tt
         ts <- (tx match {
           case tx: IssueTransaction        => Some(tx.timestamp)
           case tx: InvokeScriptTransaction => Some(tx.timestamp)
+          case tx: InvokeExpressionTransaction => Some(tx.timestamp)
+          case tx @ EthereumTransaction(_: Invocation, _, _, _) => Some(tx.timestamp)
           case _                           => None
-        }).toRight("No issue/invokeScript transaction found with the given asset ID")
+        }).toRight("No issue/invokeScript/invokeExpression transaction found with the given asset ID")
       } yield (ts, txm.height)
 
     for {

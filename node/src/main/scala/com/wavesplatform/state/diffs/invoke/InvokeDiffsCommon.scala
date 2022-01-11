@@ -3,12 +3,12 @@ package com.wavesplatform.state.diffs.invoke
 import scala.util.{Failure, Right, Success, Try}
 
 import cats.Id
-import cats.instances.either._
-import cats.instances.list._
-import cats.instances.map._
-import cats.syntax.either._
-import cats.syntax.semigroup._
-import cats.syntax.traverse._
+import cats.instances.either.*
+import cats.instances.list.*
+import cats.instances.map.*
+import cats.syntax.either.*
+import cats.syntax.semigroup.*
+import cats.syntax.traverse.*
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
@@ -16,34 +16,34 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{BlockV5, SynchronousCalls}
-import com.wavesplatform.features.EstimatorProvider._
-import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
-import com.wavesplatform.features.ScriptTransferValidationProvider._
-import com.wavesplatform.lang._
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.features.EstimatorProvider.*
+import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider.*
+import com.wavesplatform.features.ScriptTransferValidationProvider.*
+import com.wavesplatform.lang.*
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, _}
+import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, *}
 import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.{BalanceDiffValidation, DiffsCommon}
-import com.wavesplatform.state.diffs.FeeValidation._
+import com.wavesplatform.state.diffs.FeeValidation.*
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.{Asset, AssetIdLength, ERC20Address, PBSince, TransactionType}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.smart._
+import com.wavesplatform.transaction.smart.*
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
-import com.wavesplatform.transaction.validation.impl.{LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
-import com.wavesplatform.utils._
+import com.wavesplatform.transaction.validation.impl.{DataTxValidator, LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
+import com.wavesplatform.utils.*
 import shapeless.Coproduct
 
 object InvokeDiffsCommon {
@@ -185,7 +185,7 @@ object InvokeDiffsCommon {
     val dataEntries     = actionsByType(classOf[DataOp]).asInstanceOf[List[DataOp]].map(dataItemToEntry)
 
     for {
-      _ <- TracedResult(checkDataEntries(tx, dataEntries, version)).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
+      _ <- TracedResult(checkDataEntries(blockchain, tx, dataEntries, version)).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
       _ <- TracedResult(checkLeaseCancels(leaseCancelList)).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
       _ <- TracedResult(
         Either.cond(
@@ -341,11 +341,7 @@ object InvokeDiffsCommon {
     else
       Right(())
 
-  private[this] def checkDataEntries(
-      tx: InvokeScriptLike,
-      dataEntries: Seq[DataEntry[_]],
-      stdLibVersion: StdLibVersion
-  ): Either[String, Unit] =
+  private def checkDataEntries(blockchain: Blockchain, tx: InvokeScriptLike, dataEntries: Seq[DataEntry[_]], stdLibVersion: StdLibVersion) =
     for {
       _ <- Either.cond(
         dataEntries.length <= ContractLimits.MaxWriteSetSize(stdLibVersion),
@@ -378,12 +374,7 @@ object InvokeDiffsCommon {
         }
         .toLeft(())
 
-      totalDataBytes = dataEntries.map(_.toBytes.length).sum
-      _ <- Either.cond(
-        totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes,
-        (),
-        s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"
-      )
+      _ <- DataTxValidator.verifyInvokeWriteSet(blockchain, dataEntries)
     } yield ()
 
   private def checkLeaseCancels(leaseCancels: Seq[LeaseCancel]): Either[String, Unit] = {

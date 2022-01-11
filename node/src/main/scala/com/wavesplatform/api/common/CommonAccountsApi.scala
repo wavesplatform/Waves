@@ -2,17 +2,19 @@ package com.wavesplatform.api.common
 
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
+import com.wavesplatform.api.common.TransactionMeta.Ethereum
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
-import com.wavesplatform.database.{DBExt, Keys, KeyTags}
+import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
 import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
 import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TransactionType
+import com.wavesplatform.transaction.EthereumTransaction.Invocation
+import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.ScorexLogging
@@ -130,7 +132,7 @@ object CommonAccountsApi extends ScorexLogging {
         Some(Height(blockchain.height) -> diff()),
         address,
         None,
-        Set(TransactionType.Lease, TransactionType.InvokeScript),
+        Set(TransactionType.Lease, TransactionType.InvokeScript, TransactionType.InvokeExpression, TransactionType.Ethereum),
         None
       ).flatMapIterable {
         case TransactionMeta(leaseHeight, lt: LeaseTransaction, true) if leaseIsActive(lt.id()) =>
@@ -146,24 +148,26 @@ object CommonAccountsApi extends ScorexLogging {
             )
           )
         case inv @ TransactionMeta.Invoke(invokeHeight, originTransaction, true, _, Some(scriptResult)) =>
-          def extractLeases(sender: Address, result: InvokeScriptResult): Seq[LeaseInfo] =
-            result.leases.collect {
-              case lease if leaseIsActive(lease.id) =>
-                LeaseInfo(
-                  lease.id,
-                  originTransaction.id(),
-                  sender,
-                  blockchain.resolveAlias(lease.recipient).explicitGet(),
-                  lease.amount,
-                  invokeHeight,
-                  LeaseInfo.Status.Active
-                )
-            } ++ {
-              result.invokes.flatMap(i => extractLeases(i.dApp, i.stateChanges))
-            }
-
-          extractLeases(blockchain.resolveAlias(inv.transaction.dApp).explicitGet(), scriptResult)
+          extractLeases(blockchain.resolveAlias(inv.transaction.dApp).explicitGet(), scriptResult, originTransaction.id(), invokeHeight)
+        case Ethereum(height, tx @ EthereumTransaction(inv: Invocation, _, _, _), true, _, _, Some(scriptResult)) =>
+          extractLeases(inv.dApp, scriptResult, tx.id(), height)
         case _ => Seq()
+      }
+
+    private def extractLeases(sender: Address, result: InvokeScriptResult, txId: ByteStr, height: Height): Seq[LeaseInfo] =
+      result.leases.collect {
+        case lease if leaseIsActive(lease.id) =>
+          LeaseInfo(
+            lease.id,
+            txId,
+            sender,
+            blockchain.resolveAlias(lease.recipient).explicitGet(),
+            lease.amount,
+            height,
+            LeaseInfo.Status.Active
+          )
+      } ++ {
+        result.invokes.flatMap(i => extractLeases(i.dApp, i.stateChanges, txId, height))
       }
 
     private def resolveDisabledAlias(leaseId: ByteStr): Either[ValidationError, Address] =

@@ -38,6 +38,7 @@ import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, CoevalR, TracedResult}
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
+import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -270,14 +271,15 @@ object InvokeScriptDiff {
 
             (actionsDiff, evaluated, remainingActions1, remainingData1, remainingDataSize1) <- scriptResult match {
               case ScriptResultV3(dataItems, transfers, unusedComplexity) =>
-                val dataSize     = dataItems.map(d => InvokeDiffsCommon.dataItemToEntry(d).toBytes.length).sum
+                val dataEntries  = dataItems.map(InvokeDiffsCommon.dataItemToEntry)
                 val dataCount    = dataItems.length
+                val dataSize     = DataTxValidator.invokeWriteSetSize(blockchain, dataEntries)
                 val actionsCount = transfers.length
                 process(dataItems ::: transfers, unusedComplexity, actionsCount, dataCount, dataSize, unit)
               case ScriptResultV4(actions, unusedComplexity, ret) =>
-                val dataItems    = actions.collect { case d: DataOp => InvokeDiffsCommon.dataItemToEntry(d) }
-                val dataCount    = dataItems.length
-                val dataSize     = dataItems.map(_.toBytes.length).sum
+                val dataEntries  = actions.collect { case d: DataOp => InvokeDiffsCommon.dataItemToEntry(d) }
+                val dataCount    = dataEntries.length
+                val dataSize     = DataTxValidator.invokeWriteSetSize(blockchain, dataEntries)
                 val actionsCount = actions.length - dataCount
                 process(actions, unusedComplexity, actionsCount, dataCount, dataSize, ret)
               case _: IncompleteResult if limitedExecution =>
@@ -330,7 +332,8 @@ object InvokeScriptDiff {
         ).flatMap {
           case (result, log) =>
             val usedComplexity = startComplexityLimit - result.unusedComplexity.max(0)
-            (for (_ <- InvokeDiffsCommon.checkScriptResultFields(blockchain, result)) yield (result, log))
+            (for (_ <-
+            InvokeDiffsCommon.checkScriptResultFields(blockchain, result)) yield (result, log))
               .leftMap(err => FailedTransactionError.dAppExecution(err.toString, usedComplexity, log))
         }
       )

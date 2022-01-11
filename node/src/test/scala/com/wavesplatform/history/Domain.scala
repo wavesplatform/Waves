@@ -2,14 +2,15 @@ package com.wavesplatform.history
 
 import scala.collection.immutable.SortedMap
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.control.NonFatal
+import scala.util.Try
 
-import cats.syntax.option._
+import cats.syntax.option.*
 import com.wavesplatform.{database, Application, TestValues}
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.api.common._
+import com.wavesplatform.api.common.*
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
@@ -22,9 +23,9 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.{BlockchainUpdater, _}
+import com.wavesplatform.transaction.{BlockchainUpdater, *}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.{EthEncoding, SystemTime}
@@ -32,9 +33,10 @@ import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import monix.execution.Scheduler.Implicits.global
 import org.iq80.leveldb.DB
+import play.api.libs.json.{JsNull, Json, JsValue}
 
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter, settings: WavesSettings) {
-  import Domain._
+  import Domain.*
 
   val blockchain: BlockchainUpdaterImpl = blockchainUpdater
 
@@ -174,7 +176,12 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   def appendAndAssertSucceed(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
     appendBlock(block)
-    txs.foreach(tx => require(blockchain.transactionSucceeded(tx.id()), s"should succeed: $tx"))
+    txs.foreach { tx =>
+      if (!blockchain.transactionSucceeded(tx.id())) {
+        val stateChanges = Try(commonApi.invokeScriptResult(tx.id())).toOption.flatMap(_.error).fold(JsNull: JsValue)(Json.toJson(_))
+        throw new AssertionError(s"Should succeed: ${tx.id()}, script error: ${Json.prettyPrint(stateChanges)}")
+      }
+    }
     lastBlock
   }
 
@@ -319,7 +326,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   //noinspection ScalaStyle
   object helpers {
     def creditWavesToDefaultSigner(amount: Long = 10_0000_0000): Unit = {
-      import com.wavesplatform.transaction.utils.EthConverters._
+      import com.wavesplatform.transaction.utils.EthConverters.*
       appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress, amount), TxHelpers.genesis(TxHelpers.defaultSigner.toEthWavesAddress, amount))
     }
 
