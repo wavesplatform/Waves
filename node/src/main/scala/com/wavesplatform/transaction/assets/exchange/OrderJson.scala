@@ -179,8 +179,7 @@ object OrderJson {
         .readNullable[String]
         .map(_.map(EthEncoding.toBytes)) and
       (JsPath \ "priceMode")
-        .readNullable[OrderPriceMode]
-        .map(_.getOrElse(OrderPriceMode.Default))
+        .readWithDefault[OrderPriceMode](OrderPriceMode.Default))
 
     r(readOrderV3V4 _)
   }
