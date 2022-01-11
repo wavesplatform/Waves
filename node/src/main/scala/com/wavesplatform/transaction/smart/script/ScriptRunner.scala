@@ -93,9 +93,9 @@ object ScriptRunner {
       val (limit, onExceed) =
         if (defaultLimit == Int.MaxValue)
           if (blockchain.checkEstimatorSumOverflow)
-            (correctedLimit, (_: EXPR) => Left(s"Verifier complexity limit = $correctedLimit is exceeded"))
+            (correctedLimit, (_: EXPR) => Left(CommonError(s"Verifier complexity limit = $correctedLimit is exceeded")))
           else
-            (defaultLimit, (_: EXPR) => Left(s"Verifier complexity limit = $defaultLimit is exceeded"))
+            (defaultLimit, (_: EXPR) => Left(CommonError(s"Verifier complexity limit = $defaultLimit is exceeded")))
         else
           (defaultLimit, (_: EXPR) => Right(default))
 

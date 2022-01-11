@@ -2,9 +2,6 @@ package com.wavesplatform.lang.v1.evaluator
 
 import cats.Id
 import cats.instances.lazyList._
-import cats.syntax.foldable._
-import com.wavesplatform.lang.ExecutionError
-import cats.instances.lazyList._
 import cats.syntax.either._
 import cats.syntax.foldable._
 import com.wavesplatform.lang.directives.values.StdLibVersion
@@ -13,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, _}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{ExecutionError, CommonError}
+import com.wavesplatform.lang.{CommonError, ExecutionError}
 import monix.eval.Coeval
 import shapeless.syntax.std.tuple._
 
@@ -349,5 +346,5 @@ object EvaluatorV2 {
       stdLibVersion: StdLibVersion,
       correctFunctionCallScope: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, expr => Left(s"Unexpected incomplete evaluation result $expr"))
+    applyOrDefault(ctx, expr, stdLibVersion, Int.MaxValue, correctFunctionCallScope, expr => Left(s"Unexpected incomplete evaluation result $expr"))
 }

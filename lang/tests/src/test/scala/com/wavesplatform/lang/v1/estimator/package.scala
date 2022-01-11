@@ -6,6 +6,7 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
+import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.traits.Environment
@@ -16,16 +17,12 @@ package object estimator {
     PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
     WavesContext.build(Global, DirectiveSet.contractDirectiveSet)
 
-  private val environment = Common.emptyBlockchainEnvironment()
-  private val evaluator =
-    new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), ctx.evaluationContext(environment)), version, correctFunctionCallScope = true)
-
   val evaluatorV2AsEstimator = new ScriptEstimator {
     override val version: Int = 0
 
     override def apply(declaredVals: Set[String], functionCosts: Map[FunctionHeader, Coeval[Long]], expr: Terms.EXPR): Either[String, Long] = {
       val evalCtx = ctx.evaluationContext(Common.emptyBlockchainEnvironment())
-      Right(EvaluatorV2.applyCompleted(evalCtx, expr, V3)._2)
+      Right(EvaluatorV2.applyCompleted(evalCtx, expr, V3, correctFunctionCallScope = true)._2)
     }
   }
 }

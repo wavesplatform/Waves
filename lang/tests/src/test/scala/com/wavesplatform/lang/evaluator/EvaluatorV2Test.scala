@@ -30,7 +30,9 @@ class EvaluatorV2Test extends PropSpec with Inside {
   private val environment = Common.emptyBlockchainEnvironment()
 
   private def evalEither(expr: EXPR, limit: Int) =
-    EvaluatorV2.applyLimited(expr, limit, ctx.evaluationContext(environment), version, correctFunctionCallScope = true).leftMap(_._1.message)
+    EvaluatorV2.applyLimitedCoeval(expr, limit, ctx.evaluationContext(environment), version, correctFunctionCallScope = true)
+      .value()
+      .leftMap(_._1.message)
 
   private def eval(expr: EXPR, limit: Int): (EXPR, String, Int) = {
     val (result, unusedComplexity, _) = evalEither(expr, limit).explicitGet()
