@@ -23,6 +23,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
       .overrideBase(_.raw(s"""
                               | waves.blockchain.custom.functionality {
                               |   estimator-pre-check-height =  $featureHeight
+                              |   estimator-sum-overflow-fix-height = 999999
                               |   pre-activated-features = {14 = 0, 15 = 999999}
                               |}""".stripMargin))
       .buildNonConflicting()
@@ -36,46 +37,8 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   var issuedAssetId = ""
 
-  test("send waves to accounts") {
 
-    Seq(smartAcc, callerAcc).foreach(
-      r =>
-        sender
-          .transfer(
-            sender.keyPair,
-            recipient = r.toAddress.toString,
-            assetId = None,
-            amount = 5.waves,
-            fee = minFee,
-            waitForTx = true
-          )
-    )
 
-    val value = ByteStr(("4djidnqe9lK09le4FvgRD0BTok55nHP8MKFotfUeQOWEfBkp6MV4skCceWgDGBnc" * 512).dropRight(1).getBytes)
-    val data = List(
-      BinaryDataEntry(
-        "v32767",
-        value
-      ),
-      BinaryDataEntry(
-        "key",
-        ByteStr
-          .decodeBase64(
-            "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA9TuTafHJ0vfVBzFmF0jpUgcYt9Evuqkrk5BYZQyMPK5mB6YCEKDpK+C57oEhKf4sWNhxhBy5pwOQVCXQFO+IWLyTreVDKg091gAosZNFES5uC1hHmMKJUUHoXirEa1Zk6dgc9ErtCe3tJmA5FwVeGG1zg+4PUR3DTBIbPojVFu0GneMU9/p2Yp42PmOwuCzBHSWJxLGqL6wFvQKevT12vesNRSpF+d4Dl6IxDONojJDuPhPdHYIRNaQiSiEWtZ2pwg5WCUTwyl9ZpUM8Cx5e3pwbaqq3vufsbImAAR0QtTbgfi/YaEXj5lrd3Y1T4QWJczEeQHsdKXNkY0ZaErzRVwIDAQAB"
-          )
-          .get
-      ),
-      BinaryDataEntry(
-        "s",
-        ByteStr
-          .decodeBase64(
-            "E1CFy1u245yo1UNJXVXtW/4H8YSVt+98S7ackF4r1reeJHXL3z8V4rUyiq8B2qVg39GBfGiP82UJlmLbOP9BEztIPdMyLI+mQUBdEPQ35oziXxbJndqnqJozdoSaYUfq4UpEk334y7l6E4xOQmW7IsMhgG+T4+oK6AKXtNxLCB4Dpcaz7xM+kdsi/37usNvKcAfitx3bKdSL0ukFsaDLGuyingqIcofa7lj4s/xybWI1d4xcjhRUFbOzslnWeuoxePUZ/UJvg2wOhG/HtTVbfVc6z0nvS+yfju/AqAiPUdcsfu8dfu5xZsxf0HiXU6vweFWUHV5tY6SauZuopkcJEw=="
-          )
-          .get
-      )
-    )
-    sender.putData(smartAcc, data, 0.3.waves, waitForTx = true)
-  }
 
   test("can issue scripted asset and set script fro asset before precheck activation") {
     issuedAssetId = sender
@@ -180,4 +143,44 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
     sender.transfer(smartAcc, callerAcc.toAddress.toString, 1, minFee + 2 * smartFee, Some(issuedAssetId), None, waitForTx = true)
   }
 
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+    Seq(smartAcc, callerAcc).foreach(
+      r =>
+        sender
+          .transfer(
+            sender.keyPair,
+            recipient = r.toAddress.toString,
+            assetId = None,
+            amount = 5.waves,
+            fee = minFee,
+            waitForTx = true
+          )
+    )
+
+    val value = ByteStr(("4djidnqe9lK09le4FvgRD0BTok55nHP8MKFotfUeQOWEfBkp6MV4skCceWgDGBnc" * 512).dropRight(1).getBytes)
+    val data = List(
+      BinaryDataEntry(
+        "v32767",
+        value
+      ),
+      BinaryDataEntry(
+        "key",
+        ByteStr
+          .decodeBase64(
+            "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA9TuTafHJ0vfVBzFmF0jpUgcYt9Evuqkrk5BYZQyMPK5mB6YCEKDpK+C57oEhKf4sWNhxhBy5pwOQVCXQFO+IWLyTreVDKg091gAosZNFES5uC1hHmMKJUUHoXirEa1Zk6dgc9ErtCe3tJmA5FwVeGG1zg+4PUR3DTBIbPojVFu0GneMU9/p2Yp42PmOwuCzBHSWJxLGqL6wFvQKevT12vesNRSpF+d4Dl6IxDONojJDuPhPdHYIRNaQiSiEWtZ2pwg5WCUTwyl9ZpUM8Cx5e3pwbaqq3vufsbImAAR0QtTbgfi/YaEXj5lrd3Y1T4QWJczEeQHsdKXNkY0ZaErzRVwIDAQAB"
+          )
+          .get
+      ),
+      BinaryDataEntry(
+        "s",
+        ByteStr
+          .decodeBase64(
+            "E1CFy1u245yo1UNJXVXtW/4H8YSVt+98S7ackF4r1reeJHXL3z8V4rUyiq8B2qVg39GBfGiP82UJlmLbOP9BEztIPdMyLI+mQUBdEPQ35oziXxbJndqnqJozdoSaYUfq4UpEk334y7l6E4xOQmW7IsMhgG+T4+oK6AKXtNxLCB4Dpcaz7xM+kdsi/37usNvKcAfitx3bKdSL0ukFsaDLGuyingqIcofa7lj4s/xybWI1d4xcjhRUFbOzslnWeuoxePUZ/UJvg2wOhG/HtTVbfVc6z0nvS+yfju/AqAiPUdcsfu8dfu5xZsxf0HiXU6vweFWUHV5tY6SauZuopkcJEw=="
+          )
+          .get
+      )
+    )
+    sender.putData(smartAcc, data, 0.3.waves, waitForTx = true)
+  }
 }

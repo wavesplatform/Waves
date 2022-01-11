@@ -64,7 +64,7 @@ class InvokeActionsFeeTest
                     |  )
                     |
                     """.stripMargin
-    ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()._1
   }
 
   private def dApp(asset: IssuedAsset): Script =

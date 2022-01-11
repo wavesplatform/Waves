@@ -30,7 +30,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
   private val environment = Common.emptyBlockchainEnvironment()
 
   private def evalEither(expr: EXPR, limit: Int) =
-    EvaluatorV2.applyLimited(expr, limit, ctx.evaluationContext(environment), version).leftMap(_._1.message)
+    EvaluatorV2.applyLimited(expr, limit, ctx.evaluationContext(environment), version, correctFunctionCallScope = true).leftMap(_._1.message)
 
   private def eval(expr: EXPR, limit: Int): (EXPR, String, Int) = {
     val (result, unusedComplexity, _) = evalEither(expr, limit).explicitGet()
@@ -935,5 +935,17 @@ class EvaluatorV2Test extends PropSpec with Inside {
         |	value = true
         |)
       """.stripMargin.trim
+  }
+
+  property("arg of the function should not overlap var accessed from the let") {
+    eval(
+      """
+        |let a = 4
+        |let x = a
+        |func f(a: Int) = x
+        |f(1)
+      """.stripMargin,
+      1000
+    )._1 shouldBe CONST_LONG(4)
   }
 }

@@ -482,16 +482,13 @@ object InvokeDiffsCommon {
 
               val asset = IssuedAsset(issue.id)
 
-              DiffsCommon
-                .countVerifierComplexity(None /*issue.compiledScript*/, blockchain, isAsset = true)
-                .map { script =>
-                  Diff(
-                    portfolios = Map(pk.toAddress -> Portfolio(assets = Map(asset -> issue.quantity))),
-                    issuedAssets = Map(asset      -> NewAssetInfo(staticInfo, info, volumeInfo)),
-                    assetScripts = Map(asset      -> script.map(script => AssetScriptInfo(script._1, script._2)))
-                  )
-                }
-                .leftMap(FailedTransactionError.asFailedScriptError)
+              Right(
+                Diff(
+                  portfolios = Map(pk.toAddress -> Portfolio(assets = Map(asset -> issue.quantity))),
+                  issuedAssets = Map(asset      -> NewAssetInfo(staticInfo, info, volumeInfo)),
+                  assetScripts = Map(asset      -> None)
+                )
+              )
             }
           }
 

@@ -44,7 +44,7 @@ object TxHelpers {
       amount: Long = 1.waves,
       asset: Asset = Waves,
       fee: Long = TestValues.fee,
-      version: Byte = TxVersion.V1
+      version: Byte = TxVersion.V2
   ): TransferTransaction =
     TransferTransaction.selfSigned(version, from, to, asset, amount, Waves, fee, ByteStr.empty, timestamp).explicitGet()
 
@@ -68,27 +68,37 @@ object TxHelpers {
   def order(orderType: OrderType, asset: Asset): Order =
     orderV3(orderType, asset, Waves)
 
-  def orderV3(orderType: OrderType, amountAsset: Asset, priceAsset: Asset, feeAsset: Asset): Order = {
+  def orderV3(
+      orderType: OrderType,
+      amountAsset: Asset,
+      priceAsset: Asset,
+      feeAsset: Asset,
+      amount: TxAmount = 1L,
+      price: TxAmount = 1L,
+      fee: TxAmount = 1L,
+      sender: KeyPair = defaultSigner,
+      matcher: KeyPair = defaultSigner
+  ): Order = {
     Order.selfSigned(
       TxVersion.V3,
-      defaultSigner,
-      defaultSigner.publicKey,
+      sender,
+      matcher.publicKey,
       AssetPair(amountAsset, priceAsset),
       orderType,
-      1L,
-      1L,
+      amount,
+      price,
       timestamp,
       timestamp + 100000,
-      1L,
+      fee,
       feeAsset
     )
   }
 
-  def exchange(order1: Order, order2: Order): ExchangeTransaction = {
+  def exchange(order1: Order, order2: Order, matcher: KeyPair = defaultSigner): ExchangeTransaction = {
     ExchangeTransaction
       .signed(
         TxVersion.V2,
-        defaultSigner.privateKey,
+        matcher.privateKey,
         order1,
         order2,
         order1.amount,
@@ -102,7 +112,7 @@ object TxHelpers {
   }
 
   def script(scriptText: String): Script = {
-    val (script, _) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()
+    val (script, _) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3(fixOverflow = true)).explicitGet()
     script
   }
 

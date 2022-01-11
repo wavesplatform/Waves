@@ -316,7 +316,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       )
       .compilerContext
 
-    Global.compileExpression(expr, ctx, V4, ScriptEstimatorV3) should produce("Script is too large: 8756 bytes > 8192 bytes")
+    Global.compileExpression(expr, ctx, V4, ScriptEstimatorV3(fixOverflow = true)) should produce("Script is too large: 8756 bytes > 8192 bytes")
   }
 
   property("extract() removed from V4") {

@@ -6,13 +6,14 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.TxHelpers
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
 
 class CancelLeasesToDisabledAliasesSpec extends FlatSpec with PathMockFactory with WithDomain with BeforeAndAfterAll {
-  val MainnetSettings = {
+  val MainnetSettings: WavesSettings = {
     import SettingsFromDefaultConfig.blockchainSettings.{functionalitySettings => fs}
     SettingsFromDefaultConfig.copy(
       blockchainSettings = SettingsFromDefaultConfig.blockchainSettings.copy(
@@ -20,6 +21,7 @@ class CancelLeasesToDisabledAliasesSpec extends FlatSpec with PathMockFactory wi
         functionalitySettings = fs.copy(
           preActivatedFeatures = fs.preActivatedFeatures ++ Map(
             BlockchainFeatures.NG.id               -> 0,
+            BlockchainFeatures.SmartAccounts.id    -> 0,
             BlockchainFeatures.SynchronousCalls.id -> 2
           )
         )
@@ -30,7 +32,7 @@ class CancelLeasesToDisabledAliasesSpec extends FlatSpec with PathMockFactory wi
   "CancelLeasesToDisabledAliases" should "be applied only once" in withDomain(MainnetSettings) { d =>
     d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
     testLeaseBalance(d).out shouldBe 0L
-    
+
     d.appendKeyBlock()
     testLeaseBalance(d).out shouldBe -2562590821L
 

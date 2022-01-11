@@ -16,6 +16,10 @@ package object estimator {
     PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
     WavesContext.build(Global, DirectiveSet.contractDirectiveSet)
 
+  private val environment = Common.emptyBlockchainEnvironment()
+  private val evaluator =
+    new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), ctx.evaluationContext(environment)), version, correctFunctionCallScope = true)
+
   val evaluatorV2AsEstimator = new ScriptEstimator {
     override val version: Int = 0
 

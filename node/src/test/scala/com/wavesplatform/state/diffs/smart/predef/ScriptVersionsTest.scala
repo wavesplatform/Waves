@@ -116,7 +116,7 @@ class ScriptVersionsTest extends FreeSpec {
   "ScriptV4" - {
     "DataTransaction entry mapping" in {
       def compile(scriptText: String) =
-        ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1
+        ScriptCompiler.compile(scriptText, ScriptEstimatorV3(fixOverflow = true)).explicitGet()._1
 
       def script(dApp: Boolean, version: StdLibVersion): Script =
         compile(

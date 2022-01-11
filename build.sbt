@@ -118,7 +118,7 @@ inScope(Global)(
     scalaVersion := "2.13.6",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 3, 10),
+    V.fallback := (1, 3, 12),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     scalacOptions ++= Seq(
