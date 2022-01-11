@@ -18,7 +18,6 @@ import com.wavesplatform.it.util.*
 import com.wavesplatform.it.util.GlobalTimer.instance as timer
 import com.wavesplatform.lang.script.Script as Scr
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.Amount
