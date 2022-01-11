@@ -61,7 +61,7 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
     for {
       parentHitSource <- getHitSource(parentHeight)
       gs <- if (vrfActivated(parentHeight + 1)) {
-        crypto.verifyVRF(header.generationSignature, parentHitSource.arr, header.generator).map(_.arr)
+        crypto.verifyVRF(header.generationSignature, parentHitSource.arr, header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).map(_.arr)
       } else {
         generationSignature(parentHitSource, header.generator).asRight[ValidationError]
       }
@@ -79,7 +79,7 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
     val height      = blockchain.height
 
     if (vrfActivated(height + 1)) {
-      getHitSource(height).flatMap(hs => crypto.verifyVRF(blockGenSig, hs.arr, block.header.generator))
+      getHitSource(height).flatMap(hs => crypto.verifyVRF(blockGenSig, hs.arr, block.header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)))
     } else {
       blockchain.lastBlockHeader
         .toRight(GenericError("No blocks in blockchain"))
@@ -147,7 +147,7 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
       hitSource <- getHitSource(height)
       gs <- if (vrfActivated(height + 1)) {
         val vrfProof = crypto.signVRF(account.privateKey, hitSource.arr)
-        crypto.verifyVRF(vrfProof, hitSource.arr, account.publicKey).map(_.arr)
+        crypto.verifyVRF(vrfProof, hitSource.arr, account.publicKey, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).map(_.arr)
       } else {
         generationSignature(hitSource, account.publicKey).asRight[ValidationError]
       }

@@ -1,40 +1,42 @@
 package com.wavesplatform.it.api
 
+import java.util.NoSuchElementException
+
+import scala.concurrent.Future
+import scala.concurrent.duration.*
+
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
+import com.wavesplatform.api.grpc.{TransactionStatus as PBTransactionStatus, *}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{TransactionStatus => PBTransactionStatus, _}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.invokeExpressionFee
-import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
-import com.wavesplatform.it.util._
+import com.wavesplatform.it.util.*
+import com.wavesplatform.it.util.GlobalTimer.instance as timer
+import com.wavesplatform.lang.script.Script as Scr
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.script.{Script => Scr}
+import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.serialization.Deser
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.{Asset, TxVersion}
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.subjects.ConcurrentSubject
 import play.api.libs.json.Json
 
-import java.util.NoSuchElementException
-import scala.concurrent.Future
-import scala.concurrent.duration._
-
 object AsyncGrpcApi {
   implicit class NodeAsyncGrpcApi(val n: Node) {
 
-    import com.wavesplatform.protobuf.transaction.{Transaction => PBTransaction, _}
+    import com.wavesplatform.protobuf.transaction.{Transaction as PBTransaction, *}
     import monix.execution.Scheduler.Implicits.global
 
     private[this] lazy val assets       = AssetsApiGrpc.stub(n.grpcChannel)
@@ -56,7 +58,7 @@ object AsyncGrpcApi {
       val (obs, result) = createCallObserver[TransactionResponse]
       transactions.getTransactions(request, obs)
       result.runToFuture.map { r =>
-        import com.wavesplatform.state.{InvokeScriptResult => VISR}
+        import com.wavesplatform.state.InvokeScriptResult as VISR
         r.map { r =>
           val tx = PBTransactions.vanillaUnsafe(r.getTransaction)
           assert(r.getInvokeScriptResult.transfers.forall(_.address.size() == 20))
@@ -196,10 +198,11 @@ object AsyncGrpcApi {
         version,
         PBTransaction.Data.DataTransaction(DataTransactionData.of(data))
       )
-      if (PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = false).isLeft) {
+      val safeCreated = PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = false)
+      if (safeCreated.isLeft) {
         transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.EMPTY)))
       } else {
-        val proofs = crypto.sign(source.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = false).explicitGet().bodyBytes())
+        val proofs = crypto.sign(source.privateKey, safeCreated.explicitGet().bodyBytes())
         transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
       }
     }

@@ -38,8 +38,8 @@ class InvokeScriptTransactionSpecification extends PropSpec {
       deser.timestamp shouldEqual transaction.timestamp
       deser.proofs shouldEqual transaction.proofs
       bytes shouldEqual deser.bytes()
-      Verifier.verifyAsEllipticCurveSignature(transaction) should beRight
-      Verifier.verifyAsEllipticCurveSignature(deser) should beRight // !!!!!!!!!!!!!!!
+      Verifier.verifyAsEllipticCurveSignature(transaction, checkWeakPk = false) should beRight
+      Verifier.verifyAsEllipticCurveSignature(deser, checkWeakPk = false) should beRight // !!!!!!!!!!!!!!!
     }
   }
 
