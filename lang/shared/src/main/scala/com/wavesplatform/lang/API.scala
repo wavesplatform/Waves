@@ -18,6 +18,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
 sealed trait CompileAndParseResult
+
 object CompileAndParseResult {
 
   case class Expression(bytes: Array[Byte], complexity: Long, expr: Expressions.SCRIPT, errors: Seq[CompilationError]) extends CompileAndParseResult
