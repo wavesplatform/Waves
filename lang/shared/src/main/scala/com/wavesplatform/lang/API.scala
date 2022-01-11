@@ -34,13 +34,28 @@ object CompileAndParseResult {
   ) extends CompileAndParseResult
 }
 
-sealed trait CompileResult
+sealed trait CompileResult {
+  def bytes: Array[Byte]
+  def verifierComplexity: Long
+  def callableComplexities: Map[String, Long]
+  def maxComplexity: Long = callableComplexities.values.maxOption.fold(verifierComplexity)(_.max(verifierComplexity))
+}
 object CompileResult {
-  case class Expression(bytes: Array[Byte], complexity: Long, expr: EXPR, error: Either[String, Unit]) extends CompileResult
+  case class Expression(bytes: Array[Byte], verifierComplexity: Long, expr: EXPR, error: Either[String, Unit]) extends CompileResult {
+    override val callableComplexities: Map[String, Long] = Map.empty
+  }
 
-  case class Library(bytes: Array[Byte], complexity: Long, expr: EXPR) extends CompileResult
+  case class Library(bytes: Array[Byte], complexity: Long, expr: EXPR) extends CompileResult {
+    override val verifierComplexity: Long                = 0
+    override val callableComplexities: Map[String, Long] = Map.empty
+    override val maxComplexity: Long                     = complexity
+  }
 
-  case class DApp(dAppInfo: DAppInfo, error: Either[String, Unit]) extends CompileResult
+  case class DApp(dAppInfo: DAppInfo, error: Either[String, Unit]) extends CompileResult {
+    override def bytes: Array[Byte]                      = dAppInfo.bytes
+    override def verifierComplexity: Long                = dAppInfo.verifierComplexity
+    override def callableComplexities: Map[String, Long] = dAppInfo.callableComplexities
+  }
 }
 
 object API {

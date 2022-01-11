@@ -114,44 +114,44 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String]) & parameter("compact".as[Boolean] ? false)) { (code, compact) =>
-      executeLimited(API.compile(code, blockchain.estimator.version, compact)) {
-        case Left(e) => complete(ScriptCompilerError(e))
-        case Right(CompileResult.DApp(dapp, _)) =>
-          val v5Activated = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
-          val extraFee =
-            if (dapp.verifierComplexity <= ContractLimits.FreeVerifierComplexity && v5Activated)
-              0
-            else
-              FeeValidation.ScriptExtraFee
+      executeLimited(API.compile(code, estimator().version, compact))(
+        _.fold(
+          e => complete(ScriptCompilerError(e)), { cr =>
+            val v5Activated = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+            val extraFee =
+              if (cr.verifierComplexity <= ContractLimits.FreeVerifierComplexity && v5Activated)
+                0
+              else
+                FeeValidation.ScriptExtraFee
 
-          complete(
-            Json.obj(
-              "script"               -> Base64.encode(dapp.bytes),
-              "complexity"           -> dapp.maxComplexity._2,
-              "verifierComplexity"   -> dapp.verifierComplexity,
-              "callableComplexities" -> dapp.callableComplexities,
-              "extraFee"             -> extraFee
+            complete(
+              Json.obj(
+                "script"               -> ByteStr(cr.bytes).base64,
+                "complexity"           -> cr.maxComplexity,
+                "verifierComplexity"   -> cr.verifierComplexity,
+                "callableComplexities" -> cr.callableComplexities,
+                "extraFee"             -> extraFee
+              )
             )
-          )
-      }
-
+          }
+        )
+      )
     }
   }
 
   def compileWithImports: Route = path("script" / "compileWithImports") {
     import ScriptWithImportsRequest._
     (post & entity(as[ScriptWithImportsRequest])) { req =>
-      executeLimited(API.compile(req.script, estimator().version, false, false, req.imports)) { result =>
+      executeLimited(API.compile(req.script, estimator().version, needCompaction = false, removeUnusedCode = false, req.imports)) { result =>
         complete(
           result
             .fold(
-              e => ScriptCompilerError(e), {
-                case CompileResult.DApp(dapp, _) =>
-                  Json.obj(
-                    "script"     -> Base64.encode(dapp.bytes),
-                    "complexity" -> dapp.maxComplexity._2,
-                    "extraFee"   -> FeeValidation.ScriptExtraFee
-                  )
+              e => ScriptCompilerError(e), { cr: CompileResult =>
+                Json.obj(
+                  "script"     -> ByteStr(cr.bytes).base64,
+                  "complexity" -> cr.verifierComplexity,
+                  "extraFee"   -> FeeValidation.ScriptExtraFee
+                )
               }
             )
         )
