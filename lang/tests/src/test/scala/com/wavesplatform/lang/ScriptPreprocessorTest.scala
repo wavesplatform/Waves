@@ -29,7 +29,7 @@ class ScriptPreprocessorTest extends PropSpec with ScriptGenParser {
 
   private def eval(code: String): Either[String, EVALUATED] = {
     val untyped  = Parser.parseExpr(code).get.value
-    val ctx: CTX[NoContext] = Monoid.combineAll(Seq(PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true)))
+    val ctx: CTX[NoContext] = Monoid.combineAll(Seq(PureContext.build(V3, useNewPowPrecision = true)))
     val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => evaluator.apply[EVALUATED](ctx.evaluationContext, v._1))
   }

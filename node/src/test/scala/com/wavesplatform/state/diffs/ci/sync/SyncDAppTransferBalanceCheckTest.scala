@@ -12,13 +12,11 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test._
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import org.scalatest.Ignore
 
-@Ignore
 class SyncDAppTransferBalanceCheckTest extends PropSpec with WithDomain with TransactionGenBase {
 
   private val time = new TestTime
@@ -71,7 +69,6 @@ class SyncDAppTransferBalanceCheckTest extends PropSpec with WithDomain with Tra
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(syncDAppCheckPaymentsHeight = 0, syncDAppCheckTransfersHeight = 4)
 
   property("negative balance always rejects tx after syncDAppCheckTransfersHeight") {
     for {
@@ -82,16 +79,13 @@ class SyncDAppTransferBalanceCheckTest extends PropSpec with WithDomain with Tra
 
       withDomain(domainSettingsWithFS(settings)) { d =>
         d.appendBlock(preparingTxs: _*)
-
+        
         val invoke1 = invoke()
-        d.appendBlock(invoke1)
-        d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
-
-        val invoke2 = invoke()
-        d.appendBlock()
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include(
-          s"Sync call leads to temporary negative balance = -100 for address $dApp2Address"
-        )
+        if (!bigComplexityDApp1 && !bigComplexityDApp2) {
+          d.appendAndCatchError(invoke1).toString should include("negative waves balance")
+        } else {
+          d.appendAndAssertFailed(invoke1)
+        }
       }
     }
   }
