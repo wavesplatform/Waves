@@ -582,7 +582,7 @@ object InvokeDiffsCommon {
                 )
             }
 
-          val baseDiff = action match {
+          val baseDiffTraced = action match {
             case t: AssetTransfer =>
               applyTransfer(t, if (blockchain.isFeatureActivated(BlockV5)) {
                 pk
@@ -598,16 +598,11 @@ object InvokeDiffsCommon {
             case lc: LeaseCancel => applyLeaseCancel(lc).leftMap(FailedTransactionError.asFailedScriptError)
           }
 
-          val diff = for {
-            baseDiff <- baseDiff
-
-            // Check temporary negative balance
-            _ <- TracedResult(
-              BalanceDiffValidation
-                .cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(baseDiff)
-                .leftMap(FailedTransactionError.asFailedScriptError(_).addComplexity(baseDiff.scriptsComplexity))
-            )
-          } yield baseDiff
+          val diff = baseDiffTraced.flatMap(baseDiff => TracedResult(
+            BalanceDiffValidation
+              .cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(baseDiff)
+              .leftMap(FailedTransactionError.asFailedScriptError(_).addComplexity(baseDiff.scriptsComplexity))
+          ))
 
           diffAcc |+| diff.leftMap(_.addComplexity(curDiff.scriptsComplexity))
 

@@ -307,7 +307,7 @@ class ExpressionCompilerV1Test extends PropSpec {
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
+          PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
           WavesContext.build(
             Global,

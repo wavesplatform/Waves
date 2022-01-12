@@ -280,7 +280,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(stdLibVersion, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
+            PureContext.build(stdLibVersion, useNewPowPrecision = true).withEnvironment[Environment],
             CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment],
             WavesContext.build(
               Global,

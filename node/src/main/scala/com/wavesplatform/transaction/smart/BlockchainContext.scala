@@ -55,7 +55,7 @@ object BlockchainContext {
       .synchronized(
         cache.computeIfAbsent(
           (ds.stdLibVersion, fixUnicodeFunctions, ds), { _ =>
-            PureContext.build(ds.stdLibVersion, fixUnicodeFunctions, useNewPowPrecision).withEnvironment[Environment] |+|
+            PureContext.build(ds.stdLibVersion, useNewPowPrecision).withEnvironment[Environment] |+|
               CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment] |+|
               WavesContext.build(Global, ds)
           }
