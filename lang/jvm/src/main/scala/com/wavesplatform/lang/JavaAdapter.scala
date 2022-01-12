@@ -15,7 +15,7 @@ object JavaAdapter {
       Seq(
         CryptoContext.compilerContext(Global, version),
         WavesContext.build(Global, ???).compilerContext,
-        PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).compilerContext
+        PureContext.build(version, useNewPowPrecision = true).compilerContext
       ))
 
   def compile(input: String): EXPR = {

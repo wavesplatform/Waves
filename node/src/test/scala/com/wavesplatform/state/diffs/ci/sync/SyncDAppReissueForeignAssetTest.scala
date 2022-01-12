@@ -70,7 +70,6 @@ class SyncDAppReissueForeignAssetTest extends PropSpec with WithDomain with Tran
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(syncDAppCheckTransfersHeight = 100)
 
   property("reissue foreign asset") {
     for {

@@ -120,9 +120,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val minerSettings = settings0.minerSettings.copy(quorum = 0)
     val blockchainSettings0 = settings0.blockchainSettings.copy(
-      functionalitySettings = settings0.blockchainSettings.functionalitySettings.copy(
-        preActivatedFeatures = Map(BlockchainFeatures.FairPoS.id -> 1)
-      )
+      functionalitySettings = settings0.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map(BlockchainFeatures.FairPoS.id -> 1))
     )
     val synchronizationSettings0 = settings0.synchronizationSettings.copy(maxBaseTarget = Some(1L))
     val settings = settings0.copy(

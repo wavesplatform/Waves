@@ -40,13 +40,11 @@ class BalancesV4Test extends PropSpec with WithState {
   val SetScriptFee: Long      = Constants.UnitsInWave / 1000L
   val SetAssetScriptFee: Long = Constants.UnitsInWave
 
-  val rideV4Activated: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
+  val rideV4Activated: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
       BlockchainFeatures.Ride4DApps.id    -> 0,
       BlockchainFeatures.SmartAccounts.id -> 0,
       BlockchainFeatures.BlockV5.id       -> 0
-    )
-  )
+    ))
   val functionCall: Option[FUNCTION_CALL] =
     Some(
       FUNCTION_CALL(
@@ -133,7 +131,7 @@ class BalancesV4Test extends PropSpec with WithState {
     def assetScript(acc: ByteStr): Script = {
       val ctx = {
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
-        PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
+        PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
           WavesContext.build(Global, directives)
       }
@@ -218,7 +216,7 @@ class BalancesV4Test extends PropSpec with WithState {
     def assetScript(acc: ByteStr): Script = {
       val ctx = {
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
-        PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
+        PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
           WavesContext.build(Global, directives)
       }

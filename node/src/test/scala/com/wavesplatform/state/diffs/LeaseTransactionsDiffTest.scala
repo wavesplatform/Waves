@@ -191,9 +191,7 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
     forAll(scenario) {
       case (genesis, lease, leaseCancel, ts) =>
         val beforeFailedTxs = TestFunctionalitySettings.Enabled
-        val afterFailedTxs = beforeFailedTxs.copy(
-          preActivatedFeatures = beforeFailedTxs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
-        )
+        val afterFailedTxs = beforeFailedTxs.copy(preActivatedFeatures = beforeFailedTxs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
 
         assertDiffEi(Seq(TestBlock.create(ts, Seq(genesis, lease))), TestBlock.create(ts + 1, Seq(leaseCancel)), beforeFailedTxs) { ei =>
           ei.explicitGet()

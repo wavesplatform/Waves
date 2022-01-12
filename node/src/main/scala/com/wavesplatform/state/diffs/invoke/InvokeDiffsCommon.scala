@@ -3,11 +3,12 @@ package com.wavesplatform.state.diffs.invoke
 import scala.util.{Failure, Right, Success, Try}
 
 import cats.Id
-import cats.instances.list._
-import cats.instances.map._
-import cats.syntax.either._
-import cats.syntax.semigroup._
-import cats.syntax.traverse._
+import cats.instances.either.*
+import cats.instances.list.*
+import cats.instances.map.*
+import cats.syntax.either.*
+import cats.syntax.semigroup.*
+import cats.syntax.traverse.*
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
@@ -15,34 +16,34 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{BlockV5, SynchronousCalls}
-import com.wavesplatform.features.EstimatorProvider._
-import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
-import com.wavesplatform.features.ScriptTransferValidationProvider._
-import com.wavesplatform.lang._
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.features.EstimatorProvider.*
+import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider.*
+import com.wavesplatform.features.ScriptTransferValidationProvider.*
+import com.wavesplatform.lang.*
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, _}
-import com.wavesplatform.lang.v1.evaluator.{Log, RejectException, ScriptResult, ScriptResultV4}
+import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, *}
+import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
-import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.DiffsCommon
-import com.wavesplatform.state.diffs.FeeValidation._
+import com.wavesplatform.state.*
+import com.wavesplatform.state.diffs.{BalanceDiffValidation, DiffsCommon}
+import com.wavesplatform.state.diffs.FeeValidation.*
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.{Asset, AssetIdLength, ERC20Address, PBSince, TransactionType}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.smart._
+import com.wavesplatform.transaction.smart.*
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
 import com.wavesplatform.transaction.validation.impl.{DataTxValidator, LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
-import com.wavesplatform.utils._
+import com.wavesplatform.utils.*
 import shapeless.Coproduct
 
 object InvokeDiffsCommon {
@@ -490,10 +491,7 @@ object InvokeDiffsCommon {
             } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
               TracedResult(Left(FailedTransactionError.dAppExecution("Invalid asset description", 0L)), List())
             } else if (blockchain.assetDescription(asset).isDefined || blockchain.resolveERC20Address(ERC20Address(asset)).isDefined) {
-              if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
-                throw RejectException(s"Asset ${issue.id} is already issued")
-              else
-                TracedResult(Left(FailedTransactionError.dAppExecution(s"Asset $asset is already issued", 0L)), List())
+              TracedResult(Left(FailedTransactionError.dAppExecution(s"Asset $asset is already issued", 0L)), List())
             } else {
               val staticInfo = AssetStaticInfo(TransactionId @@ itx.txId, pk, issue.decimals, blockchain.isNFT(issue))
               val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
@@ -584,7 +582,7 @@ object InvokeDiffsCommon {
                 )
             }
 
-          val diff = action match {
+          val baseDiffTraced = action match {
             case t: AssetTransfer =>
               applyTransfer(t, if (blockchain.isFeatureActivated(BlockV5)) {
                 pk
@@ -599,6 +597,13 @@ object InvokeDiffsCommon {
             case l: Lease        => applyLease(l).leftMap(FailedTransactionError.asFailedScriptError)
             case lc: LeaseCancel => applyLeaseCancel(lc).leftMap(FailedTransactionError.asFailedScriptError)
           }
+
+          val diff = baseDiffTraced.flatMap(baseDiff => TracedResult(
+            BalanceDiffValidation
+              .cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(baseDiff)
+              .leftMap(FailedTransactionError.asFailedScriptError(_).addComplexity(baseDiff.scriptsComplexity))
+          ))
+
           diffAcc |+| diff.leftMap(_.addComplexity(curDiff.scriptsComplexity))
 
         case _ => diffAcc
@@ -653,19 +658,14 @@ object InvokeDiffsCommon {
       availableDataSize: Int
   ): TracedResult[ValidationError, Unit] = {
     def error(message: String) = TracedResult(Left(FailedTransactionError.dAppExecution(message, usedComplexity, log)))
-    val checkSizeHeight        = blockchain.settings.functionalitySettings.checkTotalDataEntriesBytesHeight
-    val checkSizeRejectHeight  = blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight
 
     if (dataCount > availableData)
       error("Stored data count limit is exceeded")
     else if (dataSize > availableDataSize) {
-      val limit   = ContractLimits.MaxTotalWriteSetSizeInBytes
-      val actual  = limit + dataSize - availableDataSize
-      val message = s"Storing data size should not exceed $limit, actual: $actual bytes"
-      if (blockchain.height >= checkSizeRejectHeight) {
-        throw RejectException(message)
-      } else if (blockchain.height >= checkSizeHeight)
-        error(message)
+      val limit  = ContractLimits.MaxTotalWriteSetSizeInBytes
+      val actual = limit + dataSize - availableDataSize
+      if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls))
+        error(s"Storing data size should not exceed $limit, actual: $actual bytes")
       else
         TracedResult(Right(()))
     } else if (actionsCount > availableActions)
@@ -674,25 +674,35 @@ object InvokeDiffsCommon {
       TracedResult(Right(()))
   }
 
-  def checkScriptResultFields(blockchain: Blockchain, r: ScriptResult): Unit =
-    r match {
-      case ScriptResultV4(actions, _, _) if blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight =>
-        actions.foreach {
-          case Reissue(_, _, quantity) => if (quantity < 0) throw RejectException(s"Negative reissue quantity = $quantity")
-          case Burn(_, quantity)       => if (quantity < 0) throw RejectException(s"Negative burn quantity = $quantity")
-          case t: AssetTransfer        => if (t.amount < 0) throw RejectException(s"Negative transfer amount = ${t.amount}")
-          case l: Lease                => if (l.amount < 0) throw RejectException(s"Negative lease amount = ${l.amount}")
-          case s: SponsorFee =>
-            if (s.minSponsoredAssetFee.exists(_ < 0)) throw RejectException(s"Negative sponsor amount = ${s.minSponsoredAssetFee.get}")
-          case i: Issue =>
-            val length = i.name.getBytes("UTF-8").length
-            if (length < IssueTransaction.MinAssetNameLength || length > IssueTransaction.MaxAssetNameLength) {
-              throw RejectException("Invalid asset name")
-            } else if (i.description.length > IssueTransaction.MaxAssetDescriptionLength) {
-              throw RejectException("Invalid asset description")
-            }
-          case _ =>
-        }
-      case _ =>
+  /**
+    * Checks invoke script callable function result for negative numbers in issue, burn, transfers, etc.
+      Should produce failed transactions if the spent complexity went over the fail-free limit, and should reject them if not.
+    * @note Ignores all checks before the SynchronousCalls feature activation
+    * @note Caller should calculate spent complexity and transform the error into a FailedTransactionError
+    */
+  private[invoke] def checkScriptResultFields(blockchain: Blockchain, result: ScriptResult): Either[ValidationError, Unit] =
+    result match {
+      case ScriptResultV4(actions, _, _) if blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) =>
+        actions
+          .map {
+            case Reissue(_, _, quantity) if quantity < 0 => Left(GenericError(s"Negative reissue quantity = $quantity"))
+            case Burn(_, quantity) if quantity < 0       => Left(GenericError(s"Negative burn quantity = $quantity"))
+            case t: AssetTransfer if t.amount < 0        => Left(GenericError(s"Negative transfer amount = ${t.amount}"))
+            case l: Lease if l.amount < 0                => Left(GenericError(s"Negative lease amount = ${l.amount}"))
+            case s: SponsorFee if s.minSponsoredAssetFee.exists(_ < 0) =>
+              Left(GenericError(s"Negative sponsor amount = ${s.minSponsoredAssetFee.get}"))
+            case i: Issue =>
+              val length = i.name.getBytes("UTF-8").length
+              if (length < IssueTransaction.MinAssetNameLength || length > IssueTransaction.MaxAssetNameLength) {
+                Left(GenericError("Invalid asset name"))
+              } else if (i.description.length > IssueTransaction.MaxAssetDescriptionLength) {
+                Left(GenericError("Invalid asset description"))
+              } else Right(())
+            case _ => Right(())
+          }
+          .sequence
+          .map(_ => ())
+
+      case _ => Right(())
     }
 }

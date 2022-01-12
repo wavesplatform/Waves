@@ -185,11 +185,7 @@ class CommonValidationTest extends PropSpec with WithState {
 
   private def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): FunctionalitySettings =
     TestFunctionalitySettings.Enabled
-      .copy(
-        preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }.toMap,
-        blocksForFeatureActivation = 1,
-        featureCheckBlocksPeriod = 1
-      )
+      .copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }.toMap)
 
   private def smartTokensCheckFeeTest(feeInAssets: Boolean, feeAmount: Long)(f: Either[ValidationError, Unit] => Any): Unit = {
     val settings = createSettings(BlockchainFeatures.SmartAccounts -> 0, BlockchainFeatures.SmartAssets -> 0)

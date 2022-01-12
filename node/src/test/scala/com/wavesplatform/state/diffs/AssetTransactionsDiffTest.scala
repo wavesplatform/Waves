@@ -117,9 +117,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
 
     val fs =
       TestFunctionalitySettings.Enabled
-        .copy(
-          preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.BurnAnyTokens.id -> 0)
-        )
+        .copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.BurnAnyTokens.id -> 0))
 
     forAll(setup) {
       case (genesis, issue, assetTransfer, wavesTransfer, burn) =>
@@ -147,9 +145,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
 
     val fs =
       TestFunctionalitySettings.Enabled
-        .copy(
-          preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.DataTransaction.id -> 0)
-        )
+        .copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.DataTransaction.id -> 0))
 
     forAll(setup) {
       case (_, _, genesis, issue, reissue) =>
@@ -209,9 +205,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
 
     val fs =
       TestFunctionalitySettings.Enabled
-        .copy(
-          preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.DataTransaction.id -> 0)
-        )
+        .copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.DataTransaction.id -> 0))
 
     forAll(setup) {
       case (_, _, genesis, issue, reissue, transfer) =>
@@ -348,10 +342,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
   }
 
   val assetInfoUpdateEnabled: FunctionalitySettings = TestFunctionalitySettings.Enabled
-    .copy(
-      preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0) + (BlockchainFeatures.NG.id -> 0),
-      minAssetInfoUpdateInterval = 100
-    )
+    .copy(preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0) + (BlockchainFeatures.NG.id -> 0), minAssetInfoUpdateInterval = 100)
 
   property("Can't update before activation") {
     forAll(genesisIssueUpdate) {
@@ -474,12 +465,10 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
         | groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')
       """.stripMargin
 
-    val rideV4Activated = TestFunctionalitySettings.Enabled.copy(
-      preActivatedFeatures = Map(
+    val rideV4Activated = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
         BlockchainFeatures.Ride4DApps.id -> 0,
         BlockchainFeatures.BlockV5.id    -> 0
-      )
-    )
+      ))
 
     forAll(genesisIssueTransferReissue(exprV4WithComplexityBetween3000And4000, V4)) {
       case (gen, issue, _, _, _) =>
@@ -582,10 +571,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
     def settings(checkNegative: Boolean = false, checkSumOverflow: Boolean = false): FunctionalitySettings = {
       TestFunctionalitySettings
         .withFeatures(BlockV5)
-        .copy(
-          estimationOverflowFixHeight = if (checkNegative) 0 else 999,
-          estimatorSumOverflowFixHeight = if (checkSumOverflow) 0 else 999
-        )
+        .copy(estimationOverflowFixHeight = if (checkNegative) 0 else 999, estimatorSumOverflowFixHeight = if (checkSumOverflow) 0 else 999)
     }
 
     def assert(preparingTxs: Seq[Transaction], scriptedTx: () => Transaction) = {

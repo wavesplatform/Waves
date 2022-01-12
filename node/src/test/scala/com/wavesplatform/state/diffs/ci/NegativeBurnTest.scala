@@ -52,8 +52,7 @@ class NegativeBurnTest extends PropSpec with WithDomain with TransactionGenBase 
 
   private val settings =
     TestFunctionalitySettings
-      .withFeatures(BlockV5, SynchronousCalls)
-      .copy(syncDAppCheckTransfersHeight = 3)
+      .withFeatures(BlockV5, SynchronousCalls, RideV6)
 
   property("negative burn quantity") {
     for (bigComplexity <- Seq(false, true)) {
@@ -62,12 +61,11 @@ class NegativeBurnTest extends PropSpec with WithDomain with TransactionGenBase 
         d.appendBlock(preparingTxs: _*)
 
         val invoke1 = invoke()
-        d.appendBlock(invoke1)
-        d.blockchain.transactionSucceeded(invoke1.txId) shouldBe true
-        d.blockchain.balance(dApp, asset) shouldBe 101
-
-        val invoke2 = invoke()
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include("Negative burn quantity = -1")
+        if (!bigComplexity) {
+          d.appendAndCatchError(invoke1).toString should include("Negative burn quantity")
+        } else {
+          d.appendAndAssertFailed(invoke1)
+        }
       }
     }
   }

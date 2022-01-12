@@ -53,11 +53,11 @@ class ContractCompilerCompactorTest extends PropSpec {
     }
 
     val ctxV4 =
-      PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
+      PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
 
     val ctxV5 =
-      PureContext.build(V5, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
+      PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
 
     def expectedScript(stdLibVersion: StdLibVersion): String =
@@ -104,7 +104,7 @@ class ContractCompilerCompactorTest extends PropSpec {
 
     val stdLibVer = V3
     val ctx =
-      PureContext.build(stdLibVer, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
+      PureContext.build(stdLibVer, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(stdLibVer, Account, DAppType).explicitGet())
 
     val compilationResult =
@@ -153,7 +153,7 @@ class ContractCompilerCompactorTest extends PropSpec {
     }
 
     val ctx =
-      PureContext.build(V5, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
+      PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
 
     val compilationResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = true).explicitGet().compactedSource(V5)
@@ -198,7 +198,7 @@ class ContractCompilerCompactorTest extends PropSpec {
     }
 
     val ctx =
-      PureContext.build(V5, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
+      PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
 
     val compilationResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = true).explicitGet().compactedSource(V5)
@@ -241,7 +241,7 @@ class ContractCompilerCompactorTest extends PropSpec {
     }
 
     val ctx =
-      PureContext.build(V5, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
+      PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
 
     val compilationCompactedResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = true)
@@ -284,7 +284,7 @@ class ContractCompilerCompactorTest extends PropSpec {
     }
 
     val ctx =
-      PureContext.build(V5, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
+      PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
 
     val compilationResult =
@@ -344,7 +344,7 @@ class ContractCompilerCompactorTest extends PropSpec {
       """.stripMargin
 
     val ctx =
-      PureContext.build(V5, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
+      PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
 
     //noinspection RedundantDefaultArgument
@@ -390,7 +390,7 @@ class ContractCompilerCompactorTest extends PropSpec {
     }
 
     val ctx =
-      PureContext.build(V5, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
+      PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
 
     val compilationCompactedResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = true).explicitGet().compactedSource()
@@ -428,7 +428,7 @@ class ContractCompilerCompactorTest extends PropSpec {
     }
 
     val ctx =
-      PureContext.build(V5, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
+      PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
 
     val compilationCompactedResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = true).explicitGet().compactedSource()

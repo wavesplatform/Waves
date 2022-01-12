@@ -4,14 +4,14 @@ import com.google.common.primitives.Ints
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.{DataEntry, StringDataEntry}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
@@ -20,8 +20,8 @@ import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeS
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.utils.EthConverters._
 import org.web3j.crypto.ECKeyPair
 
 object TxHelpers {
@@ -32,6 +32,7 @@ object TxHelpers {
   def defaultAddress: Address = defaultSigner.toAddress
   def secondSigner: KeyPair   = signer(1)
   def secondAddress: Address  = secondSigner.toAddress
+  def voidAddress: Address    = Address(new Array[Byte](20))
 
   def defaultEthSigner: ECKeyPair = defaultSigner.toEthKeyPair
 
@@ -70,10 +71,13 @@ object TxHelpers {
       .selfSigned(TxVersion.V2, defaultSigner, asset, amount, reissuable = true, TestValues.fee, timestamp)
       .explicitGet()
 
+  def dataEntry(account: KeyPair, value: DataEntry[?]): DataTransaction =
+    DataTransaction.selfSigned(TxVersion.V1, account, Seq(value), TestValues.fee * 3, timestamp).explicitGet()
+
   def data(account: KeyPair = defaultSigner, key: String = "test", value: String = "test"): DataTransaction =
     dataWithMultipleEntries(account, Seq(StringDataEntry(key, value)))
 
-  def dataWithMultipleEntries(account: KeyPair, entries: Seq[DataEntry[_]]): DataTransaction =
+  def dataWithMultipleEntries(account: KeyPair, entries: Seq[DataEntry[?]]): DataTransaction =
     DataTransaction.selfSigned(TxVersion.V1, account, entries, TestValues.fee * 3, timestamp).explicitGet()
 
   def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {
@@ -109,7 +113,13 @@ object TxHelpers {
     )
   }
 
-  def exchange(order1: Order, order2: Order, version: TxVersion = TxVersion.V2, timestamp: TxTimestamp = this.timestamp, matcher: KeyPair = defaultSigner): ExchangeTransaction = {
+  def exchange(
+      order1: Order,
+      order2: Order,
+      version: TxVersion = TxVersion.V2,
+      timestamp: TxTimestamp = this.timestamp,
+      matcher: KeyPair = defaultSigner
+  ): ExchangeTransaction = {
     ExchangeTransaction
       .signed(
         version,
@@ -150,7 +160,7 @@ object TxHelpers {
       fee: Long = TestValues.fee,
       feeAssetId: Asset = Waves
   ): InvokeScriptTransaction = {
-    val fc = functionCall(func, args: _*)
+    val fc = functionCall(func, args*)
     Signed.invokeScript(TxVersion.V1, defaultSigner, dApp, Some(fc), payments, fee, feeAssetId, timestamp)
   }
 

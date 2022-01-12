@@ -20,21 +20,14 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
 
   private val WavesSettings = history.DefaultWavesSettings.copy(
     blockchainSettings = history.DefaultWavesSettings.blockchainSettings.copy(
-      functionalitySettings = history.DefaultWavesSettings.blockchainSettings.functionalitySettings.copy(
-        featureCheckBlocksPeriod = ApprovalPeriod,
-        blocksForFeatureActivation = (ApprovalPeriod * 0.9).toInt,
-        preActivatedFeatures = Map.empty
-      )
+      functionalitySettings = history.DefaultWavesSettings.blockchainSettings.functionalitySettings.copy(featureCheckBlocksPeriod = ApprovalPeriod, blocksForFeatureActivation = (ApprovalPeriod * 0.9).toInt, preActivatedFeatures = Map.empty)
     ),
     featuresSettings = history.DefaultWavesSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = true)
   )
 
   private val WavesSettingsWithDoubling = WavesSettings.copy(
     blockchainSettings = WavesSettings.blockchainSettings.copy(
-      functionalitySettings = WavesSettings.blockchainSettings.functionalitySettings.copy(
-        doubleFeaturesPeriodsAfterHeight = 300,
-        preActivatedFeatures = Map.empty
-      )
+      functionalitySettings = WavesSettings.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map.empty, doubleFeaturesPeriodsAfterHeight = 300)
     )
   )
 

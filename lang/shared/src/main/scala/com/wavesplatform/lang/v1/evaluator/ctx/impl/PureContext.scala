@@ -561,9 +561,9 @@ object PureContext {
     }
 
   private val dropBytesBeforeV6 = dropBytes(checkLimits = false)
-  private val dropBytesFromV6  = dropBytes(checkLimits = true)
+  private val dropBytesFromV6   = dropBytes(checkLimits = true)
   private val takeBytesBeforeV6 = takeBytes(checkLimits = false)
-  private val takeBytesFromV6  = takeBytes(checkLimits = true)
+  private val takeBytesFromV6   = takeBytes(checkLimits = true)
 
   private val dropRightBytesBeforeV6: BaseFunction[NoContext] =
     UserFunction(
@@ -839,14 +839,14 @@ object PureContext {
     ) {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil =>
         val limit = Terms.DataEntryValueMax
-          if (number < 0)
-            Left(s"Unexpected negative number = $number passed to takeRight()")
-          else if (number > limit)
-            Left(s"Number = $number passed to takeRight() exceeds String limit = $limit")
-          else {
-            val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
-            CONST_STRING(xs.takeRight(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
-          }
+        if (number < 0)
+          Left(s"Unexpected negative number = $number passed to takeRight()")
+        else if (number > limit)
+          Left(s"Number = $number passed to takeRight() exceeds String limit = $limit")
+        else {
+          val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
+          CONST_STRING(xs.takeRight(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
+        }
       case xs =>
         notImplemented[Id, EVALUATED]("takeRight(xs: String, number: Int)", xs)
     }
@@ -919,7 +919,6 @@ object PureContext {
       case xs =>
         notImplemented[Id, EVALUATED]("dropRight(xs: String, number: Int)", xs)
     }
-
 
   val UTF8Decoder = UTF_8.newDecoder
 
@@ -1492,7 +1491,7 @@ object PureContext {
       1,
       (CREATE_TUPLE + resultSize - 2).toShort,
       PARAMETERIZEDTUPLE(typeParams),
-      typeParams.mapWithIndex { case (typeParam, i) => (s"element${i + 1}", typeParam) }*
+      typeParams.mapWithIndex { case (typeParam, i) => (s"element${i + 1}", typeParam) } *
     ) {
       case elements if elements.length == resultSize =>
         val fields = elements.mapWithIndex { case (element, i) => (s"_${i + 1}", element) }.toMap
@@ -1513,16 +1512,18 @@ object PureContext {
     }
 
   def pow(roundTypes: UNION, useNewPrecision: Boolean): BaseFunction[NoContext] = {
-    NativeFunction("pow",
-                   Map(V3 -> 100L, V4 -> 100L, V5 -> 100L, V6 -> 28L),
-                   POW,
-                   LONG,
-                   ("base", LONG),
-                   ("bp", LONG),
-                   ("exponent", LONG),
-                   ("ep", LONG),
-                   ("rp", LONG),
-                   ("round", roundTypes)) {
+    NativeFunction(
+      "pow",
+      Map(V3 -> 100L, V4 -> 100L, V5 -> 100L, V6 -> 28L),
+      POW,
+      LONG,
+      ("base", LONG),
+      ("bp", LONG),
+      ("exponent", LONG),
+      ("ep", LONG),
+      ("rp", LONG),
+      ("round", roundTypes)
+    ) {
       case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
         if (bp < 0
             || bp > 8
@@ -1716,7 +1717,7 @@ object PureContext {
                       m.flatMap(result) {
                         case (Right(value), complexity) => evaluateUserFunction(function, List(value, element), complexity)
                         case (error, complexity)        => Coeval((error, complexity).pure[F])
-                    }
+                      }
                   )
             case xs =>
               val err = notImplemented[F, EVALUATED](s"fold_$limit(list: List[A], accumulator: B, function: String)", xs)
@@ -1834,7 +1835,7 @@ object PureContext {
       Array(
         extract,
         fraction(fixLimitCheck = false),
-        sizeStringFixed,
+        sizeStringFixed
       )
 
   private val v1V2V3CommonFunctionsUnfixed =
@@ -1884,14 +1885,14 @@ object PureContext {
       splitStrFixed
     )
 
-  private def v3Functions(fixUnicodeFunctions: Boolean, useNewPowPrecision: Boolean) =
-    v1V2V3CommonFunctions(fixUnicodeFunctions) ++
+  private def v3Functions(useNewPowPrecision: Boolean) =
+    v1V2V3CommonFunctions(useNewPowPrecision) ++
       fromV3Functions ++
       v3V4Functions(useNewPowPrecision) ++
       Array(
         toUtf8String(reduceLimit = false),
         listConstructor(checkSize = false)
-      ) ++ (if (fixUnicodeFunctions) v3FunctionFixed else v3FunctionsUnfixed)
+      ) ++ (if (useNewPowPrecision) v3FunctionFixed else v3FunctionsUnfixed)
 
   private val fromV4Functions =
     commonFunctions ++
@@ -1913,11 +1914,11 @@ object PureContext {
         makeString
       ) ++ (MinTupleSize to MaxTupleSize).map(i => createTupleN(i))
 
-  private def v4FunctionsUnfixed(useNewPowPrecision: Boolean) =
+  private def v4FunctionsUnfixed =
     fromV4Functions ++
       takeDropBytesBeforeV6 ++
       takeDropStringUnfixedBeforeV6 ++
-      v3V4Functions(useNewPowPrecision) ++
+      v3V4Functions(useNewPowPrecision = false) ++
       Array(
         indexOf,
         indexOfN,
@@ -1928,11 +1929,11 @@ object PureContext {
         fraction(fixLimitCheck = false)
       )
 
-  private def v4FunctionsFixed(useNewPowPrecision: Boolean) =
+  private def v4FunctionsFixed =
     fromV4Functions ++
       takeDropBytesBeforeV6 ++
       takeDropStringFixedBeforeV6 ++
-      v3V4Functions(useNewPowPrecision) ++
+      v3V4Functions(useNewPowPrecision = true) ++
       Array(
         indexOfFixed,
         indexOfNFixed,
@@ -1943,8 +1944,8 @@ object PureContext {
         fraction(fixLimitCheck = false)
       )
 
-  private def v4Functions(fixUnicodeFunctions: Boolean, useNewPowPrecision: Boolean) =
-    if (fixUnicodeFunctions) v4FunctionsFixed(useNewPowPrecision) else v4FunctionsUnfixed(useNewPowPrecision)
+  private def v4Functions(useNewPowPrecision: Boolean) =
+    if (useNewPowPrecision) v4FunctionsFixed else v4FunctionsUnfixed
 
   private def fromV5Functions(useNewPowPrecision: Boolean) =
     fromV4Functions ++
@@ -1980,7 +1981,7 @@ object PureContext {
         logBigInt(UNION(fromV5RoundTypes)),
         pow(UNION(fromV5RoundTypes), useNewPowPrecision),
         log(UNION(fromV5RoundTypes)),
-        fraction(fixLimitCheck = true),
+        fraction(fixLimitCheck = true)
       )
 
   private def v5Functions(useNewPowPrecision: Boolean) =
@@ -2015,27 +2016,19 @@ object PureContext {
       v1V2V3CommonFunctions(fixUnicodeFunctions)
     )
 
-  private def v3Ctx(fixUnicodeFunctions: Boolean, useNewPowPrecision: Boolean) =
+  private def v3Ctx(useNewPowPrecision: Boolean) =
     CTX[NoContext](
       v1v2v3v4Types,
       v3V4Vars,
-      v3Functions(fixUnicodeFunctions, useNewPowPrecision)
+      v3Functions(useNewPowPrecision)
     )
 
-  private def v4Ctx(fixUnicodeFunctions: Boolean, useNewPowPrecision: Boolean) =
+  private def v4Ctx(useNewPowPrecision: Boolean) =
     CTX[NoContext](
       v1v2v3v4Types,
       v3V4Vars,
-      v4Functions(fixUnicodeFunctions, useNewPowPrecision)
+      v4Functions(useNewPowPrecision)
     )
-
-  private val v1V2CtxFixed = v1V2Ctx(true)
-  private def v3CtxFixed(useNewPowPrecision: Boolean)   = v3Ctx(true, useNewPowPrecision)
-  private def v4CtxFixed(useNewPowPrecision: Boolean)   = v4Ctx(true, useNewPowPrecision)
-
-  private val v1V2CtxUnfixed = v1V2Ctx(false)
-  private def v3CtxUnfixed(useNewPowPrecision: Boolean)   = v3Ctx(false, useNewPowPrecision)
-  private def v4CtxUnfixed(useNewPowPrecision: Boolean)   = v4Ctx(false, useNewPowPrecision)
 
   private def v5Ctx(useNewPowPrecision: Boolean) =
     CTX[NoContext](
@@ -2044,22 +2037,19 @@ object PureContext {
       v5Functions(useNewPowPrecision)
     )
 
-  private val v6Ctx =
+  private[this] val v6Ctx =
     CTX[NoContext](
       v5Types,
       v5Vars,
       v6Functions
     )
 
-  def build(version: StdLibVersion, fixUnicodeFunctions: Boolean, useNewPowPrecision: Boolean): CTX[NoContext] =
+  def build(version: StdLibVersion, useNewPowPrecision: Boolean): CTX[NoContext] =
     version match {
-      case V1 | V2 if fixUnicodeFunctions => v1V2CtxFixed
-      case V3 if fixUnicodeFunctions      => v3CtxFixed(useNewPowPrecision)
-      case V4 if fixUnicodeFunctions      => v4CtxFixed(useNewPowPrecision)
-      case V1 | V2                        => v1V2CtxUnfixed
-      case V3                             => v3CtxUnfixed(useNewPowPrecision)
-      case V4                             => v4CtxUnfixed(useNewPowPrecision)
-      case V5                             => v5Ctx(useNewPowPrecision)
-      case V6                             => v6Ctx
+      case V1 | V2 => v1V2Ctx(useNewPowPrecision)
+      case V3      => v3Ctx(useNewPowPrecision)
+      case V4      => v4Ctx(useNewPowPrecision)
+      case V5      => v5Ctx(useNewPowPrecision)
+      case V6      => v6Ctx
     }
 }

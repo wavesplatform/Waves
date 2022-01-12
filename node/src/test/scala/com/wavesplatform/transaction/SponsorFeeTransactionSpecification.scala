@@ -21,14 +21,8 @@ import play.api.libs.json.Json
 
 class SponsorFeeTransactionSpecification extends PropSpec with WithState {
   val One = 100000000L
-  val NgAndSponsorshipSettings: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(NG.id -> 0, FeeSponsorship.id -> 0, SmartAccounts.id -> 0),
-    blocksForFeatureActivation = 1,
-    featureCheckBlocksPeriod = 1
-  )
-  val BlockV5Settings: FunctionalitySettings = NgAndSponsorshipSettings.copy(
-    preActivatedFeatures = NgAndSponsorshipSettings.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
-  )
+  val NgAndSponsorshipSettings: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = Map(NG.id -> 0, FeeSponsorship.id -> 0, SmartAccounts.id -> 0))
+  val BlockV5Settings: FunctionalitySettings = NgAndSponsorshipSettings.copy(preActivatedFeatures = NgAndSponsorshipSettings.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
 
   property("SponsorFee serialization roundtrip") {
     forAll(sponsorFeeGen) { tx: SponsorFeeTransaction =>
