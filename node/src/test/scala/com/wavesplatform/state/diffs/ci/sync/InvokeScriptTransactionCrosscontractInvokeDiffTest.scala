@@ -32,8 +32,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
     with DBCacheSettings
     with EitherValues {
 
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
+  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id    -> 0,
       BlockchainFeatures.SmartAssets.id      -> 0,
       BlockchainFeatures.Ride4DApps.id       -> 0,
@@ -41,8 +40,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
       BlockchainFeatures.DataTransaction.id  -> 0,
       BlockchainFeatures.BlockV5.id          -> 0,
       BlockchainFeatures.SynchronousCalls.id -> 0
-    )
-  )
+    ))
 
   property("Crosscontract call - internal invoke state update") {
 

@@ -19,7 +19,7 @@ import com.wavesplatform.test._
 class ScriptResultTest extends PropSpec {
 
   val pureEvalContext: EvaluationContext[Environment, Id] =
-    PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment].evaluationContext(utils.environment)
+    PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment].evaluationContext(utils.environment)
 
   val el       = List.empty[(String, FINAL)]
   val address1 = ByteStr.fromBytes(19: Byte)

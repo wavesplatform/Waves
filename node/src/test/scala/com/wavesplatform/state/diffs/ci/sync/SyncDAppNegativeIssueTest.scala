@@ -67,7 +67,6 @@ class SyncDAppNegativeIssueTest extends PropSpec with WithDomain with Transactio
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(syncDAppCheckTransfersHeight = 100)
 
   property("negative issue amount") {
     for {

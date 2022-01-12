@@ -40,7 +40,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
         BlockchainFeatures.Ride4DApps,
         BlockchainFeatures.BlockV5
       ) ++ v5ForkO
-    TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = parameters.map(_.id -> 0).toMap, syncDAppCheckTransfersHeight = 999)
+    TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = parameters.map(_.id -> 0).toMap)
   }
 
   private val v4Features = features(activateV5 = false)
@@ -588,7 +588,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id()).get.text shouldBe "NonPositiveAmount(-100,waves)"
+            diff.errorMessage(invoke.id()).get.text should include("Negative lease amount")
         }
     }
   }

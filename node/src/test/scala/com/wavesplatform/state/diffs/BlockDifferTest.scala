@@ -102,12 +102,7 @@ class BlockDifferTest extends FreeSpec with BlockGen with WithState {
   }
 
   private def assertDiff(blocks: Seq[Block], ngAtHeight: Int)(assertion: (Diff, Blockchain) => Unit): Unit = {
-    val fs = FunctionalitySettings(
-      featureCheckBlocksPeriod = ngAtHeight / 2,
-      blocksForFeatureActivation = 1,
-      preActivatedFeatures = Map[Short, Int]((2, ngAtHeight)),
-      doubleFeaturesPeriodsAfterHeight = Int.MaxValue
-    )
+    val fs = FunctionalitySettings(featureCheckBlocksPeriod = ngAtHeight / 2, blocksForFeatureActivation = 1, preActivatedFeatures = Map[Short, Int]((2, ngAtHeight)), doubleFeaturesPeriodsAfterHeight = Int.MaxValue)
     assertNgDiffState(blocks.init, blocks.last, fs)(assertion)
   }
 

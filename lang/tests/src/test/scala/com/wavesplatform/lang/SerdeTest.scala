@@ -176,8 +176,8 @@ class SerdeTest extends FreeSpec {
     (result, System.currentTimeMillis() - start)
   }
 
-  private def roundTripTest(untypedExpr: Expressions.EXPR): Unit = {
-    val typedExpr = ExpressionCompiler(PureContext.build(V1, fixUnicodeFunctions = true, useNewPowPrecision = true).compilerContext, untypedExpr).map(_._1).explicitGet()
+  private def roundTripTest(untypedExpr: Expressions.EXPR): Assertion = {
+    val typedExpr = ExpressionCompiler(PureContext.build(V1, useNewPowPrecision = true).compilerContext, untypedExpr).map(_._1).explicitGet()
     roundTripTest(typedExpr)
   }
 

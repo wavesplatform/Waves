@@ -95,7 +95,6 @@ class ContractCompilerCompactorTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
 
-
     val compilationResult =
       compiler.ContractCompiler(ctxForV(V3).compilerContext, expr, V3, needCompaction = true).explicitGet().compactedSource(V3)
     compilationResult shouldBe """{-# STDLIB_VERSION 3 #-}
@@ -803,6 +802,6 @@ class ContractCompilerCompactorTest extends PropSpec {
   }
 
   private def ctxForV(version: StdLibVersion): CTX[Environment] =
-    PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
+    PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment] |+|
       WavesContext.build(Global, DirectiveSet(version, Account, DAppType).explicitGet())
 }

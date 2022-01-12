@@ -65,8 +65,7 @@ object ScriptsCountTest {
 //noinspection NameBooleanParameters
 class ScriptsCountTest extends PropSpec with WithState with Inside {
 
-  private val fs = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
+  private val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id       -> 0,
       BlockchainFeatures.SmartAssets.id         -> 0,
       BlockchainFeatures.SmartAccountTrading.id -> 0,
@@ -75,11 +74,9 @@ class ScriptsCountTest extends PropSpec with WithState with Inside {
       BlockchainFeatures.MassTransfer.id        -> 0,
       BlockchainFeatures.FeeSponsorship.id      -> 0,
       BlockchainFeatures.Ride4DApps.id          -> Int.MaxValue
-    )
-  )
+    ))
 
-  private val fs1 = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
+  private val fs1 = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id       -> 0,
       BlockchainFeatures.SmartAssets.id         -> 0,
       BlockchainFeatures.SmartAccountTrading.id -> 0,
@@ -88,8 +85,7 @@ class ScriptsCountTest extends PropSpec with WithState with Inside {
       BlockchainFeatures.MassTransfer.id        -> 0,
       BlockchainFeatures.FeeSponsorship.id      -> 0,
       BlockchainFeatures.Ride4DApps.id          -> 0
-    )
-  )
+    ))
 
   val allAllowed = ExprScript(TRUE).explicitGet()
 

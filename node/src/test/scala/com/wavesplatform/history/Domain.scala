@@ -2,15 +2,15 @@ package com.wavesplatform.history
 
 import scala.collection.immutable.SortedMap
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.control.NonFatal
 import scala.util.Try
 
-import cats.syntax.option._
-import com.wavesplatform.{database, Application}
+import cats.syntax.option.*
+import com.wavesplatform.{database, Application, TestValues}
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.api.common._
+import com.wavesplatform.api.common.*
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
@@ -23,9 +23,9 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.{BlockchainUpdater, _}
+import com.wavesplatform.transaction.{BlockchainUpdater, *}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.{EthEncoding, SystemTime}
@@ -36,7 +36,7 @@ import org.iq80.leveldb.DB
 import play.api.libs.json.{JsNull, Json, JsValue}
 
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter, settings: WavesSettings) {
-  import Domain._
+  import Domain.*
 
   val blockchain: BlockchainUpdaterImpl = blockchainUpdater
 
@@ -185,11 +185,25 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     lastBlock
   }
 
+  def appendAndCatchError(txs: Transaction*): ValidationError = {
+    val block  = createBlock(Block.PlainBlockVersion, txs)
+    val result = appendBlockE(block)
+    txs.foreach { tx =>
+      require(blockchain.transactionInfo(tx.id()).isEmpty, s"should not pass: $tx")
+    }
+    result.left.getOrElse(throw new RuntimeException(s"Block appended successfully: $txs"))
+  }
+
   def appendAndAssertFailed(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
-    appendBlock(block)
-    txs.foreach(tx => require(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx"))
-    lastBlock
+    appendBlockE(block) match {
+      case Left(err) =>
+        throw new RuntimeException(s"Should be success: $err")
+
+      case Right(_) =>
+        txs.foreach(tx => require(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx"))
+        lastBlock
+    }
   }
 
   def appendBlockE(txs: Transaction*): Either[ValidationError, Seq[Diff]] =
@@ -312,7 +326,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   //noinspection ScalaStyle
   object helpers {
     def creditWavesToDefaultSigner(amount: Long = 10_0000_0000): Unit = {
-      import com.wavesplatform.transaction.utils.EthConverters._
+      import com.wavesplatform.transaction.utils.EthConverters.*
       appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress, amount), TxHelpers.genesis(TxHelpers.defaultSigner.toEthWavesAddress, amount))
     }
 
@@ -328,6 +342,22 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
     def setScript(account: KeyPair, script: Script): Unit = {
       appendBlock(TxHelpers.setScript(account, script))
+    }
+
+    def setData(account: KeyPair, entries: DataEntry[_]*): Unit = {
+      appendBlock(entries.map(TxHelpers.dataEntry(account, _)): _*)
+    }
+
+    def transfer(account: KeyPair, to: Address, amount: TxAmount, asset: Asset): Unit = {
+      appendBlock(TxHelpers.transfer(account, to, amount, asset))
+    }
+
+    def transferAll(account: KeyPair, to: Address, asset: Asset): Unit = {
+      val balanceMinusFee = {
+        val balance = blockchain.balance(account.toAddress, asset)
+        if (asset == Waves) balance - TestValues.fee else balance
+      }
+      transfer(account, to, balanceMinusFee, asset)
     }
   }
 

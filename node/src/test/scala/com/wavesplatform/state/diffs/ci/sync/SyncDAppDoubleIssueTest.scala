@@ -68,8 +68,7 @@ class SyncDAppDoubleIssueTest extends PropSpec with WithDomain with TransactionG
 
   private val settings =
     TestFunctionalitySettings
-      .withFeatures(BlockV5, SynchronousCalls)
-      .copy(syncDAppCheckTransfersHeight = 3)
+      .withFeatures(BlockV5, SynchronousCalls, RideV6)
 
   property("issue the same asset via 2 dApps") {
     for {
@@ -82,11 +81,11 @@ class SyncDAppDoubleIssueTest extends PropSpec with WithDomain with TransactionG
         d.appendBlock(preparingTxs: _*)
 
         val invoke1 = invoke()
-        d.appendBlock(invoke1)
-        d.liquidDiff.errorMessage(invoke1.txId).get.text should include("already issued")
-
-        val invoke2 = invoke()
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include("already issued")
+        if (!bigComplexityDApp1 && !bigComplexityDApp2) {
+          d.appendAndCatchError(invoke1).toString should include("already issued")
+        } else {
+          d.appendAndAssertFailed(invoke1)
+        }
       }
     }
   }

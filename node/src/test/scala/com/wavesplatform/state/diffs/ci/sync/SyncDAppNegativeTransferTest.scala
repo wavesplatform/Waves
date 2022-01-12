@@ -12,14 +12,12 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test._
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxVersion}
-import org.scalatest.Ignore
 
-@Ignore
 class SyncDAppNegativeTransferTest extends PropSpec with WithDomain with TransactionGenBase {
 
   private val time = new TestTime
@@ -72,30 +70,23 @@ class SyncDAppNegativeTransferTest extends PropSpec with WithDomain with Transac
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(syncDAppCheckTransfersHeight = 3)
 
   property("negative transfer amount") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)
     } {
-      val (preparingTxs, invoke, dApp, asset) = scenario(bigComplexityDApp1, bigComplexityDApp2).sample.get
+      val (preparingTxs, invoke, _, _) = scenario(bigComplexityDApp1, bigComplexityDApp2).sample.get
 
       withDomain(domainSettingsWithFS(settings)) { d =>
         d.appendBlock(preparingTxs: _*)
 
         val invoke1 = invoke()
-        if (bigComplexityDApp1 || bigComplexityDApp2) {
-          d.appendBlock(invoke1)
-          d.liquidDiff.errorMessage(invoke1.txId).get.text should include("Negative amount")
+        if (!bigComplexityDApp1 && !bigComplexityDApp2) {
+          d.appendAndCatchError(invoke1).toString should include("Negative transfer amount")
         } else {
-          (the[RuntimeException] thrownBy d.appendBlock(invoke1)).getMessage should include("Negative amount")
-          d.appendBlock()
+          d.appendAndAssertFailed(invoke1)
         }
-
-        val invoke2 = invoke()
-        d.appendBlock()
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include("Negative transfer amount = -1")
       }
     }
   }

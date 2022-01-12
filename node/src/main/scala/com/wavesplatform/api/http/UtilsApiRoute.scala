@@ -317,7 +317,7 @@ object UtilsApiRoute {
   private object ScriptCallEvaluator {
     def compile(stdLibVersion: StdLibVersion)(str: String): Either[GenericError, EXPR] = {
       val ctx =
-        PureContext.build(stdLibVersion, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
+        PureContext.build(stdLibVersion, useNewPowPrecision = true).withEnvironment[Environment] |+|
           CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment] |+|
           WavesContext.build(Global, DirectiveSet(stdLibVersion, Account, Expression).explicitGet())
 

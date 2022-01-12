@@ -44,14 +44,12 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
   val MATCHER: KeyPair = TestValues.keyPair
 
-  val fs: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
+  val fs: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id       -> 0,
       BlockchainFeatures.SmartAssets.id         -> 0,
       BlockchainFeatures.SmartAccountTrading.id -> 0,
       BlockchainFeatures.Ride4DApps.id          -> 0
-    )
-  )
+    ))
 
   val fsWithOrderFeature: FunctionalitySettings =
     fs.copy(preActivatedFeatures = fs.preActivatedFeatures ++ Map(BlockchainFeatures.OrderV3.id -> 0))
@@ -60,9 +58,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     fsWithOrderFeature.copy(preActivatedFeatures = fsWithOrderFeature.preActivatedFeatures + (BlockchainFeatures.MassTransfer.id -> 0))
 
   val fsWithBlockV5: FunctionalitySettings =
-    fsWithOrderFeature.copy(
-      preActivatedFeatures = fsWithOrderFeature.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
-    )
+    fsWithOrderFeature.copy(preActivatedFeatures = fsWithOrderFeature.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
 
   private val estimator = ScriptEstimatorV2
 
@@ -774,11 +770,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
   private def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): FunctionalitySettings =
     TestFunctionalitySettings.Enabled
-      .copy(
-        preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }.toMap,
-        blocksForFeatureActivation = 1,
-        featureCheckBlocksPeriod = 1
-      )
+      .copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }.toMap)
 
   property(s"Exchange transaction with scripted matcher and orders needs extra fee ($ScriptExtraFee)") {
     val allValidP = smartTradePreconditions(
