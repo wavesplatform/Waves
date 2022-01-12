@@ -108,7 +108,6 @@ trait BaseGlobal {
       context: CompilerContext,
       letBlockOnly: Boolean,
       stdLibVersion: StdLibVersion,
-      isFreeCall: Boolean,
       estimator: ScriptEstimator
   ): Either[String, (Array[Byte], Long, Expressions.SCRIPT, Iterable[CompilationError])] = {
     (for {

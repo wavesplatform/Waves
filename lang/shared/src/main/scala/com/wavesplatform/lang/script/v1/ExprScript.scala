@@ -41,14 +41,16 @@ object ExprScript {
       expr: EXPR,
       version: StdLibVersion,
       isFreeCall: Boolean,
-      estimator: ScriptEstimator
+      estimator: ScriptEstimator,
+      withCombinedContext: Boolean = false
   ): Either[String, Long] = {
     val modifiedExpr = if (version < V6) {
       expr
     } else {
       BLOCK(LET(ContractCompiler.FreeCallInvocationArg, TRUE), expr)
     }
-    estimator(varNames(version, Expression), functionCosts(version, Expression, if (isFreeCall) Call else Account), modifiedExpr)
+    val resultVarNames = if (withCombinedContext) combinedVarNames(version, Expression) else varNames(version, Expression)
+    estimator(resultVarNames, functionCosts(version, Expression, if (isFreeCall) Call else Account, withCombinedContext = withCombinedContext), modifiedExpr)
   }
 
   def estimate(
@@ -56,10 +58,11 @@ object ExprScript {
       version: StdLibVersion,
       isFreeCall: Boolean,
       estimator: ScriptEstimator,
-      useContractVerifierLimit: Boolean
+      useContractVerifierLimit: Boolean,
+      withCombinedContext: Boolean = false
   ): Either[String, Long] =
     for {
-      complexity <- estimateExact(expr, version, isFreeCall, estimator)
+      complexity <- estimateExact(expr, version, isFreeCall, estimator, withCombinedContext)
       _          <- checkComplexity(version, complexity, useContractVerifierLimit)
     } yield complexity
 

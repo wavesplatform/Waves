@@ -210,7 +210,8 @@ case class UtilsApiRoute(
                 script,
                 estimator(),
                 fixEstimateOfVerifier = blockchain.isFeatureActivated(RideV6),
-                useContractVerifierLimit = false
+                useContractVerifierLimit = false,
+                withCombinedContext = true
               )
               .map((script, _))
           }
