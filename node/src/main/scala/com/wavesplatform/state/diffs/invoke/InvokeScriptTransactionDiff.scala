@@ -35,10 +35,10 @@ import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.TransactionBase
 import com.wavesplatform.transaction.TxValidationError.*
+import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
 import com.wavesplatform.transaction.smart.InvokeTransaction.DefaultCall
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
-import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
 import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import monix.eval.Coeval
 import shapeless.Coproduct
@@ -336,8 +336,12 @@ object InvokeScriptTransactionDiff {
           } else
             ScriptExecutionError.dAppExecution(error, log)
       }
-      .map { r =>
-        InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1); r
+      .flatMap {
+        case (result, log) =>
+          val usedComplexity = startLimit - result.unusedComplexity.max(0)
+          (for (_ <-
+        InvokeDiffsCommon.checkScriptResultFields(blockchain, result)) yield (result, log))
+            .leftMap(err => FailedTransactionError.dAppExecution(err.toString, usedComplexity, log))
       }
   }
 

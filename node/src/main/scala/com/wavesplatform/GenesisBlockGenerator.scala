@@ -48,14 +48,7 @@ object GenesisBlockGenerator extends App {
     val features: Map[Short, Int] =
       preActivatedFeatures.map(_.toShort -> 0).toMap
 
-    val functionalitySettings: FunctionalitySettings = FunctionalitySettings(
-      Int.MaxValue,
-      Int.MaxValue,
-      preActivatedFeatures = features,
-      doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-      minBlockTime = minBlockTime.getOrElse(15.seconds),
-      delayDelta = delayDelta.getOrElse(8)
-    )
+    val functionalitySettings: FunctionalitySettings = FunctionalitySettings(Int.MaxValue, Int.MaxValue, preActivatedFeatures = features, doubleFeaturesPeriodsAfterHeight = Int.MaxValue, minBlockTime = minBlockTime.getOrElse(15.seconds), delayDelta = delayDelta.getOrElse(8))
 
     def preActivated(feature: BlockchainFeature): Boolean = features.contains(feature.id)
   }

@@ -17,7 +17,7 @@ class DocExportTest extends PropSpec {
   def buildFullContext(ds: DirectiveSet): CTX[Environment] = {
     val wavesCtx  = WavesContext.build(Global, ds)
     val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment]
-    val pureCtx = PureContext.build(ds.stdLibVersion, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment]
+    val pureCtx = PureContext.build(ds.stdLibVersion, useNewPowPrecision = true).withEnvironment[Environment]
     pureCtx |+| cryptoCtx |+| wavesCtx
   }
 

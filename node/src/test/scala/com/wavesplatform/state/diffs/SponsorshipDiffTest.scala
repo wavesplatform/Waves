@@ -19,14 +19,10 @@ import com.wavesplatform.utils._
 class SponsorshipDiffTest extends PropSpec with WithState {
 
   def settings(sponsorshipActivationHeight: Int): FunctionalitySettings =
-    TestFunctionalitySettings.Enabled.copy(
-      preActivatedFeatures = Map(
+    TestFunctionalitySettings.Enabled.copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = Map(
         BlockchainFeatures.FeeSponsorship.id -> sponsorshipActivationHeight,
         BlockchainFeatures.BlockV5.id        -> 0
-      ),
-      featureCheckBlocksPeriod = 1,
-      blocksForFeatureActivation = 1
-    )
+      ))
 
   property("work") {
     val s = settings(0)

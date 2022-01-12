@@ -27,9 +27,7 @@ import org.scalatest.Assertion
 
 class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
 
-  private val fs = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.Ride4DApps.id -> 0)
-  )
+  private val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.Ride4DApps.id -> 0))
 
   val preconditionsAndSetScript: Gen[(GenesisTransaction, SetScriptTransaction)] = for {
     master <- accountGen
@@ -86,16 +84,12 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
   property("Script with BlockV2 only works after Ride4DApps feature activation") {
     import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 
-    val settingsUnactivated = TestFunctionalitySettings.Enabled.copy(
-      preActivatedFeatures = Map(
+    val settingsUnactivated = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
         BlockchainFeatures.Ride4DApps.id -> 3
-      )
-    )
-    val settingsActivated = TestFunctionalitySettings.Enabled.copy(
-      preActivatedFeatures = Map(
+      ))
+    val settingsActivated = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
         BlockchainFeatures.Ride4DApps.id -> 0
-      )
-    )
+      ))
     val setup = for {
       master <- accountGen
       ts     <- positiveLongGen
@@ -201,18 +195,14 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       TestCompiler(V4).compileContract(script)
     }
 
-    val rideV3Activated = TestFunctionalitySettings.Enabled.copy(
-      preActivatedFeatures = Map(
+    val rideV3Activated = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
         BlockchainFeatures.Ride4DApps.id -> 0
-      )
-    )
+      ))
 
-    val rideV4Activated = TestFunctionalitySettings.Enabled.copy(
-      preActivatedFeatures = Map(
+    val rideV4Activated = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
         BlockchainFeatures.Ride4DApps.id -> 0,
         BlockchainFeatures.BlockV5.id    -> 0
-      )
-    )
+      ))
 
     def assertSuccess(script: Script, settings: FunctionalitySettings): Unit = {
       forAll(preconditionsAndSetCustomContract(script)) {
@@ -283,10 +273,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     def settings(checkNegative: Boolean = false, checkSumOverflow: Boolean = false): FunctionalitySettings = {
       TestFunctionalitySettings
         .withFeatures(BlockV5)
-        .copy(
-          estimationOverflowFixHeight = if (checkNegative) 0 else 999,
-          estimatorSumOverflowFixHeight = if (checkSumOverflow) 0 else 999
-        )
+        .copy(estimationOverflowFixHeight = if (checkNegative) 0 else 999, estimatorSumOverflowFixHeight = if (checkSumOverflow) 0 else 999)
     }
 
     def assert(script: Script, checkNegativeMessage: String): Assertion = {
@@ -376,9 +363,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
 
     val settings =
       DomainPresets.RideV5.copy(blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
-        functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(
-          estimatorSumOverflowFixHeight = 3
-        )
+        functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(estimatorSumOverflowFixHeight = 3)
       ))
 
     withDomain(settings) { d =>

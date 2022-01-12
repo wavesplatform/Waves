@@ -433,7 +433,7 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
         dApp
       )
 
-      assertBadRequestAndMessage(miner.invokeScript(miner.keyPair, dAppAddress, Some("sponsorAsset"), fee = smartMinFee), "Negative sponsor amount = -1")
+      assertBadRequestAndMessage(miner.invokeScript(miner.keyPair, dAppAddress, Some("sponsorAsset"), fee = smartMinFee), "NegativeMinFee(-1,asset)")
     }
 
     "SponsorFee is available only for assets issuing from current address" in {
