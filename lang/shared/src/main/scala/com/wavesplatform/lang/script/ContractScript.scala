@@ -16,7 +16,6 @@ import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.ContractLimits.*
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.*
-import com.wavesplatform.lang.v1.compiler.Types.{LIST, UNION}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
 import monix.eval.Coeval
@@ -67,11 +66,7 @@ object ContractScript {
       } else {
         MetaMapper.dicFromProto(expr)
           .map(!_.callableFuncTypes
-            .exists(_.flatten.exists {
-              case UNION(types, _) if types.size > 1 => true
-              case LIST(UNION(types, _)) if types.size > 1 => true
-              case _ => false
-            })
+            .exists(_.flatten.exists(_.containsUnion))
           )
       }
   }

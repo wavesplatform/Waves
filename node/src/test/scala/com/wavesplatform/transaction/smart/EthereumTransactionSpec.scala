@@ -361,7 +361,7 @@ class EthereumTransactionSpec
     )
 
     val diff = differ(transaction).resultE
-    diff should produce("ethFuncSignatureTypeName: Unexpected type: Int|String")
+    diff should produce("Function not defined: 1f9773e9")
   }
 
   it should "work with no arguments" in {

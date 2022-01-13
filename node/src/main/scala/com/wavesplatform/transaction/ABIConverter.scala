@@ -10,6 +10,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.{Terms, Types}
+import com.wavesplatform.lang.v1.compiler.Types.TypeExt
 import com.wavesplatform.transaction.ABIConverter.WavesByteRepr
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import org.web3j.abi.TypeReference
@@ -60,7 +61,7 @@ object ABIConverter {
         } else {
           Json.obj("type" -> (base.value("type").as[String] + "[]"))
         }
-
+      case Types.UNION(tpe :: Nil, _) => ethTypeObj(tpe)
       // only for payments
       case Types.TUPLE(types) =>
         t("tuple") ++ Json.obj(
@@ -77,6 +78,7 @@ object ABIConverter {
     case Types.BYTESTR         => "bytes"
     case Types.STRING          => "string"
     case Types.LIST(innerType) => s"${ethFuncSignatureTypeName(innerType)}[]"
+    case Types.UNION(tpe :: Nil, _) => ethFuncSignatureTypeName(tpe)
     case Types.TUPLE(types) => s"(${types.map(ethFuncSignatureTypeName).mkString(",")})"
     case other              => throw new IllegalArgumentException(s"ethFuncSignatureTypeName: Unexpected type: $other")
   }
@@ -101,19 +103,6 @@ object ABIConverter {
           limited = true
         )
         .explicitGet()
-
-    case t: Tuple if rideType.isInstanceOf[Types.UNION] =>
-      val tupleValList = t.asScala.toVector
-      if (tupleValList.nonEmpty) {
-        val unionSubtypeIdx: Int = tupleValList.head.asInstanceOf[Int]
-        if (unionSubtypeIdx < tupleValList.length) {
-          toRideValue(tupleValList(unionSubtypeIdx + 1), rideType.asInstanceOf[Types.UNION].typeList(unionSubtypeIdx))
-        } else {
-          throw new UnsupportedOperationException(s"Incorrect tuple size for Union type.")
-        }
-      } else {
-        throw new UnsupportedOperationException(s"Incorrect tuple size for Union type. Empty tuple.")
-      }
 
     case t: Tuple =>
       Terms
@@ -171,7 +160,14 @@ final case class ABIConverter(script: Script) {
     lazy val ethMethodId: String = ABIConverter.buildMethodId(ethSignature)
   }
 
-  private[this] lazy val funcsWithTypes = Global.dAppFuncTypes(script)
+  private[this] lazy val funcsWithTypes =
+    Global.dAppFuncTypes(script)
+      .map { signatures =>
+        val filtered  = signatures.argsWithFuncName.filter { case (_, args) =>
+          !args.exists { case (_, tpe) => tpe.containsUnion }
+        }
+        signatures.copy(argsWithFuncName = filtered)
+      }
 
   private[this] def functionsWithArgs: Seq[(String, List[(String, Types.FINAL)])] = {
     funcsWithTypes match {

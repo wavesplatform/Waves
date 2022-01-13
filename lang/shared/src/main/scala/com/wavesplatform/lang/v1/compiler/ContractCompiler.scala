@@ -26,6 +26,8 @@ import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports.*
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 
+import scala.annotation.tailrec
+
 object ContractCompiler {
   val FreeCallInvocationArg = "i"
 
@@ -428,6 +430,16 @@ object ContractCompiler {
     }
 
   private def checkCallableUnions(func: Expressions.ANNOTATEDFUNC, annotations: List[Annotation], version: StdLibVersion): CompileM[Seq[UnionNotAllowedForCallableArgs]] = {
+    @tailrec
+    def containsUnion(tpe: Type): Boolean =
+      tpe match {
+        case Expressions.Union(types) if types.size > 1 => true
+        case Expressions.Single(PART.VALID(_, Type.ListTypeName), Some(PART.VALID(_, Expressions.Union(types)))) if types.size > 1 => true
+        case Expressions.Single(PART.VALID(_, Type.ListTypeName), Some(PART.VALID(_, inner@Expressions.Single(PART.VALID(_, Type.ListTypeName), _)))) =>
+          containsUnion(inner)
+        case _ => false
+      }
+
     val isCallable = annotations.exists {
       case CallableAnnotation(_) => true
       case _ => false
@@ -436,10 +448,8 @@ object ContractCompiler {
     if (version < V6 || !isCallable) {
       Seq.empty[UnionNotAllowedForCallableArgs].pure[CompileM]
     } else {
-      func.f.args.filter {
-        case (_, Expressions.Union(types)) if types.size > 1 => true
-        case (_, Expressions.Single(PART.VALID(_, Type.ListTypeName), Some(PART.VALID(_, Expressions.Union(types))))) if types.size > 1 => true
-        case _ => false
+      func.f.args.filter { case (_, tpe) =>
+        containsUnion(tpe)
       }.map { case (argName, _) =>
         UnionNotAllowedForCallableArgs(argName.position.start, argName.position.end)
       }.pure[CompileM]
