@@ -235,7 +235,7 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
       (new Loader(
         db,
         blocksApi,
-        liquidState.map(ls => ls.keyBlock.height -> ls.keyBlock.id),
+        liquidState.map(ls => (ls.keyBlock.height - 1) -> ls.keyBlock.block.header.reference),
         streamId
       ).loadUpdates(fromHeight) ++
         subject.map(_.protobuf))
