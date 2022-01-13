@@ -20,7 +20,7 @@ object DirectiveParser {
       .!
 
   private def directiveValueP[_: P]: P[String] =
-    P(CharIn("a-zA-Z0-9_-/\\., "))
+    P(CharIn("a-zA-Z0-9_\\-/\\., "))
       .repX(1)
       .!
 
