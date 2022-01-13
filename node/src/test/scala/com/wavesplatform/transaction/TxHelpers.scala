@@ -141,12 +141,21 @@ object TxHelpers {
     script
   }
 
-  def scriptV5(scriptText: String): Script = script(s"""
-       |{-# STDLIB_VERSION 5 #-}
-       |{-# CONTENT_TYPE DAPP #-}
-       |
-       |$scriptText
-       |""".stripMargin)
+  def scriptV5(scriptText: String): Script =
+    script(s"""
+              |{-# STDLIB_VERSION 5 #-}
+              |{-# CONTENT_TYPE DAPP #-}
+              |
+              |$scriptText
+              |""".stripMargin)
+
+  def scriptV6(scriptText: String): Script =
+    script(s"""
+              |{-# STDLIB_VERSION 6 #-}
+              |{-# CONTENT_TYPE DAPP #-}
+              |
+              |$scriptText
+              |""".stripMargin)
 
   def setScript(acc: KeyPair, script: Script): SetScriptTransaction = {
     SetScriptTransaction.selfSigned(TxVersion.V1, acc, Some(script), TestValues.fee, timestamp).explicitGet()
