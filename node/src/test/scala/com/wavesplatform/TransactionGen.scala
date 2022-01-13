@@ -1,15 +1,18 @@
 package com.wavesplatform
 
+import scala.concurrent.duration.*
+import scala.util.Random
+
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values.{V3, V6}
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.testing.{ScriptGen, TypedScriptGen}
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -18,20 +21,17 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.lease.*
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
 import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
-import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import org.scalatest.Suite
 import org.web3j.crypto.ECKeyPair
-
-import scala.concurrent.duration.*
-import scala.util.Random
 
 trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _: Suite =>
 
@@ -41,9 +41,9 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.containerOfN[Array, Byte](length, Arbitrary.arbitrary[Byte])
   def stringGen(length: Int): Gen[String]         = Gen.containerOfN[Array, Char](length, Arbitrary.arbitrary[Char]).map(new String(_))
 
-  val bytes32gen: Gen[Array[Byte]]   = byteArrayGen(32)
-  val bytes64gen: Gen[Array[Byte]]   = byteArrayGen(64)
-  val attachmentGen: Gen[ByteStr] = bytes32gen.map(ByteStr(_))
+  val bytes32gen: Gen[Array[Byte]] = byteArrayGen(32)
+  val bytes64gen: Gen[Array[Byte]] = byteArrayGen(64)
+  val attachmentGen: Gen[ByteStr]  = bytes32gen.map(ByteStr(_))
 
   def genBoundedBytes(minSize: Int, maxSize: Int): Gen[Array[Byte]] =
     for {
@@ -61,9 +61,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     }
   }
 
-  val accountGen: Gen[KeyPair] = bytes32gen.map(seed =>
-    KeyPair(seed)
-  )
+  val accountGen: Gen[KeyPair] = bytes32gen.map(seed => KeyPair(seed))
 
   val ethAccountGen: Gen[ECKeyPair] = accountGen.map(_.toEthKeyPair)
 
@@ -155,7 +153,18 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       timestamp                                                   <- timestampGen
       script1                                                     <- scriptGen
       script2                                                     <- scriptGen
-      issue = IssueTransaction(TxVersion.V2, sender.publicKey, assetName, description, quantity, decimals, reissuable = true, Some(script1), iFee, timestamp)
+      issue = IssueTransaction(
+        TxVersion.V2,
+        sender.publicKey,
+        assetName,
+        description,
+        quantity,
+        decimals,
+        reissuable = true,
+        Some(script1),
+        iFee,
+        timestamp
+      )
         .signWith(sender.privateKey)
       setAssetScript = SetAssetScriptTransaction
         .selfSigned(1.toByte, sender, IssuedAsset(issue.id()), Some(script2), 1 * Constants.UnitsInWave + ScriptExtraFee, timestamp)
@@ -260,7 +269,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   def leaseGen(sender: KeyPair, timestamp: Long): Gen[LeaseTransaction] = for {
     (_, amount, fee, _, recipient) <- leaseParamGen
-    version <- Gen.oneOf(1.toByte, 2.toByte, 3.toByte)
+    version                        <- Gen.oneOf(1.toByte, 2.toByte, 3.toByte)
   } yield LeaseTransaction.selfSigned(version, sender, recipient.toAddress, amount, fee, timestamp).explicitGet()
 
   val leaseGen: Gen[LeaseTransaction]             = leaseAndCancelGen.map(_._1)
@@ -341,7 +350,19 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   val transferV2Gen: Gen[TransferTransaction] = (for {
     (assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment) <- transferParamGen
     proofs                                                                             <- proofsGen
-  } yield TransferTransaction(2.toByte, sender.publicKey, recipient, assetId, amount, feeAssetId, feeAmount, attachment, timestamp, proofs, recipient.chainId))
+  } yield TransferTransaction(
+    2.toByte,
+    sender.publicKey,
+    recipient,
+    assetId,
+    amount,
+    feeAssetId,
+    feeAmount,
+    attachment,
+    timestamp,
+    proofs,
+    recipient.chainId
+  ))
     .label("VersionedTransferTransaction")
 
   def versionedTransferGenP(sender: PublicKey, recipient: AddressOrAlias, proofs: Proofs): Gen[TransferTransaction] =
@@ -362,7 +383,9 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   val selfTransferGen: Gen[TransferTransaction] = for {
     (assetId, sender, _, amount, timestamp, feeAssetId, feeAmount, attachment) <- transferParamGen
-  } yield TransferTransaction.selfSigned(1.toByte, sender, sender.toAddress, assetId, amount, feeAssetId, feeAmount, attachment, timestamp).explicitGet()
+  } yield TransferTransaction
+    .selfSigned(1.toByte, sender, sender.toAddress, assetId, amount, feeAssetId, feeAmount, attachment, timestamp)
+    .explicitGet()
 
   val massTransferGen: Gen[MassTransferTransaction] = massTransferGen(MaxTransferCount)
 
@@ -457,10 +480,12 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
         .explicitGet()
     } yield tx
 
-  /**
-    * @param issueQuantity must be positive
-    * @param reissueQuantity must be positive
-    * @param burnQuantity must be positive
+  /** @param issueQuantity
+    *   must be positive
+    * @param reissueQuantity
+    *   must be positive
+    * @param burnQuantity
+    *   must be positive
     */
   def issueReissueBurnGeneratorP(
       issueQuantity: Long,
@@ -473,9 +498,9 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       (_, assetName, description, _, decimals, reissuable, iFee, timestamp) <- issueParamGen
       reissuable2                                                           <- Arbitrary.arbitrary[Boolean]
       fee                                                                   <- smallFeeGen
-      issue                                                                 <- createLegacyIssue(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp)
-      reissue                                                               <- createReissue(sender, issue.asset, reissueQuantity, reissuable2, fee, timestamp)
-      burn                                                                  <- createBurn(sender, issue.asset, burnQuantity, fee, timestamp)
+      issue   <- createLegacyIssue(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp)
+      reissue <- createReissue(sender, issue.asset, reissueQuantity, reissuable2, fee, timestamp)
+      burn    <- createBurn(sender, issue.asset, burnQuantity, fee, timestamp)
     } yield (issue, reissue, burn)
   }
 
@@ -483,8 +508,9 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     (sender, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
     fee                                                                      <- smallFeeGen
   } yield {
-    val issue = IssueTransaction(TxVersion.V1, sender.publicKey, assetName, description, quantity, decimals, reissuable = true, script = None, iFee, timestamp)
-      .signWith(sender.privateKey)
+    val issue =
+      IssueTransaction(TxVersion.V1, sender.publicKey, assetName, description, quantity, decimals, reissuable = true, script = None, iFee, timestamp)
+        .signWith(sender.privateKey)
     val reissue1 =
       ReissueTransaction.selfSigned(1.toByte, sender, issue.asset, quantity, reissuable = false, fee, timestamp).explicitGet()
     val reissue2 =
@@ -532,7 +558,10 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   val reissueGen: Gen[ReissueTransaction] = issueReissueBurnGen.map(_._2)
   val burnGen: Gen[BurnTransaction]       = issueReissueBurnGen.map(_._3)
 
-  def sponsorFeeCancelSponsorFeeGen(sender: KeyPair, reducedFee: Boolean = true): Gen[(IssueTransaction, SponsorFeeTransaction, SponsorFeeTransaction, SponsorFeeTransaction)] =
+  def sponsorFeeCancelSponsorFeeGen(
+      sender: KeyPair,
+      reducedFee: Boolean = true
+  ): Gen[(IssueTransaction, SponsorFeeTransaction, SponsorFeeTransaction, SponsorFeeTransaction)] =
     for {
       (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
       issue = IssueTransaction(
@@ -550,7 +579,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       minFee  <- smallFeeGen
       minFee1 <- smallFeeGen
       assetId = issue.asset
-      fee = (if (reducedFee) 0.001 * Constants.UnitsInWave else 1 * Constants.UnitsInWave.toDouble).toLong
+      fee     = (if (reducedFee) 0.001 * Constants.UnitsInWave else 1 * Constants.UnitsInWave.toDouble).toLong
     } yield (
       issue,
       SponsorFeeTransaction.selfSigned(1.toByte, sender, assetId, Some(minFee), fee, timestamp).explicitGet(),
@@ -704,15 +733,27 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     for {
       (_, genMatcher, _, _, amount1, price, timestamp, expiration, genMatcherFee) <- orderParamGen
       amount2: Long                                                               <- matcherAmountGen
-      matchedAmount: Long                                                         <- Gen.choose(Math.min(amount1, amount2) / 2000, Math.min(amount1, amount2) / 1000)
+      matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2) / 2000, Math.min(amount1, amount2) / 1000)
       assetPair = AssetPair(amountAssetId, priceAssetId)
     } yield {
       val matcherFee = fixedMatcherFee.getOrElse(genMatcherFee)
       val matcher    = fixedMatcher.getOrElse(genMatcher)
-      val o1         = Order.buy(1: Byte, buyer, matcher.publicKey, assetPair, amount1, price, timestamp, expiration, matcherFee)
-      val o2         = Order.sell(1: Byte, seller, matcher.publicKey, assetPair, amount2, price, timestamp, expiration, matcherFee)
-      val buyFee     = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue
-      val sellFee    = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue
+      val o1 =
+        Order.buy(1: Byte, buyer, matcher.publicKey, assetPair, amount1, price, timestamp, expiration, matcherFee, priceMode = OrderPriceMode.Default)
+      val o2 = Order.sell(
+        1: Byte,
+        seller,
+        matcher.publicKey,
+        assetPair,
+        amount2,
+        price,
+        timestamp,
+        expiration,
+        matcherFee,
+        priceMode = OrderPriceMode.Default
+      )
+      val buyFee  = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue
+      val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue
       val trans =
         ExchangeTransaction(1.toByte, o1, o2, matchedAmount, price, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100, Proofs.empty, chainId)
           .signWith(matcher.privateKey)
@@ -832,8 +873,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   val randomTransactionGen: Gen[Transaction & ProvenTransaction] = (for {
     tr <- transferV1Gen
-    (is, ri, bu) <- issueReissueBurnGen.retryUntil {
-      case (i, r, b) => i.version == 1 && r.version == 1 && b.version == 1
+    (is, ri, bu) <- issueReissueBurnGen.retryUntil { case (i, r, b) =>
+      i.version == 1 && r.version == 1 && b.version == 1
     }
     ca <- createAliasGen.retryUntil(_.version == 1)
     xt <- exchangeTransactionGen
@@ -919,8 +960,9 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       sender    <- sender.fold(accountGen)(Gen.const)
       size      <- Gen.choose(0, maxEntryCount)
       maxEntrySize = if (useForScript) 200 else (DataTransaction.MaxBytes - 122) / (size max 1) min DataEntry.MaxValueSize
-      data <- if (useForScript) Gen.listOfN(size, dataEntryGen(maxEntrySize, dataScriptsKeyGen, withDeleteEntry))
-      else Gen.listOfN(size, dataEntryGen(maxEntrySize))
+      data <-
+        if (useForScript) Gen.listOfN(size, dataEntryGen(maxEntrySize, dataScriptsKeyGen, withDeleteEntry))
+        else Gen.listOfN(size, dataEntryGen(maxEntrySize))
       uniq = data.foldRight(List.empty[DataEntry[?]]) { (e, es) =>
         if (es.exists(_.key == e.key)) es else e :: es
       }
@@ -993,5 +1035,4 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     )
 }
 
-trait TransactionGen extends TransactionGenBase { _: Suite =>
-}
+trait TransactionGen extends TransactionGenBase { _: Suite => }

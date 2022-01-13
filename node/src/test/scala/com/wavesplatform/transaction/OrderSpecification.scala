@@ -2,12 +2,11 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.NTPTime
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderAuthentication, OrderType}
 import com.wavesplatform.transaction.smart.Verifier
-import org.scalatest._
-
+import org.scalatest.*
 import scala.util.Random
 
 class OrderSpecification extends PropSpec with ValidationMatcher with NTPTime {
@@ -77,64 +76,68 @@ class OrderSpecification extends PropSpec with ValidationMatcher with NTPTime {
 
   property("Order signature validation") {
     val err = "Proof doesn't validate as signature"
-    forAll(orderGen, accountGen) {
-      case (order, pka) =>
-        val rndAsset = Array[Byte](32)
+    forAll(orderGen, accountGen) { case (order, pka) =>
+      val rndAsset = Array[Byte](32)
 
-        Random.nextBytes(rndAsset)
+      Random.nextBytes(rndAsset)
 
-        Verifier.verifyAsEllipticCurveSignature(order, checkWeakPk = false) shouldBe an[Right[_, _]]
-        Verifier.verifyAsEllipticCurveSignature(order.copy(senderPublicKey = pka.publicKey), checkWeakPk = false) should produce(err)
-        Verifier.verifyAsEllipticCurveSignature(order.copy(matcherPublicKey = pka.publicKey), checkWeakPk = false) should produce(err)
-        val assetPair = order.assetPair
-        Verifier.verifyAsEllipticCurveSignature(
-          order
-            .copy(assetPair = assetPair.copy(amountAsset = IssuedAsset(ByteStr(rndAsset)))),
-          checkWeakPk = false
-        ) should produce(err)
-        Verifier.verifyAsEllipticCurveSignature(
-          order
-            .copy(assetPair = assetPair.copy(priceAsset = IssuedAsset(ByteStr(rndAsset)))),
-          checkWeakPk = false
-        ) should produce(err)
-        Verifier.verifyAsEllipticCurveSignature(order.copy(orderType = OrderType.reverse(order.orderType)), checkWeakPk = false) should produce(err)
-        Verifier.verifyAsEllipticCurveSignature(order.copy(price = order.price + 1), checkWeakPk = false) should produce(err)
-        Verifier.verifyAsEllipticCurveSignature(order.copy(amount = order.amount + 1), checkWeakPk = false) should produce(err)
-        Verifier.verifyAsEllipticCurveSignature(order.copy(expiration = order.expiration + 1), checkWeakPk = false) should produce(err)
-        Verifier.verifyAsEllipticCurveSignature(order.copy(matcherFee = order.matcherFee + 1), checkWeakPk = false) should produce(err)
-        Verifier.verifyAsEllipticCurveSignature(order.copy(proofs = Proofs(Seq(ByteStr(pka.publicKey.arr ++ pka.publicKey.arr)))), checkWeakPk = false) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order, checkWeakPk = false) shouldBe an[Right[?, ?]]
+      Verifier.verifyAsEllipticCurveSignature(
+        order.copy(orderAuthentication = OrderAuthentication.OrderProofs(pka.publicKey, Proofs(ByteStr.empty))),
+        checkWeakPk = false
+      ) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order.copy(matcherPublicKey = pka.publicKey), checkWeakPk = false) should produce(err)
+      val assetPair = order.assetPair
+      Verifier.verifyAsEllipticCurveSignature(
+        order
+          .copy(assetPair = assetPair.copy(amountAsset = IssuedAsset(ByteStr(rndAsset)))),
+        checkWeakPk = false
+      ) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(
+        order
+          .copy(assetPair = assetPair.copy(priceAsset = IssuedAsset(ByteStr(rndAsset)))),
+        checkWeakPk = false
+      ) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order.copy(orderType = OrderType.reverse(order.orderType)), checkWeakPk = false) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order.copy(price = order.price + 1), checkWeakPk = false) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order.copy(amount = order.amount + 1), checkWeakPk = false) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order.copy(expiration = order.expiration + 1), checkWeakPk = false) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order.copy(matcherFee = order.matcherFee + 1), checkWeakPk = false) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(
+        order.withProofs(Proofs(Seq(ByteStr(pka.publicKey.arr ++ pka.publicKey.arr)))),
+        checkWeakPk = false
+      ) should produce(err)
     }
   }
 
   property("Buy and Sell orders") {
-    forAll(orderParamGen) {
-      case (sender, matcher, pair, _, amount, price, timestamp, _, _) =>
-        val expiration = timestamp + Order.MaxLiveTime - 1000
-        val buy = Order.buy(
-          Order.V1,
-          sender = sender,
-          matcher = matcher.publicKey,
-          pair = pair,
-          amount = amount,
-          price = price,
-          timestamp = timestamp,
-          expiration = expiration,
-          matcherFee = price
-        )
-        buy.orderType shouldBe OrderType.BUY
+    forAll(orderParamGen) { case (sender, matcher, pair, _, amount, price, timestamp, _, _) =>
+      val expiration = timestamp + Order.MaxLiveTime - 1000
+      val buy = Order.buy(
+        Order.V1,
+        sender = sender,
+        matcher = matcher.publicKey,
+        pair = pair,
+        amount = amount,
+        price = price,
+        timestamp = timestamp,
+        expiration = expiration,
+        matcherFee = price
+      )
+      buy.orderType shouldBe OrderType.BUY
 
-        val sell = Order.sell(
-          Order.V1,
-          sender = sender,
-          matcher = matcher.publicKey,
-          pair = pair,
-          amount = amount,
-          price = price,
-          timestamp = timestamp,
-          expiration = expiration,
-          matcherFee = price
-        )
-        sell.orderType shouldBe OrderType.SELL
+      val sell = Order.sell(
+        Order.V1,
+        sender = sender,
+        matcher = matcher.publicKey,
+        pair = pair,
+        amount = amount,
+        price = price,
+        timestamp = timestamp,
+        expiration = expiration,
+        matcherFee = price
+      )
+      sell.orderType shouldBe OrderType.SELL
     }
   }
 
