@@ -12,7 +12,7 @@ object MiningConstraints {
   val MaxScriptRunsInBlock = 100
   object MaxScriptsComplexityInBlock {
     val BeforeRideV5 = 1000000
-    val AfterRideV5  = 2500000
+    val AfterRideV5  = Int.MaxValue
   }
 
   val ClassicAmountOfTxsInBlock = 100
