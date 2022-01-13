@@ -73,135 +73,129 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
   }
 
   "BlockchainUpdates" - {
-    "should return order ids in exchange metadata" in withSettings(DomainPresets.RideV4)(withDomainAndRepo {
-      case (d, repo) =>
-        val issue = TxHelpers.issue()
-        d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
-        d.appendBlock(issue)
+    "should return order ids in exchange metadata" in withSettings(DomainPresets.RideV4)(withDomainAndRepo { case (d, repo) =>
+      val issue = TxHelpers.issue()
+      d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
+      d.appendBlock(issue)
 
-        val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
-        val exchange     = TxHelpers.exchange(TxHelpers.order(OrderType.BUY, issue.asset), TxHelpers.order(OrderType.SELL, issue.asset))
-        d.appendBlock(exchange)
+      val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+      val exchange     = TxHelpers.exchange(TxHelpers.order(OrderType.BUY, issue.asset), TxHelpers.order(OrderType.SELL, issue.asset))
+      d.appendBlock(exchange)
 
-        subscription.lastAppendEvent(d.blockchain).transactionMetadata should matchPattern {
-          case Seq(TransactionMetadata(TransactionMetadata.Metadata.Exchange(TransactionMetadata.ExchangeMetadata(ids, _)), _))
-              if ids.map(_.toByteStr) == Seq(exchange.order1.id(), exchange.order2.id()) =>
-        }
+      subscription.lastAppendEvent(d.blockchain).transactionMetadata should matchPattern {
+        case Seq(TransactionMetadata(TransactionMetadata.Metadata.Exchange(TransactionMetadata.ExchangeMetadata(ids, _)), _))
+            if ids.map(_.toByteStr) == Seq(exchange.order1.id(), exchange.order2.id()) =>
+      }
     })
 
-    "should process nested invoke with args" in withDomainAndRepo {
-      case (d, repo) =>
-        val script = TxHelpers.script("""
-            |{-# STDLIB_VERSION 5 #-}
-            |{-# CONTENT_TYPE DAPP #-}
-            |
-            |@Callable(inv)
-            |func foo() = {
-            |  strict ii = invoke(this, "bar", [1], [])
-            |  [IntegerEntry("test1", 1)]
-            |}
-            |
-            |@Callable(inv)
-            |func bar(i: Int) = [IntegerEntry("test", 2)]
-            |
+    "should process nested invoke with args" in withDomainAndRepo { case (d, repo) =>
+      val script = TxHelpers.script("""
+                                      |{-# STDLIB_VERSION 5 #-}
+                                      |{-# CONTENT_TYPE DAPP #-}
+                                      |
+                                      |@Callable(inv)
+                                      |func foo() = {
+                                      |  strict ii = invoke(this, "bar", [1], [])
+                                      |  [IntegerEntry("test1", 1)]
+                                      |}
+                                      |
+                                      |@Callable(inv)
+                                      |func bar(i: Int) = [IntegerEntry("test", 2)]
+                                      |
         """.stripMargin)
 
-        d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
-        d.appendBlock(TxHelpers.setScript(TxHelpers.defaultSigner, script))
-        d.appendBlock(TxHelpers.invoke(TxHelpers.defaultAddress, "foo"))
+      d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
+      d.appendBlock(TxHelpers.setScript(TxHelpers.defaultSigner, script))
+      d.appendBlock(TxHelpers.invoke(TxHelpers.defaultAddress, "foo"))
 
-        val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
-        val events       = subscription.fetchAllEvents(d.blockchain).map(_.getUpdate.vanillaAppend)
-        val invocations  = events.last.transactionMetadata.head.getInvokeScript.getResult.invokes
+      val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+      val events       = subscription.fetchAllEvents(d.blockchain).map(_.getUpdate.vanillaAppend)
+      val invocations  = events.last.transactionMetadata.head.getInvokeScript.getResult.invokes
 
-        invocations shouldBe List(
-          Invocation(
-            ByteString.copyFrom(TxHelpers.defaultAddress.bytes),
-            Some(Call("bar", args = Seq(Call.Argument(Call.Argument.Value.IntegerValue(1))))),
-            stateChanges = Some(InvokeScriptResult(data = Seq(DataEntry("test", DataEntry.Value.IntValue(2)))))
-          )
+      invocations shouldBe List(
+        Invocation(
+          ByteString.copyFrom(TxHelpers.defaultAddress.bytes),
+          Some(Call("bar", args = Seq(Call.Argument(Call.Argument.Value.IntegerValue(1))))),
+          stateChanges = Some(InvokeScriptResult(data = Seq(DataEntry("test", DataEntry.Value.IntValue(2)))))
         )
+      )
     }
 
-    "should not freeze on micro rollback" in withDomainAndRepo {
-      case (d, repo) =>
-        val keyBlockId = d.appendKeyBlock().id()
-        d.appendMicroBlock(TxHelpers.transfer())
-        d.appendMicroBlock(TxHelpers.transfer())
+    "should not freeze on micro rollback" in withDomainAndRepo { case (d, repo) =>
+      val keyBlockId = d.appendKeyBlock().id()
+      d.appendMicroBlock(TxHelpers.transfer())
+      d.appendMicroBlock(TxHelpers.transfer())
 
-        val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
-        d.appendKeyBlock(Some(keyBlockId))
+      val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+      d.appendKeyBlock(Some(keyBlockId))
 
-        subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
-          case Seq(
+      subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
+        case Seq(
               E.Block(1, _),
               E.Micro(1, _),
               E.Micro(1, _),
               E.MicroRollback(1, `keyBlockId`),
               E.Block(2, _)
-              ) =>
-        }
+            ) =>
+      }
     }
 
-    "should not freeze on block rollback" in withDomainAndRepo {
-      case (d, repo) =>
-        val block1Id = d.appendKeyBlock().id()
-        d.appendKeyBlock()
+    "should not freeze on block rollback" in withDomainAndRepo { case (d, repo) =>
+      val block1Id = d.appendKeyBlock().id()
+      d.appendKeyBlock()
 
-        val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
-        d.rollbackTo(block1Id)
-        d.appendKeyBlock()
+      val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+      d.rollbackTo(block1Id)
+      d.appendKeyBlock()
 
-        subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
-          case Seq(
+      subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
+        case Seq(
               E.Block(1, _),
               E.Block(2, _),
               E.Rollback(1, `block1Id`),
               E.Block(2, _)
-              ) =>
-        }
+            ) =>
+      }
     }
 
-    "should not duplicate blocks" in withDomainAndRepo {
-      case (d, repo) =>
-        for (_ <- 1 to 99) d.appendBlock()
-        d.appendKeyBlock()
-        d.appendMicroBlock(TxHelpers.transfer())
-        d.appendKeyBlock()
+    "should not duplicate blocks" in withDomainAndRepo { case (d, repo) =>
+      for (_ <- 1 to 99) d.appendBlock()
+      d.appendKeyBlock()
+      d.appendMicroBlock(TxHelpers.transfer())
+      d.appendKeyBlock()
 
-        val events = {
-          val sub = repo.createFakeObserver(SubscribeRequest.of(1, 0))
-          sub.fetchAllEvents(d.blockchain).map(_.getUpdate)
-        }
+      val events = {
+        val sub = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+        sub.fetchAllEvents(d.blockchain).map(_.getUpdate)
+      }
 
-        val lastEvents = events.dropWhile(_.height < 100)
-        lastEvents should matchPattern {
-          case Seq(
+      val lastEvents = events.dropWhile(_.height < 100)
+      lastEvents should matchPattern {
+        case Seq(
               E.Block(100, _),
               E.Block(101, _)
-              ) =>
-        }
+            ) =>
+      }
     }
 
-    "should not freeze on block rollback without key-block" in withDomainAndRepo {
-      case (d, repo) =>
-        val block1Id = d.appendBlock().id()
-        val block2Id = d.appendBlock().id()
-        d.appendBlock()
-        d.rollbackTo(block2Id)
+    "should not freeze on block rollback without key-block" in withDomainAndRepo { case (d, repo) =>
+      val block1Id = d.appendBlock().id()
+      val block2Id = d.appendBlock().id()
+      d.appendBlock()
+      d.rollbackTo(block2Id)
 
-        val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
-        d.rollbackTo(block1Id)
-        d.appendBlock()
+      val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+      d.rollbackTo(block1Id)
+      d.appendBlock()
 
-        subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
-          case Seq(
+      subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
+        case Seq(
               E.Block(1, _),
               E.Block(2, _),
               E.Rollback(1, `block1Id`),
               E.Block(2, _)
-              ) =>
-        }
+            ) =>
+      }
     }
 
     "should survive invalid rollback" in withDomain(
@@ -216,27 +210,26 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
       }
     }
 
-    "should survive invalid micro rollback" in withDomainAndRepo {
-      case (d, repo) =>
-        d.appendKeyBlock()
-        val sub   = repo.createFakeObserver(SubscribeRequest(1))
-        val mb1Id = d.appendMicroBlock(TxHelpers.transfer())
-        val mb2Id = d.appendMicroBlock(TxHelpers.transfer())
-        d.appendMicroBlock(TxHelpers.transfer())
+    "should survive invalid micro rollback" in withDomainAndRepo { case (d, repo) =>
+      d.appendKeyBlock()
+      val sub   = repo.createFakeObserver(SubscribeRequest(1))
+      val mb1Id = d.appendMicroBlock(TxHelpers.transfer())
+      val mb2Id = d.appendMicroBlock(TxHelpers.transfer())
+      d.appendMicroBlock(TxHelpers.transfer())
 
-        d.blockchain.removeAfter(mb1Id) // Should not do anything
-        d.appendKeyBlock(ref = Some(mb2Id))
+      d.blockchain.removeAfter(mb1Id) // Should not do anything
+      d.appendKeyBlock(ref = Some(mb2Id))
 
-        sub.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
-          case Seq(
+      sub.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
+        case Seq(
               E.Block(1, _),
               E.Micro(1, _),
               E.Micro(1, _),
               E.Micro(1, _),
               E.MicroRollback(1, `mb2Id`),
               E.Block(2, _)
-              ) =>
-        }
+            ) =>
+      }
     }
 
     "should survive rollback to key block" in withDomainAndRepo { (d, repo) =>
@@ -248,11 +241,11 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
 
       subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
         case Seq(
-            E.Block(1, _),
-            E.Block(2, _),
-            E.Micro(2, _),
-            E.MicroRollback(2, `keyBlockId`),
-            E.Block(3, _)
+              E.Block(1, _),
+              E.Block(2, _),
+              E.Micro(2, _),
+              E.MicroRollback(2, `keyBlockId`),
+              E.Block(3, _)
             ) =>
       }
     }
@@ -462,22 +455,22 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
       val (dAppScript, _) = ScriptCompiler
         .compile(
           s"""
-           |{-# STDLIB_VERSION 5 #-}
-           |{-# SCRIPT_TYPE ACCOUNT #-}
-           |{-# CONTENT_TYPE DAPP #-}
-           |
-           |@Callable(i)
-           |func issue() = {
-           |  let issue = Issue("name", "description", 1000, 4, true, unit, 0)
-           |  let lease = Lease(i.caller, 500000000)
-           |  [
-           |    issue,
-           |    BinaryEntry("assetId", calculateAssetId(issue)),
-           |    lease,
-           |    BinaryEntry("leaseId", calculateLeaseId(lease))
-           |  ]
-           |}
-           |""".stripMargin,
+             |{-# STDLIB_VERSION 5 #-}
+             |{-# SCRIPT_TYPE ACCOUNT #-}
+             |{-# CONTENT_TYPE DAPP #-}
+             |
+             |@Callable(i)
+             |func issue() = {
+             |  let issue = Issue("name", "description", 1000, 4, true, unit, 0)
+             |  let lease = Lease(i.caller, 500000000)
+             |  [
+             |    issue,
+             |    BinaryEntry("assetId", calculateAssetId(issue)),
+             |    lease,
+             |    BinaryEntry("leaseId", calculateLeaseId(lease))
+             |  ]
+             |}
+             |""".stripMargin,
           ScriptEstimatorV3(fixOverflow = true, overhead = false)
         )
         .explicitGet()
@@ -535,7 +528,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
       val subscription = repo.createFakeObserver(request)
       generateBlocks(d)
 
-      val result = subscription.fetchAllEvents(d.blockchain, request.toHeight)
+      val result = subscription.fetchAllEvents(d.blockchain, if (request.toHeight > 0) request.toHeight else Int.MaxValue)
       f(result.map(_.getUpdate))
     }
   }

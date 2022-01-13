@@ -8,14 +8,14 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.protobuf.transaction.PBOrders
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
+import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.utils.EthEncoding
 import play.api.libs.json.{JsObject, Json}
 
 object OrderSerializer {
   def toJson(order: Order): JsObject = {
-    import order._
+    import order.*
     Json.obj(
       "version"          -> version,
       "id"               -> idStr(),
@@ -32,11 +32,12 @@ object OrderSerializer {
       "signature"        -> proofs.toSignature.toString,
       "proofs"           -> proofs.proofs.map(_.toString)
     ) ++ (if (version >= Order.V3) Json.obj("matcherFeeAssetId" -> matcherFeeAssetId) else JsObject.empty) ++
-      (if (version >= Order.V4) Json.obj("eip712Signature"         -> eip712Signature.map(bs => EthEncoding.toHexString(bs.arr))) else JsObject.empty) // TODO: Should it be hex or base58?
+      (if (version >= Order.V4) Json.obj("eip712Signature" -> eip712Signature.map(bs => EthEncoding.toHexString(bs.arr)), "priceMode" -> priceMode)
+       else JsObject.empty) // TODO: Should it be hex or base58?
   }
 
   def bodyBytes(order: Order): Array[Byte] = {
-    import order._
+    import order.*
 
     version match {
       case Order.V1 =>
@@ -82,15 +83,20 @@ object OrderSerializer {
         )
 
       case _ =>
-        PBUtils.encodeDeterministic(PBOrders.protobuf(order.copy(proofs = Proofs.empty)))
+        val orderWithoutProofs = order.orderAuthentication match {
+          case OrderAuthentication.OrderProofs(_, _)  => order.withProofs(Proofs.empty)
+          case OrderAuthentication.Eip712Signature(_) => order // Keep original signature
+        }
+        PBUtils.encodeDeterministic(PBOrders.protobuf(orderWithoutProofs))
     }
   }
 
   def toBytes(ord: Order): Array[Byte] = {
-    import ord._
-    (version: @unchecked) match {
+    import ord.*
+    version match {
       case Order.V1            => Bytes.concat(this.bodyBytes(ord), proofs.toSignature.arr)
       case Order.V2 | Order.V3 => Bytes.concat(this.bodyBytes(ord), proofs.bytes())
+      case other => throw new IllegalArgumentException(s"Couldn't serialize OrderV$other")
     }
   }
 
@@ -105,23 +111,35 @@ object OrderSerializer {
       val timestamp  = buf.getLong
       val expiration = buf.getLong
       val matcherFee = buf.getLong
-      Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee)
+      Order(
+        version,
+        OrderAuthentication(sender),
+        matcher,
+        assetPair,
+        orderType,
+        amount,
+        price,
+        timestamp,
+        expiration,
+        matcherFee,
+        priceMode = OrderPriceMode.Default
+      )
     }
 
     version match {
       case Order.V1 =>
         val buf = ByteBuffer.wrap(bytes)
-        parseCommonPart(buf).copy(proofs = Proofs(buf.getSignature))
+        parseCommonPart(buf).withProofs(Proofs(buf.getSignature))
 
       case Order.V2 =>
         require(bytes(0) == version, "order version mismatch")
         val buf = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
-        parseCommonPart(buf).copy(proofs = buf.getProofs)
+        parseCommonPart(buf).withProofs(buf.getProofs)
 
       case Order.V3 =>
         require(bytes(0) == version, "order version mismatch")
         val buf = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
-        parseCommonPart(buf).copy(matcherFeeAssetId = buf.getAsset, proofs = buf.getProofs)
+        parseCommonPart(buf).copy(matcherFeeAssetId = buf.getAsset).withProofs(buf.getProofs)
 
       case _ =>
         throw new IllegalArgumentException(s"Unsupported order version: $version")
