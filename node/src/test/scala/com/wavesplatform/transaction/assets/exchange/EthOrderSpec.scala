@@ -5,61 +5,29 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.test.{FlatSpec, TestTime}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.BlockchainStubHelpers
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.{Proofs, TxHelpers, TxVersion}
-import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, EthSetChainId}
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, EthSetChainId, JsonMatchers}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
+import play.api.libs.json.{JsObject, Json}
 
 class EthOrderSpec
     extends FlatSpec
     with BeforeAndAfterAll
     with PathMockFactory
     with BlockchainStubHelpers
-    with EthHelpers
     with EthSetChainId
-    with DiffMatchers {
-
-  val ethBuyOrder = Order(
-    Order.V4,
-    TestEthOrdersPublicKey,
-    TxHelpers.matcher.publicKey,
-    AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
-    OrderType.BUY,
-    1,
-    100L,
-    1,
-    123,
-    100000,
-    Waves,
-    eip712Signature = EthSignature(
-      "0xe5ff562bfb0296e95b631365599c87f1c5002597bf56a131f289765275d2580f5344c62999404c37cd858ea037328ac91eca16ad1ce69c345ebb52fde70b66251c"
-    )
-  )
-
-  val ethSellOrder = Order(
-    Order.V4,
-    TestEthOrdersPublicKey,
-    TxHelpers.matcher.publicKey,
-    AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
-    OrderType.SELL,
-    1,
-    100L,
-    1,
-    123,
-    100000,
-    Waves,
-    eip712Signature = EthSignature(
-      "0xc8ba2bdafd27742546b3be34883efc51d6cdffbb235798d7b51876c6854791f019b0522d7a39b6f2087cba46ae86919b71a2d9d7920dfc8e00246d8f02a258f21b"
-    )
-  )
+    with DiffMatchers
+    with JsonMatchers {
+  import EthOrderSpec.{ethBuyOrder, ethSellOrder}
 
   "ETH signed order" should "recover signer public key correctly" in {
     val testOrder = Order(
-      Order.V1,
-      PublicKey(EthStubBytes32),
-      PublicKey(EthStubBytes32),
+      Order.V4,
+      OrderAuthentication(TestEthOrdersPublicKey),
+      TestEthOrdersPublicKey,
       AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), IssuedAsset(ByteStr(EthStubBytes32))),
       OrderType.BUY,
       1,
@@ -72,7 +40,7 @@ class EthOrderSpec
 
     val signature =
       EthEncoding.toBytes(
-        "0x54119bc5b24d9363b7a1a31a71a2e6194dfeedc5e9644893b0a04bb57004e5b14342c1ce29ee00877da49180fd6d7fb332ff400231f809da7ed0dcb07c504e2d1c"
+        "0xe4b329ea85ab9b82fda55f6bf063170864fbb66651dbf5d7e8278a79df2a46d26400f966b49c5a46c82cea590538569dc058facaa43b6246b3dce0d37fae6b4a1b"
       )
 
     val result = EthOrders.recoverEthSignerKey(testOrder, signature)
@@ -80,10 +48,24 @@ class EthOrderSpec
     result.toAddress shouldBe TestEthOrdersPublicKey.toAddress
   }
 
+  it should "recover public key at json parse stage" in {
+    import com.wavesplatform.transaction.assets.exchange.OrderJson.orderReads
+
+    val json  = Json.toJson(ethBuyOrder).as[JsObject] - "senderPublicKey"
+    val order = Json.fromJson[Order](json).get
+    order.senderPublicKey shouldBe ethBuyOrder.senderPublicKey
+
+    intercept[IllegalArgumentException](Json.fromJson[Order](json - "eip712Signature")).getMessage should include(
+      "Either senderPublicKey or eip712Signature should be provided"
+    )
+  }
+
   it should "be of version 4" in {
     val testOrder = Order(
       Order.V1,
-      PublicKey(EthStubBytes32),
+      EthSignature(
+        "0xb557dae4c614146dd35ba6fd80e4702a75d33ffcb8af09e80e0c1a7386b8ffcb5b76bd8037f6484de809a80a5b39a224301c76e8bad9b1a9e7ada53ba6fa7e361c"
+      ),
       PublicKey(EthStubBytes32),
       AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
       OrderType.BUY,
@@ -92,35 +74,10 @@ class EthOrderSpec
       123,
       321,
       1,
-      Waves,
-      eip712Signature = EthSignature(
-        "0xb557dae4c614146dd35ba6fd80e4702a75d33ffcb8af09e80e0c1a7386b8ffcb5b76bd8037f6484de809a80a5b39a224301c76e8bad9b1a9e7ada53ba6fa7e361c"
-      )
+      Waves
     )
 
     testOrder.isValid(123).labels shouldBe Set("eip712Signature available only in V4")
-  }
-
-  it should "be not contain proofs" in {
-    val testOrder = Order(
-      Order.V4,
-      PublicKey(EthStubBytes32),
-      PublicKey(EthStubBytes32),
-      AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
-      OrderType.BUY,
-      1,
-      1,
-      123,
-      321,
-      1,
-      Waves,
-      Proofs(ByteStr.empty),
-      eip712Signature = EthSignature(
-        "0xb557dae4c614146dd35ba6fd80e4702a75d33ffcb8af09e80e0c1a7386b8ffcb5b76bd8037f6484de809a80a5b39a224301c76e8bad9b1a9e7ada53ba6fa7e361c"
-      )
-    )
-
-    testOrder.isValid(123).labels shouldBe Set("eip712Signature excludes proofs")
   }
 
   it should "work in exchange transaction" in {
@@ -137,7 +94,7 @@ class EthOrderSpec
     diff should containAppliedTx(transaction.id())
   }
 
-  it should "work in exchange transaction with old order" in {
+  it should "work in exchange transaction with an old order" in {
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
@@ -165,6 +122,106 @@ class EthOrderSpec
     diff should containAppliedTx(transaction.id())
   }
 
+  it should "recover valid ids of exchange tx" in {
+    val blockchain = createBlockchainStub { blockchain =>
+      val sh = StubHelpers(blockchain)
+      sh.creditBalance(TxHelpers.matcher.toAddress, *)
+      sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
+      sh.issueAsset(ByteStr(EthStubBytes32))
+    }
+
+    val buyOrder = Order
+      .selfSigned(
+        Order.V3,
+        TxHelpers.defaultSigner,
+        TxHelpers.matcher.publicKey,
+        AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
+        OrderType.BUY,
+        1,
+        100L,
+        1,
+        123,
+        100000,
+        Waves
+      )
+      .withProofs(TxHelpers.signature("2Bi5YFCeAUvQqWFJYUTzaDUfAdoHmQ4RC6nviBwvQgUYJLKrsa4T5eESGr5Er261kdeyNgHVJUGai8mALtLLWDoQ"))
+
+    val sellOrder = ethSellOrder.copy(orderAuthentication =
+      EthSignature(
+        "0x6c4385dd5f6f1200b4d0630c9076104f34c801c16a211e505facfd743ba242db4429b966ffa8d2a9aff9037dafda78cfc8f7c5ef1c94493f5954bc7ebdb649281b"
+      )
+    )
+
+    StubHelpers(blockchain).creditBalance(sellOrder.senderAddress, *)
+
+    val transaction = TxHelpers
+      .exchange(buyOrder, sellOrder, TxVersion.V3, 100)
+      .copy(proofs = TxHelpers.signature("4WrABDgkk9JraBLNQK4LTq7LWqVLgLzAEv8fr1rjr4ovca7224EBzLrEgcHdtHscGpQbLsk39ttQfqHMVLr9tXcB"))
+
+    transaction.json() should matchJson("""{
+                                          |  "type": 7,
+                                          |  "id": "GNz9EGRPNroTXhQ4Kjz2Qb4u3oBoRdteRTYwsHfDHJW5",
+                                          |  "fee": 1000000,
+                                          |  "feeAssetId": null,
+                                          |  "timestamp": 100,
+                                          |  "version": 3,
+                                          |  "chainId": 69,
+                                          |  "sender": "3FrCwv8uFRxQazhX6Lno45aZ68Bof6ScaeF",
+                                          |  "senderPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                          |  "proofs": [
+                                          |    "4WrABDgkk9JraBLNQK4LTq7LWqVLgLzAEv8fr1rjr4ovca7224EBzLrEgcHdtHscGpQbLsk39ttQfqHMVLr9tXcB"
+                                          |  ],
+                                          |  "order1": {
+                                          |    "version": 3,
+                                          |    "id": "75YqwVQbiQmLMQBE61W1aLcsaAUnWbzM5Udh9Z4mXUBf",
+                                          |    "sender": "3FrCwv8uFRxQazhX6Lno45aZ68Bof6ScaeF",
+                                          |    "senderPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                          |    "matcherPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                          |    "assetPair": {
+                                          |      "amountAsset": "5fQPsn8hoaVddFG26cWQ5QFdqxWtUPNaZ9zH2E6LYzFn",
+                                          |      "priceAsset": null
+                                          |    },
+                                          |    "orderType": "buy",
+                                          |    "amount": 1,
+                                          |    "price": 100,
+                                          |    "timestamp": 1,
+                                          |    "expiration": 123,
+                                          |    "matcherFee": 100000,
+                                          |    "signature": "2Bi5YFCeAUvQqWFJYUTzaDUfAdoHmQ4RC6nviBwvQgUYJLKrsa4T5eESGr5Er261kdeyNgHVJUGai8mALtLLWDoQ",
+                                          |    "proofs": [
+                                          |      "2Bi5YFCeAUvQqWFJYUTzaDUfAdoHmQ4RC6nviBwvQgUYJLKrsa4T5eESGr5Er261kdeyNgHVJUGai8mALtLLWDoQ"
+                                          |    ],
+                                          |    "matcherFeeAssetId": null
+                                          |  },
+                                          |  "order2": {
+                                          |    "version": 4,
+                                          |    "id": "8274Mc8WiNQdP3YhinBGkEX79AcZe5th51DJCTW8rEUZ",
+                                          |    "sender": "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
+                                          |    "senderPublicKey": "5vwTDMooR7Hp57MekN7qHz7fHNVrkn2Nx4CiWdq4cyBR4LNnZWYAr7UfBbzhmSvtNkv6e45aJ4Q4aKCSinyHVw33",
+                                          |    "matcherPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                          |    "assetPair": {
+                                          |      "amountAsset": "5fQPsn8hoaVddFG26cWQ5QFdqxWtUPNaZ9zH2E6LYzFn",
+                                          |      "priceAsset": null
+                                          |    },
+                                          |    "orderType": "sell",
+                                          |    "amount": 1,
+                                          |    "price": 100,
+                                          |    "timestamp": 1,
+                                          |    "expiration": 123,
+                                          |    "matcherFee": 100000,
+                                          |    "signature": "",
+                                          |    "proofs": [],
+                                          |    "matcherFeeAssetId": null,
+                                          |    "eip712Signature": "0x6c4385dd5f6f1200b4d0630c9076104f34c801c16a211e505facfd743ba242db4429b966ffa8d2a9aff9037dafda78cfc8f7c5ef1c94493f5954bc7ebdb649281b",
+                                          |    "priceMode": null
+                                          |  },
+                                          |  "amount": 1,
+                                          |  "price": 100,
+                                          |  "buyMatcherFee": 100000,
+                                          |  "sellMatcherFee": 100000
+                                          |}""".stripMargin)
+  }
+
   it should "not work in exchange transaction with changed signature" in {
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
@@ -177,15 +234,15 @@ class EthOrderSpec
     val transaction = TxHelpers
       .exchange(ethBuyOrder, ethSellOrder, TxVersion.V3, 100)
       .copy(
-        order2 = ethSellOrder.copy(
-          eip712Signature = EthSignature(
+        order2 = ethSellOrder.copy(orderAuthentication =
+          EthSignature(
             "0x1717804a1d60149988821546732442eabc69f46b2764e231eaeef48351d9f36577278c3f29fe3d61500932190dba8c045b19acda117a4690bfd3d2c28bb67bf91c"
           )
         )
       )
 
     differ(transaction).resultE should matchPattern {
-      case Left(err) if err.toString.contains("Proof doesn't validate as signature") =>
+      case Left(err) if err.toString.contains("negative waves balance") =>
     }
   }
 
@@ -234,16 +291,16 @@ class EthOrderSpec
 
       val script = TxHelpers.script(
         """
-                                      |{-# STDLIB_VERSION 5 #-}
-                                      |{-# CONTENT_TYPE EXPRESSION #-}
-                                      |{-# SCRIPT_TYPE ACCOUNT #-}
-                                      |
-                                      |
-                                      |match tx {
-                                      |  case e: ExchangeTransaction => if (e.buyOrder.proofs[0] == base58'' && e.sellOrder.proofs[0] == base58'') then true else throw("Only ethereum")
-                                      |  case _: Order => true
-                                      |  case _ => false
-                                      |}""".stripMargin
+          |{-# STDLIB_VERSION 5 #-}
+          |{-# CONTENT_TYPE EXPRESSION #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |
+          |
+          |match tx {
+          |  case e: ExchangeTransaction => if (e.buyOrder.proofs[0] == base58'' && e.sellOrder.proofs[0] == base58'') then true else throw("Only ethereum")
+          |  case _: Order => true
+          |  case _ => false
+          |}""".stripMargin
       )
       sh.setScript(TxHelpers.matcher.toAddress, script)
     }
@@ -253,4 +310,48 @@ class EthOrderSpec
     val diff        = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
   }
+}
+
+object EthOrderSpec extends EthHelpers {
+
+  /** Use for create a hardcoded signature for a test order
+    * @param order
+    *   Order parameters
+    */
+  def signOrder(order: Order): Unit = {
+    val signature = EthOrders.signOrder(order, TxHelpers.defaultEthSigner)
+    println(EthEncoding.toHexString(signature))
+  }
+
+  val ethBuyOrder: Order = Order(
+    Order.V4,
+    EthSignature(
+      "0x0a897d382e4e4a066e1d98e5c3c1051864a557c488571ff71e036c0f5a2c7204274cb293cd4aa7ad40f8c2f650e1a2770ecca6aa14a1da883388fa3b5b9fa8b71c"
+    ),
+    TxHelpers.matcher.publicKey,
+    AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
+    OrderType.BUY,
+    1,
+    100L,
+    1,
+    123,
+    100000,
+    Waves
+  )
+
+  val ethSellOrder: Order = Order(
+    Order.V4,
+    EthSignature(
+      "0x6c4385dd5f6f1200b4d0630c9076104f34c801c16a211e505facfd743ba242db4429b966ffa8d2a9aff9037dafda78cfc8f7c5ef1c94493f5954bc7ebdb649281b"
+    ),
+    TxHelpers.matcher.publicKey,
+    AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
+    OrderType.SELL,
+    1,
+    100L,
+    1,
+    123,
+    100000,
+    Waves
+  )
 }
