@@ -2,10 +2,9 @@ package com.wavesplatform.events
 
 import java.nio.file.Files
 
-import scala.concurrent.{Await, Promise}
+import scala.concurrent.{Await, Future, Promise}
 import scala.concurrent.duration._
 import scala.util.Random
-
 import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, KeyPair}
@@ -38,6 +37,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import io.grpc.StatusException
 import io.grpc.stub.{CallStreamObserver, StreamObserver}
 import monix.eval.Task
@@ -535,6 +535,33 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
       d.appendBlock()
 
       check()
+    }
+
+    "should handle modifying last block correctly" in withDomainAndRepo { (d, repo) =>
+      (1 to 5).foreach(_ => d.appendBlock())
+
+      val subscription = Future {
+        d.blockchain.height shouldBe 5
+        d.addressTransactions(TxHelpers.defaultAddress) shouldBe Nil
+        // microblock was not appended
+
+        val subscription = repo.createSubscription(SubscribeRequest.of(1, 5))
+
+        while (d.blockchain.height == 5) {}
+        d.addressTransactions(TxHelpers.defaultAddress).head._2.typeId shouldBe TransferTransaction.typeId
+        // both microblock and key block was appended
+
+        subscription.cancel()
+        subscription.futureValue.map(_.getUpdate.height) shouldBe (1 to 4)
+        // 4 because 5th block was liquid on loading
+      }
+
+      val modifyBlock = Future {
+        d.appendMicroBlock(TxHelpers.transfer())
+        d.appendKeyBlock()
+      }
+
+      Await.result(Future.sequence(List(subscription, modifyBlock)), 5 seconds)
     }
   }
 
