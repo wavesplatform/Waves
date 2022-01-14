@@ -169,7 +169,6 @@ object JsAPI {
             ctx.compilerContext,
             Global.LetBlockVersions.contains(stdLibVer),
             stdLibVer,
-            ds.scriptType == Call,
             estimator
           )
           .map {

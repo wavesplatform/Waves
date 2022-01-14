@@ -1,13 +1,13 @@
 package com.wavesplatform.transaction.smart.script
 
-import com.wavesplatform.lang.directives._
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.*
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script, ScriptPreprocessor}
-import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.utils._
+import com.wavesplatform.utils.*
 
 object ScriptCompiler extends ScorexLogging {
 
@@ -40,7 +40,7 @@ object ScriptCompiler extends ScorexLogging {
       defaultStdLib: => StdLibVersion,
       fixEstimateOfVerifier: Boolean
   ): Either[String, (Script, Script.ComplexityInfo)] =
-    compileAndEstimate(scriptText, estimator, Map(), Script.complexityInfo, defaultStdLib, fixEstimateOfVerifier)
+    compileAndEstimate(scriptText, estimator, Map(), Script.complexityInfo(_, _, _, _), defaultStdLib, fixEstimateOfVerifier)
 
   private def compileAndEstimate[C](
       scriptText: String,

@@ -1,29 +1,29 @@
 package com.wavesplatform.lang.v1.compiler
 
-import cats.instances.list._
-import cats.instances.option._
-import cats.instances.vector._
-import cats.syntax.applicative._
-import cats.syntax.either._
-import cats.syntax.traverse._
+import cats.instances.list.*
+import cats.instances.option.*
+import cats.instances.vector.*
+import cats.syntax.applicative.*
+import cats.syntax.either.*
+import cats.syntax.traverse.*
 import cats.{Id, Show}
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.DApp._
+import com.wavesplatform.lang.contract.DApp.*
 import com.wavesplatform.lang.contract.meta.{MetaMapper, V1, V2}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, WrongArgumentType}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.{VariableInfo, vars}
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler.*
 import com.wavesplatform.lang.v1.compiler.ScriptResultSource.FreeCall
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, LONG, STRING}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
-import com.wavesplatform.lang.v1.evaluator.ctx.impl._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.*
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Type}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
-import com.wavesplatform.lang.v1.task.imports._
+import com.wavesplatform.lang.v1.task.imports.*
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 
 object ContractCompiler {
@@ -219,7 +219,9 @@ object ContractCompiler {
         var resultDApp = DApp(metaWithErr._1.get, decs, callableFuncs, verifierFuncOptWithErr._1.get)
 
         if (removeUnusedCode) resultDApp = ContractScriptCompactor.removeUnusedCode(resultDApp)
-        if (needCompaction) resultDApp = ContractScriptCompactor.compact(resultDApp)
+        if (needCompaction) {
+          resultDApp = ContractScriptCompactor.compact(resultDApp)
+        }
 
         (Some(resultDApp), parsedDappResult, subExprErrorList)
       } else {

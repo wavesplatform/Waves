@@ -1,28 +1,23 @@
-package com.wavesplatform.lang.contract
+package com.wavesplatform.lang.contract.serialization
+
+import cats.instances.list._
+import cats.syntax.either._
+import cats.syntax.option._
+import cats.syntax.traverse._
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.v1.compiler.Terms.{DECLARATION, FUNC}
+import com.wavesplatform.lang.utils.Serialize._
+import com.wavesplatform.lang.v1.ContractLimits
+import com.wavesplatform.lang.v1.serialization.SerdeV1
+import com.wavesplatform.protobuf.dapp.DAppMeta
+import monix.eval.Coeval
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
-import cats.syntax.either._
-import cats.syntax.traverse._
-import cats.instances.either._
-import cats.syntax.option._
-import cats.instances.list._
-import com.wavesplatform.lang.contract.DApp._
-import com.wavesplatform.lang.utils.Serialize._
-import com.wavesplatform.lang.v1.Serde.desAux
-import com.wavesplatform.lang.v1.compiler.Terms.{DECLARATION, FUNC}
-import com.wavesplatform.lang.v1.{ContractLimits, Serde}
-import com.wavesplatform.protobuf.dapp.DAppMeta
-import monix.eval.Coeval
-
-import scala.util.Try
-
-object ContractSerDe {
-
-  val CALL_ANNO: Int = 1
-  val VER_ANNO: Int  = 3
+object ContractSerDeV1 extends ContractSerDe {
 
   def serialize(c: DApp): Either[String, Array[Byte]] =
     for {
@@ -44,7 +39,7 @@ object ContractSerDe {
         c.callableFuncs.foreach(cFunc => serializeAnnotatedFunction(out, cFunc.u, cFunc.annotation.invocationArgName))
 
         c.verifierFuncOpt match {
-          case None     => out.writeInt(0)
+          case None => out.writeInt(0)
           case Some(vf) =>
             out.writeInt(1)
             serializeAnnotatedFunction(out, vf.u, vf.annotation.invocationArgName)
@@ -74,13 +69,13 @@ object ContractSerDe {
       }
     } yield meta
 
-  private[lang]  def serializeDeclaration(out: ByteArrayOutputStream, dec: DECLARATION): Unit = {
-    Serde.serializeDeclaration(out, dec, Serde.serAux(out, Coeval.now(()), _)).value()
+  private[lang] def serializeDeclaration(out: ByteArrayOutputStream, dec: DECLARATION): Unit = {
+    SerdeV1.serializeDeclaration(out, dec, SerdeV1.serAux(out, Coeval.now(()), _)).value()
   }
 
-  private[lang]  def deserializeDeclaration(bb: ByteBuffer): Either[String, DECLARATION] = {
+  private[lang] def deserializeDeclaration(bb: ByteBuffer): Either[String, DECLARATION] = {
     val decType = bb.get()
-    Serde.deserializeDeclaration(bb, desAux(bb), decType).attempt.value().leftMap(_.getMessage)
+    SerdeV1.deserializeDeclaration(bb, SerdeV1.desAux(bb), decType).attempt.value().leftMap(_.getMessage)
   }
 
   private[lang] def serializeAnnotation(out: ByteArrayOutputStream, invocationName: String): Unit = {
@@ -134,22 +129,5 @@ object ContractSerDe {
         case true  => df(bb).map(_.some)
         case false => Right(None)
       }
-  }
-
-  private[lang] def deserializeFromArray[A](bb: ByteBuffer, df: Array[Byte] => Either[String, A]): Either[String, A] = {
-    tryEi {
-      val len = bb.getInt()
-      if (len <= (bb.limit() - bb.position()) && len >= 0) {
-        val arr = new Array[Byte](len)
-        bb.get(arr, bb.arrayOffset(), len)
-        arr
-      } else {
-        throw new Exception(s"At position ${bb.position()} array of arguments too big.")
-      }
-    } flatMap df
-  }
-
-  private[lang] def tryEi[A](f: => A): Either[String, A] = Try(f).toEither.leftMap { e =>
-    if (e.getMessage != null) e.getMessage else e.toString
   }
 }

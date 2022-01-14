@@ -1,10 +1,11 @@
 package com.wavesplatform.lang
 
 import cats.Id
+import cats.syntax.traverse.*
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.Native
@@ -28,9 +29,9 @@ package object utils {
 
   private val Global: BaseGlobal = com.wavesplatform.lang.Global // Hack for IDEA
 
-  val environment = buildEnvironment(ByteStr.empty)
+  val environment: Environment[Id] = buildEnvironment(ByteStr.empty)
 
-  def buildEnvironment(txIdParam: ByteStr) = new Environment[Id] {
+  def buildEnvironment(txIdParam: ByteStr): Environment[Id] = new Environment[Id] {
     override def height: Long                                                                                    = 0
     override def chainId: Byte                                                                                   = 1: Byte
     override def inputEntity: Environment.InputEntity                                                            = null
@@ -104,19 +105,48 @@ package object utils {
           (ds.stdLibVersion, functions())
     }
 
+  private val combinedContext: Map[(StdLibVersion, ContentType), CTX[Environment]] =
+    lazyContexts.groupBy { case (ds, _) =>
+      (ds.stdLibVersion, ds.contentType)
+    }.view
+      .mapValues(
+        _.toList
+          .map(_._2)
+          .sequence
+          .map(Monoid.combineAll[CTX[Environment]])()
+      ).toMap
+
+  private val combinedFunctionCosts: Map[(StdLibVersion, ContentType), Map[FunctionHeader, Coeval[Long]]] =
+    lazyFunctionCosts.groupBy { case (ds, _) =>
+      (ds.stdLibVersion, ds.contentType)
+    }.view
+      .mapValues(
+        _.toList
+          .map(_._2)
+          .sequence
+          .map(_.foldLeft(Map.empty[FunctionHeader, Coeval[Long]])(_ ++ _))()
+      ).toMap
+
   def functionCosts(
       version: StdLibVersion,
       contentType: ContentType = Expression,
       scriptType: ScriptType = Account,
-      isDAppVerifier: Boolean = false
+      isDAppVerifier: Boolean = false,
+      withCombinedContext: Boolean = false
   ): Map[FunctionHeader, Coeval[Long]] =
     if (isDAppVerifier)
       dAppVerifierFunctionCosts(version)
+    else if (withCombinedContext)
+      combinedFunctionCosts(DirectiveSet(version, scriptType, contentType).explicitGet())
     else
       functionCosts(DirectiveSet(version, scriptType, contentType).explicitGet())
 
+
   def functionCosts(ds: DirectiveSet): Map[FunctionHeader, Coeval[Long]] =
     lazyFunctionCosts(ds)()
+
+  def combinedFunctionCosts(ds: DirectiveSet): Map[FunctionHeader, Coeval[Long]] =
+    combinedFunctionCosts((ds.stdLibVersion, ds.contentType))
 
   def estimate(version: StdLibVersion, ctx: EvaluationContext[Environment, Id]): Map[FunctionHeader, Coeval[Long]] = {
     val costs: mutable.Map[FunctionHeader, Coeval[Long]] = mutable.Map.from(ctx.typeDefs.collect {
@@ -138,9 +168,12 @@ package object utils {
 
   def compilerContext(ds: DirectiveSet): CompilerContext = lazyContexts(ds.copy(imports = Imports()))().compilerContext
 
-  def getDecompilerContext(v: StdLibVersion, cType: ContentType, scriptType: ScriptType = Account): DecompilerContext =
-    lazyContexts(DirectiveSet(v, scriptType, cType).explicitGet())().decompilerContext
+  def getDecompilerContext(v: StdLibVersion, cType: ContentType): DecompilerContext =
+    combinedContext((v, cType)).decompilerContext
 
   def varNames(version: StdLibVersion, cType: ContentType): Set[String] =
     compilerContext(version, cType, isAssetScript = false).varDefs.keySet
+
+  def combinedVarNames(version: StdLibVersion, cType: ContentType): Set[String] =
+    combinedContext((version, cType)).compilerContext.varDefs.keySet
 }
