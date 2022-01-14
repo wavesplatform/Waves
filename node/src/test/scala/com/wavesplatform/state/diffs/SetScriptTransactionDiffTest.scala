@@ -100,7 +100,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       val scriptV5 = Try(TxHelpers.scriptV5(scriptText))
       scriptV5 shouldBe Symbol("success")
 
-      val scriptV6 = scriptV5.get.asInstanceOf[ContractScriptImpl].copy(stdLibVersion = StdLibVersion.V6)
+      val scriptV6 = scriptV5.get.copy(stdLibVersion = StdLibVersion.V6)
 
       intercept[RuntimeException](TxHelpers.scriptV6(scriptText)).toString should include("Can't find a function")
 
