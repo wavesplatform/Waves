@@ -1,20 +1,21 @@
 package com.wavesplatform.lang.script
 
-import cats.instances.either._
-import cats.instances.list._
-import cats.instances.option._
-import cats.syntax.either._
-import cats.syntax.flatMap._
-import cats.syntax.foldable._
-import cats.syntax.traverse._
+import cats.instances.either.*
+import cats.instances.list.*
+import cats.instances.option.*
+import cats.syntax.either.*
+import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
+import cats.syntax.traverse.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.VerifierFunction
-import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppType}
-import com.wavesplatform.lang.utils._
-import com.wavesplatform.lang.v1.ContractLimits._
+import com.wavesplatform.lang.contract.meta.MetaMapper
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V6, DApp as DAppType}
+import com.wavesplatform.lang.utils.*
+import com.wavesplatform.lang.v1.ContractLimits.*
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
 import monix.eval.Coeval
@@ -58,6 +59,16 @@ object ContractScript {
       (verifierExpr ::: declExprs ::: callableExprs)
         .exists(com.wavesplatform.lang.v1.compiler.containsArray)
     }
+
+    def isUnionInCallableAllowed: Either[String, Boolean] =
+      if (stdLibVersion < V6) {
+        Right(true)
+      } else {
+        MetaMapper.dicFromProto(expr)
+          .map(!_.callableFuncTypes
+            .exists(_.flatten.exists(_.containsUnion))
+          )
+      }
   }
 
   private def estimateAnnotatedFunctions(

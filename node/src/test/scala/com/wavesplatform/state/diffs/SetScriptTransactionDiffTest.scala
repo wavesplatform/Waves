@@ -5,21 +5,21 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures._
+import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import org.scalacheck.Gen
@@ -82,7 +82,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
   }
 
   property("Script with BlockV2 only works after Ride4DApps feature activation") {
-    import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
+    import com.wavesplatform.lagonaki.mocks.TestBlock.create as block
 
     val settingsUnactivated = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
         BlockchainFeatures.Ride4DApps.id -> 3
@@ -367,7 +367,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       ))
 
     withDomain(settings) { d =>
-      d.appendBlock(keyPairs.map(kp => GenesisTransaction.create(kp.toAddress, 10.waves, System.currentTimeMillis()).explicitGet()): _*)
+      d.appendBlock(keyPairs.map(kp => GenesisTransaction.create(kp.toAddress, 10.waves, System.currentTimeMillis()).explicitGet())*)
       d.appendBlock(
         setScript(0, verifier),
         setScript(1, userFunctions),
@@ -380,5 +380,55 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       d.appendBlockE(setScript(6, innerOverlapWithVerifier)) should produce("shadows preceding declaration")
       d.appendBlockE(setScript(7, innerOverlapWithCallable)) should produce("shadows preceding declaration")
     }
+  }
+
+  property("unions are forbidden as @Callable arguments for RIDE 6 scripts and allowed for RIDE 4 and 5") {
+    def checkForExpr(expr: String, version: StdLibVersion): Assertion = {
+      val compileVersion = if (version == V6) V5 else version
+      val script = ContractScriptImpl(version, TestCompiler(compileVersion).compile(expr).explicitGet())
+
+      val tx = SetScriptTransaction.selfSigned(
+        TxVersion.V1,
+        accountGen.sample.get,
+        Some(script),
+        100000000,
+        1526287561757L
+      )
+
+      if (version == V6) {
+        tx shouldBe Left(GenericError("Union type is not allowed in callable function arguments of script"))
+      } else {
+        tx.toOption shouldBe defined
+      }
+    }
+
+    val exprWithPlainUnion =
+      """
+        |{-# STDLIB_VERSION 5 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |@Callable(i)
+        |func test(a: Int|String) = []
+        |""".stripMargin
+
+    val exprWithListUnion =
+      """
+        |{-# STDLIB_VERSION 5 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |@Callable(i)
+        |func test(a: List[Int|String]) = []
+        |""".stripMargin
+
+    checkForExpr(exprWithPlainUnion, V4)
+    checkForExpr(exprWithListUnion, V4)
+
+    checkForExpr(exprWithPlainUnion, V5)
+    checkForExpr(exprWithListUnion, V5)
+
+    checkForExpr(exprWithPlainUnion, V6)
+    checkForExpr(exprWithListUnion, V6)
   }
 }

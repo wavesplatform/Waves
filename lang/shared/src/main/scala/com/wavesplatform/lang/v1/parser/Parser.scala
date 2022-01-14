@@ -273,7 +273,7 @@ object Parser {
   def matchCaseP(implicit c: fastparse.P[Any]): P[MATCH_CASE] = {
     def checkForGenericAndGetLastPos(t: Type): Either[INVALID, Option[Pos]] =
       t match {
-        case Single(VALID(position, "List"), Some(VALID(_, AnyType(_)))) => Right(Some(position))
+        case Single(VALID(position, Type.ListTypeName), Some(VALID(_, AnyType(_)))) => Right(Some(position))
         case Single(name, parameter) =>
           parameter
             .toLeft(Some(name.position))
