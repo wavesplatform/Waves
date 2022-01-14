@@ -66,7 +66,7 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
     )
 
     liquidState.foreach(
-      ls => db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.update(_.block.modify(_.copy(block = None)))).toByteArray)
+      ls => db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.block.optionalBlock := None).toByteArray)
     )
 
     val ba = BlockAppended.from(block, diff, blockchainBeforeWithMinerReward)
