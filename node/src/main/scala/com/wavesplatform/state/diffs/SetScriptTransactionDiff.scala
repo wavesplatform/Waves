@@ -1,10 +1,10 @@
 package com.wavesplatform.state.diffs
 
-import cats.instances.list._
-import cats.syntax.either._
-import cats.syntax.traverse._
-import com.wavesplatform.features.ComplexityCheckPolicyProvider._
-import com.wavesplatform.features.EstimatorProvider._
+import cats.instances.list.*
+import cats.syntax.either.*
+import cats.syntax.traverse.*
+import com.wavesplatform.features.ComplexityCheckPolicyProvider.*
+import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.DApp

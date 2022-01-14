@@ -5,8 +5,8 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.{ContractScript, ScriptReader}
-import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.test._
 import com.wavesplatform.test.PropSpec
@@ -18,7 +18,7 @@ class ScriptReaderTest extends PropSpec with TypedScriptGen with Inside with Eit
 
   property("should parse all bytes for V1") {
     forAll(exprGen) { sc =>
-      val body     = Array(V1.id.toByte) ++ Serde.serialize(sc) ++ "foo".getBytes("UTF-8")
+      val body     = Array(V1.id.toByte) ++ SerdeV1.serialize(sc) ++ "foo".getBytes("UTF-8")
       val allBytes = body ++ crypto.secureHash(body).take(checksumLength)
       ScriptReader.fromBytes(allBytes) should produce("bytes left")
     }
@@ -27,6 +27,13 @@ class ScriptReaderTest extends PropSpec with TypedScriptGen with Inside with Eit
   property("should parse all bytes for V3") {
     forAll(contractGen) { sc =>
       val allBytes = ContractScript.apply(V3, sc).explicitGet().bytes().arr
+      ScriptReader.fromBytes(allBytes).explicitGet().expr shouldBe sc
+    }
+  }
+
+  property("should parse all bytes for V6") {
+    forAll(contractGen) { sc =>
+      val allBytes = ContractScript.apply(V6, sc).explicitGet().bytes().arr
       ScriptReader.fromBytes(allBytes).explicitGet().expr shouldBe sc
     }
   }
@@ -103,7 +110,7 @@ object ScriptReaderTest {
   // invalid version byte and unknown length of remaining bytes
   val invalidPrefix: Gen[Array[Byte]] =
     for {
-      v  <- Gen.negNum[Byte].suchThat(_ != ScriptReader.FreeCallHeader)
+      v  <- Gen.negNum[Byte]
       n  <- Gen.choose(0, 5)
       bs <- Gen.listOfN(n, Arbitrary.arbitrary[Byte])
     } yield v +: bs.toArray

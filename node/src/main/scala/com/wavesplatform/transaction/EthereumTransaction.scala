@@ -4,7 +4,8 @@ import java.math.BigInteger
 
 import scala.reflect.ClassTag
 
-import com.wavesplatform.account._
+import cats.syntax.either.*
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.lang.ValidationError
@@ -21,12 +22,12 @@ import com.wavesplatform.transaction.validation.{TxConstraints, TxValidator, Val
 import com.wavesplatform.utils.EthEncoding
 import monix.eval.Coeval
 import org.web3j.abi.TypeDecoder
-import org.web3j.abi.datatypes.{Address => EthAddress}
+import org.web3j.abi.datatypes.Address as EthAddress
 import org.web3j.abi.datatypes.generated.Uint256
-import org.web3j.crypto._
+import org.web3j.crypto.*
 import org.web3j.crypto.Sign.SignatureData
 import org.web3j.utils.Convert
-import play.api.libs.json._
+import play.api.libs.json.*
 
 final case class EthereumTransaction(
     payload: EthereumTransaction.Payload,
@@ -111,21 +112,24 @@ object EthereumTransaction {
 
   case class Invocation(dApp: Address, hexCallData: String) extends Payload {
     def toInvokeScriptLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, InvokeScriptTransactionLike] =
-      for {
-        scriptInfo <- blockchain.accountScript(dApp).toRight(GenericError(s"No script at address $dApp"))
-        (extractedCall, extractedPayments) = ABIConverter(scriptInfo.script).decodeFunctionCall(hexCallData)
-      } yield new InvokeScriptTransactionLike {
-        override def funcCall: Terms.FUNCTION_CALL                  = extractedCall
-        override def payments: Seq[InvokeScriptTransaction.Payment] = extractedPayments
-        override def id: Coeval[ByteStr]                            = tx.id
-        override def dApp: AddressOrAlias                           = Invocation.this.dApp
-        override val sender: PublicKey                              = tx.signerPublicKey()
-        override def root: InvokeScriptTransactionLike              = this
-        override def assetFee: (Asset, TxTimestamp)                 = tx.assetFee
-        override def timestamp: TxTimestamp                         = tx.timestamp
-        override def chainId: TxVersion                             = tx.chainId
-        override def checkedAssets: Seq[Asset.IssuedAsset]          = this.paymentAssets
-        override val tpe: TransactionType                           = TransactionType.InvokeScript
+      blockchain.accountScript(dApp).toRight(GenericError(s"No script at address $dApp")).flatMap { scriptInfo =>
+        ABIConverter(scriptInfo.script).decodeFunctionCall(hexCallData)
+          .leftMap(GenericError(_))
+          .map { case (extractedCall, extractedPayments) =>
+            new InvokeScriptTransactionLike {
+              override def funcCall: Terms.FUNCTION_CALL                  = extractedCall
+              override def payments: Seq[InvokeScriptTransaction.Payment] = extractedPayments
+              override def id: Coeval[ByteStr]                            = tx.id
+              override def dApp: AddressOrAlias                           = Invocation.this.dApp
+              override val sender: PublicKey                              = tx.signerPublicKey()
+              override def root: InvokeScriptTransactionLike              = this
+              override def assetFee: (Asset, TxTimestamp)                 = tx.assetFee
+              override def timestamp: TxTimestamp                         = tx.timestamp
+              override def chainId: TxVersion                             = tx.chainId
+              override def checkedAssets: Seq[Asset.IssuedAsset]          = this.paymentAssets
+              override val tpe: TransactionType                           = TransactionType.InvokeScript
+            }
+          }
       }
   }
 

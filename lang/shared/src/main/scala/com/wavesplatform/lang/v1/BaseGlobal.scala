@@ -3,10 +3,10 @@ package com.wavesplatform.lang.v1
 import cats.syntax.either._
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.meta.{FunctionSignatures, MetaMapper, ParsedMeta}
-import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
-import com.wavesplatform.lang.directives.values.{Asset, Call, Expression, ScriptType, StdLibVersion, V1, V2, DApp => DAppType}
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.serialization.{ContractSerDeV1, ContractSerDeV2}
+import com.wavesplatform.lang.directives.values.{Asset, Call, Expression, ScriptType, StdLibVersion, V1, V2, V6, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
-import com.wavesplatform.lang.script.ScriptReader.FreeCallHeader
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
@@ -23,6 +23,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding._
+import com.wavesplatform.lang.v1.serialization.{SerdeV1, SerdeV2}
 
 import scala.annotation.tailrec
 import scala.util.Random
@@ -78,24 +79,35 @@ trait BaseGlobal {
 
   def checksum(arr: Array[Byte]): Array[Byte] = secureHash(arr).take(4)
 
-  def serializeExpression(expr: EXPR, stdLibVersion: StdLibVersion, isFreeCall: Boolean): Array[Byte] = {
-    val header = if (isFreeCall) Array(FreeCallHeader) else Array()
-    val s      = header ++ Array(stdLibVersion.id.toByte) ++ Serde.serialize(expr)
-    s ++ checksum(s)
+  def serializeExpression(expr: EXPR, stdLibVersion: StdLibVersion): Array[Byte] = {
+    val serialized = if (stdLibVersion < V6) {
+      stdLibVersion.id.toByte +: SerdeV1.serialize(expr)
+    } else {
+      Array(stdLibVersion.id.toByte, Expression.id.toByte) ++ SerdeV2.serialize(expr)
+    }
+
+    serialized ++ checksum(serialized)
   }
 
-  def serializeContract(c: DApp, stdLibVersion: StdLibVersion): Either[String, Array[Byte]] =
-    ContractSerDe
-      .serialize(c)
-      .map(Array(0: Byte, DAppType.id.toByte, stdLibVersion.id.toByte) ++ _)
-      .map(r => r ++ checksum(r))
+  def serializeContract(c: DApp, stdLibVersion: StdLibVersion): Either[String, Array[Byte]] = {
+    val serialized = if (stdLibVersion < V6) {
+      ContractSerDeV1
+        .serialize(c)
+        .map(Array(0: Byte, DAppType.id.toByte, stdLibVersion.id.toByte) ++ _)
+    } else {
+      ContractSerDeV2
+        .serialize(c)
+        .map(Array(stdLibVersion.id.toByte, DAppType.id.toByte) ++ _)
+    }
+
+    serialized.map(r => r ++ checksum(r))
+  }
 
   def parseAndCompileExpression(
       input: String,
       context: CompilerContext,
       letBlockOnly: Boolean,
       stdLibVersion: StdLibVersion,
-      isFreeCall: Boolean,
       estimator: ScriptEstimator
   ): Either[String, (Array[Byte], Long, Expressions.SCRIPT, Iterable[CompilationError])] = {
     (for {
@@ -103,7 +115,7 @@ trait BaseGlobal {
       (compExpr, exprScript, compErrorList) = compRes
       illegalBlockVersionUsage              = letBlockOnly && com.wavesplatform.lang.v1.compiler.containsBlockV2(compExpr)
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
-      bytes = if (compErrorList.isEmpty) serializeExpression(compExpr, stdLibVersion, isFreeCall) else Array.empty[Byte]
+      bytes = if (compErrorList.isEmpty) serializeExpression(compExpr, stdLibVersion) else Array.empty[Byte]
 
       vars  = utils.varNames(stdLibVersion, Expression)
       costs = utils.functionCosts(stdLibVersion, DAppType)
@@ -152,7 +164,7 @@ trait BaseGlobal {
     val isFreeCall = scriptType == Call
     for {
       expr <- if (isFreeCall) ContractCompiler.compileFreeCall(input, context, version) else compiler(input, context)
-      bytes = serializeExpression(expr, version, isFreeCall)
+      bytes = serializeExpression(expr, version)
       _ <- ExprScript.validateBytes(bytes, isFreeCall)
       complexity <- ExprScript.estimateExact(expr, version, isFreeCall, estimator)
     } yield (bytes, expr, complexity)

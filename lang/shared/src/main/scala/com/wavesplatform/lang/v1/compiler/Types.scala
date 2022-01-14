@@ -1,7 +1,9 @@
 package com.wavesplatform.lang.v1.compiler
 
-import cats.syntax.traverse._
-import cats.instances.list._
+import cats.syntax.traverse.*
+import cats.instances.list.*
+
+import scala.annotation.tailrec
 
 object Types {
 
@@ -150,6 +152,19 @@ object Types {
     }
 
     def <=(l2: FINAL): Boolean = l2 >= l1
+
+    def containsUnion: Boolean = {
+      @tailrec
+      def check(tpe: FINAL): Boolean = {
+        tpe match {
+          case Types.UNION(types, _) if types.size > 1 => true
+          case Types.LIST(Types.UNION(types, _)) if types.size > 1 => true
+          case Types.LIST(inner@Types.LIST(_)) => check(inner)
+          case _ => false
+        }
+      }
+      check(l1)
+    }
   }
 
   val UNIT: CASETYPEREF    = CASETYPEREF("Unit", List.empty)

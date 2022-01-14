@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.account._
-import com.wavesplatform.api.http.requests._
-import com.wavesplatform.api.http.requests.DataRequest._
-import com.wavesplatform.api.http.requests.InvokeExpressionRequest._
-import com.wavesplatform.api.http.requests.SponsorFeeRequest._
+import com.wavesplatform.account.*
+import com.wavesplatform.api.http.requests.*
+import com.wavesplatform.api.http.requests.DataRequest.*
+import com.wavesplatform.api.http.requests.InvokeExpressionRequest.*
+import com.wavesplatform.api.http.requests.SponsorFeeRequest.*
 import com.wavesplatform.api.http.versionReads
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -12,11 +12,11 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, UnsupportedTransactionType, UnsupportedTypeAndVersion, WrongChain}
-import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.assets.*
+import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.{JsObject, JsValue}
@@ -383,7 +383,7 @@ object TransactionFactory {
     } yield tx
 
   def fromSignedRequest(jsv: JsValue): Either[ValidationError, Transaction] = {
-    import InvokeScriptRequest._
+    import InvokeScriptRequest.*
     val chainId = (jsv \ "chainId").asOpt[Byte]
     val typeId  = (jsv \ "type").as[Byte]
     val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
@@ -418,7 +418,7 @@ object TransactionFactory {
   }
 
   def parseRequestAndSign(wallet: Wallet, signerAddress: String, time: Time, jsv: JsObject): Either[ValidationError, Transaction] = {
-    import play.api.libs.json._
+    import play.api.libs.json.*
 
     val typeId = (jsv \ "type").as[Byte]
 

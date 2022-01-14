@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import cats.Show
 import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.{Declaration, PART}
@@ -136,6 +136,10 @@ object CompilationError {
 
   final case class GenericFunctionNotFound(start: Int, end: Int, name: String) extends CompilationError {
     val message = s"Can't find a generic function $name[T]"
+  }
+
+  final case class UnionNotAllowedForCallableArgs(start: Int, end: Int) extends CompilationError {
+    val message = "Union type is not allowed for callable function arguments"
   }
 
   final case class Generic(start: Int, end: Int, message: String) extends CompilationError

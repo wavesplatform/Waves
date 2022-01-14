@@ -1,21 +1,21 @@
 package com.wavesplatform.state.diffs
 
-import cats.instances.either._
-import cats.syntax.flatMap._
-import cats.syntax.ior._
-import cats.syntax.semigroup._
+import cats.instances.either.*
+import cats.syntax.flatMap.*
+import cats.syntax.ior.*
+import cats.syntax.semigroup.*
 import com.google.common.base.Utf8
 import com.google.protobuf.ByteString
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.EstimatorProvider._
+import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue, SponsorFee}
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction.{Asset, ERC20Address}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.utils.ScorexLogging
 
 object AssetTransactionsDiff extends ScorexLogging {
