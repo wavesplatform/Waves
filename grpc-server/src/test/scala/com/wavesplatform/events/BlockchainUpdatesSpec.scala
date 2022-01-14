@@ -1,24 +1,23 @@
 package com.wavesplatform.events
 
 import java.nio.file.Files
+import java.util.Map
 
-import scala.concurrent.{Await, Future, Promise}
-import scala.concurrent.duration._
-import scala.util.Random
 import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
+import com.wavesplatform.database.openDB
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
+import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
 import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdatesRangeRequest, SubscribeEvent, SubscribeRequest}
-import com.wavesplatform.events.protobuf.{TransactionMetadata, BlockchainUpdated => PBBlockchainUpdated}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.events.protobuf.serde._
+import com.wavesplatform.events.protobuf.{TransactionMetadata, BlockchainUpdated => PBBlockchainUpdated}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -27,25 +26,31 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
-import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation}
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult
+import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
 import com.wavesplatform.test.{FreeSpec, _}
-import com.wavesplatform.transaction.{Asset, GenesisTransaction, PaymentTransaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, PaymentTransaction, TxHelpers}
 import io.grpc.StatusException
 import io.grpc.stub.{CallStreamObserver, StreamObserver}
 import monix.eval.Task
 import monix.execution.CancelableFuture
 import monix.execution.Scheduler.Implicits.global
+import org.iq80.leveldb
+import org.iq80.leveldb.{DB, DBIterator, ReadOptions, Snapshot, WriteBatch, WriteOptions}
 import org.scalactic.source.Position
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.ScalaFutures
+
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future, Promise}
+import scala.util.Random
 
 class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures with PathMockFactory {
   var currentSettings: WavesSettings = domainSettingsWithFS(
@@ -537,37 +542,88 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
       check()
     }
 
-    "should handle modifying last block correctly" in withDomainAndRepo { (d, repo) =>
-      (1 to 5).foreach(_ => d.appendBlock())
+    "should handle modifying last block correctly" in {
+      @volatile var suspend   = true
+      @volatile var startRead = false
+      withDomainAndRepo(
+        { (d, repo) =>
+          (1 to 5).foreach(_ => d.appendBlock())
 
-      val subscription = Future {
-        d.blockchain.height shouldBe 5
-        d.addressTransactions(TxHelpers.defaultAddress) shouldBe Nil
-        // microblock was not appended
+          val subscription = Future {
+            val s = repo.createSubscription(SubscribeRequest.of(1, 5))
+            while (repo.height == 5) {}
+            s.cancel()
+            s
+          }.flatten
 
-        val subscription = repo.createSubscription(SubscribeRequest.of(1, 5))
+          val modifyBlock = Future {
+            while (!startRead) {}
+            // waiting start of loader
 
-        while (d.blockchain.height == 5) {}
-        d.addressTransactions(TxHelpers.defaultAddress).head._2.typeId shouldBe TransferTransaction.typeId
-        // both microblock and key block was appended
+            d.appendMicroBlock(TxHelpers.transfer())
+            d.appendKeyBlock()
 
-        subscription.cancel()
-        subscription.futureValue.map(_.getUpdate.height) shouldBe (1 to 4)
-        // 4 because 5th block was liquid on loading
-      }
+            suspend = false
+            // allow to continue loading
+          }
 
-      val modifyBlock = Future {
-        d.appendMicroBlock(TxHelpers.transfer())
-        d.appendKeyBlock()
-      }
-
-      Await.result(Future.sequence(List(subscription, modifyBlock)), 5 seconds)
+          Await
+            .result(Future.sequence(List(subscription, modifyBlock)), 5 seconds)
+            .head
+            .asInstanceOf[Seq[SubscribeEvent]]
+            .map(_.getUpdate.height) shouldBe (1 to 4)
+        },
+        Some(interferableDB(suspend, { startRead = true }))
+      )
     }
   }
 
-  def withDomainAndRepo(f: (Domain, Repo) => Unit): Unit = {
+  def interferableDB(suspend: => Boolean, onHasNext: => Unit): DB = new DB {
+    private val db = openDB(Files.createTempDirectory("bc-updates").toString)
+
+    override def get(key: Array[Byte], options: ReadOptions): Array[Byte] = db.get(key, options)
+    override def put(key: Array[Byte], value: Array[Byte]): Unit          = db.put(key, value)
+    override def getSnapshot: Snapshot                                    = db.getSnapshot
+    override def close(): Unit                                            = db.close()
+
+    override def get(key: Array[Byte]): Array[Byte]                                         = ???
+    override def delete(key: Array[Byte]): Unit                                             = ???
+    override def write(updates: WriteBatch): Unit                                           = ???
+    override def createWriteBatch(): WriteBatch                                             = ???
+    override def put(key: Array[Byte], value: Array[Byte], options: WriteOptions): Snapshot = ???
+    override def delete(key: Array[Byte], options: WriteOptions): Snapshot                  = ???
+    override def write(updates: WriteBatch, options: WriteOptions): Snapshot                = ???
+    override def getApproximateSizes(ranges: leveldb.Range*): Array[Long]                   = ???
+    override def getProperty(name: String): String                                          = ???
+    override def suspendCompactions(): Unit                                                 = ???
+    override def resumeCompactions(): Unit                                                  = ???
+    override def compactRange(begin: Array[Byte], end: Array[Byte]): Unit                   = ???
+    override def iterator(): DBIterator                                                     = ???
+
+    override def iterator(options: ReadOptions): DBIterator = new DBIterator {
+      private val iterator = db.iterator()
+
+      override def next(): Map.Entry[Array[Byte], Array[Byte]] = iterator.next()
+      override def close(): Unit                               = iterator.close()
+      override def seek(key: Array[Byte]): Unit                = iterator.seek(key)
+      override def hasNext: Boolean = {
+        onHasNext
+        while (suspend) {}
+        iterator.hasNext
+      }
+
+      override def seekToFirst(): Unit                             = ???
+      override def peekNext(): Map.Entry[Array[Byte], Array[Byte]] = ???
+      override def hasPrev: Boolean                                = ???
+      override def prev(): Map.Entry[Array[Byte], Array[Byte]]     = ???
+      override def peekPrev(): Map.Entry[Array[Byte], Array[Byte]] = ???
+      override def seekToLast(): Unit                              = ???
+    }
+  }
+
+  def withDomainAndRepo(f: (Domain, Repo) => Unit, dbOpt: Option[DB] = None): Unit = {
     withDomain(currentSettings) { d =>
-      withRepo(d.blocksApi) { repo =>
+      withRepo(d.blocksApi, dbOpt) { repo =>
         d.triggers = Seq(repo)
         f(d, repo)
       }
@@ -608,8 +664,9 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
       f: Seq[PBBlockchainUpdated] => Unit
   ): Unit = withGenerateSubscription(request)(d => for (_ <- 1 to count) d.appendBlock())(f)
 
-  def withRepo[T](blocksApi: CommonBlocksApi = stub[CommonBlocksApi])(f: Repo => T): T = {
-    val repo = new Repo(Files.createTempDirectory("bc-updates").toString, blocksApi)
+  def withRepo[T](blocksApi: CommonBlocksApi = stub[CommonBlocksApi], dbOpt: Option[DB] = None)(f: Repo => T): T = {
+    val db   = dbOpt.getOrElse(openDB(Files.createTempDirectory("bc-updates").toString))
+    val repo = new Repo(db, blocksApi)
     try f(repo)
     finally repo.shutdown()
   }
