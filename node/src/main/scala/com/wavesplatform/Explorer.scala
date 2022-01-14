@@ -3,7 +3,6 @@ package com.wavesplatform
 import java.io.File
 import java.nio.ByteBuffer
 import java.util
-
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressPortfolio

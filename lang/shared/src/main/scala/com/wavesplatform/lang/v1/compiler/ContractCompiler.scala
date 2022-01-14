@@ -221,7 +221,9 @@ object ContractCompiler {
         var resultDApp = DApp(metaWithErr._1.get, decs, callableFuncs, verifierFuncOptWithErr._1.get)
 
         if (removeUnusedCode) resultDApp = ContractScriptCompactor.removeUnusedCode(resultDApp)
-        if (needCompaction) resultDApp = ContractScriptCompactor.compact(resultDApp)
+        if (needCompaction) {
+          resultDApp = ContractScriptCompactor.compact(resultDApp)
+        }
 
         (Some(resultDApp), parsedDappResult, subExprErrorList)
       } else {

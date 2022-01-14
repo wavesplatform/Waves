@@ -2,14 +2,14 @@ package com.wavesplatform.lang.v1.estimator
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.FunctionHeader.Native
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 
 import scala.collection.immutable.ArraySeq
 
@@ -233,8 +233,8 @@ class ScriptEstimatorV3Test
     estimateNoOverhead(script) shouldBe Right(0)
   }
 
-  property("sync invoke functions are allowed only for dApps") {
-    def expr(id: Short) = FUNCTION_CALL(
+  property("sync invoke functions are allowed only for dApps and invoke expressions") {
+    def expr(id: Short): FUNCTION_CALL = FUNCTION_CALL(
       Native(id),
       List(
         CaseObj(CASETYPEREF("Address", Nil), Map()),
@@ -247,6 +247,8 @@ class ScriptEstimatorV3Test
     estimate(functionCosts(V5), expr(FunctionIds.CALLDAPPREENTRANT)) should produce("not found")
     estimate(functionCosts(V5, DApp), expr(FunctionIds.CALLDAPP)) shouldBe Right(79)
     estimate(functionCosts(V5, DApp), expr(FunctionIds.CALLDAPPREENTRANT)) shouldBe Right(79)
+    estimate(functionCosts(V6, Expression, Call), expr(FunctionIds.CALLDAPP)) shouldBe Right(79)
+    estimate(functionCosts(V6, Expression, Call), expr(FunctionIds.CALLDAPPREENTRANT)) shouldBe Right(79)
   }
 
   property("overflow on sum of function args costs") {

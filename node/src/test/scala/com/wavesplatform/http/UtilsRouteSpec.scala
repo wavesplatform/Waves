@@ -19,13 +19,14 @@ import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunctio
 import com.wavesplatform.lang.directives.values.{V2, V3, V6}
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
+import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.protobuf.dapp.DAppMeta.{CallableFuncSignature, CompactNameAndOriginalNamePair}
+import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.settings.TestSettings
 import com.wavesplatform.state.{Blockchain, IntegerDataEntry}
 import com.wavesplatform.state.diffs.FeeValidation
@@ -289,7 +290,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
      """.stripMargin.trim + "\n"
 
   val freeCallExpr =
-    ByteStr(Global.serializeExpression(TestCompiler(V6).compileFreeCall(freeCall).expr, V6, isFreeCall = true)).base64
+    ByteStr(Global.serializeExpression(TestCompiler(V6).compileFreeCall(freeCall).expr, V6)).base64
 
   routePath("/script/decompile") in {
     val base64 = ExprScript(script).explicitGet().bytes().base64
@@ -358,7 +359,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         """
           |{-# STDLIB_VERSION 6 #-}
           |{-# CONTENT_TYPE EXPRESSION #-}
-          |{-# SCRIPT_TYPE CALL #-}
           |let a = this
           |let r = invoke(Address(base58'3MS5SZmYhDWiFh8DvAhKuMMdcmGDiNWqawv'), "child", nil, nil)
           |if ((r == r))
@@ -546,7 +546,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   routePath("/script/compileCode") in {
     Post(routePath("/script/compileCode?compact=true"), dAppWithNonCallable) ~> route ~> check {
       responseAs[JsValue] should matchJson("""{
-                                             |  "script" : "base64:AAIDAAAAAAAAAA0IARoJCgFhEgR0ZXN0AAAAAQEAAAABYQAAAAAGAAAAAAAAAAA00atG",
+                                             |  "script" : "base64:AAIDAAAAAAAAAAgIASIEdGVzdAAAAAEBAAAAAWEAAAAABgAAAAAAAAAAyF8thg==",
                                              |  "complexity" : 0,
                                              |  "verifierComplexity" : 0,
                                              |  "callableComplexities" : { },
@@ -556,7 +556,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       val script = (responseAs[JsValue] \ "script").as[String]
       inside(Script.fromBase64String(script).explicitGet()) {
         case ContractScript.ContractScriptImpl(_, expr) =>
-          expr.meta.compactNameAndOriginalNamePairList shouldBe Seq(CompactNameAndOriginalNamePair("a", "test"))
+          expr.meta.originalNames shouldBe Vector("test")
       }
     }
 
@@ -764,12 +764,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "error").as[Int] shouldBe 305
       (json \ "message").as[String] shouldBe "Script estimation was interrupted"
     }
-
-    Post(routePath("/script/estimate"), freeCallExpr) ~> route ~> check {
-      val json = responseAs[JsValue]
-      (json \ "error").as[Int] shouldBe 305
-      (json \ "message").as[String] shouldBe "Invoke Expression Transaction is not activated yet"
-    }
   }
 
   routePath(s"/script/estimate after ${BlockchainFeatures.RideV6}") in {
@@ -780,7 +774,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/estimate"), freeCallExpr) ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "complexity").as[Long] shouldBe 132
-      (json \ "verifierComplexity").as[Long] shouldBe 0
+      (json \ "verifierComplexity").as[Long] shouldBe 132
       (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map()
       (json \ "extraFee").as[Long] shouldBe 0
     }
@@ -847,7 +841,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       Post(routePath(s"/script/evaluate/$address"), Json.obj("expr" -> text))
 
     def evalBin(expr: EXPR) = {
-      val serialized = ByteStr(Serde.serialize(expr))
+      val serialized = ByteStr(SerdeV1.serialize(expr))
       Post(routePath(s"/script/evaluate/$dAppAddress"), Json.obj("expr" -> serialized.toString))
     }
 
