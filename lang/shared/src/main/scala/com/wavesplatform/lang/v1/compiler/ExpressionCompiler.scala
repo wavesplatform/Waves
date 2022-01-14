@@ -1,21 +1,20 @@
 package com.wavesplatform.lang.v1.compiler
 
 import java.nio.charset.StandardCharsets
-
-import cats.implicits._
+import cats.implicits.*
 import cats.{Id, Show}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.compiler.CompilationError._
-import com.wavesplatform.lang.v1.compiler.CompilerContext._
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
-import com.wavesplatform.lang.v1.evaluator.ctx._
+import com.wavesplatform.lang.v1.compiler.CompilationError.*
+import com.wavesplatform.lang.v1.compiler.CompilerContext.*
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Types.*
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
+import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, CompositePattern, ConstsPat, MATCH_CASE, ObjPat, PART, Pos, Single, TuplePat, TypedVar}
+import com.wavesplatform.lang.v1.parser.BinaryOperation.*
+import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, CompositePattern, ConstsPat, MATCH_CASE, ObjPat, PART, Pos, Single, TuplePat, Type, TypedVar}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
-import com.wavesplatform.lang.v1.task.imports._
+import com.wavesplatform.lang.v1.task.imports.*
 import com.wavesplatform.lang.v1.{BaseGlobal, ContractLimits, FunctionHeader}
 
 import scala.util.Try
@@ -212,8 +211,8 @@ object ExpressionCompiler {
 
   private def findGenericType(p: Pos, t: String): Either[CompilationError, FINAL => FINAL] =
     t match {
-      case "List" => Right(LIST)
-      case _      => Left(GenericTypeNotFound(p.start, p.end, t))
+      case Type.ListTypeName => Right(LIST)
+      case _ => Left(GenericTypeNotFound(p.start, p.end, t))
     }
 
   private def compileMatch(
@@ -915,7 +914,7 @@ object ExpressionCompiler {
           .map {
             case Expressions.Single(t, None) =>
               Expressions.FUNCTION_CALL(pos, PART.VALID(pos, "_isInstanceOf"), List(v, Expressions.CONST_STRING(pos, t))): Expressions.EXPR
-            case Expressions.Single(PART.VALID(pos, "List"), Some(PART.VALID(_, Expressions.AnyType(_)))) =>
+            case Expressions.Single(PART.VALID(pos, Type.ListTypeName), Some(PART.VALID(_, Expressions.AnyType(_)))) =>
               val t = PART.VALID(pos, "List[Any]")
               Expressions.FUNCTION_CALL(
                 pos,
@@ -927,7 +926,7 @@ object ExpressionCompiler {
           .reduceRight[Expressions.EXPR] { (c, r) =>
             BINARY_OP(pos, c, BinaryOperation.OR_OP, r)
           }
-      case (pat @ TypedVar(_, Expressions.Single(PART.VALID(_, "List"), Some(PART.VALID(_, Expressions.AnyType(_))))), path) =>
+      case (pat @ TypedVar(_, Expressions.Single(PART.VALID(_, Type.ListTypeName), Some(PART.VALID(_, Expressions.AnyType(_))))), path) =>
         val pos = pat.position
         val v   = mkGet(path, newRef, pos)
         val t   = PART.VALID(pos, "List[Any]")
@@ -956,7 +955,7 @@ object ExpressionCompiler {
           .map {
             case Expressions.Single(t, None) =>
               List(t)
-            case Expressions.Single(PART.VALID(pos, "List"), Some(PART.VALID(_, Expressions.AnyType(_)))) =>
+            case Expressions.Single(PART.VALID(pos, Type.ListTypeName), Some(PART.VALID(_, Expressions.AnyType(_)))) =>
               val t = PART.VALID(pos, "List[Any]")
               List(t)
             case _ => ???
@@ -964,7 +963,7 @@ object ExpressionCompiler {
           .reduceRight[Seq[PART[String]]] { (ct, rt) =>
             rt ++ ct
           }
-      case (_, pat @ TypedVar(_, Expressions.Single(PART.VALID(_, "List"), Some(PART.VALID(_, Expressions.AnyType(_)))))) =>
+      case (_, pat @ TypedVar(_, Expressions.Single(PART.VALID(_, Type.ListTypeName), Some(PART.VALID(_, Expressions.AnyType(_)))))) =>
         val pos = pat.position
         val t   = PART.VALID(pos, "List[Any]")
         List(t)
