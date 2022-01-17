@@ -577,6 +577,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
     }
   }
 
+  //noinspection ScalaUnusedSymbol
   def interferableDB(suspend: => Boolean, onHasNext: => Unit): DB = new DB {
     private val db = openDB(Files.createTempDirectory("bc-updates").toString)
 
