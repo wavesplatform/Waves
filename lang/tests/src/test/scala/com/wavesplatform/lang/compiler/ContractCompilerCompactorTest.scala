@@ -1,123 +1,77 @@
 package com.wavesplatform.lang.compiler
 
-import cats.syntax.semigroup._
-import com.google.protobuf.ByteString
+import cats.syntax.semigroup.*
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.DApp._
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{Directive, DirectiveParser, DirectiveSet}
-import com.wavesplatform.lang.script.ScriptPreprocessor
-import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.compiler
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, Terms}
+import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
+import com.wavesplatform.lang.script.{Script, ScriptPreprocessor}
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.v1.compiler.ContractScriptCompactor
+import com.wavesplatform.lang.v1.{CTX, compiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
-import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.protobuf.dapp.DAppMeta.{CallableFuncSignature, CompactNameAndOriginalNamePair}
-import com.wavesplatform.test._
+import com.wavesplatform.protobuf.dapp.DAppMeta.CompactNameAndOriginalNamePair
+import com.wavesplatform.test.*
+import org.scalatest.Assertion
 
 class ContractCompilerCompactorTest extends PropSpec {
-  property("contract script compaction - V4, V5") {
-    val script =
-      """
-        | {-# CONTENT_TYPE DAPP #-}
-        |
-        | let fooVar = 42
-        |
-        | func barFunc(barFuncArg1: Int) = 100500 + barFuncArg1
-        |
-        | @Callable(invocation)
-        | func bazCallableFunc(bazCallableFuncArg1: Int, bazCallableFuncArg2: String) = {
-        |   let result = barFunc(fooVar) + bazCallableFuncArg1
-        |   [
-        |     IntegerEntry("integerEntryKey", result),
-        |     StringEntry("stringEntryKey", bazCallableFuncArg2)
-        |   ]
-        | }
-        |
+  implicit class DAppExt(dApp: DApp) {
+    def compactedSource(stdLibVersion: StdLibVersion = V5): String =
+      Script.decompile(ContractScriptImpl(stdLibVersion, dApp.copy(meta = DAppMeta())))._1
+  }
+
+  property("contract script compaction - V4, V5, V6") {
+
+    def exprForV(version: StdLibVersion): Expressions.DAPP = {
+      val script =
+        """
+          | {-# CONTENT_TYPE DAPP #-}
+          |
+          | let fooVar = 42
+          |
+          | func barFunc(barFuncArg1: Int) = 100500 + barFuncArg1
+          |
+          | @Callable(invocation)
+          | func bazCallableFunc(bazCallableFuncArg1: Int, bazCallableFuncArg2: String) = {
+          |   let result = barFunc(fooVar) + bazCallableFuncArg1
+          |   [
+          |     IntegerEntry("integerEntryKey", result),
+          |     StringEntry("stringEntryKey", bazCallableFuncArg2)
+          |   ]
+          | }
+          |
         """.stripMargin
-    val exprV4 = {
-      val v4Script = "{-# STDLIB_VERSION 4 #-}\n" + script
-      Parser.parseContract(v4Script).get.value
+      val resultScript = s"{-# STDLIB_VERSION ${version.id} #-}\n" + script
+      Parser.parseContract(resultScript).get.value
     }
 
-    val exprV5 = {
-      val v5Script = "{-# STDLIB_VERSION 5 #-}\n" + script
-      Parser.parseContract(v5Script).get.value
+    def checkForV(version: StdLibVersion): Assertion = {
+      val result = compiler.ContractCompiler(ctxForV(version).compilerContext, exprForV(version), version, needCompaction = true).explicitGet().compactedSource(version)
+      result shouldBe s"""{-# STDLIB_VERSION ${version.id} #-}
+                         |{-# SCRIPT_TYPE ACCOUNT #-}
+                         |{-# CONTENT_TYPE DAPP #-}
+                         |let a = 42
+                         |
+                         |func b (c) = (100500 + c)
+                         |
+                         |
+                         |@Callable(d)
+                         |func bazCallableFunc (e,f) = {
+                         |    let g = (b(a) + e)
+                         |[IntegerEntry("integerEntryKey", g), StringEntry("stringEntryKey", f)]
+                         |    }
+                         |
+                         |""".stripMargin
     }
 
-    val expectedResult = Right(
-      DApp(
-        DAppMeta(
-          version = 2,
-          List(
-            CallableFuncSignature(ByteString.copyFrom(Array[Byte](1, 8)))
-          ),
-          Seq(
-            ("a1", "fooVar"),
-            ("a2", "barFunc"),
-            ("a3", "barFuncArg1"),
-            ("a4", "invocation"),
-            ("a5", "bazCallableFuncArg1"),
-            ("a6", "bazCallableFuncArg2"),
-            ("a7", "result")
-          ).map(el => CompactNameAndOriginalNamePair(el._1, el._2))
-        ),
-        List(
-          LET("a1", CONST_LONG(42L)),
-          Terms.FUNC(
-            "a2",
-            List("a3"),
-            FUNCTION_CALL(Native(100), List(CONST_LONG(100500L), REF("a3")))
-          )
-        ),
-        List(
-          CallableFunction(
-            CallableAnnotation("a4"),
-            Terms.FUNC(
-              "bazCallableFunc",
-              List("a5", "a6"),
-              LET_BLOCK(
-                LET(
-                  "a7",
-                  FUNCTION_CALL(Native(100), List(FUNCTION_CALL(User("a2"), List(REF("a1"))), REF("a5")))
-                ),
-                FUNCTION_CALL(
-                  Native(1100),
-                  List(
-                    FUNCTION_CALL(User("IntegerEntry"), List(CONST_STRING("integerEntryKey").explicitGet(), REF("a7"))),
-                    FUNCTION_CALL(
-                      Native(1100),
-                      List(
-                        FUNCTION_CALL(User("StringEntry"), List(CONST_STRING("stringEntryKey").explicitGet(), REF("a6"))),
-                        REF("nil")
-                      )
-                    )
-                  )
-                )
-              )
-            )
-          )
-        ),
-        None
-      )
-    )
-
-    val ctxV4 =
-      PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
-
-    val ctxV5 =
-      PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
-
-    compiler.ContractCompiler(ctxV4.compilerContext, exprV4, V4, needCompaction = true) shouldBe expectedResult
-    compiler.ContractCompiler(ctxV5.compilerContext, exprV5, V5, needCompaction = true) shouldBe expectedResult
+    checkForV(V4)
+    checkForV(V5)
+    checkForV(V6)
   }
 
   property("contract script compaction - V3") {
@@ -141,82 +95,30 @@ class ContractCompilerCompactorTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
 
-    val expectedResult = Right(
-      DApp(
-        DAppMeta(
-          version = 1,
-          List(
-            CallableFuncSignature(ByteString.copyFrom(Array[Byte](1, 8)))
-          ),
-          Seq(
-            ("a1", "fooVar"),
-            ("a2", "barFunc"),
-            ("a3", "barFuncArg1"),
-            ("a4", "invocation"),
-            ("a5", "bazCallableFuncArg1"),
-            ("a6", "bazCallableFuncArg2"),
-            ("a7", "result")
-          ).map(el => CompactNameAndOriginalNamePair(el._1, el._2))
-        ),
-        List(
-          LET("a1", CONST_LONG(42L)),
-          Terms.FUNC(
-            "a2",
-            List("a3"),
-            FUNCTION_CALL(Native(100), List(CONST_LONG(100500L), REF("a3")))
-          )
-        ),
-        List(
-          CallableFunction(
-            CallableAnnotation("a4"),
-            Terms.FUNC(
-              "bazCallableFunc",
-              List("a5", "a6"),
-              LET_BLOCK(
-                LET(
-                  "a7",
-                  FUNCTION_CALL(Native(100), List(FUNCTION_CALL(User("a2"), List(REF("a1"))), REF("a5")))
-                ),
-                FUNCTION_CALL(
-                  User(FieldNames.WriteSet),
-                  List(
-                    FUNCTION_CALL(
-                      Native(1100),
-                      List(
-                        FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("integerEntryKey").explicitGet(), REF("a7"))),
-                        FUNCTION_CALL(
-                          Native(1100),
-                          List(
-                            FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("stringEntryKey").explicitGet(), REF("a6"))),
-                            REF("nil")
-                          )
-                        )
-                      )
-                    )
-                  )
-                )
-              )
-            )
-          )
-        ),
-        None
-      )
-    )
-
-    val stdLibVer = V3
-    val ctx =
-      PureContext.build(stdLibVer, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(stdLibVer, Account, DAppType).explicitGet())
-
-    val compilationResult = compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVer, needCompaction = true)
-    compilationResult shouldBe expectedResult
+    val compilationResult =
+      compiler.ContractCompiler(ctxForV(V3).compilerContext, expr, V3, needCompaction = true).explicitGet().compactedSource(V3)
+    compilationResult shouldBe """{-# STDLIB_VERSION 3 #-}
+                                 |{-# SCRIPT_TYPE ACCOUNT #-}
+                                 |{-# CONTENT_TYPE DAPP #-}
+                                 |let a = 42
+                                 |
+                                 |func b (c) = (100500 + c)
+                                 |
+                                 |
+                                 |@Callable(d)
+                                 |func bazCallableFunc (e,f) = {
+                                 |    let g = (b(a) + e)
+                                 |    WriteSet([DataEntry("integerEntryKey", g), DataEntry("stringEntryKey", f)])
+                                 |    }
+                                 |
+                                 |""".stripMargin
   }
 
   property("contract script compaction - vars with the same name") {
-    val expr = {
+    def exprForV(version: StdLibVersion): Expressions.DAPP = {
       val script =
-        """
-          | {-# STDLIB_VERSION 5 #-}
+        s"""
+          | {-# STDLIB_VERSION ${version.id} #-}
           | {-# CONTENT_TYPE DAPP #-}
           |
           | func barFunc() = {
@@ -238,133 +140,77 @@ class ContractCompilerCompactorTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
 
-    val expectedResult = Right(
-      DApp(
-        DAppMeta(
-          version = 2,
-          List.empty,
-          Seq(
-            ("a1", "barFunc"),
-            ("a2", "fooVar"),
-            ("a3", "bazFunc"),
-            ("a4", "verify")
-          ).map(el => CompactNameAndOriginalNamePair(el._1, el._2))
-        ),
-        List(
-          Terms.FUNC(
-            "a1",
-            List.empty,
-            LET_BLOCK(
-              LET("a2", CONST_LONG(40L)),
-              REF("a2")
-            )
-          ),
-          Terms.FUNC(
-            "a3",
-            List.empty,
-            LET_BLOCK(
-              LET("a2", CONST_LONG(2L)),
-              REF("a2")
-            )
-          )
-        ),
-        List.empty,
-        Some(
-          VerifierFunction(
-            VerifierAnnotation("tx"),
-            Terms.FUNC(
-              "a4",
-              List(),
-              FUNCTION_CALL(
-                Native(0),
-                List(
-                  FUNCTION_CALL(Native(100), List(FUNCTION_CALL(User("a1"), List()), FUNCTION_CALL(User("a3"), List()))),
-                  CONST_LONG(42L)
-                )
-              )
-            )
-          )
-        )
-      )
-    )
+    def checkForV(version: StdLibVersion): Assertion = {
+      val result = compiler.ContractCompiler(ctxForV(version).compilerContext, exprForV(version), version, needCompaction = true).explicitGet().compactedSource(version)
+      result shouldBe s"""{-# STDLIB_VERSION ${version.id} #-}
+                         |{-# SCRIPT_TYPE ACCOUNT #-}
+                         |{-# CONTENT_TYPE DAPP #-}
+                         |func a () = {
+                         |    let b = 40
+                         |    b
+                         |    }
+                         |
+                         |
+                         |func c () = {
+                         |    let b = 2
+                         |    b
+                         |    }
+                         |
+                         |
+                         |
+                         |@Verifier(d)
+                         |func e () = ((a() + c()) == 42)
+                         |""".stripMargin
+    }
 
-    val ctx =
-      PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
-
-    val compilationResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = true)
-    compilationResult shouldBe expectedResult
+    checkForV(V5)
+    checkForV(V6)
   }
 
   property("contract script compaction - script var has name as compacted name") {
-    val expr = {
+    def exprForV(version: StdLibVersion): Expressions.DAPP = {
       val script =
-        """
-          | {-# STDLIB_VERSION 5 #-}
+        s"""
+          | {-# STDLIB_VERSION ${version.id} #-}
           | {-# CONTENT_TYPE DAPP #-}
           |
           | let fooVar = "some value"
           |
           | @Verifier(tx)
           | func verify() = {
-          |   let a1 = "some value"
-          |   fooVar == a1
+          |   let a = "some value"
+          |   fooVar == a
           | }
           |
         """.stripMargin
       Parser.parseContract(script).get.value
     }
 
-    val expectedResult = Right(
-      DApp(
-        DAppMeta(
-          version = 2,
-          List.empty,
-          Seq(
-            ("a1", "fooVar"),
-            ("a2", "verify"),
-            ("a3", "a1")
-          ).map(el => CompactNameAndOriginalNamePair(el._1, el._2))
-        ),
-        List(
-          LET("a1", CONST_STRING("some value").explicitGet())
-        ),
-        List.empty,
-        Some(
-          VerifierFunction(
-            VerifierAnnotation("tx"),
-            Terms.FUNC(
-              "a2",
-              List(),
-              LET_BLOCK(
-                LET("a3", CONST_STRING("some value").explicitGet()),
-                FUNCTION_CALL(
-                  Native(0),
-                  List(
-                    REF("a1"),
-                    REF("a3")
-                  )
-                )
-              )
-            )
-          )
-        )
-      )
-    )
+    def checkForV(version: StdLibVersion): Assertion = {
+      val result = compiler.ContractCompiler(ctxForV(version).compilerContext, exprForV(version), version, needCompaction = true).explicitGet().compactedSource(version)
+      result shouldBe s"""{-# STDLIB_VERSION ${version.id} #-}
+                         |{-# SCRIPT_TYPE ACCOUNT #-}
+                         |{-# CONTENT_TYPE DAPP #-}
+                         |let a = "some value"
+                         |
+                         |
+                         |@Verifier(b)
+                         |func c () = {
+                         |    let d = "some value"
+                         |    (a == d)
+                         |    }
+                         |""".stripMargin
+    }
 
-    val ctx =
-      PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
-
-    val compilationResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = true)
-    compilationResult shouldBe expectedResult
+    checkForV(V5)
+    checkForV(V6)
   }
 
   property("contract script decompaction - decompacted result equal to common compiled result") {
-    val expr = {
+    def exprForV(version: StdLibVersion): Expressions.DAPP = {
       val script =
-        """
-          | {-# STDLIB_VERSION 5 #-}
+        s"""
+          | {-# STDLIB_VERSION ${version.id} #-}
           | {-# CONTENT_TYPE DAPP #-}
           |
           | let fooVar = 42
@@ -384,23 +230,94 @@ class ContractCompilerCompactorTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
 
-    val ctx =
-      PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
+    def checkForV(version: StdLibVersion): Assertion = {
+      val compilationCompactedResult = compiler.ContractCompiler(ctxForV(version).compilerContext, exprForV(version), version, needCompaction = true)
+      val decompactedResult          = ContractScriptCompactor.decompact(compilationCompactedResult.explicitGet())
 
-    val compilationCompactedResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = true)
-    val decompactedResult          = ContractScriptCompactor.decompact(compilationCompactedResult.explicitGet())
+      //noinspection RedundantDefaultArgument
+      val compilationResult = compiler.ContractCompiler(ctxForV(version).compilerContext, exprForV(version), version, needCompaction = false)
 
-    val compilationResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = false)
+      decompactedResult shouldBe compilationResult.explicitGet()
+    }
 
-    decompactedResult shouldBe compilationResult.explicitGet()
+    checkForV(V5)
+    checkForV(V6)
+  }
+
+  property("contract script decompaction - ContractScriptCompactor must decompact scripts compacted by old compaction algorithm") {
+    def expr: Expressions.DAPP = {
+      val script =
+        s"""
+           | {-# STDLIB_VERSION 5 #-}
+           | {-# CONTENT_TYPE DAPP #-}
+           |
+           | let fooVar = 42
+           |
+           | func barFunc(barFuncArg1: Int) = 100500 + barFuncArg1
+           |
+           | @Callable(invocation)
+           | func bazCallableFunc(bazCallableFuncArg1: Int, bazCallableFuncArg2: String) = {
+           |   let result = barFunc(fooVar) + bazCallableFuncArg1
+           |   [
+           |     IntegerEntry("integerEntryKey", result),
+           |     StringEntry("stringEntryKey", bazCallableFuncArg2)
+           |   ]
+           | }
+           |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    def compactedExpr: Expressions.DAPP = {
+      val script =
+        s"""
+           | {-# STDLIB_VERSION 5 #-}
+           | {-# CONTENT_TYPE DAPP #-}
+           |
+           | let a = 42
+           |
+           | func b(c: Int) = 100500 + c
+           |
+           | @Callable(d)
+           | func bazCallableFunc(e: Int, f: String) = {
+           |   let g = b(a) + e
+           |   [
+           |     IntegerEntry("integerEntryKey", g),
+           |     StringEntry("stringEntryKey", f)
+           |   ]
+           | }
+           |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    val oldCompOriginalNames = Seq(
+      "a" -> "fooVar",
+      "b" -> "barFunc",
+      "c" -> "barFuncArg1",
+      "d" -> "invocation",
+      "e" -> "bazCallableFuncArg1",
+      "f" -> "bazCallableFuncArg2",
+      "g" -> "result"
+    ).map(p => CompactNameAndOriginalNamePair(p._1, p._2))
+
+    val compilationNotCompactedResult = compiler.ContractCompiler(ctxForV(V5).compilerContext, expr, V5).explicitGet()
+    val compilationCompactedResultNoMeta = compiler.ContractCompiler(ctxForV(V5).compilerContext, compactedExpr, V5).explicitGet()
+    val oldCompactedResult = compilationCompactedResultNoMeta.copy(
+      meta = compilationCompactedResultNoMeta.meta
+        .withCompactNameAndOriginalNamePairList(oldCompOriginalNames)
+        .withFuncs(compilationNotCompactedResult.meta.funcs)
+    )
+    val decompactedResult = ContractScriptCompactor.decompact(oldCompactedResult)
+
+    decompactedResult shouldBe compilationNotCompactedResult
   }
 
   property("contract script compaction - remove unused code") {
-    val expr = {
+    def exprForV(version: StdLibVersion): Expressions.DAPP = {
       val script =
-        """
-          |{-# STDLIB_VERSION 5 #-}
+        s"""
+          |{-# STDLIB_VERSION ${version.id} #-}
           |{-# CONTENT_TYPE DAPP #-}
           |
           |let varX = 111
@@ -426,77 +343,35 @@ class ContractCompilerCompactorTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
 
-    val expectedResult = Right(
-      DApp(
-        DAppMeta(
-          version = 2,
-          List(
-            CallableFuncSignature(ByteString.copyFrom(Array[Byte]()))
-          ),
-          Seq(
-            ("a1", "varX"),
-            ("a2", "varY"),
-            ("a3", "func2"),
-            ("a4", "func1"),
-            ("a5", "tmp1"),
-            ("a6", "verify")
-          ).map(el => CompactNameAndOriginalNamePair(el._1, el._2))
-        ),
-        List(
-          LET("a1", CONST_LONG(111L)),
-          LET("a2", CONST_LONG(222L)),
-          Terms.FUNC(
-            "a3",
-            List(),
-            FUNCTION_CALL(Native(101), List(CONST_LONG(100500L), REF("a2")))
-          ),
-          Terms.FUNC(
-            "a4",
-            List(),
-            FUNCTION_CALL(Native(100), List(FUNCTION_CALL(User("a3"), List()), CONST_LONG(42L)))
-          )
-        ),
-        List(
-          CallableFunction(
-            CallableAnnotation("i"),
-            Terms.FUNC(
-              "call",
-              List(),
-              LET_BLOCK(
-                LET(
-                  "a5",
-                  FUNCTION_CALL(Native(100), List(FUNCTION_CALL(User("a4"), List()), REF("a1")))
-                ),
-                FUNCTION_CALL(
-                  Native(1100),
-                  List(
-                    FUNCTION_CALL(User("IntegerEntry"), List(CONST_STRING("somekey").explicitGet(), REF("a5"))),
-                    REF("nil")
-                  )
-                )
-              )
-            )
-          )
-        ),
-        Some(
-          VerifierFunction(
-            VerifierAnnotation("tx"),
-            Terms.FUNC(
-              "a6",
-              List(),
-              FUNCTION_CALL(User("!="), List(FUNCTION_CALL(User("a3"), List()), REF("a1")))
-            )
-          )
-        )
-      )
-    )
+    def checkForV(version: StdLibVersion): Assertion = {
+      val result = compiler.ContractCompiler(ctxForV(version).compilerContext, exprForV(version), version, needCompaction = true, removeUnusedCode = true).explicitGet().compactedSource(version)
+      result shouldBe s"""{-# STDLIB_VERSION ${version.id} #-}
+                         |{-# SCRIPT_TYPE ACCOUNT #-}
+                         |{-# CONTENT_TYPE DAPP #-}
+                         |let a = 111
+                         |
+                         |let b = 222
+                         |
+                         |func c () = (100500 - b)
+                         |
+                         |
+                         |func d () = (c() + 42)
+                         |
+                         |
+                         |@Callable(e)
+                         |func call () = {
+                         |    let f = (d() + a)
+                         |[IntegerEntry("somekey", f)]
+                         |    }
+                         |
+                         |
+                         |@Verifier(g)
+                         |func h () = (c() != a)
+                         |""".stripMargin
+    }
 
-    val ctx =
-      PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
-
-    val compilationResult = compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = true, removeUnusedCode = true)
-    compilationResult shouldBe expectedResult
+    checkForV(V5)
+    checkForV(V6)
   }
 
   property("contract script with imports - remove unused code") {
@@ -516,9 +391,9 @@ class ContractCompilerCompactorTest extends PropSpec {
           """.stripMargin
       )
 
-    val script =
-      """
-        | {-# STDLIB_VERSION 5 #-}
+    def scriptForV(version: StdLibVersion): String =
+      s"""
+        | {-# STDLIB_VERSION ${version.id} #-}
         | {-# CONTENT_TYPE DAPP #-}
         | {-# IMPORT lib1,lib2 #-}
         |
@@ -528,57 +403,405 @@ class ContractCompilerCompactorTest extends PropSpec {
         | }
       """.stripMargin
 
-    val expectedResult = Right(
-      DApp(
-        DAppMeta(
-          version = 2,
-          List.empty,
-          Seq.empty
-        ),
-        List(
-          Terms.FUNC(
-            "bar",
-            List.empty,
-            CONST_LONG(2L)
-          ),
-          Terms.FUNC(
-            "foo",
-            List.empty,
-            CONST_LONG(40L)
-          )
-        ),
-        List.empty,
-        Some(
-          VerifierFunction(
-            VerifierAnnotation("tx"),
-            Terms.FUNC(
-              "verify",
-              List(),
-              FUNCTION_CALL(
-                Native(0),
-                List(
-                  FUNCTION_CALL(Native(100), List(FUNCTION_CALL(User("foo"), List()), FUNCTION_CALL(User("bar"), List()))),
-                  CONST_LONG(42L)
-                )
-              )
-            )
-          )
-        )
-      )
-    )
+    def checkForV(version: StdLibVersion): Assertion = {
+      //noinspection RedundantDefaultArgument
+      val compilationResult = for {
+        directives <- DirectiveParser(scriptForV(version))
+        ds         <- Directive.extractDirectives(directives)
+        linked     <- ScriptPreprocessor(scriptForV(version), libraries, ds.imports)
+        expr = Parser.parseContract(linked).get.value
+        r <- compiler.ContractCompiler(ctxForV(version).compilerContext, expr, version, needCompaction = false, removeUnusedCode = true)
+      } yield r.compactedSource(version)
 
-    val ctx =
-      PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
+      compilationResult.explicitGet() shouldBe s"""{-# STDLIB_VERSION ${version.id} #-}
+                                                 |{-# SCRIPT_TYPE ACCOUNT #-}
+                                                 |{-# CONTENT_TYPE DAPP #-}
+                                                 |func bar () = 2
+                                                 |
+                                                 |
+                                                 |func foo () = 40
+                                                 |
+                                                 |
+                                                 |
+                                                 |@Verifier(tx)
+                                                 |func verify () = ((foo() + bar()) == 42)
+                                                 |""".stripMargin
+    }
 
-    val compilationResult = for {
-      directives <- DirectiveParser(script)
-      ds         <- Directive.extractDirectives(directives)
-      linked     <- ScriptPreprocessor(script, libraries, ds.imports)
-      expr = Parser.parseContract(linked).get.value
-      r <- compiler.ContractCompiler(ctx.compilerContext, expr, V5, needCompaction = false, removeUnusedCode = true)
-    } yield r
-
-    compilationResult shouldBe expectedResult
+    checkForV(V5)
+    checkForV(V6)
   }
+
+  property("contract script compaction - fix shadowing") {
+    def exprForV(version: StdLibVersion): Expressions.DAPP = {
+      val script =
+        s"""{-# STDLIB_VERSION ${version.id} #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |
+          |func a() = true
+          |func b() = a()
+          |func bb() = b()
+          |
+          |@Callable(i)
+          |func c() = {
+          |  strict r = bb()
+          |  []
+          |}""".stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    def checkForV(version: StdLibVersion): Assertion = {
+      val result = compiler.ContractCompiler(ctxForV(version).compilerContext, exprForV(version), version, needCompaction = true).explicitGet().compactedSource(version)
+      result shouldBe s"""{-# STDLIB_VERSION ${version.id} #-}
+                         |{-# SCRIPT_TYPE ACCOUNT #-}
+                         |{-# CONTENT_TYPE DAPP #-}
+                         |func a () = true
+                         |
+                         |
+                         |func b () = a()
+                         |
+                         |
+                         |func d () = b()
+                         |
+                         |
+                         |@Callable(e)
+                         |func c () = {
+                         |    let f = d()
+                         |    if ((f == f))
+                         |        then nil
+                         |        else throw("Strict value is not equal to itself.")
+                         |    }
+                         |
+                         |""".stripMargin
+    }
+
+    checkForV(V5)
+    checkForV(V6)
+  }
+
+  property("contract script compaction - many names") {
+    def exprForV(version: StdLibVersion): Expressions.DAPP = {
+      val script =
+        s"""{-# STDLIB_VERSION ${version.id} #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |
+          |${(1 to 100).map("func a" + _ + " () = true").mkString("\n")}""".stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    def checkForV(version: StdLibVersion): Assertion = {
+      val result = compiler.ContractCompiler(ctxForV(version).compilerContext, exprForV(version), version, needCompaction = true).explicitGet().compactedSource(version)
+      result shouldBe s"""{-# STDLIB_VERSION ${version.id} #-}
+                        |{-# SCRIPT_TYPE ACCOUNT #-}
+                        |{-# CONTENT_TYPE DAPP #-}
+                        |func a () = true
+                        |
+                        |
+                        |func b () = true
+                        |
+                        |
+                        |func c () = true
+                        |
+                        |
+                        |func d () = true
+                        |
+                        |
+                        |func e () = true
+                        |
+                        |
+                        |func f () = true
+                        |
+                        |
+                        |func g () = true
+                        |
+                        |
+                        |func h () = true
+                        |
+                        |
+                        |func i () = true
+                        |
+                        |
+                        |func j () = true
+                        |
+                        |
+                        |func k () = true
+                        |
+                        |
+                        |func l () = true
+                        |
+                        |
+                        |func m () = true
+                        |
+                        |
+                        |func n () = true
+                        |
+                        |
+                        |func o () = true
+                        |
+                        |
+                        |func p () = true
+                        |
+                        |
+                        |func q () = true
+                        |
+                        |
+                        |func r () = true
+                        |
+                        |
+                        |func s () = true
+                        |
+                        |
+                        |func t () = true
+                        |
+                        |
+                        |func u () = true
+                        |
+                        |
+                        |func v () = true
+                        |
+                        |
+                        |func w () = true
+                        |
+                        |
+                        |func x () = true
+                        |
+                        |
+                        |func y () = true
+                        |
+                        |
+                        |func z () = true
+                        |
+                        |
+                        |func A () = true
+                        |
+                        |
+                        |func B () = true
+                        |
+                        |
+                        |func C () = true
+                        |
+                        |
+                        |func D () = true
+                        |
+                        |
+                        |func E () = true
+                        |
+                        |
+                        |func F () = true
+                        |
+                        |
+                        |func G () = true
+                        |
+                        |
+                        |func H () = true
+                        |
+                        |
+                        |func I () = true
+                        |
+                        |
+                        |func J () = true
+                        |
+                        |
+                        |func K () = true
+                        |
+                        |
+                        |func L () = true
+                        |
+                        |
+                        |func M () = true
+                        |
+                        |
+                        |func N () = true
+                        |
+                        |
+                        |func O () = true
+                        |
+                        |
+                        |func P () = true
+                        |
+                        |
+                        |func Q () = true
+                        |
+                        |
+                        |func R () = true
+                        |
+                        |
+                        |func S () = true
+                        |
+                        |
+                        |func T () = true
+                        |
+                        |
+                        |func U () = true
+                        |
+                        |
+                        |func V () = true
+                        |
+                        |
+                        |func W () = true
+                        |
+                        |
+                        |func X () = true
+                        |
+                        |
+                        |func Y () = true
+                        |
+                        |
+                        |func Z () = true
+                        |
+                        |
+                        |func aa () = true
+                        |
+                        |
+                        |func ab () = true
+                        |
+                        |
+                        |func ac () = true
+                        |
+                        |
+                        |func ad () = true
+                        |
+                        |
+                        |func ae () = true
+                        |
+                        |
+                        |func af () = true
+                        |
+                        |
+                        |func ag () = true
+                        |
+                        |
+                        |func ah () = true
+                        |
+                        |
+                        |func ai () = true
+                        |
+                        |
+                        |func aj () = true
+                        |
+                        |
+                        |func ak () = true
+                        |
+                        |
+                        |func al () = true
+                        |
+                        |
+                        |func am () = true
+                        |
+                        |
+                        |func an () = true
+                        |
+                        |
+                        |func ao () = true
+                        |
+                        |
+                        |func ap () = true
+                        |
+                        |
+                        |func aq () = true
+                        |
+                        |
+                        |func ar () = true
+                        |
+                        |
+                        |func as () = true
+                        |
+                        |
+                        |func at () = true
+                        |
+                        |
+                        |func au () = true
+                        |
+                        |
+                        |func av () = true
+                        |
+                        |
+                        |func aw () = true
+                        |
+                        |
+                        |func ax () = true
+                        |
+                        |
+                        |func ay () = true
+                        |
+                        |
+                        |func az () = true
+                        |
+                        |
+                        |func aA () = true
+                        |
+                        |
+                        |func aB () = true
+                        |
+                        |
+                        |func aC () = true
+                        |
+                        |
+                        |func aD () = true
+                        |
+                        |
+                        |func aE () = true
+                        |
+                        |
+                        |func aF () = true
+                        |
+                        |
+                        |func aG () = true
+                        |
+                        |
+                        |func aH () = true
+                        |
+                        |
+                        |func aI () = true
+                        |
+                        |
+                        |func aJ () = true
+                        |
+                        |
+                        |func aK () = true
+                        |
+                        |
+                        |func aL () = true
+                        |
+                        |
+                        |func aM () = true
+                        |
+                        |
+                        |func aN () = true
+                        |
+                        |
+                        |func aO () = true
+                        |
+                        |
+                        |func aP () = true
+                        |
+                        |
+                        |func aQ () = true
+                        |
+                        |
+                        |func aR () = true
+                        |
+                        |
+                        |func aS () = true
+                        |
+                        |
+                        |func aT () = true
+                        |
+                        |
+                        |func aU () = true
+                        |
+                        |
+                        |func aV () = true
+                        |
+                        |
+                        |""".stripMargin
+    }
+
+    checkForV(V5)
+    checkForV(V6)
+  }
+
+  private def ctxForV(version: StdLibVersion): CTX[Environment] =
+    PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment] |+|
+      WavesContext.build(Global, DirectiveSet(version, Account, DAppType).explicitGet())
 }

@@ -22,15 +22,18 @@ import scala.scalajs.js.{Any, Dictionary}
 
 object JsAPI {
 
-  private def wavesContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean) =
+  private def wavesContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean): CTX[Environment] =
+    wavesContext(v, ScriptType.isAssetScript(isTokenContext), isContract)
+
+  private def wavesContext(v: StdLibVersion, scriptType: ScriptType, isContract: Boolean): CTX[Environment] =
     WavesContext.build(
       Global,
-      DirectiveSet(v, ScriptType.isAssetScript(isTokenContext), if (isContract) DAppType else Expression)
+      DirectiveSet(v, scriptType, if (isContract) DAppType else Expression)
         .explicitGet()
     )
 
   private def cryptoContext(version: StdLibVersion) = CryptoContext.build(Global, version).withEnvironment[Environment]
-  private def pureContext(version: StdLibVersion)   = PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[Environment]
+  private def pureContext(version: StdLibVersion)   = PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment]
 
   private val fullDAppContext: Map[StdLibVersion, CTX[Environment]] =
     DirectiveDictionary[StdLibVersion].all
@@ -41,8 +44,13 @@ object JsAPI {
   private def buildScriptContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean): CTX[Environment] =
     Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, isTokenContext, isContract)))
 
+  private def buildScriptContext(v: StdLibVersion, scriptType: ScriptType, isContract: Boolean): CTX[Environment] =
+    Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, scriptType, isContract)))
+
   private def buildContractContext(v: StdLibVersion): CTX[Environment] =
     Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, false, true)))
+
+  private val allEstimators: Seq[ScriptEstimator] = ScriptEstimator.all(fixOverflow = true)
 
   @JSExportTopLevel("getTypes")
   def getTypes(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
@@ -128,14 +136,14 @@ object JsAPI {
   ): js.Dynamic = {
     val r = for {
       estimatorVer <- Either.cond(
-        estimatorVersion > 0 && estimatorVersion <= ScriptEstimator.all.length,
+        estimatorVersion > 0 && estimatorVersion <= allEstimators.length,
         estimatorVersion,
-        s"Version of estimator must be not greater than ${ScriptEstimator.all.length}"
+        s"Version of estimator must be not greater than ${allEstimators.length}"
       )
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
-      compiled    <- parseAndCompileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode)
+      compiled    <- parseAndCompileScript(ds, linkedInput, allEstimators.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode)
     } yield compiled
     r.fold(
       e => js.Dynamic.literal("error" -> e),
@@ -161,7 +169,6 @@ object JsAPI {
             ctx.compilerContext,
             Global.LetBlockVersions.contains(stdLibVer),
             stdLibVer,
-            ds.scriptType == Call,
             estimator
           )
           .map {
@@ -211,14 +218,14 @@ object JsAPI {
   ): js.Dynamic = {
     val r = for {
       estimatorVer <- Either.cond(
-        estimatorVersion > 0 && estimatorVersion <= ScriptEstimator.all.length,
+        estimatorVersion > 0 && estimatorVersion <= allEstimators.length,
         estimatorVersion,
-        s"Version of estimator must be not greater than ${ScriptEstimator.all.length}"
+        s"Version of estimator must be not greater than ${allEstimators.length}"
       )
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
-      compiled    <- compileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode)
+      compiled    <- compileScript(ds, linkedInput, allEstimators.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode)
     } yield compiled
     r.fold(
       e => js.Dynamic.literal("error" -> e),
@@ -237,7 +244,7 @@ object JsAPI {
     val isAsset = ds.scriptType == Asset
     ds.contentType match {
       case Expression =>
-        val ctx = buildScriptContext(version, isAsset, ds.contentType == DAppType)
+        val ctx = buildScriptContext(version, ds.scriptType, ds.contentType == DAppType)
         Global
           .compileExpression(input, ctx.compilerContext, version, ds.scriptType, estimator)
           .map {
@@ -254,7 +261,7 @@ object JsAPI {
                     error => Seq("error" -> error),
                     _ => Seq()
                   )
-              js.Dynamic.literal.applyDynamic("apply")(resultFields ++ errorFieldOpt: _*)
+              js.Dynamic.literal.applyDynamic("apply")((resultFields ++ errorFieldOpt)*)
           }
       case Library =>
         val ctx = buildScriptContext(version, isAsset, ds.contentType == DAppType)
@@ -300,7 +307,7 @@ object JsAPI {
                     _ => Seq()
                   )
               }
-              js.Dynamic.literal.applyDynamic("apply")(resultFields ++ errorFieldOpt: _*)
+              js.Dynamic.literal.applyDynamic("apply")((resultFields ++ errorFieldOpt)*)
           }
     }
   }

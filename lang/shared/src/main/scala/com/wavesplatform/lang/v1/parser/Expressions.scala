@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.parser
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Types.*
 
 object Expressions {
 
@@ -94,6 +94,9 @@ object Expressions {
         case Tuple(types) => types.exists(_.isEmpty)
       }
   }
+  object Type {
+    val ListTypeName = "List"
+  }
   case class Single(name: PART[String], parameter: Option[PART[Type]] = None) extends Type
   case class AnyType(position: Pos)                                           extends Type
   case class Union(types: Seq[Type])                                          extends Type
@@ -152,7 +155,7 @@ object Expressions {
 
   case class GENERIC_FUNCTION_CALL(position: Pos, expr: EXPR, name: PART[String], `type`: Type, resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
 
-  case class FOLD(position: Pos, limit: Int, list: EXPR, acc: EXPR, func: REF, resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
+  case class FOLD(position: Pos, limit: Int, list: EXPR, acc: EXPR, func: REF, isNative: Boolean, resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
 
   sealed trait Pattern {
     def isRest: Boolean = false

@@ -120,11 +120,11 @@ object Keys {
       unsupported("Can not explicitly write block bytes")
     )
 
-  def transactionAt(height: Height, n: TxNum): Key[Option[(Transaction, Boolean)]] =
-    Key.opt[(Transaction, Boolean)](
+  def transactionAt(height: Height, n: TxNum): Key[Option[(TxMeta, Transaction)]] =
+    Key.opt[(TxMeta, Transaction)](
       NthTransactionInfoAtHeight,
       hNum(height, n),
-      readTransaction,
+      readTransaction(height),
       writeTransaction
     )
 

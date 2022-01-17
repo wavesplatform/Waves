@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
 import cats.syntax.semigroup._
-import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
@@ -13,18 +12,18 @@ import com.wavesplatform.lang.directives.values.{Asset => AssetType, _}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader.User
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser._
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.test._
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset._
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart._
@@ -41,13 +40,11 @@ class BalancesV4Test extends PropSpec with WithState {
   val SetScriptFee: Long      = Constants.UnitsInWave / 1000L
   val SetAssetScriptFee: Long = Constants.UnitsInWave
 
-  val rideV4Activated: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
+  val rideV4Activated: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
       BlockchainFeatures.Ride4DApps.id    -> 0,
       BlockchainFeatures.SmartAccounts.id -> 0,
       BlockchainFeatures.BlockV5.id       -> 0
-    )
-  )
+    ))
   val functionCall: Option[FUNCTION_CALL] =
     Some(
       FUNCTION_CALL(
@@ -66,7 +63,7 @@ class BalancesV4Test extends PropSpec with WithState {
       GenesisTransaction
         .create(dapp.toAddress, 10 * Constants.UnitsInWave + SetScriptFee + 2 * InvokeScriptTxFee + 1 * Constants.UnitsInWave, ts)
         .explicitGet(),
-      CreateAliasTransaction.selfSigned(TxVersion.V2, acc1, Alias.create("alias").explicitGet(), MinFee, ts).explicitGet()
+      CreateAliasTransaction.selfSigned(TxVersion.V2, acc1, "alias", MinFee, ts).explicitGet()
     )
     setScript = SetScriptTransaction.selfSigned(1.toByte, dapp, Some(script("alias")), SetScriptFee, ts).explicitGet()
     ci        = Signed.invokeScript(1.toByte, master, dapp.toAddress, functionCall, Nil, InvokeScriptTxFee, Waves, ts + 3)
@@ -134,7 +131,7 @@ class BalancesV4Test extends PropSpec with WithState {
     def assetScript(acc: ByteStr): Script = {
       val ctx = {
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
-        PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+        PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
           WavesContext.build(Global, directives)
       }
@@ -185,7 +182,7 @@ class BalancesV4Test extends PropSpec with WithState {
       case (acc1, acc2) =>
         val g1    = GenesisTransaction.create(acc1.toAddress, ENOUGH_AMT, nextTs).explicitGet()
         val g2    = GenesisTransaction.create(acc2.toAddress, ENOUGH_AMT, nextTs).explicitGet()
-        val alias = CreateAliasTransaction.selfSigned(TxVersion.V2, acc2, Alias.create("alias").explicitGet(), MinFee, nextTs).explicitGet()
+        val alias = CreateAliasTransaction.selfSigned(TxVersion.V2, acc2, "alias", MinFee, nextTs).explicitGet()
         val issue = IssueTransaction(
           TxVersion.V1,
           acc1.publicKey,
@@ -219,7 +216,7 @@ class BalancesV4Test extends PropSpec with WithState {
     def assetScript(acc: ByteStr): Script = {
       val ctx = {
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
-        PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+        PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
           WavesContext.build(Global, directives)
       }

@@ -44,8 +44,7 @@ import org.scalatest.EitherValues
 
 class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSettings with MockFactory with EitherValues {
 
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
+  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id    -> 0,
       BlockchainFeatures.SmartAssets.id      -> 0,
       BlockchainFeatures.Ride4DApps.id       -> 0,
@@ -53,8 +52,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
       BlockchainFeatures.DataTransaction.id  -> 0,
       BlockchainFeatures.BlockV5.id          -> 0,
       BlockchainFeatures.SynchronousCalls.id -> 0
-    )
-  )
+    ))
 
   val assetAllowed: Script = ExprScript(
     FUNCTION_CALL(FunctionHeader.Native(FunctionIds.GT_LONG), List(GETTER(REF("tx"), "fee"), CONST_LONG(-1)))
@@ -278,7 +276,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(stdLibVersion, fixUnicodeFunctions = true).withEnvironment[Environment],
+            PureContext.build(stdLibVersion, useNewPowPrecision = true).withEnvironment[Environment],
             CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment],
             WavesContext.build(
               Global,

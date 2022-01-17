@@ -1,19 +1,21 @@
 package com.wavesplatform.it.sync.activation
 
+import scala.concurrent.duration.*
+
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.it.{NodeConfigs, NTPTime}
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionStatus
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.sync.transactions.OverflowBlock
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -21,10 +23,8 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import play.api.libs.json.JsObject
 
-import scala.concurrent.duration._
-
 class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTime with OverflowBlock {
-  import AcceptFailedScriptActivationSuite._
+  import AcceptFailedScriptActivationSuite.*
 
   private lazy val (dApp, dAppKP)               = (firstAddress, firstKeyPair)
   private lazy val (caller, callerKP)           = (secondAddress, secondKeyPair)
@@ -458,7 +458,7 @@ object AcceptFailedScriptActivationSuite {
   private val UpdateInterval     = 3
   private val MaxTxsInMicroBlock = 2
 
-  private val estimator = ScriptEstimatorV3
+  private val estimator = ScriptEstimatorV3(overhead = false, fixOverflow = true)
 
   private val priorityFee  = 5.waves
   private val minInvokeFee = invokeFee + smartFee // invoke fee + transfer action fee

@@ -6,8 +6,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures._
-import com.wavesplatform.features._
+import com.wavesplatform.features.*
+import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.history
 import com.wavesplatform.history.Domain
 import com.wavesplatform.it.util.AddressOrAliasExt
@@ -20,13 +20,13 @@ import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.traits.domain.Lease
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.utils.StringBytes
@@ -396,7 +396,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             TestBlock.create(
               nextTs,
               genesisBlockId,
-              Seq(CreateAliasTransaction.selfSigned(1.toByte, sender, alias, 1, nextTs).explicitGet())
+              Seq(CreateAliasTransaction.selfSigned(1.toByte, sender, alias.name, 1, nextTs).explicitGet())
             )
           )
 
@@ -797,7 +797,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
         // liquid block rollback
         val leaseCancelId     = append(d.lastBlockId, call)
-        val (cancelHeight, _) = d.blockchain.transactionMeta(leaseCancelId).get
+        val cancelHeight = d.blockchain.transactionMeta(leaseCancelId).get.height
 
         d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance.empty
@@ -865,7 +865,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
       "leaseCancel with lease action" in forAll(scenario) {
         case (dApp, invoker, genesis, setScript, useInvokeExpression, leaseRecipientAddress) =>
           withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SmartAccounts -> 0, SynchronousCalls -> 0, RideV6 -> 0)) { d =>
-            d.appendBlock(genesis.transactionData :+ setScript: _*)
+            d.appendBlock((genesis.transactionData :+ setScript)*)
 
             val (setScriptToConvert, leaseSender) =
               if (useInvokeExpression)
@@ -930,11 +930,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
     }
 
     def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): WavesSettings = {
-      val tfs = TestFunctionalitySettings.Enabled.copy(
-        preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }.toMap,
-        blocksForFeatureActivation = 1,
-        featureCheckBlocksPeriod = 1
-      )
+      val tfs = TestFunctionalitySettings.Enabled.copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }.toMap)
 
       history.DefaultWavesSettings.copy(blockchainSettings = history.DefaultWavesSettings.blockchainSettings.copy(functionalitySettings = tfs))
     }

@@ -334,12 +334,10 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
         Gen.const(verifier(version, Account))
     } yield verifier
 
-  private val features = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Seq(
+  private val features = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Seq(
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.SmartAssets,
       BlockchainFeatures.Ride4DApps,
       BlockchainFeatures.BlockV5
-    ).map(_.id -> 0).toMap
-  )
+    ).map(_.id -> 0).toMap)
 }

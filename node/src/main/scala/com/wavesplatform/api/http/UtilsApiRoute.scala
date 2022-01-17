@@ -1,34 +1,37 @@
 package com.wavesplatform.api.http
 
 import java.security.SecureRandom
-
 import akka.http.scaladsl.server.{PathMatcher1, Route}
-import cats.syntax.either._
-import cats.syntax.semigroup._
+import cats.syntax.either.*
+import cats.syntax.semigroup.*
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, ScriptCompilerError, TooBigArrayAllocation}
 import com.wavesplatform.api.http.requests.{ScriptWithImportsRequest, byteStrFormat}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{RideV6, SynchronousCalls}
+import com.wavesplatform.features.EstimatorProvider.*
+import com.wavesplatform.features.EvaluatorFixProvider.*
 import com.wavesplatform.features.RideVersionProvider.RideVersionBlockchainExt
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
@@ -43,7 +46,7 @@ import com.wavesplatform.transaction.{Asset, TransactionType}
 import com.wavesplatform.utils.Time
 import monix.eval.Coeval
 import monix.execution.Scheduler
-import play.api.libs.json._
+import play.api.libs.json.*
 import shapeless.Coproduct
 
 case class UtilsApiRoute(
@@ -56,7 +59,7 @@ case class UtilsApiRoute(
     with AuthRoute
     with TimeLimitedRoute {
 
-  import UtilsApiRoute._
+  import UtilsApiRoute.*
 
   private def seed(length: Int): JsObject = {
     val seed = new Array[Byte](length)
@@ -103,7 +106,7 @@ case class UtilsApiRoute(
               val result  = directives ::: "script" -> JsString(scriptText) :: Nil
               val wrapped = result.map { case (k, v) => (k, toJsFieldJsValueWrapper(v)) }
               complete(
-                Json.obj(wrapped: _*)
+                Json.obj(wrapped*)
               )
           }
       }
@@ -133,7 +136,7 @@ case class UtilsApiRoute(
   }
 
   def compileCode: Route = path("script" / "compileCode") {
-    (post & entity(as[String])) { code =>
+    (post & entity(as[String]) & parameter("compact".as[Boolean] ? false)) { (code, compact) =>
       val version               = blockchain.actualRideVersion
       val fixEstimateOfVerifier = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
       executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), version, fixEstimateOfVerifier)) { result =>
@@ -142,12 +145,27 @@ case class UtilsApiRoute(
             .fold(
               e => ScriptCompilerError(e), {
                 case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
+                  val extraFee =
+                    if (verifierComplexity <= ContractLimits.FreeVerifierComplexity && blockchain
+                          .isFeatureActivated(BlockchainFeatures.SynchronousCalls))
+                      0
+                    else
+                      FeeValidation.ScriptExtraFee
+
+                  val compactedScript = script match {
+                    case ContractScript.ContractScriptImpl(stdLibVersion, expr) if compact =>
+                      val compacted = ContractScriptCompactor.compact(expr)
+
+                      ContractScriptImpl(stdLibVersion, compacted)
+
+                    case _ => script
+                  }
                   Json.obj(
-                    "script"               -> script.bytes().base64,
+                    "script"               -> compactedScript.bytes().base64,
                     "complexity"           -> maxComplexity,
                     "verifierComplexity"   -> verifierComplexity,
                     "callableComplexities" -> callableComplexities,
-                    "extraFee"             -> extraFee(verifierComplexity)
+                    "extraFee"             -> extraFee
                   )
               }
             )
@@ -157,7 +175,7 @@ case class UtilsApiRoute(
   }
 
   def compileWithImports: Route = path("script" / "compileWithImports") {
-    import ScriptWithImportsRequest._
+    import ScriptWithImportsRequest.*
     (post & entity(as[ScriptWithImportsRequest])) { req =>
       val version               = blockchain.actualRideVersion
       val fixEstimateOfVerifier = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
@@ -192,13 +210,14 @@ case class UtilsApiRoute(
                 script,
                 estimator(),
                 fixEstimateOfVerifier = blockchain.isFeatureActivated(RideV6),
-                useContractVerifierLimit = false
+                useContractVerifierLimit = false,
+                withCombinedContext = true
               )
               .map((script, _))
           }
       ) { result =>
         complete(
-          checkInvokeExpression(result)
+          result
             .fold(
               e => ScriptCompilerError(e), {
                 case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
@@ -298,7 +317,7 @@ object UtilsApiRoute {
   private object ScriptCallEvaluator {
     def compile(stdLibVersion: StdLibVersion)(str: String): Either[GenericError, EXPR] = {
       val ctx =
-        PureContext.build(stdLibVersion, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+        PureContext.build(stdLibVersion, useNewPowPrecision = true).withEnvironment[Environment] |+|
           CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment] |+|
           WavesContext.build(Global, DirectiveSet(stdLibVersion, Account, Expression).explicitGet())
 
@@ -308,7 +327,7 @@ object UtilsApiRoute {
     }
 
     def parseBinaryCall(bs: ByteStr): Either[ValidationError, EXPR] = {
-      Serde
+      SerdeV1
         .deserialize(bs.arr)
         .left
         .map(GenericError(_))
@@ -364,11 +383,21 @@ object UtilsApiRoute {
               availableDataSize = ContractLimits.MaxTotalWriteSetSizeInBytes,
               currentDiff = Diff.empty,
               invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(address, null, Nil))
-            )
+            ),
+            fixUnicodeFunctions = true,
+            useNewPowPrecision = true
           )
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
         limitedResult <- EvaluatorV2
-          .applyLimitedCoeval(call, limit, ctx, script.stdLibVersion, checkConstructorArgsTypes = true)
+          .applyLimitedCoeval(
+            call,
+            limit,
+            ctx,
+            script.stdLibVersion,
+            correctFunctionCallScope = blockchain.checkEstimatorSumOverflow,
+            newMode = blockchain.newEvaluatorMode,
+            checkConstructorArgsTypes = true
+          )
           .value()
           .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err, log) }
         result <- limitedResult match {

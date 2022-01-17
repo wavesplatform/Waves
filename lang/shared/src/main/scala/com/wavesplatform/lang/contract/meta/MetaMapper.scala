@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.contract.meta
 
 import cats.data.OptionT
-import cats.instances.either._
+import cats.instances.either.*
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.protobuf.dapp.DAppMeta

@@ -3,7 +3,6 @@ package com.wavesplatform.http
 import com.wavesplatform.TestWallet
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
-import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.BlocksApiRoute
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -15,7 +14,7 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.SystemTime
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json._
+import play.api.libs.json.*
 
 import scala.util.Random
 
@@ -313,8 +312,6 @@ class BlocksApiRouteSpec
           val newBlock = TestBlock.create(ts + 100 + Random.nextInt(10000), Nil)
           (newBlock.header.timestamp, blocks :+ newBlock)
       }
-
-      // blocks.map(_.header.timestamp).zipWithIndex.foreach { case (ts, i) => println(s"${i + 1}: $ts") }
 
       val route = blocksApiRoute.copy(commonApi = emulateBlocks(blocks)).route
 

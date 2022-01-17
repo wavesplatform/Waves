@@ -235,7 +235,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     forAll(leasePreconditions()) {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, _, _) =>
         withDomain(domainSettingsWithFS(v5Features)) { d =>
-          d.appendBlock(preparingTxs: _*)
+          d.appendBlock(preparingTxs*)
           d.appendBlock(invoke)
 
           val invokerSpentFee  = preparingTxs.collect { case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2 }.sum
@@ -268,7 +268,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
           val invokerSpentFee = preparingTxs.collect { case a: Authorized if a.sender.toAddress == invoker                      => a.assetFee._2 }.sum
           val dAppSpentFee    = (preparingTxs :+ leaseTxFromDApp).collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
 
-          d.appendBlock(preparingTxs: _*)
+          d.appendBlock(preparingTxs*)
           d.appendBlock(leaseTxFromDApp)
 
           d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee + leaseTxFromDApp.amount
@@ -309,7 +309,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
               .sum
           val dAppSpentFee = (preparingTxs :+ leaseTxFromDApp).collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
 
-          d.appendBlock(preparingTxs: _*)
+          d.appendBlock(preparingTxs*)
           d.appendBlock(leaseTxFromDApp, leaseTxToDApp, leaseTxToDAppCancel)
 
           d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee + leaseTxFromDApp.amount
@@ -347,7 +347,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
           val invokerSpentFee = (preparingTxs :+ leaseTxToDApp).collect { case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2 }.sum
           val dAppSpentFee    = preparingTxs.collect { case a: Authorized if a.sender.toAddress == dAppAcc                    => a.assetFee._2 }.sum
 
-          d.appendBlock(preparingTxs: _*)
+          d.appendBlock(preparingTxs*)
           d.appendBlock(leaseTxToDApp)
 
           d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee - leaseTxToDApp.amount
@@ -388,7 +388,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
               .collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2}
               .sum
 
-          d.appendBlock(preparingTxs: _*)
+          d.appendBlock(preparingTxs*)
           d.appendBlock(leaseTxToDApp, leaseTxFromDApp, leaseTxFromDAppCancel)
 
           d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee - leaseTxToDApp.amount
@@ -426,7 +426,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
           val invokerSpentFee = (preparingTxs :+ leaseTxToDApp).collect { case a: Authorized if a.sender.toAddress == invoker   => a.assetFee._2 }.sum
           val dAppSpentFee    = (preparingTxs :+ leaseTxFromDApp).collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
 
-          d.appendBlock(preparingTxs: _*)
+          d.appendBlock(preparingTxs*)
           d.appendBlock(leaseTxFromDApp, leaseTxToDApp)
 
           d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee - leaseTxToDApp.amount + leaseTxFromDApp.amount
@@ -588,7 +588,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
           v5Features
         ) {
           case (diff, _) =>
-            diff.errorMessage(invoke.id()).get.text shouldBe "NonPositiveAmount(-100,waves)"
+            diff.errorMessage(invoke.id()).get.text should include("Negative lease amount")
         }
     }
   }
@@ -731,7 +731,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     forAll(leasePreconditions(customDApp = Some(leaseWithLeaseCancelDApp(recipient.toRide, amount)))) {
       case (preparingTxs, invoke, _, dAppAcc, _, _, _) =>
         withDomain(domainSettingsWithFS(v5Features)) { d =>
-          d.appendBlock(preparingTxs: _*)
+          d.appendBlock(preparingTxs*)
           d.appendBlock(invoke)
 
           val recipientPortfolio = d.blockchain.wavesPortfolio(recipient)

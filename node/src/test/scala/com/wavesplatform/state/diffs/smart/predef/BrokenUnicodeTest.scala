@@ -219,20 +219,20 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
 
   private def assertNoFix(d: Domain): Unit = {
     val (genesisTxs, setNoFix, _, checkNoFix, _) = scenario(V5).sample.get
-    d.appendBlock(genesisTxs: _*)
-    d.appendBlock(setNoFix: _*)
-    d.appendBlock(checkNoFix: _*)
-    checkNoFix.foreach(tx => d.blockchain.transactionMeta(tx.id.value()).get._2 shouldBe true)
+    d.appendBlock(genesisTxs*)
+    d.appendBlock(setNoFix*)
+    d.appendBlock(checkNoFix*)
+    checkNoFix.foreach(tx => d.blockchain.transactionSucceeded(tx.id.value()) shouldBe true)
   }
 
   private def assertFix(d: Domain, lastVersion: StdLibVersion): Unit = {
     val (genesisTxs, setNoFix, setFix, checkNoFix, checkFix) = scenario(lastVersion).sample.get
-    d.appendBlock(genesisTxs: _*)
-    d.appendBlock(setFix: _*)
-    d.appendBlock(checkFix: _*)
-    checkFix.foreach(tx => d.blockchain.transactionMeta(tx.id.value()).get._2 shouldBe true)
+    d.appendBlock(genesisTxs*)
+    d.appendBlock(setFix*)
+    d.appendBlock(checkFix*)
+    checkFix.foreach(tx => d.blockchain.transactionSucceeded(tx.id.value()) shouldBe true)
 
-    d.appendBlock(setNoFix: _*)
+    d.appendBlock(setNoFix*)
     checkNoFix.foreach { tx =>
       val error = if (tx.isInstanceOf[InvokeScriptTransaction]) "no fix error" else "TransactionNotAllowedByScript"
       (the[RuntimeException] thrownBy d.appendBlock(tx)).getMessage should include(error)

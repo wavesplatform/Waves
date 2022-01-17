@@ -37,8 +37,7 @@ class DAppDataEntryTypeTest
   private val time = new TestTime
   private def ts   = time.getTimestamp()
 
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
+  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id   -> 0,
       BlockchainFeatures.SmartAssets.id     -> 0,
       BlockchainFeatures.Ride4DApps.id      -> 0,
@@ -46,9 +45,7 @@ class DAppDataEntryTypeTest
       BlockchainFeatures.DataTransaction.id -> 0,
       BlockchainFeatures.BlockReward.id     -> 0,
       BlockchainFeatures.BlockV5.id         -> 0
-    ),
-    estimatorPreCheckHeight = Int.MaxValue
-  )
+    ), estimatorPreCheckHeight = Int.MaxValue)
 
   private def dApp(constructor: String): Script = {
     val value = if (constructor == "BooleanEntry") CONST_LONG(1) else CONST_BOOLEAN(true)
@@ -97,7 +94,7 @@ class DAppDataEntryTypeTest
   private def assert(constructor: String) = {
     val (preparingTxs, invoke) = paymentPreconditions(constructor).sample.get
     withDomain(domainSettingsWithFS(fsWithV5)) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs*)
       val value = if (constructor == "BooleanEntry") "1" else "true"
       (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include(
         s"can't reconstruct $constructor from Map(key -> key, value -> $value)"

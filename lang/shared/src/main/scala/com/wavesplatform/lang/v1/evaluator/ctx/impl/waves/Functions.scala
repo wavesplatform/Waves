@@ -7,6 +7,7 @@ import cats.{Id, Monad}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -15,7 +16,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{scriptTransf
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.{addressOrAliasType, addressType, commonDataEntryType, optionAddress, _}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, notImplemented, unit}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
-import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction, InternalCall}
+import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction, FunctionIds, InternalCall}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
@@ -37,7 +38,7 @@ object Functions {
       Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 10L),
       internalName,
       UNION(dataType.innerType, UNIT),
-      args: _*
+      args*
     ) {
       def getData[F[_]: Monad](env: Environment[F], addressOrAlias: CaseObj, key: String) = {
         val environmentFunctions = new EnvironmentFunctions[F](env)
@@ -198,7 +199,7 @@ object Functions {
                       CONST_BYTESTR(ByteStr.fromBytes(EnvironmentFunctions.AddressVersion, env.chainId)).explicitGet(),
                       // publicKeyHash
                       FUNCTION_CALL(
-                        PureContext.takeBytes,
+                        Native(FunctionIds.TAKE_BYTES),
                         List(
                           secureHashExpr(REF("@publicKey"), version),
                           CONST_LONG(EnvironmentFunctions.HashLength)
@@ -213,7 +214,7 @@ object Functions {
                   List(
                     REF("@afpk_withoutChecksum"),
                     FUNCTION_CALL(
-                      PureContext.takeBytes,
+                      Native(FunctionIds.TAKE_BYTES),
                       List(
                         secureHashExpr(REF("@afpk_withoutChecksum"), version),
                         CONST_LONG(EnvironmentFunctions.ChecksumLength)
@@ -253,11 +254,11 @@ object Functions {
     FUNCTION_CALL(
       PureContext.eq,
       List(
-        FUNCTION_CALL(PureContext.takeString, List(str, CONST_LONG(prefix.length))),
+        FUNCTION_CALL(Native(FunctionIds.TAKE_STRING), List(str, CONST_LONG(prefix.length))),
         CONST_STRING(prefix).explicitGet()
       )
     ),
-    FUNCTION_CALL(PureContext.dropString, List(str, CONST_LONG(prefix.length))),
+    FUNCTION_CALL(Native(FunctionIds.DROP_STRING), List(str, CONST_LONG(prefix.length))),
     str
   )
 
@@ -265,13 +266,19 @@ object Functions {
     PureContext.eq,
     List(
       // actual checksum
-      FUNCTION_CALL(PureContext.takeRightBytes, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
+      FUNCTION_CALL(
+        if (version >= V6) Native(FunctionIds.TAKE_RIGHT_BYTES) else User("takeRightBytes"),
+        List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))
+      ),
       // generated checksum
       FUNCTION_CALL(
-        PureContext.takeBytes,
+        Native(FunctionIds.TAKE_BYTES),
         List(
           secureHashExpr(
-            FUNCTION_CALL(PureContext.dropRightBytes, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
+            FUNCTION_CALL(
+              if (version >= V6) Native(FunctionIds.DROP_RIGHT_BYTES) else User("dropRightBytes"),
+              List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))
+            ),
             version
           ),
           CONST_LONG(EnvironmentFunctions.ChecksumLength)
@@ -302,7 +309,7 @@ object Functions {
                 FUNCTION_CALL(
                   PureContext.eq,
                   List(
-                    FUNCTION_CALL(PureContext.takeBytes, List(REF("@afs_addrBytes"), CONST_LONG(1))),
+                    FUNCTION_CALL(Native(FunctionIds.TAKE_BYTES), List(REF("@afs_addrBytes"), CONST_LONG(1))),
                     CONST_BYTESTR(ByteStr.fromBytes(EnvironmentFunctions.AddressVersion)).explicitGet()
                   )
                 ),
@@ -312,9 +319,9 @@ object Functions {
                     PureContext.eq,
                     List(
                       FUNCTION_CALL(
-                        PureContext.takeBytes,
+                        Native(FunctionIds.TAKE_BYTES),
                         List(
-                          FUNCTION_CALL(PureContext.dropBytes, List(REF("@afs_addrBytes"), CONST_LONG(1))),
+                          FUNCTION_CALL(Native(FunctionIds.DROP_BYTES), List(REF("@afs_addrBytes"), CONST_LONG(1))),
                           CONST_LONG(1)
                         )
                       ),
@@ -617,7 +624,7 @@ object Functions {
                   availableComplexity,
                   reentrant
                 )
-                .map(_.map { case (result, complexity) => (result.leftMap(_.toString), complexity) })
+                .map(_.map { case (result, complexity) => (result.leftMap(_.toString), availableComplexity - complexity) })
             case xs =>
               val err = notImplemented[F, EVALUATED](s"invoke(dApp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
               Coeval.now(err.map((_, 0)))
@@ -636,7 +643,7 @@ object Functions {
       ExtractedFuncPrefix ++ f.header.toString,
       f.costByLibVersionMap,
       f.signature.result.asInstanceOf[UNION].typeList.find(_ != UNIT).get,
-      args: _*
+      args*
     ) {
       val extractF = if (version >= V4) PureContext.value else PureContext.extract
       FUNCTION_CALL(extractF, List(FUNCTION_CALL(f.header, args.map(a => REF(a._1)).toList)))
@@ -694,7 +701,7 @@ object Functions {
   def transferTxByIdF(proofsEnabled: Boolean, version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "transferTransactionById",
-      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 60L),
+      Map[StdLibVersion, Long](V3 -> 100L, V4 -> 60L),
       TRANSFERTRANSACTIONBYID,
       UNION(buildTransferTransactionType(proofsEnabled, version), UNIT),
       ("id", BYTESTR)
@@ -709,7 +716,7 @@ object Functions {
             case CONST_BYTESTR(id: ByteStr) :: Nil =>
               env
                 .transferTransactionById(id.arr)
-                .map(_.map(transactionObject(_, proofsEnabled, version)))
+                .map(_.filter(version >= V6 || _.p.h.version > 0).map(transactionObject(_, proofsEnabled, version)))
                 .map(fromOptionCO)
                 .map(_.asRight[String])
             case xs =>

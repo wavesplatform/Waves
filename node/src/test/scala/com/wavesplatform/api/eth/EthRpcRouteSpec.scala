@@ -1,193 +1,253 @@
 package com.wavesplatform.api.eth
 
-import com.wavesplatform.BlockchainStubHelpers
-import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
-import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.eth.EthRpcRoute
-import com.wavesplatform.block.SignedBlockHeader
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.{DefaultWavesSettings, Domain, settingsWithFeatures}
 import com.wavesplatform.http.RouteSpec
-import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.utils.EthConverters._
-import com.wavesplatform.transaction.utils.EthTxGenerator
-import com.wavesplatform.utils.{EthEncoding, EthHelpers, EthSetChainId}
-import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.BeforeAndAfterEach
-import org.scalatest.matchers.should.Matchers
+import com.wavesplatform.lang.directives.values.StdLibVersion.V5
+import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.BinaryDataEntry
+import com.wavesplatform.test.*
+import com.wavesplatform.test.node.{randomAddress, randomKeyPair}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.utils.EthConverters.*
+import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxHelpers}
+import com.wavesplatform.utils.{EthEncoding, EthHelpers}
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json.{JsArray, JsObject, Json}
 
-import scala.concurrent.Future
+class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers {
 
-class EthRpcRouteSpec
-    extends RouteSpec("/eth")
-    with Matchers
-    with PathMockFactory
-    with BlockchainStubHelpers
-    with EthHelpers
-    with EthSetChainId
-    with BeforeAndAfterEach {
-  var blockchain      = stub[Blockchain]
-  var transactionsApi = stub[CommonTransactionsApi]
-  var route           = new EthRpcRoute(blockchain, transactionsApi, ntpTime)
-
-  "eth_chainId" in testRpc("eth_chainId")(resultInt shouldBe 'E'.toLong)
-
-  "eth_gasPrice" in testRpc("eth_gasPrice")(resultInt shouldBe 10000000000L)
-
-  "eth_blockNumber" in {
-    (() => blockchain.height).when().returning(123)
-    testRpc("eth_blockNumber")(resultInt shouldBe 123)
+  def routeTest[T](d: Domain, method: String, params: JsValueWrapper*)(body: => T): Unit = {
+    Post(
+      routePath(""),
+      Json.obj("method" -> method, "params" -> Json.arr(params*), "id" -> "test")
+    ) ~> new EthRpcRoute(d.blockchain, d.commonApi.transactions, ntpTime).route ~> check(body)
   }
 
-  "eth_getBalance" in {
-    (blockchain.balance _).when(*, *).returning(123)
-    testRpc("eth_getBalance", EthEncoding.toHexString(EthStubBytes32.take(20)))(resultInt shouldBe 1230000000000L)
+  "eth_chainId" in withDomain(DefaultWavesSettings) { d =>
+    routeTest(d, "eth_chainId")(resultInt shouldBe DefaultWavesSettings.blockchainSettings.addressSchemeCharacter.toLong)
+  }
+
+  "eth_gasPrice" in withDomain() { d =>
+    routeTest(d, "eth_gasPrice")(resultInt shouldBe 10000000000L)
+  }
+
+  "eth_blockNumber" in withDomain() { d =>
+    1 to 11 foreach (_ => d.appendBlock())
+    routeTest(d, "eth_blockNumber")(resultInt shouldBe 11)
+  }
+
+  "eth_getBalance" in withDomain() { d =>
+    val address = randomAddress()
+    d.appendBlock(GenesisTransaction.create(address, 123L, ntpTime.getTimestamp()).explicitGet())
+    routeTest(d, "eth_getBalance", address.toEthAddress)(resultInt shouldBe 1230000000000L)
   }
 
   "eth_getCode" - {
-    "no contract" in {
-      testRpc("eth_getCode", EthEncoding.toHexString(EthStubBytes32.take(20)))(result shouldBe "0x")
+    "no contract" in withDomain() { d =>
+      val address = randomAddress()
+      routeTest(d, "eth_getCode", address.toEthAddress)(result shouldBe "0x")
     }
 
-    "has contract" in {
-      val testAddress = Address(EthStubBytes32.take(20))
-      blockchain.stub.setScript(testAddress, TxHelpers.scriptV5(""))
-      testRpc("eth_getCode", EthEncoding.toHexString(testAddress.publicKeyHash))(result shouldBe "0xff")
+    "has contract" in withDomain(settingsWithFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls, BlockchainFeatures.Ride4DApps)) {
+      d =>
+        val testKP = randomKeyPair()
+        d.appendBlock(
+          GenesisTransaction.create(testKP.toAddress, 1.waves, ntpTime.getTimestamp()).explicitGet(),
+          Signed.setScript(
+            2.toByte,
+            testKP,
+            Some(TestCompiler(V5).compileContract("""{-# STDLIB_VERSION 4 #-}
+            |{-# CONTENT_TYPE DAPP #-}
+            |{-# SCRIPT_TYPE ACCOUNT #-}
+            |
+            |@Callable(inv)
+            |func foo() = {
+            |  [
+            |    BinaryEntry("leaseId", base64'AAA')
+            |  ]
+            |}
+            |""".stripMargin)),
+            0.01.waves,
+            ntpTime.getTimestamp()
+          )
+        )
+        routeTest(d, "eth_getCode", testKP.toAddress.toEthAddress)(result shouldBe "0xff")
     }
   }
 
-  "eth_estimateGas" in {
-    (transactionsApi.calculateFee _).when(*).returns(Right((Waves, 500000L, 500000L)))
-    testRpc("eth_estimateGas", Json.obj("to" -> TxHelpers.secondAddress.toEthAddress, "value" -> 0, "data" -> "0x00")) {
+  "eth_estimateGas" in withDomain() { d =>
+    routeTest(d, "eth_estimateGas", Json.obj("to" -> TxHelpers.secondAddress.toEthAddress, "value" -> 0, "data" -> "0x00")) {
       resultInt shouldBe 500000
     }
   }
 
   "eth_call" - {
-    "asset calls" in {
-      val assetId       = ByteStr(EthStubBytes32)
-      val fakeAddress   = Address(assetId.take(20).arr)
-      val assetContract = EthEncoding.toHexString(fakeAddress.publicKeyHash)
-      blockchain.stub.issueAsset(assetId)
-      blockchain.stub.creditBalance(fakeAddress, IssuedAsset(assetId), 255)
+    "asset calls" in withDomain() { d =>
+      val randomKP         = randomKeyPair()
+      val issueTransaction = Signed.issue(2.toByte, randomKP, "TEST", "test asset", 100000, 2, false, None, 1.waves, ntpTime.getTimestamp())
+
+      d.appendBlock(
+        GenesisTransaction.create(randomKP.toAddress, 5.waves, ntpTime.getTimestamp()).explicitGet(),
+        issueTransaction
+      )
+
+      val assetContract = EthEncoding.toHexString(issueTransaction.id().arr.take(20))
 
       withClue("asset name")(
-        testRpc("eth_call", Json.obj("to" -> assetContract, "data" -> "0x95d89b41"))(
-          result shouldBe "000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000047465737400000000000000000000000000000000000000000000000000000000"
+        routeTest(d, "eth_call", Json.obj("to" -> assetContract, "data" -> "0x95d89b41"))(
+          result shouldBe "000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000045445535400000000000000000000000000000000000000000000000000000000"
         )
       )
 
       withClue("asset decimals")(
-        testRpc("eth_call", Json.obj("to" -> assetContract, "data" -> "0x313ce567"))(
-          result shouldBe "0000000000000000000000000000000000000000000000000000000000000008"
+        routeTest(d, "eth_call", Json.obj("to" -> assetContract, "data" -> "0x313ce567"))(
+          result shouldBe "0000000000000000000000000000000000000000000000000000000000000002"
         )
       )
 
       withClue("asset balance")(
-        testRpc("eth_call", Json.obj("to" -> assetContract, "data" -> ("70a08231" + assetContract.drop(2))))(
-          result shouldBe "00000000000000000000000000000000000000000000000000000000000000ff"
+        routeTest(d, "eth_call", Json.obj("to" -> assetContract, "data" -> ("0x70a08231" + randomKP.toAddress.toEthAddress)))(
+          result shouldBe "00000000000000000000000000000000000000000000000000000000000186a0"
         )
       )
     }
   }
 
-  "eth_getTransactionReceipt" in {
-    val block       = TestBlock.create(Nil)
-    val transaction = EthTxGenerator.generateEthInvoke(TxHelpers.defaultSigner.toEthKeyPair, TxHelpers.secondAddress, "test", Nil, Nil)
-    (() => blockchain.height).when().returns(1)
-    (blockchain.blockHeader _).when(1).returns {
-      Some(SignedBlockHeader(block.header, block.signature))
-    }
-    (transactionsApi.transactionById _)
-      .when(transaction.id())
-      .returns(Some(TransactionMeta.Ethereum(Height(1), transaction, succeeded = true, None, None)))
+  "eth_getTransactionReceipt" in withDomain(settingsWithFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)) { d =>
+    val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultSigner.toEthKeyPair, TxHelpers.secondAddress, 10L, Asset.Waves)
 
-    testRpc("eth_getTransactionReceipt", transaction.id().toHexString)(resultJson should matchJson(s"""{
-                                                                                                     |  "transactionHash" : "${transaction
-                                                                                                        .id()
-                                                                                                        .toHexString}",
-                                                                                                     |  "transactionIndex" : "0x01",
-                                                                                                     |  "blockHash" : "${block.id().toHexString}",
-                                                                                                     |  "blockNumber" : "0x01",
-                                                                                                     |  "from" : "0xf1f6bdabc1b48e7d75957b361881be9c40e4b424",
-                                                                                                     |  "to" : "0x3d3ad884fa042927b9d6c37df70af5c0bd9516c5",
-                                                                                                     |  "cumulativeGasUsed" : "0x7a120",
-                                                                                                     |  "gasUsed" : "0x7a120",
-                                                                                                     |  "contractAddress" : null,
-                                                                                                     |  "logs" : [ ],
-                                                                                                     |  "logsBloom" : "0x0000000000000000000000000000000000000000000000000000000000000000",
-                                                                                                     |  "status" : "0x1"
-                                                                                                     |}""".stripMargin))
+    d.appendBlock(GenesisTransaction.create(transaction.senderAddress(), 50.waves, ntpTime.getTimestamp()).explicitGet())
+    d.appendBlock(transaction)
+
+    routeTest(d, "eth_getTransactionReceipt", transaction.id().toHexString)(
+      resultJson should matchJson(s"""{
+      |  "transactionHash" : "${transaction.id().toHexString}",
+      |  "transactionIndex" : "0x01",
+      |  "blockHash" : "${d.blockchain.lastBlockId.get.toHexString}",
+      |  "blockNumber" : "0x02",
+      |  "from" : "0xf1f6bdabc1b48e7d75957b361881be9c40e4b424",
+      |  "to" : "0x3d3ad884fa042927b9d6c37df70af5c0bd9516c5",
+      |  "cumulativeGasUsed" : "0x186a0",
+      |  "gasUsed" : "0x186a0",
+      |  "contractAddress" : null,
+      |  "logs" : [ ],
+      |  "logsBloom" : "0x0000000000000000000000000000000000000000000000000000000000000000",
+      |  "status" : "0x1"
+      |}""".stripMargin)
+    )
   }
 
-  "eth_sendRawTransaction" in {
-    val transaction = EthTxGenerator.generateEthInvoke(TxHelpers.defaultSigner.toEthKeyPair, TxHelpers.secondAddress, "test", Nil, Nil)
-    (transactionsApi.broadcastTransaction _).when(*).returns(Future.successful(TracedResult(Right(true))))
-    testRpc("eth_sendRawTransaction", EthEncoding.toHexString(transaction.bytes()))(
+  "eth_sendRawTransaction" in withDomain(settingsWithFeatures(BlockchainFeatures.RideV6, BlockchainFeatures.BlockV5)) { d =>
+    val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultSigner.toEthKeyPair, TxHelpers.secondAddress, 10, Asset.Waves)
+    d.appendBlock(
+      GenesisTransaction.create(transaction.senderAddress(), 50.waves, ntpTime.getTimestamp()).explicitGet()
+    )
+    routeTest(d, "eth_sendRawTransaction", EthEncoding.toHexString(transaction.bytes()))(
       result shouldBe transaction.id().toHexString
     )
   }
 
-  "eth/assets" in {
-    val testAsset1 = ByteStr(Array.fill(32)(1.toByte))
-    val testAsset2 = ByteStr(Array.fill(32)(2.toByte))
-    blockchain.stub.issueAsset(testAsset1)
-    blockchain.stub.issueAsset(testAsset2)
+  "eth/assets" in withDomain(settingsWithFeatures(BlockchainFeatures.Ride4DApps, BlockchainFeatures.ReduceNFTFee, BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls)) { d =>
+    val randomKP = randomKeyPair()
+    val invoker  = randomKeyPair()
+    val issue1   = Signed.issue(2.toByte, randomKP, "TEST1", "test asset", 100000, 2, true, None, 1.waves, ntpTime.getTimestamp())
+    val issue2   = Signed.issue(2.toByte, randomKP, "NFT1", "test asset", 1, 0, false, None, 0.001.waves, ntpTime.getTimestamp())
 
-    route.route
-      .anyParamTest(routePath("/assets"), "id")(EthEncoding.toHexString(testAsset1.take(20).arr), EthEncoding.toHexString(testAsset2.take(20).arr)) {
-        responseAs[JsArray] should matchJson("""[ {
-                                             |  "assetId" : "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi",
-                                             |  "issueHeight" : 1,
-                                             |  "issueTimestamp" : 123,
-                                             |  "issuer" : "3FrCwv8uFRxQazhX6Lno45aZ68Bof6ScaeF",
-                                             |  "issuerPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-                                             |  "name" : "test",
-                                             |  "description" : "test",
-                                             |  "decimals" : 8,
-                                             |  "reissuable" : false,
-                                             |  "quantity" : 10000,
+    d.appendBlock(
+      GenesisTransaction.create(randomKP.toAddress, 5.waves, ntpTime.getTimestamp()).explicitGet(),
+      GenesisTransaction.create(invoker.toAddress, 5.waves, ntpTime.getTimestamp()).explicitGet()
+    )
+
+    val invoke = Signed.invokeScript(
+      2.toByte,
+      invoker,
+      randomKP.toAddress,
+      None,
+      Seq(InvokeScriptTransaction.Payment(1.waves, Asset.Waves)),
+      1.005.waves,
+      Asset.Waves,
+      ntpTime.getTimestamp()
+    )
+    d.appendBlock(
+      issue1,
+      issue2,
+      Signed.setScript(2.toByte, randomKP, Some(TestCompiler(V5).compileContract(
+        """{-# STDLIB_VERSION 4 #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |
+          |@Callable(inv)
+          |func default() = {
+          |  let issue = Issue("INVASSET", "", 10000, 2, false)
+          |  [
+          |    issue,
+          |    BinaryEntry("assetId", calculateAssetId(issue))
+          |  ]
+          |}
+          |""".stripMargin)), 0.01.waves, ntpTime.getTimestamp()),
+      invoke
+    )
+
+    val issue3 = d.blockchain.accountData(randomKP.toAddress, "assetId").get.asInstanceOf[BinaryDataEntry].value
+
+    new EthRpcRoute(d.blockchain, d.commonApi.transactions, ntpTime).route
+      .anyParamTest(routePath("/assets"), "id")(
+        EthEncoding.toHexString(issue1.id().arr.take(20)),
+        EthEncoding.toHexString(issue2.id().arr.take(20)),
+        EthEncoding.toHexString(issue3.arr.take(20))
+      ) {
+        responseAs[JsArray] should matchJson(s"""[ {
+                                             |  "assetId" : "${issue1.id()}",
+                                             |  "issueHeight" : 2,
+                                             |  "issueTimestamp" : ${issue1.timestamp},
+                                             |  "issuer" : "${randomKP.toAddress}",
+                                             |  "issuerPublicKey" : "${randomKP.publicKey.toString}",
+                                             |  "name" : "TEST1",
+                                             |  "description" : "test asset",
+                                             |  "decimals" : 2,
+                                             |  "reissuable" : true,
+                                             |  "quantity" : 100000,
                                              |  "scripted" : false,
                                              |  "minSponsoredAssetFee" : null,
-                                             |  "originTransactionId" : "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
+                                             |  "originTransactionId" : "${issue1.id()}"
                                              |}, {
-                                             |  "assetId" : "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
-                                             |  "issueHeight" : 1,
-                                             |  "issueTimestamp" : 123,
-                                             |  "issuer" : "3FrCwv8uFRxQazhX6Lno45aZ68Bof6ScaeF",
-                                             |  "issuerPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-                                             |  "name" : "test",
-                                             |  "description" : "test",
-                                             |  "decimals" : 8,
+                                             |  "assetId" : "${issue2.id()}",
+                                             |  "issueHeight" : 2,
+                                             |  "issueTimestamp" : ${issue2.timestamp},
+                                             |  "issuer" : "${randomKP.toAddress}",
+                                             |  "issuerPublicKey" : "${randomKP.publicKey.toString}",
+                                             |  "name" : "NFT1",
+                                             |  "description" : "test asset",
+                                             |  "decimals" : 0,
+                                             |  "reissuable" : false,
+                                             |  "quantity" : 1,
+                                             |  "scripted" : false,
+                                             |  "minSponsoredAssetFee" : null,
+                                             |  "originTransactionId" : "${issue2.id()}"
+                                             |}, {
+                                             |  "assetId" : "$issue3",
+                                             |  "issueHeight" : 2,
+                                             |  "issueTimestamp" : ${invoke.timestamp},
+                                             |  "issuer" : "${randomKP.toAddress}",
+                                             |  "issuerPublicKey" : "${randomKP.publicKey.toString}",
+                                             |  "name" : "INVASSET",
+                                             |  "description" : "",
+                                             |  "decimals" : 2,
                                              |  "reissuable" : false,
                                              |  "quantity" : 10000,
                                              |  "scripted" : false,
                                              |  "minSponsoredAssetFee" : null,
-                                             |  "originTransactionId" : "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR"
+                                             |  "originTransactionId" : "${invoke.id()}"
                                              |} ]""".stripMargin)
       }
-  }
-
-  // Helpers
-  def testRpc(method: String, params: JsValueWrapper*)(doCheck: => Unit): Unit = {
-    val entity = Json.obj("method" -> method, "params" -> Json.arr(params: _*), "id" -> "test")
-    Post(routePath("/"), entity) ~> route.route ~> check(doCheck)
   }
 
   def resultJson: JsObject = (responseAs[JsObject] \ "result").as[JsObject]
   def result: String       = (responseAs[JsObject] \ "result").as[String]
   def resultInt: Long      = java.lang.Long.valueOf((responseAs[JsObject] \ "result").as[String].drop(2), 16)
-
-  override protected def beforeEach(): Unit = { // Just resets stubs
-    super.beforeEach()
-    blockchain = stub[Blockchain]
-    transactionsApi = stub[CommonTransactionsApi]
-    route = new EthRpcRoute(blockchain, transactionsApi, ntpTime)
-  }
 }

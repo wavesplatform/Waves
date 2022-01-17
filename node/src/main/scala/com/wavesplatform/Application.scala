@@ -36,7 +36,7 @@ import com.wavesplatform.mining.{Miner, MinerDebugInfo, MinerImpl}
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height, TxMeta}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
@@ -330,7 +330,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         )
 
       val apiRoutes = Seq(
-        new EthRpcRoute(blockchainUpdater, extensionContext.transactionsApi,time),
+        new EthRpcRoute(blockchainUpdater, extensionContext.transactionsApi, time),
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => shutdown()),
         BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, time),
         TransactionsApiRoute(
@@ -343,7 +343,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           time
         ),
         WalletApiRoute(settings.restAPISettings, wallet),
-        UtilsApiRoute(time, settings.restAPISettings, () => blockchainUpdater.estimator, limitedScheduler, blockchainUpdater),
+        UtilsApiRoute(
+          time,
+          settings.restAPISettings,
+          () => blockchainUpdater.estimator,
+          limitedScheduler,
+          blockchainUpdater
+        ),
         PeersApiRoute(settings.restAPISettings, address => networkServer.connect(address), peerDatabase, establishedConnections),
         AddressApiRoute(
           settings.restAPISettings,
@@ -522,17 +528,18 @@ object Application extends ScorexLogging {
     settings
   }
 
-  private[wavesplatform] def loadBlockAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[(BlockMeta, Seq[Transaction])] =
-    loadBlockInfoAt(db, blockchainUpdater)(height).map { case (meta, txs) => (meta, txs.map(_._1)) }
+  private[wavesplatform] def loadBlockAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(
+      height: Int
+  ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
+    loadBlockInfoAt(db, blockchainUpdater)(height)
 
   private[wavesplatform] def loadBlockInfoAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(
       height: Int
-  ): Option[(BlockMeta, Seq[(Transaction, Boolean)])] =
+  ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
     loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
       meta -> blockchainUpdater
         .liquidTransactions(meta.id)
-        .orElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
-        .getOrElse(Seq.empty[(Transaction, Boolean)])
+        .getOrElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
     }
 
   private[wavesplatform] def loadBlockMetaAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] = {

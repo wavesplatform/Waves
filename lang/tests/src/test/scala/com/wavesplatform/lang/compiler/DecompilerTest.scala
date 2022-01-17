@@ -21,6 +21,7 @@ import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.lang.utils.getDecompilerContext
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.test.PropSpec
+import org.scalatest.Assertion
 
 class DecompilerTest extends PropSpec {
 
@@ -31,6 +32,12 @@ class DecompilerTest extends PropSpec {
 
   val decompilerContextV3 = getTestContext(V3).decompilerContext
   val decompilerContextV4 = getTestContext(V4).decompilerContext
+
+  private def assertDecompile(script: String, decompiled: String): Assertion = {
+    val expr   = TestCompiler(V5).compileExpression(script.stripMargin).expr.asInstanceOf[EXPR]
+    val result = Decompiler(expr, getDecompilerContext(V5, Expression))
+    result shouldBe decompiled.stripMargin.trim
+  }
 
   property("successful on very deep expressions (stack overflow check)") {
     val expr = (1 to 10000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
@@ -273,7 +280,7 @@ class DecompilerTest extends PropSpec {
       ),
       Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
-    Decompiler(contract: DApp, decompilerContextV3) shouldEq
+    Decompiler(contract: DApp, decompilerContextV3, V3) shouldEq
       """|func foo () = false
          |
          |
@@ -315,7 +322,7 @@ class DecompilerTest extends PropSpec {
       ),
       None
     )
-    Decompiler(contract, decompilerContextV3) shouldEq
+    Decompiler(contract, decompilerContextV3, V3) shouldEq
       """func foo (bar,buz) = true
         |
         |
@@ -348,7 +355,7 @@ class DecompilerTest extends PropSpec {
       ),
       None
     )
-    Decompiler(contract, decompilerContextV3) shouldEq
+    Decompiler(contract, decompilerContextV3, V3) shouldEq
       """func foo (bar,buz) = true
         |
         |
@@ -799,12 +806,12 @@ class DecompilerTest extends PropSpec {
 
     val ctx =
       Monoid.combine(
-        PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment],
+        PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment],
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
       )
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4).explicitGet()
-    val res  = Decompiler(dApp, decompilerContextV4)
+    val res  = Decompiler(dApp, decompilerContextV4, V4)
     res shouldEq script
   }
 
@@ -860,14 +867,14 @@ class DecompilerTest extends PropSpec {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V4).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
         )
       )
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4).explicitGet()
-    val res  = Decompiler(dApp, ctx.decompilerContext)
+    val res  = Decompiler(dApp, ctx.decompilerContext, V4)
     res shouldEq script
   }
 
@@ -901,14 +908,14 @@ class DecompilerTest extends PropSpec {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V4).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
         )
       )
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4).explicitGet()
-    val res  = Decompiler(dApp, ctx.decompilerContext)
+    val res  = Decompiler(dApp, ctx.decompilerContext, V4)
     res shouldEq script("")
   }
 
@@ -933,14 +940,14 @@ class DecompilerTest extends PropSpec {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V5).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
         )
       )
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V5).explicitGet()
-    val res  = Decompiler(dApp, ctx.decompilerContext)
+    val res  = Decompiler(dApp, ctx.decompilerContext, V5)
     res shouldEq script
   }
 
@@ -955,26 +962,26 @@ class DecompilerTest extends PropSpec {
 
     def script(paramTypes: String) =
       s"""
-                               | func m (v$paramTypes) =
-                               |   match v {
-                               |    case _$types => 0
-                               |    case _       => 0
-                               |   }
-                             """.stripMargin
+         | func m (v$paramTypes) =
+         |   match v {
+         |     case _$types => 0
+         |     case _       => 0
+         |   }
+       """.stripMargin
 
     val parsedExpr = Parser.parseContract(directives ++ script(types)).get.value
 
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V5).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
         )
       )
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V5).explicitGet()
-    val res  = Decompiler(dApp, ctx.decompilerContext)
+    val res  = Decompiler(dApp, ctx.decompilerContext, V5)
     res shouldEq script("")
   }
 
@@ -1012,15 +1019,67 @@ class DecompilerTest extends PropSpec {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V5).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
         )
       )
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V5, needCompaction = true).explicitGet()
-    val res  = Decompiler(dApp, ctx.decompilerContext)
+    val res  = Decompiler(dApp, ctx.decompilerContext, V5)
     res shouldEq scriptWithoutTypes
+  }
+
+  property("BigInt unary minus") {
+    assertDecompile(
+      s"""
+         |let a = -toBigInt(1)
+         |true
+       """,
+      s"""
+         |let a = -(toBigInt(1))
+         |true
+       """
+    )
+  }
+
+  ignore("type cast") {
+    assertDecompile(
+      s"""
+         |func f() = true
+         |func g() = f().as[Boolean]
+         |let a    = g().exactAs[Boolean] && f().exactAs[Boolean]
+         |a.as[Boolean]
+       """,
+      s"""
+         |func f () = true
+         |
+         |func g () = {
+         |    let @ = f()
+         |    if (_isInstanceOf(@, "Boolean"))
+         |        then @
+         |        else unit
+         |    }
+         |
+         |let a = if ({
+         |    let @ = g()
+         |    if (_isInstanceOf(@, "Boolean"))
+         |        then @
+         |        else throw("Couldn't cast Boolean|Unit to Boolean")
+         |    })
+         |    then {
+         |        let @ = f()
+         |        if (_isInstanceOf(@, "Boolean"))
+         |            then @
+         |            else throw("Couldn't cast Boolean to Boolean")
+         |        }
+         |    else false
+         |let @ = a
+         |if (_isInstanceOf(@, "Boolean"))
+         |    then @
+         |    else unit
+       """
+    )
   }
 
   property("native fold") {

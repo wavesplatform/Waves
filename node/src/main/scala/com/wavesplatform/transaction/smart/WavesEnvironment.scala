@@ -29,7 +29,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TransactionBase}
+import com.wavesplatform.transaction.{Asset, TransactionBase, TransactionType}
 import monix.eval.Coeval
 import shapeless._
 
@@ -60,8 +60,8 @@ class WavesEnvironment(
     // There are no new transactions in currentBlockchain
     blockchain
       .transactionInfo(ByteStr(id))
-      .filter(_._3)
-      .map(_._2)
+      .filter(_._1.succeeded)
+      .collect { case (_, tx) if tx.t.tpe != TransactionType.Ethereum => tx }
       .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
 
   override def inputEntity: InputEntity = in()
@@ -158,7 +158,7 @@ class WavesEnvironment(
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
     // There are no new transactions in currentBlockchain
-    blockchain.transactionMeta(ByteStr(id)).collect { case (h, true) => h.toLong }
+    blockchain.transactionMeta(ByteStr(id)).collect { case tm if tm.succeeded => tm.height.toLong }
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     for {

@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract.freecall
 import com.typesafe.config.Config
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, StateCheckFailed}
+import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
@@ -59,12 +59,6 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     assertApiError(
       sender.invokeExpression(firstKeyPair, expr, version = unsupportedVersion.toByte),
       AssertiveApiError(StateCheckFailed.Id, s"Transaction version $unsupportedVersion has not been activated yet", matchMessage = true)
-    )
-
-    val illegalExpression = TestCompiler(V6).compileExpression("true").asInstanceOf[ExprScript]
-    assertApiError(
-      sender.invokeExpression(firstKeyPair, illegalExpression),
-      AssertiveApiError(CustomValidationError.Id, "Script type for Invoke Expression Transaction should be CALL")
     )
   }
 

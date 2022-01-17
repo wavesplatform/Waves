@@ -7,6 +7,7 @@ message DAppMeta {
     int32 version = 1;
     repeated CallableFuncSignature funcs = 2;
     repeated CompactNameAndOriginalNamePair compactNameAndOriginalNamePairList = 3;
+    repeated string originalNames = 4;
 
     message CallableFuncSignature {
         bytes types = 1;

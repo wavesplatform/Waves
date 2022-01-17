@@ -6,6 +6,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -306,7 +307,7 @@ class ExpressionCompilerV1Test extends PropSpec {
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -316,7 +317,8 @@ class ExpressionCompilerV1Test extends PropSpec {
       )
       .compilerContext
 
-    Global.compileExpression(expr, ctx, V4, Account, ScriptEstimatorV3) should produce("Script is too large: 8756 bytes > 8192 bytes")
+    val e = ScriptEstimatorV3(fixOverflow = true, overhead = true)
+    Global.compileExpression(expr, ctx, V4, Account, e) should produce("Script is too large: 8756 bytes > 8192 bytes")
   }
 
   property("extract() removed from V4") {
@@ -567,17 +569,6 @@ class ExpressionCompilerV1Test extends PropSpec {
         "Undefined field `_1` of variable of type `Any` in 19-23; " +
         "Undefined field `_2` of variable of type `Any` in 27-31" +
         "]"
-    )
-  }
-
-  property("using removed FOLD macro") {
-    val script =
-      """
-        | func sum(a:Int, b:Int) = a + b
-        | FOLD<20>([1, 2, 3, 4, 5], 9, sum)
-      """.stripMargin
-    ExpressionCompiler.compile(script, compilerContext) should produce(
-      "Compilation failed: [The FOLD<> macro is no longer supported, use fold_N function family instead in 34-67]"
     )
   }
 
@@ -974,19 +965,17 @@ class ExpressionCompilerV1Test extends PropSpec {
     }
   )
 
-  private val dropRightFunctionName: String = dropRightBytes.name
-
   treeTypeTest("user function overloading 1")(
     ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(
       AnyPos,
-      Expressions.PART.VALID(AnyPos, dropRightFunctionName),
+      Expressions.PART.VALID(AnyPos, "dropRight"),
       List(Expressions.CONST_BYTESTR(AnyPos, Expressions.PART.VALID(AnyPos, ByteStr.empty)), Expressions.CONST_LONG(AnyPos, 1))
     ),
     expectedResult = { res: Either[String, (EXPR, TYPE)] =>
       res shouldBe Right(
         (
-          FUNCTION_CALL(dropRightBytes.header, List(CONST_BYTESTR(ByteStr.empty).explicitGet(), CONST_LONG(1))),
+          FUNCTION_CALL(User("dropRightBytes"), List(CONST_BYTESTR(ByteStr.empty).explicitGet(), CONST_LONG(1))),
           BYTESTR
         )
       )
@@ -997,13 +986,13 @@ class ExpressionCompilerV1Test extends PropSpec {
     ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(
       AnyPos,
-      Expressions.PART.VALID(AnyPos, dropRightFunctionName),
+      Expressions.PART.VALID(AnyPos, "dropRight"),
       List(Expressions.CONST_STRING(AnyPos, Expressions.PART.VALID(AnyPos, "")), Expressions.CONST_LONG(AnyPos, 1))
     ),
     expectedResult = { res: Either[String, (EXPR, TYPE)] =>
       res shouldBe Right(
         (
-          FUNCTION_CALL(dropRightString.header, List(CONST_STRING("").explicitGet(), CONST_LONG(1))),
+          FUNCTION_CALL(User("dropRight"), List(CONST_STRING("").explicitGet(), CONST_LONG(1))),
           STRING
         )
       )
@@ -1014,7 +1003,7 @@ class ExpressionCompilerV1Test extends PropSpec {
     ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(
       AnyPos,
-      Expressions.PART.VALID(AnyPos, dropRightFunctionName),
+      Expressions.PART.VALID(AnyPos, "dropRight"),
       List(Expressions.TRUE(AnyPos), Expressions.CONST_LONG(AnyPos, 1))
     ),
     expectedResult = { res: Either[String, (EXPR, TYPE)] =>

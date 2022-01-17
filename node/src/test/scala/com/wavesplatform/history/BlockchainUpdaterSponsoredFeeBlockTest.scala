@@ -90,15 +90,11 @@ class BlockchainUpdaterSponsoredFeeBlockTest extends PropSpec with DomainScenari
 
   val SponsoredFeeActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings
-      .copy(
-        featureCheckBlocksPeriod = 1,
-        blocksForFeatureActivation = 1,
-        preActivatedFeatures = Map(
+      .copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = Map(
           BlockchainFeatures.FeeSponsorship.id -> 0,
           BlockchainFeatures.NG.id             -> 0,
           BlockchainFeatures.BlockV5.id        -> 0
-        )
-      )
+        ))
   )
 
   val SponsoredActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = SponsoredFeeActivatedAt0BlockchainSettings)

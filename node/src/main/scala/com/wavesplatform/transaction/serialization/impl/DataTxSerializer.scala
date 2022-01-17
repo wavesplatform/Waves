@@ -30,7 +30,7 @@ object DataTxSerializer {
           Array(tpe.id.toByte, version),
           sender.arr,
           Shorts.toByteArray(data.size.toShort),
-          Bytes.concat(data.map(serializeEntry): _*),
+          Bytes.concat(data.map(serializeEntry)*),
           Longs.toByteArray(timestamp),
           Longs.toByteArray(fee)
         )
@@ -40,7 +40,7 @@ object DataTxSerializer {
     }
   }
 
-  private def serializeEntry(e: DataEntry[_]): Array[Byte] = {
+  private def serializeEntry(e: DataEntry[?]): Array[Byte] = {
     val keyBytes = e.key.utf8Bytes
     val valueBytes = e match {
       case IntegerDataEntry(_, value) => Bytes.concat(Array(Type.Integer.id.toByte), Longs.toByteArray(value))

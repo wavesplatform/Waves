@@ -1,30 +1,30 @@
 package com.wavesplatform.lang
 
 import cats.Id
-import cats.syntax.semigroup._
-import cats.syntax.either._
+import cats.syntax.either.*
+import cats.syntax.semigroup.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.sampleTypes
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, Terms}
+import com.wavesplatform.lang.v1.evaluator.*
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
-import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Bindings, WavesContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import org.scalatest.Inside
 
 class ContractIntegrationTest extends PropSpec with Inside {
 
   private val ctx: CTX[Environment] =
-      PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+    PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment] |+|
       CTX[Environment](sampleTypes, Map.empty, Array.empty) |+|
       WavesContext.build(
         Global,
@@ -86,7 +86,7 @@ class ContractIntegrationTest extends PropSpec with Inside {
         DataItem.Bin("callerPk", callerPublicKey),
         DataItem.Bin("transactionId", transactionId),
         DataItem.Lng("fee", fee),
-        DataItem.Bin("feeAssetId", ByteStr.empty),
+        DataItem.Bin("feeAssetId", ByteStr.empty)
       ),
       List(),
       2147483615
@@ -147,44 +147,50 @@ class ContractIntegrationTest extends PropSpec with Inside {
     ContractCompiler(ctx.compilerContext, parsed, V3) should produce("no more than 22 arguments")
   }
 
-
-  def parseCompileAndEvaluate(script: String,
-                              func  : String,
-                              args  : List[Terms.EXPR] = List(Terms.CONST_BYTESTR(ByteStr.empty).explicitGet())
-                             ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
+  def parseCompileAndEvaluate(
+      script: String,
+      func: String,
+      args: List[Terms.EXPR] = List(Terms.CONST_BYTESTR(ByteStr.empty).explicitGet())
+  ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed, V3).explicitGet()
 
-    ContractEvaluator.applyV2Coeval(
-      ctx.evaluationContext(environment),
-      compiled,
-      Invocation(
-        Terms.FUNCTION_CALL(FunctionHeader.User(func), args),
-        Recipient.Address(callerAddress),
-        callerPublicKey,
-        Recipient.Address(callerAddress),
-        callerPublicKey,
-        AttachedPayments.Single(None),
-        transactionId,
-        fee,
-        feeAssetId
-      ),
-      V3,
-      Int.MaxValue
-    ).value().leftMap { case (e, _, log) => (e, log) }
+    ContractEvaluator
+      .applyV2Coeval(
+        ctx.evaluationContext(environment),
+        compiled,
+        Invocation(
+          Terms.FUNCTION_CALL(FunctionHeader.User(func), args),
+          Recipient.Address(callerAddress),
+          callerPublicKey,
+          Recipient.Address(callerAddress),
+          callerPublicKey,
+          AttachedPayments.Single(None),
+          transactionId,
+          fee,
+          feeAssetId
+        ),
+        V3,
+        Int.MaxValue,
+        correctFunctionCallScope = true,
+        newMode = false
+      )
+      .value()
+      .leftMap { case (e, _, log) => (e, log) }
   }
 
   def parseCompileAndVerify(script: String, tx: Tx): Either[ExecutionError, EVALUATED] = {
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed, V3).explicitGet()
     val txObject = Bindings.transactionObject(tx, proofsEnabled = true, V3)
-    ContractEvaluator.verify(
-      compiled.decs,
-      compiled.verifierFuncOpt.get,
-      ctx.evaluationContext(environment),
-      EvaluatorV2.applyCompleted(_, _, V3),
-      txObject
-    )._3
+    ContractEvaluator
+      .verify(
+        compiled.decs,
+        compiled.verifierFuncOpt.get,
+        EvaluatorV2.applyCompleted(ctx.evaluationContext(environment), _, V3, correctFunctionCallScope = true, newMode = false),
+        txObject
+      )
+      ._3
   }
 
   property("Simple verify") {

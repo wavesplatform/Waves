@@ -8,7 +8,6 @@ import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.curve25519
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
 import com.wavesplatform.utils.EthHelpers
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -21,10 +20,10 @@ import org.openjdk.jmh.infra.Blackhole
 @Measurement(iterations = 10, time = 1)
 class AddressFromPublicKeyBenchmark {
   @Benchmark
-  def addressFromPublicKeyWaves(s: PkSt, bh: Blackhole): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.exprWaves, V6))
+  def addressFromPublicKeyWaves(s: PkSt, bh: Blackhole): Unit = bh.consume(eval(s.ctx, s.exprWaves, V6))
 
   @Benchmark
-  def addressFromPublicKeyEth(s: PkSt, bh: Blackhole): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.exprEth, V6))
+  def addressFromPublicKeyEth(s: PkSt, bh: Blackhole): Unit = bh.consume(eval(s.ctx, s.exprEth, V6))
 }
 
 @State(Scope.Benchmark)
@@ -34,5 +33,5 @@ class PkSt extends EthHelpers {
 
   val wavesPk   = ByteStr(curve25519.generateKeypair._2)
   val exprWaves = TestCompiler(V6).compileExpression(s"addressFromPublicKey(base58'$wavesPk')").expr.asInstanceOf[EXPR]
-  val exprEth   = TestCompiler(V6).compileExpression(s"addressFromPublicKey(base58'$TestEthPublicKey')").expr.asInstanceOf[EXPR]
+  val exprEth   = TestCompiler(V6).compileExpression(s"addressFromPublicKey(base58'$TestEthOrdersPublicKey')").expr.asInstanceOf[EXPR]
 }

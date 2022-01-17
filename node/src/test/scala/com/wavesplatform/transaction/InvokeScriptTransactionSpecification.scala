@@ -9,7 +9,8 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BIGINT, CONST_LONG, CaseObj}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
+import com.wavesplatform.lang.v1.serialization.SerdeV1
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.{Amount, transaction}
 import com.wavesplatform.serialization.Deser
@@ -37,8 +38,8 @@ class InvokeScriptTransactionSpecification extends PropSpec {
       deser.timestamp shouldEqual transaction.timestamp
       deser.proofs shouldEqual transaction.proofs
       bytes shouldEqual deser.bytes()
-      Verifier.verifyAsEllipticCurveSignature(transaction) should beRight
-      Verifier.verifyAsEllipticCurveSignature(deser) should beRight // !!!!!!!!!!!!!!!
+      Verifier.verifyAsEllipticCurveSignature(transaction, checkWeakPk = false) should beRight
+      Verifier.verifyAsEllipticCurveSignature(deser, checkWeakPk = false) should beRight // !!!!!!!!!!!!!!!
     }
   }
 
@@ -53,7 +54,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
         transaction.PBTransaction.Data.InvokeScript(
           InvokeScriptTransactionData(
             Some(PBRecipients.create(tx.dApp)),
-            ByteString.copyFrom(Deser.serializeOption(tx.funcCallOpt)(Serde.serialize(_))),
+            ByteString.copyFrom(Deser.serializeOption(tx.funcCallOpt)(SerdeV1.serialize(_))),
             tx.payments.map(p => Amount.of(PBAmounts.toPBAssetId(p.assetId), p.amount))
           )
         )

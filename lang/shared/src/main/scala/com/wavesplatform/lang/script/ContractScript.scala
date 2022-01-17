@@ -1,20 +1,21 @@
 package com.wavesplatform.lang.script
 
-import cats.instances.either._
-import cats.instances.list._
-import cats.instances.option._
-import cats.syntax.either._
-import cats.syntax.flatMap._
-import cats.syntax.foldable._
-import cats.syntax.traverse._
+import cats.instances.either.*
+import cats.instances.list.*
+import cats.instances.option.*
+import cats.syntax.either.*
+import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
+import cats.syntax.traverse.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.VerifierFunction
-import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppType}
-import com.wavesplatform.lang.utils._
-import com.wavesplatform.lang.v1.ContractLimits._
+import com.wavesplatform.lang.contract.meta.MetaMapper
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V6, DApp as DAppType}
+import com.wavesplatform.lang.utils.*
+import com.wavesplatform.lang.v1.ContractLimits.*
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
 import monix.eval.Coeval
@@ -58,6 +59,16 @@ object ContractScript {
       (verifierExpr ::: declExprs ::: callableExprs)
         .exists(com.wavesplatform.lang.v1.compiler.containsArray)
     }
+
+    def isUnionInCallableAllowed: Either[String, Boolean] =
+      if (stdLibVersion < V6) {
+        Right(true)
+      } else {
+        MetaMapper.dicFromProto(expr)
+          .map(!_.callableFuncTypes
+            .exists(_.flatten.exists(_.containsUnion))
+          )
+      }
   }
 
   private def estimateAnnotatedFunctions(
@@ -67,7 +78,7 @@ object ContractScript {
       fixEstimateOfVerifier: Boolean
   ): Either[String, Iterable[(String, Long)]] =
     for {
-      callables <- estimateDeclarations(version, dApp, estimator, callables(dApp))
+      callables <- estimateDeclarations(version, dApp, estimator, callables(dApp), preserveDefinition = true)
       verifier  <- dApp.verifierFuncOpt.traverse(estimateVerifier(version, dApp, estimator, fixEstimateOfVerifier, _))
     } yield verifier ++ callables
 
@@ -76,14 +87,14 @@ object ContractScript {
       dApp: DApp,
       estimator: ScriptEstimator
   ): Either[String, List[(String, Long)]] =
-    estimateDeclarations(version, dApp, estimator, dApp.decs.collect { case f: FUNC => (None, f) })
+    estimateDeclarations(version, dApp, estimator, dApp.decs.collect { case f: FUNC => (None, f) }, preserveDefinition = false)
 
   def estimateGlobalVariables(
       version: StdLibVersion,
       dApp: DApp,
       estimator: ScriptEstimator
   ): Either[String, List[(String, Long)]] =
-    estimateDeclarations(version, dApp, estimator, dApp.decs.collect { case l: LET => (None, l) })
+    estimateDeclarations(version, dApp, estimator, dApp.decs.collect { case l: LET => (None, l) }, preserveDefinition = false)
 
   private def callables(dApp: DApp): List[(Some[String], FUNC)] =
     dApp.callableFuncs
@@ -93,14 +104,15 @@ object ContractScript {
       version: StdLibVersion,
       dApp: DApp,
       estimator: ScriptEstimator,
-      functions: List[(Option[String], DECLARATION)]
+      functions: List[(Option[String], DECLARATION)],
+      preserveDefinition: Boolean
   ): Either[String, List[(String, Long)]] =
     functions.traverse {
       case (annotationArgName, funcExpr) =>
         estimator(
           varNames(version, DAppType),
           functionCosts(version, DAppType),
-          constructExprFromDeclAndContext(dApp.decs, annotationArgName, funcExpr)
+          constructExprFromDeclAndContext(dApp.decs, annotationArgName, funcExpr, preserveDefinition)
         ).map((funcExpr.name, _))
     }
 
@@ -117,24 +129,29 @@ object ContractScript {
       estimator(
         varNames(version, DAppType),
         functionCosts(version, DAppType, isDAppVerifier = !fixEstimateOfVerifier),
-        constructExprFromDeclAndContext(dApp.decs, Some(verifier.annotation.invocationArgName), verifier.u)
+        constructExprFromDeclAndContext(dApp.decs, Some(verifier.annotation.invocationArgName), verifier.u, preserveDefinition = true)
       ).map((verifier.u.name, _))
   }
 
   private[script] def constructExprFromDeclAndContext(
       dec: List[DECLARATION],
       annotationArgNameOpt: Option[String],
-      decl: DECLARATION
+      decl: DECLARATION,
+      preserveDefinition: Boolean
   ): EXPR = {
     val declExpr =
       decl match {
-        case let @ LET(name, _) =>
+        case let @ LET(name, _) if preserveDefinition =>
           BLOCK(let, REF(name))
-        case func @ FUNC(name, args, _) =>
+        case LET(name, _) =>
+          REF(name)
+        case func @ FUNC(name, args, _) if preserveDefinition =>
           BLOCK(
             func,
             FUNCTION_CALL(FunctionHeader.User(name), List.fill(args.size)(TRUE))
           )
+        case FUNC(name, args, _) =>
+          FUNCTION_CALL(FunctionHeader.User(name), List.fill(args.size)(TRUE))
         case Terms.FAILED_DEC() =>
           FAILED_EXPR()
       }

@@ -8,6 +8,7 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Asset, Expression, StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
@@ -16,16 +17,17 @@ import scala.collection.mutable
 
 class TestCompiler(version: StdLibVersion) {
   private lazy val baseCompilerContext =
-    PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+    PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment] |+|
       CryptoContext.build(Global, version).withEnvironment[Environment]
 
   private lazy val compilerContext =
     (baseCompilerContext |+|
       WavesContext.build(Global, DirectiveSet(version, Account, DAppType).explicitGet())).compilerContext
 
+  lazy val expressionContext: CTX[Environment] = WavesContext.build(Global, DirectiveSet(version, Account, Expression).explicitGet())
   private lazy val expressionCompilerContext =
     (baseCompilerContext |+|
-      WavesContext.build(Global, DirectiveSet(version, Account, Expression).explicitGet())).compilerContext
+      expressionContext).compilerContext
 
   private lazy val assetCompilerContext =
     (baseCompilerContext |+|
@@ -37,7 +39,7 @@ class TestCompiler(version: StdLibVersion) {
   def compileContract(script: String, allowIllFormedStrings: Boolean = false): Script =
     ContractScript(version, compile(script, allowIllFormedStrings).explicitGet()).explicitGet()
 
-  def compileExpression(script: String, allowIllFormedStrings: Boolean = false, checkSize: Boolean = true): Script =
+  def compileExpression(script: String, allowIllFormedStrings: Boolean = false, checkSize: Boolean = true): ExprScript =
     ExprScript(
       version,
       ExpressionCompiler.compile(script, expressionCompilerContext, allowIllFormedStrings).explicitGet()._1,

@@ -6,6 +6,7 @@
    2. You've checked "Make project before run"
  */
 
+import sbt.Def
 import sbt.Keys._
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
@@ -75,7 +76,9 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .crossType(CrossType.Full)
   .settings(
-    libraryDependencies ++= Dependencies.protobuf.value ++ Dependencies.langCompilerPlugins.value,
+    libraryDependencies ++= Dependencies.protobuf.value ++
+      Dependencies.langCompilerPlugins.value ++
+      Dependencies.circe.value,
     inConfig(Compile)(
       Seq(
         PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
@@ -118,13 +121,14 @@ lazy val root = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion := "2.13.6",
+    scalaVersion := "2.13.7",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 4, 0),
+    V.fallback := (1, 4, 1),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     scalacOptions ++= Seq(
+      "-Xsource:3",
       "-feature",
       "-deprecation",
       "-unchecked",
@@ -133,7 +137,7 @@ inScope(Global)(
       "-language:postfixOps",
       "-Ywarn-unused:-implicits",
       "-Xlint",
-      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s", // Ignore gRPC warnings
+      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
       "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
       "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
     ),
@@ -152,7 +156,7 @@ inScope(Global)(
      */
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
-    network := Network(sys.props.get("network")),
+    network := Network.default(),
     resolvers ++= Seq(
       Resolver.sonatypeRepo("snapshots"),
       Resolver.mavenLocal
@@ -203,4 +207,26 @@ def checkPR: Command = Command.command("checkPR") { state =>
   state
 }
 
-commands += checkPR
+lazy val buildDebPackages = taskKey[Unit]("Build debian packages")
+buildDebPackages := {
+  (`grpc-server` / Debian / packageBin).value
+  (node / Debian / packageBin).value
+}
+
+def buildPackages: Command = Command("buildPackages")(_ => Network.networkParser) { (state, args) =>
+  args.toSet[Network].foreach { n =>
+    val newState = Project
+      .extract(state)
+      .appendWithoutSession(
+        Seq(Global / network := n),
+        state
+      )
+    Project.extract(newState).runTask(buildDebPackages, newState)
+  }
+
+  Project.extract(state).runTask(packageAll, state)
+
+  state
+}
+
+commands ++= Seq(checkPR, buildPackages)

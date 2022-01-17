@@ -72,7 +72,7 @@ object MicroBlockResponse {
 }
 
 case class MicroBlockInv(sender: PublicKey, totalBlockId: ByteStr, reference: ByteStr, signature: ByteStr) extends Message with Signed {
-  override val signatureValid: Coeval[Boolean] =
+  override protected val signatureValid: Coeval[Boolean] =
     Coeval.evalOnce(crypto.verify(signature, sender.toAddress.bytes ++ totalBlockId.arr ++ reference.arr, sender))
 
   override def toString: String = s"MicroBlockInv(${totalBlockId.trim} ~> ${reference.trim})"

@@ -78,11 +78,13 @@ object Global extends BaseGlobal {
   override def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean =
     Merkle.verify(rootBytes, proofBytes, valueBytes)
 
-  private val longDigits  = 19
-  private val longContext = new MathContext(longDigits)
+  private val longDigits     = 19
+  private val longContext    = new MathContext(longDigits)
+  private val oldLongContext = MathContext.DECIMAL128
 
   private val bigIntDigits = 154
   private val bigMathContext = new MathContext(bigIntDigits)
+  private val oldBigMathContext = new MathContext(156 + 40)
 
   // Math functions
   def pow(
@@ -91,17 +93,24 @@ object Global extends BaseGlobal {
       exponent: Long,
       exponentPrecision: Int,
       resultPrecision: Int,
-      round: Rounding
+      round: Rounding,
+      useNewPrecision: Boolean
   ): Either[String, Long] =
     tryEither {
-      val baseBD = BD.valueOf(base, basePrecision)
-      val expBD  = BD.valueOf(exponent, exponentPrecision)
+      val baseBD  = BD.valueOf(base, basePrecision)
+      val expBD   = BD.valueOf(exponent, exponentPrecision)
+      val context = if (useNewPrecision) longContext else oldLongContext
       val result = if (expBD == BigDecimal(0.5).bigDecimal) {
-        BigDecimalMath.sqrt(baseBD, longContext)
+        BigDecimalMath.sqrt(baseBD, context)
       } else {
-        BigDecimalMath.pow(baseBD, expBD, longContext)
+        BigDecimalMath.pow(baseBD, expBD, context)
       }
-      setScale(resultPrecision, round, longDigits, result)
+      if (useNewPrecision)
+        setScale(resultPrecision, round, context.getPrecision, result)
+      else {
+        val value = result.setScale(resultPrecision.toInt, round.mode).unscaledValue
+        Right(BigInt(value))
+      }
     }.flatten.map(_.bigInteger.longValueExact())
 
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: Rounding): Either[String, Long] =
@@ -114,16 +123,20 @@ object Global extends BaseGlobal {
 
   def toJBig(v: BigInt, p: Long) = BigDecimal(v).bigDecimal.multiply(BD.valueOf(1L, p.toInt))
 
-  def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =
+  def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding, useNewPrecision: Boolean): Either[String, BigInt] =
     tryEither {
-      val base = toJBig(b, bp)
-      val exp  = toJBig(e, ep)
+      val base    = toJBig(b, bp)
+      val exp     = toJBig(e, ep)
+      val context = if (useNewPrecision) bigMathContext else oldBigMathContext
       val res = if (exp == BigDecimal(0.5).bigDecimal) {
-        BigDecimalMath.sqrt(base, bigMathContext)
+        BigDecimalMath.sqrt(base, context)
       } else {
-        BigDecimalMath.pow(base, exp, bigMathContext)
+        BigDecimalMath.pow(base, exp, context)
       }
-      setScale(rp.toInt, round, bigIntDigits, res)
+      if (useNewPrecision)
+        setScale(rp.toInt, round, context.getPrecision, res)
+      else
+        Right(BigInt(res.setScale(rp.toInt, round.mode).unscaledValue))
     }.flatten
 
   def logBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding): Either[String, BigInt] =

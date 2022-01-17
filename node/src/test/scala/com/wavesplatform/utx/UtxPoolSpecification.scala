@@ -4,7 +4,7 @@ import java.nio.file.{Files, Path}
 
 import cats.data.NonEmptyList
 import com.wavesplatform
-import com.wavesplatform._
+import com.wavesplatform.*
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -24,32 +24,32 @@ import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.mining._
-import com.wavesplatform.settings._
-import com.wavesplatform.state._
-import com.wavesplatform.state.diffs._
+import com.wavesplatform.mining.*
+import com.wavesplatform.settings.*
+import com.wavesplatform.state.*
+import com.wavesplatform.state.diffs.*
 import com.wavesplatform.state.utils.TestLevelDB
-import com.wavesplatform.test.{FreeSpec, _}
+import com.wavesplatform.test.{FreeSpec, *}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Asset, Transaction, _}
+import com.wavesplatform.transaction.{Asset, Transaction, *}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool.PackStrategy
 import monix.reactive.subjects.PublishSubject
 import org.iq80.leveldb.DB
-import org.scalacheck.Gen._
+import org.scalacheck.Gen.*
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatest.concurrent.Eventually
 
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Random
 
 private object UtxPoolSpecification {
@@ -76,9 +76,9 @@ class UtxPoolSpecification
     with Eventually {
   private val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
 
-  import FeeValidation.{ScriptExtraFee => extraFee}
-  import FunctionalitySettings.TESTNET.{maxTransactionTimeBackOffset => maxAge}
-  import UtxPoolSpecification._
+  import FeeValidation.ScriptExtraFee as extraFee
+  import FunctionalitySettings.TESTNET.maxTransactionTimeBackOffset as maxAge
+  import UtxPoolSpecification.*
 
   private def mkBlockchain(genAccounts: Map[Address, Long]) = {
     val genesisSettings = TestHelpers.genesisSettings(genAccounts)
@@ -86,13 +86,11 @@ class UtxPoolSpecification
     val settings = origSettings.copy(
       blockchainSettings = BlockchainSettings(
         'T',
-        FunctionalitySettings.TESTNET.copy(
-          preActivatedFeatures = Map(
+        FunctionalitySettings.TESTNET.copy(preActivatedFeatures = Map(
             BlockchainFeatures.MassTransfer.id  -> 0,
             BlockchainFeatures.SmartAccounts.id -> 0,
             BlockchainFeatures.Ride4DApps.id    -> 0
-          )
-        ),
+          )),
         genesisSettings,
         RewardsSettings.TESTNET
       ),
@@ -100,8 +98,8 @@ class UtxPoolSpecification
     )
 
     val dbContext            = TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)
-    val (bcu, levelDBWriter) = TestStorageFactory(settings, dbContext.db, new TestTime, ignoreSpendableBalanceChanged, ignoreBlockchainUpdateTriggers)
-    bcu.processBlock(Block.genesis(genesisSettings).explicitGet()) should beRight
+    val (bcu, _) = TestStorageFactory(settings, dbContext.db, new TestTime, ignoreSpendableBalanceChanged, ignoreBlockchainUpdateTriggers)
+    bcu.processBlock(Block.genesis(genesisSettings, bcu.isFeatureActivated(BlockchainFeatures.RideV6)).explicitGet()) should beRight
     bcu
   }
 
@@ -188,7 +186,7 @@ class UtxPoolSpecification
     fee                          <- chooseNum(extraFee, (senderBalance * 0.01).toLong)
     offset                       <- chooseNum(1000L, 2000L)
   } yield {
-    val time = new TestTime()
+    val time = TestTime()
     val utx =
       new UtxPoolImpl(time, bcu, UtxSettings(
           10,
@@ -772,7 +770,7 @@ class UtxPoolSpecification
                  |    }
                  | }
                """.stripMargin,
-              ScriptEstimatorV3
+              ScriptEstimatorV3(fixOverflow = true, overhead = true)
             )
             .explicitGet()
             ._1
@@ -786,8 +784,8 @@ class UtxPoolSpecification
             (genesis :: genesisTxs, setScript :: setScripts)
         }
 
-        d.appendBlock(genesisTxs: _*)
-        d.appendBlock(setScripts: _*)
+        d.appendBlock(genesisTxs*)
+        d.appendBlock(setScripts*)
 
         val invoke = TxHelpers.invoke(genesisTxs.head.recipient, "default")
         val utx    = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings)

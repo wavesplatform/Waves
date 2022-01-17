@@ -18,9 +18,7 @@ import org.scalacheck.Gen
 class CreateAliasTransactionDiffTest extends PropSpec with WithState {
 
   val fs =
-    TestFunctionalitySettings.Enabled.copy(
-      preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0)
-    )
+    TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
 
   val preconditionsAndAliasCreations
       : Gen[(GenesisTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction)] = for {
@@ -87,7 +85,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
     maybeFeeAsset            <- Gen.oneOf(maybeAsset, maybeAsset2)
     alias                    <- aliasGen
     fee                      <- smallFeeGen
-    aliasTx = CreateAliasTransaction.selfSigned(Transaction.V2, aliasedRecipient, alias, fee, ts).explicitGet()
+    aliasTx = CreateAliasTransaction.selfSigned(Transaction.V2, aliasedRecipient, alias.name, fee, ts).explicitGet()
     transfer <- transferGeneratorP(
       master,
       alias,

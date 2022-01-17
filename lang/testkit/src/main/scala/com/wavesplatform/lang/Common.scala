@@ -29,7 +29,8 @@ object Common {
   val addCtx: CTX[NoContext]     = CTX[NoContext](Seq(dataEntryType), Map.empty, Array.empty)
 
   def ev[T <: EVALUATED](
-      context: EvaluationContext[NoContext, Id] = Monoid.combine(PureContext.build(V1, fixUnicodeFunctions = true).evaluationContext, addCtx.evaluationContext),
+      context: EvaluationContext[NoContext, Id] =
+        Monoid.combine(PureContext.build(V1, useNewPowPrecision = true).evaluationContext, addCtx.evaluationContext),
       expr: EXPR
   ): Either[ExecutionError, T] =
     new EvaluatorV1[Id, NoContext]().apply[T](context, expr)

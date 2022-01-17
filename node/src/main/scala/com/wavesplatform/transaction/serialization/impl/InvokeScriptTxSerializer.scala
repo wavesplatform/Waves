@@ -1,22 +1,20 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-
 import scala.util.Try
-
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import play.api.libs.json.{JsArray, JsObject, Json, JsString}
+import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
 object InvokeScriptTxSerializer {
   def functionCallToJson(fc: Terms.FUNCTION_CALL): JsObject = {
@@ -31,12 +29,13 @@ object InvokeScriptTxSerializer {
     )
   }
 
-  private def mapSingleArg(arg: EXPR) =
+  private def mapSingleArg(arg: EXPR): JsObject =
     arg match {
       case Terms.CONST_LONG(num)      => Json.obj("type" -> "integer", "value" -> num)
       case Terms.CONST_BOOLEAN(bool)  => Json.obj("type" -> "boolean", "value" -> bool)
       case Terms.CONST_BYTESTR(bytes) => Json.obj("type" -> "binary", "value" -> bytes.base64)
       case Terms.CONST_STRING(str)    => Json.obj("type" -> "string", "value" -> str)
+      case Terms.ARR(_)               => Json.obj("type" -> "list", "value" -> "unsupported") // should not be shown on normal cases, added only to avoid NotImplementedError while constructing error for illegal callable argument type
       case arg                        => throw new NotImplementedError(s"Not supported: $arg")
     }
 
@@ -50,7 +49,7 @@ object InvokeScriptTxSerializer {
           Array(tpe.id.toByte, version, chainId),
           sender.arr,
           dApp.bytes,
-          Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
+          Deser.serializeOption(funcCallOpt)(SerdeV1.serialize(_)),
           Deser.serializeArrays(payments.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
           Longs.toByteArray(fee),
           feeAssetId.byteRepr,
@@ -81,7 +80,7 @@ object InvokeScriptTxSerializer {
 
     val sender       = buf.getPublicKey
     val dApp         = buf.getAddressOrAlias
-    val functionCall = Deser.parseOption(buf)(Serde.deserializeFunctionCall(_).explicitGet())
+    val functionCall = Deser.parseOption(buf)(SerdeV1.deserializeFunctionCall(_).explicitGet())
     val payments     = Deser.parseArrays(buf).map(parsePayment)
     val fee          = buf.getLong
     val feeAssetId   = buf.getAsset

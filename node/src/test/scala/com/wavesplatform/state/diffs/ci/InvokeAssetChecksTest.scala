@@ -10,17 +10,19 @@ import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Portfolio}
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Portfolio}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
+
+import scala.collection.immutable.VectorMap
 
 class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBCacheSettings with MockFactory with WithDomain with EitherValues {
 
@@ -64,7 +66,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         genesis2Tx  = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp), fee, ts + 2).explicitGet()
         call        = Some(FUNCTION_CALL(User(func), Nil))
-        invokeTx = Signed.invokeScript(TxVersion.V2, invoker, master.toAddress, call, Seq(), fee, Waves, ts + 3)
+        invokeTx    = Signed.invokeScript(TxVersion.V2, invoker, master.toAddress, call, Seq(), fee, Waves, ts + 3)
       } yield (activated, func, invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
 
     val (activated, func, invoke, genesisTxs) = transferBase58WavesDAppScenario.sample.get
@@ -72,7 +74,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
       val miner       = TestBlock.defaultSigner.toAddress
       val dAppAddress = invoke.dApp.asInstanceOf[Address]
       def invokeInfo(succeeded: Boolean) =
-        Map(invoke.id() -> NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded))
+        VectorMap(invoke.id() -> NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L))
 
       val expectedResult =
         if (activated) {
@@ -115,16 +117,12 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
       val fs = TestFunctionalitySettings.Enabled
       val features =
         if (activated)
-          TestFunctionalitySettings.Enabled.copy(
-            preActivatedFeatures = fs.preActivatedFeatures ++ Map(
+          TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = fs.preActivatedFeatures ++ Map(
               BlockchainFeatures.BlockV5.id          -> 0,
               BlockchainFeatures.SynchronousCalls.id -> 0
-            )
-          )
+            ))
         else
-          TestFunctionalitySettings.Enabled.copy(
-            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
-          )
+          TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
 
       assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke)), features)(
         _ shouldBe Right(expectedResult)
@@ -166,8 +164,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
        """.stripMargin
     )
 
-    val features = TestFunctionalitySettings.Enabled.copy(
-      preActivatedFeatures = Map(
+    val features = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
         BlockchainFeatures.SmartAccounts.id    -> 0,
         BlockchainFeatures.SmartAssets.id      -> 0,
         BlockchainFeatures.Ride4DApps.id       -> 0,
@@ -176,8 +173,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         BlockchainFeatures.BlockReward.id      -> 0,
         BlockchainFeatures.BlockV5.id          -> 0,
         BlockchainFeatures.SynchronousCalls.id -> 0
-      )
-    )
+      ))
 
     val preconditions =
       for {
@@ -189,28 +185,30 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         setDApp  = SetScriptTransaction.selfSigned(1.toByte, dAppAcc, Some(dApp(emptyDAppAcc.toAddress)), fee, ts).explicitGet()
         setDApp2 = SetScriptTransaction.selfSigned(1.toByte, emptyDAppAcc, Some(emptyDApp), fee, ts).explicitGet()
         invokeInvalidLength = Signed.invokeScript(
-            1.toByte,
-            dAppAcc,
-            dAppAcc.toAddress,
-            Some(FUNCTION_CALL(User("invalidLength"), Nil)),
-            Nil,
-            fee,
-            Waves,
-            ts)
+          1.toByte,
+          dAppAcc,
+          dAppAcc.toAddress,
+          Some(FUNCTION_CALL(User("invalidLength"), Nil)),
+          Nil,
+          fee,
+          Waves,
+          ts
+        )
         invokeUnexisting = Signed.invokeScript(
-            1.toByte,
-            dAppAcc,
-            dAppAcc.toAddress,
-            Some(FUNCTION_CALL(User("unexisting"), Nil)),
-            Nil,
-            fee,
-            Waves,
-            ts)
+          1.toByte,
+          dAppAcc,
+          dAppAcc.toAddress,
+          Some(FUNCTION_CALL(User("unexisting"), Nil)),
+          Nil,
+          fee,
+          Waves,
+          ts
+        )
       } yield (List(genesis, genesis2, setDApp, setDApp2), invokeInvalidLength, invokeUnexisting)
 
     val (preparingTxs, invokeInvalidLength, invokeUnexisting) = preconditions.sample.get
     withDomain(domainSettingsWithFS(features)) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs *)
       (the[RuntimeException] thrownBy d.appendBlock(invokeInvalidLength)).getMessage should include(
         s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32"
       )

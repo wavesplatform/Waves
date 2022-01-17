@@ -30,8 +30,7 @@ class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettin
   private val estimatorV3ActivationHeight = 3
   private val fixActivationHeight         = 5
 
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
+  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id    -> 0,
       BlockchainFeatures.SmartAssets.id      -> 0,
       BlockchainFeatures.Ride4DApps.id       -> 0,
@@ -40,9 +39,7 @@ class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettin
       BlockchainFeatures.BlockReward.id      -> 0,
       BlockchainFeatures.BlockV5.id          -> estimatorV3ActivationHeight,
       BlockchainFeatures.SynchronousCalls.id -> fixActivationHeight
-    ),
-    estimatorPreCheckHeight = Int.MaxValue
-  )
+    ), estimatorPreCheckHeight = Int.MaxValue)
 
   private val lambordini: Script = {
     val base64 =
@@ -102,7 +99,7 @@ class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettin
   property(s"fee multiplier is disabled after activation ${BlockchainFeatures.SynchronousCalls}") {
     val (preparingTxs, invoke1, data2, invoke2) = paymentPreconditions(lambordini).sample.get
     withDomain(domainSettingsWithFS(fsWithV5)) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs*)
       d.appendBlock(invoke1)
 
       d.appendBlock(data2)

@@ -12,10 +12,10 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test._
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 
 class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with TransactionGenBase {
 
@@ -58,25 +58,17 @@ class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with Transaction
       invokeTx = () => Signed.invokeScript(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts)
     } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx2), invokeTx)
 
-  property("temporary negative balance of sync call produce error only after set height") {
+  property("temporary negative balance of sync call produces error") {
     val (preparingTxs, invoke) = scenario.sample.get
     val settings =
       TestFunctionalitySettings
         .withFeatures(BlockV5, SynchronousCalls)
-        .copy(syncDAppCheckPaymentsHeight = 4)
 
     withDomain(domainSettingsWithFS(settings)) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs*)
 
       val invoke1 = invoke()
-      d.appendBlock(invoke1)
-      d.blockchain.transactionInfo(invoke1.id.value()).get._3 shouldBe true
-
-      val invoke2 = invoke()
-      d.appendBlock()
-      (the[RuntimeException] thrownBy d.appendBlock(invoke2)).getMessage should include(
-        s"Sync call leads to temporary negative balance = -100 for address ${invoke2.dApp}"
-      )
+      d.appendAndCatchError(invoke1).toString should include("negative waves balance")
     }
   }
 }

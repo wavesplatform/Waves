@@ -145,7 +145,7 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
     } {
       val (genesis, setInvoke, setReentrantInvoke) = scenario(contract).sample.get
       withDomain(features) { d =>
-        d.appendBlock(genesis: _*)
+        d.appendBlock(genesis*)
         (the[RuntimeException] thrownBy d.appendBlock(setInvoke)).getMessage should include(
           s"DApp-to-dApp invocations are not allowed from verifier"
         )
@@ -160,7 +160,7 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
     List(true, false).foreach { callFromCallable =>
       val (genesis, setInvoke, setReentrantInvoke) = scenario(declarationsContract(_, callFromCallable)).sample.get
       withDomain(RideV5) { d =>
-        d.appendBlock(genesis: _*)
+        d.appendBlock(genesis*)
         (the[RuntimeException] thrownBy d.appendBlock(setInvoke)).getMessage should include(s"DApp-to-dApp invocations are not allowed from verifier")
         (the[RuntimeException] thrownBy d.appendBlock(setReentrantInvoke)).getMessage should include(
           s"DApp-to-dApp invocations are not allowed from verifier"
@@ -173,11 +173,11 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
     List(true, false).foreach { callFromCallable =>
       val (genesis, setInvoke, setReentrantInvoke) = scenario(declarationsContract(_, callFromCallable)).sample.get
       withDomain(RideV6) { d =>
-        d.appendBlock(genesis: _*)
+        d.appendBlock(genesis*)
         d.appendBlock(setInvoke)
         d.appendBlock(setReentrantInvoke)
-        d.blockchain.transactionMeta(setInvoke.id.value()).get._2 shouldBe true
-        d.blockchain.transactionMeta(setReentrantInvoke.id.value()).get._2 shouldBe true
+        d.blockchain.transactionSucceeded(setInvoke.id.value()) shouldBe true
+        d.blockchain.transactionSucceeded(setReentrantInvoke.id.value()) shouldBe true
       }
     }
   }

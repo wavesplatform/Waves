@@ -1,7 +1,6 @@
 package com.wavesplatform
 
 import scala.concurrent.Future
-
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.block.SignedBlockHeader
@@ -12,7 +11,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Diff, Height, LeaseBalance, NG, VolumeAndFee}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Diff, Height, LeaseBalance, NG, TxMeta, VolumeAndFee}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -69,7 +68,7 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
     }
 
     def activateAllFeatures(): Unit = {
-      this.activateFeatures(BlockchainFeatures.implemented.flatMap(BlockchainFeatures.feature).toSeq: _*)
+      this.activateFeatures(BlockchainFeatures.implemented.flatMap(BlockchainFeatures.feature).toSeq*)
     }
 
     def creditBalance(address: MockParameter[Address], asset: MockParameter[Asset], amount: Long = Long.MaxValue / 3): Unit = {
@@ -103,11 +102,10 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
         .returns(
           Some(
             (
-              1, // height
+              TxMeta(Height(1), true, 0), // height
               IssueTransaction
                 .selfSigned(2.toByte, TestValues.keyPair, "test", "test", 10000, 8, reissuable = true, script, 500000L, 123L)
-                .explicitGet(),
-              true // applied
+                .explicitGet()
             )
           )
         )

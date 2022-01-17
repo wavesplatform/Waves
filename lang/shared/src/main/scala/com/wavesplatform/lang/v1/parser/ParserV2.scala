@@ -74,13 +74,19 @@ class ParserV2(val input: ParserInput) extends Parser {
     push(cursor) ~ AtomExpr ~ zeroOrMore(WS ~ MULT_GROUP_OP ~ WS ~ AtomExpr ~> BinaryOpWithExpr) ~ push(cursor) ~> parseBinaryOperationAtom _
   }
   def AtomExpr: Rule1[EXPR] = rule {
-    push(cursor) ~ optional(UNARY_OP) ~ WS ~ (Fold | GettableExpr | IfWithError | Match | ConstAtom) ~ push(cursor) ~> parseAtomExpr _
+    push(cursor) ~ optional(UNARY_OP) ~ WS ~ (FoldNative | FoldMacro | GettableExpr | IfWithError | Match | ConstAtom) ~ push(cursor) ~> parseAtomExpr _
   }
 
-  def Fold: Rule1[EXPR] = rule {
+  def FoldNative: Rule1[EXPR] = rule {
     push(cursor) ~ "fold_" ~ WS ~ capture(Digits) ~ WS ~ "(" ~ WS ~ Expr ~ WS ~ "," ~ WS ~ Expr ~ WS ~ "," ~ WS ~ ReferenceAtom ~ WS ~ ")" ~ push(
       cursor
-    ) ~> parseFoldExpr _
+    ) ~> parseFoldExpr(isNative = true) _
+  }
+
+  def FoldMacro: Rule1[EXPR] = rule {
+    push(cursor) ~ "FOLD" ~ WS ~ "<" ~ WS ~ capture(Digits) ~ WS ~ ">" ~ WS ~ "(" ~ WS ~ Expr ~ WS ~ "," ~ WS ~ Expr ~ WS ~ "," ~ WS ~ ReferenceAtom ~ WS ~ ")" ~ push(
+      cursor
+    ) ~> parseFoldExpr(isNative = false) _
   }
 
   def GettableExpr: Rule1[EXPR] = rule {
@@ -232,10 +238,10 @@ class ParserV2(val input: ParserInput) extends Parser {
     LET(Pos(startPos, endPos), name, value)
   }
 
-  def parseFoldExpr(startPos: Int, limitNumStr: String, list: EXPR, acc: EXPR, f: EXPR, endPos: Int): EXPR = {
+  def parseFoldExpr(isNative: Boolean)(startPos: Int, limitNumStr: String, list: EXPR, acc: EXPR, f: EXPR, endPos: Int): EXPR = {
     val limit = limitNumStr.toInt
     val pos   = Pos(startPos, endPos)
-    FOLD(pos, limit, list, acc, f.asInstanceOf[REF])
+    FOLD(pos, limit, list, acc, f.asInstanceOf[REF], isNative)
   }
 
   def parseGettableExpr(expr: EXPR, accessors: Seq[Accessor], endPos: Int): EXPR = {

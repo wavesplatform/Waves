@@ -37,8 +37,7 @@ class DiffComplexityCountTest
 
   private val activationHeight = 3
 
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
+  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id    -> 0,
       BlockchainFeatures.SmartAssets.id      -> 0,
       BlockchainFeatures.Ride4DApps.id       -> 0,
@@ -47,9 +46,7 @@ class DiffComplexityCountTest
       BlockchainFeatures.BlockReward.id      -> 0,
       BlockchainFeatures.BlockV5.id          -> 0,
       BlockchainFeatures.SynchronousCalls.id -> activationHeight
-    ),
-    estimatorPreCheckHeight = Int.MaxValue
-  )
+    ), estimatorPreCheckHeight = Int.MaxValue)
 
   // ~1900 complexity
   val groth: String =
@@ -71,7 +68,7 @@ class DiffComplexityCountTest
                     |   else ($groth)
                     |
                   """.stripMargin
-    ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()._1
   }
 
   private def dApp(asset: IssuedAsset): Script = TestCompiler(V4).compileContract(
@@ -119,7 +116,7 @@ class DiffComplexityCountTest
   property(s"evaluated complexity is used for diff instead of estimated one after activation ${BlockchainFeatures.SynchronousCalls}") {
     val (preparingTxs, invoke) = paymentPreconditions.sample.get
     withDomain(domainSettingsWithFS(fsWithV5)) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs*)
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)

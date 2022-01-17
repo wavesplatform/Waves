@@ -3,16 +3,19 @@ package com.wavesplatform.transaction.assets.exchange
 import java.math.BigInteger
 import java.nio.ByteBuffer
 
+import com.google.common.base.CaseFormat
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import org.bouncycastle.util.encoders.Hex
-import org.web3j.crypto.{ECDSASignature, Sign, StructuredDataEncoder}
+import org.web3j.crypto.{ECDSASignature, ECKeyPair, Sign, StructuredDataEncoder}
 import org.web3j.crypto.Sign.SignatureData
 import play.api.libs.json.{JsObject, Json}
 
 object EthOrders extends App {
+  private[this] lazy val toSnakeCase = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.UPPER_UNDERSCORE)
+
   def toEip712Json(order: Order): JsObject = {
     def encodeAsset(asset: Asset): String = asset match {
       case IssuedAsset(id) => id.toString
@@ -22,6 +25,12 @@ object EthOrders extends App {
     def encodeOrderType(orderType: OrderType): String = orderType match {
       case OrderType.BUY  => "BUY"
       case OrderType.SELL => "SELL"
+    }
+
+    val priceMode = order.priceMode match {
+      case OrderPriceMode.Default if order.version < Order.V4 => OrderPriceMode.AssetDecimals
+      case OrderPriceMode.Default                             => OrderPriceMode.FixedDecimals
+      case other                                              => other
     }
 
     val message = Json.obj(
@@ -35,7 +44,8 @@ object EthOrders extends App {
       "timestamp"         -> order.timestamp,
       "expiration"        -> order.expiration,
       "matcherFee"        -> order.matcherFee,
-      "matcherFeeAssetId" -> encodeAsset(order.matcherFeeAssetId)
+      "matcherFeeAssetId" -> encodeAsset(order.matcherFeeAssetId),
+      "priceMode"         -> toSnakeCase.convert(priceMode.toString)
     )
 
     Json.parse(orderDomainJson).as[JsObject] ++ Json.obj("message" -> message)
@@ -65,12 +75,22 @@ object EthOrders extends App {
     PublicKey(ByteStr(signerKey))
   }
 
+  def signOrder(order: Order, key: ECKeyPair): Array[Byte] = {
+    val message   = hashOrderStruct(order)
+    val signature = Sign.signMessage(message, key, false)
+    val buffer    = ByteBuffer.allocate(signature.getR.length + signature.getS.length + signature.getV.length)
+    buffer.put(signature.getR)
+    buffer.put(signature.getS)
+    buffer.put(signature.getV)
+    buffer.array()
+  }
+
   def decodeSignature(signature: Array[Byte]): SignatureData = {
     val buffer = ByteBuffer.wrap(signature)
     val paramSize = buffer.remaining() match {
-      case 129 => 64
-      case 65  => 32
-      case other   => throw new IllegalArgumentException(s"Unexpected signature length: $other")
+      case 129   => 64
+      case 65    => 32
+      case other => throw new IllegalArgumentException(s"Unexpected signature length: $other")
     }
     val R = new Array[Byte](paramSize)
     val S = new Array[Byte](paramSize)
@@ -82,81 +102,85 @@ object EthOrders extends App {
 
   def orderDomainJson: String =
     s"""
-      |{
-      |  "types": {
-      |    "EIP712Domain": [
-      |      {
-      |        "name": "name",
-      |        "type": "string"
-      |      },
-      |      {
-      |        "name": "version",
-      |        "type": "string"
-      |      },
-      |      {
-      |        "name": "chainId",
-      |        "type": "uint256"
-      |      },
-      |      {
-      |        "name": "verifyingContract",
-      |        "type": "address"
-      |      }
-      |    ],
-      |    "Order": [
-      |      {
-      |        "name": "version",
-      |        "type": "int32"
-      |      },
-      |      {
-      |        "name": "matcherPublicKey",
-      |        "type": "string"
-      |      },
-      |      {
-      |        "name": "amountAsset",
-      |        "type": "string"
-      |      },
-      |      {
-      |        "name": "priceAsset",
-      |        "type": "string"
-      |      },
-      |      {
-      |        "name": "orderType",
-      |        "type": "string"
-      |      },
-      |      {
-      |        "name": "amount",
-      |        "type": "int64"
-      |      },
-      |      {
-      |        "name": "price",
-      |        "type": "int64"
-      |      },
-      |      {
-      |        "name": "timestamp",
-      |        "type": "int64"
-      |      },
-      |      {
-      |        "name": "expiration",
-      |        "type": "int64"
-      |      },
-      |      {
-      |        "name": "matcherFee",
-      |        "type": "int64"
-      |      },
-      |      {
-      |        "name": "matcherFeeAssetId",
-      |        "type": "string"
-      |      }
-      |    ]
-      |  },
-      |  "primaryType": "Order",
-      |  "domain": {
-      |    "name": "Waves Exchange",
-      |    "version": "1",
-      |    "chainId": ${AddressScheme.current.chainId},
-      |    "verifyingContract": "0x${Hex.toHexString(Array.fill[Byte](20)(AddressScheme.current.chainId))}"
-      |  },
-      |  "message": {}
-      |}
-      |""".stripMargin
+       |{
+       |  "types": {
+       |    "EIP712Domain": [
+       |      {
+       |        "name": "name",
+       |        "type": "string"
+       |      },
+       |      {
+       |        "name": "version",
+       |        "type": "string"
+       |      },
+       |      {
+       |        "name": "chainId",
+       |        "type": "uint256"
+       |      },
+       |      {
+       |        "name": "verifyingContract",
+       |        "type": "address"
+       |      }
+       |    ],
+       |    "Order": [
+       |      {
+       |        "name": "version",
+       |        "type": "int32"
+       |      },
+       |      {
+       |        "name": "matcherPublicKey",
+       |        "type": "string"
+       |      },
+       |      {
+       |        "name": "amountAsset",
+       |        "type": "string"
+       |      },
+       |      {
+       |        "name": "priceAsset",
+       |        "type": "string"
+       |      },
+       |      {
+       |        "name": "orderType",
+       |        "type": "string"
+       |      },
+       |      {
+       |        "name": "amount",
+       |        "type": "int64"
+       |      },
+       |      {
+       |        "name": "price",
+       |        "type": "int64"
+       |      },
+       |      {
+       |        "name": "timestamp",
+       |        "type": "int64"
+       |      },
+       |      {
+       |        "name": "expiration",
+       |        "type": "int64"
+       |      },
+       |      {
+       |        "name": "matcherFee",
+       |        "type": "int64"
+       |      },
+       |      {
+       |        "name": "matcherFeeAssetId",
+       |        "type": "string"
+       |      },
+       |      {
+       |        "name": "priceMode",
+       |        "type": "string"
+       |      }
+       |    ]
+       |  },
+       |  "primaryType": "Order",
+       |  "domain": {
+       |    "name": "Waves Exchange",
+       |    "version": "1",
+       |    "chainId": ${AddressScheme.current.chainId},
+       |    "verifyingContract": "0x${Hex.toHexString(Array.fill[Byte](20)(AddressScheme.current.chainId))}"
+       |  },
+       |  "message": {}
+       |}
+       |""".stripMargin
 }

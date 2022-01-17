@@ -1,18 +1,18 @@
 package com.wavesplatform.transaction.validation
 
-import scala.util.Try
-
-import cats.data.{NonEmptyList, Validated}
 import cats.data.Validated.{Invalid, Valid}
-import cats.implicits._
+import cats.data.{NonEmptyList, Validated}
+import cats.implicits.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.{Asset, TxValidationError, TxVersion, VersionedTransaction}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, TooBigArray}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Asset, TxValidationError, TxVersion, VersionedTransaction}
+
+import scala.util.Try
 
 object TxConstraints {
   // Generic
@@ -26,17 +26,18 @@ object TxConstraints {
   }
 
   def cond(cond: => Boolean, err: => ValidationError): ValidatedNV =
-    if (cond) Valid(()) else Invalid(err).toValidatedNel
+    if (cond) Valid(())
+    else Invalid(err).toValidatedNel
 
   def byVersionSet[T <: VersionedTransaction](tx: T)(f: (Set[TxVersion], () => ValidatedV[Any])*): ValidatedV[T] = {
     seq(tx)(f.collect {
       case (v, func) if v.contains(tx.version) =>
         func()
-    }: _*)
+    }*)
   }
 
   def byVersion[T <: VersionedTransaction](tx: T)(f: (TxVersion, () => ValidatedV[Any])*): ValidatedV[T] =
-    byVersionSet(tx)(f.map { case (v, f) => (Set(v), f) }: _*)
+    byVersionSet(tx)(f.map { case (v, f) => (Set(v), f) }*)
 
   def fee(fee: Long): ValidatedV[Long] = {
     Validated

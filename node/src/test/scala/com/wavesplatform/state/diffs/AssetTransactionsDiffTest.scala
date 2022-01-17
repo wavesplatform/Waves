@@ -6,29 +6,29 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.{BlockchainFeatures, EstimatorProvider}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, V1, V4}
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
+import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
 import fastparse.Parsed
 import org.scalacheck.{Arbitrary, Gen}
 
-class AssetTransactionsDiffTest
-    extends PropSpec
-    with BlocksTransactionsHelpers
-    with WithDomain {
+class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers with WithDomain {
 
   def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransaction, BurnTransaction))] =
     for {
@@ -117,9 +117,7 @@ class AssetTransactionsDiffTest
 
     val fs =
       TestFunctionalitySettings.Enabled
-        .copy(
-          preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.BurnAnyTokens.id -> 0)
-        )
+        .copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.BurnAnyTokens.id -> 0))
 
     forAll(setup) {
       case (genesis, issue, assetTransfer, wavesTransfer, burn) =>
@@ -147,9 +145,7 @@ class AssetTransactionsDiffTest
 
     val fs =
       TestFunctionalitySettings.Enabled
-        .copy(
-          preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.DataTransaction.id -> 0)
-        )
+        .copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.DataTransaction.id -> 0))
 
     forAll(setup) {
       case (_, _, genesis, issue, reissue) =>
@@ -199,7 +195,8 @@ class AssetTransactionsDiffTest
       issue       <- createLegacyIssue(issuer, assetName, description, quantity, decimals, reissuable = true, fee, timestamp)
       assetId = issue.asset
       attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
-      transfer = TransferTransaction.selfSigned(1.toByte, issuer, holder.toAddress, assetId, quantity - 1, Waves, fee, ByteStr(attachment), timestamp)
+      transfer = TransferTransaction
+        .selfSigned(1.toByte, issuer, holder.toAddress, assetId, quantity - 1, Waves, fee, ByteStr(attachment), timestamp)
         .explicitGet()
       reissue = ReissueTransaction
         .selfSigned(1.toByte, issuer, assetId, (Long.MaxValue - quantity) + 1, reissuable = true, 1, timestamp)
@@ -208,9 +205,7 @@ class AssetTransactionsDiffTest
 
     val fs =
       TestFunctionalitySettings.Enabled
-        .copy(
-          preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.DataTransaction.id -> 0)
-        )
+        .copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.DataTransaction.id -> 0))
 
     forAll(setup) {
       case (_, _, genesis, issue, reissue, transfer) =>
@@ -262,7 +257,7 @@ class AssetTransactionsDiffTest
       ).signWith(accountA.privateKey)
       assetId = IssuedAsset(issue.id())
       transfer = TransferTransaction
-        .selfSigned(TxVersion.V1, accountA, accountB.toAddress, assetId, issue.quantity, Waves, smallFee, ByteStr.empty,  timestamp + 2)
+        .selfSigned(TxVersion.V1, accountA, accountB.toAddress, assetId, issue.quantity, Waves, smallFee, ByteStr.empty, timestamp + 2)
         .explicitGet()
       reissue        = ReissueTransaction.selfSigned(TxVersion.V1, accountA, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
       illegalReissue = ReissueTransaction.selfSigned(TxVersion.V1, accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
@@ -292,9 +287,9 @@ class AssetTransactionsDiffTest
                     AssetScriptInfo(
                       s,
                       Script
-                        .estimate(s, EstimatorProvider.EstimatorBlockchainExt(newState).estimator, fixEstimateOfVerifier = true, useContractVerifierLimit = false)
+                        .estimate(s, ScriptEstimatorV1, fixEstimateOfVerifier = true, useContractVerifierLimit = false)
                         .explicitGet()
-                    )
+                  )
                 ),
                 0L,
                 issue.decimals == 0 && issue.quantity == 1 && !issue.reissuable
@@ -347,10 +342,7 @@ class AssetTransactionsDiffTest
   }
 
   val assetInfoUpdateEnabled: FunctionalitySettings = TestFunctionalitySettings.Enabled
-    .copy(
-      preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0) + (BlockchainFeatures.NG.id -> 0),
-      minAssetInfoUpdateInterval = 100
-    )
+    .copy(preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0) + (BlockchainFeatures.NG.id -> 0), minAssetInfoUpdateInterval = 100)
 
   property("Can't update before activation") {
     forAll(genesisIssueUpdate) {
@@ -417,7 +409,7 @@ class AssetTransactionsDiffTest
           d.appendBlock(keyBlock)
           val microBlockId = d.appendMicroBlock(mbs.head)
 
-          val issue = issues(0)
+          val issue  = issues(0)
           val issue1 = issues(1)
 
           { // Check liquid block
@@ -473,12 +465,10 @@ class AssetTransactionsDiffTest
         | groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')
       """.stripMargin
 
-    val rideV4Activated = TestFunctionalitySettings.Enabled.copy(
-      preActivatedFeatures = Map(
+    val rideV4Activated = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
         BlockchainFeatures.Ride4DApps.id -> 0,
         BlockchainFeatures.BlockV5.id    -> 0
-      )
-    )
+      ))
 
     forAll(genesisIssueTransferReissue(exprV4WithComplexityBetween3000And4000, V4)) {
       case (gen, issue, _, _, _) =>
@@ -558,4 +548,53 @@ class AssetTransactionsDiffTest
       )
       .explicitGet()
   } yield (gen :+ genesisTx3, Seq(issue, issue1), accountC, update1)
+
+  property("estimation overflow") {
+    val testScript = TestCompiler(V3).compileExpression {
+      val n = 65
+      s"""
+         | func f0() = true
+         | ${(0 until n).map(i => s"func f${i + 1}() = if (f$i()) then f$i() else f$i()").mkString("\n")}
+         | f$n()
+       """.stripMargin
+    }
+
+    def t       = System.currentTimeMillis()
+    val sender  = accountGen.sample.get
+    val genesis = GenesisTransaction.create(sender.toAddress, ENOUGH_AMT, t).explicitGet()
+
+    def issue(script: Script) =
+      IssueTransaction.selfSigned(2.toByte, sender, "name", "", ENOUGH_AMT, 0, true, Some(script), 100000000, t).explicitGet()
+    def setAssetScript(asset: IssuedAsset) =
+      SetAssetScriptTransaction.selfSigned(2.toByte, sender, asset, Some(testScript), 100000000, t).explicitGet()
+
+    def settings(checkNegative: Boolean = false, checkSumOverflow: Boolean = false): FunctionalitySettings = {
+      TestFunctionalitySettings
+        .withFeatures(BlockV5)
+        .copy(estimationOverflowFixHeight = if (checkNegative) 0 else 999, estimatorSumOverflowFixHeight = if (checkSumOverflow) 0 else 999)
+    }
+
+    def assert(preparingTxs: Seq[Transaction], scriptedTx: () => Transaction) = {
+      withDomain(domainSettingsWithFS(settings())) { db =>
+        db.appendBlock(preparingTxs: _*)
+        val tx = scriptedTx()
+        db.appendBlock(tx)
+        db.liquidDiff.errorMessage(tx.id()) shouldBe None
+      }
+
+      withDomain(domainSettingsWithFS(settings(checkNegative = true))) { db =>
+        db.appendBlock(preparingTxs: _*)
+        (the[Exception] thrownBy db.appendBlock(scriptedTx())).getMessage should include("Unexpected negative complexity")
+      }
+
+      withDomain(domainSettingsWithFS(settings(checkSumOverflow = true))) { db =>
+        db.appendBlock(preparingTxs: _*)
+        (the[Exception] thrownBy db.appendBlock(scriptedTx())).getMessage should include("Illegal script")
+      }
+    }
+
+    val emptyIssue = issue(TestCompiler(V3).compileExpression("true"))
+    assert(Seq(genesis, emptyIssue), () => setAssetScript(IssuedAsset(emptyIssue.id())))
+    assert(Seq(genesis), () => issue(testScript))
+  }
 }

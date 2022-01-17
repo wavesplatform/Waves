@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
@@ -10,11 +10,11 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test._
-import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
 import org.scalacheck.Gen
 
 class ScriptTransferByAliasTest extends PropSpec with WithDomain {
@@ -24,8 +24,7 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
 
   private val activationHeight = 3
 
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
+  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id    -> 0,
       BlockchainFeatures.SmartAssets.id      -> 0,
       BlockchainFeatures.Ride4DApps.id       -> 0,
@@ -34,9 +33,7 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
       BlockchainFeatures.BlockReward.id      -> 0,
       BlockchainFeatures.BlockV5.id          -> 0,
       BlockchainFeatures.SynchronousCalls.id -> activationHeight
-    ),
-    estimatorPreCheckHeight = Int.MaxValue
-  )
+    ), estimatorPreCheckHeight = Int.MaxValue)
 
   private val verifier: Script =
     TestCompiler(V4).compileExpression(
@@ -85,7 +82,7 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
         genesis     <- GenesisTransaction.create(dAppAcc.toAddress, ENOUGH_AMT, ts)
         genesis2    <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         genesis3    <- GenesisTransaction.create(receiver.toAddress, ENOUGH_AMT, ts)
-        createAlias <- CreateAliasTransaction.selfSigned(2.toByte, receiver, Alias.create(alias).explicitGet(), fee, ts)
+        createAlias <- CreateAliasTransaction.selfSigned(2.toByte, receiver, alias, fee, ts)
         issue       <- IssueTransaction.selfSigned(2.toByte, dAppAcc, "Asset", "Description", ENOUGH_AMT, 8, true, Some(verifier), fee, ts)
         asset = IssuedAsset(issue.id())
         setDApp <- SetScriptTransaction.selfSigned(1.toByte, dAppAcc, Some(dApp(asset)), fee, ts)
@@ -96,7 +93,7 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
   property(s"ScriptTransfer alias recipient is mapped correctly after ${BlockchainFeatures.SynchronousCalls} activation") {
     val (preparingTxs, invoke, asset, receiver) = paymentPreconditions.sample.get
     withDomain(domainSettingsWithFS(fsWithV5)) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs*)
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)

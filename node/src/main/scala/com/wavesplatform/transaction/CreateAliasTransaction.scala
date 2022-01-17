@@ -76,6 +76,6 @@ object CreateAliasTransaction extends TransactionParser {
   ): Either[ValidationError, TransactionT] =
     create(version, sender, alias, fee, timestamp, Nil).map(_.signWith(signer))
 
-  def selfSigned(version: TxVersion, sender: KeyPair, alias: Alias, fee: TxAmount, timestamp: TxTimestamp): Either[ValidationError, TransactionT] =
-    signed(version, sender.publicKey, alias.name, fee, timestamp, sender.privateKey)
+  def selfSigned(version: TxVersion, sender: KeyPair, aliasName: String, fee: TxAmount, timestamp: TxTimestamp): Either[ValidationError, TransactionT] =
+    signed(version, sender.publicKey, aliasName, fee, timestamp, sender.privateKey)
 }

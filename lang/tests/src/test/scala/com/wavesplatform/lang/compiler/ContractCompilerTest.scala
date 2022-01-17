@@ -1,17 +1,17 @@
 package com.wavesplatform.lang.compiler
 
 import cats.kernel.Monoid
-import cats.syntax.semigroup._
+import cats.syntax.semigroup.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.DApp._
+import com.wavesplatform.lang.contract.DApp.*
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ScriptResultSource, Terms, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
@@ -22,36 +22,75 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
+import org.scalatest.Assertion
 
 class ContractCompilerTest extends PropSpec {
-  private val dAppV3Ctx: CompilerContext =
+  private def dAppCtxForV(version: StdLibVersion) =
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment],
+          CryptoContext.build(com.wavesplatform.lang.Global, version).withEnvironment[Environment],
           WavesContext.build(
             Global,
-            DirectiveSet(V3, Account, DAppType).explicitGet()
+            DirectiveSet(version, Account, DAppType).explicitGet()
           )
         )
       )
       .compilerContext
 
-  private val dAppV4Ctx: CompilerContext =
-    Monoid
-      .combineAll(
-        Seq(
-          PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
-          WavesContext.build(
-            Global,
-            DirectiveSet(V4, Account, DAppType).explicitGet()
-          )
+  private val dAppV3Ctx: CompilerContext = dAppCtxForV(V3)
+  private val dAppV4Ctx: CompilerContext = dAppCtxForV(V4)
+
+  property("contract compiles with comment in function body") {
+    val ctx = Monoid.combine(
+      compilerContext,
+      WavesContext
+        .build(
+          Global,
+          DirectiveSet(V5, Account, DAppType).explicitGet()
         )
+        .compilerContext
+    )
+    val expr = {
+      val script =
+        """
+          |func foo() = {
+          |  #comment
+          |  strict a = 1
+          |  a
+          |  #comment
+          |}
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    val expectedResult = Right(
+      DApp(
+        DAppMeta(
+          version = 2,
+          List()
+        ),
+        List(
+          FUNC(
+            "foo",
+            List(),
+            /**/LET_BLOCK(
+              LET("a", CONST_LONG(1)),
+              IF(
+                FUNCTION_CALL(Native(0), List(REF("a"), REF("a"))),
+                REF("a"),
+                FUNCTION_CALL(Native(2), List(CONST_STRING("Strict value is not equal to itself.").explicitGet()))
+              )
+            )
+          )
+        ),
+        List(),
+        None
       )
-      .compilerContext
+    )
+    compiler.ContractCompiler(ctx, expr, V5) shouldBe expectedResult
+  }
 
   property("contract compiles when uses annotation bindings and correct return type") {
     val ctx = Monoid.combine(
@@ -279,7 +318,7 @@ class ContractCompilerTest extends PropSpec {
   }
 
   property("contract compiles fails when incorrect return type") {
-    import com.wavesplatform.lang.v1.evaluator.ctx.impl._
+    import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
 
     val ctx = compilerContext
     val expr = {
@@ -380,7 +419,7 @@ class ContractCompilerTest extends PropSpec {
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -517,7 +556,7 @@ class ContractCompilerTest extends PropSpec {
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -951,7 +990,7 @@ class ContractCompilerTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("right")
@@ -961,7 +1000,7 @@ class ContractCompilerTest extends PropSpec {
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -1008,7 +1047,7 @@ class ContractCompilerTest extends PropSpec {
         |
       """.stripMargin
 
-    Global.compileContract(dApp, dAppV4Ctx, V4, ScriptEstimatorV3, false, false) should produce("Script is too large: 37551 bytes > 32768 bytes")
+    Global.compileContract(dApp, dAppV4Ctx, V4, ScriptEstimatorV3(fixOverflow = true, overhead = true), false, false) should produce("Script is too large: 37551 bytes > 32768 bytes")
   }
 
   property("@Callable Invoke") {
@@ -1043,7 +1082,7 @@ class ContractCompilerTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V5) shouldBe Symbol("right")
@@ -1081,7 +1120,7 @@ class ContractCompilerTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("left")
@@ -1104,7 +1143,7 @@ class ContractCompilerTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
 
     val result = compiler.ContractCompiler(ctx.compilerContext, expr, V4)
@@ -1127,4 +1166,87 @@ class ContractCompilerTest extends PropSpec {
       """.stripMargin
     ) should produce("Non-matching types: expected: ByteVector, actual: ByteVector|Unit")
   }
+
+  property("JsAPI compiles dApp with no errors") {
+    Global.compileContract(
+      """
+        |
+        |func xxx() = {
+        |  let some = 1 + 2
+        |  some
+        |}
+        |
+        |func yyy() = {
+        |  xxx()
+        |}
+        |
+        |let z1 = 1
+        |let z2 = xxx() + yyy()
+        |let z3 = z1 + z2
+        |
+        |@Callable(i)
+        |func call() = {
+        |  let a = xxx()
+        |  let b = yyy()
+        |  let c = z3
+        |  []
+        |}
+        |
+        |@Verifier(t)
+        |func v() = {
+        |  let a = xxx()
+        |  let b = yyy()
+        |  let c = z3
+        |  true
+        |}
+      """.stripMargin,
+      getTestContext(V4).compilerContext,
+      V4,
+      ScriptEstimatorV3(fixOverflow = true, overhead = true),
+      false,
+      false
+    ) shouldBe Symbol("right")
+  }
+
+  property("union as @Callable argument is allowed in V4,V5") {
+    def checkForV(version: StdLibVersion): Assertion =
+      TestCompiler(version).compile(scriptWithUnionArg(version)) shouldBe Symbol("right")
+
+    checkForV(V4)
+    checkForV(V5)
+  }
+
+  property("union as @Callable argument forbidden in V6") {
+    TestCompiler(V6).compile(scriptWithUnionArg(V6)) should
+      produce("Union type is not allowed for callable function arguments in 101-102; Union type is not allowed for callable function arguments in 148-149")
+  }
+
+  property("union as argument of non-@Callable function is allowed in V6") {
+    val script =
+      """
+        |{-# STDLIB_VERSION 6 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |func test(a: List[Int|String], b: Int|String) = []
+        |
+        |@Callable(i)
+        |func f(a: Int) = []
+        |""".stripMargin
+
+    TestCompiler(V6).compile(script) shouldBe Symbol("right")
+  }
+
+  private def scriptWithUnionArg(version: StdLibVersion): String =
+    s"""
+      |{-# STDLIB_VERSION ${version.id} #-}
+      |{-# CONTENT_TYPE DAPP #-}
+      |{-# SCRIPT_TYPE ACCOUNT #-}
+      |
+      |@Callable(i)
+      |func f(a: List[Int|String]) = []
+      |
+      |@Callable(i)
+      |func g(a: Int|String) = []
+      |""".stripMargin
 }

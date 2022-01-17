@@ -82,10 +82,10 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
 
   override def getStateChanges(request: TransactionsRequest, responseObserver: StreamObserver[InvokeScriptResultResponse]): Unit =
     responseObserver.interceptErrors {
-      val result = Observable(request.transactionIds: _*)
+      val result = Observable(request.transactionIds*)
         .flatMap(txId => Observable.fromIterable(commonApi.transactionById(txId.toByteStr)))
         .collect {
-          case TransactionMeta.Invoke(_, transaction, _, invokeScriptResult) =>
+          case TransactionMeta.Invoke(_, transaction, _, _, invokeScriptResult) =>
             InvokeScriptResultResponse.of(Some(PBTransactions.protobuf(transaction)), invokeScriptResult.map(VISR.toPB))
         }
 
@@ -94,7 +94,7 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
 
   override def getStatuses(request: TransactionsByIdRequest, responseObserver: StreamObserver[TransactionStatus]): Unit =
     responseObserver.interceptErrors {
-      val result = Observable(request.transactionIds: _*).map { txId =>
+      val result = Observable(request.transactionIds*).map { txId =>
         commonApi
           .unconfirmedTransactionById(txId.toByteStr)
           .map(_ => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED))
@@ -128,7 +128,7 @@ private object TransactionsApiGrpcImpl {
     val transactionId = meta.transaction.id().toByteString
     val status        = if (meta.succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
     val invokeScriptResult = meta match {
-      case TransactionMeta.Invoke(_, _, _, r) => r.map(VISR.toPB)
+      case TransactionMeta.Invoke(_, _, _, _, r) => r.map(VISR.toPB)
       case _                                  => None
     }
 
