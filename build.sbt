@@ -20,10 +20,11 @@ lazy val lang =
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       inConfig(Compile)(
         Seq(
-          PB.protoSources := Seq(baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"),
-          PB.targets := Seq(
-            scalapb.gen(flatPackage = true) -> sourceManaged.value
-          ),
+          PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
+          PB.protoSources += PB.externalIncludePath.value,
+          PB.generate / includeFilter := { (f: File) =>
+            (** / "waves" / "lang" / "*.proto").matches(f.toPath)
+          },
           PB.deleteTargetDirectory := false
         )
       )
