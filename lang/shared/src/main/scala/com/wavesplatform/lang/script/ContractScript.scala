@@ -31,7 +31,7 @@ object ContractScript {
       s"Script is too large: ${bs.length} bytes > $MaxContractSizeInBytes bytes"
     )
 
-  def apply(version: StdLibVersion, contract: DApp): Either[String, Script] =
+  def apply(version: StdLibVersion, contract: DApp): Either[String, ContractScriptImpl] =
     ContractScriptImpl(version, contract)
       .asRight[String]
       .flatTap(s => validateBytes(s.bytes().arr))

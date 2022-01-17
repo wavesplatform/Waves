@@ -1,70 +1,53 @@
 package com.wavesplatform.lang.compiler
 
-import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.meta.{MetaMapper, ParsedMeta}
-import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, V3, V4, DApp => DAppType}
-import com.wavesplatform.lang.v1.compiler
-import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.directives.values.{V3, V4}
+import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import org.scalatest.Inside
 
 class MetaTest extends PropSpec with Inside {
   property("meta v1 with union type parameters") {
-    val ctx = Monoid.combine(
-      compilerContext,
-      WavesContext
-        .build(
-          Global, 
-          DirectiveSet(V3, Account, DAppType).explicitGet()
-        )
-        .compilerContext
-    )
-    val expr = {
-      val script =
-        """
-          |
-          | @Callable(invocation)
-          | func foo(
-          |   a: Int|String|ByteVector|Boolean,
-          |   b: Int|Int,
-          |   c: String|Int,
-          |   d: Int|String,
-          |   e: String|ByteVector|Boolean,
-          |   f: ByteVector|Int
-          | ) = {
-          |  let sender0 = invocation.caller.bytes
-          |  WriteSet([DataEntry("a", a), DataEntry("sender", sender0)])
-          | }
-          |
-          | @Callable(invocation)
-          | func bar(
-          |   a: Int|Boolean
-          | ) = {
-          |  let sender0 = invocation.caller.bytes
-          |  WriteSet([DataEntry("a", a), DataEntry("sender", sender0)])
-          | }
-          |
+    val dApp =
+      TestCompiler(V3)
+        .compileContract(
+          """
+            | @Callable(invocation)
+            | func foo(
+            |   a: Int|String|ByteVector|Boolean,
+            |   b: Int|Int,
+            |   c: String|Int,
+            |   d: Int|String,
+            |   e: String|ByteVector|Boolean,
+            |   f: ByteVector|Int
+            | ) = {
+            |  let sender0 = invocation.caller.bytes
+            |  WriteSet([DataEntry("a", a), DataEntry("sender", sender0)])
+            | }
+            |
+            | @Callable(invocation)
+            | func bar(
+            |   a: Int|Boolean
+            | ) = {
+            |  let sender0 = invocation.caller.bytes
+            |  WriteSet([DataEntry("a", a), DataEntry("sender", sender0)])
+            | }
         """.stripMargin
-      Parser.parseContract(script).get.value
-    }
+        )
+        .expr
 
     val expectedMeta = DAppMeta(
       version = 1,
       List(
         CallableFuncSignature(ByteString.copyFrom(Array[Byte](15, 1, 9, 9, 14, 3))),
-        CallableFuncSignature(ByteString.copyFrom(Array[Byte](5))),
+        CallableFuncSignature(ByteString.copyFrom(Array[Byte](5)))
       )
     )
 
-    val dApp = compiler.ContractCompiler(ctx, expr, V3).explicitGet()
     dApp.meta shouldBe expectedMeta
 
     MetaMapper.dicFromProto(dApp) shouldBe Right(
@@ -90,37 +73,22 @@ class MetaTest extends PropSpec with Inside {
   }
 
   property("meta v1 with empty-param function") {
-    val ctx = Monoid.combine(
-      compilerContext,
-      WavesContext
-        .build(
-          Global,
-          DirectiveSet(V3, Account, DAppType).explicitGet()
-        )
-        .compilerContext
-    )
-    val expr = {
-      val script =
+    val dApp = TestCompiler(V3)
+      .compileContract(
         """
-          |
-          | {-# STDLIB_VERSION 3 #-}
-          | {-# CONTENT_TYPE DAPP #-}
-          | {-# SCRIPT_TYPE ACCOUNT #-}
-          |
           | @Callable(i)
           | func default() = WriteSet([])
-        """.stripMargin
-      Parser.parseContract(script).get.value
-    }
+      """.stripMargin
+      )
+      .expr
 
     val expectedMeta = DAppMeta(
       version = 1,
       List(
-        CallableFuncSignature(ByteString.EMPTY),
+        CallableFuncSignature(ByteString.EMPTY)
       )
     )
 
-    val dApp = compiler.ContractCompiler(ctx, expr, V3).explicitGet()
     dApp.meta shouldBe expectedMeta
 
     MetaMapper.dicFromProto(dApp) shouldBe Right(
@@ -129,35 +97,26 @@ class MetaTest extends PropSpec with Inside {
   }
 
   property("meta v2 supporting list parameters") {
-    val ctx = Monoid.combine(
-      compilerContext,
-      WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
-        .compilerContext
-    )
-
-    val expr = {
-      val script =
-        """
-          |
-          | @Callable(i)
-          | func foo(a: List[Int], b: List[String], c: ByteVector, d: Int|String|Boolean) = []
-          |
-          | @Callable(i)
-          | func bar(a: List[ByteVector]) = []
-          |
+    val dApp =
+      TestCompiler(V4)
+        .compileContract(
+          """
+            | @Callable(i)
+            | func foo(a: List[Int], b: List[String], c: ByteVector, d: Int|String|Boolean) = []
+            |
+            | @Callable(i)
+            | func bar(a: List[ByteVector]) = []
         """.stripMargin
-      Parser.parseContract(script).get.value
-    }
+        )
+        .expr
 
     val expectedMeta = DAppMeta(
       version = 2,
       List(
         CallableFuncSignature(ByteString.copyFrom(Array[Byte](17, 24, 2, 13))),
-        CallableFuncSignature(ByteString.copyFrom(Array[Byte](18))),
+        CallableFuncSignature(ByteString.copyFrom(Array[Byte](18)))
       )
     )
-
-    val dApp = compiler.ContractCompiler(ctx, expr, V4).explicitGet()
 
     dApp.meta shouldBe expectedMeta
     MetaMapper.dicFromProto(dApp) shouldBe Right(
@@ -181,37 +140,23 @@ class MetaTest extends PropSpec with Inside {
   }
 
   property("meta v2 with empty-param function") {
-    val ctx = Monoid.combine(
-      compilerContext,
-      WavesContext
-        .build(
-          Global,
-          DirectiveSet(V4, Account, DAppType).explicitGet()
+    val dApp =
+      TestCompiler(V4)
+        .compileContract(
+          """
+            | @Callable(i)
+            | func default() = []
+          """.stripMargin
         )
-        .compilerContext
-    )
-    val expr = {
-      val script =
-        """
-          |
-          | {-# STDLIB_VERSION 4 #-}
-          | {-# CONTENT_TYPE DAPP #-}
-          | {-# SCRIPT_TYPE ACCOUNT #-}
-          |
-          | @Callable(i)
-          | func default() = []
-        """.stripMargin
-      Parser.parseContract(script).get.value
-    }
+        .expr
 
     val expectedMeta = DAppMeta(
       version = 2,
       List(
-        CallableFuncSignature(ByteString.EMPTY),
+        CallableFuncSignature(ByteString.EMPTY)
       )
     )
 
-    val dApp = compiler.ContractCompiler(ctx, expr, V4).explicitGet()
     dApp.meta shouldBe expectedMeta
 
     MetaMapper.dicFromProto(dApp) shouldBe Right(

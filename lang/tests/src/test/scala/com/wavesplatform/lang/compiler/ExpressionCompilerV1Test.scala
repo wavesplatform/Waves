@@ -576,7 +576,8 @@ class ExpressionCompilerV1Test extends PropSpec {
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
       varDefs = Map("p"                -> VariableInfo(AnyPos, pointType)),
-      functionDefs = Map.empty
+      functionDefs = Map.empty,
+      provideRuntimeTypeOnCastError = false
     ),
     expr = Expressions.GETTER(
       AnyPos,
@@ -592,7 +593,8 @@ class ExpressionCompilerV1Test extends PropSpec {
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
       varDefs = Map("p"                -> VariableInfo(AnyPos, pointType)),
-      functionDefs = Map.empty
+      functionDefs = Map.empty,
+      provideRuntimeTypeOnCastError = false
     ),
     expr = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
     expectedResult = { res: Either[String, (EXPR, TYPE)] =>
@@ -604,7 +606,8 @@ class ExpressionCompilerV1Test extends PropSpec {
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
       varDefs = Map("p"                -> VariableInfo(AnyPos, pointType)),
-      functionDefs = Map.empty
+      functionDefs = Map.empty,
+      provideRuntimeTypeOnCastError = false
     ),
     expr = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
     expectedResult = { res: Either[String, (EXPR, TYPE)] =>
