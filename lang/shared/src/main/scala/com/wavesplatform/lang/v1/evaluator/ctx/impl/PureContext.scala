@@ -1238,10 +1238,10 @@ object PureContext {
           val expectedStringSize = arr.elementsWeightSum + separatorStringSize
           if (rejectNonStrings && arr.xs.exists(!_.isInstanceOf[CONST_STRING]))
             Left("makeString only accepts strings")
-          else if (expectedStringSize <= outputLimit)
-            CONST_STRING(arr.xs.mkString(separator))
-          else
+          else if (expectedStringSize > outputLimit)
             Left(s"Constructing string size = $expectedStringSize bytes will exceed $outputLimit")
+          else
+            CONST_STRING(arr.xs.mkString(separator))
         }
       case xs =>
         notImplemented[Id, EVALUATED](s"$name(list: List[String], separator: String)", xs)
