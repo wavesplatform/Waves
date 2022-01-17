@@ -572,13 +572,12 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
             .asInstanceOf[Seq[SubscribeEvent]]
             .map(_.getUpdate.height) shouldBe (1 to 4)
         },
-        Some(interferableDB(suspend, { startRead = true }))
+        Some(InterferableDB(() => suspend, () => startRead = true))
       )
     }
   }
 
-  //noinspection ScalaUnusedSymbol
-  def interferableDB(suspend: => Boolean, onHasNext: => Unit): DB = new DB {
+  case class InterferableDB(suspend: () => Boolean, onHasNext: () => Unit) extends DB {
     private val db = openDB(Files.createTempDirectory("bc-updates").toString)
 
     override def get(key: Array[Byte], options: ReadOptions): Array[Byte] = db.get(key, options)
@@ -607,8 +606,8 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
       override def close(): Unit                               = iterator.close()
       override def seek(key: Array[Byte]): Unit                = iterator.seek(key)
       override def hasNext: Boolean = {
-        onHasNext
-        while (suspend) {}
+        onHasNext()
+        while (suspend()) {}
         iterator.hasNext
       }
 
