@@ -1,12 +1,11 @@
 package com.wavesplatform.lang.contract
 
-import com.wavesplatform.lang.contract.DApp.{CallableFunction, VerifierFunction}
+import com.wavesplatform.lang.contract.DApp.{CallableFunction, ExprWithCtx, VerifierFunction}
 import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.compiler.{CompilationError, Terms}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{CALLDAPP, CALLDAPPREENTRANT}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
@@ -20,29 +19,42 @@ case class DApp(
     callableFuncs: List[CallableFunction],
     verifierFuncOpt: Option[VerifierFunction]
 ) {
-  val verifierContainsSyncCall: Boolean =
-    verifierFuncOpt.map(_.u.body).exists(e => containsSyncCall(List(e)))
-
-  @tailrec private def containsSyncCall(e: List[EXPR]): Boolean = {
-    def funcBody(header: FunctionHeader): List[EXPR] =
-      decs.collectFirst { case FUNC(header.funcName, _, body) => body }.toList
-
-    def refBody(key: String): List[EXPR] =
-      decs.collect { case LET(`key`, body) => body }
-
-    e match {
-      case Nil                                              => false
-      case FUNCTION_CALL(Native(CALLDAPP), _) :: _          => true
-      case FUNCTION_CALL(Native(CALLDAPPREENTRANT), _) :: _ => true
-      case GETTER(expr, _) :: l                             => containsSyncCall(expr :: l)
-      case LET_BLOCK(LET(_, value), body) :: l              => containsSyncCall(value :: body :: l)
-      case BLOCK(LET(_, value), body) :: l                  => containsSyncCall(value :: body :: l)
-      case BLOCK(FUNC(_, _, value), body) :: l              => containsSyncCall(value :: body :: l)
-      case IF(cond, ifTrue, ifFalse) :: l                   => containsSyncCall(cond :: ifTrue :: ifFalse :: l)
-      case FUNCTION_CALL(header, args) :: l                 => containsSyncCall(funcBody(header) ::: args ::: l)
-      case REF(key) :: l                                    => containsSyncCall(refBody(key) ::: l)
-      case _ :: l                                           => containsSyncCall(l)
+  def verifierContainsSyncCall: Boolean =
+    verifierFuncOpt.map(_.u.body).exists { e =>
+      containsSyncCall(List(ExprWithCtx(e, Map.empty)))
     }
+
+  private def containsSyncCall(e: List[ExprWithCtx]): Boolean = {
+    val commonCtx = decs.collect {
+      case LET(name, value) => name -> ExprWithCtx(value, Map.empty)
+      case FUNC(name, _, body) => name -> ExprWithCtx(body, Map.empty)
+    }.toMap
+
+    @tailrec
+    def checkLoop(e: List[ExprWithCtx]): Boolean =
+      e match {
+        case Nil => false
+        case ExprWithCtx(FUNCTION_CALL(Native(CALLDAPP), _), _) :: _ => true
+        case ExprWithCtx(FUNCTION_CALL(Native(CALLDAPPREENTRANT), _), _) :: _ => true
+        case ExprWithCtx(GETTER(expr, _), ctx) :: l =>
+          checkLoop(ExprWithCtx(expr, ctx) :: l)
+        case ExprWithCtx(LET_BLOCK(LET(name, value), body), ctx) :: l =>
+          checkLoop(ExprWithCtx(value, ctx) :: ExprWithCtx(body, ctx + (name -> ExprWithCtx(value, ctx))) :: l)
+        case ExprWithCtx(BLOCK(LET(name, value), body), ctx) :: l =>
+          checkLoop(ExprWithCtx(value, ctx) :: ExprWithCtx(body, ctx + (name -> ExprWithCtx(value, ctx))) :: l)
+        case ExprWithCtx(BLOCK(FUNC(name, _, value), body), ctx) :: l =>
+          checkLoop(ExprWithCtx(value, ctx) :: ExprWithCtx(body, ctx + (name -> ExprWithCtx(value, ctx))) :: l)
+        case ExprWithCtx(IF(cond, ifTrue, ifFalse), ctx) :: l =>
+          checkLoop(ExprWithCtx(cond, ctx) :: ExprWithCtx(ifTrue, ctx) :: ExprWithCtx(ifFalse, ctx) :: l)
+        case ExprWithCtx(FUNCTION_CALL(header, args), ctx) :: l =>
+          val body = ctx.orElse(commonCtx).lift(header.funcName).toList
+          checkLoop(body ::: args.map(ExprWithCtx(_, ctx)) ::: l)
+        case ExprWithCtx(REF(key), ctx) :: l =>
+          val body = ctx.orElse(commonCtx).lift(key).toList
+          checkLoop(body ::: l)
+        case _ :: l => checkLoop(l)
+      }
+    checkLoop(e)
   }
 }
 
@@ -87,4 +99,6 @@ object DApp {
   }
   case class CallableFunction(override val annotation: CallableAnnotation, override val u: Terms.FUNC) extends AnnotatedFunction
   case class VerifierFunction(override val annotation: VerifierAnnotation, override val u: Terms.FUNC) extends AnnotatedFunction
+
+  case class ExprWithCtx(expr: EXPR, ctx: Map[String, ExprWithCtx])
 }

@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import cats._
+import cats.*
 import com.wavesplatform.BlocksTransactionsHelpers
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
@@ -9,21 +9,22 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.assets.*
+import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
 import fastparse.Parsed
 import org.scalacheck.{Arbitrary, Gen}
@@ -596,5 +597,51 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
     val emptyIssue = issue(TestCompiler(V3).compileExpression("true"))
     assert(Seq(genesis, emptyIssue), () => setAssetScript(IssuedAsset(emptyIssue.id())))
     assert(Seq(genesis), () => issue(testScript))
+  }
+
+  property("synchronous calls are not allowed in asset script") {
+    val issuer = accountGen.sample.get
+    val ts: Long = System.currentTimeMillis()
+
+    def issue(script: Option[Script] = None): IssueTransaction =
+      IssueTransaction.selfSigned(
+        version = TxVersion.V2,
+        sender = issuer,
+        name = "test",
+        description = "desc",
+        quantity = 1,
+        decimals = 0,
+        reissuable = true,
+        script = script,
+        fee = 0.01.waves,
+        timestamp = ts
+      ).explicitGet()
+
+    withDomain(DomainPresets.RideV5) { d =>
+      val genesis = GenesisTransaction.create(issuer.toAddress, ENOUGH_AMT, ts).explicitGet()
+
+      val successfulIssue = issue()
+      val setAssetScriptWithInvoke = SetAssetScriptTransaction.selfSigned(TxVersion.V2, issuer, successfulIssue.asset, Some(getScriptWithSyncCall("invoke")), 0.01.waves, ts).explicitGet()
+      val setAssetScriptWithReentrantInvoke = SetAssetScriptTransaction.selfSigned(TxVersion.V2, issuer, successfulIssue.asset, Some(getScriptWithSyncCall("reentrantInvoke")), 0.01.waves, ts).explicitGet()
+
+      d.appendBlock(genesis)
+      d.appendBlockE(issue(Some(getScriptWithSyncCall("invoke")))) should produce("function 'Native(1020)' not found")
+      d.appendBlockE(issue(Some(getScriptWithSyncCall("reentrantInvoke")))) should produce("function 'Native(1021)' not found")
+      d.appendBlock(successfulIssue)
+      d.appendBlockE(setAssetScriptWithInvoke) should produce("function 'Native(1020)' not found")
+      d.appendBlockE(setAssetScriptWithReentrantInvoke) should produce("function 'Native(1021)' not found")
+    }
+  }
+
+  private def getScriptWithSyncCall(syncCall: String): ExprScript = {
+    val expr =
+      s"""
+         |strict a = $syncCall(Address(base58'123'), "test", [], [])
+         |true
+         |""".stripMargin
+
+    ExpressionCompiler.compileBoolean(expr, compilerContext(DirectiveSet(V5, Call, Expression).explicitGet()))
+      .flatMap(ExprScript(V5, _))
+      .explicitGet()
   }
 }
