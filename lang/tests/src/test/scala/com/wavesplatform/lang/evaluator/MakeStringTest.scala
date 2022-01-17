@@ -3,12 +3,11 @@ package com.wavesplatform.lang.evaluator
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4, V6}
-import com.wavesplatform.lang.directives.values.StdLibVersion.{V1, V5}
-import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
+import com.wavesplatform.lang.directives.values.StdLibVersion.V5
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG, CONST_STRING, EXPR, FUNCTION_CALL, REF}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.test.produce
 
 class MakeStringTest extends EvaluatorSpec {
@@ -34,17 +33,19 @@ class MakeStringTest extends EvaluatorSpec {
         )
     }
 
-    val script = FUNCTION_CALL(
-      Native(1209),
+    def script(funcId: Short): FUNCTION_CALL = FUNCTION_CALL(
+      Native(funcId),
       List(
         mkConsList(List(CONST_STRING("test").explicitGet(), CONST_LONG(123), CONST_BOOLEAN(true), CONST_BYTESTR(ByteStr.empty).explicitGet())),
         CONST_STRING(",").explicitGet()
       )
     )
-    eval(script, V5, V5) shouldBe Right(CONST_STRING("test,123,true,").explicitGet())
-    eval(script, V6, V6) should produce("makeString only accepts strings")
+    
+    eval(script(FunctionIds.MAKESTRING), V5, V5) shouldBe Right(CONST_STRING("test,123,true,").explicitGet())
+    eval(script(FunctionIds.MAKESTRING), V6, V6) should produce("makeString only accepts strings")
+    eval(script(FunctionIds.MAKESTRING1C), V6, V6) should produce("makeString only accepts strings")
+    eval(script(FunctionIds.MAKESTRING2C), V6, V6) should produce("makeString only accepts strings")
   }
-
 
   property("makeString limit") {
     implicit val v: StdLibVersion = V4
