@@ -1,8 +1,9 @@
 package com.wavesplatform.lang.v1.repl
 
 import cats.arrow.FunctionK
-import cats.implicits._
+import cats.implicits.*
 import cats.{Functor, Id, Monoid}
+import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.repl.node.ErrorMessageEnvironment
@@ -10,14 +11,14 @@ import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.lang.v1.traits.Environment
 import monix.execution.atomic.Atomic
 
-import scala.concurrent.ExecutionContext.Implicits.{global => g}
+import scala.concurrent.ExecutionContext.Implicits.global as g
 import scala.concurrent.Future
 
 case class Repl(
   settings: Option[NodeConnectionSettings] = None,
   libraries: List[String] = Nil,
   lastContext: (CompilerContext, EvaluationContext[Environment, Future]) =
-    (CompilerContext.empty, Monoid[EvaluationContext[Environment, Future]].empty)
+    (CTX.empty.compilerContext, Monoid[EvaluationContext[Environment, Future]].empty)
 ) {
   private val environment  = buildEnvironment(settings)
   private val initialState = state(
