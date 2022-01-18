@@ -32,9 +32,9 @@ lazy val lang =
 
 lazy val `lang-jvm` = lang.jvm
   .settings(
-    name := "RIDE Compiler",
-    normalizedName := "lang",
-    description := "The RIDE smart contract language compiler",
+    name                                  := "RIDE Compiler",
+    normalizedName                        := "lang",
+    description                           := "The RIDE smart contract language compiler",
     libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided
   )
 
@@ -77,9 +77,13 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .crossType(CrossType.Full)
   .settings(
-    libraryDependencies ++= Dependencies.protobuf.value ++
-      Dependencies.langCompilerPlugins.value ++
-      Dependencies.circe.value,
+    libraryDependencies ++=
+      Dependencies.protobuf.value ++
+        Dependencies.langCompilerPlugins.value ++
+        Dependencies.circe.value ++
+        Seq(
+          "org.scala-js" %%% "scala-js-macrotask-executor" % "1.0.0"
+        ),
     inConfig(Compile)(
       Seq(
         PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
@@ -122,12 +126,12 @@ lazy val root = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion := "2.13.7",
-    organization := "com.wavesplatform",
-    organizationName := "Waves Platform",
-    V.fallback := (1, 4, 1),
+    scalaVersion         := "2.13.7",
+    organization         := "com.wavesplatform",
+    organizationName     := "Waves Platform",
+    V.fallback           := (1, 4, 1),
     organizationHomepage := Some(url("https://wavesplatform.com")),
-    licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
+    licenses             := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     scalacOptions ++= Seq(
       "-Xsource:3",
       "-feature",
@@ -144,9 +148,9 @@ inScope(Global)(
     ),
     crossPaths := false,
     dependencyOverrides ++= Dependencies.enforcedVersions.value,
-    cancelable := true,
+    cancelable        := true,
     parallelExecution := false,
-    testListeners := Seq.empty, // Fix for doubled test reports
+    testListeners     := Seq.empty, // Fix for doubled test reports
     /* http://www.scalatest.org/user_guide/using_the_runner
      * o - select the standard output reporter
      * I - show reminder of failed and canceled tests without stack traces
@@ -162,13 +166,13 @@ inScope(Global)(
       Resolver.sonatypeRepo("snapshots"),
       Resolver.mavenLocal
     ),
-    Compile / doc / sources := Seq.empty,
+    Compile / doc / sources                := Seq.empty,
     Compile / packageDoc / publishArtifact := false
   )
 )
 
 // ThisBuild options
-git.useGitDescribe := true
+git.useGitDescribe       := true
 git.uncommittedSignifier := Some("DIRTY")
 
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
