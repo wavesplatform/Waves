@@ -157,7 +157,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
 }
 
 object WebEnvironment {
-  private implicit val executionContext: ExecutionContext = com.wavesplatform.lang.v1.repl.JsCompat.executionContext
+  implicit val executionContext: ExecutionContext = com.wavesplatform.lang.v1.repl.JsCompat.executionContext
 
   implicit val BalanceDetailsDecoder: Decoder[BalanceDetails] = (c: HCursor) =>
     for {

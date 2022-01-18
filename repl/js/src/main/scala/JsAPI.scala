@@ -1,13 +1,13 @@
-import com.wavesplatform.lang.v1.repl.Repl
-import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
-import scala.scalajs.js.Dynamic.{literal => jObj}
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.scalajs.js.JSConverters._
-
 import scala.concurrent.Future
 import scala.scalajs.js
 import scala.scalajs.js.{Promise, UndefOr}
+import scala.scalajs.js.Dynamic.literal as jObj
+import scala.scalajs.js.JSConverters.*
 import scala.scalajs.js.annotation.JSExportTopLevel
+
+import com.wavesplatform.lang.v1.repl.Repl
+import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
+import com.wavesplatform.lang.v1.repl.node.http.WebEnvironment.executionContext
 
 object JsAPI {
   @JSExportTopLevel("repl")
@@ -25,11 +25,11 @@ object JsAPI {
       "reconfigure" -> (repl.reconfigure _ andThen asJs)
     )
 
-  private def mapResult(eval: Future[Either[String, String]]): Promise[js.Object with js.Dynamic] =
+  private def mapResult(eval: Future[Either[String, String]]): Promise[js.Object & js.Dynamic] =
     eval
       .map(
         _.fold(
-          e => jObj("error"  -> e),
+          e => jObj("error" -> e),
           r => jObj("result" -> r)
         )
       )
