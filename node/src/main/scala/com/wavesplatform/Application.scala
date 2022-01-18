@@ -506,10 +506,8 @@ object Application extends ScorexLogging {
     AddressScheme.current = new AddressScheme {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
-
-    // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
-    //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
-    Kamon.reconfigure(config)
+    
+    Kamon.init(config)
     sys.addShutdownHook {
       Try(Await.result(Kamon.stopModules(), 30 seconds))
       Metrics.shutdown()

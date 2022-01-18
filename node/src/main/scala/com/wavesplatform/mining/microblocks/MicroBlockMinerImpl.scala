@@ -1,15 +1,15 @@
 package com.wavesplatform.mining.microblocks
 
-import cats.syntax.applicativeError._
-import cats.syntax.bifunctor._
-import cats.syntax.either._
+import cats.syntax.applicativeError.*
+import cats.syntax.bifunctor.*
+import cats.syntax.either.*
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
-import com.wavesplatform.metrics._
-import com.wavesplatform.mining._
-import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl._
-import com.wavesplatform.network.{MicroBlockInv, _}
+import com.wavesplatform.metrics.*
+import com.wavesplatform.mining.*
+import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl.*
+import com.wavesplatform.network.{MicroBlockInv, *}
 import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.MicroblockAppender
@@ -23,12 +23,12 @@ import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class MicroBlockMinerImpl(
     setDebugState: MinerDebugInfo.State => Unit,
     allChannels: ChannelGroup,
-    blockchainUpdater: BlockchainUpdater with Blockchain,
+    blockchainUpdater: BlockchainUpdater & Blockchain,
     utx: UtxPool,
     settings: MinerSettings,
     minerScheduler: SchedulerService,
@@ -117,6 +117,7 @@ class MicroBlockMinerImpl(
             .liftTo[Task]
           (signedBlock, microBlock) = blocks
           blockId <- appendMicroBlock(microBlock)
+          _ = BlockStats.mined(microBlock, blockId)
           _       <- broadcastMicroBlock(account, microBlock, blockId)
         } yield {
           if (updatedTotalConstraint.isFull) Stop
@@ -167,7 +168,6 @@ class MicroBlockMinerImpl(
         microBlock <- MicroBlock
           .buildAndSign(signedBlock.header.version, account, unconfirmed, accumulatedBlock.id(), signedBlock.signature)
           .leftMap(MicroBlockBuildError)
-        _ = BlockStats.mined(microBlock)
       } yield (signedBlock, microBlock)
     }
 }
