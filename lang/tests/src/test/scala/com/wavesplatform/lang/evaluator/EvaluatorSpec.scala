@@ -61,7 +61,7 @@ abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
     EvaluatorV2.applyCompleted(evalCtx, expr, version, correctFunctionCallScope = true, newMode = true)
   }
 
-  private def compile(code: String, version: StdLibVersion): Either[String, EXPR] = {
+  def compile(code: String, version: StdLibVersion): Either[String, EXPR] = {
     val ctx    = lazyContexts(DirectiveSet(version, Account, Expression).explicitGet()).value()
     val parsed = Parser.parseExpr(code).get.value
     ExpressionCompiler(ctx.compilerContext, parsed, allowIllFormedStrings = true).map(_._1)

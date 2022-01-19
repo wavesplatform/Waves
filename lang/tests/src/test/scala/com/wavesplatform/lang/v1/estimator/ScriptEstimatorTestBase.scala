@@ -33,7 +33,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*) extends PropSpec {
   implicit val version: StdLibVersion = V3
 
   private def ctx(implicit version: StdLibVersion) = {
-    val transactionType = Types.buildTransferTransactionType(true, version)
+    val transactionType = Types.buildTransferTransactionType(true)
     val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
     Monoid
       .combineAll(
