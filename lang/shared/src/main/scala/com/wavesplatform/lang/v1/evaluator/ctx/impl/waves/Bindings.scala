@@ -410,7 +410,7 @@ object Bindings {
 
   def transferTransactionObject(tx: Tx.Transfer, proofsEnabled: Boolean, version: StdLibVersion): CaseObj =
     CaseObj(
-      buildTransferTransactionType(proofsEnabled, version),
+      buildTransferTransactionType(proofsEnabled),
       combine(
         Map(
           "amount"     -> tx.amount,
