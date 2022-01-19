@@ -3,11 +3,10 @@ package com.wavesplatform.generator
 import java.nio.file.{Files, Paths}
 import java.util.UUID
 import java.util.concurrent.ThreadLocalRandom
-
 import cats.Show
 import com.wavesplatform.account.{Alias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.generator.utils.{Gen, Universe}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -102,7 +101,7 @@ class NarrowTransactionGenerator(
                       sender,
                       recipient,
                       Asset.fromCompatId(asset),
-                      500,
+                      5,
                       Waves,
                       500000L,
                       createAttachment(),
@@ -288,8 +287,12 @@ class NarrowTransactionGenerator(
             val data = for {
               ScriptSettings.Function.Arg(argType, value) <- function.args
             } yield argType.toLowerCase match {
-              case "integer" => Terms.CONST_LONG(value.toLong)
-              case "string"  => Terms.CONST_STRING(value).explicitGet()
+              case "integer" => Terms.CONST_LONG(Long.MaxValue - (value.toLong + random.nextInt(50000)))
+              //case "string"  => Terms.CONST_STRING(value).explicitGet()
+              case "string"  => Terms.CONST_STRING(Base64.encode(Base58.decode(
+                GeneratorSettings.toKeyPair(
+                  value + " 1" + "" + (1+ random.nextInt(50))).toAddress.stringRepr
+              ))).explicitGet()
               case "boolean" => Terms.CONST_BOOLEAN(value.toBoolean)
               case "binary"  => Terms.CONST_BYTESTR(ByteStr.decodeBase58(value).get).explicitGet()
             }
@@ -305,9 +308,9 @@ class NarrowTransactionGenerator(
               InvokeScriptTransaction.selfSigned(
                 correctVersion(TxVersion.V1),
                 sender,
-                GeneratorSettings.toKeyPair(script.dappAccount).toAddress,
+                GeneratorSettings.toKeyPair((script.dappAccount+random.nextInt(100))).toAddress,
                 maybeFunctionCall,
-                Seq(InvokeScriptTransaction.Payment(random.nextInt(5000), asset)),
+                Seq(InvokeScriptTransaction.Payment(1+random.nextInt(20), asset)),
                 5300000L,
                 Waves,
                 timestamp
