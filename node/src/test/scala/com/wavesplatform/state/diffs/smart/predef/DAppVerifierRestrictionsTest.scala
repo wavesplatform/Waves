@@ -2,19 +2,25 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.values.V5
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms.{BLOCK, CONST_BOOLEAN, DECLARATION, EXPR, FUNC, FUNCTION_CALL, LET, REF}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import org.scalatest.EitherValues
 
 class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherValues {
 
-  import DomainPresets._
+  import DomainPresets.*
 
   private val time = new TestTime
   private def ts   = time.getTimestamp()
@@ -180,5 +186,51 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
         d.blockchain.transactionSucceeded(setReentrantInvoke.id.value()) shouldBe true
       }
     }
+  }
+
+  property("dApp verifier estimation don't stuck on special cases") {
+    def createScript(decs: List[DECLARATION], verifierBody: EXPR): Script =
+      ContractScript(
+        V5,
+        DApp(
+          DAppMeta(),
+          decs,
+          List.empty,
+          Some(VerifierFunction(VerifierAnnotation("tx"), FUNC("v", List.empty, verifierBody)))
+        )
+      ).explicitGet()
+
+    def estimateScript(script: Script): Option[Long] = {
+      val estimator = ScriptEstimatorV3(fixOverflow = true, overhead = false)
+
+      Script.estimate(script, estimator, fixEstimateOfVerifier = false, useContractVerifierLimit =  false).toOption
+    }
+
+    val script1 = createScript(
+      List(LET("a1", CONST_BOOLEAN(true)), LET("a1", REF("a1"))),
+      REF("a1")
+    )
+    val script2 = createScript(
+      List(LET("a1", REF("a1"))),
+      REF("a1")
+    )
+    val script3 = createScript(
+      List(LET("a1", BLOCK(LET("a1", CONST_BOOLEAN(true)), REF("a1")))),
+      REF("a1")
+    )
+    val script4 = createScript(
+      List(LET("a1", BLOCK(FUNC("f", List("a1"), REF("a1")), CONST_BOOLEAN(true)))),
+      REF("a1")
+    )
+    val script5 = createScript(
+      List(FUNC("f", List.empty, BLOCK(FUNC("f", List.empty, CONST_BOOLEAN(true)), FUNCTION_CALL(FunctionHeader.User("f"), List.empty)))),
+      FUNCTION_CALL(FunctionHeader.User("f"), List.empty)
+    )
+
+    estimateScript(script1) shouldBe defined
+    estimateScript(script2) shouldBe defined
+    estimateScript(script3) shouldBe defined
+    estimateScript(script4) shouldBe defined
+    estimateScript(script5) shouldBe defined
   }
 }

@@ -10,16 +10,18 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.compilerContext
+import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms, TestCompiler}
+import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.test.*
@@ -513,24 +515,61 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
          |}
          |""".stripMargin
 
+    def dAppVerifierRec(syncCallId: Short): Script =
+      ContractScript(
+        V5,
+        DApp(
+          DAppMeta(),
+          List(
+            FUNC(
+              name = "f",
+              args = List.empty,
+              body = BLOCK(
+                LET("a", FUNCTION_CALL(FunctionHeader.Native(syncCallId), List.empty)), FUNCTION_CALL(FunctionHeader.User("f"), List.empty)
+              )
+            )
+          ),
+          List.empty,
+          Some(VerifierFunction(VerifierAnnotation("tx"), FUNC("v", List.empty, FUNCTION_CALL(FunctionHeader.User("f"), List.empty))))
+        )
+      ).explicitGet()
+
     withDomain(DomainPresets.RideV5) { d =>
       val dApp = accountGen.sample.get
       val ts: Long = System.currentTimeMillis()
+      val fee = 0.01.waves
       val genesis = GenesisTransaction.create(dApp.toAddress, ENOUGH_AMT, ts).explicitGet()
 
       val scriptWithInvoke = TestCompiler(V5).compileContract(dAppVerifier("invoke"))
-      val setScriptWithInvoke = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(scriptWithInvoke), 0.01.waves, ts).explicitGet()
+      val setScriptWithInvoke = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(scriptWithInvoke), fee, ts).explicitGet()
 
       val scriptWithReentrantInvoke = TestCompiler(V5).compileContract(dAppVerifier("reentrantInvoke"))
-      val setScriptWithReentrantInvoke = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(scriptWithReentrantInvoke), 0.01.waves, ts).explicitGet()
+      val setScriptWithReentrantInvoke = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(scriptWithReentrantInvoke), fee, ts).explicitGet()
+
+      val setScriptWithInvokeRec = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(dAppVerifierRec(FunctionIds.CALLDAPP)), fee, ts).explicitGet()
+      val setScriptWithReentrantInvokeRec = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(dAppVerifierRec(FunctionIds.CALLDAPPREENTRANT)), fee, ts).explicitGet()
 
       d.appendBlock(genesis)
       d.appendBlockE(setScriptWithInvoke) should produce("DApp-to-dApp invocations are not allowed from verifier")
       d.appendBlockE(setScriptWithReentrantInvoke) should produce("DApp-to-dApp invocations are not allowed from verifier")
+      d.appendBlockE(setScriptWithInvokeRec) should produce("DApp-to-dApp invocations are not allowed from verifier")
+      d.appendBlockE(setScriptWithReentrantInvokeRec) should produce("DApp-to-dApp invocations are not allowed from verifier")
     }
   }
 
   property("synchronous calls are not allowed in account script") {
+    def getScriptWithSyncCall(syncCall: String): ExprScript = {
+      val expr =
+        s"""
+           |strict a = $syncCall(Address(base58'123'), "test", [], [])
+           |true
+           |""".stripMargin
+
+      ExpressionCompiler.compileBoolean(expr, compilerContext(DirectiveSet(V5, Call, Expression).explicitGet()))
+        .flatMap(ExprScript(V5, _))
+        .explicitGet()
+    }
+
     withDomain(DomainPresets.RideV5) { d =>
       val smartAcc = accountGen.sample.get
       val ts: Long = System.currentTimeMillis()
@@ -543,17 +582,5 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       d.appendBlockE(setScriptWithInvoke) should produce("function 'Native(1020)' not found")
       d.appendBlockE(setScriptWithReentrantInvoke) should produce("function 'Native(1021)' not found")
     }
-  }
-
-  private def getScriptWithSyncCall(syncCall: String): ExprScript = {
-    val expr =
-      s"""
-         |strict a = $syncCall(Address(base58'123'), "test", [], [])
-         |true
-         |""".stripMargin
-
-    ExpressionCompiler.compileBoolean(expr, compilerContext(DirectiveSet(V5, Call, Expression).explicitGet()))
-      .flatMap(ExprScript(V5, _))
-      .explicitGet()
   }
 }
