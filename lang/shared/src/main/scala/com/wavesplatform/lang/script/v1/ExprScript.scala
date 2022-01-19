@@ -83,8 +83,8 @@ object ExprScript {
       s"Script is too complex: $complexity > $limit"
     )
   }
-
-  case class ExprScriptImpl(stdLibVersion: StdLibVersion, isFreeCall: Boolean, expr: EXPR) extends ExprScript {
+  
+  final case class ExprScriptImpl(stdLibVersion: StdLibVersion, isFreeCall: Boolean, expr: EXPR) extends ExprScript {
     override type Expr = EXPR
     override val bytes: Coeval[ByteStr]           = Coeval.evalOnce(ByteStr(Global.serializeExpression(expr, stdLibVersion)))
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(com.wavesplatform.lang.v1.compiler.containsBlockV2(expr))

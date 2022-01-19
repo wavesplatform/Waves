@@ -5,8 +5,11 @@ import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
@@ -141,12 +144,38 @@ object TxHelpers {
     script
   }
 
-  def scriptV5(scriptText: String): Script = script(s"""
-       |{-# STDLIB_VERSION 5 #-}
-       |{-# CONTENT_TYPE DAPP #-}
-       |
-       |$scriptText
-       |""".stripMargin)
+  def exprScript(version: StdLibVersion)(scriptText: String): ExprScriptImpl =
+    script(s"""
+              |{-# STDLIB_VERSION ${version.id} #-}
+              |{-# CONTENT_TYPE EXPRESSION #-}
+              |
+              |$scriptText
+              |""".stripMargin) match {
+      case es: ExprScriptImpl => es
+      case other              => throw new IllegalStateException(s"Not an expression: $other")
+    }
+
+  def scriptV5(scriptText: String): ContractScriptImpl =
+    script(s"""
+              |{-# STDLIB_VERSION 5 #-}
+              |{-# CONTENT_TYPE DAPP #-}
+              |
+              |$scriptText
+              |""".stripMargin) match {
+      case cs: ContractScriptImpl => cs
+      case other                  => throw new IllegalStateException(s"Not a contract: $other")
+    }
+
+  def scriptV6(scriptText: String): ContractScriptImpl =
+    script(s"""
+              |{-# STDLIB_VERSION 6 #-}
+              |{-# CONTENT_TYPE DAPP #-}
+              |
+              |$scriptText
+              |""".stripMargin) match {
+      case cs: ContractScriptImpl => cs
+      case other                  => throw new IllegalStateException(s"Not a contract: $other")
+    }
 
   def setScript(acc: KeyPair, script: Script): SetScriptTransaction = {
     SetScriptTransaction.selfSigned(TxVersion.V1, acc, Some(script), TestValues.fee, timestamp).explicitGet()
