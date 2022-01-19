@@ -68,15 +68,15 @@ object TransactionDiffer {
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] = {
-    val verifyAssets = verify || (transactionMayFail(tx) && acceptFailed(blockchain))
+    val runVerifiers = verify || (transactionMayFail(tx) && acceptFailed(blockchain))
     val result = for {
       _               <- validateCommon(blockchain, tx, prevBlockTimestamp, currentBlockTimestamp, verify).traced
       _               <- validateFunds(blockchain, tx).traced
-      verifierDiff    <- if (verify) verifierDiff(blockchain, tx) else Right(Diff.empty).traced
+      verifierDiff    <- if (runVerifiers) verifierDiff(blockchain, tx) else Right(Diff.empty).traced
       transactionDiff <- transactionDiff(blockchain, tx, verifierDiff, currentBlockTimestamp, limitedExecution)
       remainingComplexity = if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - transactionDiff.scriptsComplexity.toInt else Int.MaxValue
       _ <- validateBalance(blockchain, tx.tpe, transactionDiff).traced.leftMap { err =>
-        def acceptFailedByBalance() =
+        def acceptFailedByBalance(): Boolean =
           acceptFailed(blockchain) && blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
 
         if (transactionDiff.scriptsComplexity > ContractLimits.FailFreeInvokeComplexity && transactionMayFail(tx) && acceptFailedByBalance())
@@ -84,9 +84,17 @@ object TransactionDiffer {
         else
           err
       }
-      diff <- assetsVerifierDiff(blockchain, tx, verifyAssets, transactionDiff, remainingComplexity)
+      diff <- assetsVerifierDiff(blockchain, tx, runVerifiers, transactionDiff, remainingComplexity)
     } yield diff
-    result.leftMap(TransactionValidationError(_, tx))
+
+    result.leftMap {
+      // Force reject
+      case fte: FailedTransactionError
+          if fte.spentComplexity <= ContractLimits.FailFreeInvokeComplexity && blockchain.isFeatureActivated(BlockchainFeatures.RideV6) =>
+        TransactionValidationError(ScriptExecutionError(fte.message, fte.log, fte.assetId), tx)
+
+      case err => TransactionValidationError(err, tx)
+    }
   }
 
   // validation related
@@ -134,7 +142,7 @@ object TransactionDiffer {
         }
       } yield ()
 
-  private def verifierDiff(blockchain: Blockchain, tx: Transaction) =
+  private[this] def verifierDiff(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] =
     Verifier(blockchain)(tx).map(complexity => Diff.empty.copy(scriptsComplexity = complexity))
 
   def assetsVerifierDiff(

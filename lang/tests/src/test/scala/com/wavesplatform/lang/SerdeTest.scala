@@ -1,7 +1,6 @@
 package com.wavesplatform.lang
 
 import java.nio.charset.StandardCharsets
-
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
@@ -11,14 +10,16 @@ import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.Expressions
-import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.serialization.{SerdeV1, SerdeV2}
 import com.wavesplatform.test._
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.Assertion
 
 import scala.util.Try
 
 class SerdeTest extends FreeSpec {
+
+  val serializers = List(SerdeV1, SerdeV2)
 
   private val caseObj = CaseObj(
     CASETYPEREF("Object type", Nil),
@@ -95,7 +96,7 @@ class SerdeTest extends FreeSpec {
       case (untypedExpr, _) => roundTripTest(untypedExpr)
     }
 
-    "stack safety" in {
+    "stack safety" in serializers.foreach { ser =>
       val bigSum = (1 to 10000).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
         FUNCTION_CALL(
           function = PureContext.sumLong,
@@ -108,21 +109,21 @@ class SerdeTest extends FreeSpec {
         args = List(CONST_LONG(1), bigSum)
       )
 
-      Serde.serialize(expr).nonEmpty shouldBe true
+      ser.serialize(expr).nonEmpty shouldBe true
     }
   }
 
-  "spec input" in {
+  "spec input" in serializers.foreach { ser =>
     val byteArr   = Array[Byte](1, 113, -1, 63, 0, -1, 127, 0, -1, 39, -1, 87, -41, 50, -111, -38, 12, 1, 0, -19, 101, -128, -1, 54)
-    val (r, time) = measureTime(Serde.deserialize(byteArr).map(_._1))
+    val (r, time) = measureTime(ser.deserialize(byteArr).map(_._1))
 
     r shouldBe an[Either[_, _]]
     time should be <= 1000L
   }
 
-  "any input" in {
+  "any input" in serializers.foreach { ser =>
     forAll(Gen.containerOf[Array, Byte](Arbitrary.arbByte.arbitrary)) { byteArr =>
-      val (r, time) = measureTime(Serde.deserialize(byteArr).map(_._1))
+      val (r, time) = measureTime(ser.deserialize(byteArr).map(_._1))
 
       r shouldBe an[Either[_, _]]
       time should be <= 1000L
@@ -142,31 +143,31 @@ class SerdeTest extends FreeSpec {
     measureBase64Deser("AgQAAAABYgEAAAAEAAAAAAkAAAAAAAACCQAB9wAAAAEFAAAAAWIJAAH3AP8AAQUAAAABYpURGZc=")
   }
 
-  "too big string" in {
+  "too big string" in serializers.foreach { ser =>
     val maxString = "a" * Terms.DataEntryValueMax
-    val expr1     = Serde.serialize(CONST_STRING(maxString, reduceLimit = false).explicitGet())
-    Serde.deserialize(expr1).map(_._1) shouldBe CONST_STRING(maxString)
+    val expr1     = ser.serialize(CONST_STRING(maxString, reduceLimit = false).explicitGet())
+    ser.deserialize(expr1).map(_._1) shouldBe CONST_STRING(maxString)
 
     val tooBigString = maxString + "a"
-    val expr2        = Serde.serialize(CONST_STRING(tooBigString, reduceLimit = false).explicitGet())
-    Serde.deserialize(expr2) should produce("String size=32768 exceeds 32767 bytes")
+    val expr2        = ser.serialize(CONST_STRING(tooBigString, reduceLimit = false).explicitGet())
+    ser.deserialize(expr2) should produce("String size=32768 exceeds 32767 bytes")
   }
 
-  "too big bytes" in {
+  "too big bytes" in serializers.foreach { ser =>
     val maxBytes = ("a" * Terms.DataEntryValueMax).getBytes(StandardCharsets.UTF_8)
-    val expr1    = Serde.serialize(CONST_BYTESTR(ByteStr(maxBytes)).explicitGet())
-    Serde.deserialize(expr1).map(_._1) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
+    val expr1    = ser.serialize(CONST_BYTESTR(ByteStr(maxBytes)).explicitGet())
+    ser.deserialize(expr1).map(_._1) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
 
     val tooBigBytes = maxBytes :+ (1: Byte)
-    val expr2       = Serde.serialize(CONST_BYTESTR(ByteStr(tooBigBytes), limit = CONST_BYTESTR.DataTxSize).explicitGet())
-    Serde.deserialize(expr2) should produce("ByteStr size=32768 exceeds 32767 bytes")
+    val expr2       = ser.serialize(CONST_BYTESTR(ByteStr(tooBigBytes), limit = CONST_BYTESTR.DataTxSize).explicitGet())
+    ser.deserialize(expr2) should produce("ByteStr size=32768 exceeds 32767 bytes")
   }
 
-  "forbid CaseObj" in {
-    Try(Serde.serialize(caseObj)).toEither shouldBe Symbol("left")
+  "forbid CaseObj" in serializers.foreach { ser =>
+    Try(ser.serialize(caseObj)).toEither shouldBe Symbol("left")
 
-    val objectBytes = Serde.serialize(caseObj, allowObjects = true)
-    Serde.deserialize(objectBytes) shouldBe Symbol("left")
+    val objectBytes = ser.serialize(caseObj, allowObjects = true)
+    ser.deserialize(objectBytes) shouldBe Symbol("left")
   }
 
   def measureTime[A](f: => A): (A, Long) = {
@@ -175,18 +176,20 @@ class SerdeTest extends FreeSpec {
     (result, System.currentTimeMillis() - start)
   }
 
-  private def roundTripTest(untypedExpr: Expressions.EXPR): Assertion = {
-    val typedExpr = ExpressionCompiler(PureContext.build(V1, fixUnicodeFunctions = true, useNewPowPrecision = true).compilerContext, untypedExpr).map(_._1).explicitGet()
+  private def roundTripTest(untypedExpr: Expressions.EXPR): Unit = {
+    val typedExpr = ExpressionCompiler(PureContext.build(V1, useNewPowPrecision = true).compilerContext, untypedExpr).map(_._1).explicitGet()
     roundTripTest(typedExpr)
   }
 
-  private def roundTripTest(typedExpr: EXPR, allowObjects: Boolean = false): Assertion = {
-    val encoded = Serde.serialize(typedExpr, allowObjects)
-    encoded.nonEmpty shouldBe true
+  private def roundTripTest(typedExpr: EXPR, allowObjects: Boolean = false): Unit = {
+    serializers.foreach { ser =>
+      val encoded = ser.serialize(typedExpr, allowObjects)
+      encoded.nonEmpty shouldBe true
 
-    val decoded = Serde.deserialize(encoded, all = true, allowObjects).map(_._1).explicitGet()
-    withClue(s"encoded bytes: [${encoded.mkString(", ")}]") {
-      decoded shouldEqual typedExpr
+      val decoded = ser.deserialize(encoded, all = true, allowObjects).map(_._1).explicitGet()
+      withClue(s"encoded bytes: [${encoded.mkString(", ")}]") {
+        decoded shouldEqual typedExpr
+      }
     }
   }
 }

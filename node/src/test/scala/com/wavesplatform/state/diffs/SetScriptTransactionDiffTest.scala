@@ -1,25 +1,31 @@
 package com.wavesplatform.state.diffs
 
+import scala.util.Try
+
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures._
+import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.utils.compilerContext
+import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.Native
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms, TestCompiler}
+import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion, TxHelpers}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import org.scalacheck.Gen
@@ -27,8 +33,8 @@ import org.scalatest.Assertion
 
 class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
 
-  private val fs = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.Ride4DApps.id -> 0)
+  private val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures =
+    Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.Ride4DApps.id -> 0)
   )
 
   val preconditionsAndSetScript: Gen[(GenesisTransaction, SetScriptTransaction)] = for {
@@ -63,36 +69,89 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       fee <- smallFeeGen
     } yield (genesis, SetScriptTransaction.selfSigned(1.toByte, master, Some(script), fee, ts).explicitGet())
 
+  property("cannot use transaction constructors in V6") {
+    val orderConstructor =
+      "Order(base58'', base58'', AssetPair(base58'', base58''), Buy, 1, 1, 1, 1, 1, unit, Address(base58''), base58'', base58'', [])"
+
+    val constructors = Seq(
+      "GenesisTransaction(1, Address(base58''), base58'', 1, 1, 1)",
+      "PaymentTransaction(1, Address(base58''), base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])",
+      "TransferTransaction(unit, 1, unit, Alias(\"\"), base58'', base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])",
+      "IssueTransaction(1, \"\", \"\", true, 1, unit, base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])",
+      "ReissueTransaction(1, base58'', true, base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])",
+      "BurnTransaction(1, base58'', base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])",
+      "SetScriptTransaction(unit, base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])",
+      "SponsorFeeTransaction(base58'', 5, base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])",
+      "LeaseTransaction(1, Address(base58''), base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])",
+      "LeaseCancelTransaction(base58'', base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])",
+      "CreateAliasTransaction(\"\", base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])",
+      s"ExchangeTransaction($orderConstructor, $orderConstructor, 1, 1, 1, 1, base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])",
+      "UpdateAssetInfoTransaction(base58'', \"\", \"\", base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])",
+      "DataTransaction([], base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])",
+      "MassTransferTransaction(base58'', 1, [], 1, base58'', base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])",
+      "SetAssetScriptTransaction(unit, base58'', base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])",
+      "InvokeScriptTransaction(Address(base58''), unit, \"\", [], base58'', 1, 1, 1, Address(base58''), base58'', base58'', [], [])"
+    )
+
+    for (constructor <- constructors) withClue("\\w+Transaction".r.findFirstIn(constructor).get) {
+      val scriptText =
+        s"""
+           |@Callable(i)
+           |func test() = {
+           |  strict transfer = $constructor
+           |  []
+           |}""".stripMargin
+      val scriptV5 = Try(TxHelpers.scriptV5(scriptText))
+      scriptV5 shouldBe Symbol("success")
+
+      val scriptV6 = scriptV5.get.copy(stdLibVersion = StdLibVersion.V6)
+
+      intercept[RuntimeException](TxHelpers.scriptV6(scriptText)).toString should include("Can't find a function")
+
+      withDomain(DomainPresets.RideV6) { d =>
+        d.helpers.creditWavesToDefaultSigner()
+        d.appendAndAssertSucceed(TxHelpers.setScript(TxHelpers.defaultSigner, scriptV5.get))
+        d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, scriptV6))
+          .toString should include regex "function 'User\\(\\w+\\)' not found".r
+      }
+    }
+
+    withClue("InvokeExpression") {
+      intercept[RuntimeException](TxHelpers.scriptV6(s"""
+                                                        |@Callable(i)
+                                                        |func test() = {
+                                                        |  strict tx = InvokeExpressionTransaction(base58'', unit, base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])
+                                                        |  []
+                                                        |}""".stripMargin)).toString should include("Can't find a function")
+    }
+  }
+
   property("setting script results in account state") {
-    forAll(preconditionsAndSetContract) {
-      case (genesis, setScript) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) {
-          case (blockDiff, newState) =>
-            newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
-        }
+    forAll(preconditionsAndSetContract) { case (genesis, setScript) =>
+      assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) { case (blockDiff, newState) =>
+        newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
+      }
     }
   }
 
   property("setting contract results in account state") {
-    forAll(preconditionsAndSetContract) {
-      case (genesis, setScript) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) {
-          case (blockDiff, newState) =>
-            newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
-        }
+    forAll(preconditionsAndSetContract) { case (genesis, setScript) =>
+      assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) { case (blockDiff, newState) =>
+        newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
+      }
     }
   }
 
   property("Script with BlockV2 only works after Ride4DApps feature activation") {
-    import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
+    import com.wavesplatform.lagonaki.mocks.TestBlock.create as block
 
-    val settingsUnactivated = TestFunctionalitySettings.Enabled.copy(
-      preActivatedFeatures = Map(
+    val settingsUnactivated = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures =
+      Map(
         BlockchainFeatures.Ride4DApps.id -> 3
       )
     )
-    val settingsActivated = TestFunctionalitySettings.Enabled.copy(
-      preActivatedFeatures = Map(
+    val settingsActivated = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures =
+      Map(
         BlockchainFeatures.Ride4DApps.id -> 0
       )
     )
@@ -105,15 +164,14 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       tx      = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), 100000, ts + 1).explicitGet()
     } yield (genesis, tx)
 
-    forAll(setup) {
-      case (genesis, tx) =>
-        assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsUnactivated) { blockDiffEi =>
-          blockDiffEi should produce("RIDE 4 DAPPS feature has not been activated yet")
-        }
+    forAll(setup) { case (genesis, tx) =>
+      assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsUnactivated) { blockDiffEi =>
+        blockDiffEi should produce("RIDE 4 DAPPS feature has not been activated yet")
+      }
 
-        assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsActivated) { blockDiffEi =>
-          blockDiffEi.explicitGet()
-        }
+      assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsActivated) { blockDiffEi =>
+        blockDiffEi.explicitGet()
+      }
     }
   }
 
@@ -170,14 +228,14 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     val contractV4WithComplexityBetween2000And3000 = {
       val script =
         """
-        | {-#STDLIB_VERSION 4 #-}
-        | {-#SCRIPT_TYPE ACCOUNT #-}
-        | {-#CONTENT_TYPE DAPP #-}
-        |
-        | @Verifier(tx)
-        | func verify() =
-        |   groth16Verify_5inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK') || groth16Verify_1inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')
-        |
+          | {-#STDLIB_VERSION 4 #-}
+          | {-#SCRIPT_TYPE ACCOUNT #-}
+          | {-#CONTENT_TYPE DAPP #-}
+          |
+          | @Verifier(tx)
+          | func verify() =
+          |   groth16Verify_5inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK') || groth16Verify_1inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')
+          |
       """.stripMargin
 
       TestCompiler(V4).compileContract(script)
@@ -186,50 +244,47 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     val contractV4WithCallableComplexityBetween3000And4000 = {
       val script =
         """
-        | {-#STDLIB_VERSION 4 #-}
-        | {-#SCRIPT_TYPE ACCOUNT #-}
-        | {-#CONTENT_TYPE DAPP #-}
-        |
-        | @Callable(i)
-        | func default() = {
-        |   if(groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK'))
-        |     then [] else []
-        | }
-        |
+          | {-#STDLIB_VERSION 4 #-}
+          | {-#SCRIPT_TYPE ACCOUNT #-}
+          | {-#CONTENT_TYPE DAPP #-}
+          |
+          | @Callable(i)
+          | func default() = {
+          |   if(groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK'))
+          |     then [] else []
+          | }
+          |
       """.stripMargin
 
       TestCompiler(V4).compileContract(script)
     }
 
-    val rideV3Activated = TestFunctionalitySettings.Enabled.copy(
-      preActivatedFeatures = Map(
+    val rideV3Activated = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures =
+      Map(
         BlockchainFeatures.Ride4DApps.id -> 0
       )
     )
 
-    val rideV4Activated = TestFunctionalitySettings.Enabled.copy(
-      preActivatedFeatures = Map(
+    val rideV4Activated = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures =
+      Map(
         BlockchainFeatures.Ride4DApps.id -> 0,
         BlockchainFeatures.BlockV5.id    -> 0
       )
     )
 
     def assertSuccess(script: Script, settings: FunctionalitySettings): Unit = {
-      forAll(preconditionsAndSetCustomContract(script)) {
-        case (genesis, setScript) =>
-          assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), settings) {
-            case (_, newState) =>
-              newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
-          }
+      forAll(preconditionsAndSetCustomContract(script)) { case (genesis, setScript) =>
+        assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), settings) { case (_, newState) =>
+          newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
+        }
       }
     }
 
     def assertFailure(script: Script, settings: FunctionalitySettings, errorMessage: String): Unit = {
-      forAll(preconditionsAndSetCustomContract(script)) {
-        case (genesis, setScript) =>
-          assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), settings)(
-            _ should produce(errorMessage)
-          )
+      forAll(preconditionsAndSetCustomContract(script)) { case (genesis, setScript) =>
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), settings)(
+          _ should produce(errorMessage)
+        )
       }
     }
 
@@ -248,7 +303,8 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     val freeCall = TestCompiler(V6).compileFreeCall("[]")
     val account  = accountGen.sample.get
     SetScriptTransaction.selfSigned(1.toByte, account, Some(freeCall), MinIssueFee, System.currentTimeMillis()) shouldBe Left(
-      GenericError("Script type for Set Script Transaction should not be CALL"))
+      GenericError("Script type for Set Script Transaction should not be CALL")
+    )
   }
 
   property("estimation overflow") {
@@ -283,10 +339,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     def settings(checkNegative: Boolean = false, checkSumOverflow: Boolean = false): FunctionalitySettings = {
       TestFunctionalitySettings
         .withFeatures(BlockV5)
-        .copy(
-          estimationOverflowFixHeight = if (checkNegative) 0 else 999,
-          estimatorSumOverflowFixHeight = if (checkSumOverflow) 0 else 999
-        )
+        .copy(estimationOverflowFixHeight = if (checkNegative) 0 else 999, estimatorSumOverflowFixHeight = if (checkSumOverflow) 0 else 999)
     }
 
     def assert(script: Script, checkNegativeMessage: String): Assertion = {
@@ -333,7 +386,8 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       @Verifier(tx)
       func a2() = a1()
      */
-    val userFunctions = "AAIFAAAAAAAAAA0IAhoJCgJhMRIDYTExAAAAAgEAAAACYTEAAAAABgEAAAACYTEAAAAACQEAAAACYTEAAAAAAAAAAAAAAAEAAAACdHgBAAAAAmEyAAAAAAkBAAAAAmExAAAAAIGVAL4="
+    val userFunctions =
+      "AAIFAAAAAAAAAA0IAhoJCgJhMRIDYTExAAAAAgEAAAACYTEAAAAABgEAAAACYTEAAAAACQEAAAACYTEAAAAAAAAAAAAAAAEAAAACdHgBAAAAAmEyAAAAAAkBAAAAAmExAAAAAIGVAL4="
 
     /*
       func a1() = true
@@ -349,7 +403,8 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       @Verifier(tx)
       func a4() = a2()
      */
-    val innerOverlapWithVerifier = "AAIFAAAAAAAAAA0IAhoJCgJhMRIDYTExAAAAAgEAAAACYTEAAAAABgEAAAACYTIAAAAACgEAAAACYTMAAAAACgEAAAACYTEAAAAACQEAAAACYTEAAAAACQEAAAACYTEAAAAACQEAAAACYTMAAAAAAAAAAAAAAAEAAAACdHgBAAAAAmE0AAAAAAkBAAAAAmEyAAAAAEjFcsE="
+    val innerOverlapWithVerifier =
+      "AAIFAAAAAAAAAA0IAhoJCgJhMRIDYTExAAAAAgEAAAACYTEAAAAABgEAAAACYTIAAAAACgEAAAACYTMAAAAACgEAAAACYTEAAAAACQEAAAACYTEAAAAACQEAAAACYTEAAAAACQEAAAACYTMAAAAAAAAAAAAAAAEAAAACdHgBAAAAAmE0AAAAAAkBAAAAAmEyAAAAAEjFcsE="
 
     /*
       func a1() = true
@@ -368,21 +423,24 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
         []
       }
      */
-    val innerOverlapWithCallable = "AAIFAAAAAAAAAA8IAhIAGgkKAmExEgNhMTEAAAACAQAAAAJhMQAAAAAGAQAAAAJhMgAAAAAKAQAAAAJhMwAAAAAKAQAAAAJhMQAAAAAJAQAAAAJhMQAAAAAJAQAAAAJhMQAAAAAJAQAAAAJhMwAAAAAAAAABAAAAAWkBAAAAAmE0AAAAAAQAAAACYTAJAQAAAAJhMgAAAAADCQAAAAAAAAIFAAAAAmEwBQAAAAJhMAUAAAADbmlsCQAAAgAAAAECAAAAJFN0cmljdCB2YWx1ZSBpcyBub3QgZXF1YWwgdG8gaXRzZWxmLgAAAABEHCSy"
+    val innerOverlapWithCallable =
+      "AAIFAAAAAAAAAA8IAhIAGgkKAmExEgNhMTEAAAACAQAAAAJhMQAAAAAGAQAAAAJhMgAAAAAKAQAAAAJhMwAAAAAKAQAAAAJhMQAAAAAJAQAAAAJhMQAAAAAJAQAAAAJhMQAAAAAJAQAAAAJhMwAAAAAAAAABAAAAAWkBAAAAAmE0AAAAAAQAAAACYTAJAQAAAAJhMgAAAAADCQAAAAAAAAIFAAAAAmEwBQAAAAJhMAUAAAADbmlsCQAAAgAAAAECAAAAJFN0cmljdCB2YWx1ZSBpcyBub3QgZXF1YWwgdG8gaXRzZWxmLgAAAABEHCSy"
     val keyPairs = Vector.tabulate(8)(i => KeyPair(Ints.toByteArray(i)))
 
     def setScript(keyPairIndex: Int, script: String): SetScriptTransaction =
-      SetScriptTransaction.selfSigned(2.toByte, keyPairs(keyPairIndex), Script.fromBase64String(script).toOption, 0.01.waves, System.currentTimeMillis()).explicitGet()
+      SetScriptTransaction
+        .selfSigned(2.toByte, keyPairs(keyPairIndex), Script.fromBase64String(script).toOption, 0.01.waves, System.currentTimeMillis())
+        .explicitGet()
 
     val settings =
-      DomainPresets.RideV5.copy(blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
-        functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(
-          estimatorSumOverflowFixHeight = 3
+      DomainPresets.RideV5.copy(blockchainSettings =
+        DomainPresets.RideV5.blockchainSettings.copy(
+          functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(estimatorSumOverflowFixHeight = 3)
         )
-      ))
+      )
 
     withDomain(settings) { d =>
-      d.appendBlock(keyPairs.map(kp => GenesisTransaction.create(kp.toAddress, 10.waves, System.currentTimeMillis()).explicitGet()): _*)
+      d.appendBlock(keyPairs.map(kp => GenesisTransaction.create(kp.toAddress, 10.waves, System.currentTimeMillis()).explicitGet())*)
       d.appendBlock(
         setScript(0, verifier),
         setScript(1, userFunctions),
@@ -394,6 +452,135 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       d.appendBlockE(setScript(5, userFunctions)) should produce("shadows preceding declaration")
       d.appendBlockE(setScript(6, innerOverlapWithVerifier)) should produce("shadows preceding declaration")
       d.appendBlockE(setScript(7, innerOverlapWithCallable)) should produce("shadows preceding declaration")
+    }
+  }
+
+  property("unions are forbidden as @Callable arguments for RIDE 6 scripts and allowed for RIDE 4 and 5") {
+    def checkForExpr(expr: String, version: StdLibVersion): Assertion = {
+      val compileVersion = if (version == V6) V5 else version
+      val script = ContractScriptImpl(version, TestCompiler(compileVersion).compile(expr).explicitGet())
+
+      val tx = SetScriptTransaction.selfSigned(
+        TxVersion.V1,
+        accountGen.sample.get,
+        Some(script),
+        100000000,
+        1526287561757L
+      )
+
+      if (version == V6) {
+        tx shouldBe Left(GenericError("Union type is not allowed in callable function arguments of script"))
+      } else {
+        tx.toOption shouldBe defined
+      }
+    }
+
+    val exprWithPlainUnion =
+      """
+        |{-# STDLIB_VERSION 5 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |@Callable(i)
+        |func test(a: Int|String) = []
+        |""".stripMargin
+
+    val exprWithListUnion =
+      """
+        |{-# STDLIB_VERSION 5 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |@Callable(i)
+        |func test(a: List[Int|String]) = []
+        |""".stripMargin
+
+    checkForExpr(exprWithPlainUnion, V4)
+    checkForExpr(exprWithListUnion, V4)
+
+    checkForExpr(exprWithPlainUnion, V5)
+    checkForExpr(exprWithListUnion, V5)
+
+    checkForExpr(exprWithPlainUnion, V6)
+    checkForExpr(exprWithListUnion, V6)
+  }
+
+  property("synchronous calls are not allowed in dApp verifier function") {
+    def dAppVerifier(syncCall: String): String =
+      s"""
+         |@Verifier(tx)
+         |func verify() = {
+         |strict a = $syncCall(Address(base58'123'), "test", [], [])
+         |true
+         |}
+         |""".stripMargin
+
+    def dAppVerifierRec(syncCallId: Short): Script =
+      ContractScript(
+        V5,
+        DApp(
+          DAppMeta(),
+          List(
+            FUNC(
+              name = "f",
+              args = List.empty,
+              body = BLOCK(
+                LET("a", FUNCTION_CALL(FunctionHeader.Native(syncCallId), List.empty)), FUNCTION_CALL(FunctionHeader.User("f"), List.empty)
+              )
+            )
+          ),
+          List.empty,
+          Some(VerifierFunction(VerifierAnnotation("tx"), FUNC("v", List.empty, FUNCTION_CALL(FunctionHeader.User("f"), List.empty))))
+        )
+      ).explicitGet()
+
+    withDomain(DomainPresets.RideV5) { d =>
+      val dApp = accountGen.sample.get
+      val ts: Long = System.currentTimeMillis()
+      val fee = 0.01.waves
+      val genesis = GenesisTransaction.create(dApp.toAddress, ENOUGH_AMT, ts).explicitGet()
+
+      val scriptWithInvoke = TestCompiler(V5).compileContract(dAppVerifier("invoke"))
+      val setScriptWithInvoke = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(scriptWithInvoke), fee, ts).explicitGet()
+
+      val scriptWithReentrantInvoke = TestCompiler(V5).compileContract(dAppVerifier("reentrantInvoke"))
+      val setScriptWithReentrantInvoke = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(scriptWithReentrantInvoke), fee, ts).explicitGet()
+
+      val setScriptWithInvokeRec = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(dAppVerifierRec(FunctionIds.CALLDAPP)), fee, ts).explicitGet()
+      val setScriptWithReentrantInvokeRec = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(dAppVerifierRec(FunctionIds.CALLDAPPREENTRANT)), fee, ts).explicitGet()
+
+      d.appendBlock(genesis)
+      d.appendBlockE(setScriptWithInvoke) should produce("DApp-to-dApp invocations are not allowed from verifier")
+      d.appendBlockE(setScriptWithReentrantInvoke) should produce("DApp-to-dApp invocations are not allowed from verifier")
+      d.appendBlockE(setScriptWithInvokeRec) should produce("DApp-to-dApp invocations are not allowed from verifier")
+      d.appendBlockE(setScriptWithReentrantInvokeRec) should produce("DApp-to-dApp invocations are not allowed from verifier")
+    }
+  }
+
+  property("synchronous calls are not allowed in account script") {
+    def getScriptWithSyncCall(syncCall: String): ExprScript = {
+      val expr =
+        s"""
+           |strict a = $syncCall(Address(base58'123'), "test", [], [])
+           |true
+           |""".stripMargin
+
+      ExpressionCompiler.compileBoolean(expr, compilerContext(DirectiveSet(V5, Call, Expression).explicitGet()))
+        .flatMap(ExprScript(V5, _))
+        .explicitGet()
+    }
+
+    withDomain(DomainPresets.RideV5) { d =>
+      val smartAcc = accountGen.sample.get
+      val ts: Long = System.currentTimeMillis()
+      val genesis = GenesisTransaction.create(smartAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
+
+      val setScriptWithInvoke = SetScriptTransaction.selfSigned(TxVersion.V2, smartAcc, Some(getScriptWithSyncCall("invoke")), 0.01.waves, ts).explicitGet()
+      val setScriptWithReentrantInvoke = SetScriptTransaction.selfSigned(TxVersion.V2, smartAcc, Some(getScriptWithSyncCall("reentrantInvoke")), 0.01.waves, ts).explicitGet()
+
+      d.appendBlock(genesis)
+      d.appendBlockE(setScriptWithInvoke) should produce("function 'Native(1020)' not found")
+      d.appendBlockE(setScriptWithReentrantInvoke) should produce("function 'Native(1021)' not found")
     }
   }
 }

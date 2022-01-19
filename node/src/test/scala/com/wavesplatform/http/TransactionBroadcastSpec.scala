@@ -1,5 +1,8 @@
 package com.wavesplatform.http
 
+import scala.concurrent.Future
+import scala.util.Random
+
 import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.common.CommonTransactionsApi
@@ -11,20 +14,15 @@ import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
 import com.wavesplatform.test.TestTime
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
-import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxVersion}
-import com.wavesplatform.utils.EthHelpers
+import com.wavesplatform.utils.{EthEncoding, EthHelpers}
 import com.wavesplatform.wallet.Wallet
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json.{JsObject, JsValue, Json}
-
-import scala.concurrent.Future
-import scala.util.Random
+import play.api.libs.json.{JsObject, Json, JsValue}
 
 class TransactionBroadcastSpec
     extends RouteSpec("/transactions")
@@ -61,102 +59,91 @@ class TransactionBroadcastSpec
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = transactionPublisher).route
 
-      val ethBuyOrder = Order(
-        Order.V4,
-        TestEthOrdersPublicKey,
-        TxHelpers.matcher.publicKey,
-        AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
-        OrderType.BUY,
-        1,
-        100L,
-        1,
-        123,
-        100000,
-        Waves,
-        eip712Signature = EthSignature(
-          "0xe5ff562bfb0296e95b631365599c87f1c5002597bf56a131f289765275d2580f5344c62999404c37cd858ea037328ac91eca16ad1ce69c345ebb52fde70b66251c"
-        )
-      )
-
-      val ethSellOrder = Order(
-        Order.V4,
-        TestEthOrdersPublicKey,
-        TxHelpers.matcher.publicKey,
-        AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
-        OrderType.SELL,
-        1,
-        100L,
-        1,
-        123,
-        100000,
-        Waves,
-        eip712Signature = EthSignature(
-          "0xc8ba2bdafd27742546b3be34883efc51d6cdffbb235798d7b51876c6854791f019b0522d7a39b6f2087cba46ae86919b71a2d9d7920dfc8e00246d8f02a258f21b"
-        )
-      )
-
+      import com.wavesplatform.transaction.assets.exchange.EthOrderSpec.{ethBuyOrder, ethSellOrder}
       val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, TxVersion.V3, 100)
       testTime.setTime(100)
+      val validResponseJson =
+        s"""{
+           |  "type" : 7,
+           |  "id" : "${transaction.id()}",
+           |  "sender" : "3FrCwv8uFRxQazhX6Lno45aZ68Bof6ScaeF",
+           |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+           |  "fee" : 1000000,
+           |  "feeAssetId" : null,
+           |  "timestamp" : 100,
+           |  "proofs" : [ "${transaction.signature}" ],
+           |  "version" : 3,
+           |  "chainId" : 69,
+           |  "order1" : {
+           |    "version" : 4,
+           |    "id" : "${ethBuyOrder.id()}",
+           |    "sender" : "${ethBuyOrder.senderPublicKey.toAddress}",
+           |    "senderPublicKey" : "${ethBuyOrder.senderPublicKey}",
+           |    "matcherPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+           |    "assetPair" : {
+           |      "amountAsset" : "5fQPsn8hoaVddFG26cWQ5QFdqxWtUPNaZ9zH2E6LYzFn",
+           |      "priceAsset" : null
+           |    },
+           |    "orderType" : "buy",
+           |    "amount" : 1,
+           |    "price" : 100,
+           |    "timestamp" : 1,
+           |    "expiration" : 123,
+           |    "matcherFee" : 100000,
+           |    "signature" : "",
+           |    "proofs" : [ ],
+           |    "matcherFeeAssetId" : null,
+           |    "eip712Signature" : "${EthEncoding.toHexString(ethBuyOrder.eip712Signature.get.arr)}",
+           |    "priceMode" : null
+           |  },
+           |  "order2" : {
+           |    "version" : 4,
+           |    "id" : "${ethSellOrder.id()}",
+           |    "sender" : "${ethSellOrder.senderPublicKey.toAddress}",
+           |    "senderPublicKey" : "${ethSellOrder.senderPublicKey}",
+           |    "matcherPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+           |    "assetPair" : {
+           |      "amountAsset" : "5fQPsn8hoaVddFG26cWQ5QFdqxWtUPNaZ9zH2E6LYzFn",
+           |      "priceAsset" : null
+           |    },
+           |    "orderType" : "sell",
+           |    "amount" : 1,
+           |    "price" : 100,
+           |    "timestamp" : 1,
+           |    "expiration" : 123,
+           |    "matcherFee" : 100000,
+           |    "signature" : "",
+           |    "proofs" : [ ],
+           |    "matcherFeeAssetId" : null,
+           |    "eip712Signature" : "${EthEncoding.toHexString(ethSellOrder.eip712Signature.get.arr)}",
+           |    "priceMode" : null
+           |  },
+           |  "amount" : 1,
+           |  "price" : 100,
+           |  "buyMatcherFee" : 100000,
+           |  "sellMatcherFee" : 100000
+           |}
+           |""".stripMargin
+
       Post(routePath("/broadcast"), transaction.json()) ~> route ~> check {
-        responseAs[JsObject] should matchJson(s"""{
-                                                |  "type" : 7,
-                                                |  "id" : "${transaction.id()}",
-                                                |  "sender" : "3FrCwv8uFRxQazhX6Lno45aZ68Bof6ScaeF",
-                                                |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-                                                |  "fee" : 1000000,
-                                                |  "feeAssetId" : null,
-                                                |  "timestamp" : 100,
-                                                |  "proofs" : [ "${transaction.signature}" ],
-                                                |  "version" : 3,
-                                                |  "chainId" : 69,
-                                                |  "order1" : {
-                                                |    "version" : 4,
-                                                |    "id" : "${ethBuyOrder.id()}",
-                                                |    "sender" : "3FzoJXUesFqzf4nmMYejpUDYmFJvkwEiQG6",
-                                                |    "senderPublicKey" : "5BQPcwDXaZexgonPb8ipDrLRXY3RHn1kFLP9fqp1s6M6xiRhC4LvsAq2HueXCMzkpuXsrLnuBA3SdkJyuhNZXMCd",
-                                                |    "matcherPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-                                                |    "assetPair" : {
-                                                |      "amountAsset" : "5fQPsn8hoaVddFG26cWQ5QFdqxWtUPNaZ9zH2E6LYzFn",
-                                                |      "priceAsset" : null
-                                                |    },
-                                                |    "orderType" : "buy",
-                                                |    "amount" : 1,
-                                                |    "price" : 100,
-                                                |    "timestamp" : 1,
-                                                |    "expiration" : 123,
-                                                |    "matcherFee" : 100000,
-                                                |    "signature" : "",
-                                                |    "proofs" : [ ],
-                                                |    "matcherFeeAssetId" : null,
-                                                |    "eip712Signature" : "0xe5ff562bfb0296e95b631365599c87f1c5002597bf56a131f289765275d2580f5344c62999404c37cd858ea037328ac91eca16ad1ce69c345ebb52fde70b66251c"
-                                                |  },
-                                                |  "order2" : {
-                                                |    "version" : 4,
-                                                |    "id" : "${ethSellOrder.id()}",
-                                                |    "sender" : "3FzoJXUesFqzf4nmMYejpUDYmFJvkwEiQG6",
-                                                |    "senderPublicKey" : "5BQPcwDXaZexgonPb8ipDrLRXY3RHn1kFLP9fqp1s6M6xiRhC4LvsAq2HueXCMzkpuXsrLnuBA3SdkJyuhNZXMCd",
-                                                |    "matcherPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-                                                |    "assetPair" : {
-                                                |      "amountAsset" : "5fQPsn8hoaVddFG26cWQ5QFdqxWtUPNaZ9zH2E6LYzFn",
-                                                |      "priceAsset" : null
-                                                |    },
-                                                |    "orderType" : "sell",
-                                                |    "amount" : 1,
-                                                |    "price" : 100,
-                                                |    "timestamp" : 1,
-                                                |    "expiration" : 123,
-                                                |    "matcherFee" : 100000,
-                                                |    "signature" : "",
-                                                |    "proofs" : [ ],
-                                                |    "matcherFeeAssetId" : null,
-                                                |    "eip712Signature" : "0xc8ba2bdafd27742546b3be34883efc51d6cdffbb235798d7b51876c6854791f019b0522d7a39b6f2087cba46ae86919b71a2d9d7920dfc8e00246d8f02a258f21b"
-                                                |  },
-                                                |  "amount" : 1,
-                                                |  "price" : 100,
-                                                |  "buyMatcherFee" : 100000,
-                                                |  "sellMatcherFee" : 100000
-                                                |}
-                                                |""".stripMargin)
+        responseAs[JsObject] should matchJson(validResponseJson)
+      }
+
+      def removeFields(json: JsObject, fields: String*): JsObject = {
+        val order1 = (json \ "order1").as[JsObject]
+        val order2 = (json \ "order2").as[JsObject]
+        json + ("order1" -> fields.foldLeft(order1)(_ - _)) + ("order2" -> fields.foldLeft(order2)(_ - _))
+      }
+
+      Post(routePath("/broadcast"), removeFields(transaction.json(), "senderPublicKey")) ~> route ~> check {
+        responseAs[JsObject] should matchJson(validResponseJson)
+      }
+
+      Post(routePath("/broadcast"), removeFields(transaction.json(), "senderPublicKey", "eip712Signature")) ~> route ~> check {
+        responseAs[JsObject] should matchJson("""{
+                                                |  "error" : 199,
+                                                |  "message" : "Either senderPublicKey or eip712Signature should be provided"
+                                                |}""".stripMargin)
       }
     }
   }

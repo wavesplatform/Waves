@@ -122,14 +122,10 @@ object ReissueTransactionDiffTest {
   type ValidationResults    = (Either[ValidationError, Unit], Either[ValidationError, Unit], Either[ValidationError, Unit])
 
   val fs: FunctionalitySettings =
-    TestFunctionalitySettings.Enabled.copy(
-      featureCheckBlocksPeriod = 1,
-      blocksForFeatureActivation = 1,
-      preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures ++ Seq(
+    TestFunctionalitySettings.Enabled.copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures ++ Seq(
         BlockchainFeatures.FeeSponsorship.id -> 0,
         BlockchainFeatures.BlockV5.id        -> 3
-      )
-    )
+      ))
 
   val BeforeActivationFee: Long = 1 * Constants.UnitsInWave
   val AfterActivationFee: Long  = 100000

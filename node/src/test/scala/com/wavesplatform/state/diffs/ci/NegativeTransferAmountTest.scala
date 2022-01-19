@@ -52,8 +52,7 @@ class NegativeTransferAmountTest extends PropSpec with WithDomain with Transacti
 
   private val settings =
     TestFunctionalitySettings
-      .withFeatures(BlockV5, SynchronousCalls)
-      .copy(syncDAppCheckTransfersHeight = 3)
+      .withFeatures(BlockV5, SynchronousCalls, RideV6)
 
   property("negative transfer amount") {
     for (bigComplexity <- Seq(false, true)) {
@@ -62,11 +61,11 @@ class NegativeTransferAmountTest extends PropSpec with WithDomain with Transacti
         d.appendBlock(preparingTxs: _*)
 
         val invoke1 = invoke()
-        d.appendBlock(invoke1)
-        d.blockchain.bestLiquidDiff.get.errorMessage(invoke1.txId).get.text shouldBe "Negative amount"
-
-        val invoke2 = invoke()
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include("Negative transfer amount = -1")
+        if (!bigComplexity) {
+          d.appendAndCatchError(invoke1).toString should include("Negative transfer amount")
+        } else {
+          d.appendAndAssertFailed(invoke1)
+        }
       }
     }
   }

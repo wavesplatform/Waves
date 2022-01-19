@@ -2,22 +2,20 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures._
-import com.wavesplatform.lang.directives.values.V5
+import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 
 class PowNewPrecisionTest extends PropSpec with WithDomain {
   private def ts = ntpTime.getTimestamp()
 
-  private val contract = TestCompiler(V5).compileContract(
+  private val contract = TestCompiler(V4).compileContract(
     """
       | @Callable(i)
       | func default() = {
@@ -51,19 +49,22 @@ class PowNewPrecisionTest extends PropSpec with WithDomain {
       invokeTx = () => Signed.invokeScript(TxVersion.V3, invoker, master.toAddress, None, Nil, fee, Waves, ts)
     } yield (Seq(gTx1, gTx2, ssTx), invokeTx, master.toAddress)
 
-  private val settings =
-    TestFunctionalitySettings
-      .withFeatures(BlockV5, SynchronousCalls)
-      .copy(syncDAppCheckPaymentsHeight = 3)
 
-  property("pow changes precision after syncDAppCheckPaymentsHeight") {
+  property("pow has bigger precision before SynchronousCalls") {
     val (genesisTxs, invoke, dApp) = scenario.sample.get
-    withDomain(domainSettingsWithFS(settings)) { d =>
+    withDomain(DomainPresets.RideV4) { d =>
       d.appendBlock(genesisTxs: _*)
 
       d.appendBlock(invoke())
       d.blockchain.accountData(dApp, "result1").get.value shouldBe 9049204201489L
       d.blockchain.accountData(dApp, "result2").get.value shouldBe 1
+    }
+  }
+
+  property("pow changes precision after SynchronousCalls") {
+    val (genesisTxs, invoke, dApp) = scenario.sample.get
+    withDomain(DomainPresets.RideV5) { d =>
+      d.appendBlock(genesisTxs: _*)
 
       d.appendBlock(invoke())
       d.blockchain.accountData(dApp, "result1").get.value shouldBe 9049204201491L

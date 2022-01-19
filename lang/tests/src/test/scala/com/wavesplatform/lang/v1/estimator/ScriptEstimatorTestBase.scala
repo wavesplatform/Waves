@@ -33,12 +33,12 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*) extends PropSpec {
   implicit val version: StdLibVersion = V3
 
   private def ctx(implicit version: StdLibVersion) = {
-    val transactionType = Types.buildTransferTransactionType(true, version)
+    val transactionType = Types.buildTransferTransactionType(true)
     val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
+          PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, version).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet()),
           CTX[NoContext](

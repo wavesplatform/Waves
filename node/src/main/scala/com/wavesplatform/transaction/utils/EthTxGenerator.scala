@@ -2,13 +2,13 @@ package com.wavesplatform.transaction.utils
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.transaction.{ABIConverter, Asset, EthereumTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.utils.EthEncoding
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.{AbiTypes, StructType}
-import org.web3j.crypto._
+import org.web3j.crypto.*
 
 object EthTxGenerator {
   sealed trait Arg
@@ -19,13 +19,12 @@ object EthTxGenerator {
     case class BigInteger(bi: BigInt, typeStr: String = "int256") extends Arg
     case class Bool(b: Boolean)                                   extends Arg
     case class List(listType: Arg, elements: Seq[Arg])            extends Arg
-    case class Union(index: Int, fields: Seq[Arg])                extends Arg
     case class Struct(values: Arg*)                               extends Arg
   }
 
-  import org.web3j.abi.{datatypes => ethTypes}
+  import org.web3j.abi.datatypes as ethTypes
 
-  def toEthType(value: Arg): ethTypes.Type[_] = value match {
+  def toEthType(value: Arg): ethTypes.Type[?] = value match {
     case Arg.Integer(v, typeStr) =>
       val typeClass = ethTypes.AbiTypes.getType(typeStr)
       typeClass.getConstructor(classOf[Long]).newInstance(v)
@@ -42,13 +41,10 @@ object EthTxGenerator {
     case Arg.List(listType, elements) =>
       val ethTypedXs = elements.map(toEthType)
       val arrayClass = toEthType(listType)
-      new ethTypes.DynamicArray(arrayClass.getClass.asInstanceOf[Class[ethTypes.Type[_]]], ethTypedXs*) {
+      new ethTypes.DynamicArray(arrayClass.getClass.asInstanceOf[Class[ethTypes.Type[?]]], ethTypedXs*) {
         override def getTypeAsString: String =
           (if (classOf[StructType].isAssignableFrom(arrayClass.getClass)) arrayClass.getTypeAsString else AbiTypes.getTypeAString(getComponentType)) + "[]"
       }
-    case Arg.Union(index, fields) =>
-      new ethTypes.DynamicStruct((toEthType(Arg.Integer(index, "uint8")) +: fields.map(toEthType))*)
-
     case Arg.Struct(values*) => new ethTypes.StaticStruct(values.map(toEthType)*)
   }
 
@@ -75,10 +71,10 @@ object EthTxGenerator {
       )
 
     case Asset.IssuedAsset(assetId) =>
-      import scala.jdk.CollectionConverters._
+      import scala.jdk.CollectionConverters.*
       val function = new org.web3j.abi.datatypes.Function(
         "transfer",
-        Seq[ethTypes.Type[_]](
+        Seq[ethTypes.Type[?]](
           new ethTypes.Address(EthEncoding.toHexString(recipient.publicKeyHash)),
           new ethTypes.generated.Uint256(amount)
         ).asJava,
@@ -104,7 +100,7 @@ object EthTxGenerator {
       payments: Seq[Payment],
       fee: Long = 500000
   ): EthereumTransaction = {
-    import scala.jdk.CollectionConverters._
+    import scala.jdk.CollectionConverters.*
     val paymentsArg = {
       val tuples = payments.toVector.map { p =>
         val assetId = p.assetId match {

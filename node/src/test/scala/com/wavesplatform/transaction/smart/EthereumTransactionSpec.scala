@@ -1,20 +1,19 @@
 package com.wavesplatform.transaction.smart
 
-import scala.concurrent.duration._
-
-import cats.syntax.monoid._
+import scala.concurrent.duration.*
+import cats.syntax.monoid.*
 import com.wavesplatform.{BlockchainStubHelpers, TestValues}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.state.Portfolio
-import com.wavesplatform.test.{produce, FlatSpec, TestTime}
+import com.wavesplatform.test.{FlatSpec, TestTime, produce}
 import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.utils.EthConverters._
+import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, EthSetChainId, JsonMatchers}
@@ -269,7 +268,7 @@ class EthereumTransactionSpec
     transaction.senderAddress() shouldBe senderAccount.toWavesAddress
   }
 
-  it should "work with all types of arguments" in {
+  it should "work with all types of arguments except unions" in {
     val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
     val dAppAccount    = TxHelpers.secondSigner
     val blockchain = createBlockchainStub { blockchain =>
@@ -285,7 +284,7 @@ class EthereumTransactionSpec
           |{-# CONTENT_TYPE DAPP #-}
           |
           |@Callable (i)
-          |func deposit(amount: Int, bs: ByteVector, str: String, bool: Boolean, list: List[Int], union: ByteVector|String) = {
+          |func deposit(amount: Int, bs: ByteVector, str: String, bool: Boolean, list: List[Int]) = {
           |  [
           |    ScriptTransfer(i.caller, amount, unit)
           |  ]
@@ -305,8 +304,7 @@ class EthereumTransactionSpec
         Arg.Bytes(ByteStr.empty),
         Arg.Str("123"),
         Arg.Bool(true),
-        Arg.List(Arg.Integer(0), Seq(Arg.Integer(123))),
-        Arg.Union(0, Seq(Arg.Str("123"), Arg.Bytes(ByteStr.empty)))
+        Arg.List(Arg.Integer(0), Seq(Arg.Integer(123)))
       ),
       Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
     )
@@ -327,6 +325,43 @@ class EthereumTransactionSpec
                                                                    |  "leaseCancels" : [ ],
                                                                    |  "invokes" : [ ]
                                                                    |}""".stripMargin)
+  }
+
+  it should "not work with union type" in {
+    val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
+    val dAppAccount    = TxHelpers.secondSigner
+    val blockchain = createBlockchainStub { blockchain =>
+      val sh = StubHelpers(blockchain)
+      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
+      sh.creditBalance(invokerAccount.toWavesAddress, *)
+      sh.creditBalance(dAppAccount.toAddress, *)
+      sh.issueAsset(ByteStr(EthStubBytes32))
+
+      val script = TxHelpers.script(
+        """{-# STDLIB_VERSION 4 #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |
+          |@Callable (i)
+          |func test(union: String|Int) = []
+          |""".stripMargin
+      )
+      sh.setScript(dAppAccount.toAddress, script)
+    }
+
+    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
+    val transaction = EthTxGenerator.generateEthInvoke(
+      invokerAccount,
+      dAppAccount.toAddress,
+      "test",
+      Seq(
+        Arg.Integer(123)
+      ),
+      Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
+    )
+
+    val diff = differ(transaction).resultE
+    diff should produce("Function not defined: 1f9773e9")
   }
 
   it should "work with no arguments" in {

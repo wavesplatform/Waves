@@ -41,10 +41,16 @@ object ExprScript {
       expr: EXPR,
       version: StdLibVersion,
       isFreeCall: Boolean,
-      estimator: ScriptEstimator
+      estimator: ScriptEstimator,
+      withCombinedContext: Boolean = false
   ): Either[String, Long] = {
-    val modifiedExpr = if (isFreeCall) BLOCK(LET(ContractCompiler.FreeCallInvocationArg, TRUE), expr) else expr
-    estimator(varNames(version, Expression), functionCosts(version, Expression, if (isFreeCall) Call else Account), modifiedExpr)
+    val modifiedExpr = if (version < V6) {
+      expr
+    } else {
+      BLOCK(LET(ContractCompiler.FreeCallInvocationArg, TRUE), expr)
+    }
+    val resultVarNames = if (withCombinedContext) combinedVarNames(version, Expression) else varNames(version, Expression)
+    estimator(resultVarNames, functionCosts(version, Expression, if (isFreeCall) Call else Account, withCombinedContext = withCombinedContext), modifiedExpr)
   }
 
   def estimate(
@@ -52,10 +58,11 @@ object ExprScript {
       version: StdLibVersion,
       isFreeCall: Boolean,
       estimator: ScriptEstimator,
-      useContractVerifierLimit: Boolean
+      useContractVerifierLimit: Boolean,
+      withCombinedContext: Boolean = false
   ): Either[String, Long] =
     for {
-      complexity <- estimateExact(expr, version, isFreeCall, estimator)
+      complexity <- estimateExact(expr, version, isFreeCall, estimator, withCombinedContext)
       _          <- checkComplexity(version, complexity, useContractVerifierLimit)
     } yield complexity
 
@@ -76,10 +83,10 @@ object ExprScript {
       s"Script is too complex: $complexity > $limit"
     )
   }
-
-  private case class ExprScriptImpl(stdLibVersion: StdLibVersion, isFreeCall: Boolean, expr: EXPR) extends ExprScript {
+  
+  final case class ExprScriptImpl(stdLibVersion: StdLibVersion, isFreeCall: Boolean, expr: EXPR) extends ExprScript {
     override type Expr = EXPR
-    override val bytes: Coeval[ByteStr]           = Coeval.evalOnce(ByteStr(Global.serializeExpression(expr, stdLibVersion, isFreeCall)))
+    override val bytes: Coeval[ByteStr]           = Coeval.evalOnce(ByteStr(Global.serializeExpression(expr, stdLibVersion)))
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(com.wavesplatform.lang.v1.compiler.containsBlockV2(expr))
     override val containsArray: Boolean           = com.wavesplatform.lang.v1.compiler.containsArray(expr)
   }
