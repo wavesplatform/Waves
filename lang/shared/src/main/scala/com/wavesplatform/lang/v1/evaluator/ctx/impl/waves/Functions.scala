@@ -703,12 +703,12 @@ object Functions {
       "transferTransactionById",
       Map[StdLibVersion, Long](V3 -> 100L, V4 -> 60L),
       TRANSFERTRANSACTIONBYID,
-      UNION(buildTransferTransactionType(proofsEnabled, version), UNIT),
+      UNION(buildTransferTransactionType(proofsEnabled), UNIT),
       ("id", BYTESTR)
     ) {
       new ContextfulNativeFunction.Simple[Environment](
         "transferTransactionById",
-        UNION(buildTransferTransactionType(proofsEnabled, version), UNIT),
+        UNION(buildTransferTransactionType(proofsEnabled), UNIT),
         Seq(("id", BYTESTR))
       ) {
         override def evaluate[F[_]: Monad](env: Environment[F], args: List[EVALUATED]): F[Either[ExecutionError, EVALUATED]] =
@@ -772,12 +772,12 @@ object Functions {
       "transferTransactionFromProto",
       5,
       TRANSFER_TRANSACTION_FROM_PROTO,
-      UNION(buildTransferTransactionType(proofsEnabled, version), UNIT),
+      UNION(buildTransferTransactionType(proofsEnabled), UNIT),
       ("bytes", BYTESTR)
     ) {
       new ContextfulNativeFunction.Simple[Environment](
         "transferTransactionFromProto",
-        UNION(buildTransferTransactionType(proofsEnabled, version), UNIT),
+        UNION(buildTransferTransactionType(proofsEnabled), UNIT),
         Seq(("bytes", BYTESTR))
       ) {
         override def evaluate[F[_]: Monad](env: Environment[F], args: List[EVALUATED]): F[Either[ExecutionError, EVALUATED]] =
