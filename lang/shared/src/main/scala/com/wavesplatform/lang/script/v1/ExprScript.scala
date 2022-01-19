@@ -83,7 +83,7 @@ object ExprScript {
       s"Script is too complex: $complexity > $limit"
     )
   }
-
+  
   final case class ExprScriptImpl(stdLibVersion: StdLibVersion, isFreeCall: Boolean, expr: EXPR) extends ExprScript {
     override type Expr = EXPR
     override val bytes: Coeval[ByteStr]           = Coeval.evalOnce(ByteStr(Global.serializeExpression(expr, stdLibVersion)))
