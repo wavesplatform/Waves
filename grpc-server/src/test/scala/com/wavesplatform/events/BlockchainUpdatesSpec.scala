@@ -2,7 +2,6 @@ package com.wavesplatform.events
 
 import java.nio.file.Files
 import java.util.Map
-
 import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, KeyPair}
@@ -47,6 +46,7 @@ import org.scalactic.source.Position
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.ScalaFutures
 
+import java.util.concurrent.Semaphore
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 import scala.util.Random
@@ -542,27 +542,26 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
     }
 
     "should handle modifying last block correctly" in {
-      @volatile var suspend   = true
-      @volatile var startRead = false
+      val suspend   = new Semaphore(0, true)
+      val startRead = new Semaphore(0, true)
       withDomainAndRepo(
         { (d, repo) =>
           (1 to 5).foreach(_ => d.appendBlock())
 
           val subscription = Future {
             val s = repo.createSubscription(SubscribeRequest.of(1, 5))
-            while (repo.height == 5) {}
             s.cancel()
             s
           }.flatten
 
           val modifyBlock = Future {
-            while (!startRead) {}
+            startRead.acquire()
             // waiting start of loader
 
             d.appendMicroBlock(TxHelpers.transfer())
             d.appendKeyBlock()
 
-            suspend = false
+            suspend.release(9999)
             // allow to continue loading
           }
 
@@ -572,12 +571,12 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
             .asInstanceOf[Seq[SubscribeEvent]]
             .map(_.getUpdate.height) shouldBe (1 to 4)
         },
-        Some(InterferableDB(() => suspend, () => startRead = true))
+        Some(InterferableDB(suspend, startRead))
       )
     }
   }
 
-  case class InterferableDB(suspend: () => Boolean, onHasNext: () => Unit) extends DB {
+  case class InterferableDB(suspend: Semaphore, startRead: Semaphore) extends DB {
     private val db = openDB(Files.createTempDirectory("bc-updates").toString)
 
     override def get(key: Array[Byte], options: ReadOptions): Array[Byte] = db.get(key, options)
@@ -606,8 +605,8 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
       override def close(): Unit                               = iterator.close()
       override def seek(key: Array[Byte]): Unit                = iterator.seek(key)
       override def hasNext: Boolean = {
-        onHasNext()
-        while (suspend()) {}
+        startRead.release()
+        suspend.acquire()
         iterator.hasNext
       }
 
