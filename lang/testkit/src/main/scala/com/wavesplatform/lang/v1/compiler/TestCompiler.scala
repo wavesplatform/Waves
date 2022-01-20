@@ -1,11 +1,12 @@
 package com.wavesplatform.lang.v1.compiler
 
-import cats.syntax.semigroup._
+import cats.syntax.semigroup.*
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, Asset, Expression, StdLibVersion, DApp => DAppType}
+import com.wavesplatform.lang.directives.values.{Account, Asset, Expression, StdLibVersion, DApp as DAppType}
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.CTX
@@ -36,7 +37,7 @@ class TestCompiler(version: StdLibVersion) {
   def compile(script: String, allowIllFormedStrings: Boolean = false): Either[String, DApp] =
     ContractCompiler.compile(script, compilerContext, version, allowIllFormedStrings = allowIllFormedStrings)
 
-  def compileContract(script: String, allowIllFormedStrings: Boolean = false): Script =
+  def compileContract(script: String, allowIllFormedStrings: Boolean = false): ContractScriptImpl =
     ContractScript(version, compile(script, allowIllFormedStrings).explicitGet()).explicitGet()
 
   def compileExpression(script: String, allowIllFormedStrings: Boolean = false, checkSize: Boolean = true): ExprScript =

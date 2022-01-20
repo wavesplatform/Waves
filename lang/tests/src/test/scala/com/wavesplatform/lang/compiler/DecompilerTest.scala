@@ -5,14 +5,14 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.DApp._
-import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.contract.DApp.*
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.compiler._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl._
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Types.*
+import com.wavesplatform.lang.v1.compiler.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation.NE_OP
 import com.wavesplatform.lang.v1.parser.Parser
@@ -33,9 +33,9 @@ class DecompilerTest extends PropSpec {
   val decompilerContextV3 = getTestContext(V3).decompilerContext
   val decompilerContextV4 = getTestContext(V4).decompilerContext
 
-  private def assertDecompile(script: String, decompiled: String): Assertion = {
-    val expr   = TestCompiler(V5).compileExpression(script.stripMargin).expr.asInstanceOf[EXPR]
-    val result = Decompiler(expr, getDecompilerContext(V5, Expression))
+  private def assertDecompile(script: String, decompiled: String, version: StdLibVersion): Assertion = {
+    val expr   = TestCompiler(version).compileExpression(script.stripMargin).expr.asInstanceOf[EXPR]
+    val result = Decompiler(expr, getDecompilerContext(version, Expression))
     result shouldBe decompiled.stripMargin.trim
   }
 
@@ -116,7 +116,7 @@ class DecompilerTest extends PropSpec {
       LET("vari", REF("p")),
       TRUE
     )
-    val actual   = Decompiler(expr, decompilerContextV3)
+    val actual = Decompiler(expr, decompilerContextV3)
     val expected = """|let vari = p
                       |true""".stripMargin
     actual shouldEq expected
@@ -577,13 +577,13 @@ class DecompilerTest extends PropSpec {
     val rev = Decompiler(expr, decompilerContextV3)
 
     rev shouldEq """match tv {
-    |    case x: PointB|PointA => 
-    |        x
-    |    case x: PointC => 
-    |        x
-    |    case _ => 
-    |        throw("Match error")
-    |}""".stripMargin
+                   |    case x: PointB|PointA => 
+                   |        x
+                   |    case x: PointC => 
+                   |        x
+                   |    case _ => 
+                   |        throw("Match error")
+                   |}""".stripMargin
   }
 
   property("match with case without type") {
@@ -598,11 +598,11 @@ class DecompilerTest extends PropSpec {
     val rev = Decompiler(expr, decompilerContextV3)
 
     rev shouldEq """match tv {
-    |    case _: PointB|PointA =>
-    |        1
-    |    case _ =>
-    |        2
-    |}""".stripMargin
+                   |    case _: PointB|PointA =>
+                   |        1
+                   |    case _ =>
+                   |        2
+                   |}""".stripMargin
   }
 
   property("match with case without var") {
@@ -617,11 +617,11 @@ class DecompilerTest extends PropSpec {
     val rev = Decompiler(expr, decompilerContextV3)
 
     rev shouldEq """match tv {
-    |    case _: PointB|PointA => 
-    |        1
-    |    case x => 
-    |        x
-    |}""".stripMargin
+                   |    case _: PointB|PointA => 
+                   |        1
+                   |    case x => 
+                   |        x
+                   |}""".stripMargin
   }
 
   property("multiple value list") {
@@ -747,10 +747,10 @@ class DecompilerTest extends PropSpec {
 
   property("V4 - valueOrElse") {
     val script = """let a = 1
-                             |let b = 2
-                             |a.valueOrElse(b)""".stripMargin
-    val expr   = compileExpr(script, V4).explicitGet()._1
-    val res    = Decompiler(expr, decompilerContextV4)
+                   |let b = 2
+                   |a.valueOrElse(b)""".stripMargin
+    val expr = compileExpr(script, V4).explicitGet()._1
+    val res  = Decompiler(expr, decompilerContextV4)
     res shouldEq """let a = 1
                    |let b = 2
                    |valueOrElse(a, b)""".stripMargin
@@ -825,41 +825,41 @@ class DecompilerTest extends PropSpec {
         |""".stripMargin
     val script =
       s"""
-        | @Callable(i)
-        | func foo() = {
-        |   let v1 = transferTransactionFromProto(base58'')
-        |   let v2 = groth16Verify(base58'', base58'', base58'')
-        |   let v3 = createMerkleRoot(nil, base58'', 0)
-        |   let v4 = [${(for { s <- sizes; h <- hashes } yield h ++ "256_" ++ s.toString ++ "Kb(base58'')").mkString(", ")}]
-        |   let v5 = [${(for { s <- sizes } yield "sigVerify_" ++ s.toString ++ "Kb(base58'', base58'', base58'')").mkString(", ")}]
-        |   let v6 = [${(for { s <- sizes } yield "rsaVerify_" ++ s.toString ++ "Kb(SHA256, base58'', base58'', base58'')").mkString(", ")}]
-        |   let v7 = [${(for { s <- 1 to 15 } yield "groth16Verify_" ++ s.toString ++ "inputs( base58'', base58'', base58'')").mkString(", ")}]
-        |   let v8 = value(1)
-        |   let v9 = valueOrErrorMessage(1,"")
-        |   let v10 = toUtf8String(base58'')
-        |   let v11 = toInt(base58'', toInt(base58''))
-        |   let v12 = indexOf("", "")
-        |   let v13 = lastIndexOf("", "")
-        |   let v14 = split("", "")
-        |   let v15 = parseInt("")
-        |   let v16 = parseIntValue("")
-        |   let v17 = pow(0,0,0,0,0,UP)
-        |   let v18 = log(0,0,0,0,0,UP)
-        |   let v19 = assetInfo(base58'')
-        |   let v20 = blockInfoByHeight(0)
-        |   let v21 = transferTransactionById(base58'')
-        |   let v22 = toString(Address(base58''))
-        |   let v23 = toBase16String(base58'')
-        |   let v24 = fromBase16String("")
-        |   let v25 = indexOf(["a", "b", "c"], "a")
-        |   let v26 = lastIndexOf(["a", "b", "c"], "a")
-        |   let v27 = containsElement(["a", "b", "c"], "a")
-        |   let v28 = min([1, 2, 3])
-        |   let v29 = max([1, 2, 3])
-        |   let v30 = makeString(["a","b","c"],"|")
-        |   let v31 = ecrecover(base58'aaaa', base58'bbbb')
-        |   nil
-        | }
+         | @Callable(i)
+         | func foo() = {
+         |   let v1 = transferTransactionFromProto(base58'')
+         |   let v2 = groth16Verify(base58'', base58'', base58'')
+         |   let v3 = createMerkleRoot(nil, base58'', 0)
+         |   let v4 = [${(for { s <- sizes; h <- hashes } yield h ++ "256_" ++ s.toString ++ "Kb(base58'')").mkString(", ")}]
+         |   let v5 = [${(for { s <- sizes } yield "sigVerify_" ++ s.toString ++ "Kb(base58'', base58'', base58'')").mkString(", ")}]
+         |   let v6 = [${(for { s <- sizes } yield "rsaVerify_" ++ s.toString ++ "Kb(SHA256, base58'', base58'', base58'')").mkString(", ")}]
+         |   let v7 = [${(for { s <- 1 to 15 } yield "groth16Verify_" ++ s.toString ++ "inputs( base58'', base58'', base58'')").mkString(", ")}]
+         |   let v8 = value(1)
+         |   let v9 = valueOrErrorMessage(1,"")
+         |   let v10 = toUtf8String(base58'')
+         |   let v11 = toInt(base58'', toInt(base58''))
+         |   let v12 = indexOf("", "")
+         |   let v13 = lastIndexOf("", "")
+         |   let v14 = split("", "")
+         |   let v15 = parseInt("")
+         |   let v16 = parseIntValue("")
+         |   let v17 = pow(0,0,0,0,0,UP)
+         |   let v18 = log(0,0,0,0,0,UP)
+         |   let v19 = assetInfo(base58'')
+         |   let v20 = blockInfoByHeight(0)
+         |   let v21 = transferTransactionById(base58'')
+         |   let v22 = toString(Address(base58''))
+         |   let v23 = toBase16String(base58'')
+         |   let v24 = fromBase16String("")
+         |   let v25 = indexOf(["a", "b", "c"], "a")
+         |   let v26 = lastIndexOf(["a", "b", "c"], "a")
+         |   let v27 = containsElement(["a", "b", "c"], "a")
+         |   let v28 = min([1, 2, 3])
+         |   let v29 = max([1, 2, 3])
+         |   let v30 = makeString(["a","b","c"],"|")
+         |   let v31 = ecrecover(base58'aaaa', base58'bbbb')
+         |   nil
+         | }
         """.stripMargin
 
     val parsedExpr = Parser.parseContract(directives ++ script).get.value
@@ -889,19 +889,19 @@ class DecompilerTest extends PropSpec {
       ": UpdateAssetInfoTransaction | InvokeScriptTransaction | DataTransaction | IssueTransaction | TransferTransaction | MassTransferTransaction | Asset | BlockInfo"
 
     def script(t: String) = s"""
-        | func m (v$t) =
-        |   match v {
-        |    case _: UpdateAssetInfoTransaction => nil
-        |    case _: InvokeScriptTransaction => nil
-        |    case _: DataTransaction => nil
-        |    case _: IssueTransaction => nil
-        |    case _: TransferTransaction => nil
-        |    case _: MassTransferTransaction => nil
-        |    case _: Asset => nil
-        |    case _: BlockInfo => nil
-        |    case _ => nil
-        |   }
-        |""".stripMargin
+                               | func m (v$t) =
+                               |   match v {
+                               |    case _: UpdateAssetInfoTransaction => nil
+                               |    case _: InvokeScriptTransaction => nil
+                               |    case _: DataTransaction => nil
+                               |    case _: IssueTransaction => nil
+                               |    case _: TransferTransaction => nil
+                               |    case _: MassTransferTransaction => nil
+                               |    case _: Asset => nil
+                               |    case _: BlockInfo => nil
+                               |    case _ => nil
+                               |   }
+                               |""".stripMargin
 
     val parsedExpr = Parser.parseContract(directives ++ script(types)).get.value
 
@@ -1039,18 +1039,20 @@ class DecompilerTest extends PropSpec {
       s"""
          |let a = -(toBigInt(1))
          |true
-       """
+       """,
+      V5
     )
   }
 
-  ignore("type cast") {
-    assertDecompile(
+  property("type cast") {
+    val script =
       s"""
          |func f() = true
          |func g() = f().as[Boolean]
          |let a    = g().exactAs[Boolean] && f().exactAs[Boolean]
          |a.as[Boolean]
-       """,
+       """
+    val decompiledV5 =
       s"""
          |func f () = true
          |
@@ -1079,7 +1081,40 @@ class DecompilerTest extends PropSpec {
          |    then @
          |    else unit
        """
-    )
+    val decompiledV6 =
+      s"""
+         |func f () = true
+         |
+         |func g () = {
+         |    let @ = f()
+         |    if (_isInstanceOf(@, "Boolean"))
+         |        then @
+         |        else unit
+         |    }
+         |
+         |let a = if ({
+         |    let @ = g()
+         |    if (_isInstanceOf(@, "Boolean"))
+         |        then @
+         |        else throw((_getType(g()) + " couldn't be cast to Boolean"))
+         |    })
+         |    then {
+         |        let @ = f()
+         |        if (_isInstanceOf(@, "Boolean"))
+         |            then @
+         |            else throw((_getType(f()) + " couldn't be cast to Boolean"))
+         |        }
+         |    else false
+         |let @ = a
+         |if (_isInstanceOf(@, "Boolean"))
+         |    then @
+         |    else unit
+       """
+
+    assertDecompile(script, decompiledV5, V5)
+    DirectiveDictionary[StdLibVersion].all
+      .filter(_ >= V6)
+      .foreach(assertDecompile(script, decompiledV6, _))
   }
 
   property("native fold") {
