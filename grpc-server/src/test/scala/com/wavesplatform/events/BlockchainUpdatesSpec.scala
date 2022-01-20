@@ -1,7 +1,5 @@
 package com.wavesplatform.events
 
-import java.nio.file.Files
-import java.util.Map
 import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, KeyPair}
@@ -41,12 +39,13 @@ import monix.eval.Task
 import monix.execution.CancelableFuture
 import monix.execution.Scheduler.Implicits.global
 import org.iq80.leveldb
-import org.iq80.leveldb.{DB, DBIterator, ReadOptions, Snapshot, WriteBatch, WriteOptions}
+import org.iq80.leveldb._
 import org.scalactic.source.Position
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.ScalaFutures
 
-import java.util.concurrent.Semaphore
+import java.nio.file.Files
+import java.util.Map
 import java.util.concurrent.locks.ReentrantLock
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
