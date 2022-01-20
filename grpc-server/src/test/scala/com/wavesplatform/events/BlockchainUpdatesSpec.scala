@@ -40,17 +40,17 @@ import io.grpc.stub.{CallStreamObserver, StreamObserver}
 import monix.eval.Task
 import monix.execution.CancelableFuture
 import monix.execution.Scheduler.Implicits.global
+import monix.reactive.Observable
 import org.iq80.leveldb
 import org.iq80.leveldb.{DB, DBIterator, ReadOptions, Snapshot, WriteBatch, WriteOptions}
 import org.scalactic.source.Position
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.ScalaFutures
 
-import java.util.concurrent.Semaphore
 import java.util.concurrent.locks.ReentrantLock
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
-import scala.util.Random
+import scala.util.{Random, Try}
 
 class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures with PathMockFactory {
   var currentSettings: WavesSettings = domainSettingsWithFS(
@@ -543,7 +543,18 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
     }
 
     "should handle modifying last block correctly" in {
-      val startRead = new ReentrantLock()
+      var i = 0
+      def loader(fromHeight: Int): Observable[Try[Seq[PBBlockchainUpdated]]] =
+        Observable.fromIteratorUnsafe(new Iterator[Try[Seq[PBBlockchainUpdated]]] {
+          override def hasNext: Boolean = {
+            i < 6
+          }
+          override def next(): Try[Seq[PBBlockchainUpdated]] = Try {
+            println(i)
+            i = i + 1
+            Seq(PBBlockchainUpdated(height = i))
+          }
+        })
       withDomainAndRepo(
         { (d, repo) =>
           (1 to 5).foreach(_ => d.appendBlock())
@@ -564,54 +575,54 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
             .result(subscription, 5 seconds)
             .map(_.getUpdate.height) shouldBe (1 to 4)
         },
-        Some(InterferableDB(startRead))
+        Some(loader)
       )
     }
   }
 
-  case class InterferableDB(startRead: ReentrantLock) extends DB {
-    private val db = openDB(Files.createTempDirectory("bc-updates").toString)
+//  case class InterferableDB(startRead: ReentrantLock) extends DB {
+//    private val db = openDB(Files.createTempDirectory("bc-updates").toString)
+//
+//    override def get(key: Array[Byte], options: ReadOptions): Array[Byte] = db.get(key, options)
+//    override def put(key: Array[Byte], value: Array[Byte]): Unit          = db.put(key, value)
+//    override def getSnapshot: Snapshot                                    = db.getSnapshot
+//    override def close(): Unit                                            = db.close()
+//
+//    override def get(key: Array[Byte]): Array[Byte]                                         = ???
+//    override def delete(key: Array[Byte]): Unit                                             = ???
+//    override def write(updates: WriteBatch): Unit                                           = ???
+//    override def createWriteBatch(): WriteBatch                                             = ???
+//    override def put(key: Array[Byte], value: Array[Byte], options: WriteOptions): Snapshot = ???
+//    override def delete(key: Array[Byte], options: WriteOptions): Snapshot                  = ???
+//    override def write(updates: WriteBatch, options: WriteOptions): Snapshot                = ???
+//    override def getApproximateSizes(ranges: leveldb.Range*): Array[Long]                   = ???
+//    override def getProperty(name: String): String                                          = ???
+//    override def suspendCompactions(): Unit                                                 = ???
+//    override def resumeCompactions(): Unit                                                  = ???
+//    override def compactRange(begin: Array[Byte], end: Array[Byte]): Unit                   = ???
+//    override def iterator(): DBIterator                                                     = ???
+//
+//    override def iterator(options: ReadOptions): DBIterator = new DBIterator {
+//      private val iterator = db.iterator()
+//      startRead.lock()
+//
+//      override def next(): Map.Entry[Array[Byte], Array[Byte]] = iterator.next()
+//      override def close(): Unit                               = iterator.close()
+//      override def seek(key: Array[Byte]): Unit                = iterator.seek(key)
+//      override def hasNext: Boolean                            = iterator.hasNext
+//
+//      override def seekToFirst(): Unit                             = ???
+//      override def peekNext(): Map.Entry[Array[Byte], Array[Byte]] = ???
+//      override def hasPrev: Boolean                                = ???
+//      override def prev(): Map.Entry[Array[Byte], Array[Byte]]     = ???
+//      override def peekPrev(): Map.Entry[Array[Byte], Array[Byte]] = ???
+//      override def seekToLast(): Unit                              = ???
+//    }
+//  }
 
-    override def get(key: Array[Byte], options: ReadOptions): Array[Byte] = db.get(key, options)
-    override def put(key: Array[Byte], value: Array[Byte]): Unit          = db.put(key, value)
-    override def getSnapshot: Snapshot                                    = db.getSnapshot
-    override def close(): Unit                                            = db.close()
-
-    override def get(key: Array[Byte]): Array[Byte]                                         = ???
-    override def delete(key: Array[Byte]): Unit                                             = ???
-    override def write(updates: WriteBatch): Unit                                           = ???
-    override def createWriteBatch(): WriteBatch                                             = ???
-    override def put(key: Array[Byte], value: Array[Byte], options: WriteOptions): Snapshot = ???
-    override def delete(key: Array[Byte], options: WriteOptions): Snapshot                  = ???
-    override def write(updates: WriteBatch, options: WriteOptions): Snapshot                = ???
-    override def getApproximateSizes(ranges: leveldb.Range*): Array[Long]                   = ???
-    override def getProperty(name: String): String                                          = ???
-    override def suspendCompactions(): Unit                                                 = ???
-    override def resumeCompactions(): Unit                                                  = ???
-    override def compactRange(begin: Array[Byte], end: Array[Byte]): Unit                   = ???
-    override def iterator(): DBIterator                                                     = ???
-
-    override def iterator(options: ReadOptions): DBIterator = new DBIterator {
-      private val iterator = db.iterator()
-      startRead.lock()
-
-      override def next(): Map.Entry[Array[Byte], Array[Byte]] = iterator.next()
-      override def close(): Unit                               = iterator.close()
-      override def seek(key: Array[Byte]): Unit                = iterator.seek(key)
-      override def hasNext: Boolean                            = iterator.hasNext
-
-      override def seekToFirst(): Unit                             = ???
-      override def peekNext(): Map.Entry[Array[Byte], Array[Byte]] = ???
-      override def hasPrev: Boolean                                = ???
-      override def prev(): Map.Entry[Array[Byte], Array[Byte]]     = ???
-      override def peekPrev(): Map.Entry[Array[Byte], Array[Byte]] = ???
-      override def seekToLast(): Unit                              = ???
-    }
-  }
-
-  def withDomainAndRepo(f: (Domain, Repo) => Unit, dbOpt: Option[DB] = None): Unit = {
+  def withDomainAndRepo(f: (Domain, Repo) => Unit, customLoadBatch: Option[Int => Observable[Try[Seq[PBBlockchainUpdated]]]] = None): Unit = {
     withDomain(currentSettings) { d =>
-      withRepo(d.blocksApi, dbOpt) { repo =>
+      withRepo(d.blocksApi, customLoadBatch) { repo =>
         d.triggers = Seq(repo)
         f(d, repo)
       }
@@ -652,9 +663,9 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
       f: Seq[PBBlockchainUpdated] => Unit
   ): Unit = withGenerateSubscription(request)(d => for (_ <- 1 to count) d.appendBlock())(f)
 
-  def withRepo[T](blocksApi: CommonBlocksApi = stub[CommonBlocksApi], dbOpt: Option[DB] = None)(f: Repo => T): T = {
-    val db   = dbOpt.getOrElse(openDB(Files.createTempDirectory("bc-updates").toString))
-    val repo = new Repo(db, blocksApi)
+  def withRepo[T](blocksApi: CommonBlocksApi = stub[CommonBlocksApi], customLoadBatch: Option[Int => Observable[Try[Seq[PBBlockchainUpdated]]]] = None)(f: Repo => T): T = {
+    val db   = openDB(Files.createTempDirectory("bc-updates").toString)
+    val repo = new Repo(db, blocksApi, customLoadBatch)
     try f(repo)
     finally repo.shutdown()
   }

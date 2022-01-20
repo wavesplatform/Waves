@@ -1,14 +1,13 @@
 package com.wavesplatform.events
 
-import java.nio.{ByteBuffer, ByteOrder}
-
 import cats.syntax.semigroup._
 import com.google.common.primitives.Ints
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.grpc._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.DBExt
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.database.{DBExt, DBResource}
 import com.wavesplatform.events.Repo.keyForHeight
 import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc.BlockchainUpdatesApi
 import com.wavesplatform.events.api.grpc.protobuf._
@@ -25,12 +24,15 @@ import monix.reactive.Observable
 import monix.reactive.subjects.PublishToOneSubject
 import org.iq80.leveldb.DB
 
+import java.nio.{ByteBuffer, ByteOrder}
+import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.Future
-import scala.util.Using
 import scala.util.control.Exception
+import scala.util.{Try, Using}
 
-class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
-    extends BlockchainUpdatesApi
+class Repo(db: DB, blocksApi: CommonBlocksApi, customLoadBatch: Option[Int => Observable[Try[Seq[PBBlockchainUpdated]]]] = None)(
+    implicit s: Scheduler
+) extends BlockchainUpdatesApi
     with BlockchainUpdateTriggers
     with ScorexLogging {
   private[this] val monitor     = new Object
@@ -232,13 +234,10 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
         handlers -= handler
       })
 
-      (new Loader(
-        db,
-        blocksApi,
-        liquidState.map(ls => (ls.keyBlock.height - 1) -> ls.keyBlock.block.header.reference),
-        streamId
-      ).loadUpdates(fromHeight) ++
-        subject.map(_.protobuf))
+      val target = liquidState.map(ls => (ls.keyBlock.height - 1) -> ls.keyBlock.block.header.reference)
+      log.trace(s"[$streamId] Loading stored updates from $fromHeight up to ${target.fold("the most recent one") { case (h, id) => s"$id at $h" }}")
+
+      (new Loader(customLoadBatch.getOrElse(loadBatch(target))).loadUpdates(fromHeight) ++ subject.map(_.protobuf))
         .takeWhile(u => toHeight == 0 || u.height <= toHeight)
         .doOnComplete(removeHandler)
         .doOnError(t => Task(log.error(s"[$streamId] Subscriber error", t)).flatMap(_ => removeHandler))
@@ -246,6 +245,9 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
         .doOnSubscriptionCancel(removeHandler)
     }
   }
+
+  private def loadBatch(target: Option[(Int, ByteStr)])(fromHeight: Int): Observable[Try[Seq[PBBlockchainUpdated]]] =
+    db.resourceObservable.map(res => Repo.loadBatch(fromHeight, target, blocksApi, res))
 
   override def subscribe(request: SubscribeRequest, responseObserver: StreamObserver[SubscribeEvent]): Unit = {
     responseObserver.interceptErrors(
@@ -258,4 +260,23 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
 
 object Repo {
   def keyForHeight(height: Int): Array[Byte] = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN).putInt(height).array()
+
+  def loadBatch(fromHeight: Int, target: Option[(Int, ByteStr)], blocksApi: CommonBlocksApi, res: DBResource): Try[Seq[PBBlockchainUpdated]] =
+    Try {
+      res.iterator.seek(Ints.toByteArray(fromHeight))
+      val buffer = ArrayBuffer[PBBlockchainUpdated]()
+
+      while (res.iterator.hasNext && buffer.size < 100 && target.forall { case (h, _) => fromHeight + buffer.size <= h }) {
+        buffer.append(Loader.parseUpdate(res.iterator.next().getValue, blocksApi, fromHeight + buffer.size))
+      }
+
+      for ((h, id) <- target if h == fromHeight + buffer.size - 1; u <- buffer.lastOption) {
+        require(
+          u.id.toByteArray.sameElements(id.arr),
+          s"Stored update ${Base58.encode(u.id.toByteArray)} at ${u.height} does not match target $id at $h"
+        )
+      }
+
+      buffer.toSeq
+    }
 }
