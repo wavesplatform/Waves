@@ -73,9 +73,8 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.putIfNew(tx, forceValidate = true).resultE should produce("negative asset balance")
     utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
 
-    utx.addAndCleanup(Nil)
-    Thread.sleep(5000)
-    utx.size shouldBe 1
+    utx.cleanUnconfirmed()
+    utx.all shouldBe Seq(tx)
 
     utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
     intercept[RuntimeException](d.appendBlock(tx))
@@ -128,10 +127,9 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.putIfNew(tx, forceValidate = false).resultE should produce("reached err")
     utx.putIfNew(tx, forceValidate = true).resultE should produce("reached err")
 
-    utx.addAndCleanup(Seq(tx))
-    eventually {
-      utx.size shouldBe 0
-    }
+    utx.addTransaction(tx, verify = false)
+    utx.cleanUnconfirmed()
+    utx.all shouldBe Nil
   }
 
   it should s"accept failed Invoke with asset script with complexity > ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
