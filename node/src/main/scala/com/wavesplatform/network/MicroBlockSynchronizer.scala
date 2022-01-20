@@ -122,7 +122,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
     val observable = microblockResponses.observeOn(scheduler).flatMap {
       case (ch, MicroBlockResponse(mb, totalRef)) =>
         successfullyReceived.put(totalRef, dummy)
-        BlockStats.received(mb, ch)
+        BlockStats.received(mb, ch, totalRef)
         Option(awaiting.getIfPresent(totalRef)) match {
           case None =>
             log.trace(s"${id(ch)} Got unexpected ${mb.stringRepr(totalRef)}")
