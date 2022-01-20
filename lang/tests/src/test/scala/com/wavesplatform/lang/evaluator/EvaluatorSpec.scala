@@ -18,29 +18,48 @@ import org.scalatest.exceptions.TestFailedException
 abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
   val lastVersion: StdLibVersion = DirectiveDictionary[StdLibVersion].all.last
 
-  def eval(code: String)(implicit startVersion: StdLibVersion = V1, checkNext: Boolean = true): Either[String, EVALUATED] =
-    eval(code, startVersion, if (checkNext) lastVersion else startVersion)
+  def eval(
+      code: String
+  )(implicit startVersion: StdLibVersion = V1, checkNext: Boolean = true, checkOldPowVersion: Boolean = false): Either[String, EVALUATED] =
+    evalVerRange(code, startVersion, if (checkNext) lastVersion else startVersion, checkOldPowVersion)
 
-  def eval(code: String, startVersion: StdLibVersion, endVersion: StdLibVersion): Either[String, EVALUATED] =
-    eval(compile(code, _), startVersion, endVersion).map(_._1)
+  def evalVerRange(
+      code: String,
+      startVersion: StdLibVersion,
+      endVersion: StdLibVersion,
+      checkOldPowVersion: Boolean = false
+  ): Either[String, EVALUATED] =
+    evalInternal(compile(code, _), startVersion, endVersion, checkOldPowVersion).map(_._1)
 
-  def eval(expr: EXPR, startVersion: StdLibVersion, endVersion: StdLibVersion): Either[String, EVALUATED] =
-    eval(_ => Right(expr), startVersion, endVersion).map(_._1)
+  def evalExpr(expr: EXPR, startVersion: StdLibVersion, endVersion: StdLibVersion, checkOldPowVersion: Boolean = false): Either[String, EVALUATED] =
+    evalInternal(_ => Right(expr), startVersion, endVersion, checkOldPowVersion).map(_._1)
 
   def evalWithCost(code: String)(implicit startVersion: StdLibVersion = V1): (EVALUATED, Int) = {
-    val (result, unused) = eval(compile(code, _), startVersion, lastVersion).explicitGet()
+    val (result, unused) = evalInternal(compile(code, _), startVersion, lastVersion, checkOldPowVersion = false).explicitGet()
     (result, Int.MaxValue - unused)
   }
 
-  private def eval[A](
+  private def evalInternal[A](
       toExpr: StdLibVersion => Either[String, EXPR],
       startVersion: StdLibVersion,
-      endVersion: StdLibVersion
+      endVersion: StdLibVersion,
+      checkOldPowVersion: Boolean
   ): Either[String, (EVALUATED, Int)] = {
+    def doEval(
+        toExpr: StdLibVersion => Either[String, EXPR],
+        version: StdLibVersion,
+        useNewPowPrecision: Boolean
+    ): Either[String, (EVALUATED, Int)] =
+      for {
+        compiled <- toExpr(version)
+        (_, cost, result) = evalExpr(compiled, version, useNewPowPrecision)
+        evaluated <- result
+      } yield (evaluated, cost)
+
     val results = (for {
       version            <- DirectiveDictionary[StdLibVersion].all if version.id >= startVersion.id && version.id <= endVersion.id
-      useNewPowPrecision <- Seq(false, true)
-      result = eval(toExpr, version, useNewPowPrecision)
+      useNewPowPrecision <- if (checkOldPowVersion) Seq(false, true) else Seq(true)
+      result = doEval(toExpr, version, useNewPowPrecision)
     } yield ((version, useNewPowPrecision), result)).toSeq.sortBy(_._1)
 
     val evaluatedResults = results.map { case (_, resultEi) => resultEi }
@@ -50,17 +69,6 @@ abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
     else
       throw new TestFailedException(s"Evaluation results are not the same: $results", 0)
   }
-
-  private def eval[A](
-      toExpr: StdLibVersion => Either[String, EXPR],
-      version: StdLibVersion,
-      useNewPowPrecision: Boolean
-  ): Either[String, (EVALUATED, Int)] =
-    for {
-      compiled <- toExpr(version)
-      (_, cost, result) = evalExpr(compiled, version, useNewPowPrecision)
-      evaluated <- result
-    } yield (evaluated, cost)
 
   private def evalExpr(expr: EXPR, version: StdLibVersion, useNewPowPrecision: Boolean): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
     val ctx     = lazyContextsAll(DirectiveSet(version, Account, Expression).explicitGet() -> useNewPowPrecision).value()
