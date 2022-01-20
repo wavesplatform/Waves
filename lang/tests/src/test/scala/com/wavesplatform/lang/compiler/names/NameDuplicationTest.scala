@@ -1,32 +1,12 @@
 package com.wavesplatform.lang.compiler.names
 
-import cats.kernel.Monoid
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.compiler.compilerContext
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
-import com.wavesplatform.lang.v1.compiler
-import com.wavesplatform.lang.v1.compiler.CompilerContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.test._
+import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.test.*
 import org.scalacheck.Gen
 
 class NameDuplicationTest extends FreeSpec {
-
-  val ctx: CompilerContext =
-    Monoid.combine(
-      compilerContext,
-      WavesContext
-        .build(
-          Global,
-          DirectiveSet(V3, Account, DAppType).explicitGet()
-        )
-        .compilerContext
-    )
-
   "Contract compilation" - {
 
     "should succeed when" - {
@@ -220,9 +200,5 @@ class NameDuplicationTest extends FreeSpec {
 
   }
 
-  def compileOf(script: String): Either[String, DApp] = {
-    val expr = Parser.parseContract(script.stripMargin).get.value
-    compiler.ContractCompiler(ctx, expr, V3)
-  }
-
+  def compileOf(script: String): Either[String, DApp] = TestCompiler(V3).compile(script.stripMargin)
 }

@@ -22,6 +22,7 @@ import com.wavesplatform.history.{randomSig, settingsWithFeatures, DefaultWavesS
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.StdLibVersion.V6
+import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, TestCompiler}
@@ -325,18 +326,15 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       (utx, time, tx1, tx2)
     }
 
-  private val expr: EXPR = {
-    val code =
-      """let x = 1
-        |let y = 2
-        |true""".stripMargin
-    ExpressionCompiler.compileBoolean(code, CompilerContext.empty).explicitGet()
-  }
-
-  private val script: Script = ExprScript(expr).explicitGet()
-
   private def preconditionBlocks(lastBlockId: ByteStr, master: KeyPair, time: Time): Seq[Block] = {
-    val ts        = time.getTimestamp()
+    val ts = time.getTimestamp()
+    val script = TestCompiler(V3).compileExpression(
+      """
+        |let x = 1
+        |let y = 2
+        |true
+      """.stripMargin
+    )
     val setScript = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), 100000L, ts + 1).explicitGet()
     Seq(TestBlock.create(ts + 1, lastBlockId, Seq(setScript)))
   }

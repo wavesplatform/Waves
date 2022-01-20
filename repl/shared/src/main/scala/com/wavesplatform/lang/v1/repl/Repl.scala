@@ -1,10 +1,11 @@
 package com.wavesplatform.lang.v1.repl
 
+import cats.arrow.FunctionK
+import cats.implicits.*
 import scala.concurrent.Future
 
 import cats.{Functor, Id, Monoid}
-import cats.arrow.FunctionK
-import cats.implicits.*
+import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.repl.node.ErrorMessageEnvironment
@@ -17,7 +18,7 @@ case class Repl(
     settings: Option[NodeConnectionSettings] = None,
     libraries: List[String] = Nil,
     lastContext: (CompilerContext, EvaluationContext[Environment, Future]) =
-      (CompilerContext.empty, Monoid[EvaluationContext[Environment, Future]].empty)
+      (CTX.empty.compilerContext, Monoid[EvaluationContext[Environment, Future]].empty)
 ) {
   private val environment = buildEnvironment(settings)
   private val initialState = state(
