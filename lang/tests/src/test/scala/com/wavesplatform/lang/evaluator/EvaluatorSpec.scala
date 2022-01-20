@@ -2,19 +2,16 @@ package com.wavesplatform.lang.evaluator
 
 import cats.Id
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.{Common, ExecutionError}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.utils.{lazyContexts, lazyContextsAll}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, Log}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.{Common, ExecutionError}
-import com.wavesplatform.lang.v1.CTX
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.test.PropSpec
-import monix.eval.Coeval
 import org.scalatest.Inside
 import org.scalatest.exceptions.TestFailedException
 
