@@ -87,7 +87,7 @@ package object utils {
   }
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] =
-    lazyContextsAll.collect { case ((ds, _), ctx) => ds -> ctx }
+    lazyContextsAll.collect { case ((ds, true), ctx) => ds -> ctx }
 
   private val lazyFunctionCosts: Map[DirectiveSet, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
     lazyContexts.map(el => (el._1, el._2.map(ctx => estimate(el._1.stdLibVersion, ctx.evaluationContext[Id](environment)))))
