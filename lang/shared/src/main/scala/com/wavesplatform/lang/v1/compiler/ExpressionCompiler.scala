@@ -628,7 +628,7 @@ object ExpressionCompiler {
       name        <- handlePart(namePart)
       handledType <- handleCompositeType(p, rawType, None, None)
       handledExpr <- compileExprWithCtx(e, saveExprContext, allowIllFormedStrings)
-    } yield TypeCast(p, name, handledExpr, handledType)
+    } yield TypeCast(p, name, handledExpr, handledType, ctx.provideRuntimeTypeOnCastError)
 
   private def compileRef(p: Pos, keyPart: PART[String], saveExprContext: Boolean): CompileM[CompilationStepResultExpr] =
     for {
