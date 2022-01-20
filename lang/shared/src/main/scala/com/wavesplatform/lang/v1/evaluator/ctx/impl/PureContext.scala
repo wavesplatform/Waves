@@ -1950,7 +1950,8 @@ object PureContext {
         lastIndexOfWithOffset,
         splitStr,
         sizeString,
-        fraction(fixLimitCheck = false)
+        fraction(fixLimitCheck = false),
+        makeString
       )
 
   private def v4FunctionsFixed =
