@@ -306,9 +306,10 @@ object Importer extends ScorexLogging {
     if (importOptions.dryRun) {
       def readNextBlock(): Future[Option[Block]] = Future.successful(None)
       readNextBlock().flatMap {
-        case None => Future.successful(())
-        case Some(block) =>
+        case None =>
+          Future.successful(())
 
+        case Some(_) =>
           readNextBlock()
       }
     }
@@ -317,7 +318,7 @@ object Importer extends ScorexLogging {
       quit = true
       Await.result(actorSystem.terminate(), 10.second)
       lock.synchronized {
-        if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) {
+        if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG) && blockchainUpdater.liquidBlockMeta.nonEmpty) {
           // Force store liquid block in leveldb
           val lastHeader = blockchainUpdater.lastBlockHeader.get.header
           val pseudoBlock = Block(

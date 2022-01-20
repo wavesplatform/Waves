@@ -40,11 +40,11 @@ class MakeStringTest extends EvaluatorSpec {
         CONST_STRING(",").explicitGet()
       )
     )
-    
-    eval(script(FunctionIds.MAKESTRING), V5, V5) shouldBe Right(CONST_STRING("test,123,true,").explicitGet())
-    eval(script(FunctionIds.MAKESTRING), V6, V6) should produce("makeString only accepts strings")
-    eval(script(FunctionIds.MAKESTRING1C), V6, V6) should produce("makeString only accepts strings")
-    eval(script(FunctionIds.MAKESTRING2C), V6, V6) should produce("makeString only accepts strings")
+
+    evalExpr(script(FunctionIds.MAKESTRING), V4, V5, checkOldPowVersion = true) shouldBe Right(CONST_STRING("test,123,true,").explicitGet())
+    evalExpr(script(FunctionIds.MAKESTRING), V6, V6) should produce("makeString only accepts strings")
+    evalExpr(script(FunctionIds.MAKESTRING1C), V6, V6) should produce("makeString only accepts strings")
+    evalExpr(script(FunctionIds.MAKESTRING2C), V6, V6) should produce("makeString only accepts strings")
   }
 
   property("makeString limit") {

@@ -47,12 +47,12 @@ package object utils {
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-    override def tthis: Environment.Tthis                                                                        = Coproduct(Recipient.Address(ByteStr.empty))
-    override def multiPaymentAllowed: Boolean                                                                    = true
-    override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
-    override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
-    override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]                               = ???
-    override def accountScript(addressOrAlias: Recipient): Option[Script]                                        = ???
+    override def tthis: Environment.Tthis                                              = Coproduct(Recipient.Address(ByteStr.empty))
+    override def multiPaymentAllowed: Boolean                                          = true
+    override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]     = ???
+    override def addressFromString(address: String): Either[String, Recipient.Address] = ???
+    override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]     = ???
+    override def accountScript(addressOrAlias: Recipient): Option[Script]              = ???
     override def callScript(
         dApp: Address,
         func: String,
@@ -63,30 +63,31 @@ package object utils {
     ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
   }
 
-  val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {
+  val lazyContextsAll: Map[(DirectiveSet, Boolean), Coeval[CTX[Environment]]] = {
     val directives = for {
-      version    <- DirectiveDictionary[StdLibVersion].all
-      cType      <- DirectiveDictionary[ContentType].all
-      scriptType <- DirectiveDictionary[ScriptType].all
-    } yield DirectiveSet(version, scriptType, cType)
-    directives
-      .filter(_.isRight)
-      .map(_.explicitGet())
-      .map(ds => {
-        val version = ds.stdLibVersion
-        val ctx = Coeval.evalOnce(
-          Monoid.combineAll(
-            Seq(
-              PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment],
-              CryptoContext.build(Global, version).withEnvironment[Environment],
-              WavesContext.build(Global, ds)
-            )
+      version            <- DirectiveDictionary[StdLibVersion].all
+      cType              <- DirectiveDictionary[ContentType].all
+      scriptType         <- DirectiveDictionary[ScriptType].all
+      useNewPowPrecision <- Seq(false, true)
+    } yield (DirectiveSet(version, scriptType, cType), useNewPowPrecision)
+
+    directives.collect { case (Right(ds), useNewPowPrecision) =>
+      val version = ds.stdLibVersion
+      val ctx = Coeval.evalOnce(
+        Monoid.combineAll(
+          Seq(
+            PureContext.build(version, useNewPowPrecision).withEnvironment[Environment],
+            CryptoContext.build(Global, version).withEnvironment[Environment],
+            WavesContext.build(Global, ds)
           )
         )
-        ds -> ctx
-      })
-      .toMap
+      )
+      (ds, useNewPowPrecision) -> ctx
+    }.toMap
   }
+
+  val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] =
+    lazyContextsAll.collect { case ((ds, true), ctx) => ds -> ctx }
 
   private val lazyFunctionCosts: Map[DirectiveSet, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
     lazyContexts.map(el => (el._1, el._2.map(ctx => estimate(el._1.stdLibVersion, ctx.evaluationContext[Id](environment)))))
@@ -106,26 +107,32 @@ package object utils {
     }
 
   private val combinedContext: Map[(StdLibVersion, ContentType), CTX[Environment]] =
-    lazyContexts.groupBy { case (ds, _) =>
-      (ds.stdLibVersion, ds.contentType)
-    }.view
+    lazyContexts
+      .groupBy { case (ds, _) =>
+        (ds.stdLibVersion, ds.contentType)
+      }
+      .view
       .mapValues(
         _.toList
           .map(_._2)
           .sequence
           .map(Monoid.combineAll[CTX[Environment]])()
-      ).toMap
+      )
+      .toMap
 
   private val combinedFunctionCosts: Map[(StdLibVersion, ContentType), Map[FunctionHeader, Coeval[Long]]] =
-    lazyFunctionCosts.groupBy { case (ds, _) =>
-      (ds.stdLibVersion, ds.contentType)
-    }.view
+    lazyFunctionCosts
+      .groupBy { case (ds, _) =>
+        (ds.stdLibVersion, ds.contentType)
+      }
+      .view
       .mapValues(
         _.toList
           .map(_._2)
           .sequence
           .map(_.foldLeft(Map.empty[FunctionHeader, Coeval[Long]])(_ ++ _))()
-      ).toMap
+      )
+      .toMap
 
   def functionCosts(
       version: StdLibVersion,
@@ -140,7 +147,6 @@ package object utils {
       combinedFunctionCosts(DirectiveSet(version, scriptType, contentType).explicitGet())
     else
       functionCosts(DirectiveSet(version, scriptType, contentType).explicitGet())
-
 
   def functionCosts(ds: DirectiveSet): Map[FunctionHeader, Coeval[Long]] =
     lazyFunctionCosts(ds)()
