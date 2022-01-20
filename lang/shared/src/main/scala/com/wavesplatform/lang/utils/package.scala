@@ -63,12 +63,12 @@ package object utils {
     ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
   }
 
-  val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {
+  val lazyContextsAll: Seq[((DirectiveSet, Boolean), Coeval[CTX[Environment]])] = {
     val directives = for {
       version            <- DirectiveDictionary[StdLibVersion].all
       cType              <- DirectiveDictionary[ContentType].all
       scriptType         <- DirectiveDictionary[ScriptType].all
-      useNewPowPrecision <- Seq(true, false)
+      useNewPowPrecision <- Seq(false, true)
     } yield (DirectiveSet(version, scriptType, cType), useNewPowPrecision)
 
     directives.collect { case (Right(ds), useNewPowPrecision) =>
@@ -82,9 +82,12 @@ package object utils {
           )
         )
       )
-      ds -> ctx
-    }.toMap
+      (ds, useNewPowPrecision) -> ctx
+    }.toList
   }
+
+  val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] =
+    lazyContextsAll.collect { case ((ds, _), ctx) => ds -> ctx }.toMap
 
   private val lazyFunctionCosts: Map[DirectiveSet, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
     lazyContexts.map(el => (el._1, el._2.map(ctx => estimate(el._1.stdLibVersion, ctx.evaluationContext[Id](environment)))))
