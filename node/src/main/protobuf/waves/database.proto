@@ -45,9 +45,13 @@ message EthereumTransactionMeta {
         bytes public_key_hash = 1;
         Amount amount = 2;
     }
+    message InvokeExpression {
+        bytes expression = 1;
+    }
     oneof payload {
         Invocation invocation = 1;
         Transfer transfer = 2;
+        InvokeExpression invoke_expression = 3;
     }
 }
 

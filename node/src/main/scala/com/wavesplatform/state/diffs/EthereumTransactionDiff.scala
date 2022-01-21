@@ -44,6 +44,21 @@ object EthereumTransactionDiff {
             )
           )
         )
+
+      case ei: EthereumTransaction.InvokeExpression =>
+        for {
+          invocation <- ei.toInvokeExpressionLike(e)
+        } yield Diff(
+          ethereumTransactionMeta = Map(
+            e.id() -> EthereumTransactionMeta(
+              EthereumTransactionMeta.Payload.InvokeExpression(
+                EthereumTransactionMeta.InvokeExpression(
+                  ByteString.copyFrom(invocation.expression.bytes().arr)
+                )
+              )
+            )
+          )
+        )
     }
     resultEi.getOrElse(Diff.empty)
   }
@@ -64,6 +79,12 @@ object EthereumTransactionDiff {
           paymentsDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, invocation, verify = true, Diff(), Int.MaxValue)
           diff         <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(invocation)
         } yield paymentsDiff |+| diff
+
+      case ei: EthereumTransaction.InvokeExpression =>
+        for {
+          invocation <- TracedResult(ei.toInvokeExpressionLike(e))
+          diff       <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(invocation)
+        } yield diff
     }
 
     baseDiff.map(_ |+| this.meta(blockchain)(e))

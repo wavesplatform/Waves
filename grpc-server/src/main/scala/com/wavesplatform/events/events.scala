@@ -456,6 +456,9 @@ object StateUpdate {
                 for {
                   invoke <- inv.toInvokeScriptLike(et, blockchain).toOption
                 } yield EthereumMetadata(et.senderAddress().toByteString, EthereumMetadata.Action.Invoke(invokeScriptLikeToMetadata(invoke)))
+
+              case _: EthereumTransaction.InvokeExpression =>
+                ???
             }
             metadataOpt
               .map(TransactionMetadata.Metadata.Ethereum)

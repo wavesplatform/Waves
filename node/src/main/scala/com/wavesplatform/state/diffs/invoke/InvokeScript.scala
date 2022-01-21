@@ -1,8 +1,9 @@
 package com.wavesplatform.state.diffs.invoke
 
-import com.wavesplatform.account._
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -20,6 +21,10 @@ trait InvokeScriptLike {
 }
 
 trait InvokeScriptTransactionLike extends TransactionBase with InvokeScriptLike with Authorized
+
+trait InvokeExpressionTransactionLike extends InvokeScriptTransactionLike {
+  val expression: ExprScript
+}
 
 object InvokeScriptLike {
   implicit class ISLExt(val isl: InvokeScriptLike) extends AnyVal {

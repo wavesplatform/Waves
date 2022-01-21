@@ -1,22 +1,21 @@
 package com.wavesplatform.transaction
 
-import java.math.BigInteger
-
-import scala.reflect.ClassTag
-
 import cats.syntax.either.*
+import com.esaulpaugh.headlong.util.FastHex
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.ScriptReader
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
+import com.wavesplatform.state.diffs.invoke.{InvokeExpressionTransactionLike, InvokeScriptTransactionLike}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.serialization.impl.BaseTxJson
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, InvokeTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.validation.{TxConstraints, TxValidator, ValidatedV}
 import com.wavesplatform.utils.EthEncoding
@@ -29,6 +28,10 @@ import org.web3j.crypto.Sign.SignatureData
 import org.web3j.utils.Convert
 import play.api.libs.json.*
 
+import java.math.BigInteger
+import scala.reflect.ClassTag
+import scala.util.Try
+
 final case class EthereumTransaction(
     payload: EthereumTransaction.Payload,
     underlying: RawTransaction,
@@ -38,7 +41,7 @@ final case class EthereumTransaction(
     with Authorized
     with VersionedTransaction.ConstV1
     with PBSince.V1 { self =>
-  import EthereumTransaction._
+  import EthereumTransaction.*
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(encodeTransaction(underlying, signatureData))
 
@@ -113,7 +116,8 @@ object EthereumTransaction {
   case class Invocation(dApp: Address, hexCallData: String) extends Payload {
     def toInvokeScriptLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, InvokeScriptTransactionLike] =
       blockchain.accountScript(dApp).toRight(GenericError(s"No script at address $dApp")).flatMap { scriptInfo =>
-        ABIConverter(scriptInfo.script).decodeFunctionCall(hexCallData)
+        ABIConverter(scriptInfo.script)
+          .decodeFunctionCall(hexCallData)
           .leftMap(GenericError(_))
           .map { case (extractedCall, extractedPayments) =>
             new InvokeScriptTransactionLike {
@@ -130,6 +134,30 @@ object EthereumTransaction {
               override val tpe: TransactionType                           = TransactionType.InvokeScript
             }
           }
+      }
+  }
+
+  case class InvokeExpression(expressionHex: String) extends Payload {
+    def toInvokeExpressionLike(tx: EthereumTransaction): Either[ValidationError, InvokeExpressionTransactionLike] =
+      for {
+        expressionBytes <- Try(FastHex.decode(expressionHex)).toEither.leftMap(e => GenericError(Option(e.getMessage).getOrElse("Hex decode error")))
+        script          <- ScriptReader.fromBytes(expressionBytes).leftMap(e => GenericError(e.m))
+        exprScript <- script match {
+          case expr: ExprScript => Right(expr)
+          case other            => Left(GenericError(s"Unexpected script $other for InvokeExpression"))
+        }
+      } yield new InvokeExpressionTransactionLike {
+        override val expression: ExprScript                         = exprScript
+        override def dApp: AddressOrAlias                           = sender.toAddress
+        override def funcCall: Terms.FUNCTION_CALL                  = InvokeTransaction.DefaultCall
+        override def payments: Seq[InvokeScriptTransaction.Payment] = Nil
+        override def root: InvokeScriptTransactionLike              = this
+        override val sender: PublicKey                              = tx.signerPublicKey()
+        override def assetFee: (Asset, TxTimestamp)                 = tx.assetFee
+        override def timestamp: TxTimestamp                         = tx.timestamp
+        override def chainId: TxVersion                             = tx.chainId
+        override def id: Coeval[ByteStr]                            = tx.id
+        override val tpe: TransactionType                           = TransactionType.InvokeExpression
       }
   }
 
@@ -150,7 +178,8 @@ object EthereumTransaction {
       tx.payload match {
         case Transfer(tokenAddress, amount, _) =>
           TxConstraints.positiveAmount(amount, tokenAddress.fold("waves")(erc20 => EthEncoding.toHexString(erc20.arr)))
-        case Invocation(_, _) => TxConstraints.seq(tx)()
+        case _: Invocation | _: InvokeExpression =>
+          TxConstraints.seq(tx)()
       }
     )
   }
@@ -183,9 +212,8 @@ object EthereumTransaction {
   val ERC20TransferPrefix: String = "a9059cbb"
 
   def extractPayload(underlying: RawTransaction, chainId: Byte): Payload = {
-    val hexData               = EthEncoding.cleanHexPrefix(underlying.getData)
-    val recipientBytes        = ByteStr(EthEncoding.toBytes(underlying.getTo))
-    lazy val recipientAddress = Address(recipientBytes.arr, chainId)
+    val hexData        = EthEncoding.cleanHexPrefix(underlying.getData)
+    val recipientBytes = EthEncoding.toBytes(underlying.getTo)
 
     hexData match {
       // Waves transfer
@@ -194,7 +222,7 @@ object EthereumTransaction {
         Transfer(
           None,
           amount.bigInteger.longValueExact(),
-          recipientAddress
+          Address(recipientBytes, chainId)
         )
 
       // Asset transfer
@@ -202,14 +230,17 @@ object EthereumTransaction {
         val recipient = decode[EthAddress](transferCall, 8)
         val amount    = decode[Uint256](transferCall, 72)
         Transfer(
-          Some(ERC20Address(recipientBytes)),
+          Some(ERC20Address(ByteStr(recipientBytes))),
           amount.getValue.longValueExact(),
           Address(EthEncoding.toBytes(recipient.toString), chainId)
         )
 
       // Script invocation
-      case customCall =>
-        Invocation(recipientAddress, customCall)
+      case hexCallData if recipientBytes.nonEmpty =>
+        Invocation(Address(recipientBytes, chainId), hexCallData)
+
+      case expression =>
+        InvokeExpression(expression)
     }
   }
 

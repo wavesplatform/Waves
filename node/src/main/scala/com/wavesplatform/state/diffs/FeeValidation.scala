@@ -23,13 +23,17 @@ object FeeValidation {
   val NFTMultiplier     = 0.001
   val BlockV5Multiplier = 0.001
 
+  private val TransferFee         = 1
+  private val InvokeScriptFee     = 5
+  private val InvokeExpressionFee = 10
+
   val FeeConstants: Map[TransactionType.TransactionType, Long] = Map(
     TransactionType.Genesis          -> 0,
     TransactionType.Payment          -> 1,
     TransactionType.Issue            -> 1000,
     TransactionType.Reissue          -> 1000,
     TransactionType.Burn             -> 1,
-    TransactionType.Transfer         -> 1,
+    TransactionType.Transfer         -> TransferFee,
     TransactionType.MassTransfer     -> 1,
     TransactionType.Lease            -> 1,
     TransactionType.LeaseCancel      -> 1,
@@ -39,10 +43,10 @@ object FeeValidation {
     TransactionType.SetScript        -> 10,
     TransactionType.SponsorFee       -> 1000,
     TransactionType.SetAssetScript   -> (1000 - 4),
-    TransactionType.InvokeScript     -> 5,
+    TransactionType.InvokeScript     -> InvokeScriptFee,
     TransactionType.UpdateAssetInfo  -> 1,
     TransactionType.Ethereum         -> 1,
-    TransactionType.InvokeExpression -> 10
+    TransactionType.InvokeExpression -> InvokeExpressionFee
   )
 
   def apply(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] = {
@@ -97,8 +101,9 @@ object FeeValidation {
             (baseFee * multiplier).toLong
           case et: EthereumTransaction =>
             et.payload match {
-              case _: EthereumTransaction.Transfer   => 1
-              case _: EthereumTransaction.Invocation => 5
+              case _: EthereumTransaction.Transfer         => TransferFee
+              case _: EthereumTransaction.Invocation       => InvokeScriptFee
+              case _: EthereumTransaction.InvokeExpression => InvokeExpressionFee
             }
           case _ => baseFee
         }
