@@ -1,23 +1,21 @@
 package com.wavesplatform.mining
 
 import java.time.LocalTime
-
-
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.Block._
+import com.wavesplatform.block.Block.*
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.metrics.{BlockStats, Instrumented, _}
+import com.wavesplatform.metrics.{BlockStats, Instrumented, *}
 import com.wavesplatform.mining.microblocks.MicroBlockMiner
-import com.wavesplatform.network._
+import com.wavesplatform.network.*
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool.PackStrategy
 import com.wavesplatform.utx.UtxPoolImpl
@@ -29,7 +27,7 @@ import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 trait Miner {
   def scheduleMining(blockchain: Option[Blockchain] = None): Unit
@@ -88,6 +86,22 @@ class MinerImpl(
   def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] =
     this.nextBlockGenOffsetWithConditions(account, blockchainUpdater)
 
+  def scheduleMining(tempBlockchain: Option[Blockchain]): Unit = {
+    Miner.blockMiningStarted.increment()
+
+    val hasAllowedForMiningScriptsAccounts = wallet.privateKeyAccounts.filter(kp => hasAllowedForMiningScript(kp, tempBlockchain.getOrElse(blockchainUpdater)))
+    scheduledAttempts := CompositeCancelable.fromSet(hasAllowedForMiningScriptsAccounts.map { account =>
+      generateBlockTask(account, tempBlockchain)
+        .onErrorHandle(err => log.warn(s"Error mining Block", err))
+        .runAsyncLogErr(appenderScheduler)
+    }.toSet)
+    microBlockAttempt := SerialCancelable()
+
+    debugStateRef = MinerDebugInfo.MiningBlocks
+  }
+
+  override def state: MinerDebugInfo.State = debugStateRef
+
   private def checkAge(parentHeight: Int, parentTimestamp: Long): Either[String, Unit] =
     Either
       .cond(parentHeight == 1, (), (timeService.correctedTime() - parentTimestamp).millis)
@@ -101,9 +115,12 @@ class MinerImpl(
           )
       )
 
+  private def hasAllowedForMiningScript(account: KeyPair, blockchain: Blockchain): Boolean =
+    blockchain.isFeatureActivated(BlockchainFeatures.RideV6) || !blockchain.hasAccountScript(account.toAddress)
+
   private def checkScript(blockchain: Blockchain, account: KeyPair): Either[String, Unit] = {
     Either.cond(
-      !blockchain.hasAccountScript(account.toAddress),
+      hasAllowedForMiningScript(account, blockchain),
       (),
       s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks"
     )
@@ -297,20 +314,6 @@ class MinerImpl(
     }
   }
 
-  def scheduleMining(tempBlockchain: Option[Blockchain]): Unit = {
-    Miner.blockMiningStarted.increment()
-
-    val nonScriptedAccounts = wallet.privateKeyAccounts.filterNot(kp => tempBlockchain.getOrElse(blockchainUpdater).hasAccountScript(kp.toAddress))
-    scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map { account =>
-      generateBlockTask(account, tempBlockchain)
-        .onErrorHandle(err => log.warn(s"Error mining Block", err))
-        .runAsyncLogErr(appenderScheduler)
-    }.toSet)
-    microBlockAttempt := SerialCancelable()
-
-    debugStateRef = MinerDebugInfo.MiningBlocks
-  }
-
   private[this] def startMicroBlockMining(
       account: KeyPair,
       lastBlock: Block,
@@ -322,8 +325,6 @@ class MinerImpl(
       .runAsyncLogErr(minerScheduler)
     log.trace(s"MicroBlock mining scheduled for acc=${account.toAddress}")
   }
-
-  override def state: MinerDebugInfo.State = debugStateRef
 
   //noinspection TypeAnnotation,ScalaStyle
   private[this] object metrics {
