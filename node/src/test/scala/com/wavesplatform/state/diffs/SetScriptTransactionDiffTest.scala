@@ -39,12 +39,13 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
   )
 
   val preconditionsAndSetScript: Gen[(GenesisTransaction, SetScriptTransaction)] = for {
+    version <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
     master <- accountGen
     ts     <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
     fee    <- smallFeeGen
     script <- Gen.option(scriptGen)
-  } yield (genesis, SetScriptTransaction.selfSigned(1.toByte, master, script, fee, ts).explicitGet())
+  } yield (genesis, SetScriptTransaction.selfSigned(version, master, script, fee, ts).explicitGet())
 
   val preconditionsAndSetContract: Gen[(GenesisTransaction, SetScriptTransaction)] =
     preconditionsAndSetCustomContract(
