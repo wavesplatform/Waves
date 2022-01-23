@@ -63,7 +63,7 @@ class ContractCompilerTest extends PropSpec {
           FUNC(
             "foo",
             List(),
-            /**/LET_BLOCK(
+            /**/ LET_BLOCK(
               LET("a", CONST_LONG(1)),
               IF(
                 FUNCTION_CALL(Native(0), List(REF("a"), REF("a"))),
@@ -858,16 +858,29 @@ class ContractCompilerTest extends PropSpec {
   }
 
   property("JS API compile limit exceeding error") {
+    def byteVectorsList(size: Int) = {
+      (1 to size).map(_ => s"base64'${ByteStr(new Array[Byte](1000)).base64Raw}'").mkString("[", ", ", "]")
+    }
+
     val dApp =
       s"""
-        |
-        |@Verifier(tx)
-        |func verify() =
-        |  ${"sigVerify(base58'', base58'', base58'') &&" * 1500} true
-        |
+         |
+         |@Verifier(tx)
+         |func verify() = {
+         |  let list = ${byteVectorsList(163)}
+         |  true
+         |}
+         |
       """.stripMargin
 
-    Global.compileContract(dApp, dAppV4Ctx, V4, ScriptEstimatorV3(fixOverflow = true, overhead = true), false, false) should produce("Script is too large: 37551 bytes > 32768 bytes")
+    Global.compileContract(
+      dApp,
+      dAppV4Ctx,
+      V4,
+      ScriptEstimatorV3(fixOverflow = true, overhead = true),
+      needCompaction = false,
+      removeUnusedCode = false
+    ) should produce("Script is too large: 165187 bytes > 163840 bytes")
   }
 
   property("@Callable Invoke") {
@@ -1023,8 +1036,8 @@ class ContractCompilerTest extends PropSpec {
       getTestContext(V4).compilerContext,
       V4,
       ScriptEstimatorV3(fixOverflow = true, overhead = true),
-      false,
-      false
+      needCompaction = false,
+      removeUnusedCode = false
     ) shouldBe Symbol("right")
   }
 
@@ -1038,7 +1051,9 @@ class ContractCompilerTest extends PropSpec {
 
   property("union as @Callable argument forbidden in V6") {
     TestCompiler(V6).compile(scriptWithUnionArg(V6)) should
-      produce("Union type is not allowed for callable function arguments in 101-102; Union type is not allowed for callable function arguments in 148-149")
+      produce(
+        "Union type is not allowed for callable function arguments in 101-102; Union type is not allowed for callable function arguments in 148-149"
+      )
   }
 
   property("union as argument of non-@Callable function is allowed in V6") {
@@ -1059,14 +1074,14 @@ class ContractCompilerTest extends PropSpec {
 
   private def scriptWithUnionArg(version: StdLibVersion): String =
     s"""
-      |{-# STDLIB_VERSION ${version.id} #-}
-      |{-# CONTENT_TYPE DAPP #-}
-      |{-# SCRIPT_TYPE ACCOUNT #-}
-      |
-      |@Callable(i)
-      |func f(a: List[Int|String]) = []
-      |
-      |@Callable(i)
-      |func g(a: Int|String) = []
-      |""".stripMargin
+       |{-# STDLIB_VERSION ${version.id} #-}
+       |{-# CONTENT_TYPE DAPP #-}
+       |{-# SCRIPT_TYPE ACCOUNT #-}
+       |
+       |@Callable(i)
+       |func f(a: List[Int|String]) = []
+       |
+       |@Callable(i)
+       |func g(a: Int|String) = []
+       |""".stripMargin
 }

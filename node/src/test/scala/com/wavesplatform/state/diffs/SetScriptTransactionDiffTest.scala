@@ -39,15 +39,6 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.Ride4DApps.id -> 0)
   )
 
-  val preconditionsAndSetScript: Gen[(GenesisTransaction, SetScriptTransaction)] = for {
-    version <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
-    master  <- accountGen
-    ts      <- timestampGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-    fee    <- smallFeeGen
-    script <- Gen.option(scriptGen)
-  } yield (genesis, SetScriptTransaction.selfSigned(version, master, script, fee, ts).explicitGet())
-
   val preconditionsAndSetContract: Gen[(GenesisTransaction, SetScriptTransaction)] =
     preconditionsAndSetCustomContract(
       ContractScript(
@@ -65,12 +56,11 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
 
   private def preconditionsAndSetCustomContract(script: Script): Gen[(GenesisTransaction, SetScriptTransaction)] =
     for {
-      version <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
       master <- accountGen
       ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       fee <- smallFeeGen
-    } yield (genesis, SetScriptTransaction.selfSigned(version, master, Some(script), fee, ts).explicitGet())
+    } yield (genesis, SetScriptTransaction.selfSigned(TxVersion.V1, master, Some(script), fee, ts).explicitGet())
 
   property("increased limit after V6") {
     def byteVectorsList(size: Int) = {
