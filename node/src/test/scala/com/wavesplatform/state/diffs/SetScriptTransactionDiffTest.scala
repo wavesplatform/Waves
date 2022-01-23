@@ -29,6 +29,7 @@ import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
+import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
@@ -40,8 +41,8 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
 
   val preconditionsAndSetScript: Gen[(GenesisTransaction, SetScriptTransaction)] = for {
     version <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
-    master <- accountGen
-    ts     <- timestampGen
+    master  <- accountGen
+    ts      <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
     fee    <- smallFeeGen
     script <- Gen.option(scriptGen)
@@ -64,42 +65,59 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
 
   private def preconditionsAndSetCustomContract(script: Script): Gen[(GenesisTransaction, SetScriptTransaction)] =
     for {
-      master  <- accountGen
-      ts      <- timestampGen
+      version <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
+      master <- accountGen
+      ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       fee <- smallFeeGen
-    } yield (genesis, SetScriptTransaction.selfSigned(1.toByte, master, Some(script), fee, ts).explicitGet())
+    } yield (genesis, SetScriptTransaction.selfSigned(version, master, Some(script), fee, ts).explicitGet())
 
   property("increased limit after V6") {
     def byteVectorsList(size: Int) = {
       (1 to size).map(_ => s"base64'${ByteStr(new Array[Byte](1000)).base64Raw}'").mkString("[", ", ", "]")
     }
 
-    val script = TxHelpers.scriptV6(
-      s"""
-        |@Callable(i)
-        |func test() = {
-        |  strict a = ${byteVectorsList(162)}
-        |  []
-        |}
-        |""".stripMargin)
+    val script = TxHelpers.scriptV6(s"""
+                                       |@Callable(i)
+                                       |func test() = {
+                                       |  strict a = ${byteVectorsList(162)}
+                                       |  []
+                                       |}
+                                       |""".stripMargin)
 
     withDomain(DomainPresets.RideV6) { d =>
       d.helpers.creditWavesToDefaultSigner()
       val setScriptTransaction = TxHelpers.setScript(TxHelpers.defaultSigner, script, version = TxVersion.V2)
       d.commonApi.calculateWavesFee(setScriptTransaction) shouldBe 0.16.waves
       d.appendAndAssertSucceed(setScriptTransaction)
+
+      val fakeBigExpr = new ExprScript {
+        val stdLibVersion: StdLibVersion     = StdLibVersion.V6
+        val isFreeCall: Boolean              = false
+        val expr: EXPR                       = TxHelpers.exprScript(StdLibVersion.V6)("true").expr
+        val bytes: Coeval[ByteStr]           = Coeval(ByteStr(new Array[Byte](1024 * 9)))
+        val containsBlockV2: Coeval[Boolean] = Coeval(false)
+        val containsArray: Boolean           = false
+      }
+
+      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, fakeBigExpr, version = TxVersion.V2)).toString should include(
+        "Script is too large: 9216 bytes > 8192 bytes"
+      )
     }
+
+    intercept[RuntimeException](TxHelpers.exprScript(StdLibVersion.V6)(s"""
+                                                                          |strict a = ${byteVectorsList(9)}
+                                                                          |true
+                                                                          |""".stripMargin)).toString should include("Script is too large: 9140 bytes > 8192 bytes")
   }
 
   property("lowered fee after V6") {
-    val script = TxHelpers.scriptV6(
-      s"""
-         |@Callable(i)
-         |func test() = {
-         |  []
-         |}
-         |""".stripMargin)
+    val script = TxHelpers.scriptV6(s"""
+                                       |@Callable(i)
+                                       |func test() = {
+                                       |  []
+                                       |}
+                                       |""".stripMargin)
 
     withDomain(DomainPresets.RideV6) { d =>
       val setScriptTransaction = TxHelpers.setScript(TxHelpers.defaultSigner, script, version = TxVersion.V2)
@@ -497,7 +515,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
   property("unions are forbidden as @Callable arguments for RIDE 6 scripts and allowed for RIDE 4 and 5") {
     def checkForExpr(expr: String, version: StdLibVersion): Assertion = {
       val compileVersion = if (version == V6) V5 else version
-      val script = ContractScriptImpl(version, TestCompiler(compileVersion).compile(expr).explicitGet())
+      val script         = ContractScriptImpl(version, TestCompiler(compileVersion).compile(expr).explicitGet())
 
       val tx = SetScriptTransaction.selfSigned(
         TxVersion.V1,
@@ -564,7 +582,8 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
               name = "f",
               args = List.empty,
               body = BLOCK(
-                LET("a", FUNCTION_CALL(FunctionHeader.Native(syncCallId), List.empty)), FUNCTION_CALL(FunctionHeader.User("f"), List.empty)
+                LET("a", FUNCTION_CALL(FunctionHeader.Native(syncCallId), List.empty)),
+                FUNCTION_CALL(FunctionHeader.User("f"), List.empty)
               )
             )
           ),
@@ -574,19 +593,21 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       ).explicitGet()
 
     withDomain(DomainPresets.RideV5) { d =>
-      val dApp = accountGen.sample.get
+      val dApp     = accountGen.sample.get
       val ts: Long = System.currentTimeMillis()
-      val fee = 0.01.waves
-      val genesis = GenesisTransaction.create(dApp.toAddress, ENOUGH_AMT, ts).explicitGet()
+      val fee      = 0.01.waves
+      val genesis  = GenesisTransaction.create(dApp.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-      val scriptWithInvoke = TestCompiler(V5).compileContract(dAppVerifier("invoke"))
+      val scriptWithInvoke    = TestCompiler(V5).compileContract(dAppVerifier("invoke"))
       val setScriptWithInvoke = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(scriptWithInvoke), fee, ts).explicitGet()
 
-      val scriptWithReentrantInvoke = TestCompiler(V5).compileContract(dAppVerifier("reentrantInvoke"))
+      val scriptWithReentrantInvoke    = TestCompiler(V5).compileContract(dAppVerifier("reentrantInvoke"))
       val setScriptWithReentrantInvoke = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(scriptWithReentrantInvoke), fee, ts).explicitGet()
 
-      val setScriptWithInvokeRec = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(dAppVerifierRec(FunctionIds.CALLDAPP)), fee, ts).explicitGet()
-      val setScriptWithReentrantInvokeRec = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(dAppVerifierRec(FunctionIds.CALLDAPPREENTRANT)), fee, ts).explicitGet()
+      val setScriptWithInvokeRec =
+        SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(dAppVerifierRec(FunctionIds.CALLDAPP)), fee, ts).explicitGet()
+      val setScriptWithReentrantInvokeRec =
+        SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(dAppVerifierRec(FunctionIds.CALLDAPPREENTRANT)), fee, ts).explicitGet()
 
       d.appendBlock(genesis)
       d.appendBlockE(setScriptWithInvoke) should produce("DApp-to-dApp invocations are not allowed from verifier")
@@ -604,7 +625,8 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
            |true
            |""".stripMargin
 
-      ExpressionCompiler.compileBoolean(expr, compilerContext(DirectiveSet(V5, Call, Expression).explicitGet()))
+      ExpressionCompiler
+        .compileBoolean(expr, compilerContext(DirectiveSet(V5, Call, Expression).explicitGet()))
         .flatMap(ExprScript(V5, _))
         .explicitGet()
     }
@@ -612,10 +634,12 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     withDomain(DomainPresets.RideV5) { d =>
       val smartAcc = accountGen.sample.get
       val ts: Long = System.currentTimeMillis()
-      val genesis = GenesisTransaction.create(smartAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
+      val genesis  = GenesisTransaction.create(smartAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-      val setScriptWithInvoke = SetScriptTransaction.selfSigned(TxVersion.V2, smartAcc, Some(getScriptWithSyncCall("invoke")), 0.01.waves, ts).explicitGet()
-      val setScriptWithReentrantInvoke = SetScriptTransaction.selfSigned(TxVersion.V2, smartAcc, Some(getScriptWithSyncCall("reentrantInvoke")), 0.01.waves, ts).explicitGet()
+      val setScriptWithInvoke =
+        SetScriptTransaction.selfSigned(TxVersion.V2, smartAcc, Some(getScriptWithSyncCall("invoke")), 0.01.waves, ts).explicitGet()
+      val setScriptWithReentrantInvoke =
+        SetScriptTransaction.selfSigned(TxVersion.V2, smartAcc, Some(getScriptWithSyncCall("reentrantInvoke")), 0.01.waves, ts).explicitGet()
 
       d.appendBlock(genesis)
       d.appendBlockE(setScriptWithInvoke) should produce("function 'Native(1020)' not found")
