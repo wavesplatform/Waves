@@ -177,8 +177,8 @@ object TxHelpers {
       case other                  => throw new IllegalStateException(s"Not a contract: $other")
     }
 
-  def setScript(acc: KeyPair, script: Script): SetScriptTransaction = {
-    SetScriptTransaction.selfSigned(TxVersion.V1, acc, Some(script), TestValues.fee, timestamp).explicitGet()
+  def setScript(acc: KeyPair, script: Script, version: TxVersion = TxVersion.V1): SetScriptTransaction = {
+    SetScriptTransaction.selfSigned(version, acc, Option(script), TestValues.fee, timestamp).explicitGet()
   }
 
   def invoke(

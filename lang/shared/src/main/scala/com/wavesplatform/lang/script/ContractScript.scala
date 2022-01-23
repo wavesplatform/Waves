@@ -26,9 +26,9 @@ object ContractScript {
 
   def validateBytes(bs: Array[Byte]): Either[String, Unit] =
     Either.cond(
-      bs.length <= MaxContractSizeInBytes,
+      bs.length <= MaxContractSizeInBytesV6,
       (),
-      s"Script is too large: ${bs.length} bytes > $MaxContractSizeInBytes bytes"
+      s"Script is too large: ${bs.length} bytes > $MaxContractSizeInBytesV6 bytes"
     )
 
   def apply(version: StdLibVersion, contract: DApp): Either[String, ContractScriptImpl] =

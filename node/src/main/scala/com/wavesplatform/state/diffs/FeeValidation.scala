@@ -100,6 +100,14 @@ object FeeValidation {
               case _: EthereumTransaction.Transfer   => 1
               case _: EthereumTransaction.Invocation => 5
             }
+
+          case ss: SetScriptTransaction if blockchain.isFeatureActivated(BlockchainFeatures.RideV6) =>
+            ss.script.fold(1) { script =>
+              val scriptSize = script.bytes().size
+              val kbs        = scriptSize / 1024
+              if (scriptSize > 0 && scriptSize % 1024 == 0) kbs else kbs + 1
+            }
+
           case _ => baseFee
         }
       }

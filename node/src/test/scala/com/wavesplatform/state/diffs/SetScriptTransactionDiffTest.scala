@@ -4,6 +4,7 @@ import scala.util.Try
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
@@ -25,7 +26,7 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion, TxHelpers}
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import org.scalacheck.Gen
@@ -62,12 +63,49 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
 
   private def preconditionsAndSetCustomContract(script: Script): Gen[(GenesisTransaction, SetScriptTransaction)] =
     for {
-      version <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
       master  <- accountGen
       ts      <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       fee <- smallFeeGen
     } yield (genesis, SetScriptTransaction.selfSigned(1.toByte, master, Some(script), fee, ts).explicitGet())
+
+  property("increased limit after V6") {
+    def byteVectorsList(size: Int) = {
+      (1 to size).map(_ => s"base64'${ByteStr(new Array[Byte](1000)).base64Raw}'").mkString("[", ", ", "]")
+    }
+
+    val script = TxHelpers.scriptV6(
+      s"""
+        |@Callable(i)
+        |func test() = {
+        |  strict a = ${byteVectorsList(162)}
+        |  []
+        |}
+        |""".stripMargin)
+
+    withDomain(DomainPresets.RideV6) { d =>
+      d.helpers.creditWavesToDefaultSigner()
+      val setScriptTransaction = TxHelpers.setScript(TxHelpers.defaultSigner, script, version = TxVersion.V2)
+      d.commonApi.calculateWavesFee(setScriptTransaction) shouldBe 0.16.waves
+      d.appendAndAssertSucceed(setScriptTransaction)
+    }
+  }
+
+  property("lowered fee after V6") {
+    val script = TxHelpers.scriptV6(
+      s"""
+         |@Callable(i)
+         |func test() = {
+         |  []
+         |}
+         |""".stripMargin)
+
+    withDomain(DomainPresets.RideV6) { d =>
+      val setScriptTransaction = TxHelpers.setScript(TxHelpers.defaultSigner, script, version = TxVersion.V2)
+      d.helpers.creditWavesToDefaultSigner()
+      d.commonApi.calculateWavesFee(setScriptTransaction) shouldBe 0.001.waves
+    }
+  }
 
   property("cannot use transaction constructors in V6") {
     val orderConstructor =

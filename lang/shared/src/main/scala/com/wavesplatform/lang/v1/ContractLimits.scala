@@ -32,6 +32,7 @@ object ContractLimits {
 
   val MaxExprSizeInBytes     = 8 * 1024
   val MaxContractSizeInBytes = 32 * 1024
+  val MaxContractSizeInBytesV6 = 160 * 1024
 
   val MaxContractMetaSizeInBytes = 1024
 
