@@ -84,7 +84,7 @@ object DataTxValidator extends TxValidator[DataTransaction] {
     )
   }
 
-  private[this] def realUserPayloadSize(entries: Seq[DataEntry[?]]): Int = {
+  def realUserPayloadSize(entries: Seq[DataEntry[?]]): Int = {
     entries
       .flatMap(
         e =>

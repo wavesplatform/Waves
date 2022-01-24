@@ -4,9 +4,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.network
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.test.FlatSpec
-import com.wavesplatform.transaction.{DataTransaction, TxHelpers}
+import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.test.{FlatSpec, NumericExt}
+import com.wavesplatform.transaction.{DataTransaction, TxAmount, TxHelpers}
 
 class DataTransactionNewLimitsSpec extends FlatSpec with WithDomain {
   def generateMaxAllowed(limit: Int, overLimit: Boolean = false): (BooleanDataEntry, IntegerDataEntry, StringDataEntry, Seq[BinaryDataEntry]) = {
@@ -17,7 +18,7 @@ class DataTransactionNewLimitsSpec extends FlatSpec with WithDomain {
 
     val bytesOrStrEntryLimit = (limit - KeySize * 2 - 8 - 1 - (KeySize * ArbitraryEntriesCount)) / ArbitraryEntriesCount + (if (overLimit) 1 else 0)
     val str                  = StringDataEntry("3", String.valueOf(Array.fill(bytesOrStrEntryLimit)('A')))
-    val bytes                = (1 until ArbitraryEntriesCount).map(i => BinaryDataEntry((3 + i).toString, ByteStr(Array.fill(bytesOrStrEntryLimit)('A'.toByte))))
+    val bytes = (1 until ArbitraryEntriesCount).map(i => BinaryDataEntry((3 + i).toString, ByteStr(Array.fill(bytesOrStrEntryLimit)('A'.toByte))))
     (bool, int, str, bytes)
   }
 
@@ -55,10 +56,12 @@ class DataTransactionNewLimitsSpec extends FlatSpec with WithDomain {
   }
 
   it should "not handle 401 bytes key" in withDomain(DomainPresets.RideV6) { d =>
-    val dataEntry       = StringDataEntry("a" * 401, "test")
+    val dataEntry = StringDataEntry("a" * 401, "test")
     d.helpers.creditWavesToDefaultSigner()
-    
-    intercept[RuntimeException](d.appendBlock(TxHelpers.dataWithMultipleEntries(TxHelpers.defaultSigner, Seq(dataEntry)))).toString should include("TooBigArray")
+
+    intercept[RuntimeException](d.appendBlock(TxHelpers.dataWithMultipleEntries(TxHelpers.defaultSigner, Seq(dataEntry)))).toString should include(
+      "TooBigArray"
+    )
     d.blockchain.accountData(TxHelpers.defaultAddress, "a" * 401) shouldBe None
   }
 
@@ -82,20 +85,29 @@ class DataTransactionNewLimitsSpec extends FlatSpec with WithDomain {
     d.blockchain.accountData(TxHelpers.defaultAddress, "test") shouldBe None
   }
 
+  it should "have lowered fee after V6" in {
+    def calculateFee(preset: WavesSettings)(data: DataEntry[?]*): TxAmount =
+      withDomain(preset)(d => d.commonApi.calculateWavesFee(TxHelpers.dataWithMultipleEntries(TxHelpers.defaultSigner, data)))
+
+    val bigData = (1 to 100).map(i => BinaryDataEntry(i.toString, ByteStr(new Array[Byte](1024 - i.toString.length))))
+    calculateFee(DomainPresets.RideV5)(bigData*) shouldBe 0.101.waves
+    calculateFee(DomainPresets.RideV6)(bigData*) shouldBe 0.100.waves
+  }
+
   "Invoke transaction with data entries" should "handle new limits" in withDomain(DomainPresets.RideV6) { d =>
     val (bool, int, str, bytes) = generateMaxAllowed(ContractLimits.MaxWriteSetSizeInBytes)
 
     val script = TxHelpers.scriptV5(s"""
-        |@Callable(i)
-        |func default() = {
-        |   [
-        |     BooleanEntry("${bool.key}", ${bool.value}),
-        |     IntegerEntry("${int.key}", ${int.value}),
-        |     StringEntry("${str.key}", "${str.value}"),
-        |     ${bytes.map(bytes => s"BinaryEntry(\"${bytes.key}\", base64'${bytes.value.base64Raw}')").mkString(",\n     ")}
-        |   ]
-        |}
-        |""".stripMargin)
+                                       |@Callable(i)
+                                       |func default() = {
+                                       |   [
+                                       |     BooleanEntry("${bool.key}", ${bool.value}),
+                                       |     IntegerEntry("${int.key}", ${int.value}),
+                                       |     StringEntry("${str.key}", "${str.value}"),
+                                       |     ${bytes.map(bytes => s"BinaryEntry(\"${bytes.key}\", base64'${bytes.value.base64Raw}')").mkString(",\n     ")}
+                                       |   ]
+                                       |}
+                                       |""".stripMargin)
 
     val dAppAccount = TxHelpers.secondSigner
     d.helpers.creditWavesToDefaultSigner()
