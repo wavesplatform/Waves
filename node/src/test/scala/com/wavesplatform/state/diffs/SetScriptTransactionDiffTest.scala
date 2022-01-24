@@ -62,11 +62,29 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       fee <- smallFeeGen
     } yield (genesis, SetScriptTransaction.selfSigned(TxVersion.V1, master, Some(script), fee, ts).explicitGet())
 
-  property("increased limit after V6") {
-    def byteVectorsList(size: Int) = {
-      (1 to size).map(_ => s"base64'${ByteStr(new Array[Byte](1000)).base64Raw}'").mkString("[", ", ", "]")
-    }
+  private[this] def byteVectorsList(size: Int): String = {
+    (1 to size).map(_ => s"base64'${ByteStr(new Array[Byte](1000)).base64Raw}'").mkString("[", ", ", "]")
+  }
 
+  property("limit 32kb before V6") {
+    val script = TxHelpers.scriptV5(s"""
+                                       |@Callable(i)
+                                       |func test() = {
+                                       |  strict a = ${byteVectorsList(33)}
+                                       |  []
+                                       |}
+                                       |""".stripMargin)
+
+    withDomain(DomainPresets.RideV5) { d =>
+      d.helpers.creditWavesToDefaultSigner()
+      val setScriptTransaction = TxHelpers.setScript(TxHelpers.defaultSigner, script, version = TxVersion.V2)
+      d.appendAndCatchError(setScriptTransaction).toString should include(
+        "33570 bytes > 32768 bytes"
+      )
+    }
+  }
+
+  property("increased limit after V6") {
     val script = TxHelpers.scriptV6(s"""
                                        |@Callable(i)
                                        |func test() = {
@@ -111,7 +129,6 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
 
     withDomain(DomainPresets.RideV6) { d =>
       val setScriptTransaction = TxHelpers.setScript(TxHelpers.defaultSigner, script, version = TxVersion.V2)
-      d.helpers.creditWavesToDefaultSigner()
       d.commonApi.calculateWavesFee(setScriptTransaction) shouldBe 0.001.waves
     }
   }
