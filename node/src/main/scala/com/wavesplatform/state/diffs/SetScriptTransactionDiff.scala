@@ -50,7 +50,7 @@ object SetScriptTransactionDiff {
 
   private[this] def scriptSizeValidation(value: Script, limit: Int): Either[GenericError, Unit] = {
     Either.cond(
-      value.bytes().size < limit,
+      value.bytes().size <= limit,
       (),
       GenericError(s"Script is too large: ${value.bytes().size} bytes > $limit bytes")
     )

@@ -240,6 +240,8 @@ trait WithDomain extends WithState { _: Suite =>
     val RideV5 = RideV4.addFeatures(BlockchainFeatures.SynchronousCalls)
     val RideV6 = RideV5.addFeatures(BlockchainFeatures.RideV6)
 
+    def mostRecent: WavesSettings = RideV6
+
     def settingsForRide(v: StdLibVersion): WavesSettings =
       v match {
         case V1 => RideV3

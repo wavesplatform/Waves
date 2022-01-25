@@ -20,8 +20,8 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.compilerContext
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.Native
-import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms, TestCompiler}
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
@@ -34,10 +34,7 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 
 class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
-
-  private val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures =
-    Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.Ride4DApps.id -> 0)
-  )
+  private[this] val DefaultFS = DomainPresets.mostRecent.blockchainSettings.functionalitySettings
 
   val preconditionsAndSetContract: Gen[(GenesisTransaction, SetScriptTransaction)] =
     preconditionsAndSetCustomContract(
@@ -62,61 +59,76 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       fee <- smallFeeGen
     } yield (genesis, SetScriptTransaction.selfSigned(TxVersion.V1, master, Some(script), fee, ts).explicitGet())
 
-  private[this] def byteVectorsList(size: Int): String = {
-    (1 to size).map(_ => s"base64'${ByteStr(new Array[Byte](1000)).base64Raw}'").mkString("[", ", ", "]")
+  private[this] def exactSizeContract(version: StdLibVersion, size: Int): ContractScriptImpl =
+    new ContractScriptImpl(
+      version,
+      TxHelpers
+        .script(s"""
+                   |{-# STDLIB_VERSION ${version.id} #-}
+                   |{-# CONTENT_TYPE DAPP #-}
+                   |""".stripMargin)
+        .asInstanceOf[ContractScriptImpl]
+        .expr
+    ) {
+      override val bytes: Coeval[ByteStr] = Coeval(ByteStr(new Array[Byte](size)))
+    }
+
+  private[this] def exactSizeExpr(version: StdLibVersion, size: Int): ExprScript = new ExprScript {
+    val stdLibVersion: StdLibVersion     = version
+    val isFreeCall: Boolean              = false
+    val expr: EXPR                       = TxHelpers.exprScript(StdLibVersion.V6)("true").expr
+    val bytes: Coeval[ByteStr]           = Coeval(ByteStr(new Array[Byte](size)))
+    val containsBlockV2: Coeval[Boolean] = Coeval(false)
+    val containsArray: Boolean           = false
   }
 
-  property("limit 32kb before V6") {
-    val script = TxHelpers.scriptV5(s"""
-                                       |@Callable(i)
-                                       |func test() = {
-                                       |  strict a = ${byteVectorsList(33)}
-                                       |  []
-                                       |}
-                                       |""".stripMargin)
-
+  property("limit 32kb/8kb before V6") {
     withDomain(DomainPresets.RideV5) { d =>
       d.helpers.creditWavesToDefaultSigner()
-      val setScriptTransaction = TxHelpers.setScript(TxHelpers.defaultSigner, script, version = TxVersion.V2)
-      d.appendAndCatchError(setScriptTransaction).toString should include(
-        "33570 bytes > 32768 bytes"
+
+      d.appendAndAssertSucceed(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeContract(StdLibVersion.V5, 32768), version = TxVersion.V2))
+      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeContract(StdLibVersion.V5, 32769), version = TxVersion.V2))
+        .toString should include(
+        "32769 bytes > 32768 bytes"
+      )
+
+      d.appendAndAssertSucceed(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(StdLibVersion.V5, 8192), version = TxVersion.V2))
+      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(StdLibVersion.V5, 8193), version = TxVersion.V2))
+        .toString should include(
+        "Script is too large: 8193 bytes > 8192 bytes"
       )
     }
   }
 
-  property("increased limit after V6") {
-    val script = TxHelpers.scriptV6(s"""
-                                       |@Callable(i)
-                                       |func test() = {
-                                       |  strict a = ${byteVectorsList(162)}
-                                       |  []
-                                       |}
-                                       |""".stripMargin)
-
+  property("limit 160kb/8kb after V6") {
     withDomain(DomainPresets.RideV6) { d =>
       d.helpers.creditWavesToDefaultSigner()
-      val setScriptTransaction = TxHelpers.setScript(TxHelpers.defaultSigner, script, version = TxVersion.V2)
-      d.commonApi.calculateWavesFee(setScriptTransaction) shouldBe 0.16.waves
-      d.appendAndAssertSucceed(setScriptTransaction)
 
-      val fakeBigExpr = new ExprScript {
-        val stdLibVersion: StdLibVersion     = StdLibVersion.V6
-        val isFreeCall: Boolean              = false
-        val expr: EXPR                       = TxHelpers.exprScript(StdLibVersion.V6)("true").expr
-        val bytes: Coeval[ByteStr]           = Coeval(ByteStr(new Array[Byte](1024 * 9)))
-        val containsBlockV2: Coeval[Boolean] = Coeval(false)
-        val containsArray: Boolean           = false
-      }
+      val setScript160kb = TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeContract(StdLibVersion.V6, 160 * 1024), version = TxVersion.V2)
+      d.commonApi.calculateWavesFee(setScript160kb) shouldBe 0.16.waves
+      d.appendAndAssertSucceed(setScript160kb)
 
-      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, fakeBigExpr, version = TxVersion.V2)).toString should include(
-        "Script is too large: 9216 bytes > 8192 bytes"
+      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeContract(StdLibVersion.V6, 160 * 1024 + 1), version = TxVersion.V2))
+        .toString should include(
+        "Script is too large: 163841 bytes > 163840 bytes"
+      )
+
+      d.appendAndAssertSucceed(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(StdLibVersion.V6, 8 * 1024), version = TxVersion.V2))
+      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(StdLibVersion.V6, 8 * 1024 + 1), version = TxVersion.V2))
+        .toString should include(
+        "Script is too large: 8193 bytes > 8192 bytes"
       )
     }
+
+    def byteVectorsList(size: Int): String =
+      (1 to size).map(_ => s"base64'${ByteStr(new Array[Byte](1000)).base64Raw}'").mkString("[", ", ", "]")
 
     intercept[RuntimeException](TxHelpers.exprScript(StdLibVersion.V6)(s"""
                                                                           |strict a = ${byteVectorsList(9)}
                                                                           |true
-                                                                          |""".stripMargin)).toString should include("Script is too large: 9140 bytes > 8192 bytes")
+                                                                          |""".stripMargin)).toString should include(
+      "Script is too large: 9140 bytes > 8192 bytes"
+    )
   }
 
   property("lowered fee after V6") {
@@ -192,7 +204,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
 
   property("setting script results in account state") {
     forAll(preconditionsAndSetContract) { case (genesis, setScript) =>
-      assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) { case (blockDiff, newState) =>
+      assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), DefaultFS) { case (blockDiff, newState) =>
         newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
       }
     }
@@ -200,7 +212,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
 
   property("setting contract results in account state") {
     forAll(preconditionsAndSetContract) { case (genesis, setScript) =>
-      assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) { case (blockDiff, newState) =>
+      assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), DefaultFS) { case (blockDiff, newState) =>
         newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
       }
     }
