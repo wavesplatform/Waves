@@ -126,7 +126,7 @@ object ContractSerDeV2 extends ContractSerDe {
       .flatMap {
         case 0 => Right(None)
         case 1 => df(in).map(_.some)
-        case _ => Left(s"At position ${in.getTotalBytesRead} unknown option flag value")
+        case _ => Left(s"At position ${in.getTotalBytesRead()} unknown option flag value")
       }
   }
 }
