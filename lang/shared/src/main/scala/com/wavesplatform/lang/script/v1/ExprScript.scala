@@ -50,7 +50,11 @@ object ExprScript {
       BLOCK(LET(ContractCompiler.FreeCallInvocationArg, TRUE), expr)
     }
     val resultVarNames = if (withCombinedContext) combinedVarNames(version, Expression) else varNames(version, Expression)
-    estimator(resultVarNames, functionCosts(version, Expression, if (isFreeCall) Call else Account, withCombinedContext = withCombinedContext), modifiedExpr)
+    estimator(
+      resultVarNames,
+      functionCosts(version, Expression, if (isFreeCall) Call else Account, withCombinedContext = withCombinedContext),
+      modifiedExpr
+    )
   }
 
   def estimate(
@@ -63,16 +67,14 @@ object ExprScript {
   ): Either[String, Long] =
     for {
       complexity <- estimateExact(expr, version, isFreeCall, estimator, withCombinedContext)
-      _          <- checkComplexity(version, complexity, useContractVerifierLimit)
+      _          <- checkComplexity(version, complexity, useContractVerifierLimit, isFreeCall)
     } yield complexity
 
-  def checkComplexity(
-      version: StdLibVersion,
-      complexity: Long,
-      useContractVerifierLimit: Boolean
-  ): Either[String, Unit] = {
+  def checkComplexity(version: StdLibVersion, complexity: Long, useContractVerifierLimit: Boolean, isFreeCall: Boolean): Either[String, Unit] = {
     val limit =
-      if (useContractVerifierLimit)
+      if (isFreeCall)
+        MaxCallableComplexityByVersion(version)
+      else if (useContractVerifierLimit)
         MaxAccountVerifierComplexityByVersion(version)
       else
         MaxComplexityByVersion(version)
@@ -83,7 +85,7 @@ object ExprScript {
       s"Script is too complex: $complexity > $limit"
     )
   }
-  
+
   final case class ExprScriptImpl(stdLibVersion: StdLibVersion, isFreeCall: Boolean, expr: EXPR) extends ExprScript {
     override type Expr = EXPR
     override val bytes: Coeval[ByteStr]           = Coeval.evalOnce(ByteStr(Global.serializeExpression(expr, stdLibVersion)))

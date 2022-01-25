@@ -12,6 +12,7 @@ import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.{DataEntry, StringDataEntry}
 import com.wavesplatform.test.*
@@ -151,6 +152,12 @@ object TxHelpers {
               |
               |$scriptText
               |""".stripMargin) match {
+      case es: ExprScriptImpl => es
+      case other              => throw new IllegalStateException(s"Not an expression: $other")
+    }
+
+  def freeCallScript(scriptText: String, version: StdLibVersion = StdLibVersion.V6): ExprScriptImpl =
+    TestCompiler(version).compileFreeCall(scriptText) match {
       case es: ExprScriptImpl => es
       case other              => throw new IllegalStateException(s"Not an expression: $other")
     }

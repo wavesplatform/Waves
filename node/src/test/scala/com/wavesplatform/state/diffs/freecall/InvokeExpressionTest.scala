@@ -10,6 +10,8 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, NewAssetInfo}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
@@ -27,6 +29,27 @@ import play.api.libs.json.Json
 class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with WithDomain with EitherValues with JsonMatchers {
   import DomainPresets.{RideV5, RideV6}
   import InvokeExpressionTest.*
+
+  property("can use max contract complexity") {
+    def sigVerifyList(size: Int): String = (1 to size).map(_ => "sigVerify(base58'', base58'', base58'')").mkString("[", ", ", "]")
+
+    val script = TxHelpers.freeCallScript(s"""
+                                             |strict a = ${sigVerifyList(ContractLimits.MaxTotalInvokeComplexity(StdLibVersion.V6) / 181)}
+                                             |[]
+                                             |""".stripMargin)
+
+    Script.estimate(
+      script,
+      ScriptEstimatorV3(fixOverflow = true, overhead = false),
+      fixEstimateOfVerifier = true,
+      useContractVerifierLimit = false
+    ) shouldBe Right(25885L)
+
+    withDomain(DomainPresets.RideV6) { d =>
+      d.helpers.creditWavesToDefaultSigner()
+      d.appendAndAssertSucceed(TxHelpers.invokeExpression(script))
+    }
+  }
 
   property("cannot create transaction objects") {
     val orderConstructor =
