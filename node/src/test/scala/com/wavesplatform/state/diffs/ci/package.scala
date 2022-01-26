@@ -48,7 +48,7 @@ package object ci {
     )
 
   def toInvokeExpression(
-      setScript: SetScriptTransaction,
+      setDApp: SetScriptTransaction,
       invoker: KeyPair,
       fee: Option[Long] = None,
       call: Option[FUNCTION_CALL] = None
@@ -57,26 +57,27 @@ package object ci {
       .selfSigned(
         TxVersion.V1,
         invoker,
-        toFreeCall(setScript, call),
+        toFreeCall(setDApp, call),
         fee.getOrElse(ciFee(freeCall = true).sample.get),
         Waves,
-        setScript.timestamp
+        setDApp.timestamp
       )
       .explicitGet()
 
   def toEthInvokeExpression(
-      setScript: SetScriptTransaction,
+      setDApp: SetScriptTransaction,
       invoker: ECKeyPair,
       call: Option[FUNCTION_CALL] = None,
       fee: Option[Long] = None
   ): EthereumTransaction =
-    EthTxGenerator.generateEthInvokeExpression(invoker, toFreeCall(setScript, call), fee)
+    EthTxGenerator.generateEthInvokeExpression(invoker, toFreeCall(setDApp, call), fee)
 
   private def toFreeCall(
-      setScript: SetScriptTransaction,
+      setDApp: SetScriptTransaction,
       call: Option[FUNCTION_CALL]
   ): ExprScript = {
-    val callables = setScript.script.get.asInstanceOf[ContractScriptImpl].expr.callableFuncs
+    val dApp      = setDApp.script.get.asInstanceOf[ContractScriptImpl]
+    val callables = dApp.expr.callableFuncs
     val expression =
       call.fold(
         callables.head.u.body
@@ -86,6 +87,6 @@ package object ci {
           BLOCK(LET(argName, arg), resultExpr)
         }
       }
-    ExprScript(V5, expression, isFreeCall = true).explicitGet()
+    ExprScript(dApp.stdLibVersion, expression, isFreeCall = true).explicitGet()
   }
 }
