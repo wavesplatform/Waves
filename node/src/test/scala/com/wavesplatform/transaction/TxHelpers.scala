@@ -184,6 +184,18 @@ object TxHelpers {
       case other                  => throw new IllegalStateException(s"Not a contract: $other")
     }
 
+  def estimate(script: Script): Int =
+    math.toIntExact(
+      Script
+        .estimate(
+          script,
+          ScriptEstimatorV3(fixOverflow = true, overhead = false),
+          fixEstimateOfVerifier = true,
+          useContractVerifierLimit = false
+        )
+        .explicitGet()
+    )
+
   def setScript(acc: KeyPair, script: Script): SetScriptTransaction = {
     SetScriptTransaction.selfSigned(TxVersion.V1, acc, Some(script), TestValues.fee, timestamp).explicitGet()
   }

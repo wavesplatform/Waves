@@ -38,12 +38,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
                                              |[]
                                              |""".stripMargin)
 
-    Script.estimate(
-      script,
-      ScriptEstimatorV3(fixOverflow = true, overhead = false),
-      fixEstimateOfVerifier = true,
-      useContractVerifierLimit = false
-    ) shouldBe Right(25885L)
+    TxHelpers.estimate(script) shouldBe 51949
 
     withDomain(DomainPresets.RideV6) { d =>
       d.helpers.creditWavesToDefaultSigner()
