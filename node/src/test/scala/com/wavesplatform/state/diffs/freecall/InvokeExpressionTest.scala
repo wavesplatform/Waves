@@ -40,9 +40,15 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
 
     TxHelpers.estimate(script) shouldBe 51949
 
+    val bigScript = TxHelpers.freeCallScript(s"""
+                                             |strict a = ${sigVerifyList(ContractLimits.MaxTotalInvokeComplexity(StdLibVersion.V6) / 181 + 1)}
+                                             |[]
+                                             |""".stripMargin)
+
     withDomain(DomainPresets.RideV6) { d =>
       d.helpers.creditWavesToDefaultSigner()
       d.appendAndAssertSucceed(TxHelpers.invokeExpression(script))
+      d.appendAndCatchError(TxHelpers.invokeExpression(bigScript)).toString should include("Contract function (default) is too complex: 52130 > 52000")
     }
   }
 
