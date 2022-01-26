@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1
 
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.compiler.Terms
 
 //noinspection ScalaStyle
@@ -11,15 +11,15 @@ object ContractLimits {
   }
 
   val MaxCallableComplexityByVersion: StdLibVersion => Int = {
-    case v if v < V5 => 4000
-    case V5          => 10000
-    case V6          => 52000
+    case V1 | V2 | V3 | V4 => 4000
+    case V5                => 10000
+    case V6                => 52000
   }
 
   val MaxTotalInvokeComplexity: StdLibVersion => Int = {
-    case v if v < V5 => MaxComplexityByVersion(v) * (MaxAttachedPaymentAmount + MaxCallableActionsAmount(V4) + 1)
-    case V5          => 26000
-    case V6          => 52000
+    case v @ (V1 | V2 | V3 | V4) => MaxComplexityByVersion(v) * (MaxAttachedPaymentAmount + MaxCallableActionsAmount(V4) + 1)
+    case V5                      => 26000
+    case V6                      => 52000
   }
 
   val MaxSyncDAppCalls: StdLibVersion => Int =
