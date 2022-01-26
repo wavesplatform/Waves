@@ -299,19 +299,17 @@ class AssetsRouteSpec
         withRoute { (d, route) =>
           val tx =
             if (useInvokeExpression) {
-              val call = Some(
-                FUNCTION_CALL(
-                  User("issue"),
-                  List(
-                    CONST_STRING(assetDesc.name.toStringUtf8).explicitGet(),
-                    CONST_STRING(assetDesc.description.toStringUtf8).explicitGet(),
-                    CONST_LONG(assetDesc.totalVolume.toInt),
-                    CONST_LONG(assetDesc.decimals),
-                    CONST_BOOLEAN(assetDesc.reissuable)
-                  )
+              val call = FUNCTION_CALL(
+                User("issue"),
+                List(
+                  CONST_STRING(assetDesc.name.toStringUtf8).explicitGet(),
+                  CONST_STRING(assetDesc.description.toStringUtf8).explicitGet(),
+                  CONST_LONG(assetDesc.totalVolume.toInt),
+                  CONST_LONG(assetDesc.decimals),
+                  CONST_BOOLEAN(assetDesc.reissuable)
                 )
               )
-              ci.toEthInvokeExpression(setScript, invoker, call, Some(fee))
+              ci.toEthInvokeExpression(setScript, invoker, call, fee)
             } else {
               EthTxGenerator.generateEthInvoke(
                 keyPair = invoker,

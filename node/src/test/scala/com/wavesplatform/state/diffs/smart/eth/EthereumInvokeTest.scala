@@ -130,7 +130,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with E
 
     val ethInvoke =
       if (invokeExpression)
-        toEthInvokeExpression(setDApp, eCKeyPair, Some(FUNCTION_CALL(User("default"), List(CONST_LONG(passingArg)))))
+        toEthInvokeExpression(setDApp, eCKeyPair, FUNCTION_CALL(User("default"), List(CONST_LONG(passingArg))))
       else
         EthTxGenerator.generateEthInvoke(eCKeyPair, dAppAddress, "default", Seq(Integer(passingArg)), assets.map(a => Payment(paymentAmount, a)))
 

@@ -138,9 +138,8 @@ object EthTxGenerator {
   def generateEthInvokeExpression(
       invoker: ECKeyPair,
       expression: ExprScript,
-      feeOpt: Option[Long] = None
+      fee: Long = FeeConstants(TransactionType.InvokeExpression) * FeeUnit
   ): EthereumTransaction = {
-    val fee = feeOpt.getOrElse(FeeConstants(TransactionType.InvokeExpression) * FeeUnit)
     signRawTransaction(invoker, AddressScheme.current.chainId)(
       RawTransaction.createTransaction(
         BigInt(System.currentTimeMillis()).bigInteger,

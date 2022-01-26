@@ -3,16 +3,16 @@ package com.wavesplatform.state.diffs
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.directives.values.{V3, V5}
+import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.{BLOCK, FUNCTION_CALL, LET}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.FeeValidation.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{EthereumTransaction, TransactionType, TxVersion}
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.utils.EthTxGenerator
+import com.wavesplatform.transaction.{EthereumTransaction, TransactionType, TxVersion}
 import org.scalacheck.Gen
 import org.web3j.crypto.ECKeyPair
 
@@ -67,10 +67,10 @@ package object ci {
   def toEthInvokeExpression(
       setDApp: SetScriptTransaction,
       invoker: ECKeyPair,
-      call: Option[FUNCTION_CALL] = None,
-      fee: Option[Long] = None
+      call: FUNCTION_CALL,
+      fee: Long = FeeConstants(TransactionType.InvokeExpression) * FeeUnit
   ): EthereumTransaction =
-    EthTxGenerator.generateEthInvokeExpression(invoker, toFreeCall(setDApp, call), fee)
+    EthTxGenerator.generateEthInvokeExpression(invoker, toFreeCall(setDApp, Some(call)), fee)
 
   private def toFreeCall(
       setDApp: SetScriptTransaction,

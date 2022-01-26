@@ -326,7 +326,7 @@ class LeaseRouteSpec
       invokeEth <-
         if (useInvokeExpression) Gen.const {
           val args = List(CONST_BYTESTR(ByteStr(recipient.toAddress.bytes)).explicitGet(), CONST_LONG(10000.waves))
-          ci.toEthInvokeExpression(setScript, sender, Some(FUNCTION_CALL(User("leaseTo"), args)))
+          ci.toEthInvokeExpression(setScript, sender, FUNCTION_CALL(User("leaseTo"), args))
         }
         else
           ethereumInvokeTransactionGen(
@@ -336,7 +336,7 @@ class LeaseRouteSpec
             Seq(Arg.Bytes(ByteStr(recipient.toAddress.bytes)), Arg.Integer(10000.waves))
           )
       invokeLeaseCancel = (leaseId: ByteStr) => {
-        val call = Some(FUNCTION_CALL(User("cancelLease"), List(CONST_BYTESTR(leaseId).explicitGet())))
+        val call = FUNCTION_CALL(User("cancelLease"), List(CONST_BYTESTR(leaseId).explicitGet()))
         ci.toEthInvokeExpression(setScript, sender, call)
       }
       genesisE <- genesisGeneratorP(invokeEth.sender.toAddress)

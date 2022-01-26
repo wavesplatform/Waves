@@ -1,26 +1,31 @@
 package com.wavesplatform.transaction.smart
 
-import scala.concurrent.duration.*
 import cats.syntax.monoid.*
-import com.wavesplatform.{BlockchainStubHelpers, TestValues}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
+import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.compiler.Terms.REF
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.Portfolio
+import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.test.{FlatSpec, TestTime, produce}
-import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
+import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, TxHelpers}
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, EthSetChainId, JsonMatchers}
+import com.wavesplatform.{BlockchainStubHelpers, TestValues}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, Inside}
 import org.web3j.crypto.{RawTransaction, Sign, SignedRawTransaction, TransactionEncoder}
 import play.api.libs.json.Json
+
+import scala.concurrent.duration.*
 
 class EthereumTransactionSpec
     extends FlatSpec
@@ -49,16 +54,16 @@ class EthereumTransactionSpec
 
     EthChainId.unset() // Set to 'T'
 
-    inside(EthereumTransaction(transfer.toSignedRawTransaction).explicitGet().payload) {
-      case t: EthereumTransaction.Transfer => t.recipient.chainId shouldBe 'E'.toByte
+    inside(EthereumTransaction(transfer.toSignedRawTransaction).explicitGet().payload) { case t: EthereumTransaction.Transfer =>
+      t.recipient.chainId shouldBe 'E'.toByte
     }
 
-    inside(EthereumTransaction(assetTransfer.toSignedRawTransaction).explicitGet().payload) {
-      case t: EthereumTransaction.Transfer => t.recipient.chainId shouldBe 'E'.toByte
+    inside(EthereumTransaction(assetTransfer.toSignedRawTransaction).explicitGet().payload) { case t: EthereumTransaction.Transfer =>
+      t.recipient.chainId shouldBe 'E'.toByte
     }
 
-    inside(EthereumTransaction(invoke.toSignedRawTransaction).explicitGet().payload) {
-      case t: EthereumTransaction.Invocation => t.dApp.chainId shouldBe 'E'.toByte
+    inside(EthereumTransaction(invoke.toSignedRawTransaction).explicitGet().payload) { case t: EthereumTransaction.Invocation =>
+      t.dApp.chainId shouldBe 'E'.toByte
     }
   }
 
@@ -101,7 +106,7 @@ class EthereumTransactionSpec
     val assetTransfer   = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, Long.MaxValue, TestAsset)
 
     (differ(transfer) |+| differ(assetTransfer)).portfolios shouldBe Map(
-      senderAddress    -> Portfolio(-Long.MaxValue, assets = Map(TestAsset  -> -Long.MaxValue)),
+      senderAddress    -> Portfolio(-Long.MaxValue, assets = Map(TestAsset -> -Long.MaxValue)),
       recipientAddress -> Portfolio(LongMaxMinusFee, assets = Map(TestAsset -> Long.MaxValue))
     )
   }
@@ -111,23 +116,27 @@ class EthereumTransactionSpec
       BigInt(System.currentTimeMillis()).bigInteger,
       EthereumTransaction.GasPrice,
       BigInt(100000).bigInteger, // fee
-      "", // empty "to"
+      "",                        // empty "to"
       (BigInt(1) * EthereumTransaction.AmountMultiplier).bigInteger,
       ""
     )
-    a[RuntimeException] should be thrownBy(EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(rawTransaction))
+    a[RuntimeException] should be thrownBy (EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(
+      rawTransaction
+    ))
   }
-       
+
   it should "fail with invalid to field" in {
     val rawTransaction = RawTransaction.createTransaction(
       BigInt(System.currentTimeMillis()).bigInteger,
       EthereumTransaction.GasPrice,
       BigInt(100000).bigInteger, // fee
-      "0xffffffff", // invalid "to"
+      "0xffffffff",              // invalid "to"
       (BigInt(1) * EthereumTransaction.AmountMultiplier).bigInteger,
       ""
     )
-    a[RuntimeException] should be thrownBy(EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(rawTransaction))
+    a[RuntimeException] should be thrownBy (EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(
+      rawTransaction
+    ))
   }
 
   it should "use chainId in signer key recovery" in {
@@ -252,7 +261,9 @@ class EthereumTransactionSpec
   it should "not be accepted before RideV6 activation" in {
     val blockchain = createBlockchainStub { blockchain =>
       // Activate all features except ride v6
-      val features = BlockchainFeatures.implemented.collect { case id if id != BlockchainFeatures.RideV6.id => BlockchainFeatures.feature(id) }.flatten
+      val features = BlockchainFeatures.implemented.collect {
+        case id if id != BlockchainFeatures.RideV6.id => BlockchainFeatures.feature(id)
+      }.flatten
       blockchain.stub.activateFeatures(features.toSeq*)
     }
     val differ = blockchain.stub.transactionDiffer().andThen(_.resultE)
@@ -262,10 +273,12 @@ class EthereumTransactionSpec
   }
 
   "Ethereum invoke" should "recover correct key" in {
-    val senderAccount = TxHelpers.defaultSigner.toEthKeyPair
-    val senderAddress = TxHelpers.defaultSigner.toEthWavesAddress
-    val transaction   = EthTxGenerator.generateEthInvoke(senderAccount, senderAddress, "test", Nil, Nil)
-    transaction.senderAddress() shouldBe senderAccount.toWavesAddress
+    val senderAccount    = TxHelpers.defaultSigner.toEthKeyPair
+    val senderAddress    = TxHelpers.defaultSigner.toEthWavesAddress
+    val invoke           = EthTxGenerator.generateEthInvoke(senderAccount, senderAddress, "test", Nil, Nil)
+    val invokeExpression = EthTxGenerator.generateEthInvokeExpression(senderAccount, ExprScript(V3, REF("nil")).explicitGet())
+    invoke.senderAddress() shouldBe senderAccount.toWavesAddress
+    invokeExpression.senderAddress() shouldBe senderAccount.toWavesAddress
   }
 
   it should "work with all types of arguments except unions" in {
@@ -566,51 +579,69 @@ class EthereumTransactionSpec
 
       val script = TxHelpers.script(
         s"""{-# STDLIB_VERSION 4 #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |
-          |@Callable (i)
-          |func default() = {
-          |  [
-          |    ScriptTransfer(i.caller, 123, unit),
-          |    ScriptTransfer(i.caller, 123, base58'$TestAsset')
-          |  ]
-          |}
-          |""".stripMargin
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |
+           |@Callable (i)
+           |func default() = {
+           |  [
+           |    ScriptTransfer(i.caller, 123, unit),
+           |    ScriptTransfer(i.caller, 123, base58'$TestAsset')
+           |  ]
+           |}
+           |""".stripMargin
       )
       sh.setScript(dAppAccount.toAddress, script)
     }
 
     val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
-    val transaction = EthTxGenerator.generateEthInvoke(
+    val invokeScript = EthTxGenerator.generateEthInvoke(
       invokerAccount,
       dAppAccount.toAddress,
       "default",
       Seq(),
       Nil
     )
-    val diff = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
-    Json.toJson(diff.scriptResults.values.head) should matchJson(s"""{
-                                                                   |  "data" : [ ],
-                                                                   |  "transfers" : [ {
-                                                                   |    "address" : "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
-                                                                   |    "asset" : null,
-                                                                   |    "amount" : 123
-                                                                   |  },
-                                                                   |   {
-                                                                   |    "address" : "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
-                                                                   |    "asset" : "$TestAsset",
-                                                                   |    "amount" : 123
-                                                                   |  }],
-                                                                   |  "issues" : [ ],
-                                                                   |  "reissues" : [ ],
-                                                                   |  "burns" : [ ],
-                                                                   |  "sponsorFees" : [ ],
-                                                                   |  "leases" : [ ],
-                                                                   |  "leaseCancels" : [ ],
-                                                                   |  "invokes" : [ ]
-                                                                   |}""".stripMargin)
+    val invokeExpression = EthTxGenerator.generateEthInvokeExpression(
+      invokerAccount,
+      TestCompiler(V3).compileFreeCall(
+        s"""
+           | TransferSet([
+           |   ScriptTransfer(i.caller, 123, unit),
+           |   ScriptTransfer(i.caller, 123, base58'$TestAsset')
+           | ])
+        """.stripMargin
+      )
+    )
+    Seq(invokeScript, invokeExpression)
+      .foreach { transaction =>
+        val diff = differ(transaction).resultE.explicitGet()
+        diff should containAppliedTx(transaction.id())
+        Json.toJson(diff.scriptResults.values.head) should matchJson(
+          s"""
+             |{
+             |  "data" : [ ],
+             |  "transfers" : [ {
+             |    "address" : "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
+             |    "asset" : null,
+             |    "amount" : 123
+             |  },
+             |   {
+             |    "address" : "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
+             |    "asset" : "$TestAsset",
+             |    "amount" : 123
+             |  }],
+             |  "issues" : [ ],
+             |  "reissues" : [ ],
+             |  "burns" : [ ],
+             |  "sponsorFees" : [ ],
+             |  "leases" : [ ],
+             |  "leaseCancels" : [ ],
+             |  "invokes" : [ ]
+             |}
+           """.stripMargin
+        )
+      }
   }
 
   it should "test minimum fee" in {
@@ -638,7 +669,7 @@ class EthereumTransactionSpec
     }
 
     val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
-    val transaction = EthTxGenerator.generateEthInvoke(
+    val invokeScript = EthTxGenerator.generateEthInvoke(
       invokerAccount,
       dAppAccount.toAddress,
       "default",
@@ -646,9 +677,13 @@ class EthereumTransactionSpec
       Nil,
       fee = 499999
     )
+    val invokeExpression = EthTxGenerator.generateEthInvokeExpression(invokerAccount, ExprScript(V3, REF("nil")).explicitGet(), 999999)
 
-    intercept[RuntimeException](differ(transaction).resultE.explicitGet()).toString should include(
+    intercept[RuntimeException](differ(invokeScript).resultE.explicitGet()).toString should include(
       "Fee in WAVES for InvokeScriptTransaction (499999 in WAVES) does not exceed minimal value of 500000 WAVES"
+    )
+    intercept[RuntimeException](differ(invokeExpression).resultE.explicitGet()).toString should include(
+      "Fee in WAVES for InvokeExpressionTransaction (999999 in WAVES) does not exceed minimal value of 1000000 WAVES"
     )
   }
 }
