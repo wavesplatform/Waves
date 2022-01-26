@@ -14,8 +14,11 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{Domain, defaultSigner}
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.FunctionHeader.User
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
+import com.wavesplatform.state.diffs.ci
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, BinaryDataEntry, Diff, Height}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{Transaction, TxHelpers, TxVersion}
@@ -59,9 +62,9 @@ class AssetsRouteSpec
       f(d, route(d).route)
     }
 
-  private val seed               = "seed".getBytes("UTF-8")
-  private val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)
-  private val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
+  private val seed                 = "seed".getBytes("UTF-8")
+  private val senderPrivateKey     = Wallet.generateNewAccount(seed, 0)
+  private val receiverPrivateKey   = Wallet.generateNewAccount(seed, 1)
   private val MaxDistributionDepth = 1
 
   private def setScriptTransaction(sender: KeyPair) =
@@ -69,20 +72,24 @@ class AssetsRouteSpec
       .selfSigned(
         TxVersion.V2,
         sender,
-        Some(TestCompiler(V6).compileContract("""
-          |{-# STDLIB_VERSION 6 #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |
-          |@Callable(inv)
-          |func issue(name: String, description: String, amount: Int, decimals: Int, isReissuable: Boolean) = {
-          |  let t = Issue(name, description, amount, decimals, isReissuable)
-          |  [
-          |    t,
-          |    BinaryEntry("assetId", calculateAssetId(t))
-          |  ]
-          |}
-          |""".stripMargin)),
+        Some(
+          TestCompiler(V6).compileContract(
+            """
+              |{-# STDLIB_VERSION 6 #-}
+              |{-# CONTENT_TYPE DAPP #-}
+              |{-# SCRIPT_TYPE ACCOUNT #-}
+              |
+              |@Callable(inv)
+              |func issue(name: String, description: String, amount: Int, decimals: Int, isReissuable: Boolean) = {
+              |  let t = Issue(name, description, amount, decimals, isReissuable)
+              |  [
+              |    t,
+              |    BinaryEntry("assetId", calculateAssetId(t))
+              |  ]
+              |}
+              |""".stripMargin
+          )
+        ),
         0.01.waves,
         ntpTime.getTimestamp()
       )
@@ -100,7 +107,8 @@ class AssetsRouteSpec
         reissuable = assetDesc.reissuable,
         script = script,
         fee = 1.waves,
-        timestamp = TxHelpers.timestamp)
+        timestamp = TxHelpers.timestamp
+      )
       .explicitGet()
 
   private val assetDesc = AssetDescription(
@@ -212,7 +220,7 @@ class AssetsRouteSpec
           feeAssetId = None,
           amount = 1.waves,
           fee = 0.3.waves,
-          sender =  senderPrivateKey.toAddress.toString,
+          sender = senderPrivateKey.toAddress.toString,
           attachment = Some("attachment"),
           recipient = receiverPrivateKey.toAddress.toString,
           timestamp = Some(System.currentTimeMillis())
@@ -270,9 +278,10 @@ class AssetsRouteSpec
 
       val assetId = d.blockchain
         .accountData(tx.sender.toAddress, "assetId")
-        .collect {
-          case i: BinaryDataEntry => i.value
-        }.get
+        .collect { case i: BinaryDataEntry =>
+          i.value
+        }
+        .get
 
       d.liquidAndSolidAssert { () =>
         checkDetails(d, route, tx, assetId.toString, assetDesc)
@@ -281,57 +290,87 @@ class AssetsRouteSpec
   }
 
   routePath(s"/details/{id} - issued by Ethereum transaction") in {
-    withRoute { (d, route) =>
-      val tx = EthTxGenerator.generateEthInvoke(
-        keyPair = TxHelpers.defaultEthSigner,
-        address = defaultSigner.toAddress,
-        funcName = "issue",
-        args = Seq(
-          Arg.Str(assetDesc.name.toStringUtf8),
-          Arg.Str(assetDesc.description.toStringUtf8),
-          Arg.Integer(assetDesc.totalVolume.toInt),
-          Arg.Integer(assetDesc.decimals),
-          Arg.Bool(assetDesc.reissuable)
-        ),
-        payments = Seq.empty,
-        fee = 1.01.waves
-      )
+    val setScript = setScriptTransaction(defaultSigner)
+    val invoker   = TxHelpers.defaultEthSigner
+    val fee       = 1.01.waves
 
-      d.appendBlock(TxHelpers.genesis(tx.sender.toAddress), TxHelpers.genesis(defaultSigner.toAddress))
-      d.appendBlock(setScriptTransaction(defaultSigner), tx)
+    Seq(true, false)
+      .foreach { useInvokeExpression =>
+        withRoute { (d, route) =>
+          val tx =
+            if (useInvokeExpression) {
+              val call = Some(
+                FUNCTION_CALL(
+                  User("issue"),
+                  List(
+                    CONST_STRING(assetDesc.name.toStringUtf8).explicitGet(),
+                    CONST_STRING(assetDesc.description.toStringUtf8).explicitGet(),
+                    CONST_LONG(assetDesc.totalVolume.toInt),
+                    CONST_LONG(assetDesc.decimals),
+                    CONST_BOOLEAN(assetDesc.reissuable)
+                  )
+                )
+              )
+              ci.toEthInvokeExpression(setScript, invoker, call, Some(fee))
+            } else {
+              EthTxGenerator.generateEthInvoke(
+                keyPair = invoker,
+                address = defaultSigner.toAddress,
+                funcName = "issue",
+                args = Seq(
+                  Arg.Str(assetDesc.name.toStringUtf8),
+                  Arg.Str(assetDesc.description.toStringUtf8),
+                  Arg.Integer(assetDesc.totalVolume.toInt),
+                  Arg.Integer(assetDesc.decimals),
+                  Arg.Bool(assetDesc.reissuable)
+                ),
+                payments = Seq.empty,
+                fee
+              )
+            }
+          val description = if (useInvokeExpression) assetDesc.copy(issuer = tx.sender) else assetDesc
+          val dataAddress = if (useInvokeExpression) tx.sender.toAddress else defaultSigner.toAddress
 
-      val assetId = d.blockchain
-        .accountData(defaultSigner.toAddress, "assetId")
-        .collect {
-          case i: BinaryDataEntry => i.value
-        }.get
+          d.appendBlock(TxHelpers.genesis(tx.sender.toAddress), TxHelpers.genesis(defaultSigner.toAddress))
+          d.appendBlock(setScript, tx)
 
-      d.liquidAndSolidAssert { () =>
-        checkDetails(d, route, tx, assetId.toString, assetDesc)
+          val assetId = d.blockchain
+            .accountData(dataAddress, "assetId")
+            .collect { case i: BinaryDataEntry => i.value }
+            .get
+
+          d.liquidAndSolidAssert { () =>
+            checkDetails(d, route, tx, assetId.toString, description)
+          }
+        }
       }
-    }
   }
 
   private val smartIssueAndDetailsGen = {
     scriptGen.map { script =>
       (
         issueTransaction(script = Some(script)),
-        assetDesc.copy(script = Some(AssetScriptInfo(script, Script.estimate(script, ScriptEstimatorV1, fixEstimateOfVerifier = true, useContractVerifierLimit = false).explicitGet())))
+        assetDesc.copy(script =
+          Some(
+            AssetScriptInfo(
+              script,
+              Script.estimate(script, ScriptEstimatorV1, fixEstimateOfVerifier = true, useContractVerifierLimit = false).explicitGet()
+            )
+          )
+        )
       )
     }
   }
 
-  routePath(s"/details/{id} - smart asset") in forAll(smartIssueAndDetailsGen) {
-    case (tx, assetDesc) =>
-      withRoute { (d, route) =>
+  routePath(s"/details/{id} - smart asset") in forAll(smartIssueAndDetailsGen) { case (tx, assetDesc) =>
+    withRoute { (d, route) =>
+      d.appendBlock(TxHelpers.genesis(tx.sender.toAddress))
+      d.appendBlock(tx)
 
-        d.appendBlock(TxHelpers.genesis(tx.sender.toAddress))
-        d.appendBlock(tx)
-
-        d.liquidAndSolidAssert { () =>
-          checkDetails(d, route, tx, tx.id().toString, assetDesc)
-        }
+      d.liquidAndSolidAssert { () =>
+        checkDetails(d, route, tx, tx.id().toString, assetDesc)
       }
+    }
   }
 
   routePath(s"/details/{id} - non-smart asset") in {

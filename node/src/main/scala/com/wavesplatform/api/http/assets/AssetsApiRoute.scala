@@ -1,45 +1,43 @@
 package com.wavesplatform.api.http.assets
 
-import java.util.concurrent._
-
+import java.util.concurrent.*
 import scala.concurrent.Future
-
 import akka.NotUsed
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Source
 import cats.data.Validated
-import cats.instances.either._
-import cats.instances.list._
-import cats.syntax.alternative._
-import cats.syntax.either._
-import cats.syntax.traverse._
+import cats.instances.either.*
+import cats.instances.list.*
+import cats.syntax.alternative.*
+import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
-import com.wavesplatform.api.http._
-import com.wavesplatform.api.http.ApiError._
+import com.wavesplatform.api.http.*
+import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
-import com.wavesplatform.api.http.requests._
+import com.wavesplatform.api.http.requests.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.EthereumTransaction.Invocation
+import com.wavesplatform.transaction.EthereumTransaction.{Invocation, InvokeExpression}
 import com.wavesplatform.transaction.{EthereumTransaction, TransactionFactory}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.assets.exchange.OrderJson._
+import com.wavesplatform.transaction.assets.exchange.OrderJson.*
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import io.netty.util.concurrent.DefaultThreadFactory
 import monix.execution.Scheduler
 import monix.reactive.Observable
-import play.api.libs.json._
+import play.api.libs.json.*
 
 case class AssetsApiRoute(
     settings: RestAPISettings,
@@ -156,8 +154,8 @@ case class AssetsApiRoute(
       Json.obj("assetId" -> asset)
   }
 
-  /**
-    * @param assets Some(assets) for specific asset balances, None for a full portfolio
+  /** @param assets
+    *   Some(assets) for specific asset balances, None for a full portfolio
     */
   def balances(address: Address, assets: Option[Seq[IssuedAsset]] = None): Route = extractScheduler { implicit s =>
     implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsObject, NotUsed]] =
@@ -174,9 +172,8 @@ case class AssetsApiRoute(
           .mapConcat(identity)
     }
 
-    val jsonStream = assetBalances.map {
-      case (assetId, balance) =>
-        fullAssetInfoJson(assetId) ++ Json.obj("balance" -> balance)
+    val jsonStream = assetBalances.map { case (assetId, balance) =>
+      fullAssetInfoJson(assetId) ++ Json.obj("balance" -> balance)
     }
 
     complete(jsonStream)
@@ -217,12 +214,11 @@ case class AssetsApiRoute(
             Json.obj(
               "hasNext"  -> (l.length == limit),
               "lastItem" -> l.lastOption.map(_._1),
-              "items" -> Json.toJson(l.map {
-                case (a, b) =>
-                  a.toString -> accept.fold[JsValue](JsNumber(b)) {
-                    case a if a.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings) => JsString(b.toString)
-                    case _                                                             => JsNumber(b)
-                  }
+              "items" -> Json.toJson(l.map { case (a, b) =>
+                a.toString -> accept.fold[JsValue](JsNumber(b)) {
+                  case a if a.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings) => JsString(b.toString)
+                  case _                                                             => JsNumber(b)
+                }
               }.toMap)
             )
           }
@@ -255,13 +251,12 @@ case class AssetsApiRoute(
           Source.fromPublisher(
             commonAccountApi
               .nftList(address, after)
-              .flatMap {
-                case (assetId, assetDesc) =>
-                  Observable.fromEither(
-                    AssetsApiRoute
-                      .jsonDetails(blockchain)(assetId, assetDesc, true)
-                      .leftMap(err => new IllegalArgumentException(err))
-                  )
+              .flatMap { case (assetId, assetDesc) =>
+                Observable.fromEither(
+                  AssetsApiRoute
+                    .jsonDetails(blockchain)(assetId, assetDesc, true)
+                    .leftMap(err => new IllegalArgumentException(err))
+                )
               }
               .take(limit)
               .toReactivePublisher
@@ -346,11 +341,11 @@ object AssetsApiRoute {
           .toRight("Failed to find issue/invokeScript/invokeExpression transaction by ID")
         (txm, tx) = tt
         ts <- (tx match {
-          case tx: IssueTransaction        => Some(tx.timestamp)
-          case tx: InvokeScriptTransaction => Some(tx.timestamp)
-          case tx: InvokeExpressionTransaction => Some(tx.timestamp)
-          case tx @ EthereumTransaction(_: Invocation, _, _, _) => Some(tx.timestamp)
-          case _                           => None
+          case tx: IssueTransaction                                                   => Some(tx.timestamp)
+          case tx: InvokeScriptTransaction                                            => Some(tx.timestamp)
+          case tx: InvokeExpressionTransaction                                        => Some(tx.timestamp)
+          case tx @ EthereumTransaction(_: Invocation | _: InvokeExpression, _, _, _) => Some(tx.timestamp)
+          case _                                                                      => None
         }).toRight("No issue/invokeScript/invokeExpression transaction found with the given asset ID")
       } yield (ts, txm.height)
 
@@ -378,13 +373,12 @@ object AssetsApiRoute {
           case sponsorship => JsNumber(sponsorship)
         }),
         "originTransactionId" -> JsString(description.originTransactionId.toString)
-      ) ++ script.toSeq.map {
-        case AssetScriptInfo(script, complexity) =>
-          "scriptDetails" -> Json.obj(
-            "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
-            "script"           -> JsString(script.bytes().base64),
-            "scriptText"       -> JsString(script.expr.toString) // [WAIT] JsString(Script.decompile(script))
-          )
+      ) ++ script.toSeq.map { case AssetScriptInfo(script, complexity) =>
+        "scriptDetails" -> Json.obj(
+          "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
+          "script"           -> JsString(script.bytes().base64),
+          "scriptText"       -> JsString(script.expr.toString) // [WAIT] JsString(Script.decompile(script))
+        )
       }
     )
   }

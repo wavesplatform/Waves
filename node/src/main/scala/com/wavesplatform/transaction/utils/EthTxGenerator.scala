@@ -5,6 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.transaction.{ABIConverter, Asset, EthereumTransaction, TransactionType}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.utils.EthEncoding
@@ -137,9 +138,10 @@ object EthTxGenerator {
 
   def generateEthInvokeExpression(
       invoker: ECKeyPair,
-      expression: ExprScript
+      expression: ExprScript,
+      feeOpt: Option[Long] = None
   ): EthereumTransaction = {
-    val fee = FeeValidation.FeeConstants(TransactionType.InvokeExpression) * FeeValidation.FeeUnit
+    val fee = feeOpt.getOrElse(FeeConstants(TransactionType.InvokeExpression) * FeeUnit)
     signRawTransaction(invoker, AddressScheme.current.chainId)(
       RawTransaction.createTransaction(
         BigInt(System.currentTimeMillis()).bigInteger,

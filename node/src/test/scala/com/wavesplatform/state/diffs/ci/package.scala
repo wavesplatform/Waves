@@ -67,9 +67,10 @@ package object ci {
   def toEthInvokeExpression(
       setScript: SetScriptTransaction,
       invoker: ECKeyPair,
-      call: Option[FUNCTION_CALL] = None
+      call: Option[FUNCTION_CALL] = None,
+      fee: Option[Long] = None
   ): EthereumTransaction =
-    EthTxGenerator.generateEthInvokeExpression(invoker, toFreeCall(setScript, call))
+    EthTxGenerator.generateEthInvokeExpression(invoker, toFreeCall(setScript, call), fee)
 
   private def toFreeCall(
       setScript: SetScriptTransaction,
