@@ -10,7 +10,6 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, NewAssetInfo}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
