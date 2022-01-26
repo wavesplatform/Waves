@@ -180,12 +180,11 @@ case class TransactionsApiRoute(
 
   def merkleProof: Route = path("merkleProof") {
     (get & parameters("id".as[String].*))(ids => complete(merkleProof(ids.toList.reverse))) ~
-      jsonPost[JsObject](
-        jsv =>
-          (jsv \ "ids").validate[List[String]] match {
-            case JsSuccess(ids, _) => merkleProof(ids)
-            case JsError(err)      => WrongJson(errors = err.toSeq)
-          }
+      jsonPost[JsObject](jsv =>
+        (jsv \ "ids").validate[List[String]] match {
+          case JsSuccess(ids, _) => merkleProof(ids)
+          case JsError(err)      => WrongJson(errors = err.toSeq)
+        }
       )
   }
 
@@ -208,21 +207,20 @@ case class TransactionsApiRoute(
         .map(aliases => aliases.toSet)
         .memoize
 
-    /**
-      * Produces compact representation for large transactions by stripping unnecessary data.
-      * Currently implemented for MassTransfer transaction only.
+    /** Produces compact representation for large transactions by stripping unnecessary data. Currently implemented for MassTransfer transaction only.
       */
     def compactJson(address: Address, meta: TransactionMeta): Task[JsObject] = {
       import com.wavesplatform.transaction.transfer._
       meta.transaction match {
         case mtt: MassTransferTransaction if mtt.sender.toAddress != address =>
-          (if (mtt.transfers.exists(
-                 pt =>
-                   pt.address match {
-                     case address: Address => false
-                     case a: Alias         => true
-                   }
-               )) aliasesOfAddress.map(aliases => mtt.compactJson(address, aliases))
+          (if (
+             mtt.transfers.exists(pt =>
+               pt.address match {
+                 case address: Address => false
+                 case a: Alias         => true
+               }
+             )
+           ) aliasesOfAddress.map(aliases => mtt.compactJson(address, aliases))
            else Task.now(mtt.compactJson(address, Set.empty))).map(_ ++ serializer.transactionMetaJson(meta))
 
         case _ => Task.now(serializer.transactionWithMetaJson(meta))
@@ -241,7 +239,7 @@ case class TransactionsApiRoute(
 object TransactionsApiRoute {
   type LeaseStatus = LeaseStatus.Value
 
-  //noinspection TypeAnnotation
+  // noinspection TypeAnnotation
   object LeaseStatus extends Enumeration {
     val active   = Value(1)
     val canceled = Value(0)
@@ -317,6 +315,13 @@ object TransactionsApiRoute {
                   "dApp"         -> Address(EthEncoding.toBytes(e.transaction.underlying.getTo)),
                   "call"         -> functionCallEi.toOption,
                   "payment"      -> payments,
+                  "stateChanges" -> e.invokeScriptResult
+                )
+
+              case Payload.InvokeExpression(i) =>
+                Json.obj(
+                  "type"         -> "invokeExpression",
+                  "expression"   -> ByteStr(i.expression.toByteArray).base64,
                   "stateChanges" -> e.invokeScriptResult
                 )
 

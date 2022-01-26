@@ -4,10 +4,9 @@ import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
-import com.wavesplatform.transaction.{ABIConverter, Asset, EthereumTransaction, TransactionType}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.{ABIConverter, Asset, EthereumTransaction, TransactionType}
 import com.wavesplatform.utils.EthEncoding
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.{AbiTypes, StructType}
