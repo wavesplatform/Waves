@@ -6,6 +6,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.state.diffs.invoke.InvokeExpressionTransactionLike
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.serialization.impl.{BaseTxJson, PBTransactionSerializer}
 import com.wavesplatform.transaction.validation.TxValidator
@@ -26,6 +27,7 @@ case class InvokeExpressionTransaction(
     chainId: Byte
 ) extends Transaction(TransactionType.InvokeExpression, Nil)
     with InvokeTransaction
+    with InvokeExpressionTransactionLike
     with PBSince.V1 {
 
   lazy val expressionBytes: ByteStr = expression.bytes.value()

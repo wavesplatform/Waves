@@ -1,9 +1,11 @@
 package com.wavesplatform.transaction.utils
 
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
-import com.wavesplatform.transaction.{ABIConverter, Asset, EthereumTransaction}
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.transaction.{ABIConverter, Asset, EthereumTransaction, TransactionType}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.utils.EthEncoding
 import org.web3j.abi.FunctionEncoder
@@ -43,7 +45,8 @@ object EthTxGenerator {
       val arrayClass = toEthType(listType)
       new ethTypes.DynamicArray(arrayClass.getClass.asInstanceOf[Class[ethTypes.Type[?]]], ethTypedXs*) {
         override def getTypeAsString: String =
-          (if (classOf[StructType].isAssignableFrom(arrayClass.getClass)) arrayClass.getTypeAsString else AbiTypes.getTypeAString(getComponentType)) + "[]"
+          (if (classOf[StructType].isAssignableFrom(arrayClass.getClass)) arrayClass.getTypeAsString
+           else AbiTypes.getTypeAString(getComponentType)) + "[]"
       }
     case Arg.Struct(values*) => new ethTypes.StaticStruct(values.map(toEthType)*)
   }
@@ -128,6 +131,22 @@ object EthTxGenerator {
         BigInt(fee).bigInteger,
         EthEncoding.toHexString(address.publicKeyHash),
         FunctionEncoder.encode(function)
+      )
+    )
+  }
+
+  def generateEthInvokeExpression(
+      invoker: ECKeyPair,
+      expression: ExprScript
+  ): EthereumTransaction = {
+    val fee = FeeValidation.FeeConstants(TransactionType.InvokeExpression) * FeeValidation.FeeUnit
+    signRawTransaction(invoker, AddressScheme.current.chainId)(
+      RawTransaction.createTransaction(
+        BigInt(System.currentTimeMillis()).bigInteger,
+        EthereumTransaction.GasPrice,
+        BigInt(fee).bigInteger,
+        "",
+        EthEncoding.toHexString(expression.bytes().arr)
       )
     )
   }

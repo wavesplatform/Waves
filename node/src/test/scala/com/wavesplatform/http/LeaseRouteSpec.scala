@@ -12,9 +12,11 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.{V5, V6}
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.network.TransactionPublisher
+import com.wavesplatform.state.diffs.ci
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Diff, Height, TxMeta}
 import com.wavesplatform.test.*
@@ -56,32 +58,32 @@ class LeaseRouteSpec
       f(d, route(d).route)
     }
 
+  private val leaseContract = TestCompiler(V5).compileContract(
+    """
+      |@Callable(inv)
+      |func leaseTo(recipient: ByteVector, amount: Int) = {
+      |  let lease = Lease(Address(recipient), amount)
+      |  [
+      |    lease,
+      |    BinaryEntry("leaseId", lease.calculateLeaseId())
+      |  ]
+      |}
+      |
+      |@Callable(inv)
+      |func cancelLease(id: ByteVector) = {
+      |  [
+      |    LeaseCancel(id)
+      |  ]
+      |}
+    """.stripMargin
+  )
+
   private def setScriptTransaction(sender: KeyPair) =
     SetScriptTransaction
       .selfSigned(
         TxVersion.V2,
         sender,
-        Some(TestCompiler(V5).compileContract("""
-          |{-# STDLIB_VERSION 4 #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |
-          |@Callable(inv)
-          |func leaseTo(recipient: ByteVector, amount: Int) = {
-          |  let lease = Lease(Address(recipient), amount)
-          |  [
-          |    lease,
-          |    BinaryEntry("leaseId", lease.calculateLeaseId())
-          |  ]
-          |}
-          |
-          |@Callable(inv)
-          |func cancelLease(id: ByteVector) = {
-          |  [
-          |    LeaseCancel(id)
-          |  ]
-          |}
-          |""".stripMargin)),
+        Some(leaseContract),
         0.01.waves,
         ntpTime.getTimestamp()
       )
@@ -118,8 +120,8 @@ class LeaseRouteSpec
     Get(routePath(s"/active/$address")) ~> route ~> check {
       val resp = responseAs[Seq[JsObject]]
       resp.size shouldEqual expectedDetails.size
-      resp.zip(expectedDetails).foreach {
-        case (json, (id, details)) => checkDetails(id, details, json)
+      resp.zip(expectedDetails).foreach { case (json, (id, details)) =>
+        checkDetails(id, details, json)
       }
     }
 
@@ -140,48 +142,46 @@ class LeaseRouteSpec
       leaseTx <- leaseGen(sender, genesis.amount, ntpTime.correctedTime())
     } yield (sender, genesis, leaseTx)
 
-    "created and cancelled by Lease/LeaseCancel transactions" in forAll(genesisWithLease) {
-      case (sender, genesis, leaseTransaction) =>
-        withRoute { (d, r) =>
-          d.appendBlock(genesis)
-          d.appendBlock(leaseTransaction)
-          val expectedDetails = Seq(leaseTransaction.id() -> toDetails(leaseTransaction))
-          d.liquidAndSolidAssert { () =>
-            checkActiveLeasesFor(leaseTransaction.sender.toAddress, r, expectedDetails)
-            checkActiveLeasesFor(leaseTransaction.recipient, r, expectedDetails)
-          }
-
-          d.appendMicroBlock(leaseCancelTransaction(sender, leaseTransaction.id()))
-
-          d.liquidAndSolidAssert { () =>
-            checkActiveLeasesFor(leaseTransaction.sender.toAddress, r, Seq.empty)
-            checkActiveLeasesFor(leaseTransaction.recipient, r, Seq.empty)
-          }
+    "created and cancelled by Lease/LeaseCancel transactions" in forAll(genesisWithLease) { case (sender, genesis, leaseTransaction) =>
+      withRoute { (d, r) =>
+        d.appendBlock(genesis)
+        d.appendBlock(leaseTransaction)
+        val expectedDetails = Seq(leaseTransaction.id() -> toDetails(leaseTransaction))
+        d.liquidAndSolidAssert { () =>
+          checkActiveLeasesFor(leaseTransaction.sender.toAddress, r, expectedDetails)
+          checkActiveLeasesFor(leaseTransaction.recipient, r, expectedDetails)
         }
+
+        d.appendMicroBlock(leaseCancelTransaction(sender, leaseTransaction.id()))
+
+        d.liquidAndSolidAssert { () =>
+          checkActiveLeasesFor(leaseTransaction.sender.toAddress, r, Seq.empty)
+          checkActiveLeasesFor(leaseTransaction.recipient, r, Seq.empty)
+        }
+      }
     }
 
-    "created by LeaseTransaction and canceled by InvokeScriptTransaction" in forAll(genesisWithLease) {
-      case (sender, genesis, leaseTransaction) =>
-        withRoute { (d, r) =>
-          d.appendBlock(genesis)
-          d.appendBlock(leaseTransaction)
-          val expectedDetails = Seq(leaseTransaction.id() -> toDetails(leaseTransaction))
+    "created by LeaseTransaction and canceled by InvokeScriptTransaction" in forAll(genesisWithLease) { case (sender, genesis, leaseTransaction) =>
+      withRoute { (d, r) =>
+        d.appendBlock(genesis)
+        d.appendBlock(leaseTransaction)
+        val expectedDetails = Seq(leaseTransaction.id() -> toDetails(leaseTransaction))
 
-          d.liquidAndSolidAssert { () =>
-            checkActiveLeasesFor(leaseTransaction.sender.toAddress, r, expectedDetails)
-            checkActiveLeasesFor(leaseTransaction.recipient, r, expectedDetails)
-          }
-
-          d.appendMicroBlock(
-            setScriptTransaction(sender),
-            invokeLeaseCancel(sender, leaseTransaction.id())
-          )
-
-          d.liquidAndSolidAssert { () =>
-            checkActiveLeasesFor(leaseTransaction.sender.toAddress, r, Seq.empty)
-            checkActiveLeasesFor(leaseTransaction.recipient, r, Seq.empty)
-          }
+        d.liquidAndSolidAssert { () =>
+          checkActiveLeasesFor(leaseTransaction.sender.toAddress, r, expectedDetails)
+          checkActiveLeasesFor(leaseTransaction.recipient, r, expectedDetails)
         }
+
+        d.appendMicroBlock(
+          setScriptTransaction(sender),
+          invokeLeaseCancel(sender, leaseTransaction.id())
+        )
+
+        d.liquidAndSolidAssert { () =>
+          checkActiveLeasesFor(leaseTransaction.sender.toAddress, r, Seq.empty)
+          checkActiveLeasesFor(leaseTransaction.recipient, r, Seq.empty)
+        }
+      }
     }
 
     val genesisWithSetScriptAndInvoke = for {
@@ -217,8 +217,8 @@ class LeaseRouteSpec
           d.appendBlock(invoke)
           val leaseId = d.blockchain
             .accountData(genesis.recipient, "leaseId")
-            .collect {
-              case i: BinaryDataEntry => i.value
+            .collect { case i: BinaryDataEntry =>
+              i.value
             }
             .get
           val expectedDetails = Seq(leaseId -> LeaseDetails(setScript.sender, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
@@ -247,8 +247,8 @@ class LeaseRouteSpec
 
           val leaseId = d.blockchain
             .accountData(genesis.recipient, "leaseId")
-            .collect {
-              case i: BinaryDataEntry => i.value
+            .collect { case i: BinaryDataEntry =>
+              i.value
             }
             .get
           val expectedDetails = Seq(leaseId -> LeaseDetails(setScript.sender, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
@@ -297,8 +297,8 @@ class LeaseRouteSpec
           d.appendBlock(invoke)
           val leaseId = d.blockchain
             .accountData(genesis.recipient, "leaseId")
-            .collect {
-              case i: BinaryDataEntry => i.value
+            .collect { case i: BinaryDataEntry =>
+              i.value
             }
             .get
           val expectedDetails = Seq(leaseId -> LeaseDetails(sender.publicKey, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
@@ -317,53 +317,66 @@ class LeaseRouteSpec
         }
     }
 
-    val genesisWithEthereumInvoke = for {
-      sender <- ethAccountGen
-      dApp    <- accountGen
+    def genesisWithEthereumInvoke(useInvokeExpression: Boolean) = for {
+      sender    <- ethAccountGen
+      dApp      <- accountGen
       recipient <- accountGen
       genesisS  <- genesisGeneratorP(dApp.toAddress)
-      invokeEth <- ethereumInvokeTransactionGen(
-        sender,
-        dApp,
-        "leaseTo",
-        Seq(Arg.Bytes(ByteStr(recipient.toAddress.bytes)), Arg.Integer(10000.waves))
-      )
-      genesisE  <- genesisGeneratorP(invokeEth.sender.toAddress)
+      setScript = setScriptTransaction(dApp)
+      invokeEth <-
+        if (useInvokeExpression) Gen.const {
+          val args = List(CONST_BYTESTR(ByteStr(recipient.toAddress.bytes)).explicitGet(), CONST_LONG(10000.waves))
+          ci.toEthInvokeExpression(setScript, sender, Some(FUNCTION_CALL(User("leaseTo"), args)))
+        }
+        else
+          ethereumInvokeTransactionGen(
+            sender,
+            dApp,
+            "leaseTo",
+            Seq(Arg.Bytes(ByteStr(recipient.toAddress.bytes)), Arg.Integer(10000.waves))
+          )
+      invokeLeaseCancel = (leaseId: ByteStr) => {
+        val call = Some(FUNCTION_CALL(User("cancelLease"), List(CONST_BYTESTR(leaseId).explicitGet())))
+        ci.toEthInvokeExpression(setScript, sender, call)
+      }
+      genesisE <- genesisGeneratorP(invokeEth.sender.toAddress)
     } yield (
+      Seq(genesisS, genesisE, setScript),
       dApp,
-      genesisS,
-      genesisE,
-      setScriptTransaction(dApp),
       invokeEth,
+      invokeLeaseCancel,
       recipient.toAddress
     )
 
-    "created by EthereumTransaction and canceled by CancelLeaseTransaction" in forAll(genesisWithEthereumInvoke) {
-      case (dApp, genesisS, genesisE, setScript, invoke, recipient) =>
-        withRoute { (d, r) =>
-          d.appendBlock(genesisS, genesisE, setScript)
-          d.appendBlock(invoke)
-          val leaseId = d.blockchain
-            .accountData(genesisS.recipient, "leaseId")
-            .collect {
-              case i: BinaryDataEntry => i.value
+    "created by EthereumTransaction and canceled by LeaseCancelTransaction for InvokeScript and EthereumTransaction for InvokeExpression" in
+      Seq(true, false)
+        .foreach { useInvokeExpression =>
+          val (preparingTxs, dAppKp, invoke, invokeEthCancel, recipient) = genesisWithEthereumInvoke(useInvokeExpression).sample.get
+
+          val leaseCancel   = if (useInvokeExpression) invokeEthCancel else leaseCancelTransaction(dAppKp, _)
+          val leaseSenderPk = if (useInvokeExpression) invoke.sender else dAppKp.publicKey
+          val leaseSender   = leaseSenderPk.toAddress
+
+          withRoute { (d, r) =>
+            d.appendBlock(preparingTxs: _*)
+            d.appendBlock(invoke)
+
+            val leaseId         = d.blockchain.accountData(leaseSender, "leaseId").collect { case i: BinaryDataEntry => i.value }.get
+            val expectedDetails = Seq(leaseId -> LeaseDetails(leaseSenderPk, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
+
+            d.liquidAndSolidAssert { () =>
+              checkActiveLeasesFor(leaseSender, r, expectedDetails)
+              checkActiveLeasesFor(recipient, r, expectedDetails)
             }
-            .get
-          val expectedDetails = Seq(leaseId -> LeaseDetails(dApp.publicKey, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
 
-          d.liquidAndSolidAssert { () =>
-            checkActiveLeasesFor(dApp.toAddress, r, expectedDetails)
-            checkActiveLeasesFor(recipient, r, expectedDetails)
-          }
+            d.appendMicroBlock(leaseCancel(leaseId))
 
-          d.appendMicroBlock(leaseCancelTransaction(dApp, leaseId))
-
-          d.liquidAndSolidAssert { () =>
-            checkActiveLeasesFor(dApp.toAddress, r, Seq.empty)
-            checkActiveLeasesFor(recipient, r, Seq.empty)
+            d.liquidAndSolidAssert { () =>
+              checkActiveLeasesFor(leaseSender, r, Seq.empty)
+              checkActiveLeasesFor(recipient, r, Seq.empty)
+            }
           }
         }
-    }
 
     val nestedInvocation = for {
       proxy     <- accountGen
@@ -382,16 +395,16 @@ class LeaseRouteSpec
             TxVersion.V2,
             proxy,
             Some(TestCompiler(V5).compileContract("""
-              |{-# STDLIB_VERSION 4 #-}
-              |{-# CONTENT_TYPE DAPP #-}
-              |{-# SCRIPT_TYPE ACCOUNT #-}
-              |
-              |@Callable(inv)
-              |func callProxy(targetDapp: ByteVector, recipient: ByteVector, amount: Int) = {
-              |  strict result = invoke(Address(targetDapp), "leaseTo", [recipient, amount], [])
-              |  []
-              |}
-              |""".stripMargin)),
+                                                    |{-# STDLIB_VERSION 4 #-}
+                                                    |{-# CONTENT_TYPE DAPP #-}
+                                                    |{-# SCRIPT_TYPE ACCOUNT #-}
+                                                    |
+                                                    |@Callable(inv)
+                                                    |func callProxy(targetDapp: ByteVector, recipient: ByteVector, amount: Int) = {
+                                                    |  strict result = invoke(Address(targetDapp), "leaseTo", [recipient, amount], [])
+                                                    |  []
+                                                    |}
+                                                  """.stripMargin)),
             0.01.waves,
             ntpTime.getTimestamp()
           )
@@ -399,45 +412,44 @@ class LeaseRouteSpec
       )
     )
 
-    "created by nested invocations" in forAll(nestedInvocation) {
-      case ((proxy, target, recipient), genesisTransactions) =>
-        withRoute { (d, r) =>
-          d.appendBlock(genesisTransactions*)
-          val ist = Signed.invokeScript(
-            TxVersion.V2,
-            proxy,
-            proxy.toAddress,
-            Some(
-              FUNCTION_CALL(
-                FunctionHeader.User("callProxy"),
-                List(
-                  CONST_BYTESTR(ByteStr(target.toAddress.bytes)).explicitGet(),
-                  CONST_BYTESTR(ByteStr(recipient.bytes)).explicitGet(),
-                  CONST_LONG(10_000.waves)
-                )
+    "created by nested invocations" in forAll(nestedInvocation) { case ((proxy, target, recipient), genesisTransactions) =>
+      withRoute { (d, r) =>
+        d.appendBlock(genesisTransactions*)
+        val ist = Signed.invokeScript(
+          TxVersion.V2,
+          proxy,
+          proxy.toAddress,
+          Some(
+            FUNCTION_CALL(
+              FunctionHeader.User("callProxy"),
+              List(
+                CONST_BYTESTR(ByteStr(target.toAddress.bytes)).explicitGet(),
+                CONST_BYTESTR(ByteStr(recipient.bytes)).explicitGet(),
+                CONST_LONG(10_000.waves)
               )
-            ),
-            Seq.empty,
-            0.005.waves,
-            Asset.Waves,
-            ntpTime.getTimestamp()
-          )
+            )
+          ),
+          Seq.empty,
+          0.005.waves,
+          Asset.Waves,
+          ntpTime.getTimestamp()
+        )
 
-          d.appendBlock(ist)
-          val leaseId = d.blockchain
-            .accountData(target.toAddress, "leaseId")
-            .collect {
-              case i: BinaryDataEntry => i.value
-            }
-            .get
-
-          val expectedDetails = Seq(leaseId -> LeaseDetails(target.publicKey, recipient, 10_000.waves, LeaseDetails.Status.Active, ist.id(), 1))
-
-          d.liquidAndSolidAssert { () =>
-            checkActiveLeasesFor(target.toAddress, r, expectedDetails)
-            checkActiveLeasesFor(recipient, r, expectedDetails)
+        d.appendBlock(ist)
+        val leaseId = d.blockchain
+          .accountData(target.toAddress, "leaseId")
+          .collect { case i: BinaryDataEntry =>
+            i.value
           }
+          .get
+
+        val expectedDetails = Seq(leaseId -> LeaseDetails(target.publicKey, recipient, 10_000.waves, LeaseDetails.Status.Active, ist.id(), 1))
+
+        d.liquidAndSolidAssert { () =>
+          checkActiveLeasesFor(target.toAddress, r, expectedDetails)
+          checkActiveLeasesFor(recipient, r, expectedDetails)
         }
+      }
     }
   }
 
@@ -472,16 +484,16 @@ class LeaseRouteSpec
     Get(routePath(s"/info/${lease.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
       response should matchJson(s"""{
-                               |  "id" : "${lease.id()}",
-                               |  "originTransactionId" : "${lease.id()}",
-                               |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                               |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
-                               |  "amount" : 1000000000,
-                               |  "height" : 1,
-                               |  "status" : "canceled",
-                               |  "cancelHeight" : 2,
-                               |  "cancelTransactionId" : "${leaseCancel.id()}"
-                               |}""".stripMargin)
+                                   |  "id" : "${lease.id()}",
+                                   |  "originTransactionId" : "${lease.id()}",
+                                   |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                                   |  "amount" : 1000000000,
+                                   |  "height" : 1,
+                                   |  "status" : "canceled",
+                                   |  "cancelHeight" : 2,
+                                   |  "cancelTransactionId" : "${leaseCancel.id()}"
+                                   |}""".stripMargin)
     }
 
     val leasesListJson = Json.parse(s"""[{
@@ -545,11 +557,11 @@ class LeaseRouteSpec
     Get(routePath(s"/info?id=nonvalid&id=${leaseCancel.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
       response should matchJson(s"""
-                               |{
-                               |  "error" : 116,
-                               |  "message" : "Request contains invalid IDs. nonvalid, ${leaseCancel.id()}",
-                               |  "ids" : [ "nonvalid", "${leaseCancel.id()}" ]
-                               |}""".stripMargin)
+                                   |{
+                                   |  "error" : 116,
+                                   |  "message" : "Request contains invalid IDs. nonvalid, ${leaseCancel.id()}",
+                                   |  "ids" : [ "nonvalid", "${leaseCancel.id()}" ]
+                                   |}""".stripMargin)
     }
   }
 }

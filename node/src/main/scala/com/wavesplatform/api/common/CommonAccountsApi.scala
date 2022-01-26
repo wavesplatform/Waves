@@ -13,7 +13,7 @@ import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain,
 import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
 import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.EthereumTransaction.Invocation
+import com.wavesplatform.transaction.EthereumTransaction.{Invocation, InvokeExpression}
 import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -151,6 +151,8 @@ object CommonAccountsApi extends ScorexLogging {
           extractLeases(blockchain.resolveAlias(inv.transaction.dApp).explicitGet(), scriptResult, originTransaction.id(), invokeHeight)
         case Ethereum(height, tx @ EthereumTransaction(inv: Invocation, _, _, _), true, _, _, Some(scriptResult)) =>
           extractLeases(inv.dApp, scriptResult, tx.id(), height)
+        case Ethereum(height, tx @ EthereumTransaction(inv: InvokeExpression, _, _, _), true, _, _, Some(scriptResult)) =>
+          extractLeases(tx.senderAddress(), scriptResult, tx.id(), height)
         case _ => Seq()
       }
 

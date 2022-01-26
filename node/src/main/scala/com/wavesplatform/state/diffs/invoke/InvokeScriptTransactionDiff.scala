@@ -58,8 +58,8 @@ object InvokeScriptTransactionDiff {
         address <- blockchain.resolveAlias(tx.dApp)
         scriptOpt = blockchain.accountScript(address)
         script <- tx match {
-          case ie: InvokeExpressionTransaction => extractFreeCall(ie, blockchain)
-          case _                               => extractInvoke(tx, scriptOpt)
+          case ie: InvokeExpressionTransactionLike => extractFreeCall(ie, blockchain)
+          case _                                   => extractInvoke(tx, scriptOpt)
         }
       } yield (address, script)
 
@@ -292,7 +292,7 @@ object InvokeScriptTransactionDiff {
       .toRight(GenericError(s"No contract at address ${tx.dApp}"))
 
   private def extractFreeCall(
-      tx: InvokeExpressionTransaction,
+      tx: InvokeExpressionTransactionLike,
       blockchain: Blockchain
   ): Either[GenericError, (PublicKey, StdLibVersion, FUNCTION_CALL, DApp, Map[Int, Map[String, Long]])] = {
     val annotation = CallableAnnotation(ContractCompiler.FreeCallInvocationArg)
