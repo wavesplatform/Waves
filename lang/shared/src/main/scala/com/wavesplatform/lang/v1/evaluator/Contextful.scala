@@ -37,8 +37,7 @@ object ContextfulNativeFunction {
     def evaluate[F[_]: Monad](
         env: C[F],
         evaluatedArgs: List[EVALUATED],
-        availableComplexity: Int,
-        evaluateUserFunction: InternalCall[F]
+        availableComplexity: Int
     )(implicit m: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]]
   }
 }

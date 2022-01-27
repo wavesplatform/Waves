@@ -138,7 +138,7 @@ object ExpressionCompiler {
         case Expressions.REF(p, key, _, _)                     => compileRef(p, key, saveExprContext)
         case Expressions.FUNCTION_CALL(p, name, args, _, _)    => compileFunctionCall(p, name, args, saveExprContext, allowIllFormedStrings)
         case Expressions.MATCH(p, ex, cases, _, _)             => compileMatch(p, ex, cases.toList, saveExprContext, allowIllFormedStrings)
-        case Expressions.FOLD(p, limit, list, acc, f, n, _, _) => compileFold(p, limit, list, acc, f.key, n)
+        case Expressions.FOLD(p, limit, list, acc, f, _, _) => compileFold(p, limit, list, acc, f.key)
         case Expressions.GENERIC_FUNCTION_CALL(p, e, name, t, _, _) =>
           compileGenericFunctionCall(p, e, name, t, saveExprContext, allowIllFormedStrings)
         case Expressions.BINARY_OP(p, a, op, b, _, _) =>
@@ -665,12 +665,11 @@ object ExpressionCompiler {
       limit: Int,
       list: Expressions.EXPR,
       acc: Expressions.EXPR,
-      func: PART[String],
-      isNative: Boolean
+      func: PART[String]
   ): CompileM[CompilationStepResultExpr] =
     for {
       (compiledList, listType, _) <- compileExpr(list)
-      name = if (isNative) s"fold_$limit" else s"FOLD<$limit>"
+      name = s"FOLD<$limit>"
       listInnerType <- (listType match {
         case list: LIST => Right(list.innerType)
         case other      => Left(Generic(p.start, p.end, s"First $name argument should be List[A], but $other found"))
@@ -692,15 +691,7 @@ object ExpressionCompiler {
         .toCompileM
       _ <- set[Id, CompilerContext, CompilationError](ctx.copy(foldIdx = ctx.foldIdx + 1))
       resultType = compiledFunc.args.head._2.asInstanceOf[FINAL]
-      compiledFold <- if (isNative)
-        compileFunctionCall(
-          p,
-          PART.VALID(p, s"fold_$limit"),
-          List(list, acc, Expressions.CONST_STRING(p, func)),
-          saveExprContext = false,
-          allowIllFormedStrings = false
-        ).map(_.copy(t = resultType))
-      else {
+      compiledFold <- {
         val unwrapped = CompilerMacro.unwrapFold(ctx.foldIdx, limit, compiledList, compiledAcc, compiledFunc.header)
         CompilationStepResultExpr(ctx, unwrapped, resultType, accRaw)
           .asRight[CompilationError]

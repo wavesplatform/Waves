@@ -7,11 +7,10 @@ import cats.syntax.foldable.*
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, Simple}
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.{EvaluationException, incomplete}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.EvaluationException
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.traits.Environment
 import monix.eval.Coeval
@@ -86,7 +85,7 @@ class EvaluatorV2(
       else {
         val args = fc.args.asInstanceOf[List[EVALUATED]]
         (function.ev match {
-          case f: Extended[Environment] => f.evaluate[Id](ctx.ec.environment, args, limit - cost, evaluateHighOrder)
+          case f: Extended[Environment] => f.evaluate[Id](ctx.ec.environment, args, limit - cost)
           case f: Simple[Environment]   => Coeval((f.evaluate(ctx.ec.environment, args), limit - cost))
         }).onErrorHandleWith {
             case _: SecurityException =>
@@ -107,18 +106,6 @@ class EvaluatorV2(
           }
       }
     }
-
-    def evaluateHighOrder(function: String, args: List[EVALUATED], limit: Int): Coeval[(Either[ExecutionError, EVALUATED], Int)] =
-      applyCoeval(FUNCTION_CALL(User(function), args), limit, parentBlocks)
-        .redeem(
-          {
-            case e: EvaluationException => (Left(e.getMessage), e.unusedComplexity)
-            case e                      => (Left(e.getMessage), limit)
-          }, {
-            case (r: EVALUATED, unusedComplexity) => (Right(r), unusedComplexity)
-            case (expr, unusedComplexity)         => (incomplete(expr), unusedComplexity)
-          }
-        )
 
     def evaluateUserFunction(fc: FUNCTION_CALL, limit: Int, name: String, startArgs: List[EXPR]): Option[Coeval[Int]] =
       ctx.ec.functions

@@ -1116,25 +1116,4 @@ class DecompilerTest extends PropSpec {
       .filter(_ >= V6)
       .foreach(assertDecompile(script, decompiledV6, _))
   }
-
-  property("native fold") {
-    val script =
-      s"""
-         | func sum(a:Int, b:Int) = a + b
-         | let r = fold_20([1, 2, 3, 4, 5], 9, sum)
-         | true
-       """.stripMargin
-
-    val expected =
-      s"""
-         |func sum (a,b) = (a + b)
-         |
-         |let r = fold_20([1, 2, 3, 4, 5], 9, "sum")
-         |true
-       """.stripMargin.trim
-
-    val expr   = TestCompiler(V6).compileExpression(script).expr.asInstanceOf[EXPR]
-    val result = Decompiler(expr, getDecompilerContext(V6, Expression))
-    result shouldBe expected
-  }
 }
