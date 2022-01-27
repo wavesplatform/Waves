@@ -99,7 +99,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
           val droppedBlocks = d.rollbackTo(genesisSignature).map(_._1)
           droppedBlocks(0).header.reference shouldBe genesisSignature
           droppedBlocks.map(_.id()).toList shouldBe blocks
-          droppedBlocks foreach d.appendBlock
+          droppedBlocks foreach (d.appendBlock(_))
         }
     }
 

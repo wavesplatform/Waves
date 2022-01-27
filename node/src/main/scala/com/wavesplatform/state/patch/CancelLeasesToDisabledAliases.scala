@@ -2,12 +2,12 @@ package com.wavesplatform.state.patch
 
 import cats.instances.map._
 import cats.syntax.semigroup._
-import com.wavesplatform.account.{Address, AddressScheme, Alias, PublicKey}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
 import play.api.libs.json.{Json, Reads}
 
 case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatures.SynchronousCalls, Set('W')) {
@@ -21,14 +21,13 @@ case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatu
   )
 
   private[this] lazy val mainnetPatchData = {
-    require(AddressScheme.current.chainId == 'W')
     implicit val cancelDetailsReads: Reads[CancelDetails] = Json.reads
 
-    readPatchData[Seq[CancelDetails]]().map { cancelDetails =>
+    readPatchData[Seq[CancelDetails]]('W').map { cancelDetails =>
       val leaseId          = ByteStr(Base58.decode(cancelDetails.id))
       val sender           = PublicKey(Base58.decode(cancelDetails.senderPublicKey))
       val recipientAlias   = Alias.fromString(cancelDetails.recipientAlias).explicitGet()
-      val recipientAddress = Address.fromString(cancelDetails.recipientAddress).explicitGet()
+      val recipientAddress = Address.fromString(cancelDetails.recipientAddress, checkChainId = false).explicitGet()
       leaseId -> (LeaseDetails(
         sender,
         recipientAlias,
@@ -40,11 +39,11 @@ case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatu
     }.toMap
   }
 
-  def patchData: Map[ByteStr, (LeaseDetails, Address)] =
-    if (AddressScheme.current.chainId == 'W'.toByte) mainnetPatchData else Map.empty
+  def patchData(chainId: Char): Map[ByteStr, (LeaseDetails, Address)] =
+    if (chainId == 'W') mainnetPatchData else Map.empty
 
   override def apply(blockchain: Blockchain): Diff =
-    patchData
+    patchData(blockchain.settings.addressSchemeCharacter)
       .map {
         case (id, (ld, recipientAddress)) =>
           Diff(

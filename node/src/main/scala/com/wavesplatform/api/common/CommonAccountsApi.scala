@@ -170,7 +170,7 @@ object CommonAccountsApi extends ScorexLogging {
       }
 
     private def resolveDisabledAlias(leaseId: ByteStr): Either[ValidationError, Address] =
-      CancelLeasesToDisabledAliases.patchData
+      CancelLeasesToDisabledAliases.patchData(blockchain.settings.addressSchemeCharacter)
         .get(leaseId)
         .fold[Either[ValidationError, Address]](Left(GenericError("Unknown lease ID"))) {
           case (_, recipientAddress) => Right(recipientAddress)

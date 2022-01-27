@@ -75,9 +75,6 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     val bytes = Base64.decode(
       "ABABRFnfcU6tj7ELaOMRU60BmUEXZSyzyWDG4yxX597CilhGAUSJ/UXOr7T3dYRD2dI6xLKS+XNccQNSaToBCQEAAAADZm9vAAAAAQEAAAAFYWxpY2UAAQApAAAAAAAAAAcBWd9xTq2PsQto4xFTrQGZQRdlLLPJYMbjLFfn3sKKWEYAAAAAAAGGoAAAAAFjgvl7hQEAAQBAL4aaBFut6sRjmJqyUMSsW344/xjKn74k0tXmtbAMnZhCIysagYHWE578HZUBuKPxN/3v8OxBmN3lSChpsYrsCg=="
     )
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = 'D'.toByte
-    }
     val json = Json.parse(s"""{
                          "type": 16,
                          "id": "F4Kf5GZqAEnfTgaK9Zj9CypXApE6M4yYGR2DQ3yMhjwF",
@@ -104,14 +101,12 @@ class InvokeScriptTransactionSpecification extends PropSpec {
                         }
     """)
 
-    val tx = InvokeScriptTransaction.serializer.parseBytes(bytes).get
+    val tx = InvokeScriptTransaction.serializer.parseBytes(bytes, checkChainId = false).get
     tx.json() shouldBe json
     ByteStr(tx.bytes()) shouldBe ByteStr(bytes)
-    AddressScheme.current = DefaultAddressScheme
   }
 
   property("JSON format validation for InvokeScriptTransaction") {
-    AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val js = Json.parse(s"""{
                          "type": 16,
                          "id": "F4Kf5GZqAEnfTgaK9Zj9CypXApE6M4yYGR2DQ3yMhjwF",
@@ -142,7 +137,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
       .selfSigned(
         1.toByte,
         KeyPair("test3".getBytes("UTF-8")),
-        KeyPair("test4".getBytes("UTF-8")).toAddress,
+        KeyPair("test4".getBytes("UTF-8")).toAddress('D'),
         Some(
           Terms.FUNCTION_CALL(
             FunctionHeader.User("foo"),
@@ -159,11 +154,9 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
 
     TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
-    AddressScheme.current = DefaultAddressScheme
   }
 
   property("JSON format validation for InvokeScriptTransaction without FUNCTION_CALL") {
-    AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val js = Json.parse(s"""{
                          "type": 16,
                          "id": "CoAdpSKQWNJEieS9StynH8VwmaSPbKSFKEYWinkTGHBF",
@@ -186,7 +179,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
       .selfSigned(
         1.toByte,
         KeyPair("test3".getBytes("UTF-8")),
-        KeyPair("test4".getBytes("UTF-8")).toAddress,
+        KeyPair("test4".getBytes("UTF-8")).toAddress('D'),
         None,
         Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
         100000,
@@ -198,11 +191,9 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
 
     TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
-    AddressScheme.current = DefaultAddressScheme
   }
 
   property("Signed InvokeScriptTransactionRequest parser") {
-    AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedInvokeScriptRequest(
       Some(1.toByte),
       senderPublicKey = publicKey,
@@ -220,8 +211,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
       proofs =
         Proofs(List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").map(s => ByteStr.decodeBase58(s).get))
     )
-    req.toTx.explicitGet()
-    AddressScheme.current = DefaultAddressScheme
+    req.toTx(checkChainId = false).explicitGet()
   }
 
   property(s"can't have more than ${ContractLimits.MaxInvokeScriptArgs} args") {
@@ -318,7 +308,6 @@ class InvokeScriptTransactionSpecification extends PropSpec {
   }
 
   property("can't have zero amount") {
-    AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedInvokeScriptRequest(
       Some(1.toByte),
       senderPublicKey = publicKey,
@@ -336,12 +325,10 @@ class InvokeScriptTransactionSpecification extends PropSpec {
       proofs =
         Proofs(List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").map(s => ByteStr.decodeBase58(s).get))
     )
-    req.toTx shouldBe Left(NonPositiveAmount(0, "Waves"))
-    AddressScheme.current = DefaultAddressScheme
+    req.toTx(checkChainId = false) shouldBe Left(NonPositiveAmount(0, "Waves"))
   }
 
   property("can't have negative amount") {
-    AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedInvokeScriptRequest(
       Some(1.toByte),
       senderPublicKey = publicKey,
@@ -359,7 +346,6 @@ class InvokeScriptTransactionSpecification extends PropSpec {
       proofs =
         Proofs(List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").map(s => ByteStr.decodeBase58(s).get))
     )
-    req.toTx shouldBe Left(NonPositiveAmount(-1, "Waves"))
-    AddressScheme.current = DefaultAddressScheme
+    req.toTx(checkChainId = false) shouldBe Left(NonPositiveAmount(-1, "Waves"))
   }
 }
