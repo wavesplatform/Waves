@@ -14,19 +14,18 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{Domain, defaultSigner}
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.FunctionHeader.User
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONST_STRING, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONST_STRING}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.state.diffs.ci
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, BinaryDataEntry, Diff, Height}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
+import com.wavesplatform.transaction.{Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{RequestGen, TestValues, TestWallet}
 import org.scalamock.scalatest.PathMockFactory
@@ -299,8 +298,7 @@ class AssetsRouteSpec
         withRoute { (d, route) =>
           val tx =
             if (useInvokeExpression) {
-              val call = FUNCTION_CALL(
-                User("issue"),
+              val args =
                 List(
                   CONST_STRING(assetDesc.name.toStringUtf8).explicitGet(),
                   CONST_STRING(assetDesc.description.toStringUtf8).explicitGet(),
@@ -308,8 +306,7 @@ class AssetsRouteSpec
                   CONST_LONG(assetDesc.decimals),
                   CONST_BOOLEAN(assetDesc.reissuable)
                 )
-              )
-              ci.toEthInvokeExpression(setScript, invoker, call, fee)
+              ci.toEthInvokeExpression(setScript, invoker, "issue", args, fee)
             } else {
               EthTxGenerator.generateEthInvoke(
                 keyPair = invoker,

@@ -6,7 +6,8 @@ import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.Terms.{BLOCK, FUNCTION_CALL, LET}
+import com.wavesplatform.lang.v1.FunctionHeader.User
+import com.wavesplatform.lang.v1.compiler.Terms.{BLOCK, EXPR, FUNCTION_CALL, LET}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.FeeValidation.*
 import com.wavesplatform.transaction.Asset.Waves
@@ -67,10 +68,14 @@ package object ci {
   def toEthInvokeExpression(
       setDApp: SetScriptTransaction,
       invoker: ECKeyPair,
-      call: FUNCTION_CALL,
+      function: String,
+      args: List[EXPR],
       fee: Long = FeeConstants(TransactionType.InvokeExpression) * FeeUnit
-  ): EthereumTransaction =
-    EthTxGenerator.generateEthInvokeExpression(invoker, toFreeCall(setDApp, Some(call)), fee)
+  ): EthereumTransaction = {
+    val call = FUNCTION_CALL(User(function), args)
+    val expr = toFreeCall(setDApp, Some(call))
+    EthTxGenerator.generateEthInvokeExpression(invoker, expr, fee)
+  }
 
   private def toFreeCall(
       setDApp: SetScriptTransaction,

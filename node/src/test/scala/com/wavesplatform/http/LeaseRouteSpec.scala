@@ -12,7 +12,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.{V5, V6}
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.network.TransactionPublisher
@@ -326,7 +325,7 @@ class LeaseRouteSpec
       invokeEth <-
         if (useInvokeExpression) Gen.const {
           val args = List(CONST_BYTESTR(ByteStr(recipient.toAddress.bytes)).explicitGet(), CONST_LONG(10000.waves))
-          ci.toEthInvokeExpression(setScript, sender, FUNCTION_CALL(User("leaseTo"), args))
+          ci.toEthInvokeExpression(setScript, sender, "leaseTo", args)
         }
         else
           ethereumInvokeTransactionGen(
@@ -336,8 +335,7 @@ class LeaseRouteSpec
             Seq(Arg.Bytes(ByteStr(recipient.toAddress.bytes)), Arg.Integer(10000.waves))
           )
       invokeLeaseCancel = (leaseId: ByteStr) => {
-        val call = FUNCTION_CALL(User("cancelLease"), List(CONST_BYTESTR(leaseId).explicitGet()))
-        ci.toEthInvokeExpression(setScript, sender, call)
+        ci.toEthInvokeExpression(setScript, sender, "cancelLease", List(CONST_BYTESTR(leaseId).explicitGet()))
       }
       genesisE <- genesisGeneratorP(invokeEth.sender.toAddress)
     } yield (

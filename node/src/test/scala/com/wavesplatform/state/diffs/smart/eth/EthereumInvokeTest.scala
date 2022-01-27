@@ -9,8 +9,7 @@ import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V5}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.FunctionHeader.User
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments.*
 import com.wavesplatform.state.Portfolio
@@ -130,7 +129,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with E
 
     val ethInvoke =
       if (invokeExpression)
-        toEthInvokeExpression(setDApp, eCKeyPair, FUNCTION_CALL(User("default"), List(CONST_LONG(passingArg))))
+        toEthInvokeExpression(setDApp, eCKeyPair, "default", List(CONST_LONG(passingArg)))
       else
         EthTxGenerator.generateEthInvoke(eCKeyPair, dAppAddress, "default", Seq(Integer(passingArg)), assets.map(a => Payment(paymentAmount, a)))
 
