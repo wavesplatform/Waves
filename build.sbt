@@ -6,6 +6,7 @@
    2. You've checked "Make project before run"
  */
 
+import sbt.Def
 import sbt.Keys._
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
@@ -117,7 +118,7 @@ inScope(Global)(
     scalaVersion := "2.13.6",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 3, 6),
+    V.fallback := (1, 3, 12),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     scalacOptions ++= Seq(
@@ -129,9 +130,7 @@ inScope(Global)(
       "-language:postfixOps",
       "-Ywarn-unused:-implicits",
       "-Xlint",
-      "-opt:l:inline",
-      "-opt-inline-from:**",
-      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s", // Ignore gRPC warnings
+      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
       "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
       "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
     ),
@@ -150,7 +149,7 @@ inScope(Global)(
      */
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
-    network := Network(sys.props.get("network")),
+    network := Network.default(),
     resolvers += Resolver.sonatypeRepo("snapshots"),
     Compile / doc / sources := Seq.empty,
     Compile / packageDoc / publishArtifact := false
@@ -196,4 +195,26 @@ def checkPR: Command = Command.command("checkPR") { state =>
   state
 }
 
-commands += checkPR
+lazy val buildDebPackages = taskKey[Unit]("Build debian packages")
+buildDebPackages := {
+  (`grpc-server` / Debian / packageBin).value
+  (node / Debian / packageBin).value
+}
+
+def buildPackages: Command = Command("buildPackages")(_ => Network.networkParser) { (state, args) =>
+  args.toSet[Network].foreach { n =>
+    val newState = Project
+      .extract(state)
+      .appendWithoutSession(
+        Seq(Global / network := n),
+        state
+      )
+    Project.extract(newState).runTask(buildDebPackages, newState)
+  }
+
+  Project.extract(state).runTask(packageAll, state)
+
+  state
+}
+
+commands ++= Seq(checkPR, buildPackages)

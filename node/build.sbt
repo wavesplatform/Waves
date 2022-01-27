@@ -113,7 +113,7 @@ linuxPackageMappings := linuxPackageMappings.value.map { lpm =>
         dest,
         s"""-J-Dwaves.defaults.blockchain.type=${network.value}
            |-J-Dwaves.defaults.directory=/var/lib/${(Linux / packageName).value}
-           |-J-Dwaves.defaults.config.directory=/var/lib/${(Linux / packageName).value}
+           |-J-Dwaves.defaults.config.directory=/etc/${(Linux / packageName).value}
            |""".stripMargin
       )
       IO.append(dest, IO.readBytes(file))

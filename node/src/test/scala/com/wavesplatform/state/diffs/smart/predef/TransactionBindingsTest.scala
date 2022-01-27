@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs.smart.predef
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing.evaluated
@@ -16,15 +17,15 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.{WavesEnvironment, buildThisValue}
 import com.wavesplatform.transaction.{DataTransaction, Proofs, ProvenTransaction, TxVersion, VersionedTransaction}
 import com.wavesplatform.utils.EmptyBlockchain
-import com.wavesplatform.crypto
-import com.wavesplatform.test._
 import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
@@ -371,7 +372,9 @@ class TransactionBindingsTest
            |""".stripMargin
 
       val blockchain = stub[Blockchain]
+      (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
       (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
+      (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
 
       val result = runScriptWithCustomContext(script, Coproduct(t), T, V4, blockchain)
       result shouldBe evaluated(true)
@@ -713,7 +716,7 @@ class TransactionBindingsTest
     val expr       = Parser.parseExpr(script).get.value
     val directives = DirectiveSet(V2, Asset, Expression).explicitGet()
     val ctx =
-      PureContext.build(V2, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V2, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V2, Asset, Expression).explicitGet())
 
@@ -744,7 +747,7 @@ class TransactionBindingsTest
     (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
 
     val ctx =
-      PureContext.build(V2, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V2, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
         WavesContext.build(Global, directives)
 

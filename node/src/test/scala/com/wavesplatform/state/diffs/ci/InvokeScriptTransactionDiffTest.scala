@@ -71,7 +71,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
       BlockchainFeatures.DataTransaction.id  -> 0,
       BlockchainFeatures.BlockV5.id          -> 0,
       BlockchainFeatures.SynchronousCalls.id -> 0
-    )
+    ),
+    syncDAppCheckTransfersHeight = 999
   )
 
   val assetAllowed: Script = ExprScript(
@@ -296,7 +297,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(stdLibVersion, fixUnicodeFunctions = true).withEnvironment[Environment],
+            PureContext.build(stdLibVersion, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
             CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment],
             WavesContext.build(
               Global,
@@ -558,17 +559,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
             blockDiff.transactions(ci.id()).affected.contains(setScript.sender.toAddress) shouldBe true
         }
 
-    }
-  }
-
-  property("can't more than 5kb of data") {
-    forAll(for {
-      r <- preconditionsAndSetContract(s => dataContractGen(s, bigData = true))
-    } yield (r._1, r._2, r._3)) {
-      case (genesis, setScript, ci) =>
-        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fsWithV5) {
-          _ should produce("WriteSet size can't exceed")
-        }
     }
   }
 
@@ -1875,7 +1865,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
       case (invoke, genesisTxs) =>
         tempDb { _ =>
           val features = fs.copy(
-            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
+            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0),
+            syncDAppCheckTransfersHeight = 999
           )
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
             inside(ei) {
@@ -1954,7 +1945,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
             diff.scriptsRun shouldBe 0
             diff.portfolios(invoke.sender.toAddress).balanceOf(invoke.feeAssetId)
             state.balance(invoke.sender.toAddress, invoke.feeAssetId) shouldBe invoke.feeAssetId.fold(wavesBalance)(_ => sponsoredBalance) - invoke.fee
-            state.transactionInfo(invoke.id()).map(r => r._2 -> r._3) shouldBe Some((invoke, false))
+            state.transactionInfo(invoke.id()).map(r => r._2 -> r._1.succeeded) shouldBe Some((invoke, false))
         }
     }
   }
@@ -2047,7 +2038,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
         fee     <- ciFee(1)
         gTx1             = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2             = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-        (assetScript, _) = ScriptCompiler.compile("false", ScriptEstimatorV3).explicitGet()
+        (assetScript, _) = ScriptCompiler.compile("false", ScriptEstimatorV3(fixOverflow = true)).explicitGet()
         iTx = IssueTransaction
           .selfSigned(2.toByte, master, "False asset", "", ENOUGH_AMT, 8, reissuable = true, Some(assetScript), fee, ts + 1)
           .explicitGet()
@@ -2085,7 +2076,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
          |true""".stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
+      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()
     }
 
     val (falseScript, falseComplexity) = {
@@ -2094,7 +2085,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
          |false""".stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
+      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()
     }
 
     def contract(assets: Seq[String]): DApp = {
@@ -2201,7 +2192,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        alias    = CreateAliasTransaction.selfSigned(TxVersion.V2, master, Alias.create("alias").explicitGet(), fee, ts).explicitGet()
+        alias    = CreateAliasTransaction.selfSigned(TxVersion.V2, master, "alias", fee, ts).explicitGet()
         script   = ContractScript(V5, contract()).explicitGet()
         ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), fee, ts + 5).explicitGet()
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
@@ -3150,7 +3141,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
          |true""".stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
+      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()
     }
 
     def contract(asset: ByteStr): DApp = {
@@ -3262,7 +3253,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
          |false""".stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
+      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()
     }
 
     def contract(asset: ByteStr): DApp = {
@@ -3372,7 +3363,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
          |false""".stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
+      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()
     }
 
     def contract: DApp = {
@@ -3606,7 +3597,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
                       | {-# CONTENT_TYPE EXPRESSION #-}
                       | assetBalance(this.issuer, this.id) == $ENOUGH_AMT
                     """.stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()._1
     }
 
     val transferScript = {
@@ -3626,7 +3617,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
                       | issuerBalance.regular == startWavesBalance                                            &&
                       | resultInvokerBalance == startInvokerBalance - $fee
                     """.stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()._1
     }
 
     def serviceDApp(): DApp = {

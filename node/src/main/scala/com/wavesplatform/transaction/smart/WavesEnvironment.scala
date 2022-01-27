@@ -58,7 +58,7 @@ class WavesEnvironment(
     // There are no new transactions in currentBlockchain
     blockchain
       .transactionInfo(ByteStr(id))
-      .filter(_._3)
+      .filter(_._1.succeeded)
       .map(_._2)
       .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
 
@@ -156,7 +156,7 @@ class WavesEnvironment(
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
     // There are no new transactions in currentBlockchain
-    blockchain.transactionMeta(ByteStr(id)).collect { case (h, true) => h.toLong }
+    blockchain.transactionMeta(ByteStr(id)).collect { case tm if tm.succeeded => tm.height.toLong }
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     for {
@@ -305,6 +305,7 @@ class DAppEnvironment(
     var remainingCalls: Int,
     var availableActions: Int,
     var availableData: Int,
+    var availableDataSize: Int,
     var currentDiff: Diff,
     val invocationRoot: DAppEnvironment.InvocationTreeTracker
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.map(_.id()).getOrElse(ByteStr.empty)) {
@@ -356,7 +357,7 @@ class DAppEnvironment(
         val invocation = DAppEnvironment.DAppInvocation(invoke.dAppAddress, invoke.funcCall, invoke.payments)
         invocationRoot.record(invocation)
       }
-      (diff, evaluated, remainingActions, remainingData) <- InvokeScriptDiff( // This is a recursive call
+      (diff, evaluated, remainingActions, remainingData, remainingDataSize) <- InvokeScriptDiff( // This is a recursive call
         mutableBlockchain,
         blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
         limitedExecution,
@@ -365,6 +366,7 @@ class DAppEnvironment(
         remainingCalls,
         availableActions,
         availableData,
+        availableDataSize,
         if (reentrant) calledAddresses else calledAddresses + invoke.senderAddress,
         invocationTracker
       )(invoke)
@@ -378,6 +380,7 @@ class DAppEnvironment(
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions
       availableData = remainingData
+      availableDataSize = remainingDataSize
       (evaluated, diff.scriptsComplexity.toInt)
     }
 

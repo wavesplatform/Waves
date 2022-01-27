@@ -43,7 +43,7 @@ class FunctionComplexityTest extends PropSpec {
         .filterNot(_.name.startsWith("_"))
         .foreach { function =>
           val expr = FUNCTION_CALL(function.header, List.fill(function.args.size)(Terms.TRUE))
-          val estimatedCost = ScriptEstimatorV3(
+          val estimatedCost = ScriptEstimatorV3(fixOverflow = true)(
             varNames(ds.stdLibVersion, ds.contentType),
             functionCosts(ds.stdLibVersion, ds.contentType),
             expr

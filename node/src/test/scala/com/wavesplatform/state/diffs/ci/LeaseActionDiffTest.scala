@@ -40,7 +40,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
         BlockchainFeatures.Ride4DApps,
         BlockchainFeatures.BlockV5
       ) ++ v5ForkO
-    TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = parameters.map(_.id -> 0).toMap)
+    TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = parameters.map(_.id -> 0).toMap, syncDAppCheckTransfersHeight = 999)
   }
 
   private val v4Features = features(activateV5 = false)

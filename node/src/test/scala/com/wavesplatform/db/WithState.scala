@@ -3,24 +3,31 @@ package com.wavesplatform.db
 import java.nio.file.Files
 
 import cats.Monoid
+import com.wavesplatform.{NTPTime, TestHelpers}
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory, loadActiveLeases}
+import com.wavesplatform.database.{loadActiveLeases, LevelDBFactory, LevelDBWriter, TestStorageFactory}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
-import com.wavesplatform.state.diffs.{BlockDiffer, produce}
+import com.wavesplatform.settings.{
+  loadConfig,
+  BlockchainSettings,
+  FunctionalitySettings,
+  TestSettings,
+  WavesSettings,
+  TestFunctionalitySettings => TFS
+}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
+import com.wavesplatform.state.diffs.{produce, BlockDiffer}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, Transaction}
-import com.wavesplatform.{NTPTime, TestHelpers}
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import monix.reactive.Observer
 import monix.reactive.subjects.{PublishSubject, Subject}
 import org.iq80.leveldb.{DB, Options}
@@ -73,7 +80,8 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
   def assertDiffEi(preconditions: Seq[Block], block: Block, state: LevelDBWriter)(
       assertion: Either[ValidationError, Diff] => Unit
   ): Unit = {
-    def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature)
+    def differ(blockchain: Blockchain, b: Block) =
+      BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature)
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).explicitGet()
@@ -86,7 +94,8 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
   def assertDiffEiTraced(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
       assertion: TracedResult[ValidationError, Diff] => Unit
   ): Unit = withLevelDBWriter(fs) { state =>
-    def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlockTraced(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature, verify = true)
+    def differ(blockchain: Blockchain, b: Block) =
+      BlockDiffer.fromBlockTraced(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature, verify = true)
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).resultE.explicitGet()
@@ -128,7 +137,8 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
 
   def assertDiffAndState(fs: FunctionalitySettings)(test: (Seq[Transaction] => Either[ValidationError, Unit]) => Unit): Unit =
     withLevelDBWriter(fs) { state =>
-      def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature)
+      def differ(blockchain: Blockchain, b: Block) =
+        BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature)
 
       test(txs => {
         val nextHeight = state.height + 1
@@ -153,20 +163,34 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
 
 trait WithDomain extends WithState { _: Suite =>
   implicit class WavesSettingsOps(ws: WavesSettings) {
-    def withFeatures(fs: BlockchainFeature*): WavesSettings = {
-      val functionalitySettings = ws.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap)
+    def withFS(transformF: FunctionalitySettings => FunctionalitySettings): WavesSettings = {
+      val functionalitySettings = transformF(ws.blockchainSettings.functionalitySettings)
       ws.copy(blockchainSettings = ws.blockchainSettings.copy(functionalitySettings = functionalitySettings))
     }
 
-    def addFeatures(fs: BlockchainFeature*): WavesSettings = {
-      val newFeatures           = ws.blockchainSettings.functionalitySettings.preActivatedFeatures ++ fs.map(_.id -> 0)
-      val functionalitySettings = ws.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = newFeatures)
-      ws.copy(blockchainSettings = ws.blockchainSettings.copy(functionalitySettings = functionalitySettings))
+    def withFeatures(fs: BlockchainFeature*): WavesSettings =
+      withFS(_.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap))
+
+    def addFeatures(fs: BlockchainFeature*): WavesSettings =  withFS { functionalitySettings =>
+      val newFeatures           = functionalitySettings.preActivatedFeatures ++ fs.map(_.id -> 0)
+      functionalitySettings.copy(preActivatedFeatures = newFeatures)
+    }
+
+    def withActivationPeriod(period: Int): WavesSettings =
+      withFS(_.copy(featureCheckBlocksPeriod = period, blocksForFeatureActivation = period, doubleFeaturesPeriodsAfterHeight = 10000))
+
+    def noFeatures(): WavesSettings = {
+      ws.copy(
+        blockchainSettings = ws.blockchainSettings.copy(
+          functionalitySettings = ws.blockchainSettings.functionalitySettings
+            .copy(preActivatedFeatures = Map.empty)
+        ),
+        featuresSettings = ws.featuresSettings.copy(supported = Nil)
+      )
     }
   }
 
-  lazy val SettingsFromDefaultConfig: WavesSettings =
-    WavesSettings.fromRootConfig(loadConfig(None))
+  lazy val SettingsFromDefaultConfig: WavesSettings =  WavesSettings.fromRootConfig(loadConfig(None))
 
   def domainSettingsWithFS(fs: FunctionalitySettings): WavesSettings =
     SettingsFromDefaultConfig.copy(
@@ -176,30 +200,44 @@ trait WithDomain extends WithState { _: Suite =>
   def domainSettingsWithPreactivatedFeatures(fs: BlockchainFeature*): WavesSettings =
     domainSettingsWithFeatures(fs.map(_ -> 0): _*)
 
-  def domainSettingsWithFeatures(fs: (BlockchainFeature, Int)*): WavesSettings =
-    domainSettingsWithFS(SettingsFromDefaultConfig.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map { case (f, h) => f.id -> h }.toMap))
+  def domainSettingsWithFeatures(fs: (BlockchainFeature, Int)*): WavesSettings = {
+    val defaultFS = SettingsFromDefaultConfig
+      .noFeatures()
+      .blockchainSettings
+      .functionalitySettings
+    
+    domainSettingsWithFS(defaultFS.copy(preActivatedFeatures = fs.map {
+      case (f, h) => f.id -> h
+    }.toMap))
+  }
 
+  //noinspection TypeAnnotation
   object DomainPresets {
     val NG = domainSettingsWithPreactivatedFeatures(
       BlockchainFeatures.MassTransfer, // Removes limit of 100 transactions per block
       BlockchainFeatures.NG
     )
 
-    val RideV4 = NG.addFeatures(
+    val ScriptsAndSponsorship = NG.addFeatures(
       BlockchainFeatures.SmartAccounts,
+      BlockchainFeatures.SmartAccountTrading,
+      BlockchainFeatures.OrderV3,
+      BlockchainFeatures.FeeSponsorship,
       BlockchainFeatures.DataTransaction,
+      BlockchainFeatures.SmartAssets
+    )
+
+    val RideV4 = ScriptsAndSponsorship.addFeatures(
       BlockchainFeatures.Ride4DApps,
-      BlockchainFeatures.SmartAssets,
       BlockchainFeatures.BlockV5
     )
 
     val RideV5 = RideV4.addFeatures(BlockchainFeatures.SynchronousCalls)
   }
 
-
-  def withDomain[A](settings: WavesSettings = SettingsFromDefaultConfig)(
-      test: Domain => A
-  ): A =
+  def withDomain[A](
+      settings: WavesSettings = SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts) // SmartAccounts to allow V2 transfers by default
+  )(test: Domain => A): A =
     withLevelDBWriter(settings) { blockchain =>
       var domain: Domain = null
       val bcu = new BlockchainUpdaterImpl(

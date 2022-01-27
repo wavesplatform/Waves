@@ -1,25 +1,24 @@
 package com.wavesplatform.api.common
 
-import scala.concurrent.Future
-
 import com.wavesplatform.account.{Address, AddressOrAlias}
-import com.wavesplatform.api.{common, BlockMeta}
+import com.wavesplatform.api.{BlockMeta, common}
 import com.wavesplatform.block
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult}
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
-import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
+import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult, TxMeta}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
+
+import scala.concurrent.Future
 
 trait CommonTransactionsApi {
   import CommonTransactionsApi._
@@ -51,26 +50,32 @@ object CommonTransactionsApi {
     def height: Height
     def transaction: Transaction
     def succeeded: Boolean
+    def spentComplexity: Long
   }
 
   object TransactionMeta {
-    final case class Default(height: Height, transaction: Transaction, succeeded: Boolean) extends TransactionMeta
+    final case class Default(height: Height, transaction: Transaction, succeeded: Boolean, spentComplexity: Long) extends TransactionMeta
 
-    final case class Invoke(height: Height, transaction: InvokeScriptTransaction, succeeded: Boolean, invokeScriptResult: Option[InvokeScriptResult])
-        extends TransactionMeta
+    final case class Invoke(
+        height: Height,
+        transaction: InvokeScriptTransaction,
+        succeeded: Boolean,
+        spentComplexity: Long,
+        invokeScriptResult: Option[InvokeScriptResult]
+    ) extends TransactionMeta
 
     def unapply(tm: TransactionMeta): Option[(Height, Transaction, Boolean)] =
       Some((tm.height, tm.transaction, tm.succeeded))
 
-    def create(height: Height, transaction: Transaction, succeeded: Boolean)(
+    def create(height: Height, transaction: Transaction, succeeded: Boolean, spentComplexity: Long)(
         result: InvokeScriptTransaction => Option[InvokeScriptResult]
     ): TransactionMeta =
       transaction match {
         case ist: InvokeScriptTransaction =>
-          Invoke(height, ist, succeeded, result(ist))
+          Invoke(height, ist, succeeded, spentComplexity, result(ist))
 
         case _ =>
-          Default(height, transaction, succeeded)
+          Default(height, transaction, succeeded, spentComplexity)
       }
   }
 
@@ -81,7 +86,7 @@ object CommonTransactionsApi {
       utx: UtxPool,
       wallet: Wallet,
       publishTransaction: Transaction => Future[TracedResult[ValidationError, Boolean]],
-      blockAt: Int => Option[(BlockMeta, Seq[Transaction])]
+      blockAt: Int => Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
   ): CommonTransactionsApi = new CommonTransactionsApi {
     private def resolve(subject: AddressOrAlias): Option[Address] = blockchain.resolveAlias(subject).toOption
 
@@ -98,8 +103,8 @@ object CommonTransactionsApi {
 
     override def transactionById(transactionId: ByteStr): Option[TransactionMeta] =
       blockchain.transactionInfo(transactionId).map {
-        case (height, transaction, succeeded) =>
-          TransactionMeta.create(Height(height), transaction, succeeded) { _ =>
+        case (m, tx) =>
+          TransactionMeta.create(m.height, tx, m.succeeded, m.spentComplexity) { _ =>
             maybeDiff
               .flatMap { case (_, diff) => diff.scriptResults.get(transactionId) }
               .orElse(AddressTransactions.loadInvokeScriptResult(db, transactionId))
@@ -111,29 +116,22 @@ object CommonTransactionsApi {
     override def unconfirmedTransactionById(transactionId: ByteStr): Option[Transaction] =
       utx.transactionById(transactionId)
 
-    override def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
-      val defaultFee = FeeValidation.getMinFee(blockchain, tx)
-      (tx match {
-        case ist: InvokeScriptTransaction =>
-          InvokeScriptTransactionDiff.calculateFee(blockchain, ist) match {
-            case Some(wavesFee) => Right(FeeValidation.calculateAssetFee(blockchain, ist.feeAssetId, wavesFee))
-            case None           => defaultFee
-          }
-        case _ => defaultFee
-      }).map {
-        case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
-          (asset, feeInAsset, feeInWaves)
-      }
-    }
+    override def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)] =
+      FeeValidation
+        .getMinFee(blockchain, tx)
+        .map {
+          case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
+            (asset, feeInAsset, feeInWaves)
+        }
 
     override def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]] = publishTransaction(tx)
 
     override def transactionProofs(transactionIds: List[ByteStr]): List[TransactionProof] =
       for {
-        transactionId            <- transactionIds
-        (height, transaction, _) <- blockchain.transactionInfo(transactionId)
-        (meta, allTransactions)  <- blockAt(height) if meta.header.version >= Block.ProtoBlockVersion
-        transactionProof         <- block.transactionProof(transaction, allTransactions)
+        transactionId           <- transactionIds
+        (txm, tx)               <- blockchain.transactionInfo(transactionId)
+        (meta, allTransactions) <- blockAt(txm.height) if meta.header.version >= Block.ProtoBlockVersion
+        transactionProof        <- block.transactionProof(tx, allTransactions.map(_._2))
       } yield transactionProof
   }
 }

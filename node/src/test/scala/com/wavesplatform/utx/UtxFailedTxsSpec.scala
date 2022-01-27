@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.state.{Height, TxMeta}
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.exchange.OrderType
@@ -113,7 +114,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe Some(Seq(tx))
     d.appendBlock(tx)
 
-    d.blockchain.transactionMeta(tx.id()) shouldBe Some((3, false))
+    d.blockchain.transactionMeta(tx.id()) shouldBe Some(TxMeta(Height(3), false, 1212))
   })
 
   it should s"drop failed Invoke with asset script with complexity <= ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
@@ -213,7 +214,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
         |    else [IntegerEntry("h", height)]
         |  }
         |  """.stripMargin,
-        ScriptEstimatorV3
+        ScriptEstimatorV3(fixOverflow = true)
       )
       .explicitGet()
 
@@ -269,7 +270,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
          |
          |if ($expr) then true else throw("reached err")
          |""".stripMargin
-    val (script, _) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()
+    val (script, _) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3(fixOverflow = true)).explicitGet()
     script
   }
 

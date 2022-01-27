@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.invoke
 
+import cats.Id
 import cats.instances.map._
 import cats.syntax.either._
 import cats.syntax.semigroup._
@@ -18,6 +19,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, _}
+import com.wavesplatform.lang.v1.evaluator.{Log, RejectException, ScriptResult, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, _}
@@ -289,7 +291,7 @@ object InvokeDiffsCommon {
         .foldLeft(Map[Address, Portfolio]())(_ |+| _)
     )
 
-  private def dataItemToEntry(item: DataOp): DataEntry[_] =
+  def dataItemToEntry(item: DataOp): DataEntry[_] =
     item match {
       case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
       case DataItem.Str(k, b)  => StringDataEntry(k, b)
@@ -468,7 +470,10 @@ object InvokeDiffsCommon {
             } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
               TracedResult(Left(FailedTransactionError.dAppExecution("Invalid asset description", 0L)), List())
             } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined) {
-              TracedResult(Left(FailedTransactionError.dAppExecution(s"Asset ${issue.id} is already issued", 0L)), List())
+              if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
+                throw RejectException(s"Asset ${issue.id} is already issued")
+              else
+                TracedResult(Left(FailedTransactionError.dAppExecution(s"Asset ${issue.id} is already issued", 0L)), List())
             } else {
               val staticInfo = AssetStaticInfo(TransactionId @@ itx.txId, pk, issue.decimals, blockchain.isNFT(issue))
               val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
@@ -476,16 +481,13 @@ object InvokeDiffsCommon {
 
               val asset = IssuedAsset(issue.id)
 
-              DiffsCommon
-                .countVerifierComplexity(None /*issue.compiledScript*/, blockchain, isAsset = true)
-                .map { script =>
-                  Diff(
-                    portfolios = Map(pk.toAddress -> Portfolio(assets = Map(asset -> issue.quantity))),
-                    issuedAssets = Map(asset      -> NewAssetInfo(staticInfo, info, volumeInfo)),
-                    assetScripts = Map(asset      -> script.map(script => AssetScriptInfo(script._1, script._2)))
-                  )
-                }
-                .leftMap(FailedTransactionError.asFailedScriptError)
+              Right(
+                Diff(
+                  portfolios = Map(pk.toAddress -> Portfolio(assets = Map(asset -> issue.quantity))),
+                  issuedAssets = Map(asset      -> NewAssetInfo(staticInfo, info, volumeInfo)),
+                  assetScripts = Map(asset      -> None)
+                )
+              )
             }
           }
 
@@ -619,9 +621,58 @@ object InvokeDiffsCommon {
       case Success(s) => s
     }
 
-  case class StepInfo(
-      feeInWaves: Long,
-      feeInAttachedAsset: Long,
-      scriptsRun: Int
-  )
+  def checkCallResultLimits(
+      blockchain: Blockchain,
+      usedComplexity: Long,
+      log: Log[Id],
+      actionsCount: Int,
+      dataCount: Int,
+      dataSize: Int,
+      availableActions: Int,
+      availableData: Int,
+      availableDataSize: Int
+  ): TracedResult[ValidationError, Unit] = {
+    def error(message: String) = TracedResult(Left(FailedTransactionError.dAppExecution(message, usedComplexity, log)))
+    val checkSizeHeight        = blockchain.settings.functionalitySettings.checkTotalDataEntriesBytesHeight
+    val checkSizeRejectHeight  = blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight
+
+    if (dataCount > availableData)
+      error("Stored data count limit is exceeded")
+    else if (dataSize > availableDataSize) {
+      val limit   = ContractLimits.MaxTotalWriteSetSizeInBytes
+      val actual  = limit + dataSize - availableDataSize
+      val message = s"Storing data size should not exceed $limit, actual: $actual bytes"
+      if (blockchain.height >= checkSizeRejectHeight) {
+        throw RejectException(message)
+      } else if (blockchain.height >= checkSizeHeight)
+        error(message)
+      else
+        TracedResult(Right(()))
+    } else if (actionsCount > availableActions)
+      error("Actions count limit is exceeded")
+    else
+      TracedResult(Right(()))
+  }
+
+  def checkScriptResultFields(blockchain: Blockchain, r: ScriptResult): Unit =
+    r match {
+      case ScriptResultV4(actions, _, _) if blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight =>
+        actions.foreach {
+          case Reissue(_, _, quantity) => if (quantity < 0) throw RejectException(s"Negative reissue quantity = $quantity")
+          case Burn(_, quantity)       => if (quantity < 0) throw RejectException(s"Negative burn quantity = $quantity")
+          case t: AssetTransfer        => if (t.amount < 0) throw RejectException(s"Negative transfer amount = ${t.amount}")
+          case l: Lease                => if (l.amount < 0) throw RejectException(s"Negative lease amount = ${l.amount}")
+          case s: SponsorFee =>
+            if (s.minSponsoredAssetFee.exists(_ < 0)) throw RejectException(s"Negative sponsor amount = ${s.minSponsoredAssetFee.get}")
+          case i: Issue =>
+            val length = i.name.getBytes("UTF-8").length
+            if (length < IssueTransaction.MinAssetNameLength || length > IssueTransaction.MaxAssetNameLength) {
+              throw RejectException("Invalid asset name")
+            } else if (i.description.length > IssueTransaction.MaxAssetDescriptionLength) {
+              throw RejectException("Invalid asset description")
+            }
+          case _ =>
+        }
+      case _ =>
+    }
 }

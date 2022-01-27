@@ -42,8 +42,8 @@ trait Blockchain {
   def wavesAmount(height: Int): BigInt
 
   def transferById(id: ByteStr): Option[(Int, TransferTransaction)]
-  def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)]
-  def transactionMeta(id: ByteStr): Option[(Int, Boolean)]
+  def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)]
+  def transactionMeta(id: ByteStr): Option[TxMeta]
 
   def containsTransaction(tx: Transaction): Boolean
 
@@ -180,13 +180,14 @@ object Blockchain {
       if (isFeatureActivated(BlockchainFeatures.BlockV5, height)) ProtoBlockVersion
       else if (isFeatureActivated(BlockchainFeatures.BlockReward, height)) {
         if (blockchain.activatedFeatures(BlockchainFeatures.BlockReward.id) == height) NgBlockVersion else RewardBlockVersion
-      }
-      else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight + 1 < height) NgBlockVersion
+      } else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight + 1 < height) NgBlockVersion
       else if (height > 1) PlainBlockVersion
       else GenesisBlockVersion
 
     def binaryData(address: Address, key: String): Option[ByteStr] = blockchain.accountData(address, key).collect {
       case BinaryDataEntry(_, value) => value
     }
+
+    def transactionSucceeded(id: ByteStr): Boolean = blockchain.transactionMeta(id).exists(_.succeeded)
   }
 }

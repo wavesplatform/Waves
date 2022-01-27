@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs
 
-import scala.collection.mutable
+import scala.collection.immutable.VectorMap
+import scala.util.control.NonFatal
 
 import cats.instances.either._
 import cats.instances.map._
@@ -120,6 +121,13 @@ object TransactionDiffer {
             for {
               _ <- validateOrder(blockchain, etx.buyOrder, etx.buyMatcherFee)
               _ <- validateOrder(blockchain, etx.sellOrder, etx.sellMatcherFee)
+
+              // Balance overflow check
+              _ <- if (blockchain.height >= blockchain.settings.functionalitySettings.estimatorSumOverflowFixHeight) {
+                ExchangeTransactionDiff
+                  .getPortfolios(blockchain, etx)
+                  .flatMap(pfs => validateBalance(blockchain, ExchangeTransaction.typeId, Diff(portfolios = pfs)))
+              } else Right(())
             } yield ()
           case itx: InvokeScriptTransaction => validatePayments(blockchain, itx)
           case _                            => Right(())
@@ -159,9 +167,14 @@ object TransactionDiffer {
     stats.transactionDiffValidation
       .measureForType(tx.typeId) {
         tx match {
-          case gtx: GenesisTransaction           => GenesisTransactionDiff(blockchain.height)(gtx).traced
-          case ptx: PaymentTransaction           => PaymentTransactionDiff(blockchain)(ptx).traced
-          case ci: InvokeScriptTransaction       => InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(ci)
+          case gtx: GenesisTransaction => GenesisTransactionDiff(blockchain.height)(gtx).traced
+          case ptx: PaymentTransaction => PaymentTransactionDiff(blockchain)(ptx).traced
+          case ci: InvokeScriptTransaction =>
+            try {
+              InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(ci)
+            } catch {
+              case NonFatal(e) => TracedResult(Left(GenericError(s"${e.getMessage}")))
+            }
           case etx: ExchangeTransaction          => ExchangeTransactionDiff(blockchain)(etx).traced
           case itx: IssueTransaction             => AssetTransactionsDiff.issue(blockchain)(itx).traced
           case rtx: ReissueTransaction           => AssetTransactionsDiff.reissue(blockchain, currentBlockTs)(rtx).traced
@@ -266,7 +279,7 @@ object TransactionDiffer {
     } yield {
       val affectedAddresses = portfolios.keySet ++ maybeDApp ++ calledAddresses
       Diff.empty.copy(
-        transactions = mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, affectedAddresses, applied = false))),
+        transactions = VectorMap((tx.id(), NewTransactionInfo(tx, affectedAddresses, applied = false, spentComplexity))),
         portfolios = portfolios,
         scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
         scriptsComplexity = spentComplexity
