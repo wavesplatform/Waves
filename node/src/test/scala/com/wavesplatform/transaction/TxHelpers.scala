@@ -48,9 +48,9 @@ object TxHelpers {
   ): TransferTransaction =
     TransferTransaction.selfSigned(version, from, to, asset, amount, Waves, fee, ByteStr.empty, timestamp).explicitGet()
 
-  def issue(amount: Long = 1000, script: Script = null): IssueTransaction =
+  def issue(issuer: KeyPair = defaultSigner, amount: Long = 1000, script: Option[Script] = None): IssueTransaction =
     IssueTransaction
-      .selfSigned(TxVersion.V2, defaultSigner, "test", "", amount, 0, reissuable = true, Option(script), 1.waves, timestamp)
+      .selfSigned(TxVersion.V2, issuer, "test", "", amount, 0, reissuable = true, script, 1.waves, timestamp)
       .explicitGet()
 
   def reissue(asset: IssuedAsset, amount: Long = 1000): ReissueTransaction =
@@ -122,14 +122,15 @@ object TxHelpers {
 
   def invoke(
       dApp: AddressOrAlias,
-      func: String,
+      func: Option[String] = Some("test"),
       args: Seq[EXPR] = Nil,
       payments: Seq[Payment] = Nil,
+      invoker: KeyPair = defaultSigner,
       fee: Long = TestValues.fee,
       feeAssetId: Asset = Waves
   ): InvokeScriptTransaction = {
-    val fc = functionCall(func, args: _*)
-    InvokeScriptTransaction.selfSigned(TxVersion.V1, defaultSigner, dApp, Some(fc), payments, fee, feeAssetId, timestamp).explicitGet()
+    val fc = func.map(name => functionCall(name, args: _*))
+    InvokeScriptTransaction.selfSigned(TxVersion.V1, invoker, dApp, fc, payments, fee, feeAssetId, timestamp).explicitGet()
   }
 
   def functionCall(func: String, args: EXPR*): FUNCTION_CALL = {

@@ -12,34 +12,24 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
+import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.TO_BIGINT
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
-import com.wavesplatform.TestTime
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.test.PropSpec
-import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.{EitherValues, Inside}
+import org.scalatest.{Assertion, EitherValues, Inside}
 
 class BigIntInvokeTest
     extends PropSpec
     with Inside
     with WithState
     with DBCacheSettings
-    with MockFactory
     with WithDomain
     with EitherValues {
-
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
 
   private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -82,22 +72,16 @@ class BigIntInvokeTest
       )
     }
 
-    def paymentPreconditions(action: EXPR => FUNCTION_CALL): Gen[(List[Transaction], InvokeScriptTransaction)] =
-      for {
-        dAppAcc <- accountGen
-        invoker <- accountGen
-        fee     <- ciFee()
-      } yield {
-        for {
-          genesis  <- GenesisTransaction.create(dAppAcc.toAddress, ENOUGH_AMT, ts)
-          genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
-          setDApp  <- SetScriptTransaction.selfSigned(1.toByte, dAppAcc, Some(dApp(action)), fee, ts)
-          invoke   <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, dAppAcc.toAddress, None, Nil, fee, Waves, ts)
-        } yield (List(genesis, genesis2, setDApp), invoke)
-      }.explicitGet()
+    def assert(action: EXPR => FUNCTION_CALL, message: String): Assertion = {
+      val dAppAcc = TxHelpers.signer(0)
+      val invoker = TxHelpers.signer(1)
+      val preparingTxs = Seq(
+        TxHelpers.genesis(dAppAcc.toAddress),
+        TxHelpers.genesis(invoker.toAddress),
+        TxHelpers.setScript(dAppAcc, dApp(action))
+      )
+      val invoke = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker)
 
-    def assert(action: EXPR => FUNCTION_CALL, message: String) = {
-      val (preparingTxs, invoke) = paymentPreconditions(action).sample.get
       withDomain(domainSettingsWithFS(fsWithV5)) { d =>
         d.appendBlock(preparingTxs: _*)
         (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include(message)
@@ -179,21 +163,17 @@ class BigIntInvokeTest
        """.stripMargin
     )
 
-    val preconditions =
-      for {
-        dApp1Acc <- accountGen
-        dApp2Acc <- accountGen
-        fee      <- ciFee()
-        genesis1 = GenesisTransaction.create(dApp1Acc.toAddress, ENOUGH_AMT, ts).explicitGet()
-        genesis2 = GenesisTransaction.create(dApp2Acc.toAddress, ENOUGH_AMT, ts).explicitGet()
-        setDApp1 = SetScriptTransaction.selfSigned(1.toByte, dApp1Acc, Some(dApp1(dApp2Acc.toAddress)), fee, ts).explicitGet()
-        setDApp2 = SetScriptTransaction.selfSigned(1.toByte, dApp2Acc, Some(dApp2), fee, ts).explicitGet()
-        invoke = InvokeScriptTransaction
-          .selfSigned(1.toByte, dApp1Acc, dApp1Acc.toAddress, Some(FUNCTION_CALL(User("default"), Nil)), Nil, fee, Waves, ts)
-          .explicitGet()
-      } yield (List(genesis1, genesis2, setDApp1, setDApp2), invoke)
+    val dAppAcc1 = TxHelpers.signer(0)
+    val dAppAcc2 = TxHelpers.signer(1)
 
-    val (preparingTxs, invoke) = preconditions.sample.get
+    val preparingTxs = Seq(
+      TxHelpers.genesis(dAppAcc1.toAddress),
+      TxHelpers.genesis(dAppAcc2.toAddress),
+      TxHelpers.setScript(dAppAcc1, dApp1(dAppAcc2.toAddress)),
+      TxHelpers.setScript(dAppAcc2, dApp2)
+    )
+    val invoke = TxHelpers.invoke(dAppAcc1.toAddress, func = Some("default"), invoker = dAppAcc1)
+
     assertDiffAndState(
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),

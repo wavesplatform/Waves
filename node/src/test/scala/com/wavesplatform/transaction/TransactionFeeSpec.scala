@@ -32,7 +32,7 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
 
       d.appendBlock(TxHelpers.genesis(dAppAccount.toAddress, 10.waves))
       d.appendBlock(TxHelpers.setScript(dAppAccount, dAppScript))
-      val invokeScript = TxHelpers.invoke(dAppAccount.toAddress, "default", payments = Seq(InvokeScriptTransaction.Payment(1, Waves)))
+      val invokeScript = TxHelpers.invoke(dAppAccount.toAddress, Some("default"), payments = Seq(InvokeScriptTransaction.Payment(1, Waves)))
       d.commonApi.calculateWavesFee(invokeScript) shouldBe 0.005.waves // No additional fee for transfer&payment
     }
 
@@ -259,7 +259,7 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
           |true""".stripMargin
       )
 
-      val issue = TxHelpers.issue(script = assetScript)
+      val issue = TxHelpers.issue(script = Some(assetScript))
       d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress, 10.waves))
       d.appendBlock(issue)
       d.appendBlock(TxHelpers.setScript(TxHelpers.defaultSigner, verifier))

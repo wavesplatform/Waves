@@ -1300,20 +1300,20 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
 
     withClue("price asset fails") {
-      val priceAssetIssue     = TxHelpers.issue(script = TestValues.rejectAssetScript)
-      val amountAssetIssue    = TxHelpers.issue(script = TestValues.assetScript)
-      val order1FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
-      val order2FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val priceAssetIssue     = TxHelpers.issue(script = Some(TestValues.rejectAssetScript))
+      val amountAssetIssue    = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val order1FeeAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val order2FeeAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
 
       test(priceAssetIssue, amountAssetIssue, order1FeeAssetIssue, order2FeeAssetIssue, TestValues.rejectAssetScriptComplexity)
 
     }
 
     withClue("amount asset fails") {
-      val priceAssetIssue     = TxHelpers.issue(script = TestValues.assetScript)
-      val amountAssetIssue    = TxHelpers.issue(script = TestValues.rejectAssetScript)
-      val order1FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
-      val order2FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val priceAssetIssue     = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val amountAssetIssue    = TxHelpers.issue(script = Some(TestValues.rejectAssetScript))
+      val order1FeeAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val order2FeeAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
 
       test(
         priceAssetIssue,
@@ -1325,10 +1325,10 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
 
     withClue("order1 matcher fee asset fails") {
-      val priceAssetIssue     = TxHelpers.issue(script = TestValues.assetScript)
-      val amountAssetIssue    = TxHelpers.issue(script = TestValues.assetScript)
-      val order1FeeAssetIssue = TxHelpers.issue(script = TestValues.rejectAssetScript)
-      val order2FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val priceAssetIssue     = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val amountAssetIssue    = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val order1FeeAssetIssue = TxHelpers.issue(script = Some(TestValues.rejectAssetScript))
+      val order2FeeAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
 
       test(
         priceAssetIssue,
@@ -1340,10 +1340,10 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
 
     withClue("order2 matcher fee asset fails") {
-      val priceAssetIssue     = TxHelpers.issue(script = TestValues.assetScript)
-      val amountAssetIssue    = TxHelpers.issue(script = TestValues.assetScript)
-      val order1FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
-      val order2FeeAssetIssue = TxHelpers.issue(script = TestValues.rejectAssetScript)
+      val priceAssetIssue     = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val amountAssetIssue    = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val order1FeeAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val order2FeeAssetIssue = TxHelpers.issue(script = Some(TestValues.rejectAssetScript))
 
       test(
         priceAssetIssue,
@@ -1381,24 +1381,24 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
     withClue("fee") {
       val tradeableAssetIssue = TxHelpers.issue()
-      val feeAssetIssue       = TxHelpers.issue(script = TestValues.assetScript)
+      val feeAssetIssue       = TxHelpers.issue(script = Some(TestValues.assetScript))
       test(tradeableAssetIssue, feeAssetIssue, 0)
     }
 
     withClue("asset") {
-      val tradeableAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val tradeableAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
       val feeAssetIssue       = TxHelpers.issue()
       test(tradeableAssetIssue, feeAssetIssue, 1)
     }
 
     withClue("fee and asset") {
-      val tradeableAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
-      val feeAssetIssue       = TxHelpers.issue(script = TestValues.assetScript)
+      val tradeableAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val feeAssetIssue       = TxHelpers.issue(script = Some(TestValues.assetScript))
       test(tradeableAssetIssue, feeAssetIssue, 1)
     }
 
     withClue("fee and asset (same asset)") {
-      val tradeableAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val tradeableAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
       test(tradeableAssetIssue, tradeableAssetIssue, 1)
     }
   }

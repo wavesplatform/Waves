@@ -283,7 +283,7 @@ class DebugApiRouteSpec
 
       val route = routeWithBlockchain(blockchain)
       def testFunction(name: String, result: InvokeScriptTransaction => String) = withClue(s"function $name") {
-        val tx = TxHelpers.invoke(TxHelpers.defaultAddress, name, fee = 102500000)
+        val tx = TxHelpers.invoke(TxHelpers.defaultAddress, func = Some(name), fee = 102500000)
 
         jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
           val json = Json.parse(responseAs[String])
@@ -298,7 +298,7 @@ class DebugApiRouteSpec
       }
 
       def testPayment(result: String) = withClue("payment") {
-        val tx = TxHelpers.invoke(TxHelpers.secondAddress, "test", fee = 1300000, payments = Seq(Payment(1L, TestValues.asset)))
+        val tx = TxHelpers.invoke(TxHelpers.secondAddress, fee = 1300000, payments = Seq(Payment(1L, TestValues.asset)))
 
         jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
           val json = Json.parse(responseAs[String])
@@ -546,7 +546,7 @@ class DebugApiRouteSpec
     "invoke tx returning leases" in {
       val dAppPk        = TxHelpers.defaultSigner.publicKey
       val dAppAddress = dAppPk.toAddress
-      val invoke        = TxHelpers.invoke(dAppPk.toAddress, "test")
+      val invoke        = TxHelpers.invoke(dAppPk.toAddress)
       val leaseCancelId = ByteStr(bytes32gen.sample.get)
 
       val amount1    = 100
@@ -750,7 +750,7 @@ class DebugApiRouteSpec
     "invoke tx with nested call" in {
       val dAppPk        = TxHelpers.defaultSigner.publicKey
       val dAppAddress = dAppPk.toAddress
-      val invoke        = TxHelpers.invoke(dAppPk.toAddress, "test1")
+      val invoke        = TxHelpers.invoke(dAppPk.toAddress, func = Some("test1"))
 
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
@@ -1013,7 +1013,7 @@ class DebugApiRouteSpec
       val leaseCancelId    = ByteStr(bytes32gen.sample.get)
       val recipientAddress = accountGen.sample.get.toAddress
       val recipientAlias   = aliasGen.sample.get
-      val invoke           = TxHelpers.invoke(invokeAddress, "test")
+      val invoke           = TxHelpers.invoke(invokeAddress)
       val scriptResult = InvokeScriptResult(
         leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, leaseId1), InvokeScriptResult.Lease(recipientAlias, 200, 3, leaseId2)),
         leaseCancels = Seq(LeaseCancel(leaseCancelId))

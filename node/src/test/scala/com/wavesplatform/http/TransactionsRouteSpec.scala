@@ -247,7 +247,7 @@ class TransactionsRouteSpec
     }
 
     "provides stateChanges" in forAll(accountGen) { account =>
-      val transaction = TxHelpers.invoke(account.toAddress, "test")
+      val transaction = TxHelpers.invoke(account.toAddress)
 
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
       (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
@@ -269,7 +269,7 @@ class TransactionsRouteSpec
       val leaseCancelId    = ByteStr(bytes32gen.sample.get)
       val recipientAddress = accountGen.sample.get.toAddress
       val recipientAlias   = aliasGen.sample.get
-      val invoke           = TxHelpers.invoke(invokeAddress, "test")
+      val invoke           = TxHelpers.invoke(invokeAddress)
       val scriptResult = InvokeScriptResult(
         leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, leaseId1), InvokeScriptResult.Lease(recipientAlias, 200, 3, leaseId2)),
         leaseCancels = Seq(LeaseCancel(leaseCancelId))
@@ -406,7 +406,7 @@ class TransactionsRouteSpec
     }
 
     "provides stateChanges" in forAll(accountGen) { account =>
-      val transaction = TxHelpers.invoke(account.toAddress, "test")
+      val transaction = TxHelpers.invoke(account.toAddress)
 
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
       (addressTransactions.transactionById _)
@@ -433,7 +433,7 @@ class TransactionsRouteSpec
       val nestedLeaseId       = ByteStr(bytes32gen.sample.get)
       val nestedLeaseCancelId = ByteStr(bytes32gen.sample.get)
 
-      val invoke = TxHelpers.invoke(invokeAddress, "test")
+      val invoke = TxHelpers.invoke(invokeAddress)
       val scriptResult = InvokeScriptResult(
         leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, leaseId1), InvokeScriptResult.Lease(recipientAlias, 200, 3, leaseId2)),
         leaseCancels = Seq(LeaseCancel(leaseCancelId)),
@@ -593,7 +593,7 @@ class TransactionsRouteSpec
 
     "handles multiple ids" in {
       val txCount = 5
-      val txs     = (1 to txCount).map(_ => TxHelpers.invoke(TxHelpers.defaultSigner.toAddress, "test"))
+      val txs     = (1 to txCount).map(_ => TxHelpers.invoke(TxHelpers.defaultSigner.toAddress))
       txs.foreach(
         tx =>
           (addressTransactions.transactionById _)

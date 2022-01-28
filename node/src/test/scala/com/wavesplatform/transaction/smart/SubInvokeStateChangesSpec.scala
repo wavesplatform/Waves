@@ -52,7 +52,7 @@ class SubInvokeStateChangesSpec extends FlatSpec with WithDomain with JsonMatche
     }
 
     // Actual test
-    val invoke = TxHelpers.invoke(dAppAddress.toAddress, ContractFunction)
+    val invoke = TxHelpers.invoke(dAppAddress.toAddress, Some(ContractFunction))
     d.appendBlock(invoke)
 
     val stateChanges = d.commonApi.invokeScriptResult(invoke.id())

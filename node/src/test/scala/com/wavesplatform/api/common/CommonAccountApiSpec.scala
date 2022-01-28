@@ -156,7 +156,7 @@ class CommonAccountApiSpec
            |""".stripMargin
       )
 
-      val invoke = TxHelpers.invoke(TxHelpers.secondAddress, "test")
+      val invoke = TxHelpers.invoke(TxHelpers.secondAddress)
       d.appendBlock(
         TxHelpers.genesis(TxHelpers.defaultAddress),
         TxHelpers.genesis(TxHelpers.secondAddress),

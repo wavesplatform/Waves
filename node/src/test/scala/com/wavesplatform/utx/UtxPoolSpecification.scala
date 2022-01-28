@@ -920,7 +920,7 @@ class UtxPoolSpecification
         d.appendBlock(genesisTxs: _*)
         d.appendBlock(setScripts: _*)
 
-        val invoke = TxHelpers.invoke(genesisTxs.head.recipient, "default")
+        val invoke = TxHelpers.invoke(genesisTxs.head.recipient, Some("default"))
         val utx    = new UtxPoolImpl(ntpTime, d.blockchainUpdater, PublishSubject(), DefaultWavesSettings.utxSettings)
         utx.putIfNew(invoke, forceValidate = true).resultE.explicitGet() shouldBe true
         utx.removeAll(Seq(invoke))

@@ -23,7 +23,7 @@ class RideV5LimitsChangeTest extends FlatSpec with WithDomain with PathMockFacto
     val setScript = TxHelpers.setScript(contractSigner, contract)
     d.appendBlock(setScript)
 
-    val invokes = for (_ <- 1 to 273) yield TxHelpers.invoke(contractAddress, "test") // 3675 complexity, 1003275 total
+    val invokes = for (_ <- 1 to 273) yield TxHelpers.invoke(contractAddress) // 3675 complexity, 1003275 total
 
     val block = d.createBlock(Block.ProtoBlockVersion, invokes, strictTime = true)
     val differResult = BlockDiffer.fromBlock(
@@ -46,7 +46,7 @@ class RideV5LimitsChangeTest extends FlatSpec with WithDomain with PathMockFacto
 
     val invokesCount     = 680
     val invokeComplexity = 3620
-    val invokes          = for (_ <- 1 to invokesCount) yield TxHelpers.invoke(contractAddress, "test")
+    val invokes          = for (_ <- 1 to invokesCount) yield TxHelpers.invoke(contractAddress)
 
     val time = new TestTime()
 
