@@ -110,7 +110,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
 
         d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
         d.appendBlock(TxHelpers.setScript(TxHelpers.defaultSigner, script))
-        d.appendBlock(TxHelpers.invoke(TxHelpers.defaultAddress, "foo"))
+        d.appendBlock(TxHelpers.invoke(TxHelpers.defaultAddress, Some("foo")))
         val subscription = repo.createSubscription(SubscribeRequest.of(1, 0))
         Thread.sleep(1000)
         subscription.cancel()

@@ -89,6 +89,7 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
 
       val invocation = TxHelpers.invoke(
         dApp = dApp1KP.toAddress,
+        func = Some("call"),
         args = Seq(
           CONST_STRING("aaa").explicitGet(),
           CONST_BYTESTR(ByteStr(dApp0KP.toAddress.bytes)).explicitGet(),
