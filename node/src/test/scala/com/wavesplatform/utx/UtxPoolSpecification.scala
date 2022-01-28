@@ -2,6 +2,11 @@ package com.wavesplatform.utx
 
 import java.nio.file.{Files, Path}
 
+import scala.collection.mutable.ListBuffer
+import scala.concurrent.duration._
+import scala.concurrent.Future
+import scala.util.Random
+
 import cats.data.NonEmptyList
 import com.wavesplatform
 import com.wavesplatform._
@@ -10,17 +15,17 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.database.{LevelDBWriter, TestStorageFactory, openDB}
+import com.wavesplatform.database.{openDB, LevelDBWriter, TestStorageFactory}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.{randomSig, settingsWithFeatures, DefaultWavesSettings}
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
-import com.wavesplatform.history.{DefaultWavesSettings, randomSig, settingsWithFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.mining._
@@ -29,26 +34,24 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.transaction.{Asset, Transaction, _}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Asset, Transaction, _}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool.PackStrategy
-import monix.reactive.subjects.PublishSubject
+import monix.execution.{Ack, Cancelable}
+import monix.reactive.observers.Subscriber
+import monix.reactive.subjects.{PublishSubject, Subject}
 import org.iq80.leveldb.DB
-import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatest.concurrent.Eventually
-
-import scala.collection.mutable.ListBuffer
-import scala.concurrent.duration._
-import scala.util.Random
 
 private object UtxPoolSpecification {
   private val ignoreSpendableBalanceChanged = PublishSubject[(Address, Asset)]()
@@ -992,20 +995,32 @@ class UtxPoolSpecification
         forAll(preconditions) {
           case (genesis, validTransfer, invalidTransfer) =>
             withDomain() { d =>
+
+              
               d.appendBlock(TestBlock.create(Seq(genesis)))
               val time   = new TestTime()
               val events = new ListBuffer[UtxEvent]
-              val utxPool =
-                new UtxPoolImpl(time, d.blockchainUpdater, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, events += _)
 
-              def assertEvents(f: PartialFunction[Seq[UtxEvent], Unit]): Unit = {
+              val utxPool =
+                new UtxPoolImpl(time, d.blockchainUpdater, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, new Subject[UtxEvent, UtxEvent] {
+                  def size: Int = events.size
+                  def unsafeSubscribeFn(subscriber: Subscriber[UtxEvent]): Cancelable = ???
+                  def onNext(elem: UtxEvent): Future[Ack] = Future.successful {
+                    events.synchronized(events += elem)
+                    Ack.Continue
+                  }
+                  def onError(ex: Throwable): Unit = ???
+                  def onComplete(): Unit = ???
+                })
+
+              def assertEvents(f: PartialFunction[Seq[UtxEvent], Unit]): Unit = events.synchronized {
                 val currentEvents = events.toVector
                 f(currentEvents)
                 events.clear()
               }
 
               def addUnverified(tx: Transaction): Unit = {
-                utxPool.addTransaction(tx, false)
+                utxPool.addTransaction(tx, verify = false)
               }
 
               val differ = TransactionDiffer(d.blockchainUpdater.lastBlockTimestamp, System.currentTimeMillis(), verify = false)(
