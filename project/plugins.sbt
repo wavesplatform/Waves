@@ -13,7 +13,7 @@ Seq(
   "com.github.sbt"     % "sbt-native-packager"      % "1.9.4",
   "se.marcuslonnberg"  % "sbt-docker"               % "1.8.2",
   "com.typesafe.sbt"   % "sbt-git"                  % "1.0.1",
-  "org.scala-js"       % "sbt-scalajs"              % "1.8.0",
+  "org.scala-js"       % "sbt-scalajs"              % "1.7.0",
   "org.portable-scala" % "sbt-scalajs-crossproject" % "1.1.0",
   "pl.project13.scala" % "sbt-jmh"                  % "0.4.3",
 ).map(addSbtPlugin)
