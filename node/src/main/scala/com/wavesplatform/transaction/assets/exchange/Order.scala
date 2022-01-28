@@ -41,7 +41,12 @@ case class Order(
     (timestamp > 0) :| "timestamp should be > 0" &&
     (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
     (expiration >= atTime) :| "expiration should be > currentTime" &&
-    (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves"
+    (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves" &&
+    (version > 0 && version < 5) :| "invalid version" &&
+    (Proofs.validate(proofs) match {
+      case Left(value) => Validation.failure(value.toString)
+      case Right(_)    => Validation.success
+    })
   }
 
   def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {
@@ -51,9 +56,9 @@ case class Order(
   }
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.bodyBytes(this))
-  val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(crypto.fastHash(bodyBytes())))
-  val idStr: Coeval[String] = Coeval.evalOnce(id().toString)
-  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.toBytes(this))
+  val id: Coeval[ByteStr]            = Coeval.evalOnce(ByteStr(crypto.fastHash(bodyBytes())))
+  val idStr: Coeval[String]          = Coeval.evalOnce(id().toString)
+  val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(OrderSerializer.toBytes(this))
 
   def getReceiveAssetId: Asset = orderType match {
     case OrderType.BUY  => assetPair.amountAsset
@@ -105,7 +110,8 @@ object Order {
       matcherFee: TxAmount,
       matcherFeeAssetId: Asset = Asset.Waves
   ): Order =
-    Order(version, sender.publicKey, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId).signWith(sender.privateKey)
+    Order(version, sender.publicKey, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
+      .signWith(sender.privateKey)
 
   def buy(
       version: TxVersion,

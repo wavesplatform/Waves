@@ -8,9 +8,11 @@ import com.wavesplatform.{transaction => vt}
 object PBOrders {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 
-  def vanilla(order: PBOrder, version: Int = 0): VanillaOrder = {
+  def vanilla(order: PBOrder): VanillaOrder = {
+    require(order.chainId == AddressScheme.current.chainId, s"Order from other network: ${order.chainId}")
+
     VanillaOrder(
-      if (version == 0) order.version.toByte else version.toByte,
+      order.version.toByte,
       PublicKey(order.senderPublicKey.toByteArray),
       PublicKey(order.matcherPublicKey.toByteArray),
       vt.assets.exchange

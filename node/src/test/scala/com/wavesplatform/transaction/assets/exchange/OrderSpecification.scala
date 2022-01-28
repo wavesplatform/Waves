@@ -1,15 +1,15 @@
-package com.wavesplatform.transaction
+package com.wavesplatform.transaction.assets.exchange
+
+import scala.util.Random
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.NTPTime
 import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.{Asset, Proofs, ValidationMatcher}
 import org.scalatest._
-
-import scala.util.Random
 
 class OrderSpecification extends PropSpec with ValidationMatcher with NTPTime {
   property("Order serialization roundtrip") {
