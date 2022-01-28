@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.compiler
 
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.directives.values.Imports
 import com.wavesplatform.lang.directives.{Directive, DirectiveParser}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.{CompilationError, ContractCompiler}
