@@ -111,16 +111,16 @@ class NotaryControlledTransferScenarioTest extends PropSpec with WithState {
     transferFromAToB
   )
 
-  def dummyEvalContext(version: StdLibVersion): EvaluationContext[Environment, Id] = {
+  private val dummyEvalContext: EvaluationContext[Environment, Id] = {
     val ds          = DirectiveSet(V1, Asset, Expression).explicitGet()
     val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, ds, ByteStr.empty)
-    lazyContexts(ds)().evaluationContext(environment)
+    lazyContexts((ds, true))().evaluationContext(environment)
   }
 
   private def eval(code: String) = {
     val untyped = Parser.parseExpr(code).get.value
     val typed   = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untyped).map(_._1)
-    typed.flatMap(EvaluatorV1().apply[EVALUATED](dummyEvalContext(V1), _))
+    typed.flatMap(EvaluatorV1().apply[EVALUATED](dummyEvalContext, _))
   }
 
   property("Script toBase58String") {

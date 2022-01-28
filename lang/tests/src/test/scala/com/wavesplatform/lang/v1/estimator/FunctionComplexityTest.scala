@@ -2,7 +2,6 @@ package com.wavesplatform.lang.v1.estimator
 import com.wavesplatform.DocSource
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -13,17 +12,6 @@ import com.wavesplatform.test.PropSpec
 import org.scalatest.exceptions.TestFailedException
 
 class FunctionComplexityTest extends PropSpec {
-  val directives: Iterable[DirectiveSet] =
-  DirectiveDictionary[StdLibVersion].all
-      .flatMap(
-        version =>
-          Seq(
-            DirectiveSet(version, Account, Expression).explicitGet(),
-            DirectiveSet(version, Asset, Expression).explicitGet()
-          ) ++ (if (version >= V3) Seq(DirectiveSet(version, Account, DApp).explicitGet())
-                else Seq())
-      )
-
   def docCost(function: BaseFunction[Environment], version: StdLibVersion): Int =
     DocSource.funcData
       .getOrElse(
@@ -37,9 +25,8 @@ class FunctionComplexityTest extends PropSpec {
       ._3
 
   property("all functions complexities") {
-    directives.foreach { ds =>
-      val ctx = lazyContexts(ds).value()
-      ctx.functions
+    lazyContexts.foreach { case ((ds, _), ctx) =>
+      ctx().functions
         .filterNot(_.name.startsWith("_"))
         .foreach { function =>
           val expr = FUNCTION_CALL(function.header, List.fill(function.args.size)(Terms.TRUE))

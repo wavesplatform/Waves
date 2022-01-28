@@ -41,7 +41,7 @@ class FractionIntBenchmark {
 @State(Scope.Benchmark)
 class St {
   val ds  = DirectiveSet(V5, Account, Expression).fold(null, identity)
-  val ctx = lazyContexts(ds).value().evaluationContext(Common.emptyBlockchainEnvironment())
+  val ctx = lazyContexts(ds, true).value().evaluationContext(Common.emptyBlockchainEnvironment())
   val max = Long.MaxValue
 
   val expr1 = TestCompiler(V5).compileExpression(s"fraction($max, -$max, 1)").expr.asInstanceOf[EXPR]

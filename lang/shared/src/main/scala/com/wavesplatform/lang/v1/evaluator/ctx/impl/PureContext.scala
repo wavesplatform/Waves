@@ -1316,23 +1316,6 @@ object PureContext {
   val RoundHalfDown = CASETYPEREF("HalfDown", List.empty, true)
   val rounds        = UNION(RoundDown, RoundUp, RoundHalfUp, RoundHalfDown, RoundCeiling, RoundFloor, RoundHalfEven)
 
-//  private def roundMode(m: EVALUATED): BaseGlobal.Rounds = {
-//    m match {
-//      case (p: CaseObj) =>
-//        p.caseType.name match {
-//          case "Down"     => BaseGlobal.RoundDown()
-//          case "Up"       => BaseGlobal.RoundUp()
-//          case "HalfUp"   => BaseGlobal.RoundHalfUp()
-//          case "HalfDown" => BaseGlobal.RoundHalfDown()
-//          case "HalfEven" => BaseGlobal.RoundHalfEven()
-//          case "Ceiling"  => BaseGlobal.RoundCeiling()
-//          case "Floor"    => BaseGlobal.RoundFloor()
-//          case v          => throw new Exception(s"Type error: $v isn't in $rounds")
-//        }
-//      case v => throw new Exception(s"Type error: $v isn't rounds CaseObj")
-//    }
-//  }
-
   def pow(roundTypes: UNION, useNewPrecision: Boolean): BaseFunction[NoContext] = {
     NativeFunction("pow", 100, POW, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", roundTypes)) {
       case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
