@@ -294,10 +294,10 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
   }
 
   property("complexity limit") {
-    val (genesisTxs, invoke) = scenario(sigVerifyCount = 150)
+    val (genesisTxs, invoke) = scenario(sigVerifyCount = 300)
     withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs*)
-      intercept[Exception](d.appendBlock(invoke)).getMessage should include("Contract function (default) is too complex: 27167 > 26000")
+      d.appendAndCatchError(invoke).toString should include("Contract function (default) is too complex: 54317 > 52000")
     }
   }
 
