@@ -165,7 +165,6 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
       bcu.shutdown()
     } finally {
       bcu.shutdown()
-      db.close()
     }
   }
 }
