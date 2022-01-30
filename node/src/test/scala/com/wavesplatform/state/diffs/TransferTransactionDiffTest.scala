@@ -1,118 +1,69 @@
 package com.wavesplatform.state.diffs
 
-import cats.syntax.option._
-import com.wavesplatform.account.Address
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithState
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.settings.TestFunctionalitySettings
+import cats.syntax.monoid._
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.{TxHelpers, TxValidationError, TxVersion}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxValidationError}
-import org.scalacheck.Gen
+import com.wavesplatform.TestValues
+import com.wavesplatform.lang.directives.values.StdLibVersion
 
-class TransferTransactionDiffTest extends PropSpec with WithState {
-
-  val preconditionsAndTransfer: Gen[(GenesisTransaction, IssueTransaction, IssueTransaction, TransferTransaction)] = for {
-    master    <- accountGen
-    recepient <- otherAccountGen(candidate = master)
-    ts        <- positiveIntGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-    issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
-    issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
-    maybeAsset               <- Gen.option(issue1.id()) map Asset.fromCompatId
-    maybeAsset2              <- Gen.option(issue2.id()) map Asset.fromCompatId
-    maybeFeeAsset            <- Gen.oneOf(maybeAsset, maybeAsset2)
-    transferV1               <- transferGeneratorP(master, recepient.toAddress, maybeAsset, maybeFeeAsset)
-    transferV2               <- versionedTransferGeneratorP(master, recepient.toAddress, maybeAsset, maybeFeeAsset)
-    transfer                 <- Gen.oneOf(transferV1, transferV2)
-  } yield (genesis, issue1, issue2, transfer)
+class TransferTransactionDiffTest extends PropSpec with WithDomain {
 
   property("transfers assets to recipient preserving waves invariant") {
-    forAll(preconditionsAndTransfer) {
-      case (genesis, issue1, issue2, transfer) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, issue1, issue2))), TestBlock.create(Seq(transfer))) {
-          case (totalDiff, newState) =>
-            assertBalanceInvariant(totalDiff)
+    val feeDiff = Diff(portfolios = Map(TxHelpers.defaultAddress -> Portfolio.waves(TestValues.fee)))
 
-            val recipient: Address = transfer.recipient.asInstanceOf[Address]
-            if (transfer.sender.toAddress != recipient) {
-              transfer.assetId match {
-                case aid @ IssuedAsset(_) =>
-                  newState.balance(recipient) shouldBe 0
-                  newState.balance(recipient, aid) shouldBe transfer.amount
-                case Waves =>
-                  newState.balance(recipient) shouldBe transfer.amount
-              }
-            }
-        }
+    withDomain(DomainPresets.mostRecent) { d =>
+      d.helpers.creditWavesToDefaultSigner()
+
+      val wavesTransfer = TxHelpers.transfer()
+      assertBalanceInvariant(d.createDiff(wavesTransfer) |+| feeDiff)
+
+      d.appendAndAssertSucceed(wavesTransfer)
+      d.blockchain.balance(TxHelpers.secondAddress) shouldBe wavesTransfer.amount
+      d.blockchain.balance(TxHelpers.defaultAddress) shouldBe 899400000L
+    }
+
+    withDomain(DomainPresets.mostRecent) { d =>
+      d.helpers.creditWavesToDefaultSigner()
+
+      val asset         = d.helpers.issueAsset()
+      val assetTransfer = TxHelpers.transfer(asset = asset, amount = 1000)
+      assertBalanceInvariant(d.createDiff(assetTransfer) |+| feeDiff)
+
+      d.appendAndAssertSucceed(assetTransfer)
+      d.blockchain.balance(TxHelpers.secondAddress) shouldBe 0L
+      d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 1000L
+      d.blockchain.balance(TxHelpers.defaultAddress) shouldBe 999400000L
+      d.blockchain.balance(TxHelpers.defaultAddress, asset) shouldBe 0L
     }
   }
 
-  val transferWithSmartAssetFee: Gen[(GenesisTransaction, IssueTransaction, IssueTransaction, TransferTransaction)] = {
-    for {
-      master    <- accountGen
-      recepient <- otherAccountGen(master)
-      ts        <- positiveIntGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue: IssueTransaction    <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
-      feeIssue: IssueTransaction <- issueV2TransactionGen(master, scriptGen.map(_.some))
-      transferV1                 <- transferGeneratorP(master, recepient.toAddress, IssuedAsset(issue.id()), IssuedAsset(feeIssue.id()))
-      transferV2                 <- transferGeneratorP(master, recepient.toAddress, IssuedAsset(issue.id()), IssuedAsset(feeIssue.id()))
-      transfer                   <- Gen.oneOf(transferV1, transferV2)
-    } yield (genesis, issue, feeIssue, transfer)
-  }
-
   property("handle transactions with amount + fee > Long.MaxValue") {
-    val precs = for {
-      master    <- accountGen
-      recepient <- otherAccountGen(candidate = master)
-      ts        <- positiveIntGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue: IssueTransaction <- issueReissueBurnGeneratorP(Long.MaxValue, master).map(_._1)
-      asset = IssuedAsset(issue.id())
-      transfer = TransferTransaction
-        .selfSigned(1.toByte, master, recepient.toAddress, asset, Long.MaxValue, Waves, 100000, ByteStr.empty, ts)
-        .explicitGet()
-    } yield (genesis, issue, transfer)
+    withDomain(DomainPresets.ScriptsAndSponsorship) { d =>
+      d.helpers.creditWavesToDefaultSigner()
+      val asset    = d.helpers.issueAsset(amount = Long.MaxValue)
+      val transfer = TxHelpers.transfer(asset = asset, amount = Long.MaxValue, version = TxVersion.V1, fee = 100000)
+      d.appendAndCatchError(transfer) shouldBe TransactionDiffer.TransactionValidationError(TxValidationError.OverflowError, transfer)
+    }
 
-    val rdEnabled = TestFunctionalitySettings.Stub
-
-    val rdDisabled = rdEnabled.copy(
-      preActivatedFeatures = Map(
-        BlockchainFeatures.SmartAccounts.id -> 0,
-        BlockchainFeatures.SmartAssets.id   -> 0,
-        BlockchainFeatures.FairPoS.id       -> 0
-      )
-    )
-
-    forAll(precs) {
-      case (genesis, issue, transfer) =>
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis, issue))), TestBlock.create(Seq(transfer)), rdEnabled) { diffEi =>
-          diffEi shouldBe an[Right[_, _]]
-        }
-
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis, issue))), TestBlock.create(Seq(transfer)), rdDisabled) { diffEi =>
-          diffEi shouldBe Left(TransactionDiffer.TransactionValidationError(TxValidationError.OverflowError, transfer))
-        }
+    withDomain(DomainPresets.mostRecent) { d =>
+      d.helpers.creditWavesToDefaultSigner()
+      val asset    = d.helpers.issueAsset(amount = Long.MaxValue)
+      val transfer = TxHelpers.transfer(asset = asset, amount = Long.MaxValue, version = TxVersion.V1, fee = 100000)
+      d.appendAndAssertSucceed(transfer)
     }
   }
 
   property("fails, if smart asset used as a fee") {
-    import smart._
+    withDomain(DomainPresets.mostRecent) { d =>
+      d.helpers.creditWavesToDefaultSigner(Long.MaxValue)
+      val asset    = d.helpers.issueAsset(script = TxHelpers.exprScript(StdLibVersion.V1)("true"), amount = 100000000)
+      val transfer = TxHelpers.transfer(feeAsset = asset)
 
-    forAll(transferWithSmartAssetFee) {
-      case (genesis, issue, fee, transfer) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(issue, fee)), smartEnabledFS) {
-          case (_, state) =>
-            val diffOrError = TransferTransactionDiff(state, System.currentTimeMillis())(transfer)
-            diffOrError shouldBe Left(GenericError("Smart assets can't participate in TransferTransactions as a fee"))
-        }
+      val diffOrError = TransferTransactionDiff(d.blockchain, System.currentTimeMillis())(transfer)
+      diffOrError shouldBe Left(GenericError("Smart assets can't participate in TransferTransactions as a fee"))
     }
   }
 }

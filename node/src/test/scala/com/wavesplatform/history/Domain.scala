@@ -4,8 +4,8 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 import cats.syntax.option._
-import com.wavesplatform.{database, Application}
-import com.wavesplatform.account.Address
+import com.wavesplatform.{database, Application, TestValues}
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.{AddressPortfolio, AddressTransactions, CommonBlocksApi, CommonTransactionsApi}
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
@@ -19,6 +19,7 @@ import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer
@@ -45,10 +46,14 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   val transactionDiffer: Transaction => TracedResult[ValidationError, Diff] =
     TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
 
+  def createDiffE(tx: Transaction): Either[ValidationError, Diff] = transactionDiffer(tx).resultE
+  def createDiff(tx: Transaction): Diff                           = createDiffE(tx).explicitGet()
+
   lazy val utxPool = new UtxPoolImpl(SystemTime, blockchain, Observer.empty, settings.utxSettings)
   lazy val wallet  = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
+
     /**
       * @return Tuple of (asset, feeInAsset, feeInWaves)
       * @see [[com.wavesplatform.state.diffs.FeeValidation#getMinFee(com.wavesplatform.state.Blockchain, com.wavesplatform.transaction.Transaction)]]
@@ -129,8 +134,20 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   def appendAndAssertSucceed(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
     appendBlock(block)
-    txs.foreach(tx => require(blockchain.transactionSucceeded(tx.id()), s"should succeed: $tx"))
+    txs.foreach { tx =>
+      require(blockchain.transactionInfo(tx.id()).isDefined, s"should be present: $tx")
+      require(blockchain.transactionSucceeded(tx.id()), s"should succeed: $tx")
+    }
     lastBlock
+  }
+
+  def appendAndCatchError(txs: Transaction*): ValidationError = {
+    val block  = createBlock(Block.PlainBlockVersion, txs)
+    val result = appendBlockE(block)
+    txs.foreach { tx =>
+      require(blockchain.transactionInfo(tx.id()).isEmpty, s"should not pass: $tx")
+    }
+    result.left.getOrElse(throw new RuntimeException(s"Block appended successfully: $txs"))
   }
 
   def appendAndAssertFailed(txs: Transaction*): Block = {
@@ -253,6 +270,43 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       }
 
     CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
+  }
+
+  //noinspection ScalaStyle
+  object helpers {
+    def creditWavesToDefaultSigner(amount: Long = 10_0000_0000): Unit = {
+      appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress, amount))
+    }
+
+    def creditWavesFromDefaultSigner(to: Address, amount: Long = 1_0000_0000): Unit = {
+      appendBlock(TxHelpers.transfer(to = to, amount = amount))
+    }
+
+    def issueAsset(script: Script = null, amount: Long = 1000): IssuedAsset = {
+      val transaction = TxHelpers.issue(script = Option(script), amount = amount)
+      appendBlock(transaction)
+      IssuedAsset(transaction.id())
+    }
+
+    def setScript(account: KeyPair, script: Script): Unit = {
+      appendBlock(TxHelpers.setScript(account, script))
+    }
+
+    def setData(account: KeyPair, entries: DataEntry[_]*): Unit = {
+      appendBlock(entries.map(TxHelpers.dataEntry(account, _)): _*)
+    }
+
+    def transfer(account: KeyPair, to: Address, amount: TxAmount, asset: Asset): Unit = {
+      appendBlock(TxHelpers.transfer(account, to, amount, asset))
+    }
+
+    def transferAll(account: KeyPair, to: Address, asset: Asset): Unit = {
+      val balanceMinusFee = {
+        val balance = blockchain.balance(account.toAddress, asset)
+        if (asset == Waves) balance - TestValues.fee else balance
+      }
+      transfer(account, to, balanceMinusFee, asset)
+    }
   }
 
   val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(

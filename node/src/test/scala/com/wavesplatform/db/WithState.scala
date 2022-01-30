@@ -154,7 +154,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     val portfolioDiff = Monoid.combineAll(diff.portfolios.values)
     portfolioDiff.balance shouldBe 0
     portfolioDiff.effectiveBalance shouldBe 0
-    portfolioDiff.assets.values.foreach(_ shouldBe 0)
+    all(portfolioDiff.assets.values) shouldBe 0
   }
 
   def assertLeft(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(errorMessage: String): Unit =
@@ -233,6 +233,8 @@ trait WithDomain extends WithState { _: Suite =>
     )
 
     val RideV5 = RideV4.addFeatures(BlockchainFeatures.SynchronousCalls)
+
+    def mostRecent: WavesSettings = RideV5
   }
 
   def withDomain[A](

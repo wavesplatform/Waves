@@ -5,11 +5,13 @@ import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.state.StringDataEntry
+import com.wavesplatform.state.{DataEntry, StringDataEntry}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
@@ -44,9 +46,10 @@ object TxHelpers {
       amount: Long = 1.waves,
       asset: Asset = Waves,
       fee: Long = TestValues.fee,
+      feeAsset: Asset = Waves,
       version: Byte = TxVersion.V2
   ): TransferTransaction =
-    TransferTransaction.selfSigned(version, from, to, asset, amount, Waves, fee, ByteStr.empty, timestamp).explicitGet()
+    TransferTransaction.selfSigned(version, from, to, asset, amount, feeAsset, fee, ByteStr.empty, timestamp).explicitGet()
 
   def issue(issuer: KeyPair = defaultSigner, amount: Long = 1000, script: Option[Script] = None): IssueTransaction =
     IssueTransaction
@@ -58,8 +61,14 @@ object TxHelpers {
       .selfSigned(TxVersion.V2, defaultSigner, asset, amount, reissuable = true, TestValues.fee, timestamp)
       .explicitGet()
 
+  def dataEntry(account: KeyPair, value: DataEntry[_]): DataTransaction =
+    DataTransaction.selfSigned(TxVersion.V1, account, Seq(value), TestValues.fee * 3, timestamp).explicitGet()
+
   def data(account: KeyPair = defaultSigner, key: String = "test", value: String = "test"): DataTransaction =
-    DataTransaction.selfSigned(TxVersion.V1, account, Seq(StringDataEntry(key, value)), TestValues.fee * 3, timestamp).explicitGet()
+    dataWithMultipleEntries(account, Seq(StringDataEntry(key, value)))
+
+  def dataWithMultipleEntries(account: KeyPair, entries: Seq[DataEntry[_]]): DataTransaction =
+    DataTransaction.selfSigned(TxVersion.V1, account, entries, TestValues.fee * 3, timestamp).explicitGet()
 
   def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {
     orderV3(orderType, asset, Waves, feeAsset)
@@ -115,6 +124,17 @@ object TxHelpers {
     val (script, _) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3(fixOverflow = true)).explicitGet()
     script
   }
+
+  def exprScript(version: StdLibVersion)(scriptText: String): ExprScriptImpl =
+    script(s"""
+              |{-# STDLIB_VERSION ${version.id} #-}
+              |{-# CONTENT_TYPE EXPRESSION #-}
+              |
+              |$scriptText
+              |""".stripMargin) match {
+      case es: ExprScriptImpl => es
+      case other              => throw new IllegalStateException(s"Not an expression: $other")
+    }
 
   def setScript(acc: KeyPair, script: Script): SetScriptTransaction = {
     SetScriptTransaction.selfSigned(TxVersion.V1, acc, Some(script), TestValues.fee, timestamp).explicitGet()
