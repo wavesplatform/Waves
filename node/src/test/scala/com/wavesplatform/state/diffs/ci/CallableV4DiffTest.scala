@@ -107,7 +107,8 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
   }
 
   property("action state changes affects subsequent actions") {
-    val (genesis, setScript, invoke, issue, master, invoker, reissueAmount, burnAmount, transferAmount) = multiActionPreconditions(invokeFee = 0.029.waves, withScriptError = false)
+    val (genesis, setScript, invoke, issue, master, invoker, reissueAmount, burnAmount, transferAmount) =
+      multiActionPreconditions(invokeFee = 0.029.waves, withScriptError = false)
     assertDiffAndState(
       Seq(TestBlock.create(genesis :+ setScript :+ issue)),
       TestBlock.create(Seq(invoke)),
@@ -126,7 +127,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
   }
 
   property("check fee") {
-    val minimalFee = 6 * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeValidation.FeeUnit
+    val minimalFee                                         = 6 * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeValidation.FeeUnit
     val (genesis, setScript, invoke, issue, _, _, _, _, _) = multiActionPreconditions(invokeFee = 0.005.waves, withScriptError = false)
     assertDiffEi(
       Seq(TestBlock.create(genesis :+ setScript :+ issue)),
@@ -162,7 +163,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
         |""".stripMargin
     )
 
-    val master = TxHelpers.signer(0)
+    val master  = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
 
     val genesis = Seq(
@@ -170,7 +171,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
       TxHelpers.genesis(invoker.toAddress)
     )
     val setScript = TxHelpers.setScript(master, deleteEntryDApp)
-    val invoke = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker)
+    val invoke    = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker)
 
     assertDiffAndState(
       Seq(TestBlock.create(genesis :+ setScript)),
@@ -186,25 +187,27 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
     }
   }
 
-  private def paymentPreconditions(invokeFee: Long,
-                                   assetScript: Option[Script] = None): (List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction, KeyPair, Long, Long) = {
-    val master = TxHelpers.signer(0)
-    val invoker = TxHelpers.signer(1)
+  private def paymentPreconditions(
+      invokeFee: Long,
+      assetScript: Option[Script] = None
+  ): (List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction, KeyPair, Long, Long) = {
+    val master        = TxHelpers.signer(0)
+    val invoker       = TxHelpers.signer(1)
     val reissueAmount = 10
-    val burnAmount = 5
+    val burnAmount    = 5
 
     val genesis = List(
       TxHelpers.genesis(master.toAddress),
       TxHelpers.genesis(invoker.toAddress)
     )
-    val issue = TxHelpers.issue(master, 100, assetScript)
+    val issue     = TxHelpers.issue(master, 100, assetScript)
     val setScript = TxHelpers.setScript(master, reissueAndBurnDApp(issue.id(), reissueAmount, burnAmount))
-    val invoke = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker, fee = invokeFee)
+    val invoke    = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker, fee = invokeFee)
     (genesis, setScript, invoke, issue, master, reissueAmount, burnAmount)
   }
 
   private def sponsorFeePreconditions(invokeFee: Long): (List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, Long) = {
-    val master = TxHelpers.signer(0)
+    val master  = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
 
     val minSponsoredAssetFee = 1000L
@@ -214,18 +217,18 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
       TxHelpers.genesis(invoker.toAddress)
     )
     val setScript = TxHelpers.setScript(master, sponsorFeeDApp(Some(minSponsoredAssetFee)))
-    val invoke = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker, fee  = invokeFee)
+    val invoke    = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker, fee = invokeFee)
 
     (genesis, setScript, invoke, minSponsoredAssetFee)
   }
 
   private def multiActionDApp(
-                               assetId: ByteStr,
-                               recipient: Address,
-                               reissueAmount: Long,
-                               burnAmount: Long,
-                               transferAmount: Long
-                             ): Script =
+      assetId: ByteStr,
+      recipient: Address,
+      reissueAmount: Long,
+      burnAmount: Long,
+      transferAmount: Long
+  ): Script =
     dApp(
       s"""
          | [
@@ -247,12 +250,12 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
     )
 
   def checkStateAsset(
-                       startAmount: Long,
-                       reissueAmount: Long,
-                       burnAmount: Long,
-                       transferAmount: Long,
-                       recipient: Address
-                     ): Script = {
+      startAmount: Long,
+      reissueAmount: Long,
+      burnAmount: Long,
+      transferAmount: Long,
+      recipient: Address
+  ): Script = {
     val reissueCheckAmount1  = startAmount
     val burnCheckAmount1     = reissueCheckAmount1 + reissueAmount
     val transferCheckAmount1 = burnCheckAmount1 - burnAmount
@@ -299,24 +302,27 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
     )
   }
 
-  private def multiActionPreconditions(invokeFee: Long,
-                                       withScriptError: Boolean): (List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction, KeyPair, KeyPair, Long, Long, Long) = {
-    val master = TxHelpers.signer(0)
+  private def multiActionPreconditions(
+      invokeFee: Long,
+      withScriptError: Boolean
+  ): (List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction, KeyPair, KeyPair, Long, Long, Long) = {
+    val master  = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
 
-    val startAmount = 100
-    val reissueAmount = 50
-    val burnAmount = 20
-    val transferAmount = 15
+    val startAmount              = 100
+    val reissueAmount            = 50
+    val burnAmount               = 20
+    val transferAmount           = 15
     val assetCheckTransferAmount = if (withScriptError) transferAmount + 1 else transferAmount
 
     val genesis = List(
       TxHelpers.genesis(master.toAddress),
       TxHelpers.genesis(invoker.toAddress)
     )
-    val issue = TxHelpers.issue(master, startAmount, Some(checkStateAsset(startAmount, reissueAmount, burnAmount, assetCheckTransferAmount, invoker.toAddress)))
+    val issue =
+      TxHelpers.issue(master, startAmount, Some(checkStateAsset(startAmount, reissueAmount, burnAmount, assetCheckTransferAmount, invoker.toAddress)))
     val setScript = TxHelpers.setScript(master, multiActionDApp(issue.id(), invoker.publicKey.toAddress, reissueAmount, burnAmount, transferAmount))
-    val invoke = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker, fee = invokeFee)
+    val invoke    = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker, fee = invokeFee)
 
     (genesis, setScript, invoke, issue, master, invoker, reissueAmount, burnAmount, transferAmount)
   }
@@ -366,8 +372,10 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
                                         | }
        """.stripMargin)
 
-  private def issuePreconditions(invokeFee: Long): (List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, KeyPair, Long) = {
-    val master = TxHelpers.signer(0)
+  private def issuePreconditions(
+      invokeFee: Long
+  ): (List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, KeyPair, Long) = {
+    val master  = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
 
     val amount = 100
@@ -377,18 +385,18 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
       TxHelpers.genesis(invoker.toAddress)
     )
     val setScript = TxHelpers.setScript(master, issueDApp(amount))
-    val invoke = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker, fee = invokeFee)
+    val invoke    = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker, fee = invokeFee)
 
     (genesis, setScript, invoke, master, invoker, amount)
   }
 
   private def issueDApp(
-                         issueAmount: Long,
-                         name: String = "ScriptAsset",
-                         description: String = "Issued by InvokeScript",
-                         decimals: Int = 0,
-                         reissuable: Boolean = false
-                       ): Script =
+      issueAmount: Long,
+      name: String = "ScriptAsset",
+      description: String = "Issued by InvokeScript",
+      decimals: Int = 0,
+      reissuable: Boolean = false
+  ): Script =
     dApp(
       s"""
          | [
@@ -427,7 +435,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
       features
     ) {
       case (diff, blockchain) =>
-        val asset            = diff.issuedAssets.head._1
+        val asset = diff.issuedAssets.head._1
         diff.sponsorship shouldBe Map(asset -> SponsorshipValue(minSponsoredAssetFee))
         blockchain.assetDescription(asset).map(_.sponsorship) shouldBe Some(minSponsoredAssetFee)
     }

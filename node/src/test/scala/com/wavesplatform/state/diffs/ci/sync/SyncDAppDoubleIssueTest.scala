@@ -53,8 +53,8 @@ class SyncDAppDoubleIssueTest extends PropSpec with WithDomain {
       bigComplexityDApp2 <- Seq(false, true)
     } {
       val invoker = TxHelpers.signer(0)
-      val dApp1 = TxHelpers.signer(1)
-      val dApp2 = TxHelpers.signer(2)
+      val dApp1   = TxHelpers.signer(1)
+      val dApp2   = TxHelpers.signer(2)
 
       val genesis = Seq(
         TxHelpers.genesis(invoker.toAddress),
@@ -67,8 +67,8 @@ class SyncDAppDoubleIssueTest extends PropSpec with WithDomain {
       val preparingTxs = genesis ++ Seq(setScript1, setScript2)
 
       val invokeFee = 200500000.waves
-      val invoke1 = TxHelpers.invoke(dApp1.toAddress, func = None, invoker = invoker, fee = invokeFee)
-      val invoke2 = TxHelpers.invoke(dApp1.toAddress, func = None, invoker = invoker, fee = invokeFee)
+      val invoke1   = TxHelpers.invoke(dApp1.toAddress, func = None, invoker = invoker, fee = invokeFee)
+      val invoke2   = TxHelpers.invoke(dApp1.toAddress, func = None, invoker = invoker, fee = invokeFee)
 
       withDomain(domainSettingsWithFS(settings)) { d =>
         d.appendBlock(preparingTxs: _*)
@@ -76,7 +76,7 @@ class SyncDAppDoubleIssueTest extends PropSpec with WithDomain {
         d.appendBlock(invoke1)
         d.liquidDiff.errorMessage(invoke1.txId).get.text should include("already issued")
 
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include ("already issued")
+        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include("already issued")
       }
     }
   }

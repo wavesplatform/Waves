@@ -9,11 +9,7 @@ import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.EitherValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class CallableV5LimitTest
-    extends PropSpec
-    with ScalaCheckPropertyChecks
-    with WithDomain
-    with EitherValues {
+class CallableV5LimitTest extends PropSpec with ScalaCheckPropertyChecks with WithDomain with EitherValues {
 
   import DomainPresets._
 
@@ -50,21 +46,21 @@ class CallableV5LimitTest
   )
 
   property("callable limit is 10000 from V5") {
-    val dApp = TxHelpers.signer(0)
+    val dApp     = TxHelpers.signer(0)
     val syncDApp = TxHelpers.signer(1)
-    val invoker = TxHelpers.signer(2)
+    val invoker  = TxHelpers.signer(2)
 
     val genesisTxs = Seq(
       TxHelpers.genesis(dApp.toAddress),
       TxHelpers.genesis(syncDApp.toAddress),
       TxHelpers.genesis(invoker.toAddress)
     )
-    val setAcceptableScript = TxHelpers.setScript(dApp, contract(5, V5))
-    val setProhibitedScript = TxHelpers.setScript(dApp, contract(6, V5))
+    val setAcceptableScript   = TxHelpers.setScript(dApp, contract(5, V5))
+    val setProhibitedScript   = TxHelpers.setScript(dApp, contract(6, V5))
     val setProhibitedV4Script = TxHelpers.setScript(dApp, contract(5, V4))
-    val setSyncDApp = TxHelpers.setScript(syncDApp, syncDAppScript(dApp.toAddress))
-    val invoke = TxHelpers.invoke(dApp.toAddress, func = None, invoker = invoker)
-    val syncInvoke = TxHelpers.invoke(syncDApp.toAddress, func = None, invoker = invoker)
+    val setSyncDApp           = TxHelpers.setScript(syncDApp, syncDAppScript(dApp.toAddress))
+    val invoke                = TxHelpers.invoke(dApp.toAddress, func = None, invoker = invoker)
+    val syncInvoke            = TxHelpers.invoke(syncDApp.toAddress, func = None, invoker = invoker)
 
     withDomain(RideV4) { d =>
       d.appendBlock(genesisTxs: _*)

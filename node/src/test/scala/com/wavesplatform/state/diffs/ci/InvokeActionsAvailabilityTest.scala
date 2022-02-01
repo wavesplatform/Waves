@@ -9,8 +9,8 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import org.scalatest.{EitherValues, Inside}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
@@ -100,22 +100,22 @@ class InvokeActionsAvailabilityTest
   private val paymentAmount = 12345
 
   property("actions availability in sync call") {
-    val invoker = TxHelpers.signer(0)
+    val invoker     = TxHelpers.signer(0)
     val callingDApp = TxHelpers.signer(1)
-    val proxyDApp = TxHelpers.signer(2)
+    val proxyDApp   = TxHelpers.signer(2)
 
     val genesis = Seq(
       TxHelpers.genesis(callingDApp.toAddress),
       TxHelpers.genesis(invoker.toAddress),
-      TxHelpers.genesis(proxyDApp.toAddress),
+      TxHelpers.genesis(proxyDApp.toAddress)
     )
-    val issue = TxHelpers.issue(invoker, ENOUGH_AMT)
+    val issue                = TxHelpers.issue(invoker, ENOUGH_AMT)
     val setScriptCallingDApp = TxHelpers.setScript(callingDApp, callingDAppScript)
-    val setScriptProxyDApp = TxHelpers.setScript(proxyDApp, proxyDAppScript(callingDApp.toAddress))
-    val asset = IssuedAsset(issue.id.value())
-    val payments = Seq(Payment(paymentAmount, asset))
-    val preparingTxs = genesis :+ issue :+ setScriptCallingDApp :+ setScriptProxyDApp
-    val invoke = TxHelpers.invoke(proxyDApp.toAddress, func = None, invoker = invoker, payments = payments, fee = 1.005.waves)
+    val setScriptProxyDApp   = TxHelpers.setScript(proxyDApp, proxyDAppScript(callingDApp.toAddress))
+    val asset                = IssuedAsset(issue.id.value())
+    val payments             = Seq(Payment(paymentAmount, asset))
+    val preparingTxs         = genesis :+ issue :+ setScriptCallingDApp :+ setScriptProxyDApp
+    val invoke               = TxHelpers.invoke(proxyDApp.toAddress, func = None, invoker = invoker, payments = payments, fee = 1.005.waves)
 
     withDomain(RideV5) { d =>
       d.appendBlock(preparingTxs: _*)

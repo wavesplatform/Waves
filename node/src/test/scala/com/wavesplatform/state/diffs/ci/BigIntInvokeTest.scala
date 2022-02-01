@@ -6,7 +6,6 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
@@ -19,17 +18,11 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.TO_BIGINT
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.{Assertion, EitherValues, Inside}
 
-class BigIntInvokeTest
-    extends PropSpec
-    with Inside
-    with WithState
-    with DBCacheSettings
-    with WithDomain
-    with EitherValues {
+class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheSettings with WithDomain with EitherValues {
 
   private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(

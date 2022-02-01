@@ -14,10 +14,7 @@ import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxHel
 import com.wavesplatform.{BlocksTransactionsHelpers, history}
 import monix.execution.Scheduler.Implicits.global
 
-class CommonAccountApiSpec
-    extends FreeSpec
-    with WithDomain
-    with BlocksTransactionsHelpers {
+class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransactionsHelpers {
 
   "Data stream" - {
     "handles non-existent address" in {
@@ -142,7 +139,9 @@ class CommonAccountApiSpec
   }
 
   "Lease info" - {
-    "shows info of lease made through invoke" in withDomain(domainSettingsWithPreactivatedFeatures(BlockchainFeatures.SynchronousCalls, BlockchainFeatures.Ride4DApps)) { d =>
+    "shows info of lease made through invoke" in withDomain(
+      domainSettingsWithPreactivatedFeatures(BlockchainFeatures.SynchronousCalls, BlockchainFeatures.Ride4DApps)
+    ) { d =>
       val dAppScript = TestCompiler(V5).compileContract(
         s"""
            |{-# STDLIB_VERSION 5 #-}

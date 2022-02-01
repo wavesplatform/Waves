@@ -52,16 +52,16 @@ class SyncDAppNegativeReissueTest extends PropSpec with WithDomain {
       bigComplexityDApp2 <- Seq(false, true)
     } {
       val invoker = TxHelpers.signer(0)
-      val dApp1 = TxHelpers.signer(1)
-      val dApp2 = TxHelpers.signer(2)
+      val dApp1   = TxHelpers.signer(1)
+      val dApp2   = TxHelpers.signer(2)
 
       val genesis = Seq(
         TxHelpers.genesis(invoker.toAddress),
         TxHelpers.genesis(dApp1.toAddress),
         TxHelpers.genesis(dApp2.toAddress)
       )
-      val issue = TxHelpers.issue(dApp2, 100)
-      val asset = IssuedAsset(issue.id.value())
+      val issue      = TxHelpers.issue(dApp2, 100)
+      val asset      = IssuedAsset(issue.id.value())
       val setScript1 = TxHelpers.setScript(dApp1, dApp1Script(dApp2.toAddress, bigComplexityDApp1))
       val setScript2 = TxHelpers.setScript(dApp2, dApp2Script(asset, bigComplexityDApp2))
 
@@ -77,7 +77,7 @@ class SyncDAppNegativeReissueTest extends PropSpec with WithDomain {
         d.blockchain.transactionSucceeded(invoke1.txId) shouldBe true
         d.blockchain.balance(dApp2.toAddress, asset) shouldBe 99
 
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include ("Negative reissue quantity = -1")
+        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include("Negative reissue quantity = -1")
       }
     }
   }

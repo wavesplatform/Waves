@@ -53,16 +53,16 @@ class SyncDAppNegativeBurnTest extends PropSpec with WithDomain {
     } {
 
       val invoker = TxHelpers.signer(0)
-      val dApp1 = TxHelpers.signer(1)
-      val dApp2 = TxHelpers.signer(2)
+      val dApp1   = TxHelpers.signer(1)
+      val dApp2   = TxHelpers.signer(2)
 
       val genesis = Seq(
         TxHelpers.genesis(invoker.toAddress),
         TxHelpers.genesis(dApp1.toAddress),
         TxHelpers.genesis(dApp2.toAddress)
       )
-      val issue = TxHelpers.issue(dApp2, 100)
-      val asset = IssuedAsset(issue.id.value())
+      val issue      = TxHelpers.issue(dApp2, 100)
+      val asset      = IssuedAsset(issue.id.value())
       val setScript1 = TxHelpers.setScript(dApp1, dApp1Script(dApp2.toAddress, bigComplexityDApp1))
       val setScript2 = TxHelpers.setScript(dApp2, dApp2Script(asset, bigComplexityDApp2))
 
@@ -78,7 +78,7 @@ class SyncDAppNegativeBurnTest extends PropSpec with WithDomain {
         d.blockchain.transactionSucceeded(invoke1.txId) shouldBe true
         d.blockchain.balance(dApp2.toAddress, asset) shouldBe 101
 
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include ("Negative burn quantity = -1")
+        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include("Negative burn quantity = -1")
       }
     }
   }

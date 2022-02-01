@@ -53,8 +53,8 @@ class SyncDAppLeaseBalanceCheckTest extends PropSpec with WithDomain {
       bigComplexityDApp2 <- Seq(false, true)
     } {
       val invoker = TxHelpers.signer(0)
-      val dApp1 = TxHelpers.signer(1)
-      val dApp2 = TxHelpers.signer(2)
+      val dApp1   = TxHelpers.signer(1)
+      val dApp2   = TxHelpers.signer(2)
 
       val genesis = Seq(
         TxHelpers.genesis(invoker.toAddress),

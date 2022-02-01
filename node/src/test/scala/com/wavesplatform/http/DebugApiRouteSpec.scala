@@ -159,7 +159,8 @@ class DebugApiRouteSpec
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(TxHelpers.defaultAddress, *).returns(Long.MaxValue)
 
-        val (assetScript, comp) = ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3(fixOverflow = true)).explicitGet()
+        val (assetScript, comp) =
+          ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3(fixOverflow = true)).explicitGet()
         (blockchain.assetScript _).when(TestValues.asset).returns(Some(AssetScriptInfo(assetScript, comp)))
         (blockchain.assetDescription _)
           .when(TestValues.asset)
@@ -545,7 +546,7 @@ class DebugApiRouteSpec
 
     "invoke tx returning leases" in {
       val dAppPk        = TxHelpers.defaultSigner.publicKey
-      val dAppAddress = dAppPk.toAddress
+      val dAppAddress   = dAppPk.toAddress
       val invoke        = TxHelpers.invoke(dAppPk.toAddress)
       val leaseCancelId = ByteStr(bytes32gen.sample.get)
 
@@ -748,9 +749,9 @@ class DebugApiRouteSpec
     }
 
     "invoke tx with nested call" in {
-      val dAppPk        = TxHelpers.defaultSigner.publicKey
+      val dAppPk      = TxHelpers.defaultSigner.publicKey
       val dAppAddress = dAppPk.toAddress
-      val invoke        = TxHelpers.invoke(dAppPk.toAddress, func = Some("test1"))
+      val invoke      = TxHelpers.invoke(dAppPk.toAddress, func = Some("test1"))
 
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
@@ -907,7 +908,6 @@ class DebugApiRouteSpec
         (json \ "height").as[Int] shouldBe 1
       }
     }
-
 
     "transfer transaction with asset fail" in {
       val blockchain = createBlockchainStub { blockchain =>

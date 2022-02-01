@@ -34,7 +34,7 @@ class EvaluatorFunctionCallScopeTest extends PropSpec with WithDomain {
 
   property("arg of the first function should NOT overlap var accessed from body of the second function AFTER fix") {
     val invoker = TxHelpers.signer(0)
-    val dApp = TxHelpers.signer(1)
+    val dApp    = TxHelpers.signer(1)
 
     val preparingTxs = Seq(
       TxHelpers.genesis(invoker.toAddress),

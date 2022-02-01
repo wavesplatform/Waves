@@ -51,8 +51,8 @@ class SyncDAppPaymentBalanceCheckTest extends PropSpec with WithDomain {
       bigComplexityDApp2 <- Seq(false, true)
     } {
       val invoker = TxHelpers.signer(0)
-      val dApp1 = TxHelpers.signer(1)
-      val dApp2 = TxHelpers.signer(2)
+      val dApp1   = TxHelpers.signer(1)
+      val dApp2   = TxHelpers.signer(2)
 
       val genesis = Seq(
         TxHelpers.genesis(invoker.toAddress),
@@ -71,7 +71,7 @@ class SyncDAppPaymentBalanceCheckTest extends PropSpec with WithDomain {
       withDomain(domainSettingsWithFS(settings)) { d =>
         d.appendBlock(preparingTxs: _*)
 
-        val error   = s"Sync call leads to temporary negative balance = -100 for address ${invoke1.dAppAddressOrAlias}"
+        val error = s"Sync call leads to temporary negative balance = -100 for address ${invoke1.dAppAddressOrAlias}"
         d.appendBlock(invoke1)
         d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
 
