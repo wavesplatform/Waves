@@ -512,10 +512,6 @@ class UtxPoolImpl(
     cleanupScheduler.awaitTermination(10 seconds)
   }
 
-  override def finalize(): Unit = {
-    cleanupScheduler.shutdown()
-  }
-
   //noinspection TypeAnnotation
   private[this] object PoolMetrics {
     private[this] val SampleInterval: Duration = Duration.of(500, ChronoUnit.MILLIS)
