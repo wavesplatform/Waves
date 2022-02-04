@@ -19,7 +19,7 @@ import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
+import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -33,7 +33,6 @@ import kamon.metric.MeasurementUnit
 import monix.execution.ExecutionModel
 import monix.execution.atomic.AtomicBoolean
 import monix.execution.schedulers.SchedulerService
-import monix.reactive.Observer
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
@@ -553,50 +552,4 @@ private object UtxPoolImpl {
       validatedTransactions: Set[ByteStr],
       removedTransactions: Set[ByteStr]
   )
-
-  class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Asset)], isTxKnown: ByteStr => Boolean) {
-    private type Portfolios = Map[Address, Portfolio]
-    private val transactionPortfolios = new ConcurrentHashMap[ByteStr, Portfolios]()
-    private val transactions          = new ConcurrentHashMap[Address, Set[ByteStr]]()
-
-    def add(txId: ByteStr, txDiff: Diff): Unit = {
-      val pessimisticPortfolios         = txDiff.portfolios.map { case (addr, portfolio)        => addr -> portfolio.pessimistic }
-      val nonEmptyPessimisticPortfolios = pessimisticPortfolios.filterNot { case (_, portfolio) => portfolio.isEmpty }
-
-      if (nonEmptyPessimisticPortfolios.nonEmpty &&
-          Option(transactionPortfolios.put(txId, nonEmptyPessimisticPortfolios)).isEmpty) {
-        nonEmptyPessimisticPortfolios.keys.foreach { address =>
-          transactions.put(address, transactions.getOrDefault(address, Set.empty) + txId)
-        }
-      }
-
-      // Because we need to notify about balance changes when they are applied
-      pessimisticPortfolios.foreach {
-        case (addr, p) => p.assetIds.foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
-      }
-    }
-
-    def getAggregated(accountAddr: Address): Portfolio = {
-      val portfolios = for {
-        txId <- transactions.getOrDefault(accountAddr, Set.empty).toSeq
-        if !isTxKnown(txId)
-        txPortfolios = transactionPortfolios.getOrDefault(txId, Map.empty[Address, Portfolio])
-        txAccountPortfolio <- txPortfolios.get(accountAddr).toSeq
-      } yield txAccountPortfolio
-
-      Monoid.combineAll(portfolios)
-    }
-
-    def remove(txId: ByteStr): Unit = {
-      Option(transactionPortfolios.remove(txId)) match {
-        case Some(txPortfolios) =>
-          txPortfolios.foreach {
-            case (addr, p) =>
-              transactions.computeIfPresent(addr, (_, prevTxs) => prevTxs - txId)
-              p.assetIds.foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
-          }
-        case None =>
-      }
-    }
-  }
 }
