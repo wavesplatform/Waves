@@ -156,21 +156,26 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
 
 trait WithDomain extends WithState { _: Suite =>
   implicit class WavesSettingsOps(ws: WavesSettings) {
-    def withFS(transformF: FunctionalitySettings => FunctionalitySettings): WavesSettings = {
+    def configure(transformF: FunctionalitySettings => FunctionalitySettings): WavesSettings = {
       val functionalitySettings = transformF(ws.blockchainSettings.functionalitySettings)
       ws.copy(blockchainSettings = ws.blockchainSettings.copy(functionalitySettings = functionalitySettings))
     }
 
     def withFeatures(fs: BlockchainFeature*): WavesSettings =
-      withFS(_.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap))
+      configure(_.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap))
 
-    def addFeatures(fs: BlockchainFeature*): WavesSettings = withFS { functionalitySettings =>
+    def addFeatures(fs: BlockchainFeature*): WavesSettings = configure { functionalitySettings =>
       val newFeatures = functionalitySettings.preActivatedFeatures ++ fs.map(_.id -> 0)
       functionalitySettings.copy(preActivatedFeatures = newFeatures)
     }
 
+    def setFeaturesHeight(fs: (BlockchainFeature, Int)*): WavesSettings = configure { functionalitySettings =>
+      val newFeatures = functionalitySettings.preActivatedFeatures ++ fs.map { case (f, height) => (f.id, height) }
+      functionalitySettings.copy(preActivatedFeatures = newFeatures)
+    }
+
     def withActivationPeriod(period: Int): WavesSettings =
-      withFS(_.copy(featureCheckBlocksPeriod = period, blocksForFeatureActivation = period, doubleFeaturesPeriodsAfterHeight = 10000))
+      configure(_.copy(featureCheckBlocksPeriod = period, blocksForFeatureActivation = period, doubleFeaturesPeriodsAfterHeight = 10000))
 
     def noFeatures(): WavesSettings = {
       ws.copy(
@@ -222,6 +227,7 @@ trait WithDomain extends WithState { _: Suite =>
 
     val RideV4 = ScriptsAndSponsorship.addFeatures(
       BlockchainFeatures.Ride4DApps,
+      BlockchainFeatures.BlockReward,
       BlockchainFeatures.BlockV5
     )
 

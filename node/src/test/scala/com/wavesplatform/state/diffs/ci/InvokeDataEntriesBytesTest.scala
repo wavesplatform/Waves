@@ -2,7 +2,6 @@ package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lang.directives.values.V5
@@ -12,15 +11,10 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test._
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.{TestTime, TransactionGenBase}
+import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.{TestValues, TransactionGenBase}
 
 class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with TransactionGenBase {
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
-
   private def data(i: Int, size: Int): String =
     s"""
        | [BinaryEntry("key$i", base64'${ByteStr.fill(size / 2)(1)}' + base64'${ByteStr.fill(size / 2)(1)}')]
@@ -67,28 +61,26 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
        """.stripMargin
     )
 
-  private def scenario(exceed5Kb: Boolean, sync: Boolean, reach15kb: Boolean = false) =
-    for {
-      invoker <- accountGen
-      dApp1   <- accountGen
-      dApp2   <- accountGen
-      dApp3   <- accountGen
-      dApp4   <- accountGen
-      fee     <- ciFee()
-      gTx1       = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2       = GenesisTransaction.create(dApp1.toAddress, fee, ts).explicitGet()
-      gTx3       = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx4       = GenesisTransaction.create(dApp3.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx5       = GenesisTransaction.create(dApp4.toAddress, ENOUGH_AMT, ts).explicitGet()
-      limit      = ContractLimits.MaxWriteSetSizeInBytes - 9
-      wholeLimit = ContractLimits.MaxTotalWriteSetSizeInBytes - 9
-      size       = if (exceed5Kb) limit + 1 else limit
-      ssTx1      = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script(dApp2.toAddress, size, sync)), fee, ts).explicitGet()
-      ssTx2      = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp2Script(dApp3.toAddress, size)), fee, ts).explicitGet()
-      ssTx3      = SetScriptTransaction.selfSigned(1.toByte, dApp3, Some(dApp3Script(dApp4.toAddress, size)), fee, ts).explicitGet()
-      ssTx4      = SetScriptTransaction.selfSigned(1.toByte, dApp4, Some(dApp4Script(size, !reach15kb)), fee, ts).explicitGet()
-      invokeTx   = () => InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts).explicitGet()
-    } yield (Seq(gTx1, gTx2, gTx3, gTx4, gTx5, ssTx1, ssTx2, ssTx3, ssTx4), invokeTx)
+  private def scenario(exceed5Kb: Boolean, sync: Boolean, reach15kb: Boolean = false) = {
+    val invoker  = TxHelpers.signer(0)
+    val dApp1    = TxHelpers.signer(1)
+    val dApp2    = TxHelpers.signer(2)
+    val dApp3    = TxHelpers.signer(3)
+    val dApp4    = TxHelpers.signer(4)
+    val gTx1     = TxHelpers.genesis(invoker.toAddress, ENOUGH_AMT)
+    val gTx2     = TxHelpers.genesis(dApp1.toAddress, TestValues.fee)
+    val gTx3     = TxHelpers.genesis(dApp2.toAddress, ENOUGH_AMT)
+    val gTx4     = TxHelpers.genesis(dApp3.toAddress, ENOUGH_AMT)
+    val gTx5     = TxHelpers.genesis(dApp4.toAddress, ENOUGH_AMT)
+    val limit    = ContractLimits.MaxWriteSetSizeInBytes - 9
+    val size     = if (exceed5Kb) limit + 1 else limit
+    val ssTx1    = TxHelpers.setScript(dApp1, dApp1Script(dApp2.toAddress, size, sync))
+    val ssTx2    = TxHelpers.setScript(dApp2, dApp2Script(dApp3.toAddress, size))
+    val ssTx3    = TxHelpers.setScript(dApp3, dApp3Script(dApp4.toAddress, size))
+    val ssTx4    = TxHelpers.setScript(dApp4, dApp4Script(size, !reach15kb))
+    val invokeTx = () => TxHelpers.invoke(dApp1.toAddress, None, Nil)
+    (Seq(gTx1, gTx2, gTx3, gTx4, gTx5, ssTx1, ssTx2, ssTx3, ssTx4), invokeTx)
+  }
 
   private val settings =
     TestFunctionalitySettings
@@ -97,7 +89,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
 
   property("exceeding 5 Kb before and after activation") {
     withDomain(domainSettingsWithFS(settings)) { d =>
-      val (preparingTxs, invoke) = scenario(exceed5Kb = true, sync = true).sample.get
+      val (preparingTxs, invoke) = scenario(exceed5Kb = true, sync = true)
       d.appendBlock(preparingTxs: _*)
 
       val invoke1 = invoke()
@@ -116,7 +108,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
 
   property("exceeding 15 Kb before activation, after checkTotalDataEntriesBytesHeight and after syncDAppCheckTransfersHeight") {
     withDomain(domainSettingsWithFS(settings)) { d =>
-      val (preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true).sample.get
+      val (preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true)
       d.appendBlock(preparingTxs: _*)
 
       val invoke1 = invoke()
@@ -138,7 +130,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
 
   property("reaching 5 Kb before and after activation") {
     withDomain(domainSettingsWithFS(settings)) { d =>
-      val (preparingTxs, invoke) = scenario(exceed5Kb = false, sync = false).sample.get
+      val (preparingTxs, invoke) = scenario(exceed5Kb = false, sync = false)
       d.appendBlock(preparingTxs: _*)
 
       val invoke1 = invoke()
@@ -153,7 +145,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
 
   property("reaching 15 Kb after activation") {
     withDomain(domainSettingsWithFS(settings)) { d =>
-      val (preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true, reach15kb = true).sample.get
+      val (preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true, reach15kb = true)
       d.appendBlock(preparingTxs: _*)
       d.appendBlock()
 

@@ -1,27 +1,20 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.wavesplatform.TestTime
 import com.wavesplatform.account.Address
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
 
 class InvokePaymentsAvailabilityTest extends PropSpec with Inside with DBCacheSettings with MockFactory with WithDomain with EitherValues {
   import DomainPresets._
-
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
 
   private def proxyDAppScript(callingDApp: Address): Script =
     TestCompiler(V5).compileContract(
@@ -64,26 +57,25 @@ class InvokePaymentsAvailabilityTest extends PropSpec with Inside with DBCacheSe
 
   private val paymentAmount = 12345
 
-  private def scenario(syncCall: Boolean) =
-    for {
-      invoker     <- accountGen
-      callingDApp <- accountGen
-      proxyDApp   <- accountGen
-      fee         <- ciFee()
-      gTx1     = GenesisTransaction.create(callingDApp.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx3     = GenesisTransaction.create(proxyDApp.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue    = IssueTransaction.selfSigned(2.toByte, invoker, "name", "description", ENOUGH_AMT, 1, true, None, fee, ts).explicitGet()
-      ssTx     = SetScriptTransaction.selfSigned(1.toByte, callingDApp, Some(callingDAppScript), fee, ts).explicitGet()
-      ssTx2    = SetScriptTransaction.selfSigned(1.toByte, proxyDApp, Some(proxyDAppScript(callingDApp.toAddress)), fee, ts).explicitGet()
-      asset    = IssuedAsset(issue.id.value())
-      payments = Seq(Payment(paymentAmount, asset))
-      dApp     = if (syncCall) proxyDApp.toAddress else callingDApp.toAddress
-      invokeTx = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, dApp, None, payments, fee, Waves, ts).explicitGet()
-    } yield (Seq(gTx1, gTx2, gTx3, ssTx, ssTx2, issue), invokeTx, callingDApp.toAddress, proxyDApp.toAddress, asset)
+  private def scenario(syncCall: Boolean) = {
+    val invoker     = TxHelpers.signer(0)
+    val callingDApp = TxHelpers.signer(1)
+    val proxyDApp   = TxHelpers.signer(2)
+    val gTx1        = TxHelpers.genesis(callingDApp.toAddress, ENOUGH_AMT)
+    val gTx2        = TxHelpers.genesis(invoker.toAddress, ENOUGH_AMT)
+    val gTx3        = TxHelpers.genesis(proxyDApp.toAddress, ENOUGH_AMT)
+    val issue       = TxHelpers.issue(invoker, ENOUGH_AMT)
+    val ssTx        = TxHelpers.setScript(callingDApp, callingDAppScript)
+    val ssTx2       = TxHelpers.setScript(proxyDApp, proxyDAppScript(callingDApp.toAddress))
+    val asset       = IssuedAsset(issue.id.value())
+    val payments    = Seq(Payment(paymentAmount, asset))
+    val dApp        = if (syncCall) proxyDApp.toAddress else callingDApp.toAddress
+    val invokeTx    = TxHelpers.invoke(dApp, payments = payments)
+    (Seq(gTx1, gTx2, gTx3, ssTx, ssTx2, issue), invokeTx, callingDApp.toAddress, proxyDApp.toAddress, asset)
+  }
 
   property("payments availability in usual call") {
-    val (preparingTxs, invoke, callingDApp, _, asset) = scenario(syncCall = false).sample.get
+    val (preparingTxs, invoke, callingDApp, _, asset) = scenario(syncCall = false)
     withDomain(RideV5) { d =>
       d.appendBlock(preparingTxs: _*)
       d.appendBlock(invoke)
@@ -102,7 +94,7 @@ class InvokePaymentsAvailabilityTest extends PropSpec with Inside with DBCacheSe
   }
 
   property("payments availability in sync call") {
-    val (preparingTxs, invoke, callingDApp, proxyDApp, asset) = scenario(syncCall = true).sample.get
+    val (preparingTxs, invoke, callingDApp, proxyDApp, asset) = scenario(syncCall = true)
     withDomain(RideV5) { d =>
       d.appendBlock(preparingTxs: _*)
       d.appendBlock(invoke)

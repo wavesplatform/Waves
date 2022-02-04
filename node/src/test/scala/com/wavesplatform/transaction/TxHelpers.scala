@@ -11,15 +11,16 @@ import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.{DataEntry, StringDataEntry}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
+import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
 object TxHelpers {
@@ -51,7 +52,7 @@ object TxHelpers {
   ): TransferTransaction =
     TransferTransaction.selfSigned(version, from, to, asset, amount, feeAsset, fee, ByteStr.empty, timestamp).explicitGet()
 
-  def issue(issuer: KeyPair = defaultSigner, amount: Long = 1000, script: Option[Script] = None): IssueTransaction =
+  def issue(issuer: KeyPair = defaultSigner, amount: Long = 1000, script: Option[Script] = None, name: String = "test"): IssueTransaction =
     IssueTransaction
       .selfSigned(TxVersion.V2, issuer, "test", "", amount, 0, reissuable = true, script, 1.waves, timestamp)
       .explicitGet()
@@ -65,9 +66,9 @@ object TxHelpers {
     DataTransaction.selfSigned(TxVersion.V1, account, Seq(value), TestValues.fee * 3, timestamp).explicitGet()
 
   def data(account: KeyPair = defaultSigner, key: String = "test", value: String = "test"): DataTransaction =
-    dataWithMultipleEntries(account, Seq(StringDataEntry(key, value)))
+    data(account, Seq(StringDataEntry(key, value)))
 
-  def dataWithMultipleEntries(account: KeyPair, entries: Seq[DataEntry[_]]): DataTransaction =
+  def data(account: KeyPair, entries: Seq[DataEntry[_]]): DataTransaction =
     DataTransaction.selfSigned(TxVersion.V1, account, entries, TestValues.fee * 3, timestamp).explicitGet()
 
   def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {
@@ -140,17 +141,22 @@ object TxHelpers {
     SetScriptTransaction.selfSigned(TxVersion.V1, acc, Some(script), TestValues.fee, timestamp).explicitGet()
   }
 
+  def setAssetScript(acc: KeyPair, asset: IssuedAsset, script: Script): SetAssetScriptTransaction = {
+    SetAssetScriptTransaction.selfSigned(TxVersion.V1, acc, asset, Some(script), TestValues.fee, timestamp).explicitGet()
+  }
+
   def invoke(
       dApp: AddressOrAlias,
-      func: Option[String] = Some("test"),
+      func: Option[String] = None,
       args: Seq[EXPR] = Nil,
       payments: Seq[Payment] = Nil,
       invoker: KeyPair = defaultSigner,
-      fee: Long = TestValues.fee,
-      feeAssetId: Asset = Waves
+      fee: Long = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit,
+      feeAssetId: Asset = Waves,
+      version: TxVersion = TxVersion.V2
   ): InvokeScriptTransaction = {
     val fc = func.map(name => functionCall(name, args: _*))
-    InvokeScriptTransaction.selfSigned(TxVersion.V1, invoker, dApp, fc, payments, fee, feeAssetId, timestamp).explicitGet()
+    InvokeScriptTransaction.selfSigned(version, invoker, dApp, fc, payments, fee, feeAssetId, timestamp).explicitGet()
   }
 
   def functionCall(func: String, args: EXPR*): FUNCTION_CALL = {
@@ -163,5 +169,17 @@ object TxHelpers {
 
   def leaseCancel(leaseId: ByteStr): LeaseCancelTransaction = {
     LeaseCancelTransaction.selfSigned(TxVersion.V2, defaultSigner, leaseId, TestValues.fee, timestamp).explicitGet()
+  }
+
+  def sponsor(
+      asset: IssuedAsset,
+      minSponsoredAssetFee: Option[TxAmount] = Some(TestValues.fee),
+      sender: KeyPair = defaultSigner
+  ): SponsorFeeTransaction = {
+    SponsorFeeTransaction.selfSigned(TxVersion.V2, sender, asset, minSponsoredAssetFee, TestValues.fee, timestamp).explicitGet()
+  }
+
+  def createAlias(name: String, sender: KeyPair = defaultSigner): CreateAliasTransaction = {
+    CreateAliasTransaction.selfSigned(TxVersion.V2, sender, name, TestValues.fee, timestamp).explicitGet()
   }
 }

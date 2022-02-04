@@ -106,7 +106,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           f(d, isScriptSimple)
         })
 
-        withClue("with fix")(withDomain(DomainPresets.RideV5.withFS(_.copy(estimatorSumOverflowFixHeight = 4))) { d =>
+        withClue("with fix")(withDomain(DomainPresets.RideV5.configure(_.copy(estimatorSumOverflowFixHeight = 4))) { d =>
           d.appendAndAssertSucceed(TxHelpers.genesis(TxHelpers.defaultAddress))
           d.appendAndAssertSucceed(issue, TxHelpers.transfer(TxHelpers.defaultSigner, setScript.sender.toAddress, TestValues.fee), setScript)
           f(d, true)

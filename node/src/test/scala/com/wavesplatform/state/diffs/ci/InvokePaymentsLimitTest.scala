@@ -1,8 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.wavesplatform.TestTime
 import com.wavesplatform.account.Address
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4, V5}
@@ -10,26 +8,15 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
-import org.scalacheck.Gen
+import com.wavesplatform.transaction.{Transaction, TxHelpers}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
 
-class InvokePaymentsLimitTest extends PropSpec
-    with Inside
-    with WithState
-    with DBCacheSettings
-    with MockFactory
-    with WithDomain
-    with EitherValues {
+class InvokePaymentsLimitTest extends PropSpec with Inside with WithState with DBCacheSettings with MockFactory with WithDomain with EitherValues {
   import DomainPresets._
-
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
 
   private def dApp(version: StdLibVersion, nestedInvoke: Option[(Address, Seq[Payment])]): Script = {
     val nested = nestedInvoke.fold("") {
@@ -39,10 +26,6 @@ class InvokePaymentsLimitTest extends PropSpec
     }
     TestCompiler(version).compileContract(
       s"""
-         | {-# STDLIB_VERSION ${version.id} #-}
-         | {-# CONTENT_TYPE   DAPP          #-}
-         | {-# SCRIPT_TYPE    ACCOUNT       #-}
-         |
          | @Callable(i)
          | func default() = {
          |   $nested
@@ -52,35 +35,35 @@ class InvokePaymentsLimitTest extends PropSpec
     )
   }
 
-  private def scenario(version: StdLibVersion, paymentsCount: Int, nested: Boolean): Gen[(Seq[Transaction], InvokeScriptTransaction)] =
-    for {
-      invoker <- accountGen
-      dApp1   <- accountGen
-      dApp2   <- accountGen
-      fee     <- ciFee()
-      gTx1 = GenesisTransaction.create(dApp1.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx3 = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issues = (1 to paymentsCount).map(
-        _ => IssueTransaction.selfSigned(2.toByte, if (nested) dApp1 else invoker, "name", "description", 100, 1, true, None, fee, ts).explicitGet()
-      )
-      (nestedInvoke, txPayments) = {
-        val payments = issues.map(i => Payment(1, IssuedAsset(i.id.value())))
-        if (nested) (Some((dApp2.toAddress, payments)), Nil) else (None, payments)
-      }
-      ssTx     = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp(version, nestedInvoke)), fee, ts).explicitGet()
-      ssTx2    = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp(version, None)), fee, ts).explicitGet()
-      invokeTx = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, dApp1.toAddress, None, txPayments, fee, Waves, ts).explicitGet()
-    } yield (Seq(gTx1, gTx2, gTx3, ssTx, ssTx2) ++ issues, invokeTx)
+  private def scenario(version: StdLibVersion, paymentsCount: Int, nested: Boolean): (Seq[Transaction], InvokeScriptTransaction) = {
+    val invoker = TxHelpers.signer(0)
+    val dApp1   = TxHelpers.signer(1)
+    val dApp2   = TxHelpers.signer(2)
+    val gTx1    = TxHelpers.genesis(dApp1.toAddress, ENOUGH_AMT)
+    val gTx2    = TxHelpers.genesis(invoker.toAddress, ENOUGH_AMT)
+    val gTx3    = TxHelpers.genesis(dApp2.toAddress, ENOUGH_AMT)
+    val issues  = (1 to paymentsCount).map(_ => TxHelpers.issue(if (nested) dApp1 else invoker, 100))
+    val (nestedInvoke, txPayments) = {
+      val payments = issues.map(i => Payment(1, IssuedAsset(i.id.value())))
+      if (nested)
+        (Some((dApp2.toAddress, payments)), Nil)
+      else
+        (None, payments)
+    }
+    val ssTx     = TxHelpers.setScript(dApp1, dApp(version, nestedInvoke))
+    val ssTx2    = TxHelpers.setScript(dApp2, dApp(version, None))
+    val invokeTx = TxHelpers.invoke(dApp1.toAddress, payments = txPayments)
+    (Seq(gTx1, gTx2, gTx3, ssTx, ssTx2) ++ issues, invokeTx)
+  }
 
   private def assertLimit(version: StdLibVersion, count: Int, nested: Boolean) = {
-    val (preparingTxs, invoke) = scenario(version, count, nested).sample.get
+    val (preparingTxs, invoke) = scenario(version, count, nested)
     withDomain(RideV5) { d =>
       d.appendBlock(preparingTxs: _*)
       d.appendBlock(invoke)
       d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
     }
-    val (preparingTxs2, invoke2) = scenario(version, count + 1, nested).sample.get
+    val (preparingTxs2, invoke2) = scenario(version, count + 1, nested)
     withDomain(RideV5) { d =>
       d.appendBlock(preparingTxs2: _*)
       (the[RuntimeException] thrownBy d.appendBlock(invoke2)).getMessage should include(
