@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.wavesplatform.TestValues
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
