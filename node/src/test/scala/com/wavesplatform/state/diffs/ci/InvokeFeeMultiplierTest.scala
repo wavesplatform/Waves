@@ -13,7 +13,7 @@ import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.{DataTransaction, Transaction, TxHelpers}
+import com.wavesplatform.transaction.{DataTransaction, Transaction, TxHelpers, TxVersion}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 
@@ -68,9 +68,9 @@ class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettin
         CONST_LONG(1)
       )
     val payment    = Seq(Payment(1, IssuedAsset(issue.id())))
-    val initInvoke = TxHelpers.invoke(master.toAddress, Some("init"), initArgs, invoker = master, fee = TestValues.fee)
-    val invoke1    = TxHelpers.invoke(master.toAddress, Some("buyBack"), Nil, payment)
-    val invoke2    = TxHelpers.invoke(master.toAddress, Some("buyBack"), Nil, payment)
+    val initInvoke = TxHelpers.invoke(master.toAddress, Some("init"), initArgs, invoker = master, fee = TestValues.fee, version = TxVersion.V1)
+    val invoke1    = TxHelpers.invoke(master.toAddress, Some("buyBack"), Nil, payment, version = TxVersion.V1)
+    val invoke2    = TxHelpers.invoke(master.toAddress, Some("buyBack"), Nil, payment, version = TxVersion.V1)
     (List(genesis, genesis2, setDApp, issue, data1, initInvoke), invoke1, data2, invoke2)
   }
 

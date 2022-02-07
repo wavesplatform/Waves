@@ -62,7 +62,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
                         |{-# SCRIPT_TYPE ACCOUNT #-}
                         |
                         |@Callable(i)
-                        |func test() = {    
+                        |func default() = {    
                         |  if (${genExpr(1500, result = true)}) then [
                         |    ScriptTransfer(i.caller, 15, base58'${TestValues.asset}')
                         |  ] else []
@@ -94,7 +94,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
                         |{-# SCRIPT_TYPE ACCOUNT #-}
                         |
                         |@Callable(i)
-                        |func test() = {    
+                        |func default() = {    
                         |  if (${genExpr(1500, result = true)}) then [
                         |    ScriptTransfer(i.caller, 15, base58'${TestValues.asset}')
                         |  ] else []
@@ -124,7 +124,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
       issue
     )
 
-    val tx = TxHelpers.invoke(dApp.toAddress, payments = Seq(Payment(1L, issue.asset)))
+    val tx = TxHelpers.invoke(dApp.toAddress, payments = Seq(Payment(1L, issue.asset)), fee = TestValues.invokeFee(1))
     assert(utx.putIfNew(tx, forceValidate = false).resultE.isLeft)
     assert(utx.putIfNew(tx, forceValidate = true).resultE.isLeft)
     utx.putIfNew(tx, forceValidate = false).resultE should produce("reached err")
@@ -140,7 +140,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     val issue = TxHelpers.issue(script = Some(genAssetScript(ContractLimits.FailFreeInvokeComplexity * 2)))
     d.appendBlock(TxHelpers.setScript(dApp, genScript(0, result = true)), issue)
 
-    val tx = TxHelpers.invoke(dApp.toAddress, payments = Seq(Payment(1L, issue.asset)))
+    val tx = TxHelpers.invoke(dApp.toAddress, payments = Seq(Payment(1L, issue.asset)), fee = TestValues.invokeFee(1))
     assert(utx.putIfNew(tx, forceValidate = false).resultE.isRight)
     utx.removeAll(Seq(tx))
     assert(utx.putIfNew(tx, forceValidate = true).resultE.isLeft)
@@ -252,7 +252,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
          |{-#CONTENT_TYPE DAPP#-}
          |
          |@Callable(i)
-         |func test() = {
+         |func default() = {
          |  if ($expr) then [] else throw("reached err")
          |}
          |""".stripMargin

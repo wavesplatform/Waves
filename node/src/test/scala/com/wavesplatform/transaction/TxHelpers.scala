@@ -38,8 +38,10 @@ object TxHelpers {
     lastTimestamp
   }
 
-  def genesis(address: Address, amount: Long = 100_000_000.waves): GenesisTransaction =
-    GenesisTransaction.create(address, amount, timestamp).explicitGet()
+  val genesisBalance: TxTimestamp = 100_000_000.waves
+
+  def genesis(address: Address, amount: Long = genesisBalance): GenesisTransaction =
+    GenesisTransaction.create(address, amount, timestamp).explicitGet
 
   def transfer(
       from: KeyPair = defaultSigner,

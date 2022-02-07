@@ -139,9 +139,7 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
   }
 
   "Lease info" - {
-    "shows info of lease made through invoke" in withDomain(
-      domainSettingsWithPreactivatedFeatures(BlockchainFeatures.SynchronousCalls, BlockchainFeatures.Ride4DApps)
-    ) { d =>
+    "shows info of lease made through invoke" in withDomain(DomainPresets.RideV5) { d =>
       val dAppScript = TestCompiler(V5).compileContract(
         s"""
            |{-# STDLIB_VERSION 5 #-}
@@ -149,7 +147,7 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
            |{-# CONTENT_TYPE DAPP #-}
            |
            |@Callable(i)
-           |func test() = {
+           |func default() = {
            |  [Lease(Address(base58'${TxHelpers.defaultAddress}'), 1, 1)]
            |}
            |""".stripMargin

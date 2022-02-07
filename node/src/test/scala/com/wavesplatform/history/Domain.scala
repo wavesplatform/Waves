@@ -282,8 +282,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       appendBlock(TxHelpers.transfer(to = to, amount = amount))
     }
 
-    def issueAsset(script: Script = null, amount: Long = 1000): IssuedAsset = {
-      val transaction = TxHelpers.issue(script = Option(script), amount = amount)
+    def issueAsset(issuer: KeyPair = defaultSigner, script: Script = null, amount: Long = 1000): IssuedAsset = {
+      val transaction = TxHelpers.issue(issuer, script = Option(script), amount = amount)
       appendBlock(transaction)
       IssuedAsset(transaction.id())
     }

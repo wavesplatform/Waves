@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Portfolio}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test.{NumericExt, PropSpec}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers
 import org.scalamock.scalatest.MockFactory
@@ -69,7 +69,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
               transactions = invokeInfo(false),
               portfolios = Map(
                 invoke.senderAddress -> Portfolio(-invoke.fee),
-                miner                -> Portfolio((setScriptTx.fee * 0.6 + invoke.fee * 0.4).toInt)
+                miner                -> Portfolio((setScriptTx.fee * 0.6 + invoke.fee * 0.4).toLong + 6.waves)
               ),
               scriptsComplexity = 8,
               scriptResults = Map(invoke.id() -> InvokeScriptResult(error = Some(ErrorMessage(1, expectingMessage))))
@@ -81,7 +81,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
               portfolios = Map(
                 invoke.senderAddress -> Portfolio(-invoke.fee, assets = Map(asset -> 0)),
                 dAppAddress          -> Portfolio.build(asset, 0),
-                miner                -> Portfolio((setScriptTx.fee * 0.6 + invoke.fee * 0.4).toInt)
+                miner                -> Portfolio((setScriptTx.fee * 0.6 + invoke.fee * 0.4).toLong + 6.waves)
               ),
               scriptsRun = 1,
               scriptsComplexity = 18,

@@ -10,7 +10,6 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalacheck.Gen
 
 object TestValues {
   val keyPair: KeyPair   = TxHelpers.defaultSigner
@@ -22,7 +21,7 @@ object TestValues {
 
   val invokeFee: Long = FeeUnit * FeeConstants(InvokeScriptTransaction.typeId)
 
-  def invokeFee(scripts: Int = 0, issues: Int = 0): Gen[Long] =
+  def invokeFee(scripts: Int = 0, issues: Int = 0): Long =
     invokeFee + scripts * ScriptExtraFee + issues * FeeConstants(IssueTransaction.typeId) * FeeUnit
 
   val (script, scriptComplexity) = ScriptCompiler

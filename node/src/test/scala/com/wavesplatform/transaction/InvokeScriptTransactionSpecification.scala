@@ -119,7 +119,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
                          "id": "${tx.id()}",
                          "sender": "${TxHelpers.defaultAddress}",
                          "senderPublicKey": "${TxHelpers.defaultSigner.publicKey}",
-                         "fee": 1000000,
+                         "fee": 500000,
                          "feeAssetId": null,
                          "timestamp": ${tx.timestamp},
                          "proofs": ["x7T161SxvUxpubEAKv4UL5ucB5pquAhTryZ8Qrd347TPuQ4yqqpVMQ2B5FpeFXGnpyLvb7wGeoNsyyjh5R61u7F"],
@@ -169,7 +169,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
                          "id": "${tx.id()}",
                          "sender": "${TxHelpers.defaultAddress}",
                          "senderPublicKey": "${TxHelpers.defaultSigner.publicKey}",
-                         "fee": 1000000,
+                         "fee": 500000,
                          "feeAssetId": null,
                          "timestamp": ${tx.timestamp},
                          "proofs": ["3frswEnyFZjTzBQ5pdNEJbPzvLp7Voz8sqZT3n7xsuVDdYGcasXgFNzb8HCrpNXYoDWLsHqrUSqcQfQJ8CRWjp4U"],
@@ -358,6 +358,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
 
   private def createInvoke(func: Option[String] = Some("test")): InvokeScriptTransaction =
     TxHelpers.invoke(
+      version = TxVersion.V1,
       dApp = TxHelpers.secondAddress,
       func = func,
       args = Seq(CONST_LONG(1), CONST_STRING("test_str").explicitGet(), CONST_BYTESTR(ByteStr(Base64.tryDecode("YWxpY2U=").get)).explicitGet()),

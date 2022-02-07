@@ -238,7 +238,7 @@ class DebugApiRouteSpec
                |{-# CONTENT_TYPE DAPP #-}
                |
                |@Callable(i)
-               |func test() = []
+               |func default() = []
                |
                |@Callable(i)
                |func dataAndTransfer() = [
@@ -252,8 +252,8 @@ class DebugApiRouteSpec
                |
                |@Callable(i)
                |func issue() = {
-               |  let docimals = 4
-               |  [Issue("name", "description", 1000, docimals, true, unit, 0)]
+               |  let decimals = 4
+               |  [Issue("name", "description", 1000, decimals, true, unit, 0)]
                |}
                |
                |@Callable(i)
@@ -274,7 +274,7 @@ class DebugApiRouteSpec
                 TxHelpers.defaultSigner.publicKey,
                 dAppScript,
                 0L,
-                Map(3 -> Seq("test", "dataAndTransfer", "issue", "reissue", "burn", "sponsorFee").map(_ -> 1L).toMap)
+                Map(3 -> Seq("default", "dataAndTransfer", "issue", "reissue", "burn", "sponsorFee").map(_ -> 1L).toMap)
               )
             )
           )
@@ -321,7 +321,7 @@ class DebugApiRouteSpec
                     |}, {
                     |  "type" : "dApp",
                     |  "id" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
-                    |  "function" : "test",
+                    |  "function" : "default",
                     |  "args" : [ ],
                     |  "invocations" : [ ],
                     |  "result" : {
@@ -448,7 +448,7 @@ class DebugApiRouteSpec
           |  },
           |  "error" : null,
           |  "vars" : [ {
-          |    "name" : "docimals",
+          |    "name" : "decimals",
           |    "type" : "Int",
           |    "value" : 4
           |  } ]
@@ -573,7 +573,7 @@ class DebugApiRouteSpec
                |{-# CONTENT_TYPE DAPP #-}
                |
                |@Callable(i)
-               |func test() = {
+               |func default() = {
                |  strict a = parseBigIntValue("${PureContext.BigIntMax}")
                |  let test = 1
                |  if (test == 1)
@@ -598,7 +598,7 @@ class DebugApiRouteSpec
                 dAppPk,
                 dAppScript,
                 0L,
-                Map(3 -> Seq("test", "test1").map(_ -> 0L).toMap)
+                Map(3 -> Seq("default", "test1").map(_ -> 0L).toMap)
               )
             )
           )
@@ -686,7 +686,7 @@ class DebugApiRouteSpec
              |}, {
              |  "type" : "dApp",
              |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-             |  "function" : "test",
+             |  "function" : "default",
              |  "args" : [ ],
              |  "invocations" : [ ],
              |  "result" : {

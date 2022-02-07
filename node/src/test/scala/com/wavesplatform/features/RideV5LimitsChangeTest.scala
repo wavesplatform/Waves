@@ -79,7 +79,7 @@ class RideV5LimitsChangeTest extends FlatSpec with WithDomain with PathMockFacto
          | {-#CONTENT_TYPE DAPP #-}
          |
          | @Callable(tx)
-         | func test() =
+         | func default() =
          |   if (${"sigVerify(base58'', base58'', base58'') ||" * 18} false) then []
          |   else []
          |
