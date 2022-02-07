@@ -53,7 +53,7 @@ class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettin
     )
     val data1 = TxHelpers.data(master, initData)
     val data2 = TxHelpers.data(master, initData)
-    val issue = TxHelpers.issue(invoker, ENOUGH_AMT, None)
+    val issue = TxHelpers.issue(invoker, ENOUGH_AMT, script = None)
     val initArgs =
       List(
         CONST_STRING("").explicitGet(),

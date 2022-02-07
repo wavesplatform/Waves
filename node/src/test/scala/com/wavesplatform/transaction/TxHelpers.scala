@@ -11,7 +11,7 @@ import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit, ScriptExtraFee}
 import com.wavesplatform.state.{DataEntry, StringDataEntry}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -52,9 +52,9 @@ object TxHelpers {
   ): TransferTransaction =
     TransferTransaction.selfSigned(version, from, to, asset, amount, feeAsset, fee, ByteStr.empty, timestamp).explicitGet()
 
-  def issue(issuer: KeyPair = defaultSigner, amount: Long = 1000, script: Option[Script] = None, name: String = "test"): IssueTransaction =
+  def issue(issuer: KeyPair = defaultSigner, amount: Long = 1000, name: String = "test", fee: Long = 1.waves, script: Option[Script] = None): IssueTransaction =
     IssueTransaction
-      .selfSigned(TxVersion.V2, issuer, "test", "", amount, 0, reissuable = true, script, 1.waves, timestamp)
+      .selfSigned(TxVersion.V2, issuer, name, "", amount, 0, reissuable = true, script, fee, timestamp)
       .explicitGet()
 
   def reissue(asset: IssuedAsset, amount: Long = 1000): ReissueTransaction =
@@ -182,4 +182,8 @@ object TxHelpers {
   def createAlias(name: String, sender: KeyPair = defaultSigner): CreateAliasTransaction = {
     CreateAliasTransaction.selfSigned(TxVersion.V2, sender, name, TestValues.fee, timestamp).explicitGet()
   }
+
+  def ciFee(sc: Int = 0, nonNftIssue: Int = 0): Long =
+    FeeUnit * FeeConstants(InvokeScriptTransaction.typeId) + (sc + 1) * ScriptExtraFee - 1 + nonNftIssue * FeeConstants(IssueTransaction.typeId) * FeeUnit
+
 }
