@@ -17,7 +17,6 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import monix.reactive.subjects.PublishSubject
 import org.scalatest.concurrent.Eventually
 
 import scala.concurrent.duration._
@@ -75,9 +74,8 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.putIfNew(tx, forceValidate = true).resultE should produce("negative asset balance")
     utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
 
-    utx.addAndCleanup(Nil)
-    Thread.sleep(5000)
-    utx.size shouldBe 1
+    utx.cleanUnconfirmed()
+    utx.all shouldBe Seq(tx)
 
     utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
     intercept[RuntimeException](d.appendBlock(tx))
@@ -130,10 +128,9 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.putIfNew(tx, forceValidate = false).resultE should produce("reached err")
     utx.putIfNew(tx, forceValidate = true).resultE should produce("reached err")
 
-    utx.addAndCleanup(Seq(tx))
-    eventually {
-      utx.size shouldBe 0
-    }
+    utx.addTransaction(tx, verify = false)
+    utx.cleanUnconfirmed()
+    utx.all shouldBe Nil
   }
 
   it should s"accept failed Invoke with asset script with complexity > ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
@@ -299,7 +296,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
         TxHelpers.genesis(dApp.toAddress, Long.MaxValue / 3)
       )
 
-      val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, PublishSubject(), settings.utxSettings)
+      val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings.utxSettings)
       f(d, utx)
       utx.close()
     }

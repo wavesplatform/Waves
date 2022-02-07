@@ -1,5 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
+import scala.util.{Random, Try}
+
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
@@ -9,8 +11,6 @@ import com.wavesplatform.test._
 import com.wavesplatform.transaction.CreateAliasTransaction
 import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.Json
-
-import scala.util.Random
 
 class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
   var version: Byte = 1
@@ -56,7 +56,14 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
       val (balance1, eff1) = miner.accountBalances(firstAddress)
       val aliasFee         = createAlias(firstKeyPair, alias)
-      assertBadRequestAndMessage(createAliasFromJson(secondKeyPair, alias, minFee, version = v), "Alias already claimed")
+
+      try {
+        assertBadRequestAndMessage(createAliasFromJson(secondKeyPair, alias, minFee, version = v), "Alias already claimed")
+      } catch {
+        case _: Throwable =>
+          assertBadRequestAndMessage(createAliasFromJson(secondKeyPair, alias, minFee, version = v), "is already in the state on a height")
+      }
+
       miner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
     }
   }
@@ -153,19 +160,28 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     } else 0
   }
 
-  private def createAliasFromJson(target: KeyPair, alias: String, fee: Long, version: Byte) =
-    sender.signedBroadcast(
-      Json.obj(
-        "version"         -> version,
-        "type"            -> CreateAliasTransaction.typeId,
-        "version"         -> version,
-        "sender"          -> target.toAddress.toString,
-        "senderPublicKey" -> target.publicKey.toString,
-        "fee"             -> fee,
-        "alias"           -> alias,
-        "timestamp"       -> System.currentTimeMillis()
+  private def createAliasFromJson(target: KeyPair, alias: String, fee: Long, version: Byte) = {
+    import com.wavesplatform.common.utils._
+    val transactionJson = Try(
+      CreateAliasTransaction
+        .selfSigned(version, target, alias, fee, System.currentTimeMillis())
+        .foldToTry
+    ).flatten
+      .map(_.json())
+      .getOrElse(
+        Json.obj(
+          "version"         -> version,
+          "type"            -> CreateAliasTransaction.typeId,
+          "version"         -> version,
+          "sender"          -> target.toAddress.toString,
+          "senderPublicKey" -> target.publicKey.toString,
+          "fee"             -> fee,
+          "alias"           -> alias,
+          "timestamp"       -> System.currentTimeMillis()
+        )
       )
-    )
+    sender.signedBroadcast(transactionJson, waitForTx = true)
+  }
 
   private def fullAliasByAddress(address: String, alias: String): String = {
     sender.aliasByAddress(address).find(_.endsWith(alias)).get
