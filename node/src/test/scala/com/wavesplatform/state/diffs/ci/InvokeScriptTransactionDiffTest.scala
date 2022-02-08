@@ -428,7 +428,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val setContract = TxHelpers.setScript(dApp, script)
     val issue       = TxHelpers.issue(invoker)
     val asset       = IssuedAsset(issue.id())
-    val Seq(ciWithAlias, ciWithFakeAlias) = Seq(dAppAlias, fakeAlias).map(
+    val invokes = Seq(dAppAlias, fakeAlias).map(
       TxHelpers
         .invoke(
           _,
@@ -438,7 +438,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
           feeAssetId = if (sponsored) asset else Waves
         )
     )
-    (List(genesis, genesis2), dApp, setContract, ciWithAlias, ciWithFakeAlias, aliasTx)
+    (List(genesis, genesis2), dApp, setContract, invokes(0), invokes(1), aliasTx)
   }
 
   property("invoking contract results contract's state") {
@@ -640,7 +640,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
   property("invoking contract make payment by asset") {
     val recipient = TxHelpers.signer(5).toAddress
-    val quantity  = 1000000
     val dApp      = TxHelpers.signer(1)
     val issue     = TxHelpers.issue(dApp, script = Some(assetAllowed))
     val asset     = IssuedAsset(issue.id())
@@ -761,7 +760,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
   }
 
   property("can't overflow payment + fee") {
-    val invoker                           = TxHelpers.signer(0)
     val payment                           = Some(Payment(Long.MaxValue, Waves))
     val (genesis, setScript, ci, _, _, _) = preconditionsAndSetContract(dAppWithTransfers(_), payment = payment)
     assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
@@ -986,7 +984,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
   property("transferring asset this value") {
     val recipient = TxHelpers.signer(5)
-    val quantity  = 1000000
     val dApp      = TxHelpers.signer(1)
 
     val issue                             = TxHelpers.issue(dApp, script = Some(assetUsingThis))
@@ -1194,8 +1191,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
       )
       assertDiffEi(Seq(TestBlock.create(Seq(genesis1Tx, genesis2Tx, setScriptTx))), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) {
-        ei =>
-          ei
+        _.explicitGet()
       }
     }
   }
@@ -1353,7 +1349,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
   property(
     s"rejects withdrawal of fee from the funds received as a result of the script call execution after ${BlockchainFeatures.BlockV5} activation"
   ) {
-    val invoker = TxHelpers.signer(0)
     val dApp    = TxHelpers.signer(1)
     val other   = TxHelpers.signer(2)
 
@@ -2352,7 +2347,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val dApp    = TxHelpers.signer(1)
     val service = TxHelpers.signer(2)
 
-    val fee  = ciFee()
     val gTx1 = TxHelpers.genesis(dApp.toAddress, ENOUGH_AMT)
     val gTx2 = TxHelpers.genesis(invoker.toAddress, ENOUGH_AMT)
     val gTx3 = TxHelpers.genesis(service.toAddress, ENOUGH_AMT)

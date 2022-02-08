@@ -10,7 +10,7 @@ import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{
   BlockchainSettings,
@@ -246,9 +246,11 @@ trait WithDomain extends WithState { _: Suite =>
 
     def settingsFor(version: StdLibVersion): WavesSettings =
       version match {
-        case v if v <= V3 => RideV3
-        case V4           => RideV4
-        case V5           => RideV5
+        case V1 => RideV3
+        case V2 => RideV3
+        case V3 => RideV3
+        case V4 => RideV4
+        case V5 => RideV5
       }
 
     def mostRecent: WavesSettings = RideV5
