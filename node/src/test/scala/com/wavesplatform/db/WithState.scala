@@ -10,8 +10,16 @@ import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
+import com.wavesplatform.settings.{
+  BlockchainSettings,
+  FunctionalitySettings,
+  TestSettings,
+  WavesSettings,
+  loadConfig,
+  TestFunctionalitySettings => TFS
+}
 import com.wavesplatform.state.diffs.{BlockDiffer, produce}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
@@ -225,13 +233,23 @@ trait WithDomain extends WithState { _: Suite =>
       BlockchainFeatures.SmartAssets
     )
 
-    val RideV4 = ScriptsAndSponsorship.addFeatures(
-      BlockchainFeatures.Ride4DApps,
+    val RideV3 = ScriptsAndSponsorship.addFeatures(
+      BlockchainFeatures.Ride4DApps
+    )
+
+    val RideV4 = RideV3.addFeatures(
       BlockchainFeatures.BlockReward,
       BlockchainFeatures.BlockV5
     )
 
     val RideV5 = RideV4.addFeatures(BlockchainFeatures.SynchronousCalls)
+
+    def settingsFor(version: StdLibVersion): WavesSettings =
+      version match {
+        case v if v <= V3 => RideV3
+        case V4           => RideV4
+        case V5           => RideV5
+      }
 
     def mostRecent: WavesSettings = RideV5
   }
