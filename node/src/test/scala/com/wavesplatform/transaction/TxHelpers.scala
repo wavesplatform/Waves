@@ -12,13 +12,14 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
+import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.utils.SystemTime
 
 object TxHelpers {
   def signer(i: Int): KeyPair  = KeyPair(Ints.toByteArray(i))
@@ -48,9 +49,25 @@ object TxHelpers {
   ): TransferTransaction =
     TransferTransaction.selfSigned(version, from, to, asset, amount, Waves, fee, ByteStr.empty, timestamp).explicitGet()
 
-  def issue(amount: Long = 1000, script: Script = null): IssueTransaction =
+  def issue(amount: Long, script: Script): IssueTransaction =
     IssueTransaction
       .selfSigned(TxVersion.V2, defaultSigner, "test", "", amount, 0, reissuable = true, Option(script), 1.waves, timestamp)
+      .explicitGet()
+
+  def issue(
+      sender: KeyPair,
+      name: String,
+      quantity: Long,
+      decimals: Int,
+      reissuable: Boolean = true,
+      description: String = "",
+      version: Byte = 2.toByte,
+      script: Option[Script] = None,
+      fee: Long = 1.waves,
+      timestamp: Long = SystemTime.getTimestamp()
+  ): IssueTransaction =
+    IssueTransaction
+      .selfSigned(version, sender, name, description, quantity, decimals.toByte, reissuable, script, fee, timestamp)
       .explicitGet()
 
   def reissue(asset: IssuedAsset, amount: Long = 1000): ReissueTransaction =

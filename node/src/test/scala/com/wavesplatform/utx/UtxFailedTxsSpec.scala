@@ -118,7 +118,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
   })
 
   it should s"drop failed Invoke with asset script with complexity <= ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
-    val issue = TxHelpers.issue(script = genAssetScript(800))
+    val issue = TxHelpers.issue(1000, genAssetScript(800))
     d.appendBlock(
       TxHelpers.setScript(dApp, genScript(0, result = true)),
       issue
@@ -137,7 +137,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
   }
 
   it should s"accept failed Invoke with asset script with complexity > ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
-    val issue = TxHelpers.issue(script = genAssetScript(ContractLimits.FailFreeInvokeComplexity * 2))
+    val issue = TxHelpers.issue(1000, genAssetScript(ContractLimits.FailFreeInvokeComplexity * 2))
     d.appendBlock(TxHelpers.setScript(dApp, genScript(0, result = true)), issue)
 
     val tx = TxHelpers.invoke(dApp.toAddress, "test", payments = Seq(Payment(1L, issue.asset)))
@@ -156,7 +156,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
   }
 
   it should s"drop failed Exchange with asset script with complexity <= ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
-    val issue = TxHelpers.issue(script = genAssetScript(800))
+    val issue = TxHelpers.issue(1000, genAssetScript(800))
     d.appendBlock(issue)
 
     val tx =
@@ -173,7 +173,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
   }
 
   it should s"accept failed Exchange with asset script with complexity > ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
-    val issue = TxHelpers.issue(script = genAssetScript(ContractLimits.FailFreeInvokeComplexity * 2))
+    val issue = TxHelpers.issue(1000, genAssetScript(ContractLimits.FailFreeInvokeComplexity * 2))
     d.appendBlock(issue)
 
     val tx =

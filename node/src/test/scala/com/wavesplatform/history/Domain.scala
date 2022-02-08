@@ -1,20 +1,16 @@
 package com.wavesplatform.history
 
-import scala.concurrent.Future
-import scala.concurrent.duration._
-
 import cats.syntax.option._
-import com.wavesplatform.{database, Application}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.api.common.{AddressPortfolio, AddressTransactions, CommonBlocksApi, CommonTransactionsApi}
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.api.common._
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -22,15 +18,19 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.{BlockchainUpdater, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.{BlockchainUpdater, _}
 import com.wavesplatform.utils.SystemTime
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{Application, database}
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
+
+import scala.concurrent.Future
+import scala.concurrent.duration._
 
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter, settings: WavesSettings) {
   import Domain._
@@ -49,6 +49,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   lazy val wallet  = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
+
     /**
       * @return Tuple of (asset, feeInAsset, feeInWaves)
       * @see [[com.wavesplatform.state.diffs.FeeValidation#getMinFee(com.wavesplatform.state.Blockchain, com.wavesplatform.transaction.Transaction)]]
@@ -263,6 +264,18 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     wallet,
     _ => Future.successful(TracedResult(Right(true))),
     h => blocksApi.blockAtHeight(h)
+  )
+
+  val accountsApi: CommonAccountsApi = CommonAccountsApi(
+    () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+    db,
+    blockchain
+  )
+
+  val assetsApi: CommonAssetsApi = CommonAssetsApi(
+    () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+    db,
+    blockchain
   )
 }
 

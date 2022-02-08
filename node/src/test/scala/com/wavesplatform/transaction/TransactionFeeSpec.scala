@@ -230,7 +230,7 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
 
   "transfer transaction" - {
     "with sponsored asset fee" in withDomain(DomainPresets.ScriptsAndSponsorship.withActivationPeriod(1)) { d =>
-      val issue = TxHelpers.issue()
+      val issue = TxHelpers.issue(1000, null)
       d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress, 10.waves))
       d.appendBlock(issue)
       d.appendBlock(
@@ -259,7 +259,7 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
           |true""".stripMargin
       )
 
-      val issue = TxHelpers.issue(script = assetScript)
+      val issue = TxHelpers.issue(1000, assetScript)
       d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress, 10.waves))
       d.appendBlock(issue)
       d.appendBlock(TxHelpers.setScript(TxHelpers.defaultSigner, verifier))

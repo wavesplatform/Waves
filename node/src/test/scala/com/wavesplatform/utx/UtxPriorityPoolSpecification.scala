@@ -184,7 +184,7 @@ class UtxPriorityPoolSpecification
         new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
 
       def createDiff(): Diff =
-        Monoid.combineAll((1 to 5).map(_ => Diff.empty.bindTransaction(TxHelpers.issue())))
+        Monoid.combineAll((1 to 5).map(_ => Diff.empty.bindTransaction(TxHelpers.issue(1000, null))))
 
       utx.setPriorityDiffs(Seq(createDiff(), createDiff())) // 10 total
       utx.priorityPool.nextMicroBlockSize(3) shouldBe 5
@@ -217,12 +217,12 @@ class UtxPriorityPoolSpecification
           new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
 
         utx.setPriorityTxs(Seq(tx1, tx2))
-        utx.removeAll(Seq(TxHelpers.issue()))
+        utx.removeAll(Seq(TxHelpers.issue(1000, null)))
 
         utx.priorityPool.validPriorityDiffs shouldBe empty
         utx.priorityPool.priorityTransactions shouldBe Seq(tx1, tx2)
 
-        val profitableTx = TxHelpers.issue()
+        val profitableTx = TxHelpers.issue(1000, null)
         utx.putIfNew(profitableTx).resultE should beRight
 
         utx.all shouldBe Seq(tx1, tx2, profitableTx)
