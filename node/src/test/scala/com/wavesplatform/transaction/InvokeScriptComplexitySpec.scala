@@ -16,7 +16,6 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.utx.UtxPoolImpl
-import monix.reactive.Observer
 
 class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
   private[this] val dApp1 = TestCompiler(V5).compileContract("""
@@ -82,7 +81,7 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
   "correctly estimates complexity when child dApp invocation involves payment in smart asset" in forAll(gen) {
     case (invoker, dApp0KP, dApp1KP) =>
       withDomain(settings) { d =>
-        val utx = new UtxPoolImpl(ntpTime, d.blockchain, Observer.stopped, settings.utxSettings)
+        val utx = new UtxPoolImpl(ntpTime, d.blockchain, settings.utxSettings)
 
         d.appendBlock(
           Seq(invoker.toAddress, dApp0KP.toAddress, dApp1KP.toAddress)
