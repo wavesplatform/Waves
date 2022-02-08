@@ -871,7 +871,6 @@ class TransactionsRouteSpec
         .explicitGet()
 
       Post(routePath("/broadcast?trace=true"), invoke.json()) ~> mkRoute(d) ~> check {
-        println(Json.prettyPrint(responseAs[JsObject]))
         val dappTrace = (responseAs[JsObject] \ "trace").as[Seq[JsObject]].find(jsObject => (jsObject \ "type").as[String] == "dApp").get
 
         (dappTrace \ "error").get shouldEqual JsNull

@@ -27,7 +27,6 @@ import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Application, TestValues, database}
 import monix.execution.Scheduler.Implicits.global
-import monix.reactive.Observer
 import org.iq80.leveldb.DB
 
 import scala.concurrent.Future
