@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONS
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.{EitherValues, Inside}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -86,9 +86,7 @@ class DAppDataEntryTypeTest
     withDomain(domainSettingsWithFS(fsWithV5)) { d =>
       d.appendBlock(preparingTxs: _*)
       val value = if (constructor == "BooleanEntry") "1" else "true"
-      (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include(
-        s"can't reconstruct $constructor from Map(key -> key, value -> $value)"
-      )
+      d.appendBlockE(invoke) should produce(s"can't reconstruct $constructor from Map(key -> key, value -> $value)")
     }
   }
 

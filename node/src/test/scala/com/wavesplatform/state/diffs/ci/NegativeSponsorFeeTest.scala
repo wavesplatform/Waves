@@ -56,7 +56,7 @@ class NegativeSponsorFeeTest extends PropSpec with WithDomain {
         d.appendBlock(invoke1)
         d.blockchain.bestLiquidDiff.get.errorMessage(invoke1.txId).get.text shouldBe "NegativeMinFee(-1,asset)"
 
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include ("Negative sponsor amount = -1")
+        d.appendBlockE(invoke2) should produce("Negative sponsor amount = -1")
       }
     }
   }

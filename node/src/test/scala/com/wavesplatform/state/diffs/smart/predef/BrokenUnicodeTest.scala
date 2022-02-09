@@ -224,10 +224,10 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
       d.appendBlock(checkFixTxs: _*)
       checkFixTxs.foreach(tx => d.blockchain.transactionSucceeded(tx.id.value()) shouldBe true)
       checkNoFix().foreach { tx =>
-        (the[RuntimeException] thrownBy d.appendBlock(tx)).getMessage should include("TransactionNotAllowedByScript")
+        d.appendBlockE(tx) should produce("TransactionNotAllowedByScript")
       }
       checkNoFixDApp().foreach { tx =>
-        (the[RuntimeException] thrownBy d.appendBlock(tx)).getMessage should include("ScriptExecutionError(error = DApp")
+        d.appendBlockE(tx) should produce("ScriptExecutionError(error = DApp")
       }
     }
   }

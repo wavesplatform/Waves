@@ -78,7 +78,7 @@ class SyncDAppNegativeBurnTest extends PropSpec with WithDomain {
         d.blockchain.transactionSucceeded(invoke1.txId) shouldBe true
         d.blockchain.balance(dApp2.toAddress, asset) shouldBe 101
 
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include("Negative burn quantity = -1")
+        d.appendBlockE(invoke2) should produce("Negative burn quantity = -1")
       }
     }
   }

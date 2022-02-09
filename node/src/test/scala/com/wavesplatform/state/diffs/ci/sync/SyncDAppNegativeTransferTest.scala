@@ -77,12 +77,12 @@ class SyncDAppNegativeTransferTest extends PropSpec with WithDomain {
           d.appendBlock(invoke1)
           d.liquidDiff.errorMessage(invoke1.txId).get.text should include("Negative amount")
         } else {
-          (the[RuntimeException] thrownBy d.appendBlock(invoke1)).getMessage should include("Negative amount")
+          d.appendBlockE(invoke1) should produce("Negative amount")
           d.appendBlock()
         }
 
         d.appendBlock()
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include("Negative transfer amount = -1")
+        d.appendBlockE(invoke2) should produce("Negative transfer amount = -1")
       }
     }
   }

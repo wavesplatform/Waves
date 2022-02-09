@@ -77,12 +77,12 @@ class SyncDAppNegativeSponsorFeeTest extends PropSpec with WithDomain {
           d.appendBlock(invoke1)
           d.liquidDiff.errorMessage(invoke1.txId).get.text should include("NegativeMinFee(-1,asset)")
         } else {
-          (the[RuntimeException] thrownBy d.appendBlock(invoke1)).getMessage should include("NegativeMinFee(-1,asset)")
+          d.appendBlockE(invoke1) should produce("NegativeMinFee(-1,asset)")
           d.appendBlock()
         }
 
         d.appendBlock()
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include("Negative sponsor amount = -1")
+        d.appendBlockE(invoke2) should produce("Negative sponsor amount = -1")
       }
     }
   }

@@ -81,11 +81,11 @@ class SyncDAppPaymentBalanceCheckTest extends PropSpec with WithDomain {
           d.appendBlock(invoke2)
           d.liquidDiff.errorMessage(invoke2.txId).get.text should include(error)
         } else {
-          (the[RuntimeException] thrownBy d.appendBlock(invoke2)).getMessage should include(error)
+          d.appendBlockE(invoke2) should produce(error)
           d.appendBlock()
         }
 
-        (the[RuntimeException] thrownBy d.appendBlock(invoke3)).getMessage should include(error)
+        d.appendBlockE(invoke3) should produce(error)
       }
     }
   }

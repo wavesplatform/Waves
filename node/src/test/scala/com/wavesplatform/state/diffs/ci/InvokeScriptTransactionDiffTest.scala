@@ -1449,7 +1449,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
   }
 
   property("counts complexity correctly for failed transactions (asset script fails)") {
-    val (trueScript, trueComplexity) = {
+    val (trueScript, _) = {
       val script = """
          |{-# STDLIB_VERSION 4 #-}
          |{-# CONTENT_TYPE EXPRESSION #-}
@@ -1458,7 +1458,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()
     }
 
-    val (falseScript, falseComplexity) = {
+    val (falseScript, _) = {
       val script = """
          |{-# STDLIB_VERSION 4 #-}
          |{-# CONTENT_TYPE EXPRESSION #-}
@@ -2078,7 +2078,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val genesisTxs = Seq(gTx1, gTx2, gTx3, aliasTx, ssTx1, ssTx)
 
     assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) {
-      case (diff, bc) =>
+      case (_, bc) =>
         bc.accountData(dApp.toAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
         bc.accountData(service.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
     }
@@ -2177,7 +2177,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val genesisTxs = Seq(gTx1, gTx2, gTx3, ssTx1, ssTx)
 
     assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) {
-      case (diff, bc) =>
+      case (_, bc) =>
         bc.accountData(dApp.toAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
         bc.accountData(service.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
     }

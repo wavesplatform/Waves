@@ -76,7 +76,7 @@ class SyncDAppDoubleIssueTest extends PropSpec with WithDomain {
         d.appendBlock(invoke1)
         d.liquidDiff.errorMessage(invoke1.txId).get.text should include("already issued")
 
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include("already issued")
+        d.appendBlockE(invoke2) should produce("already issued")
       }
     }
   }

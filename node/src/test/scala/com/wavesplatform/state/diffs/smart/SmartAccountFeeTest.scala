@@ -9,7 +9,7 @@ import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
 import com.wavesplatform.state.EmptyDataEntry
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.transaction.{Transaction, TxHelpers, TxWithFee}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
@@ -115,12 +115,12 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
   }
 
   private def appendAndAssertNotEnoughFee(tx: Transaction with TxWithFee, d: Domain) = {
-    val e = the[RuntimeException] thrownBy d.appendBlock(tx)
-    e.getMessage should startWith
-    "TransactionValidationError(cause = GenericError(Transaction sent from smart account. " +
-      s"Requires $ScriptExtraFee extra fee.. " +
-      s"Fee for ${Constants.TransactionNames(tx.typeId)} (${tx.fee} in WAVES) " +
-      s"does not exceed minimal value of ${FeeConstants(tx.typeId) * FeeUnit + ScriptExtraFee} WAVES.)"
+    d.appendBlockE(tx) should produce(
+      "TransactionValidationError(cause = GenericError(Transaction sent from smart account. " +
+        s"Requires $ScriptExtraFee extra fee.. " +
+        s"Fee for ${Constants.TransactionNames(tx.typeId)} (${tx.fee} in WAVES) " +
+        s"does not exceed minimal value of ${FeeConstants(tx.typeId) * FeeUnit + ScriptExtraFee} WAVES.)"
+    )
   }
 
   private def assertNoError(tx: Transaction, d: Domain) =

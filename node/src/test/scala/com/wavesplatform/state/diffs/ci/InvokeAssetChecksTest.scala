@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Portfolio}
-import com.wavesplatform.test.{NumericExt, PropSpec}
+import com.wavesplatform.test.{NumericExt, PropSpec, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers
 import org.scalamock.scalatest.MockFactory
@@ -142,13 +142,8 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
 
     withDomain(RideV5) { d =>
       d.appendBlock(genesis, genesis2, setDApp, setDApp2)
-      (the[RuntimeException] thrownBy d.appendBlock(invokeInvalidLength)).getMessage should include(
-        s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32"
-      )
-      (the[RuntimeException] thrownBy d.appendBlock(invokeUnexisting)).getMessage should include(
-        s"Transfer error: asset '$unexistingAsset' is not found on the blockchain"
-      )
-
+      d.appendBlockE(invokeInvalidLength) should produce(s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32")
+      d.appendBlockE(invokeUnexisting) should produce(s"Transfer error: asset '$unexistingAsset' is not found on the blockchain")
     }
   }
 }

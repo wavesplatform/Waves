@@ -55,7 +55,7 @@ class NegativeLeaseTest extends PropSpec with WithDomain {
         d.appendBlock(invoke1)
         d.blockchain.bestLiquidDiff.get.errorMessage(invoke1.txId).get.text shouldBe "NonPositiveAmount(-1,waves)"
 
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include ("Negative lease amount = -1")
+        d.appendBlockE(invoke2) should produce("Negative lease amount = -1")
       }
     }
   }

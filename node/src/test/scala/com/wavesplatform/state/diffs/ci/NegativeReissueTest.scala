@@ -58,7 +58,7 @@ class NegativeReissueTest extends PropSpec with WithDomain {
         d.blockchain.transactionSucceeded(invoke1.txId) shouldBe true
         d.blockchain.balance(dApp.toAddress, asset) shouldBe 99
 
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include ("Negative reissue quantity = -1")
+        d.appendBlockE(invoke2) should produce("Negative reissue quantity = -1")
       }
     }
   }

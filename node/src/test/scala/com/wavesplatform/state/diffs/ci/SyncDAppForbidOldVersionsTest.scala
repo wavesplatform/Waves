@@ -63,7 +63,7 @@ class SyncDAppForbidOldVersionsTest
 
       withDomain(RideV5) { d =>
         d.appendBlock(preparingTxs: _*)
-        (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include(
+        d.appendBlockE(invoke) should produce(
           s"DApp ${proxyDApp.toAddress} invoked DApp ${callingDApp.toAddress} that uses RIDE $callingDAppVersion, " +
             s"but dApp-to-dApp invocation requires version 5 or higher"
         )

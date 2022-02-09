@@ -64,18 +64,12 @@ class CallableV5LimitTest extends PropSpec with ScalaCheckPropertyChecks with Wi
 
     withDomain(RideV4) { d =>
       d.appendBlock(genesisTxs: _*)
-      (the[RuntimeException] thrownBy d.appendBlock(setProhibitedV4Script)).getMessage should include(
-        "Contract function (default) is too complex: 9528 > 4000"
-      )
+      d.appendBlockE(setProhibitedV4Script) should produce("Contract function (default) is too complex: 9528 > 4000")
     }
     withDomain(RideV5) { d =>
       d.appendBlock(genesisTxs: _*)
-      (the[RuntimeException] thrownBy d.appendBlock(setProhibitedV4Script)).getMessage should include(
-        "Contract function (default) is too complex: 9528 > 4000"
-      )
-      (the[RuntimeException] thrownBy d.appendBlock(setProhibitedScript)).getMessage should include(
-        "Contract function (default) is too complex: 11432 > 10000"
-      )
+      d.appendBlockE(setProhibitedV4Script) should produce("Contract function (default) is too complex: 9528 > 4000")
+      d.appendBlockE(setProhibitedScript) should produce("Contract function (default) is too complex: 11432 > 10000")
       d.appendBlock(setAcceptableScript, invoke)
       d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
 

@@ -72,7 +72,7 @@ class SyncDAppNegativeIssueTest extends PropSpec with WithDomain {
           d.appendBlock(invoke)
           d.liquidDiff.errorMessage(invoke.txId).get.text should include("Invalid decimals")
         } else {
-          (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include("Invalid decimals")
+          d.appendBlockE(invoke) should produce("Invalid decimals")
           d.appendBlock()
         }
       }

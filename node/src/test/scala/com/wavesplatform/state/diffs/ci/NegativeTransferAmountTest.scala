@@ -56,7 +56,7 @@ class NegativeTransferAmountTest extends PropSpec with WithDomain {
         d.appendBlock(invoke1)
         d.blockchain.bestLiquidDiff.get.errorMessage(invoke1.txId).get.text shouldBe "Negative amount"
 
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include ("Negative transfer amount = -1")
+        d.appendBlockE(invoke2) should produce("Negative transfer amount = -1")
       }
     }
   }

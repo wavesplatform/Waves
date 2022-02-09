@@ -19,7 +19,7 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.TO_BIGINT
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.{Assertion, EitherValues, Inside}
 
@@ -78,7 +78,7 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
 
       withDomain(domainSettingsWithFS(fsWithV5)) { d =>
         d.appendBlock(preparingTxs: _*)
-        (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include(message)
+        d.appendBlockE(invoke) should produce(message)
       }
     }
 

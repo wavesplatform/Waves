@@ -7,7 +7,7 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V4, V5}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -66,9 +66,7 @@ class InvokePaymentsLimitTest extends PropSpec with Inside with WithState with D
     val (preparingTxs2, invoke2) = scenario(version, count + 1, nested)
     withDomain(RideV5) { d =>
       d.appendBlock(preparingTxs2: _*)
-      (the[RuntimeException] thrownBy d.appendBlock(invoke2)).getMessage should include(
-        s"Script payment amount=${count + 1} should not exceed $count"
-      )
+      d.appendBlockE(invoke2) should produce(s"Script payment amount=${count + 1} should not exceed $count")
     }
   }
 

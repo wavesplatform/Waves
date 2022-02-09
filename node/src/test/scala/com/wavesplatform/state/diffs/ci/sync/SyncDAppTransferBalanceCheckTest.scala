@@ -76,9 +76,7 @@ class SyncDAppTransferBalanceCheckTest extends PropSpec with WithDomain {
         d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
 
         d.appendBlock()
-        (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include(
-          s"Sync call leads to temporary negative balance = -100 for address ${dApp2.toAddress}"
-        )
+        d.appendBlockE(invoke2) should produce(s"Sync call leads to temporary negative balance = -100 for address ${dApp2.toAddress}")
       }
     }
   }

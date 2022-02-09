@@ -93,16 +93,12 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
       d.appendBlock(preparingTxs: _*)
 
       val invoke1 = invoke()
-      (the[RuntimeException] thrownBy d.appendBlock(invoke1)).getMessage should include(
-        s"WriteSet size can't exceed 5120 bytes, actual: 5121 bytes"
-      )
+      d.appendBlockE(invoke1) should produce(s"WriteSet size can't exceed 5120 bytes, actual: 5121 bytes")
 
       d.appendBlock()
       d.appendBlock()
       val invoke2 = invoke()
-      (the[RuntimeException] thrownBy d.appendBlock(invoke2)).getMessage should include(
-        s"WriteSet size can't exceed 5120 bytes, actual: 5121 bytes"
-      )
+      d.appendBlockE(invoke2) should produce(s"WriteSet size can't exceed 5120 bytes, actual: 5121 bytes")
     }
   }
 
@@ -122,9 +118,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
       )
 
       val invoke3 = invoke()
-      (the[Exception] thrownBy d.appendBlock(invoke3)).getMessage should include(
-        "Storing data size should not exceed 15360, actual: 20476 bytes"
-      )
+      d.appendBlockE(invoke3) should produce("Storing data size should not exceed 15360, actual: 20476 bytes")
     }
   }
 

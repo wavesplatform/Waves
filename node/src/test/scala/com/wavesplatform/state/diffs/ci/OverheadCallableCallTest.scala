@@ -50,9 +50,9 @@ class OverheadCallableCallTest extends PropSpec with WithDomain {
 
     withDomain(domainSettingsWithFS(settings)) { d =>
       d.appendBlock(preparingTxs: _*)
-      (the[Exception] thrownBy d.appendBlock(invoke1)).getMessage should include("Evaluation was uncompleted with unused complexity = 0")
+      d.appendBlockE(invoke1) should produce("Evaluation was uncompleted with unused complexity = 0")
       d.appendBlock()
-      (the[Exception] thrownBy d.appendBlock(invoke2)).getMessage should include("Evaluation was uncompleted with unused complexity = 0")
+      d.appendBlockE(invoke2) should produce("Evaluation was uncompleted with unused complexity = 0")
     }
   }
 }

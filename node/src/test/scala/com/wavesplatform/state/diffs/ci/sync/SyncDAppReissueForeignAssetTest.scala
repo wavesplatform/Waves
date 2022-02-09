@@ -76,7 +76,7 @@ class SyncDAppReissueForeignAssetTest extends PropSpec with WithDomain {
           d.appendBlock(invoke)
           d.liquidDiff.errorMessage(invoke.txId).get.text should include("Asset was issued by other address")
         } else {
-          (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include("Asset was issued by other address")
+          d.appendBlockE(invoke) should produce("Asset was issued by other address")
         }
       }
     }

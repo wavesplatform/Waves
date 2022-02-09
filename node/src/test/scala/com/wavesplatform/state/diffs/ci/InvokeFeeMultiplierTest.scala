@@ -17,8 +17,6 @@ import com.wavesplatform.transaction.{DataTransaction, Transaction, TxHelpers, T
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 
-import scala.util.Try
-
 class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettings with MockFactory with WithDomain with EitherValues {
   import DomainPresets._
 
@@ -83,7 +81,7 @@ class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettin
       d.appendBlock(data2)
       d.blockchainUpdater.height shouldBe estimatorV3ActivationHeight
 
-      Try(d.appendBlock(invoke2)).toEither should produce(
+      d.appendBlockE(invoke2) should produce(
         s"Fee in WAVES for InvokeScriptTransaction (${invoke2.fee} in WAVES) with 3 invocation steps does not exceed minimal value of 1500000 WAVES"
       )
 

@@ -46,11 +46,11 @@ class VerifierComplexityLimitTest extends PropSpec with WithDomain with EitherVa
 
     withDomain(domainSettingsWithFS(features(fix = false))) { d =>
       d.appendBlock(genesis, setScript)
-      (the[RuntimeException] thrownBy d.appendBlock(checkTx())).getMessage should include("Explicit script termination")
+      d.appendBlockE(checkTx()) should produce("Explicit script termination")
     }
     withDomain(domainSettingsWithFS(features(fix = true))) { d =>
       d.appendBlock(genesis, setScript)
-      (the[RuntimeException] thrownBy d.appendBlock(checkTx())).getMessage should include("Verifier complexity limit = 2000 is exceeded")
+      d.appendBlockE(checkTx()) should produce("Verifier complexity limit = 2000 is exceeded")
     }
   }
 
@@ -65,11 +65,11 @@ class VerifierComplexityLimitTest extends PropSpec with WithDomain with EitherVa
 
     withDomain(domainSettingsWithFS(features(fix = false))) { d =>
       d.appendBlock(genesis, setScript)
-      (the[RuntimeException] thrownBy d.appendBlock(checkTx())).getMessage should include("Explicit script termination")
+      d.appendBlockE(checkTx()) should produce("Explicit script termination")
     }
     withDomain(domainSettingsWithFS(features(fix = true))) { d =>
       d.appendBlock(genesis, setScript)
-      (the[RuntimeException] thrownBy d.appendBlock(checkTx())).getMessage should include("Verifier complexity limit = 4000 is exceeded")
+      d.appendBlockE(checkTx()) should produce("Verifier complexity limit = 4000 is exceeded")
     }
   }
 }
