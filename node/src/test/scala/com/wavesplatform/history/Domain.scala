@@ -26,7 +26,6 @@ import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Application, database}
 import monix.execution.Scheduler.Implicits.global
-import monix.reactive.Observer
 import org.iq80.leveldb.DB
 
 import scala.concurrent.Future
@@ -45,7 +44,10 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   val transactionDiffer: Transaction => TracedResult[ValidationError, Diff] =
     TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
 
-  lazy val utxPool = new UtxPoolImpl(SystemTime, blockchain, Observer.empty, settings.utxSettings)
+  def transactionDiff(tx: Transaction): Diff =
+    transactionDiffer(tx).resultE.explicitGet()
+
+  lazy val utxPool = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings)
   lazy val wallet  = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
@@ -254,6 +256,13 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       }
 
     CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
+  }
+
+  //noinspection ScalaStyle
+  object helpers {
+    def creditWavesToDefaultSigner(amount: Long = 10_0000_0000): Unit = {
+      appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress, amount))
+    }
   }
 
   val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(

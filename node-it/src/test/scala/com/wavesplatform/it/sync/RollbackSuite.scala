@@ -165,54 +165,6 @@ class RollbackSuite extends BaseFunSuite with TransferSending with TableDrivenPr
     sender.transactionsByAddress(notMinerAddress, 10) should contain theSameElementsAs txsBefore1
   }
 
-  test("transfer depends from data tx") {
-    val scriptText = s"""
-    match tx {
-      case tx: TransferTransaction =>
-        let oracle = addressFromRecipient(tx.recipient)
-        extract(getString(oracle,"oracle")) == "yes"
-      case _: SetScriptTransaction | DataTransaction => true
-      case _ => false
-    }""".stripMargin
-
-    val pkSwapBC1 = notMiner.keyPair
-    val script    = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
-    val sc1SetTx = SetScriptTransaction
-      .selfSigned(1.toByte, sender = pkSwapBC1, script = Some(script), fee = setScriptFee, timestamp = System.currentTimeMillis())
-      .explicitGet()
-
-    val setScriptId = sender.signedBroadcast(sc1SetTx.json()).id
-    nodes.waitForHeightAriseAndTxPresent(setScriptId)
-
-    val height = nodes.waitForHeightArise()
-
-    nodes.waitForHeightArise()
-    val entry1 = StringDataEntry("oracle", "yes")
-    val dtx    = sender.putData(sender.keyPair, List(entry1), 0.1.waves).id
-    nodes.waitForHeightAriseAndTxPresent(dtx)
-
-    val transfer = TransferTransaction
-      .create(2.toByte, pkSwapBC1.publicKey, sender.publicKey.toAddress, Waves, transferAmount, Waves, smartMinFee, ByteStr.empty, System.currentTimeMillis(), Proofs.empty)
-      .explicitGet()
-
-    nodes.waitForHeightAriseAndTxPresent(sender.signedBroadcast(transfer.json(), waitForTx = true).id)
-
-    //as rollback is too fast, we should blacklist nodes from each other before rollback
-    sender.blacklist(miner.networkAddress)
-    miner.blacklist(sender.networkAddress)
-    nodes.rollback(height)
-    sender.connect(miner.networkAddress)
-    miner.connect(sender.networkAddress)
-
-    nodes.waitForSameBlockHeadersAt(height)
-
-    nodes.waitForHeightArise()
-
-    assert(sender.findTransactionInfo(dtx).isDefined)
-    assert(sender.findTransactionInfo(transfer.id().toString).isDefined)
-
-  }
-
   forAll(
     Table(
       ("num", "name"),
