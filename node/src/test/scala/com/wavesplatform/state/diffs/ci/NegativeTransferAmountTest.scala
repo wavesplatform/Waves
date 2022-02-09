@@ -15,7 +15,7 @@ class NegativeTransferAmountTest extends PropSpec with WithDomain {
   private def sigVerify(c: Boolean) =
     s""" strict c = ${if (c) (1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ") else "true"} """
 
-  private def dApp1Script(asset: Asset, bigComplexity: Boolean): Script =
+  private def dAppScript(asset: Asset, bigComplexity: Boolean): Script =
     TestCompiler(V5).compileContract(
       s"""
          | @Callable(i)
@@ -43,8 +43,7 @@ class NegativeTransferAmountTest extends PropSpec with WithDomain {
         TxHelpers.genesis(dApp.toAddress)
       )
       val issue = TxHelpers.issue(dApp, 100)
-      val asset = IssuedAsset(issue.id.value())
-      val setScript = TxHelpers.setScript(dApp, dApp1Script(asset, bigComplexity))
+      val setScript = TxHelpers.setScript(dApp, dAppScript(IssuedAsset(issue.id.value()), bigComplexity))
 
       val preparingTxs = genesis :+ issue :+ setScript
 

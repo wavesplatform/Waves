@@ -43,8 +43,7 @@ class NegativeSponsorFeeTest extends PropSpec with WithDomain {
         TxHelpers.genesis(dApp.toAddress)
       )
       val issue = TxHelpers.issue(dApp, 100)
-      val asset = IssuedAsset(issue.id.value())
-      val setScript = TxHelpers.setScript(dApp, dAppScript(asset, bigComplexity))
+      val setScript = TxHelpers.setScript(dApp, dAppScript(IssuedAsset(issue.id.value()), bigComplexity))
 
       val preparingTxs = genesis :+ issue :+ setScript
 

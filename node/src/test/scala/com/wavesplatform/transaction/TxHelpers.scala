@@ -139,8 +139,8 @@ object TxHelpers {
       case other              => throw new IllegalStateException(s"Not an expression: $other")
     }
 
-  def setScript(acc: KeyPair, script: Script): SetScriptTransaction = {
-    SetScriptTransaction.selfSigned(TxVersion.V1, acc, Some(script), TestValues.fee, timestamp).explicitGet()
+  def setScript(acc: KeyPair, script: Script, fee: Long = TestValues.fee): SetScriptTransaction = {
+    SetScriptTransaction.selfSigned(TxVersion.V1, acc, Some(script), fee, timestamp).explicitGet()
   }
 
   def setAssetScript(acc: KeyPair, asset: IssuedAsset, script: Script): SetAssetScriptTransaction = {
@@ -165,12 +165,12 @@ object TxHelpers {
     FUNCTION_CALL(FunctionHeader.User(func), args.toList)
   }
 
-  def lease(recipient: AddressOrAlias = secondAddress, amount: TxAmount = 10.waves): LeaseTransaction = {
-    LeaseTransaction.selfSigned(TxVersion.V2, defaultSigner, recipient, amount, TestValues.fee, timestamp).explicitGet()
+  def lease(sender: KeyPair = defaultSigner, recipient: AddressOrAlias = secondAddress, amount: TxAmount = 10.waves, fee: Long = TestValues.fee): LeaseTransaction = {
+    LeaseTransaction.selfSigned(TxVersion.V2, sender, recipient, amount, fee, timestamp).explicitGet()
   }
 
-  def leaseCancel(leaseId: ByteStr): LeaseCancelTransaction = {
-    LeaseCancelTransaction.selfSigned(TxVersion.V2, defaultSigner, leaseId, TestValues.fee, timestamp).explicitGet()
+  def leaseCancel(leaseId: ByteStr, sender: KeyPair = defaultSigner, fee: Long = TestValues.fee): LeaseCancelTransaction = {
+    LeaseCancelTransaction.selfSigned(TxVersion.V2, sender, leaseId, fee, timestamp).explicitGet()
   }
 
   def sponsor(
@@ -181,8 +181,8 @@ object TxHelpers {
     SponsorFeeTransaction.selfSigned(TxVersion.V2, sender, asset, minSponsoredAssetFee, TestValues.fee, timestamp).explicitGet()
   }
 
-  def createAlias(name: String, sender: KeyPair = defaultSigner): CreateAliasTransaction = {
-    CreateAliasTransaction.selfSigned(TxVersion.V2, sender, name, TestValues.fee, timestamp).explicitGet()
+  def createAlias(name: String, sender: KeyPair = defaultSigner, fee: Long = TestValues.fee): CreateAliasTransaction = {
+    CreateAliasTransaction.selfSigned(TxVersion.V2, sender, name, fee, timestamp).explicitGet()
   }
 
   def ciFee(sc: Int = 0, nonNftIssue: Int = 0): Long =
