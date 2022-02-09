@@ -7,7 +7,6 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.test._
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers
 
 class NegativeLeaseTest extends PropSpec with WithDomain {
@@ -43,7 +42,6 @@ class NegativeLeaseTest extends PropSpec with WithDomain {
         TxHelpers.genesis(dApp.toAddress)
       )
       val issue = TxHelpers.issue(dApp, 100)
-      val asset = IssuedAsset(issue.id.value())
       val setScript = TxHelpers.setScript(dApp, dAppScript(bigComplexity))
 
       val preparingTxs = genesis :+ issue :+ setScript

@@ -41,8 +41,6 @@ class SigVerifyPerformanceTest extends PropSpec with WithState {
       master    <- accountGen
       recipient <- accountGen
       ts        <- positiveIntGen
-      amt       <- smallFeeGen
-      fee       <- smallFeeGen
       genesis = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       setScript <- selfSignedSetScriptTransactionGenP(master, ExprScript(typed).explicitGet())
       transfer       = simpleSendGen(master, recipient.publicKey, ts)

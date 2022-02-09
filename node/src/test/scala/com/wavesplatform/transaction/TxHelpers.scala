@@ -73,6 +73,9 @@ object TxHelpers {
   def data(account: KeyPair, entries: Seq[DataEntry[_]]): DataTransaction =
     DataTransaction.selfSigned(TxVersion.V1, account, entries, TestValues.fee * 3, timestamp).explicitGet()
 
+  def dataV2(account: KeyPair, entries: Seq[DataEntry[_]], fee: Long = TestValues.fee * 3): DataTransaction =
+    DataTransaction.selfSigned(TxVersion.V2, account, entries, fee, timestamp).explicitGet()
+
   def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {
     orderV3(orderType, asset, Waves, feeAsset)
   }

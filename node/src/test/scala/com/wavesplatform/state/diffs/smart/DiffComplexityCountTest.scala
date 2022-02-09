@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.smart
 
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures
@@ -10,17 +9,11 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.TestTime
 import com.wavesplatform.test.PropSpec
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
 
 class DiffComplexityCountTest
@@ -28,12 +21,8 @@ class DiffComplexityCountTest
     with Inside
     with WithState
     with DBCacheSettings
-    with MockFactory
     with WithDomain
     with EitherValues {
-
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
 
   private val activationHeight = 3
 
@@ -96,28 +85,28 @@ class DiffComplexityCountTest
        """.stripMargin
   )
 
-  private val paymentPreconditions =
-    for {
-      account1 <- accountGen
-      account2 <- accountGen
-      fee      <- ciFee(sc = 6)
-    } yield {
-      for {
-        genesis  <- GenesisTransaction.create(account1.toAddress, ENOUGH_AMT, ts)
-        genesis2 <- GenesisTransaction.create(account2.toAddress, ENOUGH_AMT, ts)
-        issue    <- IssueTransaction.selfSigned(2.toByte, account1, "Asset", "Description", ENOUGH_AMT, 8, true, Some(verifier), fee, ts)
-        asset = IssuedAsset(issue.id())
-        transfer1   <- TransferTransaction.selfSigned(2.toByte, account1, account2.toAddress, asset, Int.MaxValue, Waves, fee, ByteStr.empty, ts)
-        setVerifier <- SetScriptTransaction.selfSigned(1.toByte, account2, Some(verifier), fee, ts)
-        setDApp     <- SetScriptTransaction.selfSigned(1.toByte, account1, Some(dApp(asset)), fee, ts)
-        payments = Seq(Payment(1, asset), Payment(1, asset))
-        invokeFromScripted = () =>
-          InvokeScriptTransaction.selfSigned(1.toByte, account2, account1.toAddress, None, payments, fee, Waves, ts).explicitGet()
-      } yield (List(genesis, genesis2, issue, transfer1, setVerifier, setDApp), invokeFromScripted)
-    }.explicitGet()
+  private val paymentPreconditions = {
+    val account1 = TxHelpers.signer(0)
+    val account2 = TxHelpers.signer(1)
+
+    val genesis = Seq(
+      TxHelpers.genesis(account1.toAddress, ENOUGH_AMT),
+      TxHelpers.genesis(account2.toAddress, ENOUGH_AMT)
+    )
+    val issue = TxHelpers.issue(account1, ENOUGH_AMT, script = Some(verifier))
+    val asset = IssuedAsset(issue.id())
+    val transfer1 = TxHelpers.transfer(account1, account2.toAddress, amount = Int.MaxValue, asset = asset)
+    val setVerifier = TxHelpers.setScript(account2, verifier)
+    val setDApp = TxHelpers.setScript(account1, dApp(asset))
+
+    val payments = Seq(Payment(1, asset), Payment(1, asset))
+    val invokeFromScripted = () => TxHelpers.invoke(account1.toAddress, invoker = account2, payments = payments, fee = TxHelpers.ciFee(6))
+
+    (genesis :+ issue :+ transfer1 :+ setVerifier :+ setDApp, invokeFromScripted)
+  }
 
   property(s"evaluated complexity is used for diff instead of estimated one after activation ${BlockchainFeatures.SynchronousCalls}") {
-    val (preparingTxs, invoke) = paymentPreconditions.sample.get
+    val (preparingTxs, invoke) = paymentPreconditions
     withDomain(domainSettingsWithFS(fsWithV5)) { d =>
       d.appendBlock(preparingTxs: _*)
 
