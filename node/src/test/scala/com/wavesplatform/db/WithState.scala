@@ -1,10 +1,11 @@
 package com.wavesplatform.db
 
 import cats.Monoid
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory, loadActiveLeases}
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.history.Domain
@@ -12,20 +13,13 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{
-  BlockchainSettings,
-  FunctionalitySettings,
-  TestSettings,
-  WavesSettings,
-  loadConfig,
-  TestFunctionalitySettings => TFS
-}
-import com.wavesplatform.state.diffs.{BlockDiffer, produce}
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
+import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT, produce}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
 import com.wavesplatform.{NTPTime, TestHelpers}
 import monix.reactive.Observer
 import monix.reactive.subjects.{PublishSubject, Subject}
@@ -256,9 +250,9 @@ trait WithDomain extends WithState { _: Suite =>
     def mostRecent: WavesSettings = RideV5
   }
 
-  def withDomain[A](
-      settings: WavesSettings = SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts) // SmartAccounts to allow V2 transfers by default
-  )(test: Domain => A): A =
+  def withDomain[A](settings: WavesSettings = SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts), // SmartAccounts to allow V2 transfers by default
+                    balances: Seq[AddrWithBalance] = Seq.empty)
+                   (test: Domain => A): A =
     withLevelDBWriter(settings) { blockchain =>
       var domain: Domain = null
       val bcu = new BlockchainUpdaterImpl(
@@ -270,7 +264,22 @@ trait WithDomain extends WithState { _: Suite =>
         loadActiveLeases(db, _, _)
       )
       domain = Domain(db, bcu, blockchain, settings)
+      val genesis = balances.map { case AddrWithBalance(address, amount) =>
+        TxHelpers.genesis(address, amount)
+      }
+      if (genesis.nonEmpty) {
+        domain.appendBlock(genesis:_*)
+      }
       try test(domain)
       finally bcu.shutdown()
     }
+}
+
+object WithState {
+  case class AddrWithBalance(address: Address, balance: Long = ENOUGH_AMT)
+
+  object AddrWithBalance {
+    def enoughBalances(accs: KeyPair*): Seq[AddrWithBalance] =
+      accs.map(acc => AddrWithBalance(acc.toAddress))
+  }
 }

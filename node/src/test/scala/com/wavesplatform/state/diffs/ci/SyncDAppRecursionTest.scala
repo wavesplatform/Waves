@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
@@ -16,10 +17,9 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     val dApp1 = TxHelpers.signer(1)
     val dApp2 = TxHelpers.signer(2)
 
-    withDomain(DomainPresets.mostRecent) { d =>
-      d.helpers.creditWavesToDefaultSigner()
-      Seq(dApp1, dApp2).foreach(account => d.helpers.creditWavesFromDefaultSigner(account.toAddress))
+    val balances = AddrWithBalance.enoughBalances(dApp1, dApp2)
 
+    withDomain(DomainPresets.mostRecent, balances) { d =>
       d.helpers.setScript(dApp1, generateScript(dApp2.toAddress))
       d.helpers.setScript(dApp2, generateScript(dApp2.toAddress, sendEnd = true))
 
@@ -35,10 +35,9 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     val dApp2 = TxHelpers.signer(2)
     val dApp3 = TxHelpers.signer(3)
 
-    withDomain(DomainPresets.mostRecent) { d =>
-      d.helpers.creditWavesToDefaultSigner()
-      Seq(dApp1, dApp2, dApp3).foreach(account => d.helpers.creditWavesFromDefaultSigner(account.toAddress))
+    val balances = AddrWithBalance.enoughBalances(dApp1, dApp2, dApp3)
 
+    withDomain(DomainPresets.mostRecent, balances) { d =>
       d.helpers.setScript(dApp1, generateScript(dApp1.toAddress))
       d.helpers.setScript(dApp2, generateScript(dApp3.toAddress))
       d.helpers.setScript(dApp3, generateScript(dApp1.toAddress))
@@ -59,10 +58,9 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       val dApp2 = TxHelpers.signer(2)
       val dApp3 = TxHelpers.signer(3)
 
-      withDomain(DomainPresets.mostRecent) { d =>
-        d.helpers.creditWavesToDefaultSigner()
-        Seq(dApp1, dApp2, dApp3).foreach(account => d.helpers.creditWavesFromDefaultSigner(account.toAddress))
+      val balances = AddrWithBalance.enoughBalances(dApp1, dApp2, dApp3)
 
+      withDomain(DomainPresets.mostRecent, balances) { d =>
         d.helpers.setScript(dApp1, generateScript(dApp1.toAddress))
         d.helpers.setScript(dApp2, generateScript(dApp3.toAddress))
         d.helpers.setScript(dApp3, generateScript(dApp2.toAddress, reentrant = reentrant))
@@ -84,10 +82,9 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     val dApp2 = TxHelpers.signer(2)
     val dApp3 = TxHelpers.signer(3)
 
-    withDomain(DomainPresets.mostRecent) { d =>
-      d.helpers.creditWavesToDefaultSigner()
-      Seq(dApp1, dApp2, dApp3).foreach(account => d.helpers.creditWavesFromDefaultSigner(account.toAddress))
+    val balances = AddrWithBalance.enoughBalances(dApp1, dApp2, dApp3)
 
+    withDomain(DomainPresets.mostRecent, balances) { d =>
       d.helpers.setScript(dApp1, generateScript(dApp1.toAddress))
       d.helpers
         .setScript(dApp2, generateScript(dApp2.toAddress, secondNextDApp = Some(dApp3.toAddress), sendChangeDApp = true, sendForceReentrant = true))
@@ -107,10 +104,9 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     val dApp3 = TxHelpers.signer(3)
     val dApp4 = TxHelpers.signer(4)
 
-    withDomain(DomainPresets.mostRecent) { d =>
-      d.helpers.creditWavesToDefaultSigner()
-      Seq(dApp1, dApp2, dApp3, dApp4).foreach(account => d.helpers.creditWavesFromDefaultSigner(account.toAddress))
+    val balances = AddrWithBalance.enoughBalances(dApp1, dApp2, dApp3, dApp4)
 
+    withDomain(DomainPresets.mostRecent, balances) { d =>
       d.helpers.setScript(dApp1, generateScript(dApp1.toAddress))
       d.helpers.setScript(dApp2, generateScript(dApp3.toAddress))
       d.helpers.setScript(dApp3, generateScript(dApp4.toAddress))
@@ -130,10 +126,9 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     val dApp3 = TxHelpers.signer(3)
     val dApp4 = TxHelpers.signer(4)
 
-    withDomain(DomainPresets.mostRecent) { d =>
-      d.helpers.creditWavesToDefaultSigner()
-      Seq(dApp1, dApp2, dApp3, dApp4).foreach(account => d.helpers.creditWavesFromDefaultSigner(account.toAddress))
+    val balances = AddrWithBalance.enoughBalances(dApp1, dApp2, dApp3, dApp4)
 
+    withDomain(DomainPresets.mostRecent, balances) { d =>
       d.helpers.setScript(dApp1, generateScript(dApp1.toAddress))
       d.helpers.setScript(dApp2, generateScript(dApp3.toAddress))
       d.helpers.setScript(dApp3, generateScript(dApp4.toAddress, reentrant = true))
@@ -152,10 +147,9 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     val dApp3 = TxHelpers.signer(3)
     val dApp4 = TxHelpers.signer(4)
 
-    withDomain(DomainPresets.mostRecent) { d =>
-      d.helpers.creditWavesToDefaultSigner()
-      Seq(dApp1, dApp2, dApp3, dApp4).foreach(account => d.helpers.creditWavesFromDefaultSigner(account.toAddress))
+    val balances = AddrWithBalance.enoughBalances(dApp1, dApp2, dApp3, dApp4)
 
+    withDomain(DomainPresets.mostRecent, balances) { d =>
       d.helpers.setScript(dApp1, generateScript(dApp1.toAddress))
       d.helpers.setScript(dApp2, generateScript(dApp3.toAddress, reentrant = true))
       d.helpers.setScript(dApp3, generateScript(dApp4.toAddress))
@@ -173,10 +167,9 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     val dApp2 = TxHelpers.signer(2)
     val dApp3 = TxHelpers.signer(3)
 
-    withDomain(DomainPresets.mostRecent) { d =>
-      d.helpers.creditWavesToDefaultSigner()
-      Seq(dApp1, dApp2, dApp3).foreach(account => d.helpers.creditWavesFromDefaultSigner(account.toAddress))
+    val balances = AddrWithBalance.enoughBalances(dApp1, dApp2, dApp3)
 
+    withDomain(DomainPresets.mostRecent, balances) { d =>
       d.helpers.setScript(dApp1, generateScript(dApp1.toAddress))
       d.helpers.setScript(dApp2, generateScript(dApp3.toAddress, reentrant = true, secondNextDApp = Some(dApp2.toAddress), sendEndToNext = true))
       d.helpers.setScript(dApp3, generateScript(dApp2.toAddress, sendChangeDApp = true))
@@ -194,10 +187,9 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     val dApp3 = TxHelpers.signer(3)
     val dApp4 = TxHelpers.signer(4)
 
-    withDomain(DomainPresets.mostRecent) { d =>
-      d.helpers.creditWavesToDefaultSigner()
-      Seq(dApp1, dApp2, dApp3, dApp4).foreach(account => d.helpers.creditWavesFromDefaultSigner(account.toAddress))
+    val balances = AddrWithBalance.enoughBalances(dApp1, dApp2, dApp3, dApp4)
 
+    withDomain(DomainPresets.mostRecent, balances) { d =>
       d.helpers.setScript(dApp1, generateScript(dApp1.toAddress))
       d.helpers.setScript(dApp2, generateScript(dApp3.toAddress, reentrant = true))
       d.helpers.setScript(dApp3, generateScript(dApp4.toAddress))
@@ -218,10 +210,9 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     val dApp4 = TxHelpers.signer(4)
     val dApp5 = TxHelpers.signer(5)
 
-    withDomain(DomainPresets.mostRecent) { d =>
-      d.helpers.creditWavesToDefaultSigner()
-      Seq(dApp1, dApp2, dApp3, dApp4, dApp5).foreach(account => d.helpers.creditWavesFromDefaultSigner(account.toAddress))
+    val balances = AddrWithBalance.enoughBalances(dApp1, dApp2, dApp3, dApp4, dApp5)
 
+    withDomain(DomainPresets.mostRecent, balances) { d =>
       d.helpers.setScript(dApp1, generateScript(dApp1.toAddress))
       d.helpers.setScript(dApp2, generateScript(dApp3.toAddress, reentrant = true, secondNextDApp = Some(dApp5.toAddress)))
       d.helpers.setScript(dApp3, generateScript(dApp4.toAddress))
@@ -242,10 +233,9 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     val dApp4 = TxHelpers.signer(4)
     val dApp5 = TxHelpers.signer(5)
 
-    withDomain(DomainPresets.mostRecent) { d =>
-      d.helpers.creditWavesToDefaultSigner()
-      Seq(dApp1, dApp2, dApp3, dApp4, dApp5).foreach(account => d.helpers.creditWavesFromDefaultSigner(account.toAddress))
+    val balances = AddrWithBalance.enoughBalances(dApp1, dApp2, dApp3, dApp4, dApp5)
 
+    withDomain(DomainPresets.mostRecent, balances) { d =>
       d.helpers.setScript(dApp1, generateScript(dApp1.toAddress))
       d.helpers.setScript(dApp2, generateScript(dApp3.toAddress, reentrant = true, secondNextDApp = Some(dApp5.toAddress)))
       d.helpers.setScript(dApp3, generateScript(dApp4.toAddress))
@@ -268,10 +258,9 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     val dApp4 = TxHelpers.signer(4)
     val dApp5 = TxHelpers.signer(5)
 
-    withDomain(DomainPresets.mostRecent) { d =>
-      d.helpers.creditWavesToDefaultSigner()
-      Seq(dApp1, dApp2, dApp3, dApp4, dApp5).foreach(account => d.helpers.creditWavesFromDefaultSigner(account.toAddress))
+    val balances = AddrWithBalance.enoughBalances(dApp1, dApp2, dApp3, dApp4, dApp5)
 
+    withDomain(DomainPresets.mostRecent, balances) { d =>
       d.helpers.setScript(dApp1, generateScript(dApp1.toAddress))
       d.helpers.setScript(dApp2, generateScript(dApp3.toAddress, secondReentrantInvoke = Some(dApp5.toAddress)))
       d.helpers.setScript(dApp3, generateScript(dApp4.toAddress, sendEnd = true, secondNextDApp = Some(dApp2.toAddress)))

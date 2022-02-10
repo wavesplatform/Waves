@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.contract.DApp
@@ -74,17 +75,13 @@ class DAppDataEntryTypeTest
   private def assert(constructor: String) = {
     val dAppAcc = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
+    val balances = AddrWithBalance.enoughBalances(dAppAcc, invoker)
 
-    val preparingTxs = Seq(
-      TxHelpers.genesis(dAppAcc.toAddress),
-      TxHelpers.genesis(invoker.toAddress),
-      TxHelpers.setScript(dAppAcc, dApp(constructor))
-    )
-
+    val setScript = TxHelpers.setScript(dAppAcc, dApp(constructor))
     val invoke = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker)
 
-    withDomain(domainSettingsWithFS(fsWithV5)) { d =>
-      d.appendBlock(preparingTxs: _*)
+    withDomain(domainSettingsWithFS(fsWithV5), balances) { d =>
+      d.appendBlock(setScript)
       val value = if (constructor == "BooleanEntry") "1" else "true"
       d.appendBlockE(invoke) should produce(s"can't reconstruct $constructor from Map(key -> key, value -> $value)")
     }

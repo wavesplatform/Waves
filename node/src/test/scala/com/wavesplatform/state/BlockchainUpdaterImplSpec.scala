@@ -7,6 +7,7 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
@@ -262,43 +263,41 @@ class BlockchainUpdaterImplSpec
       }
     }
 
-    "VRF" in withDomain(
-      domainSettingsWithPreactivatedFeatures(
-        BlockchainFeatures.NG,
-        BlockchainFeatures.BlockV5,
-        BlockchainFeatures.Ride4DApps
-      )
-    ) { d =>
-
-      val script = ScriptCompiler.compile("""
-          |{-# STDLIB_VERSION 4 #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |
-          |@Callable(i)
-          |func default() = {
-          |  [
-          |    BinaryEntry("vrf", value(value(blockInfoByHeight(height)).vrf))
-          |  ]
-          |}
-          |""".stripMargin, ScriptEstimatorV2).explicitGet()._1
-
+    "VRF" in {
       val dapp   = KeyPair(Longs.toByteArray(Random.nextLong()))
       val sender = KeyPair(Longs.toByteArray(Random.nextLong()))
 
-      d.appendBlock(
-        GenesisTransaction.create(dapp.toAddress, 10_00000000, ntpTime.getTimestamp()).explicitGet(),
-        GenesisTransaction.create(sender.toAddress, 10_00000000, ntpTime.getTimestamp()).explicitGet()
-      )
+      withDomain(
+        settings = domainSettingsWithPreactivatedFeatures(
+          BlockchainFeatures.NG,
+          BlockchainFeatures.BlockV5,
+          BlockchainFeatures.Ride4DApps
+        ),
+        balances = Seq(AddrWithBalance(dapp.toAddress, 10_00000000), AddrWithBalance(sender.toAddress, 10_00000000))
+      ) { d =>
 
-      d.appendBlock(
-        SetScriptTransaction.selfSigned(2.toByte, dapp, Some(script), 500_0000L, ntpTime.getTimestamp()).explicitGet()
-      )
+        val script = ScriptCompiler.compile("""
+                                              |{-# STDLIB_VERSION 4 #-}
+                                              |{-# SCRIPT_TYPE ACCOUNT #-}
+                                              |{-# CONTENT_TYPE DAPP #-}
+                                              |
+                                              |@Callable(i)
+                                              |func default() = {
+                                              |  [
+                                              |    BinaryEntry("vrf", value(value(blockInfoByHeight(height)).vrf))
+                                              |  ]
+                                              |}
+                                              |""".stripMargin, ScriptEstimatorV2).explicitGet()._1
 
-      val invoke =
-        InvokeScriptTransaction.selfSigned(3.toByte, sender, dapp.toAddress, None, Seq.empty, 50_0000L, Waves, ntpTime.getTimestamp()).explicitGet()
+        d.appendBlock(
+          SetScriptTransaction.selfSigned(2.toByte, dapp, Some(script), 500_0000L, ntpTime.getTimestamp()).explicitGet()
+        )
 
-      d.appendBlock(d.createBlock(5.toByte, Seq(invoke)))
+        val invoke =
+          InvokeScriptTransaction.selfSigned(3.toByte, sender, dapp.toAddress, None, Seq.empty, 50_0000L, Waves, ntpTime.getTimestamp()).explicitGet()
+
+        d.appendBlock(d.createBlock(5.toByte, Seq(invoke)))
+      }
     }
   }
 }

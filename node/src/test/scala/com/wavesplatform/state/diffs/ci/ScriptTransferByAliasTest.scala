@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.script.Script
@@ -13,7 +14,7 @@ import com.wavesplatform.transaction.TxHelpers
 
 class ScriptTransferByAliasTest extends PropSpec with WithDomain {
 
-  private val activationHeight = 3
+  private val activationHeight = 4
 
   private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -70,21 +71,18 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
     val invoker = TxHelpers.signer(1)
     val receiver = TxHelpers.signer(2)
 
-    val genesis = Seq(
-      TxHelpers.genesis(dAppAcc.toAddress),
-      TxHelpers.genesis(invoker.toAddress),
-      TxHelpers.genesis(receiver.toAddress)
-    )
+    val balances = AddrWithBalance.enoughBalances(dAppAcc, invoker, receiver)
+
     val createAlias = TxHelpers.createAlias(alias, receiver)
     val issue = TxHelpers.issue(dAppAcc, ENOUGH_AMT, script = Some(verifier))
     val asset = IssuedAsset(issue.id())
     val setDApp = TxHelpers.setScript(dAppAcc, dApp(asset))
-    val preparingTxs = genesis :+ createAlias :+ issue :+ setDApp
+    val preparingTxs = Seq(createAlias, issue, setDApp)
 
     val invoke1 = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker, fee = TxHelpers.ciFee(sc = 1))
     val invoke2 = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker, fee = TxHelpers.ciFee(sc = 1))
 
-    withDomain(domainSettingsWithFS(fsWithV5)) { d =>
+    withDomain(domainSettingsWithFS(fsWithV5), balances) { d =>
       d.appendBlock(preparingTxs: _*)
 
       d.appendBlock(invoke1)

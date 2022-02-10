@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.SynchronousCalls
@@ -12,13 +13,12 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.{Transaction, TxHelpers}
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
 
-class InvokeActionsFeeTest extends PropSpec with Inside with WithState with DBCacheSettings with MockFactory with WithDomain with EitherValues {
+class InvokeActionsFeeTest extends PropSpec with Inside with WithState with DBCacheSettings with WithDomain with EitherValues {
   import DomainPresets._
 
-  private val activationHeight = 3
+  private val activationHeight = 4
   private val fsWithV5 =
     RideV5
       .configure(_.copy(estimatorPreCheckHeight = Int.MaxValue))
@@ -45,13 +45,11 @@ class InvokeActionsFeeTest extends PropSpec with Inside with WithState with DBCa
          |  ]
       """.stripMargin)
 
-  private val paymentPreconditions: (List[Transaction], () => InvokeScriptTransaction, () => InvokeScriptTransaction) = {
+  private val paymentPreconditions: (Seq[AddrWithBalance], List[Transaction], () => InvokeScriptTransaction, () => InvokeScriptTransaction) = {
     val dAppAcc               = TxHelpers.signer(0)
     val scriptedInvoker       = TxHelpers.signer(1)
     val nonScriptedInvoker    = TxHelpers.signer(2)
-    val genesis               = TxHelpers.genesis(dAppAcc.toAddress)
-    val genesis2              = TxHelpers.genesis(scriptedInvoker.toAddress)
-    val genesis3              = TxHelpers.genesis(nonScriptedInvoker.toAddress)
+    val balances              = AddrWithBalance.enoughBalances(dAppAcc, scriptedInvoker, nonScriptedInvoker)
     val issue                 = TxHelpers.issue(dAppAcc, script = Some(verifier))
     val asset                 = IssuedAsset(issue.id())
     val transfer1             = TxHelpers.transfer(dAppAcc, scriptedInvoker.toAddress, 10, asset)
@@ -61,12 +59,12 @@ class InvokeActionsFeeTest extends PropSpec with Inside with WithState with DBCa
     val payments              = Seq(Payment(1, asset), Payment(1, asset))
     val invokeFromScripted    = () => TxHelpers.invoke(dAppAcc.toAddress, None, Nil, payments, scriptedInvoker)
     val invokeFromNonScripted = () => TxHelpers.invoke(dAppAcc.toAddress, None, Nil, payments, nonScriptedInvoker)
-    (List(genesis, genesis2, genesis3, issue, transfer1, transfer2, setVerifier, setDApp), invokeFromScripted, invokeFromNonScripted)
+    (balances, List(issue, transfer1, transfer2, setVerifier, setDApp), invokeFromScripted, invokeFromNonScripted)
   }
 
   property(s"fee for asset scripts is not required after activation ${BlockchainFeatures.SynchronousCalls}") {
-    val (preparingTxs, invokeFromScripted, invokeFromNonScripted) = paymentPreconditions
-    withDomain(fsWithV5) { d =>
+    val (balances, preparingTxs, invokeFromScripted, invokeFromNonScripted) = paymentPreconditions
+    withDomain(fsWithV5, balances) { d =>
       d.appendBlock(preparingTxs: _*)
 
       val invokeFromScripted1    = invokeFromScripted()

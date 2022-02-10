@@ -3,6 +3,7 @@ package com.wavesplatform.utx
 import com.wavesplatform.TestValues
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.script.Script
@@ -290,12 +291,9 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
   }
 
   private[this] def utxTest(f: (Domain, UtxPoolImpl) => Unit): Unit = {
-    withDomain(settings) { d =>
-      d.appendBlock(
-        TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, Long.MaxValue / 3),
-        TxHelpers.genesis(dApp.toAddress, Long.MaxValue / 3)
-      )
+    val balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner, dApp)
 
+    withDomain(settings, balances) { d =>
       val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings.utxSettings)
       f(d, utx)
       utx.close()

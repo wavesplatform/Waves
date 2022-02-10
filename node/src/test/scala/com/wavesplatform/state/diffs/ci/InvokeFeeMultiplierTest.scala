@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.TestValues
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{BlockV5, SynchronousCalls}
@@ -14,14 +15,13 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.{DataTransaction, Transaction, TxHelpers, TxVersion}
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 
-class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettings with MockFactory with WithDomain with EitherValues {
+class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettings with WithDomain with EitherValues {
   import DomainPresets._
 
-  private val estimatorV3ActivationHeight = 3
-  private val fixActivationHeight         = 5
+  private val estimatorV3ActivationHeight = 4
+  private val fixActivationHeight         = 6
   private val fsWithV5 =
     RideV5
       .setFeaturesHeight(BlockV5 -> estimatorV3ActivationHeight, SynchronousCalls -> fixActivationHeight)
@@ -33,11 +33,10 @@ class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettin
     Script.fromBase64String(base64).explicitGet()
   }
 
-  private def paymentPreconditions(dApp: Script): (List[Transaction], InvokeScriptTransaction, DataTransaction, InvokeScriptTransaction) = {
+  private def paymentPreconditions(dApp: Script): (Seq[AddrWithBalance], List[Transaction], InvokeScriptTransaction, DataTransaction, InvokeScriptTransaction) = {
     val invoker  = TxHelpers.signer(0)
     val master   = TxHelpers.signer(1)
-    val genesis  = TxHelpers.genesis(master.toAddress, ENOUGH_AMT)
-    val genesis2 = TxHelpers.genesis(invoker.toAddress, ENOUGH_AMT)
+    val balances = AddrWithBalance.enoughBalances(invoker, master)
     val setDApp  = TxHelpers.setScript(master, dApp)
     val initData = Seq(
       IntegerDataEntry(s"start_of_${invoker.toAddress}", 1),
@@ -69,12 +68,12 @@ class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettin
     val initInvoke = TxHelpers.invoke(master.toAddress, Some("init"), initArgs, invoker = master, fee = TestValues.fee, version = TxVersion.V1)
     val invoke1    = TxHelpers.invoke(master.toAddress, Some("buyBack"), Nil, payment, version = TxVersion.V1)
     val invoke2    = TxHelpers.invoke(master.toAddress, Some("buyBack"), Nil, payment, version = TxVersion.V1)
-    (List(genesis, genesis2, setDApp, issue, data1, initInvoke), invoke1, data2, invoke2)
+    (balances, List(setDApp, issue, data1, initInvoke), invoke1, data2, invoke2)
   }
 
   property(s"fee multiplier is disabled after activation ${BlockchainFeatures.SynchronousCalls}") {
-    val (preparingTxs, invoke1, data2, invoke2) = paymentPreconditions(lambordini)
-    withDomain(fsWithV5) { d =>
+    val (balances, preparingTxs, invoke1, data2, invoke2) = paymentPreconditions(lambordini)
+    withDomain(fsWithV5, balances) { d =>
       d.appendBlock(preparingTxs: _*)
       d.appendBlock(invoke1)
 

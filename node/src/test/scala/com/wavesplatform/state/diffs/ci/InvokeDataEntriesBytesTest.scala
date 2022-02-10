@@ -3,18 +3,17 @@ package com.wavesplatform.state.diffs.ci
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.{TestValues, TransactionGenBase}
 
-class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with TransactionGenBase {
+class InvokeDataEntriesBytesTest extends PropSpec with WithDomain {
   private def data(i: Int, size: Int): String =
     s"""
        | [BinaryEntry("key$i", base64'${ByteStr.fill(size / 2)(1)}' + base64'${ByteStr.fill(size / 2)(1)}')]
@@ -67,11 +66,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
     val dApp2    = TxHelpers.signer(2)
     val dApp3    = TxHelpers.signer(3)
     val dApp4    = TxHelpers.signer(4)
-    val gTx1     = TxHelpers.genesis(invoker.toAddress, ENOUGH_AMT)
-    val gTx2     = TxHelpers.genesis(dApp1.toAddress, TestValues.fee)
-    val gTx3     = TxHelpers.genesis(dApp2.toAddress, ENOUGH_AMT)
-    val gTx4     = TxHelpers.genesis(dApp3.toAddress, ENOUGH_AMT)
-    val gTx5     = TxHelpers.genesis(dApp4.toAddress, ENOUGH_AMT)
+    val balances = AddrWithBalance.enoughBalances(invoker, dApp1, dApp2, dApp3, dApp4)
     val limit    = ContractLimits.MaxWriteSetSizeInBytes - 9
     val size     = if (exceed5Kb) limit + 1 else limit
     val ssTx1    = TxHelpers.setScript(dApp1, dApp1Script(dApp2.toAddress, size, sync))
@@ -79,17 +74,18 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
     val ssTx3    = TxHelpers.setScript(dApp3, dApp3Script(dApp4.toAddress, size))
     val ssTx4    = TxHelpers.setScript(dApp4, dApp4Script(size, !reach15kb))
     val invokeTx = () => TxHelpers.invoke(dApp1.toAddress, None, Nil)
-    (Seq(gTx1, gTx2, gTx3, gTx4, gTx5, ssTx1, ssTx2, ssTx3, ssTx4), invokeTx)
+    (balances, Seq(ssTx1, ssTx2, ssTx3, ssTx4), invokeTx)
   }
 
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(checkTotalDataEntriesBytesHeight = 3, syncDAppCheckTransfersHeight = 4)
+      .copy(checkTotalDataEntriesBytesHeight = 4, syncDAppCheckTransfersHeight = 5)
 
   property("exceeding 5 Kb before and after activation") {
-    withDomain(domainSettingsWithFS(settings)) { d =>
-      val (preparingTxs, invoke) = scenario(exceed5Kb = true, sync = true)
+    val (balances, preparingTxs, invoke) = scenario(exceed5Kb = true, sync = true)
+
+    withDomain(domainSettingsWithFS(settings), balances) { d =>
       d.appendBlock(preparingTxs: _*)
 
       val invoke1 = invoke()
@@ -103,8 +99,9 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
   }
 
   property("exceeding 15 Kb before activation, after checkTotalDataEntriesBytesHeight and after syncDAppCheckTransfersHeight") {
-    withDomain(domainSettingsWithFS(settings)) { d =>
-      val (preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true)
+    val (balances, preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true)
+
+    withDomain(domainSettingsWithFS(settings), balances) { d =>
       d.appendBlock(preparingTxs: _*)
 
       val invoke1 = invoke()
@@ -123,8 +120,9 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
   }
 
   property("reaching 5 Kb before and after activation") {
-    withDomain(domainSettingsWithFS(settings)) { d =>
-      val (preparingTxs, invoke) = scenario(exceed5Kb = false, sync = false)
+    val (balances, preparingTxs, invoke) = scenario(exceed5Kb = false, sync = false)
+
+    withDomain(domainSettingsWithFS(settings), balances) { d =>
       d.appendBlock(preparingTxs: _*)
 
       val invoke1 = invoke()
@@ -138,8 +136,9 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain with Transacti
   }
 
   property("reaching 15 Kb after activation") {
-    withDomain(domainSettingsWithFS(settings)) { d =>
-      val (preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true, reach15kb = true)
+    val (balances, preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true, reach15kb = true)
+
+    withDomain(domainSettingsWithFS(settings), balances) { d =>
       d.appendBlock(preparingTxs: _*)
       d.appendBlock()
 

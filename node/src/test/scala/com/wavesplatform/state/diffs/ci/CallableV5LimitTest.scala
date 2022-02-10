@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4, V5}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test._
@@ -49,12 +50,8 @@ class CallableV5LimitTest extends PropSpec with ScalaCheckPropertyChecks with Wi
     val dApp     = TxHelpers.signer(0)
     val syncDApp = TxHelpers.signer(1)
     val invoker  = TxHelpers.signer(2)
+    val balances = AddrWithBalance.enoughBalances(dApp, syncDApp, invoker)
 
-    val genesisTxs = Seq(
-      TxHelpers.genesis(dApp.toAddress),
-      TxHelpers.genesis(syncDApp.toAddress),
-      TxHelpers.genesis(invoker.toAddress)
-    )
     val setAcceptableScript   = TxHelpers.setScript(dApp, contract(5, V5))
     val setProhibitedScript   = TxHelpers.setScript(dApp, contract(6, V5))
     val setProhibitedV4Script = TxHelpers.setScript(dApp, contract(5, V4))
@@ -62,12 +59,10 @@ class CallableV5LimitTest extends PropSpec with ScalaCheckPropertyChecks with Wi
     val invoke                = TxHelpers.invoke(dApp.toAddress, func = None, invoker = invoker)
     val syncInvoke            = TxHelpers.invoke(syncDApp.toAddress, func = None, invoker = invoker)
 
-    withDomain(RideV4) { d =>
-      d.appendBlock(genesisTxs: _*)
+    withDomain(RideV4, balances) { d =>
       d.appendBlockE(setProhibitedV4Script) should produce("Contract function (default) is too complex: 9528 > 4000")
     }
-    withDomain(RideV5) { d =>
-      d.appendBlock(genesisTxs: _*)
+    withDomain(RideV5, balances) { d =>
       d.appendBlockE(setProhibitedV4Script) should produce("Contract function (default) is too complex: 9528 > 4000")
       d.appendBlockE(setProhibitedScript) should produce("Contract function (default) is too complex: 11432 > 10000")
       d.appendBlock(setAcceptableScript, invoke)

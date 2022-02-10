@@ -10,6 +10,7 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -113,8 +114,7 @@ class DebugApiRouteSpec
     def validatePost(tx: TransferTransaction) =
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString()))
 
-    "takes the priority pool into account" in withDomain() { d =>
-      d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
+    "takes the priority pool into account" in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
       d.appendBlock(TxHelpers.transfer(to = TxHelpers.secondAddress, amount = 1.waves + TestValues.fee))
 
       val route = routeWithBlockchain(d.blockchain)

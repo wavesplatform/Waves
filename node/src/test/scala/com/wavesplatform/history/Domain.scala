@@ -134,8 +134,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     val block = createBlock(Block.PlainBlockVersion, txs)
     appendBlock(block)
     txs.foreach { tx =>
-      require(blockchain.transactionInfo(tx.id()).isDefined, s"should be present: $tx")
-      require(blockchain.transactionSucceeded(tx.id()), s"should succeed: $tx")
+      assert(blockchain.transactionInfo(tx.id()).isDefined, s"should be present: $tx")
+      assert(blockchain.transactionSucceeded(tx.id()), s"should succeed: $tx")
     }
     lastBlock
   }
@@ -144,7 +144,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     val block  = createBlock(Block.PlainBlockVersion, txs)
     val result = appendBlockE(block)
     txs.foreach { tx =>
-      require(blockchain.transactionInfo(tx.id()).isEmpty, s"should not pass: $tx")
+      assert(blockchain.transactionInfo(tx.id()).isEmpty, s"should not pass: $tx")
     }
     result.left.getOrElse(throw new RuntimeException(s"Block appended successfully: $txs"))
   }
@@ -152,7 +152,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   def appendAndAssertFailed(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
     appendBlock(block)
-    txs.foreach(tx => require(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx"))
+    txs.foreach(tx => assert(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx"))
     lastBlock
   }
 

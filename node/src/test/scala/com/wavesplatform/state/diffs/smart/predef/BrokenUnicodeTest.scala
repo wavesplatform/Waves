@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
@@ -186,9 +187,9 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
     val dAppWithFix = (1 to allDAppVersions.size).map(idx => TxHelpers.signer(idx + allVersions.size + versionsBeforeActivation.size + 1)).zip(allDAppVersions).toList
     val dAppWithNoFix = (1 to dAppVersionsBeforeActivation.size).map(idx => TxHelpers.signer(idx + allVersions.size + versionsBeforeActivation.size + allDAppVersions.size + 1)).zip(dAppVersionsBeforeActivation).toList
 
-    val genesisTxs = (accWithFix ::: accWithNoFix ::: dAppWithFix ::: dAppWithNoFix)
-      .map { case (acc, _) => TxHelpers.genesis(acc.toAddress) }
-    val invokerGenesis = TxHelpers.genesis(invoker.toAddress)
+    val balances = (accWithFix ::: accWithNoFix ::: dAppWithFix ::: dAppWithNoFix)
+      .map { case (acc, _) => AddrWithBalance(acc.toAddress) }
+    val invokerBalance = AddrWithBalance(invoker.toAddress)
 
     val setNoFix = accWithNoFix.map { case (acc, v) => TxHelpers.setScript(acc, checkNoFixScript(v)) }
     val setFix = accWithFix.map { case (acc, v) => TxHelpers.setScript(acc, checkFixScript(v)) }
@@ -200,14 +201,12 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
     val checkFixDApp = dAppWithFix.map { case (acc, _) => TxHelpers.invoke(acc.toAddress, func = None, invoker = invoker) }
     val checkNoFixDApp = () => dAppWithNoFix.map { case (acc, _) => TxHelpers.invoke(acc.toAddress, func = None, invoker = invoker) }
 
-    (invokerGenesis :: genesisTxs, setNoFix, setFix, checkFix, checkNoFix, setNoFixDApp, setFixDApp, checkFixDApp, checkNoFixDApp)
+    (invokerBalance :: balances, setNoFix, setFix, checkFix, checkNoFix, setNoFixDApp, setFixDApp, checkFixDApp, checkNoFixDApp)
   }
 
   property(s"string functions return correct results for unicode input after ${BlockchainFeatures.SynchronousCalls} activation") {
-    val (genesisTxs, setNoFix, setFix, checkFix, checkNoFix, setNoFixDApp, setFixDApp, checkFixDApp, checkNoFixDApp) = scenario
-    withDomain(domainSettingsWithFS(fs)) { d =>
-      d.appendBlock(genesisTxs: _*)
-
+    val (balances, setNoFix, setFix, checkFix, checkNoFix, setNoFixDApp, setFixDApp, checkFixDApp, checkNoFixDApp) = scenario
+    withDomain(domainSettingsWithFS(fs), balances) { d =>
       val checkNoFix1     = checkNoFix()
       val checkNoFixDApp1 = checkNoFixDApp()
       d.appendBlock(setNoFix ::: setNoFixDApp: _*)

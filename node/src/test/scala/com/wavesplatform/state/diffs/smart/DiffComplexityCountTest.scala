@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.values.V4
@@ -24,7 +25,7 @@ class DiffComplexityCountTest
     with WithDomain
     with EitherValues {
 
-  private val activationHeight = 3
+  private val activationHeight = 4
 
   private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -89,10 +90,8 @@ class DiffComplexityCountTest
     val account1 = TxHelpers.signer(0)
     val account2 = TxHelpers.signer(1)
 
-    val genesis = Seq(
-      TxHelpers.genesis(account1.toAddress, ENOUGH_AMT),
-      TxHelpers.genesis(account2.toAddress, ENOUGH_AMT)
-    )
+    val balances = AddrWithBalance.enoughBalances(account1, account2)
+
     val issue = TxHelpers.issue(account1, ENOUGH_AMT, script = Some(verifier))
     val asset = IssuedAsset(issue.id())
     val transfer1 = TxHelpers.transfer(account1, account2.toAddress, amount = Int.MaxValue, asset = asset)
@@ -102,12 +101,12 @@ class DiffComplexityCountTest
     val payments = Seq(Payment(1, asset), Payment(1, asset))
     val invokeFromScripted = () => TxHelpers.invoke(account1.toAddress, invoker = account2, payments = payments, fee = TxHelpers.ciFee(6))
 
-    (genesis :+ issue :+ transfer1 :+ setVerifier :+ setDApp, invokeFromScripted)
+    (balances, Seq(issue, transfer1, setVerifier, setDApp), invokeFromScripted)
   }
 
   property(s"evaluated complexity is used for diff instead of estimated one after activation ${BlockchainFeatures.SynchronousCalls}") {
-    val (preparingTxs, invoke) = paymentPreconditions
-    withDomain(domainSettingsWithFS(fsWithV5)) { d =>
+    val (balances, preparingTxs, invoke) = paymentPreconditions
+    withDomain(domainSettingsWithFS(fsWithV5), balances) { d =>
       d.appendBlock(preparingTxs: _*)
 
       val invoke1 = invoke()

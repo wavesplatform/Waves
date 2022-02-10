@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V4
@@ -374,20 +375,16 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
 
   private def issuePreconditions(
       invokeFee: Long
-  ): (List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, KeyPair, Long) = {
+  ): (SetScriptTransaction, InvokeScriptTransaction, KeyPair, KeyPair, Long) = {
     val master  = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
 
     val amount = 100
 
-    val genesis = List(
-      TxHelpers.genesis(master.toAddress),
-      TxHelpers.genesis(invoker.toAddress)
-    )
     val setScript = TxHelpers.setScript(master, issueDApp(amount))
     val invoke    = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker, fee = invokeFee)
 
-    (genesis, setScript, invoke, master, invoker, amount)
+    (setScript, invoke, master, invoker, amount)
   }
 
   private def issueDApp(
@@ -406,9 +403,9 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
     )
 
   property("issue action results state") {
-    val (genesis, setScript, invoke, master, invoker, amount) = issuePreconditions(1.005.waves)
-    withDomain() { d =>
-      val tb1 = TestBlock.create(genesis :+ setScript)
+    val (setScript, invoke, master, invoker, amount) = issuePreconditions(1.005.waves)
+    withDomain(balances = AddrWithBalance.enoughBalances(invoker, master)) { d =>
+      val tb1 = TestBlock.create(System.currentTimeMillis(), d.blockchain.lastBlockId.get, Seq(setScript))
       d.blockchainUpdater.processBlock(tb1, ByteStr(new Array[Byte](32)), false).explicitGet()
       val tb2 = TestBlock.create(System.currentTimeMillis(), tb1.signature, Seq(invoke))
       d.blockchainUpdater.processBlock(tb2, ByteStr(new Array[Byte](32)), false).explicitGet()

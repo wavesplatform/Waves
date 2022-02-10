@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.ci.sync
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
@@ -46,11 +47,8 @@ class SyncDAppNegativePaymentTest extends PropSpec with WithDomain {
     val dApp1 = TxHelpers.signer(1)
     val dApp2 = TxHelpers.signer(2)
 
-    val genesis = Seq(
-      TxHelpers.genesis(invoker.toAddress),
-      TxHelpers.genesis(dApp1.toAddress),
-      TxHelpers.genesis(dApp2.toAddress)
-    )
+    val balances = AddrWithBalance.enoughBalances(invoker, dApp1, dApp2)
+
     val issue = TxHelpers.issue(dApp2, 100)
     val asset = if (customAsset) IssuedAsset(issue.id()) else Waves
     val setScript = Seq(
@@ -60,13 +58,13 @@ class SyncDAppNegativePaymentTest extends PropSpec with WithDomain {
 
     val invoke = () => TxHelpers.invoke(dApp1.toAddress, invoker = invoker)
 
-    ((genesis :+ issue) ++ setScript, invoke, dApp1.toAddress, dApp2.toAddress, asset)
+    (balances, issue +: setScript, invoke, dApp1.toAddress, dApp2.toAddress, asset)
   }
 
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(forbidSyncDAppNegativePaymentHeight = 3)
+      .copy(forbidSyncDAppNegativePaymentHeight = 4)
 
   property("negative sync dApp payments amount rejects tx after forbidSyncDAppNegativePaymentHeight") {
     for {
@@ -74,8 +72,8 @@ class SyncDAppNegativePaymentTest extends PropSpec with WithDomain {
       bigComplexityDApp2 <- Seq(false, true)
       customAsset        <- Seq(false, true)
     } {
-      val (preparingTxs, invoke, dApp1, dApp2, asset) = scenario(bigComplexityDApp1, bigComplexityDApp2, customAsset)
-      withDomain(domainSettingsWithFS(settings)) { d =>
+      val (balances, preparingTxs, invoke, dApp1, dApp2, asset) = scenario(bigComplexityDApp1, bigComplexityDApp2, customAsset)
+      withDomain(domainSettingsWithFS(settings), balances) { d =>
         d.appendBlock(preparingTxs: _*)
 
         val invoke1 = invoke()

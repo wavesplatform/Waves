@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs.ci
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -69,15 +70,13 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
     def assert(action: EXPR => FUNCTION_CALL, message: String): Assertion = {
       val dAppAcc = TxHelpers.signer(0)
       val invoker = TxHelpers.signer(1)
-      val preparingTxs = Seq(
-        TxHelpers.genesis(dAppAcc.toAddress),
-        TxHelpers.genesis(invoker.toAddress),
+      val setScript = Seq(
         TxHelpers.setScript(dAppAcc, dApp(action))
       )
       val invoke = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker)
 
-      withDomain(domainSettingsWithFS(fsWithV5)) { d =>
-        d.appendBlock(preparingTxs: _*)
+      withDomain(domainSettingsWithFS(fsWithV5), AddrWithBalance.enoughBalances(dAppAcc, invoker)) { d =>
+        d.appendBlock(setScript: _*)
         d.appendBlockE(invoke) should produce(message)
       }
     }

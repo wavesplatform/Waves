@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.account.Address
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
@@ -10,10 +11,9 @@ import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
 
-class InvokePaymentsAvailabilityTest extends PropSpec with Inside with DBCacheSettings with MockFactory with WithDomain with EitherValues {
+class InvokePaymentsAvailabilityTest extends PropSpec with Inside with DBCacheSettings with WithDomain with EitherValues {
   import DomainPresets._
 
   private def proxyDAppScript(callingDApp: Address): Script =
@@ -61,9 +61,7 @@ class InvokePaymentsAvailabilityTest extends PropSpec with Inside with DBCacheSe
     val invoker     = TxHelpers.signer(0)
     val callingDApp = TxHelpers.signer(1)
     val proxyDApp   = TxHelpers.signer(2)
-    val gTx1        = TxHelpers.genesis(callingDApp.toAddress, ENOUGH_AMT)
-    val gTx2        = TxHelpers.genesis(invoker.toAddress, ENOUGH_AMT)
-    val gTx3        = TxHelpers.genesis(proxyDApp.toAddress, ENOUGH_AMT)
+    val balances    = AddrWithBalance.enoughBalances(invoker, callingDApp, proxyDApp)
     val issue       = TxHelpers.issue(invoker, ENOUGH_AMT)
     val ssTx        = TxHelpers.setScript(callingDApp, callingDAppScript)
     val ssTx2       = TxHelpers.setScript(proxyDApp, proxyDAppScript(callingDApp.toAddress))
@@ -71,12 +69,12 @@ class InvokePaymentsAvailabilityTest extends PropSpec with Inside with DBCacheSe
     val payments    = Seq(Payment(paymentAmount, asset))
     val dApp        = if (syncCall) proxyDApp.toAddress else callingDApp.toAddress
     val invokeTx    = TxHelpers.invoke(dApp, payments = payments)
-    (Seq(gTx1, gTx2, gTx3, ssTx, ssTx2, issue), invokeTx, callingDApp.toAddress, proxyDApp.toAddress, asset)
+    (balances, Seq(ssTx, ssTx2, issue), invokeTx, callingDApp.toAddress, proxyDApp.toAddress, asset)
   }
 
   property("payments availability in usual call") {
-    val (preparingTxs, invoke, callingDApp, _, asset) = scenario(syncCall = false)
-    withDomain(RideV5) { d =>
+    val (balances, preparingTxs, invoke, callingDApp, _, asset) = scenario(syncCall = false)
+    withDomain(RideV5, balances) { d =>
       d.appendBlock(preparingTxs: _*)
       d.appendBlock(invoke)
 
@@ -94,8 +92,8 @@ class InvokePaymentsAvailabilityTest extends PropSpec with Inside with DBCacheSe
   }
 
   property("payments availability in sync call") {
-    val (preparingTxs, invoke, callingDApp, proxyDApp, asset) = scenario(syncCall = true)
-    withDomain(RideV5) { d =>
+    val (balances, preparingTxs, invoke, callingDApp, proxyDApp, asset) = scenario(syncCall = true)
+    withDomain(RideV5, balances) { d =>
       d.appendBlock(preparingTxs: _*)
       d.appendBlock(invoke)
 

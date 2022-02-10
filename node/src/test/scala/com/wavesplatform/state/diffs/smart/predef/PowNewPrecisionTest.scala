@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -37,25 +38,23 @@ class PowNewPrecisionTest extends PropSpec with WithDomain {
     val master = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
 
-    val genesis = Seq(
-      TxHelpers.genesis(master.toAddress),
-      TxHelpers.genesis(invoker.toAddress)
-    )
+    val balances = AddrWithBalance.enoughBalances(master, invoker)
+
     val setScript = TxHelpers.setScript(master, contract)
     val invoke = () => TxHelpers.invoke(master.toAddress, invoker = invoker)
 
-    (genesis :+ setScript, invoke, master.toAddress)
+    (balances, setScript, invoke, master.toAddress)
   }
 
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(syncDAppCheckPaymentsHeight = 3)
+      .copy(syncDAppCheckPaymentsHeight = 4)
 
   property("pow changes precision after syncDAppCheckPaymentsHeight") {
-    val (genesisTxs, invoke, dApp) = scenario
-    withDomain(domainSettingsWithFS(settings)) { d =>
-      d.appendBlock(genesisTxs: _*)
+    val (balances, setScript, invoke, dApp) = scenario
+    withDomain(domainSettingsWithFS(settings), balances) { d =>
+      d.appendBlock(setScript)
 
       d.appendBlock(invoke())
       d.blockchain.accountData(dApp, "result1").get.value shouldBe 9049204201489L

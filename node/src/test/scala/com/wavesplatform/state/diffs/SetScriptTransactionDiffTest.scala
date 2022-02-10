@@ -4,6 +4,7 @@ import com.google.common.primitives.Ints
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -270,7 +271,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
 
     def t: Long = System.currentTimeMillis()
     val sender  = accountGen.sample.get
-    val genesis = GenesisTransaction.create(sender.toAddress, ENOUGH_AMT, t).explicitGet()
+    val balances = AddrWithBalance.enoughBalances(sender)
 
     def settings(checkNegative: Boolean = false, checkSumOverflow: Boolean = false): FunctionalitySettings = {
       TestFunctionalitySettings
@@ -284,21 +285,18 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     def assert(script: Script, checkNegativeMessage: String): Assertion = {
       def setScript() = SetScriptTransaction.selfSigned(1.toByte, sender, Some(script), 100000, t).explicitGet()
 
-      withDomain(domainSettingsWithFS(settings())) { db =>
-        db.appendBlock(genesis)
+      withDomain(domainSettingsWithFS(settings()), balances) { db =>
         val tx = setScript()
         db.appendBlock(tx)
         db.liquidDiff.errorMessage(tx.id()) shouldBe None
       }
 
-      withDomain(domainSettingsWithFS(settings(checkNegative = true))) { db =>
-        db.appendBlock(genesis)
-        (the[Exception] thrownBy db.appendBlock(setScript())).getMessage should include(checkNegativeMessage)
+      withDomain(domainSettingsWithFS(settings(checkNegative = true)), balances) { db =>
+        db.appendBlockE(setScript()) should produce(checkNegativeMessage)
       }
 
-      withDomain(domainSettingsWithFS(settings(checkSumOverflow = true))) { db =>
-        db.appendBlock(genesis)
-        (the[Exception] thrownBy db.appendBlock(setScript())).getMessage should include("Illegal script")
+      withDomain(domainSettingsWithFS(settings(checkSumOverflow = true)), balances) { db =>
+        db.appendBlockE(setScript()) should produce("Illegal script")
       }
     }
 
@@ -362,6 +360,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
      */
     val innerOverlapWithCallable = "AAIFAAAAAAAAAA8IAhIAGgkKAmExEgNhMTEAAAACAQAAAAJhMQAAAAAGAQAAAAJhMgAAAAAKAQAAAAJhMwAAAAAKAQAAAAJhMQAAAAAJAQAAAAJhMQAAAAAJAQAAAAJhMQAAAAAJAQAAAAJhMwAAAAAAAAABAAAAAWkBAAAAAmE0AAAAAAQAAAACYTAJAQAAAAJhMgAAAAADCQAAAAAAAAIFAAAAAmEwBQAAAAJhMAUAAAADbmlsCQAAAgAAAAECAAAAJFN0cmljdCB2YWx1ZSBpcyBub3QgZXF1YWwgdG8gaXRzZWxmLgAAAABEHCSy"
     val keyPairs = Vector.tabulate(8)(i => KeyPair(Ints.toByteArray(i)))
+    val balances = keyPairs.map(acc => AddrWithBalance(acc.toAddress, 10.waves))
 
     def setScript(keyPairIndex: Int, script: String): SetScriptTransaction =
       SetScriptTransaction.selfSigned(2.toByte, keyPairs(keyPairIndex), Script.fromBase64String(script).toOption, 0.01.waves, System.currentTimeMillis()).explicitGet()
@@ -373,8 +372,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
         )
       ))
 
-    withDomain(settings) { d =>
-      d.appendBlock(keyPairs.map(kp => GenesisTransaction.create(kp.toAddress, 10.waves, System.currentTimeMillis()).explicitGet()): _*)
+    withDomain(settings, balances) { d =>
       d.appendBlock(
         setScript(0, verifier),
         setScript(1, userFunctions),

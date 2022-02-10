@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.lang.directives.values.{V4, V5}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -11,12 +12,11 @@ import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Po
 import com.wavesplatform.test.{NumericExt, PropSpec, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
 
 import scala.collection.immutable.VectorMap
 
-class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBCacheSettings with MockFactory with WithDomain with EitherValues {
+class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBCacheSettings with WithDomain with EitherValues {
   import DomainPresets._
 
   private val invalidLengthAsset = IssuedAsset(ByteStr.decodeBase58("WAVES").get)
@@ -49,8 +49,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         val miner       = TxHelpers.signer(0).toAddress
         val invoker     = TxHelpers.signer(1)
         val master      = TxHelpers.signer(2)
-        val genesis1Tx  = TxHelpers.genesis(master.toAddress)
-        val genesis2Tx  = TxHelpers.genesis(invoker.toAddress)
+        val balances    = AddrWithBalance.enoughBalances(invoker, master)
         val setScriptTx = TxHelpers.setScript(master, dApp)
         val invoke      = TxHelpers.invoke(master.toAddress, Some(func), invoker = invoker)
 
@@ -96,8 +95,8 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
             )
           }
 
-        withDomain(if (activated) RideV5 else RideV4) { d =>
-          d.appendBlock(genesis1Tx, genesis2Tx, setScriptTx)
+        withDomain(if (activated) RideV5 else RideV4, balances) { d =>
+          d.appendBlock(setScriptTx)
           d.appendBlock(invoke)
           d.liquidDiff shouldBe expectedResult
         }

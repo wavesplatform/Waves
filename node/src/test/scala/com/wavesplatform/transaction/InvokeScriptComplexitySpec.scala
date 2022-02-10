@@ -4,6 +4,7 @@ import com.wavesplatform.NTPTime
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.values.{V4, V5}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_STRING}
@@ -68,17 +69,15 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
   )
 
   "correctly estimates complexity when child dApp invocation involves payment in smart asset" in {
-    withDomain(settings) { d =>
-      val invoker = TxHelpers.signer(0)
-      val dApp0KP = TxHelpers.signer(1)
-      val dApp1KP = TxHelpers.signer(2)
+    val invoker = TxHelpers.signer(0)
+    val dApp0KP = TxHelpers.signer(1)
+    val dApp1KP = TxHelpers.signer(2)
 
+    val balances = Seq(invoker, dApp0KP, dApp1KP).map(acc => AddrWithBalance(acc.toAddress, 10000.waves))
+
+    withDomain(settings, balances) { d =>
       val utx = d.utxPool
 
-      d.appendBlock(
-        Seq(invoker.toAddress, dApp0KP.toAddress, dApp1KP.toAddress)
-          .map(addr => TxHelpers.genesis(addr, 10000.waves)): _*
-      )
       val issueTx = TxHelpers.issue(issuer = dApp1KP, amount = 1000_00, script = Some(smartAssetScript))
 
       d.appendBlock(

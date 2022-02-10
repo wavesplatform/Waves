@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.ci.sync
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
@@ -43,7 +44,7 @@ class SyncDAppNegativeLeaseTest extends PropSpec with WithDomain {
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(syncDAppCheckTransfersHeight = 3)
+      .copy(syncDAppCheckTransfersHeight = 4)
 
   property("negative lease amount") {
     for {
@@ -54,21 +55,18 @@ class SyncDAppNegativeLeaseTest extends PropSpec with WithDomain {
       val dApp1   = TxHelpers.signer(1)
       val dApp2   = TxHelpers.signer(2)
 
-      val genesis = Seq(
-        TxHelpers.genesis(invoker.toAddress),
-        TxHelpers.genesis(dApp1.toAddress),
-        TxHelpers.genesis(dApp2.toAddress)
-      )
+      val balances = AddrWithBalance.enoughBalances(invoker, dApp1, dApp2)
+
       val issue      = TxHelpers.issue(dApp2, 100)
       val setScript1 = TxHelpers.setScript(dApp1, dApp1Script(dApp2.toAddress, bigComplexityDApp1))
       val setScript2 = TxHelpers.setScript(dApp2, dApp2Script(bigComplexityDApp2))
 
-      val preparingTxs = genesis ++ Seq(issue, setScript1, setScript2)
+      val preparingTxs = Seq(issue, setScript1, setScript2)
 
       val invoke1 = TxHelpers.invoke(dApp1.toAddress, func = None, invoker = invoker)
       val invoke2 = TxHelpers.invoke(dApp1.toAddress, func = None, invoker = invoker)
 
-      withDomain(domainSettingsWithFS(settings)) { d =>
+      withDomain(domainSettingsWithFS(settings), balances) { d =>
         d.appendBlock(preparingTxs: _*)
 
         if (bigComplexityDApp1 || bigComplexityDApp2) {

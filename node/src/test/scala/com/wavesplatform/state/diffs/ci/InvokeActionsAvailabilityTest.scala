@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
@@ -104,20 +105,17 @@ class InvokeActionsAvailabilityTest
     val callingDApp = TxHelpers.signer(1)
     val proxyDApp   = TxHelpers.signer(2)
 
-    val genesis = Seq(
-      TxHelpers.genesis(callingDApp.toAddress),
-      TxHelpers.genesis(invoker.toAddress),
-      TxHelpers.genesis(proxyDApp.toAddress)
-    )
+    val balances = AddrWithBalance.enoughBalances(invoker, callingDApp, proxyDApp)
+
     val issue                = TxHelpers.issue(invoker, ENOUGH_AMT)
     val setScriptCallingDApp = TxHelpers.setScript(callingDApp, callingDAppScript)
     val setScriptProxyDApp   = TxHelpers.setScript(proxyDApp, proxyDAppScript(callingDApp.toAddress))
     val asset                = IssuedAsset(issue.id.value())
     val payments             = Seq(Payment(paymentAmount, asset))
-    val preparingTxs         = genesis :+ issue :+ setScriptCallingDApp :+ setScriptProxyDApp
+    val preparingTxs         = Seq(issue, setScriptCallingDApp, setScriptProxyDApp)
     val invoke               = TxHelpers.invoke(proxyDApp.toAddress, func = None, invoker = invoker, payments = payments, fee = 1.005.waves)
 
-    withDomain(RideV5) { d =>
+    withDomain(RideV5, balances) { d =>
       d.appendBlock(preparingTxs: _*)
 
       val startProxyDAppBalance   = d.blockchain.balance(proxyDApp.toAddress)

@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.V4
@@ -15,7 +16,7 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 
 class SmartAccountFeeTest extends PropSpec with WithDomain {
 
-  private val activationHeight = 3
+  private val activationHeight = 4
 
   private val scriptWithEmptyVerifier = TestCompiler(V4).compileContract("""
     | {-# STDLIB_VERSION 4       #-}
@@ -77,11 +78,8 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
     val transferFee  = FeeUnit * FeeConstants(TransferTransaction.typeId)
     val setScriptFee = FeeUnit * FeeConstants(SetScriptTransaction.typeId)
 
-    val genesis = Seq(
-      TxHelpers.genesis(accountWithPaidVerifier.toAddress),
-      TxHelpers.genesis(accountWithSmallVerifier.toAddress),
-      TxHelpers.genesis(accountWithEmptyVerifier.toAddress)
-    )
+    val balances = AddrWithBalance.enoughBalances(accountWithPaidVerifier, accountWithSmallVerifier, accountWithEmptyVerifier)
+
     val setScript = Seq(
       TxHelpers.setScript(accountWithPaidVerifier, scriptWithPaidVerifier, fee = setScriptFee),
       TxHelpers.setScript(accountWithSmallVerifier, scriptWithSmallVerifier, fee = setScriptFee),
@@ -101,7 +99,8 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
     val dataFromEmptyVerifier = () => TxHelpers.dataV2(accountWithEmptyVerifier, Seq(EmptyDataEntry("key")), fee = transferFee)
 
     (
-      genesis ++ setScript,
+      balances,
+      setScript,
       List(invokeFromPaidVerifier, transferFromPaidVerifier, dataFromPaidVerifier),
       List(
         invokeFromSmallVerifier,
@@ -127,8 +126,8 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
     d.blockchain.bestLiquidDiff.get.errorMessage(tx.id()) shouldBe None
 
   property(s"small verifier is free after ${BlockchainFeatures.SynchronousCalls} activation") {
-    val (preparingTxs, paidVerifierTxs, freeVerifierTxs) = preconditions
-    withDomain(domainSettingsWithFS(features)) { d =>
+    val (balances, preparingTxs, paidVerifierTxs, freeVerifierTxs) = preconditions
+    withDomain(domainSettingsWithFS(features), balances) { d =>
       d.appendBlock(preparingTxs: _*)
 
       (paidVerifierTxs ::: freeVerifierTxs).foreach(tx => appendAndAssertNotEnoughFee(tx(), d))
