@@ -123,7 +123,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
 
     val utxStorage =
-      new UtxPoolImpl(time, blockchainUpdater, spendableBalanceChanged, settings.utxSettings, utxEvents)
+      new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, utxEvents)
     maybeUtx = Some(utxStorage)
 
     val timer                 = new HashedWheelTimer()

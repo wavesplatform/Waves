@@ -16,7 +16,7 @@ import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 
-final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with OptimisticLockable {
+final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging with OptimisticLockable {
   import UtxPriorityPool._
 
   private[this] case class PriorityData(diff: Diff, isValid: Boolean = true)
@@ -28,7 +28,9 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
   def priorityTransactions: Seq[Transaction] = priorityDiffs.flatMap(_.diff.transactionsValues)
   def priorityTransactionIds: Seq[ByteStr]   = priorityTransactions.map(_.id())
 
-  def compositeBlockchain: CompositeBlockchain = CompositeBlockchain(base, priorityDiffsCombined)
+  def compositeBlockchain: Blockchain =
+    if (priorityDiffs.isEmpty) realBlockchain
+    else CompositeBlockchain(realBlockchain, priorityDiffsCombined)
 
   def lockedWrite[T](f: => T): T =
     this.writeLock(f)
@@ -125,7 +127,7 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
     removed.foreach(PoolMetrics.removeTransactionPriority)
     (newTxs diff oldTxs).foreach { tx =>
       PoolMetrics.addTransactionPriority(tx)
-      ResponsivenessLogs.writeEvent(base.height, tx, ResponsivenessLogs.TxEvent.Received)
+      ResponsivenessLogs.writeEvent(realBlockchain.height, tx, ResponsivenessLogs.TxEvent.Received)
     }
     removed
   }

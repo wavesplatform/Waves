@@ -314,8 +314,6 @@ class BlocksApiRouteSpec
           (newBlock.header.timestamp, blocks :+ newBlock)
       }
 
-      // blocks.map(_.header.timestamp).zipWithIndex.foreach { case (ts, i) => println(s"${i + 1}: $ts") }
-
       val route = blocksApiRoute.copy(commonApi = emulateBlocks(blocks)).route
 
       blocks.zipWithIndex.foreach {

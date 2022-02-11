@@ -27,6 +27,7 @@ import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.{Asset, Transaction, TxValidationError}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
@@ -76,6 +77,17 @@ object InvokeScriptDiff {
               ValidationError.ScriptRunsLimitError(s"DApp calls limit = ${ContractLimits.MaxSyncDAppCalls(version)} is exceeded")
             )
           )
+          _ <- traced {
+            Right {
+              if (blockchain.height >= blockchain.settings.functionalitySettings.forbidSyncDAppNegativePaymentHeight)
+                tx.payments.collectFirst {
+                  case Payment(amount, assetId) if amount < 0 =>
+                    throw RejectException(
+                      s"DApp $invoker invoked DApp $dAppAddress with attached ${assetId.fold("WAVES")(a => s"token $a")} amount = $amount"
+                    )
+                }
+            }
+          }
           invocationComplexity <- traced {
             InvokeDiffsCommon.getInvocationComplexity(blockchain, tx.funcCall, callableComplexities, dAppAddress)
           }
