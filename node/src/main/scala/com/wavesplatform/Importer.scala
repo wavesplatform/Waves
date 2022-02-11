@@ -32,7 +32,6 @@ import com.wavesplatform.wallet.Wallet
 import kamon.Kamon
 import monix.eval.Task
 import monix.execution.Scheduler
-import monix.reactive.subjects.PublishSubject
 import monix.reactive.{Observable, Observer}
 import org.iq80.leveldb.DB
 import scopt.OParser
@@ -280,7 +279,7 @@ object Importer extends ScorexLogging {
     val db          = openDB(settings.dbSettings.directory)
     val (blockchainUpdater, levelDb) =
       StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.combined(triggers))
-    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings)
+    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings)
     val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
     val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
 
