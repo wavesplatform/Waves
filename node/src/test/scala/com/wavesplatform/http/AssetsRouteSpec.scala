@@ -53,10 +53,11 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
       }
       d.appendBlock(issueTransactions: _*)
 
-      route.anyParamTest(routePath(s"/balance/${issuer.toAddress}"), "id")(issueTransactions.map(_.id().toString): _*) {
+      route.anyParamTest(routePath(s"/balance/${issuer.toAddress}"), "id")(issueTransactions.reverseIterator.map(_.id().toString).toSeq: _*) {
         status shouldBe StatusCodes.OK
-        responseAs[Seq[JsObject]]
-          .zip(issueTransactions)
+        (responseAs[JsObject] \ "balances")
+          .as[Seq[JsObject]]
+          .zip(issueTransactions.reverse)
           .foreach {
             case (jso, tx) =>
               (jso \ "balance").as[Long] shouldEqual tx.quantity
@@ -65,7 +66,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
 
       }
 
-      route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "id")("____", "----") {
+      route.anyParamTest(routePath(s"/balance/${issuer.toAddress}"), "id")("____", "----") {
         status shouldBe StatusCodes.BadRequest
         responseAs[JsValue] should matchJson("""{
                                                |    "error": 116,
@@ -77,7 +78,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
                                                |}""".stripMargin)
       }
 
-      withClue("over limit")(route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "id")(Seq.fill(101)("aaa"): _*) {
+      withClue("over limit")(route.anyParamTest(routePath(s"/balance/${issuer.toAddress}"), "id")(Seq.fill(101)("aaa"): _*) {
         status shouldBe StatusCodes.BadRequest
         responseAs[JsValue] should matchJson("""{
                                                |  "error" : 10,
@@ -85,20 +86,20 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
                                                |}""".stripMargin)
       })
 
-      withClue("old GET portfolio")(Get(routePath(s"/balance/${TxHelpers.defaultAddress}")) ~> route ~> check { // portfolio
+      withClue("old GET portfolio")(Get(routePath(s"/balance/${issuer.toAddress}")) ~> route ~> check { // portfolio
         status shouldBe StatusCodes.OK
-        responseAs[JsValue] should matchJson("""{
-                                               |  "address" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                               |  "balances" : [ {
-                                               |    "assetId" : "xxx",
-                                               |    "balance" : 999,
-                                               |    "reissuable" : false,
-                                               |    "minSponsoredAssetFee" : null,
-                                               |    "sponsorBalance" : null,
-                                               |    "quantity" : 123,
-                                               |    "issueTransaction" : null
-                                               |  } ]
-                                               |}""".stripMargin)
+        val allBalances = (responseAs[JsValue] \ "balances")
+          .as[Seq[JsObject]]
+          .map { jso =>
+            (jso \ "assetId").as[ByteStr] -> (jso \ "balance").as[Long]
+          }
+          .toMap
+
+        val balancesAfterIssue = issueTransactions.map { it =>
+          it.id() -> it.quantity
+        }.toMap
+
+        allBalances shouldEqual balancesAfterIssue
       })
     }
   }
@@ -106,7 +107,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
   "/transfer" - {
     def posting[A: Writes](route: Route, v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(ApiKeyHeader) ~> route
 
-    "accepts TransferRequest" in routeTest { (d, route) =>
+    "accepts TransferRequest" in routeTest { (_, route) =>
       val sender    = testWallet.generateNewAccount().get
       val recipient = testWallet.generateNewAccount().get
       val req = TransferV1Request(
@@ -127,7 +128,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
       }
     }
 
-    "accepts VersionedTransferRequest" in routeTest { (d, route) =>
+    "accepts VersionedTransferRequest" in routeTest { (_, route) =>
       val sender    = testWallet.generateNewAccount().get
       val recipient = testWallet.generateNewAccount().get
       val req = TransferV2Request(
@@ -147,11 +148,10 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
       }
     }
 
-    "returns a error if it is not a transfer request" in routeTest { (d, route) =>
-//      val req = issueReq.sample.get
-//      posting(route, req) ~> check {
-//        status shouldNot be(StatusCodes.OK)
-//      }
+    "returns a error if it is not a transfer request" in routeTest { (_, route) =>
+      posting(route, Json.obj("key" -> "value")) ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
     }
   }
 
@@ -240,7 +240,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
               Height(d.blockchain.height),
               script.map(s => AssetScriptInfo(s, 1L)),
               0L,
-              false
+              nft = false
             ),
             responseAs[Seq[JsObject]].head
           )
