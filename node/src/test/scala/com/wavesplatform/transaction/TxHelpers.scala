@@ -181,7 +181,7 @@ object TxHelpers {
       minSponsoredAssetFee: Option[TxAmount] = Some(TestValues.fee),
       sender: KeyPair = defaultSigner
   ): SponsorFeeTransaction = {
-    SponsorFeeTransaction.selfSigned(TxVersion.V2, sender, asset, minSponsoredAssetFee, TestValues.fee, timestamp).explicitGet()
+    SponsorFeeTransaction.selfSigned(TxVersion.V1, sender, asset, minSponsoredAssetFee, TestValues.fee, timestamp).explicitGet()
   }
 
   def createAlias(name: String, sender: KeyPair = defaultSigner, fee: Long = TestValues.fee): CreateAliasTransaction = {
