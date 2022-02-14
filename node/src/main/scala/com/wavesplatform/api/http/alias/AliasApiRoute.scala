@@ -54,7 +54,12 @@ case class AliasApiRoute(
   def aliasOfAddress: Route = (get & path("by-address" / AddrSegment)) { address =>
     extractScheduler { implicit s =>
       val value: Source[JsValue, NotUsed] =
-        Source.fromPublisher(commonApi.aliasesOfAddress(address).map { case (_, tx) => JsString(tx.alias.stringRepr) }.toReactivePublisher)
+        Source.future(
+          commonApi
+            .aliasesOfAddress(address).map { case (_, tx) => JsString(tx.alias.stringRepr) }
+            .toListL
+            .runToFuture
+        ).mapConcat(identity)
       complete(value)
     }
   }
