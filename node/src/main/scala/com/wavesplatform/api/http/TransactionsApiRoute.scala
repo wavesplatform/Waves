@@ -172,7 +172,7 @@ case class TransactionsApiRoute(
     jsonPost[JsObject](TransactionFactory.parseRequestAndSign(wallet, address.stringRepr, time, _))
   }
 
-  def signedBroadcast: Route = path("broadcast")(broadcast[JsValue](TransactionFactory.fromSignedRequest(_)))
+  def signedBroadcast: Route = path("broadcast")(broadcast[JsValue](TransactionFactory.fromSignedRequest))
 
   def merkleProof: Route = path("merkleProof") {
     (get & parameters("id".as[String].*))(ids => complete(merkleProof(ids.toList.reverse))) ~

@@ -48,7 +48,7 @@ object PaymentTxSerializer {
     require(buf.getByte == PaymentTransaction.typeId, "transaction type mismatch")
     val timestamp = buf.getLong
     val sender    = buf.getPublicKey
-    val recipient = buf.getAddress()
+    val recipient = buf.getAddress
     val amount    = buf.getLong
     val fee       = buf.getLong
     val signature = buf.getSignature

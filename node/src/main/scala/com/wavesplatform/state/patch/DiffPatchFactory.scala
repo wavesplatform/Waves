@@ -8,11 +8,11 @@ import com.wavesplatform.state.{Blockchain, Diff}
 import play.api.libs.json.{Json, Reads}
 
 trait PatchDataLoader extends {
-  protected def readPatchData[T: Reads](chainId: Char = AddressScheme.current.chainId.toChar): T =
+  protected def readPatchData[T: Reads](): T =
     Json
       .parse(
         Source
-          .fromResource(s"patches/${getClass.getSimpleName.replace("$", "")}-$chainId.json")
+          .fromResource(s"patches/${getClass.getSimpleName.replace("$", "")}-${AddressScheme.current.chainId.toChar}.json")
           .mkString
       )
       .as[T]

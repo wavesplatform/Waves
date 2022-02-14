@@ -1,8 +1,9 @@
 package com.wavesplatform
 
 import java.nio.ByteBuffer
+
 import com.google.common.primitives.Shorts
-import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias, PublicKey}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto.{KeyLength, SignatureLength}
@@ -28,11 +29,11 @@ package object serialization {
       case b => throw new IllegalArgumentException(s"Invalid asset id prefix: $b")
     }
 
-    def getAddressOrAlias(chainId: Byte = AddressScheme.current.chainId): AddressOrAlias = {
+    def getAddressOrAlias: AddressOrAlias = {
       val prefix = buf.get(buf.position())
       prefix match {
         case Address.AddressVersion =>
-          getAddress(chainId)
+          getAddress
         case Alias.AddressVersion =>
           val length = buf.getShort(buf.position() + 2)
           Alias.fromBytes(getByteArray(length + 4)).explicitGet()
@@ -40,8 +41,8 @@ package object serialization {
       }
     }
 
-    def getAddress(chainId: Byte = AddressScheme.current.chainId): Address = {
-      Address.fromBytes(getByteArray(Address.AddressLength), chainId).explicitGet()
+    def getAddress: Address = {
+      Address.fromBytes(getByteArray(Address.AddressLength)).explicitGet()
     }
 
     // More explicit name

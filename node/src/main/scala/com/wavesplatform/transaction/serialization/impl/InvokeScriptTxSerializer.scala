@@ -75,7 +75,7 @@ object InvokeScriptTxSerializer {
     if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
     else Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
 
-  def parseBytes(bytes: Array[Byte], checkChainId: Boolean = true): Try[InvokeScriptTransaction] = Try {
+  def parseBytes(bytes: Array[Byte]): Try[InvokeScriptTransaction] = Try {
     def parsePayment(arr: Array[Byte]): Payment = {
       val amt               = Longs.fromByteArray(arr.take(8))
       val (maybeAssetId, _) = Deser.parseOption(arr, 8, 32)(ByteStr.apply)
@@ -85,12 +85,11 @@ object InvokeScriptTxSerializer {
 
     val buf = ByteBuffer.wrap(bytes)
     require(buf.getByte == 0 && buf.getByte == InvokeScriptTransaction.typeId && buf.getByte == 1, "transaction type mismatch")
-
     val chainId = buf.getByte
-    require(!checkChainId || chainId == AddressScheme.current.chainId, "chainId mismatch")
+    require(chainId == AddressScheme.current.chainId, "chainId mismatch")
 
     val sender       = buf.getPublicKey
-    val dApp         = buf.getAddressOrAlias(chainId)
+    val dApp         = buf.getAddressOrAlias
     val functionCall = Deser.parseOption(buf)(Serde.deserialize(_).explicitGet().asInstanceOf[FUNCTION_CALL])
     val payments     = Deser.parseArrays(buf).map(parsePayment)
     val fee          = buf.getLong

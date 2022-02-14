@@ -345,7 +345,7 @@ object  TransactionFactory {
       )
     } yield tx
 
-  def fromSignedRequest(jsv: JsValue, checkChainId: Boolean = true): Either[ValidationError, Transaction] = {
+  def fromSignedRequest(jsv: JsValue): Either[ValidationError, Transaction] = {
     import InvokeScriptRequest._
     val chainId = (jsv \ "chainId").asOpt[Byte]
     val typeId  = (jsv \ "type").as[Byte]
@@ -361,7 +361,7 @@ object  TransactionFactory {
       case BurnTransaction            => jsv.as[BurnRequest].toTx
       case MassTransferTransaction    => jsv.as[SignedMassTransferRequest].toTx
       case DataTransaction            => jsv.as[SignedDataRequest].toTx
-      case InvokeScriptTransaction    => jsv.as[SignedInvokeScriptRequest].toTx(checkChainId)
+      case InvokeScriptTransaction    => jsv.as[SignedInvokeScriptRequest].toTx
       case SetScriptTransaction       => jsv.as[SignedSetScriptRequest].toTx
       case SetAssetScriptTransaction  => jsv.as[SignedSetAssetScriptRequest].toTx
       case SponsorFeeTransaction      => jsv.as[SignedSponsorFeeRequest].toTx

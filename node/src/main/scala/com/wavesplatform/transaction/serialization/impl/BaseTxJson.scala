@@ -9,7 +9,7 @@ object BaseTxJson {
     Json.obj(
       "type"            -> typeId,
       "id"              -> id().toString,
-      "sender"          -> sender.toAddress(tx.chainId),
+      "sender"          -> sender.toAddress,
       "senderPublicKey" -> sender,
       "fee"             -> assetFee._2,
       "feeAssetId"      -> assetFee._1.maybeBase58Repr,

@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.smart
 
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -21,7 +20,7 @@ import monix.eval.Coeval
 import shapeless.Coproduct
 
 package object predef {
-  val chainId: Byte = AddressScheme.current.chainId
+  val chainId: Byte = 'u'
 
   def runScript[T <: EVALUATED](script: String, version: StdLibVersion, t: In, blockchain: Blockchain, chainId: Byte): Either[String, T] = {
     val expr = Parser.parseExpr(script).get.value
