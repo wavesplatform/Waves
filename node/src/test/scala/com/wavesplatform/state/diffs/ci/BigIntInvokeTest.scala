@@ -5,11 +5,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
-import com.wavesplatform.lang.directives.values.V5
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V5}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -19,33 +17,17 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.TO_BIGINT
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.TxHelpers
-import org.scalatest.{Assertion, EitherValues, Inside}
+import org.scalatest.{EitherValues, Inside}
 
 class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheSettings with WithDomain with EitherValues {
-
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
-      BlockchainFeatures.SmartAccounts.id    -> 0,
-      BlockchainFeatures.SmartAssets.id      -> 0,
-      BlockchainFeatures.Ride4DApps.id       -> 0,
-      BlockchainFeatures.FeeSponsorship.id   -> 0,
-      BlockchainFeatures.DataTransaction.id  -> 0,
-      BlockchainFeatures.BlockReward.id      -> 0,
-      BlockchainFeatures.BlockV5.id          -> 0,
-      BlockchainFeatures.SynchronousCalls.id -> 0
-    ),
-    estimatorPreCheckHeight = Int.MaxValue
-  )
-
   private val bigIntValue = 12345
 
   property("BigInt is forbidden for DApp actions") {
-    def dApp(action: EXPR => FUNCTION_CALL): Script = {
+    def dApp(action: EXPR => FUNCTION_CALL, version: StdLibVersion): Script = {
       ContractScriptImpl(
-        V5,
+        version,
         DApp(
           DAppMeta(),
           Nil,
@@ -67,17 +49,17 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
       )
     }
 
-    def assert(action: EXPR => FUNCTION_CALL, message: String): Assertion = {
+    def assert(action: EXPR => FUNCTION_CALL, message: String): Unit = {
       val dAppAcc = TxHelpers.signer(0)
       val invoker = TxHelpers.signer(1)
-      val setScript = Seq(
-        TxHelpers.setScript(dAppAcc, dApp(action))
-      )
-      val invoke = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker)
 
-      withDomain(domainSettingsWithFS(fsWithV5), AddrWithBalance.enoughBalances(dAppAcc, invoker)) { d =>
-        d.appendBlock(setScript: _*)
-        d.appendBlockE(invoke) should produce(message)
+      testDomain(AddrWithBalance.enoughBalances(dAppAcc, invoker), from = V5) {
+        case (version, d) =>
+          val setScript = TxHelpers.setScript(dAppAcc, dApp(action, version))
+          val invoke    = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker)
+
+          d.appendBlock(setScript)
+          d.appendBlockE(invoke) should produce(message)
       }
     }
 
@@ -126,12 +108,8 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
   }
 
   property("BigInt as Invoke return value") {
-    def dApp1(nextDApp: Address): Script = TestCompiler(V5).compileContract(
+    def dApp1(nextDApp: Address, version: StdLibVersion): Script = TestCompiler(version).compileContract(
       s"""
-         | {-# STDLIB_VERSION 5       #-}
-         | {-# CONTENT_TYPE   DAPP    #-}
-         | {-# SCRIPT_TYPE    ACCOUNT #-}
-         |
          | @Callable(i)
          | func default() = {
          |   let address = Address(base58'$nextDApp')
@@ -143,12 +121,8 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
      """.stripMargin
     )
 
-    val dApp2: Script = TestCompiler(V5).compileContract(
+    def dApp2(version: StdLibVersion): Script = TestCompiler(version).compileContract(
       s"""
-         | {-# STDLIB_VERSION 5       #-}
-         | {-# CONTENT_TYPE   DAPP    #-}
-         | {-# SCRIPT_TYPE    ACCOUNT #-}
-         |
          | @Callable(i)
          | func default() = {
          |   ([IntegerEntry("key", 1)], toBigInt($bigIntValue))
@@ -159,23 +133,23 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
     val dAppAcc1 = TxHelpers.signer(0)
     val dAppAcc2 = TxHelpers.signer(1)
 
-    val preparingTxs = Seq(
-      TxHelpers.genesis(dAppAcc1.toAddress),
-      TxHelpers.genesis(dAppAcc2.toAddress),
-      TxHelpers.setScript(dAppAcc1, dApp1(dAppAcc2.toAddress)),
-      TxHelpers.setScript(dAppAcc2, dApp2)
-    )
     val invoke = TxHelpers.invoke(dAppAcc1.toAddress, func = Some("default"), invoker = dAppAcc1)
 
-    assertDiffAndState(
-      Seq(TestBlock.create(preparingTxs)),
-      TestBlock.create(Seq(invoke)),
-      fsWithV5
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()) shouldBe None
-        diff.scriptsRun shouldBe 2
-        diff.accountData.head._2.data("key").value shouldBe 1
+    testDomain(from = V5) {
+      case (version, d) =>
+        val preparingTxs = Seq(
+          TxHelpers.genesis(dAppAcc1.toAddress),
+          TxHelpers.genesis(dAppAcc2.toAddress),
+          TxHelpers.setScript(dAppAcc1, dApp1(dAppAcc2.toAddress, version)),
+          TxHelpers.setScript(dAppAcc2, dApp2(version))
+        )
+
+        d.appendBlock(preparingTxs: _*)
+        d.appendBlock(invoke)
+
+        d.liquidDiff.errorMessage(invoke.id()) shouldBe None
+        d.liquidDiff.scriptsRun shouldBe 2
+        d.liquidDiff.accountData.head._2.data("key").value shouldBe 1
     }
   }
 }

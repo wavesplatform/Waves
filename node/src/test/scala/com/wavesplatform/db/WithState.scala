@@ -11,9 +11,17 @@ import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
+import com.wavesplatform.settings.{
+  BlockchainSettings,
+  FunctionalitySettings,
+  TestSettings,
+  WavesSettings,
+  loadConfig,
+  TestFunctionalitySettings => TFS
+}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT, produce}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
@@ -250,9 +258,10 @@ trait WithDomain extends WithState { _: Suite =>
     def mostRecent: WavesSettings = RideV5
   }
 
-  def withDomain[A](settings: WavesSettings = SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts), // SmartAccounts to allow V2 transfers by default
-                    balances: Seq[AddrWithBalance] = Seq.empty)
-                   (test: Domain => A): A =
+  def withDomain[A](
+      settings: WavesSettings = SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts), // SmartAccounts to allow V2 transfers by default
+      balances: Seq[AddrWithBalance] = Seq.empty
+  )(test: Domain => A): A =
     withLevelDBWriter(settings) { blockchain =>
       var domain: Domain = null
       val bcu = new BlockchainUpdaterImpl(
@@ -264,15 +273,28 @@ trait WithDomain extends WithState { _: Suite =>
         loadActiveLeases(db, _, _)
       )
       domain = Domain(db, bcu, blockchain, settings)
-      val genesis = balances.map { case AddrWithBalance(address, amount) =>
-        TxHelpers.genesis(address, amount)
+      val genesis = balances.map {
+        case AddrWithBalance(address, amount) =>
+          TxHelpers.genesis(address, amount)
       }
       if (genesis.nonEmpty) {
-        domain.appendBlock(genesis:_*)
+        domain.appendBlock(genesis: _*)
       }
       try test(domain)
       finally bcu.shutdown()
     }
+
+  private val allVersions = DirectiveDictionary[StdLibVersion].all
+  private val lastVersion = allVersions.last
+
+  def testDomain(
+      balances: Seq[AddrWithBalance] = Nil,
+      from: StdLibVersion = V3,
+      to: StdLibVersion = lastVersion
+  )(assertion: (StdLibVersion, Domain) => Unit): Unit =
+    allVersions
+      .filter(v => v >= from && v <= to)
+      .foreach(v => withDomain(DomainPresets.settingsFor(v), balances)(assertion(v, _)))
 }
 
 object WithState {
