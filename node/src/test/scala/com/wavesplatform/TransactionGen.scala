@@ -131,7 +131,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     decimals    <- Gen.choose(0: Byte, 8: Byte)
     reissuable  <- Arbitrary.arbitrary[Boolean]
     fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
-    timestamp   <- positiveLongGen
+    timestamp   = System.currentTimeMillis()
   } yield (sender, assetName, description, quantity, decimals, reissuable, fee, timestamp)
 
   val proofsGen: Gen[Proofs] = for {

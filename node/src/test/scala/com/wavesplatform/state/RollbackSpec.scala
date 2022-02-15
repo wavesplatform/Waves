@@ -920,9 +920,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
       sender      <- accountGen
       sponsorship <- sponsorFeeCancelSponsorFeeGen(sender, reducedFee = false)
       transfer    <- transferGeneratorP(sponsorship._1.timestamp, sender, sender.toAddress, 10000000000L)
-    } yield {
-      (sender, sponsorship, transfer)
-    }) {
+    } yield (sender, sponsorship, transfer)) {
       case (sender, (issue, sponsor1, sponsor2, _), transfer) =>
         withDomain(createSettings(NG -> 0, FeeSponsorship -> 0), Seq(AddrWithBalance(sender.toAddress))) { d =>
           val ts = issue.timestamp
