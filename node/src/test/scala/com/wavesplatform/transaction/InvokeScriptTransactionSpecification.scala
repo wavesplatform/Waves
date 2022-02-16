@@ -12,15 +12,14 @@ import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.{Amount, transaction}
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.NonPositiveAmount
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
-import com.wavesplatform.{OverrideAddressScheme, crypto}
+import com.wavesplatform.crypto
+import com.wavesplatform.test._
 import play.api.libs.json.{JsObject, Json}
 
-@OverrideAddressScheme
 class InvokeScriptTransactionSpecification extends PropSpec {
 
   val publicKey = "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK"

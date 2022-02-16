@@ -65,16 +65,7 @@ lazy val `lang-doc` = project
     libraryDependencies ++= Seq("com.github.spullara.mustache.java" % "compiler" % "0.9.5") ++ Dependencies.test
   )
 
-lazy val OverrideAddressSchemeTest = config("OverrideAddressSchemeTest") extend Test
-
 lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test")
-  .configs(OverrideAddressSchemeTest)
-  .settings(
-    inConfig(OverrideAddressSchemeTest)(Defaults.testTasks),
-    OverrideAddressSchemeTest / testOptions := Seq(Tests.Argument(TestFrameworks.ScalaTest, "-n", "com.wavesplatform.OverrideAddressScheme")),
-    Test / testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-l", "com.wavesplatform.OverrideAddressScheme"),
-    OverrideAddressSchemeTest / parallelExecution := false
-  )
 
 lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
 lazy val `node-it`        = project.dependsOn(node, `lang-testkit`, `repl-jvm`, `grpc-server`)
@@ -190,7 +181,6 @@ checkPRRaw := Def
       (`lang-js` / Compile / fastOptJS).value
       (`grpc-server` / Test / test).value
       (node / Test / test).value
-      (node / OverrideAddressSchemeTest / test).value
       (`repl-js` / Compile / fastOptJS).value
     }
   )

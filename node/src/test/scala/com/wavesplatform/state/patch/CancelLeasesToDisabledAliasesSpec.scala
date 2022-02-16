@@ -1,6 +1,5 @@
 package com.wavesplatform.state.patch
 
-import com.wavesplatform.OverrideAddressScheme
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
@@ -13,7 +12,6 @@ import com.wavesplatform.transaction.TxHelpers
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
 
-@OverrideAddressScheme
 class CancelLeasesToDisabledAliasesSpec extends FlatSpec with PathMockFactory with WithDomain with BeforeAndAfterAll {
   val MainnetSettings: WavesSettings = {
     import SettingsFromDefaultConfig.blockchainSettings.{functionalitySettings => fs}

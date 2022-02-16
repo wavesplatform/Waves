@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import com.wavesplatform.OverrideAddressScheme
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -15,7 +14,6 @@ import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.TxValidationError.InvalidAddress
 import org.scalacheck.Gen
 
-@OverrideAddressScheme
 class AddressTest extends PropSpec {
   property("should calculate address from public key") {
     forAll(accountGen) { acc =>
