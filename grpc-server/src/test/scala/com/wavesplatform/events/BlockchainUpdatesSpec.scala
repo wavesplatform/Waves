@@ -81,7 +81,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
   "BlockchainUpdates" - {
     "should return order ids in exchange metadata" in withSettings(DomainPresets.RideV4)(withDomainAndRepo {
       case (d, repo) =>
-        val issue = TxHelpers.issue(1000, null)
+        val issue = TxHelpers.issue()
         d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
         d.appendBlock(issue)
 
@@ -344,7 +344,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
     }
 
     "should return issued assets" in {
-      val issue = TxHelpers.issue(1000, null)
+      val issue = TxHelpers.issue()
       val description = AssetDescription(
         issue.assetId,
         issue.sender,
@@ -372,7 +372,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
     "should handle rollback properly" in {
       val transfer = TxHelpers.transfer()
       val lease    = TxHelpers.lease()
-      val issue    = TxHelpers.issue(1000, null)
+      val issue    = TxHelpers.issue()
       val reissue  = TxHelpers.reissue(issue.asset)
       val data     = TxHelpers.dataSingle()
 

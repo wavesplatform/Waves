@@ -17,14 +17,10 @@ import com.wavesplatform.state.{DataEntry, StringDataEntry}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
-import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction, UpdateAssetInfoTransaction}
-import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
+import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.utils.SystemTime
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
@@ -93,22 +89,6 @@ object TxHelpers {
             chainId: Byte = AddressScheme.current.chainId): IssueTransaction =
     IssueTransaction
       .selfSigned(version, issuer, name, description, amount, decimals, reissuable, script, fee, timestamp, chainId)
-      .explicitGet()
-
-  def issue(
-      sender: KeyPair,
-      name: String,
-      quantity: Long,
-      decimals: Int,
-      reissuable: Boolean = true,
-      description: String = "",
-      version: Byte = 2.toByte,
-      script: Option[Script] = None,
-      fee: Long = 1.waves,
-      timestamp: Long = SystemTime.getTimestamp()
-  ): IssueTransaction =
-    IssueTransaction
-      .selfSigned(version, sender, name, description, quantity, decimals.toByte, reissuable, script, fee, timestamp)
       .explicitGet()
 
   def reissue(asset: IssuedAsset,

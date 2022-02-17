@@ -237,7 +237,7 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
       val balances = Seq(AddrWithBalance(TxHelpers.defaultAddress, 10.waves))
 
       withDomain(DomainPresets.ScriptsAndSponsorship.withActivationPeriod(1), balances) { d =>
-        val issue = TxHelpers.issue(1000, null)
+        val issue = TxHelpers.issue()
         d.appendBlock(issue)
         d.appendBlock(
           SponsorFeeTransaction.selfSigned(TxVersion.V1, TxHelpers.defaultSigner, issue.asset, Some(1L), 1.waves, ntpTime.getTimestamp()).explicitGet()

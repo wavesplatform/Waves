@@ -69,7 +69,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     val buyer  = TxHelpers.signer(10)
     val seller = TxHelpers.signer(11)
 
-    val issue = TxHelpers.issue(1000, null)
+    val issue = TxHelpers.issue()
 
     def withReadyDomain(f: (Domain, Boolean) => Unit): Unit = {
       val simpleScript  = TxHelpers.script("""{-# STDLIB_VERSION 5 #-}
@@ -1404,8 +1404,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
 
     withClue("fee") {
-      val tradeableAssetIssue = TxHelpers.issue(1000, null)
-      val feeAssetIssue       = TxHelpers.issue(1000, script = Some(TestValues.assetScript))
+      val tradeableAssetIssue = TxHelpers.issue()
+      val feeAssetIssue       = TxHelpers.issue( script = Some(TestValues.assetScript))
       test(tradeableAssetIssue, feeAssetIssue, 0)
     }
 
