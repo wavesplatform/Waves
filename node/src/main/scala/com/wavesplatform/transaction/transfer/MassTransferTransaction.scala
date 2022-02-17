@@ -101,9 +101,10 @@ object MassTransferTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp,
       attachment: ByteStr,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, MassTransferTransaction] =
-    create(version, sender, assetId, transfers, fee, timestamp, attachment, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, assetId, transfers, fee, timestamp, attachment, Proofs.empty, chainId).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
@@ -112,9 +113,10 @@ object MassTransferTransaction extends TransactionParser {
       transfers: Seq[ParsedTransfer],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      attachment: ByteStr
+      attachment: ByteStr,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, MassTransferTransaction] =
-    signed(version, sender.publicKey, assetId, transfers, fee, timestamp, attachment, sender.privateKey)
+    signed(version, sender.publicKey, assetId, transfers, fee, timestamp, attachment, sender.privateKey, chainId)
 
   def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] = {
     transfers.traverse {

@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs
 import cats.syntax.monoid._
 import com.wavesplatform.TestValues
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.settings.RewardsVotingSettings
 import com.wavesplatform.state.{Diff, Portfolio}
@@ -18,20 +19,16 @@ class TransferTransactionDiffTest extends PropSpec with WithDomain {
     val recipient = TxHelpers.address(2)
     val feeDiff   = Diff(portfolios = Map(sender -> Portfolio.waves(TestValues.fee)))
 
-    withDomain(DomainPresets.mostRecent.copy(rewardsSettings = RewardsVotingSettings(None))) { d =>
-      d.appendBlock(TxHelpers.genesis(sender))
-
+    withDomain(DomainPresets.mostRecent.copy(rewardsSettings = RewardsVotingSettings(None)), AddrWithBalance.enoughBalances(senderKp)) { d =>
       val wavesTransfer = TxHelpers.transfer(senderKp, recipient)
       assertBalanceInvariant(d.createDiff(wavesTransfer) |+| feeDiff)
 
       d.appendAndAssertSucceed(wavesTransfer)
       d.blockchain.balance(recipient) shouldBe wavesTransfer.amount
-      d.blockchain.balance(sender) shouldBe TxHelpers.genesisBalance - wavesTransfer.amount - wavesTransfer.fee
+      d.blockchain.balance(sender) shouldBe ENOUGH_AMT - wavesTransfer.amount - wavesTransfer.fee
     }
 
-    withDomain(DomainPresets.mostRecent) { d =>
-      d.appendBlock(TxHelpers.genesis(sender))
-
+    withDomain(DomainPresets.mostRecent, AddrWithBalance.enoughBalances(senderKp)) { d =>
       val asset         = d.helpers.issueAsset(senderKp)
       val assetTransfer = TxHelpers.transfer(senderKp, recipient, asset = asset, amount = 1000)
       assertBalanceInvariant(d.createDiff(assetTransfer) |+| feeDiff)
@@ -39,21 +36,19 @@ class TransferTransactionDiffTest extends PropSpec with WithDomain {
       d.appendAndAssertSucceed(assetTransfer)
       d.blockchain.balance(recipient) shouldBe 0L
       d.blockchain.balance(recipient, asset) shouldBe 1000L
-      d.blockchain.balance(sender) shouldBe TxHelpers.genesisBalance - assetTransfer.fee - 1.waves
+      d.blockchain.balance(sender) shouldBe ENOUGH_AMT - assetTransfer.fee - 1.waves
       d.blockchain.balance(sender, asset) shouldBe 0L
     }
   }
 
   property("handle transactions with amount + fee > Long.MaxValue") {
-    withDomain(DomainPresets.ScriptsAndSponsorship) { d =>
-      d.helpers.creditWavesToDefaultSigner()
+    withDomain(DomainPresets.ScriptsAndSponsorship, AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>
       val asset    = d.helpers.issueAsset(amount = Long.MaxValue)
       val transfer = TxHelpers.transfer(asset = asset, amount = Long.MaxValue, version = TxVersion.V1, fee = 100000)
       d.appendAndCatchError(transfer) shouldBe TransactionDiffer.TransactionValidationError(TxValidationError.OverflowError, transfer)
     }
 
-    withDomain(DomainPresets.mostRecent) { d =>
-      d.helpers.creditWavesToDefaultSigner()
+    withDomain(DomainPresets.mostRecent, AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>
       val asset    = d.helpers.issueAsset(amount = Long.MaxValue)
       val transfer = TxHelpers.transfer(asset = asset, amount = Long.MaxValue, version = TxVersion.V1, fee = 100000)
       d.appendAndAssertSucceed(transfer)
@@ -61,8 +56,7 @@ class TransferTransactionDiffTest extends PropSpec with WithDomain {
   }
 
   property("fails, if smart asset used as a fee") {
-    withDomain(DomainPresets.mostRecent) { d =>
-      d.helpers.creditWavesToDefaultSigner(ENOUGH_AMT)
+    withDomain(DomainPresets.mostRecent, AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>
       val asset    = d.helpers.issueAsset(script = TxHelpers.exprScript(StdLibVersion.V1)("true"), amount = 100000000)
       val transfer = TxHelpers.transfer(feeAsset = asset)
 

@@ -7,7 +7,6 @@ import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.lang.directives.values.{V4, V5}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
-import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Portfolio}
 import com.wavesplatform.test.{NumericExt, PropSpec, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -132,8 +131,8 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
 
     val dAppAcc             = TxHelpers.signer(0)
     val emptyDAppAcc        = TxHelpers.signer(1)
-    val genesis             = TxHelpers.genesis(dAppAcc.toAddress, ENOUGH_AMT)
-    val genesis2            = TxHelpers.genesis(emptyDAppAcc.toAddress, ENOUGH_AMT)
+    val genesis             = TxHelpers.genesis(dAppAcc.toAddress)
+    val genesis2            = TxHelpers.genesis(emptyDAppAcc.toAddress)
     val setDApp             = TxHelpers.setScript(dAppAcc, dApp(emptyDAppAcc.toAddress))
     val setDApp2            = TxHelpers.setScript(emptyDAppAcc, emptyDApp)
     val invokeInvalidLength = TxHelpers.invoke(dAppAcc.toAddress, Some("invalidLength"))

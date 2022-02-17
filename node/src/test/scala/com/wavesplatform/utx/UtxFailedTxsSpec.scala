@@ -158,7 +158,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     d.appendBlock(issue)
 
     val tx =
-      TxHelpers.exchange(TxHelpers.order(OrderType.BUY, issue.asset), TxHelpers.order(OrderType.SELL, issue.asset))
+      TxHelpers.exchange(TxHelpers.orderV3(OrderType.BUY, issue.asset), TxHelpers.orderV3(OrderType.SELL, issue.asset))
     assert(utx.putIfNew(tx, forceValidate = false).resultE.isLeft)
     assert(utx.putIfNew(tx, forceValidate = true).resultE.isLeft)
     utx.putIfNew(tx, forceValidate = false).resultE should produce("reached err")
@@ -175,7 +175,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     d.appendBlock(issue)
 
     val tx =
-      TxHelpers.exchange(TxHelpers.order(OrderType.BUY, issue.asset), TxHelpers.order(OrderType.SELL, issue.asset))
+      TxHelpers.exchange(TxHelpers.orderV3(OrderType.BUY, issue.asset), TxHelpers.orderV3(OrderType.SELL, issue.asset))
 
     assert(utx.putIfNew(tx, forceValidate = false).resultE.isRight)
     utx.removeAll(Seq(tx))

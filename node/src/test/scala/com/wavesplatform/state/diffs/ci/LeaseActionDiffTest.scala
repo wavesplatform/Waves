@@ -180,8 +180,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     val leaseAmount  = customAmount.getOrElse(2.waves)
 
     val genesis = Seq(
-      TxHelpers.genesis(dAppAcc.toAddress, ENOUGH_AMT),
-      TxHelpers.genesis(invoker.toAddress, ENOUGH_AMT)
+      TxHelpers.genesis(dAppAcc.toAddress),
+      TxHelpers.genesis(invoker.toAddress)
     )
     val invoke = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker, fee = fee, version = TxVersion.V1)
     val invokeAliasTx = TxHelpers.createAlias(invokerAlias.name, invoker, fee)

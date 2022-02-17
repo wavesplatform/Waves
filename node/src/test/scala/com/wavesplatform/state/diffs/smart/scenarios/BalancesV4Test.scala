@@ -46,7 +46,7 @@ class BalancesV4Test extends PropSpec with WithState {
     val dapp = TxHelpers.signer(2)
 
     val genesis = Seq(
-      TxHelpers.genesis(master.toAddress, ENOUGH_AMT),
+      TxHelpers.genesis(master.toAddress),
       TxHelpers.genesis(acc1.toAddress, 25 * Constants.UnitsInWave + 3 * MinFee),
       TxHelpers.genesis(dapp.toAddress, 10 * Constants.UnitsInWave + SetScriptFee + 2 * InvokeScriptTxFee + 1 * Constants.UnitsInWave)
     )
@@ -216,8 +216,8 @@ class BalancesV4Test extends PropSpec with WithState {
     val acc2 = TxHelpers.signer(1)
 
     val genesis = Seq(
-      TxHelpers.genesis(acc1.toAddress, ENOUGH_AMT),
-      TxHelpers.genesis(acc2.toAddress, ENOUGH_AMT)
+      TxHelpers.genesis(acc1.toAddress),
+      TxHelpers.genesis(acc2.toAddress)
     )
     val issue = TxHelpers.issue(acc1, 10000000000L, script = Some(assetScript(ByteStr(acc1.toAddress.bytes))), fee = SetAssetScriptFee)
     val setScript = TxHelpers.setScript(acc1, dappScript(ByteStr(acc2.toAddress.bytes), issue.id()), SetScriptFee)

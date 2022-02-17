@@ -76,9 +76,10 @@ object ReissueTransaction extends TransactionParser {
       reissuable: Boolean,
       fee: Long,
       timestamp: Long,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ReissueTransaction] =
-    create(version, sender, asset, quantity, reissuable, fee, timestamp, Nil).map(_.signWith(signer))
+    create(version, sender, asset, quantity, reissuable, fee, timestamp, Nil,chainId).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
@@ -87,7 +88,8 @@ object ReissueTransaction extends TransactionParser {
       quantity: Long,
       reissuable: Boolean,
       fee: Long,
-      timestamp: Long
+      timestamp: Long,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ReissueTransaction] =
-    signed(version, sender.publicKey, asset, quantity, reissuable, fee, timestamp, sender.privateKey)
+    signed(version, sender.publicKey, asset, quantity, reissuable, fee, timestamp, sender.privateKey, chainId)
 }

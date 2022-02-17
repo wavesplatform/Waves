@@ -785,7 +785,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           case ((genesisTxs, setScripts), i) =>
             val account   = TxHelpers.signer(i)
             val script    = dApp(genesisTxs.headOption.map(_.recipient))
-            val genesis   = TxHelpers.genesis(account.toAddress, ENOUGH_AMT)
+            val genesis   = TxHelpers.genesis(account.toAddress)
             val setScript = TxHelpers.setScript(account, script)
             (genesis :: genesisTxs, setScript :: setScripts)
         }

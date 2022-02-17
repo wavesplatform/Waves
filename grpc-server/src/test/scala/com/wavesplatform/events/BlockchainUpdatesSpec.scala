@@ -82,7 +82,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
         d.appendBlock(issue)
 
         val subscription = repo.createSubscriptionObserver(SubscribeRequest.of(1, 0))
-        val exchange     = TxHelpers.exchange(TxHelpers.order(OrderType.BUY, issue.asset), TxHelpers.order(OrderType.SELL, issue.asset))
+        val exchange     = TxHelpers.exchange(TxHelpers.orderV3(OrderType.BUY, issue.asset), TxHelpers.orderV3(OrderType.SELL, issue.asset))
         d.appendBlock(exchange)
 
         subscription.lastAppendEvent(d.blockchain).transactionMetadata should matchPattern {
@@ -370,7 +370,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
       val lease    = TxHelpers.lease()
       val issue    = TxHelpers.issue()
       val reissue  = TxHelpers.reissue(issue.asset)
-      val data     = TxHelpers.data()
+      val data     = TxHelpers.dataSingle()
 
       val description = AssetDescription(
         issue.assetId,

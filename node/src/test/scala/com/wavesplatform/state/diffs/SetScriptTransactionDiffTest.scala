@@ -20,9 +20,8 @@ import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.test.{PropSpec, _}
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import org.scalacheck.Gen
 import org.scalatest.Assertion
 
 class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
@@ -31,15 +30,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.Ride4DApps.id -> 0)
   )
 
-  val preconditionsAndSetScript: Gen[(GenesisTransaction, SetScriptTransaction)] = for {
-    master <- accountGen
-    ts     <- timestampGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-    fee    <- smallFeeGen
-    script <- Gen.option(scriptGen)
-  } yield (genesis, SetScriptTransaction.selfSigned(1.toByte, master, script, fee, ts).explicitGet())
-
-  val preconditionsAndSetContract: Gen[(GenesisTransaction, SetScriptTransaction)] =
+  val preconditionsAndSetContract: (GenesisTransaction, SetScriptTransaction) =
     preconditionsAndSetCustomContract(
       ContractScript(
         V3,
@@ -54,32 +45,28 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       ).explicitGet()
     )
 
-  private def preconditionsAndSetCustomContract(script: Script): Gen[(GenesisTransaction, SetScriptTransaction)] =
-    for {
-      version <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
-      master  <- accountGen
-      ts      <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-      fee <- smallFeeGen
-    } yield (genesis, SetScriptTransaction.selfSigned(1.toByte, master, Some(script), fee, ts).explicitGet())
+  private def preconditionsAndSetCustomContract(script: Script): (GenesisTransaction, SetScriptTransaction) = {
+    val master = TxHelpers.signer(1)
+
+    val genesis = TxHelpers.genesis(master.toAddress)
+    val setScript = TxHelpers.setScript(master, script)
+
+    (genesis, setScript)
+  }
 
   property("setting script results in account state") {
-    forAll(preconditionsAndSetContract) {
-      case (genesis, setScript) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) {
-          case (blockDiff, newState) =>
-            newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
-        }
+    val (genesis, setScript) = preconditionsAndSetContract
+    assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) {
+      case (_, newState) =>
+        newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
     }
   }
 
   property("setting contract results in account state") {
-    forAll(preconditionsAndSetContract) {
-      case (genesis, setScript) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) {
-          case (blockDiff, newState) =>
-            newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
-        }
+    val (genesis, setScript) = preconditionsAndSetContract
+    assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) {
+      case (_, newState) =>
+        newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
     }
   }
 
@@ -96,24 +83,24 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
         BlockchainFeatures.Ride4DApps.id -> 0
       )
     )
-    val setup = for {
-      master <- accountGen
-      ts     <- positiveLongGen
-      genesis = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-      expr    = BLOCK(LET("x", CONST_LONG(3)), CONST_BOOLEAN(true))
-      script  = ExprScript(V1, expr, checkSize = false).explicitGet()
-      tx      = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), 100000, ts + 1).explicitGet()
-    } yield (genesis, tx)
+    val setup = {
+      val master = TxHelpers.signer(1)
 
-    forAll(setup) {
-      case (genesis, tx) =>
-        assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsUnactivated) { blockDiffEi =>
-          blockDiffEi should produce("RIDE 4 DAPPS feature has not been activated yet")
-        }
+      val genesis = TxHelpers.genesis(master.toAddress)
+      val expr = BLOCK(LET("x", CONST_LONG(3)), CONST_BOOLEAN(true))
+      val script = ExprScript(V1, expr, checkSize = false).explicitGet()
+      val tx = TxHelpers.setScript(master, script)
 
-        assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsActivated) { blockDiffEi =>
-          blockDiffEi.explicitGet()
-        }
+      (genesis, tx)
+    }
+
+    val (genesis, tx) = setup
+    assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsUnactivated) { blockDiffEi =>
+      blockDiffEi should produce("RIDE 4 DAPPS feature has not been activated yet")
+    }
+
+    assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsActivated) { blockDiffEi =>
+      blockDiffEi.explicitGet()
     }
   }
 
@@ -215,22 +202,18 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     )
 
     def assertSuccess(script: Script, settings: FunctionalitySettings): Unit = {
-      forAll(preconditionsAndSetCustomContract(script)) {
-        case (genesis, setScript) =>
-          assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), settings) {
-            case (_, newState) =>
-              newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
-          }
+      val (genesis, setScript) = preconditionsAndSetCustomContract(script)
+      assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), settings) {
+        case (_, newState) =>
+          newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
       }
     }
 
     def assertFailure(script: Script, settings: FunctionalitySettings, errorMessage: String): Unit = {
-      forAll(preconditionsAndSetCustomContract(script)) {
-        case (genesis, setScript) =>
-          assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), settings)(
-            _ should produce(errorMessage)
-          )
-      }
+      val (genesis, setScript) = preconditionsAndSetCustomContract(script)
+      assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), settings)(
+        _ should produce(errorMessage)
+      )
     }
 
     assertSuccess(exprV3WithComplexityBetween2000And3000, rideV3Activated)
@@ -269,8 +252,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
        """.stripMargin
     )
 
-    def t: Long = System.currentTimeMillis()
-    val sender  = accountGen.sample.get
+    val sender  = TxHelpers.signer(1)
     val balances = AddrWithBalance.enoughBalances(sender)
 
     def settings(checkNegative: Boolean = false, checkSumOverflow: Boolean = false): FunctionalitySettings = {
@@ -283,7 +265,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     }
 
     def assert(script: Script, checkNegativeMessage: String): Assertion = {
-      def setScript() = SetScriptTransaction.selfSigned(1.toByte, sender, Some(script), 100000, t).explicitGet()
+      def setScript() = TxHelpers.setScript(sender, script)
 
       withDomain(domainSettingsWithFS(settings()), balances) { db =>
         val tx = setScript()
@@ -363,7 +345,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     val balances = keyPairs.map(acc => AddrWithBalance(acc.toAddress, 10.waves))
 
     def setScript(keyPairIndex: Int, script: String): SetScriptTransaction =
-      SetScriptTransaction.selfSigned(2.toByte, keyPairs(keyPairIndex), Script.fromBase64String(script).toOption, 0.01.waves, System.currentTimeMillis()).explicitGet()
+      TxHelpers.setScript(keyPairs(keyPairIndex), Script.fromBase64String(script).explicitGet(), version = TxVersion.V2)
 
     val settings =
       DomainPresets.RideV5.copy(blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
