@@ -3,6 +3,7 @@ package com.wavesplatform.utx
 import com.wavesplatform.TestValues
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.script.Script
@@ -28,7 +29,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
   "UTX pool" should s"drop failed Invoke with complexity <= ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
     d.appendBlock(TxHelpers.setScript(dApp, genScript(ContractLimits.FailFreeInvokeComplexity)))
 
-    val tx = TxHelpers.invoke(dApp.toAddress, "test")
+    val tx = TxHelpers.invoke(dApp.toAddress)
     assert(utx.putIfNew(tx, forceValidate = false).resultE.isLeft)
     assert(utx.putIfNew(tx, forceValidate = true).resultE.isLeft)
     utx.putIfNew(tx, forceValidate = false).resultE should produce("reached err")
@@ -43,7 +44,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
   it should s"accept failed Invoke with complexity > ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
     d.appendBlock(TxHelpers.setScript(dApp, genScript(ContractLimits.FailFreeInvokeComplexity * 2)))
 
-    val tx = TxHelpers.invoke(dApp.toAddress, "test")
+    val tx = TxHelpers.invoke(dApp.toAddress)
 
     utx.putIfNew(tx, forceValidate = true).resultE should produce("reached err")
     utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
@@ -61,7 +62,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
                         |{-# SCRIPT_TYPE ACCOUNT #-}
                         |
                         |@Callable(i)
-                        |func test() = {    
+                        |func default() = {
                         |  if (${genExpr(1500, result = true)}) then [
                         |    ScriptTransfer(i.caller, 15, base58'${TestValues.asset}')
                         |  ] else []
@@ -69,7 +70,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
                         |""".stripMargin
     d.appendBlock(TxHelpers.setScript(dApp, TxHelpers.script(scriptText)))
 
-    val tx = TxHelpers.invoke(dApp.toAddress, "test")
+    val tx = TxHelpers.invoke(dApp.toAddress)
 
     utx.putIfNew(tx, forceValidate = true).resultE should produce("negative asset balance")
     utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
@@ -92,7 +93,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
                         |{-# SCRIPT_TYPE ACCOUNT #-}
                         |
                         |@Callable(i)
-                        |func test() = {    
+                        |func default() = {
                         |  if (${genExpr(1500, result = true)}) then [
                         |    ScriptTransfer(i.caller, 15, base58'${TestValues.asset}')
                         |  ] else []
@@ -100,7 +101,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
                         |""".stripMargin
     d.appendBlock(TxHelpers.setScript(dApp, TxHelpers.script(scriptText)))
 
-    val tx = TxHelpers.invoke(dApp.toAddress, "test")
+    val tx = TxHelpers.invoke(dApp.toAddress)
 
     utx.putIfNew(tx, forceValidate = true).resultE should produce(s"Transfer error: asset '${TestValues.asset}' is not found on the blockchain")
     utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
@@ -116,13 +117,13 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
   })
 
   it should s"drop failed Invoke with asset script with complexity <= ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
-    val issue = TxHelpers.issue(1000, genAssetScript(800))
+    val issue = TxHelpers.issue(script = Some(genAssetScript(800)))
     d.appendBlock(
       TxHelpers.setScript(dApp, genScript(0, result = true)),
       issue
     )
 
-    val tx = TxHelpers.invoke(dApp.toAddress, "test", payments = Seq(Payment(1L, issue.asset)))
+    val tx = TxHelpers.invoke(dApp.toAddress, payments = Seq(Payment(1L, issue.asset)), fee = TestValues.invokeFee(1))
     assert(utx.putIfNew(tx, forceValidate = false).resultE.isLeft)
     assert(utx.putIfNew(tx, forceValidate = true).resultE.isLeft)
     utx.putIfNew(tx, forceValidate = false).resultE should produce("reached err")
@@ -134,10 +135,10 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
   }
 
   it should s"accept failed Invoke with asset script with complexity > ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
-    val issue = TxHelpers.issue(1000, genAssetScript(ContractLimits.FailFreeInvokeComplexity * 2))
+    val issue = TxHelpers.issue(script = Some(genAssetScript(ContractLimits.FailFreeInvokeComplexity * 2)))
     d.appendBlock(TxHelpers.setScript(dApp, genScript(0, result = true)), issue)
 
-    val tx = TxHelpers.invoke(dApp.toAddress, "test", payments = Seq(Payment(1L, issue.asset)))
+    val tx = TxHelpers.invoke(dApp.toAddress, payments = Seq(Payment(1L, issue.asset)), fee = TestValues.invokeFee(1))
     assert(utx.putIfNew(tx, forceValidate = false).resultE.isRight)
     utx.removeAll(Seq(tx))
     assert(utx.putIfNew(tx, forceValidate = true).resultE.isLeft)
@@ -153,11 +154,11 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
   }
 
   it should s"drop failed Exchange with asset script with complexity <= ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
-    val issue = TxHelpers.issue(1000, genAssetScript(800))
+    val issue = TxHelpers.issue(script = Some(genAssetScript(800)))
     d.appendBlock(issue)
 
     val tx =
-      TxHelpers.exchange(TxHelpers.order(OrderType.BUY, issue.asset), TxHelpers.order(OrderType.SELL, issue.asset))
+      TxHelpers.exchange(TxHelpers.orderV3(OrderType.BUY, issue.asset), TxHelpers.orderV3(OrderType.SELL, issue.asset))
     assert(utx.putIfNew(tx, forceValidate = false).resultE.isLeft)
     assert(utx.putIfNew(tx, forceValidate = true).resultE.isLeft)
     utx.putIfNew(tx, forceValidate = false).resultE should produce("reached err")
@@ -170,11 +171,11 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
   }
 
   it should s"accept failed Exchange with asset script with complexity > ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
-    val issue = TxHelpers.issue(1000, genAssetScript(ContractLimits.FailFreeInvokeComplexity * 2))
+    val issue = TxHelpers.issue(script = Some(genAssetScript(ContractLimits.FailFreeInvokeComplexity * 2)))
     d.appendBlock(issue)
 
     val tx =
-      TxHelpers.exchange(TxHelpers.order(OrderType.BUY, issue.asset), TxHelpers.order(OrderType.SELL, issue.asset))
+      TxHelpers.exchange(TxHelpers.orderV3(OrderType.BUY, issue.asset), TxHelpers.orderV3(OrderType.SELL, issue.asset))
 
     assert(utx.putIfNew(tx, forceValidate = false).resultE.isRight)
     utx.removeAll(Seq(tx))
@@ -219,7 +220,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     assert(d.blockchainUpdater.height % 2 == 0)
 
     (1 to 100).foreach { _ =>
-      val invoke = TxHelpers.invoke(dApp.toAddress, "test1000")
+      val invoke = TxHelpers.invoke(dApp.toAddress, Some("test1000"))
       utx.putIfNew(invoke, forceValidate = true).resultE.explicitGet()
     }
 
@@ -249,7 +250,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
          |{-#CONTENT_TYPE DAPP#-}
          |
          |@Callable(i)
-         |func test() = {
+         |func default() = {
          |  if ($expr) then [] else throw("reached err")
          |}
          |""".stripMargin
@@ -290,12 +291,9 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
   }
 
   private[this] def utxTest(f: (Domain, UtxPoolImpl) => Unit): Unit = {
-    withDomain(settings) { d =>
-      d.appendBlock(
-        TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, Long.MaxValue / 3),
-        TxHelpers.genesis(dApp.toAddress, Long.MaxValue / 3)
-      )
+    val balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner, dApp)
 
+    withDomain(settings, balances) { d =>
       val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings.utxSettings)
       f(d, utx)
       utx.close()

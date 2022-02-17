@@ -6,7 +6,7 @@ import com.wavesplatform.api.http.requests.{InvokeScriptRequest, SignedInvokeScr
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, _}
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BIGINT, CONST_LONG, CaseObj}
+import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BIGINT, CONST_BYTESTR, CONST_LONG, CONST_STRING, CaseObj}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
 import com.wavesplatform.protobuf.transaction._
@@ -25,50 +25,51 @@ class InvokeScriptTransactionSpecification extends PropSpec {
   val publicKey = "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK"
 
   property("InvokeScriptTransaction serialization roundtrip") {
-    forAll(invokeScriptGen(paymentListGen)) { transaction: InvokeScriptTransaction =>
-      val bytes = transaction.bytes()
-      val deser = InvokeScriptTransaction.parseBytes(bytes).get
-      deser.sender shouldEqual transaction.sender
-      deser.dAppAddressOrAlias shouldEqual transaction.dAppAddressOrAlias
-      deser.funcCallOpt shouldEqual transaction.funcCallOpt
-      deser.payments shouldEqual transaction.payments
-      deser.fee shouldEqual transaction.fee
-      deser.timestamp shouldEqual transaction.timestamp
-      deser.proofs shouldEqual transaction.proofs
-      bytes shouldEqual deser.bytes()
-      Verifier.verifyAsEllipticCurveSignature(transaction) should beRight
-      Verifier.verifyAsEllipticCurveSignature(deser) should beRight // !!!!!!!!!!!!!!!
-    }
+    val transaction = createInvoke()
+
+    val bytes = transaction.bytes()
+    val deser = InvokeScriptTransaction.parseBytes(bytes).get
+    deser.sender shouldEqual transaction.sender
+    deser.dAppAddressOrAlias shouldEqual transaction.dAppAddressOrAlias
+    deser.funcCallOpt shouldEqual transaction.funcCallOpt
+    deser.payments shouldEqual transaction.payments
+    deser.fee shouldEqual transaction.fee
+    deser.timestamp shouldEqual transaction.timestamp
+    deser.proofs shouldEqual transaction.proofs
+    bytes shouldEqual deser.bytes()
+    Verifier.verifyAsEllipticCurveSignature(transaction) should beRight
+    Verifier.verifyAsEllipticCurveSignature(deser) should beRight // !!!!!!!!!!!!!!!
   }
 
   property("protobuf roundtrip") {
-    forAll(invokeScriptGen(paymentListGen), accountGen) { (tx, caller) =>
-      val unsigned = transaction.PBTransaction(
-        tx.chainId,
-        ByteString.copyFrom(caller.publicKey.arr),
-        Some(Amount.of(PBAmounts.toPBAssetId(tx.feeAssetId), tx.fee)),
-        tx.timestamp,
-        tx.version,
-        transaction.PBTransaction.Data.InvokeScript(
-          InvokeScriptTransactionData(
-            Some(PBRecipients.create(tx.dAppAddressOrAlias)),
-            ByteString.copyFrom(Deser.serializeOption(tx.funcCallOpt)(Serde.serialize(_))),
-            tx.payments.map(p => Amount.of(PBAmounts.toPBAssetId(p.assetId), p.amount))
-          )
+    val tx = createInvoke()
+    val caller = TxHelpers.defaultSigner
+
+    val unsigned = transaction.PBTransaction(
+      tx.chainId,
+      ByteString.copyFrom(caller.publicKey.arr),
+      Some(Amount.of(PBAmounts.toPBAssetId(tx.feeAssetId), tx.fee)),
+      tx.timestamp,
+      tx.version,
+      transaction.PBTransaction.Data.InvokeScript(
+        InvokeScriptTransactionData(
+          Some(PBRecipients.create(tx.dAppAddressOrAlias)),
+          ByteString.copyFrom(Deser.serializeOption(tx.funcCallOpt)(Serde.serialize(_))),
+          tx.payments.map(p => Amount.of(PBAmounts.toPBAssetId(p.assetId), p.amount))
         )
       )
-      val proof        = crypto.sign(caller.privateKey, PBTransactions.vanilla(PBSignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
-      val signed       = PBSignedTransaction(Some(unsigned), Seq(ByteString.copyFrom(proof.arr)))
-      val convTx       = PBTransactions.vanilla(signed).explicitGet()
-      val unsafeConvTx = PBTransactions.vanillaUnsafe(signed)
-      val modTx        = tx.copy(sender = caller.publicKey, proofs = Proofs(List(proof)))
-      convTx.json() shouldBe modTx.json()
-      unsafeConvTx.json() shouldBe modTx.json()
-      crypto.verify(modTx.proofs.toSignature, modTx.bodyBytes(), modTx.sender) shouldBe true
+    )
+    val proof        = crypto.sign(caller.privateKey, PBTransactions.vanilla(PBSignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
+    val signed       = PBSignedTransaction(Some(unsigned), Seq(ByteString.copyFrom(proof.arr)))
+    val convTx       = PBTransactions.vanilla(signed).explicitGet()
+    val unsafeConvTx = PBTransactions.vanillaUnsafe(signed)
+    val modTx        = tx.copy(sender = caller.publicKey, proofs = Proofs(List(proof)))
+    convTx.json() shouldBe modTx.json()
+    unsafeConvTx.json() shouldBe modTx.json()
+    crypto.verify(modTx.proofs.toSignature, modTx.bodyBytes(), modTx.sender) shouldBe true
 
-      val convToPbTx = PBTransactions.protobuf(modTx)
-      convToPbTx shouldBe signed
-    }
+    val convToPbTx = PBTransactions.protobuf(modTx)
+    convToPbTx shouldBe signed
   }
 
   property("decode pre-encoded bytes") {
@@ -112,49 +113,47 @@ class InvokeScriptTransactionSpecification extends PropSpec {
 
   property("JSON format validation for InvokeScriptTransaction") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
+    val tx = createInvoke()
     val js = Json.parse(s"""{
                          "type": 16,
-                         "id": "F4Kf5GZqAEnfTgaK9Zj9CypXApE6M4yYGR2DQ3yMhjwF",
-                         "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
-                         "senderPublicKey": "$publicKey",
-                         "fee": 100000,
+                         "id": "${tx.id()}",
+                         "sender": "${TxHelpers.defaultAddress}",
+                         "senderPublicKey": "${TxHelpers.defaultSigner.publicKey}",
+                         "fee": 500000,
                          "feeAssetId": null,
-                         "timestamp": 1526910778245,
+                         "timestamp": ${tx.timestamp},
                          "proofs": ["x7T161SxvUxpubEAKv4UL5ucB5pquAhTryZ8Qrd347TPuQ4yqqpVMQ2B5FpeFXGnpyLvb7wGeoNsyyjh5R61u7F"],
                          "version": 1,
-                         "dApp" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+                         "dApp" : "${TxHelpers.secondAddress}",
                          "call": {
-                            "function" : "foo",
+                            "function" : "test",
                              "args" : [
-                             { "type" : "binary",
+                             {
+                               "type" : "integer",
+                               "value" : 1
+                             },
+                             {
+                               "type" : "string",
+                               "value" : "test_str"
+                             },
+                             {
+                               "type" : "binary",
                                "value" : "base64:YWxpY2U="
                              }
                             ]
                           },
-                         "payment" : [{
-                            "amount" : 7,
-                            "assetId" : "$publicKey"
-                            }]
+                         "payment" : [
+                           {
+                             "amount" : 1,
+                             "assetId" : null
+                           },
+                           {
+                             "amount" : 2,
+                             "assetId" : "$publicKey"
+                           }
+                         ]
                         }
     """)
-
-    val tx = InvokeScriptTransaction
-      .selfSigned(
-        1.toByte,
-        KeyPair("test3".getBytes("UTF-8")),
-        KeyPair("test4".getBytes("UTF-8")).toAddress,
-        Some(
-          Terms.FUNCTION_CALL(
-            FunctionHeader.User("foo"),
-            List(Terms.CONST_BYTESTR(ByteStr(Base64.tryDecode("YWxpY2U=").get)).explicitGet())
-          )
-        ),
-        Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
-        100000,
-        Waves,
-        1526910778245L
-      )
-      .explicitGet()
 
     (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
 
@@ -164,36 +163,30 @@ class InvokeScriptTransactionSpecification extends PropSpec {
 
   property("JSON format validation for InvokeScriptTransaction without FUNCTION_CALL") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
+    val tx = createInvoke(None)
     val js = Json.parse(s"""{
                          "type": 16,
-                         "id": "CoAdpSKQWNJEieS9StynH8VwmaSPbKSFKEYWinkTGHBF",
-                         "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
-                         "senderPublicKey": "$publicKey",
-                         "fee": 100000,
+                         "id": "${tx.id()}",
+                         "sender": "${TxHelpers.defaultAddress}",
+                         "senderPublicKey": "${TxHelpers.defaultSigner.publicKey}",
+                         "fee": 500000,
                          "feeAssetId": null,
-                         "timestamp": 1526910778245,
+                         "timestamp": ${tx.timestamp},
                          "proofs": ["3frswEnyFZjTzBQ5pdNEJbPzvLp7Voz8sqZT3n7xsuVDdYGcasXgFNzb8HCrpNXYoDWLsHqrUSqcQfQJ8CRWjp4U"],
                          "version": 1,
-                         "dApp" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
-                         "payment" : [{
-                            "amount" : 7,
-                            "assetId" : "$publicKey"
-                            }]
+                         "dApp" : "${TxHelpers.secondAddress}",
+                         "payment" : [
+                           {
+                             "amount" : 1,
+                             "assetId" : null
+                           },
+                           {
+                             "amount" : 2,
+                             "assetId" : "$publicKey"
+                           }
+                         ]
                         }
     """)
-
-    val tx = InvokeScriptTransaction
-      .selfSigned(
-        1.toByte,
-        KeyPair("test3".getBytes("UTF-8")),
-        KeyPair("test4".getBytes("UTF-8")).toAddress,
-        None,
-        Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
-        100000,
-        Waves,
-        1526910778245L
-      )
-      .explicitGet()
 
     (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
 
@@ -362,4 +355,13 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     req.toTx shouldBe Left(NonPositiveAmount(-1, "Waves"))
     AddressScheme.current = DefaultAddressScheme
   }
+
+  private def createInvoke(func: Option[String] = Some("test")): InvokeScriptTransaction =
+    TxHelpers.invoke(
+      version = TxVersion.V1,
+      dApp = TxHelpers.secondAddress,
+      func = func,
+      args = Seq(CONST_LONG(1), CONST_STRING("test_str").explicitGet(), CONST_BYTESTR(ByteStr(Base64.tryDecode("YWxpY2U=").get)).explicitGet()),
+      payments = Seq(Payment(1, Waves), Payment(2, IssuedAsset(ByteStr.decodeBase58(publicKey).get)))
+    )
 }

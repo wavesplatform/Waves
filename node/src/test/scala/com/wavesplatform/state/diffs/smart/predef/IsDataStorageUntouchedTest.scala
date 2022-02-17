@@ -1,25 +1,17 @@
 package com.wavesplatform.state.diffs.smart.predef
-import com.wavesplatform.TestTime
+
 import com.wavesplatform.account.Address
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.{BooleanDataEntry, EmptyDataEntry}
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 
 class IsDataStorageUntouchedTest extends PropSpec with WithDomain {
 
   import DomainPresets._
-
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
 
   private val contract = TestCompiler(V5).compileContract(
     s"""
@@ -35,21 +27,24 @@ class IsDataStorageUntouchedTest extends PropSpec with WithDomain {
      """.stripMargin
   )
 
-  private val scenario =
-    for {
-      master  <- accountGen
-      invoker <- accountGen
-      fee     <- ciFee()
-      gTx1         = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2         = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      dataTx       = DataTransaction.selfSigned(TxVersion.V2, master, Seq(BooleanDataEntry("q", true)), 15000000, ts).explicitGet()
-      deleteDataTx = DataTransaction.selfSigned(TxVersion.V2, master, Seq(EmptyDataEntry("q")), 15000000, ts).explicitGet()
-      ssTx         = SetScriptTransaction.selfSigned(1.toByte, master, Some(contract), fee, ts).explicitGet()
-      invokeTx     = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, master.toAddress, None, Nil, fee, Waves, ts).explicitGet()
-    } yield (Seq(gTx1, gTx2, ssTx), dataTx, deleteDataTx, invokeTx, master.toAddress)
+  private val scenario = {
+    val master = TxHelpers.signer(0)
+    val invoker = TxHelpers.signer(1)
+
+    val genesis = Seq(
+      TxHelpers.genesis(master.toAddress),
+      TxHelpers.genesis(invoker.toAddress)
+    )
+    val dataTx = TxHelpers.dataV2(master, Seq(BooleanDataEntry("q", true)))
+    val deleteDataTx = TxHelpers.dataV2(master, Seq(EmptyDataEntry("q")))
+    val setScript = TxHelpers.setScript(master, contract)
+    val invoke = TxHelpers.invoke(master.toAddress, invoker = invoker)
+
+    (genesis :+ setScript, dataTx, deleteDataTx, invoke, master.toAddress)
+  }
 
   property("isDataStorageUntouched true") {
-    val (genesisTxs, _, _, invokeTx, dApp) = scenario.sample.get
+    val (genesisTxs, _, _, invokeTx, dApp) = scenario
     withDomain(RideV5) { d =>
       d.appendBlock(genesisTxs: _*)
       d.appendBlock(invokeTx)
@@ -58,7 +53,7 @@ class IsDataStorageUntouchedTest extends PropSpec with WithDomain {
   }
 
   property("isDataStorageUntouched false") {
-    val (genesisTxs, dataTx, _, invokeTx, dApp) = scenario.sample.get
+    val (genesisTxs, dataTx, _, invokeTx, dApp) = scenario
     withDomain(RideV5) { d =>
       val genesis = d.appendBlock(genesisTxs: _*).id()
 
@@ -73,7 +68,7 @@ class IsDataStorageUntouchedTest extends PropSpec with WithDomain {
   }
 
   property("isDataStorageUntouched false after delete") {
-    val (genesisTxs, dataTx, deleteDataTx, invokeTx, dApp) = scenario.sample.get
+    val (genesisTxs, dataTx, deleteDataTx, invokeTx, dApp) = scenario
     withDomain(RideV5) { d =>
       val genesis = d.appendBlock(genesisTxs: _*).id()
 
@@ -108,19 +103,23 @@ class IsDataStorageUntouchedTest extends PropSpec with WithDomain {
        """.stripMargin
     )
 
-    val scenario =
-      for {
-        dApp1 <- accountGen
-        dApp2 <- accountGen
-        fee   <- ciFee()
-        genesis1 = GenesisTransaction.create(dApp1.toAddress, ENOUGH_AMT, ts).explicitGet()
-        genesis2 = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
-        setDApp1 = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(syncDApp(dApp2.toAddress)), fee, ts).explicitGet()
-        setDApp2 = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(contract), fee, ts).explicitGet()
-        invoke   = InvokeScriptTransaction.selfSigned(1.toByte, dApp1, dApp1.toAddress, None, Nil, fee, Waves, ts).explicitGet()
-      } yield (List(genesis1, genesis2, setDApp1, setDApp2), invoke)
+    val scenario = {
+      val dApp1 = TxHelpers.signer(0)
+      val dApp2 = TxHelpers.signer(1)
 
-    val (genesisTxs, invokeTx) = scenario.sample.get
+      val genesis = Seq(
+        TxHelpers.genesis(dApp1.toAddress),
+        TxHelpers.genesis(dApp2.toAddress)
+      )
+      val setScript1 = TxHelpers.setScript(dApp1, syncDApp(dApp2.toAddress))
+      val setScript2 = TxHelpers.setScript(dApp2, contract)
+
+      val invoke = TxHelpers.invoke(dApp1.toAddress, invoker = dApp1, version = TxVersion.V1)
+
+      (genesis :+ setScript1 :+ setScript2, invoke)
+    }
+
+    val (genesisTxs, invokeTx) = scenario
     withDomain(RideV5) { d =>
       d.appendBlock(genesisTxs: _*).id()
       d.appendBlock(invokeTx)
