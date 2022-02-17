@@ -1,47 +1,31 @@
 package com.wavesplatform.state.diffs.ci
+
+import com.wavesplatform.TestValues
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, SynchronousCalls}
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING, FUNCTION_CALL}
-import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.state.{IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, Transaction}
-import com.wavesplatform.TestTime
 import com.wavesplatform.test.PropSpec
-import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.{DataTransaction, Transaction, TxHelpers, TxVersion}
 import org.scalatest.EitherValues
 
-import scala.util.Try
+class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettings with WithDomain with EitherValues {
+  import DomainPresets._
 
-class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettings with MockFactory with WithDomain with EitherValues {
-
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
-
-  private val estimatorV3ActivationHeight = 3
-  private val fixActivationHeight         = 5
-
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
-      BlockchainFeatures.SmartAccounts.id    -> 0,
-      BlockchainFeatures.SmartAssets.id      -> 0,
-      BlockchainFeatures.Ride4DApps.id       -> 0,
-      BlockchainFeatures.FeeSponsorship.id   -> 0,
-      BlockchainFeatures.DataTransaction.id  -> 0,
-      BlockchainFeatures.BlockReward.id      -> 0,
-      BlockchainFeatures.BlockV5.id          -> estimatorV3ActivationHeight,
-      BlockchainFeatures.SynchronousCalls.id -> fixActivationHeight
-    ),
-    estimatorPreCheckHeight = Int.MaxValue
-  )
+  private val estimatorV3ActivationHeight = 4
+  private val fixActivationHeight         = 6
+  private val fsWithV5 =
+    RideV5
+      .setFeaturesHeight(BlockV5 -> estimatorV3ActivationHeight, SynchronousCalls -> fixActivationHeight)
+      .configure(_.copy(estimatorPreCheckHeight = Int.MaxValue))
 
   private val lambordini: Script = {
     val base64 =
@@ -49,65 +33,54 @@ class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettin
     Script.fromBase64String(base64).explicitGet()
   }
 
-  private def paymentPreconditions(dApp: Script): Gen[(List[Transaction], InvokeScriptTransaction, DataTransaction, InvokeScriptTransaction)] =
-    for {
-      master  <- accountGen
-      invoker <- accountGen
-      initFee <- ciFee(1)
-      fee     <- ciFee()
-    } yield {
-      for {
-        genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
-        genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
-        setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp), fee, ts)
-        initData = Seq(
-          IntegerDataEntry(s"start_of_${invoker.toAddress}", 1),
-          IntegerDataEntry(s"lend_of_${invoker.toAddress}", 1),
-          IntegerDataEntry(s"end_of_grace_of_${invoker.toAddress}", Int.MaxValue),
-          IntegerDataEntry(s"end_of_interest_of_${invoker.toAddress}", Int.MaxValue),
-          IntegerDataEntry(s"end_of_burndown_of_${invoker.toAddress}", Int.MaxValue),
-          IntegerDataEntry(s"deposit_of_${invoker.toAddress}", Int.MaxValue),
-          IntegerDataEntry(s"open_lends_of_${invoker.toAddress}", Int.MaxValue),
-          StringDataEntry(s"lenders_of_${invoker.toAddress}", invoker.toAddress.toString)
-        )
-        data1 <- DataTransaction.selfSigned(1.toByte, master, initData, fee, ts)
-        data2 <- DataTransaction.selfSigned(1.toByte, master, initData, fee, ts)
-        issue <- IssueTransaction.selfSigned(2.toByte, invoker, "Asset", "Description", ENOUGH_AMT, 8, true, None, fee, ts)
-        initCall = Some(
-          FUNCTION_CALL(
-            FunctionHeader.User("init"),
-            List(
-              CONST_STRING("").explicitGet(),
-              CONST_STRING(issue.id().toString).explicitGet(),
-              CONST_STRING("").explicitGet(),
-              CONST_LONG(1),
-              CONST_LONG(1),
-              CONST_LONG(1),
-              CONST_LONG(1),
-              CONST_LONG(1),
-              CONST_LONG(1),
-              CONST_LONG(1)
-            )
-          )
-        )
-        call    = Some(FUNCTION_CALL(FunctionHeader.User("buyBack"), Nil))
-        payment = Seq(Payment(1, IssuedAsset(issue.id())))
-        initInvoke <- InvokeScriptTransaction.selfSigned(1.toByte, master, master.toAddress, initCall, Nil, initFee, Waves, ts)
-        invoke1    <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, call, payment, fee, Waves, ts)
-        invoke2    <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, call, payment, fee, Waves, ts)
-      } yield (List(genesis, genesis2, setDApp, issue, data1, initInvoke), invoke1, data2, invoke2)
-    }.explicitGet()
+  private def paymentPreconditions(dApp: Script): (Seq[AddrWithBalance], List[Transaction], InvokeScriptTransaction, DataTransaction, InvokeScriptTransaction) = {
+    val invoker  = TxHelpers.signer(0)
+    val master   = TxHelpers.signer(1)
+    val balances = AddrWithBalance.enoughBalances(invoker, master)
+    val setDApp  = TxHelpers.setScript(master, dApp)
+    val initData = Seq(
+      IntegerDataEntry(s"start_of_${invoker.toAddress}", 1),
+      IntegerDataEntry(s"lend_of_${invoker.toAddress}", 1),
+      IntegerDataEntry(s"end_of_grace_of_${invoker.toAddress}", Int.MaxValue),
+      IntegerDataEntry(s"end_of_interest_of_${invoker.toAddress}", Int.MaxValue),
+      IntegerDataEntry(s"end_of_burndown_of_${invoker.toAddress}", Int.MaxValue),
+      IntegerDataEntry(s"deposit_of_${invoker.toAddress}", Int.MaxValue),
+      IntegerDataEntry(s"open_lends_of_${invoker.toAddress}", Int.MaxValue),
+      StringDataEntry(s"lenders_of_${invoker.toAddress}", invoker.toAddress.toString)
+    )
+    val data1 = TxHelpers.data(master, initData)
+    val data2 = TxHelpers.data(master, initData)
+    val issue = TxHelpers.issue(invoker, ENOUGH_AMT, script = None)
+    val initArgs =
+      List(
+        CONST_STRING("").explicitGet(),
+        CONST_STRING(issue.id().toString).explicitGet(),
+        CONST_STRING("").explicitGet(),
+        CONST_LONG(1),
+        CONST_LONG(1),
+        CONST_LONG(1),
+        CONST_LONG(1),
+        CONST_LONG(1),
+        CONST_LONG(1),
+        CONST_LONG(1)
+      )
+    val payment    = Seq(Payment(1, IssuedAsset(issue.id())))
+    val initInvoke = TxHelpers.invoke(master.toAddress, Some("init"), initArgs, invoker = master, fee = TestValues.fee, version = TxVersion.V1)
+    val invoke1    = TxHelpers.invoke(master.toAddress, Some("buyBack"), Nil, payment, version = TxVersion.V1)
+    val invoke2    = TxHelpers.invoke(master.toAddress, Some("buyBack"), Nil, payment, version = TxVersion.V1)
+    (balances, List(setDApp, issue, data1, initInvoke), invoke1, data2, invoke2)
+  }
 
   property(s"fee multiplier is disabled after activation ${BlockchainFeatures.SynchronousCalls}") {
-    val (preparingTxs, invoke1, data2, invoke2) = paymentPreconditions(lambordini).sample.get
-    withDomain(domainSettingsWithFS(fsWithV5)) { d =>
+    val (balances, preparingTxs, invoke1, data2, invoke2) = paymentPreconditions(lambordini)
+    withDomain(fsWithV5, balances) { d =>
       d.appendBlock(preparingTxs: _*)
       d.appendBlock(invoke1)
 
       d.appendBlock(data2)
       d.blockchainUpdater.height shouldBe estimatorV3ActivationHeight
 
-      Try(d.appendBlock(invoke2)).toEither should produce(
+      d.appendBlockE(invoke2) should produce(
         s"Fee in WAVES for InvokeScriptTransaction (${invoke2.fee} in WAVES) with 3 invocation steps does not exceed minimal value of 1500000 WAVES"
       )
 

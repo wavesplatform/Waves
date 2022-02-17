@@ -106,7 +106,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           f(d, isScriptSimple)
         })
 
-        withClue("with fix")(withDomain(DomainPresets.RideV5.withFS(_.copy(estimatorSumOverflowFixHeight = 4))) { d =>
+        withClue("with fix")(withDomain(DomainPresets.RideV5.configure(_.copy(estimatorSumOverflowFixHeight = 4))) { d =>
           d.appendAndAssertSucceed(TxHelpers.genesis(TxHelpers.defaultAddress))
           d.appendAndAssertSucceed(issue, TxHelpers.transfer(TxHelpers.defaultSigner, setScript.sender.toAddress, TestValues.fee), setScript)
           f(d, true)
@@ -128,8 +128,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         )
 
         val exchange = TxHelpers.exchange(
-          TxHelpers.orderV3(OrderType.BUY, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, buyer),
-          TxHelpers.orderV3(OrderType.SELL, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, seller)
+          TxHelpers.order(OrderType.BUY, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, buyer),
+          TxHelpers.order(OrderType.SELL, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, seller)
         )
         doExchangeTest(d, shouldThrowBalanceError)(exchange)
     })
@@ -143,8 +143,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         )
 
         val exchange = TxHelpers.exchange(
-          TxHelpers.orderV3(OrderType.BUY, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, buyer),
-          TxHelpers.orderV3(OrderType.SELL, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, seller)
+          TxHelpers.order(OrderType.BUY, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, buyer),
+          TxHelpers.order(OrderType.SELL, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, seller)
         )
         doExchangeTest(d, shouldThrowBalanceError)(exchange)
     })
@@ -158,8 +158,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         )
 
         val exchange = TxHelpers.exchange(
-          TxHelpers.orderV3(OrderType.BUY, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, buyer, TxHelpers.secondSigner),
-          TxHelpers.orderV3(OrderType.SELL, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, seller, TxHelpers.secondSigner),
+          TxHelpers.order(OrderType.BUY, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, buyer, TxHelpers.secondSigner),
+          TxHelpers.order(OrderType.SELL, issue.asset, Waves, Waves, 1L, 1_0000_0000L, 1L, seller, TxHelpers.secondSigner),
           TxHelpers.secondSigner
         )
         doExchangeTest(d, shouldThrowBalanceError = true)(exchange)
@@ -174,8 +174,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         )
 
         val exchange = TxHelpers.exchange(
-          TxHelpers.orderV3(OrderType.BUY, issue.asset, Waves, Waves, 2L, 1_0000_0000L, 1L, buyerAndSeller),
-          TxHelpers.orderV3(OrderType.SELL, issue.asset, Waves, Waves, 2L, 1_0000_0000L, 1L, buyerAndSeller)
+          TxHelpers.order(OrderType.BUY, issue.asset, Waves, Waves, 2L, 1_0000_0000L, 1L, buyerAndSeller),
+          TxHelpers.order(OrderType.SELL, issue.asset, Waves, Waves, 2L, 1_0000_0000L, 1L, buyerAndSeller)
         )
         doExchangeTest(d, shouldThrowBalanceError)(exchange)
     })
@@ -183,299 +183,323 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
   property("Validation fails when Order feature is not activation yet") {
 
-    val preconditionsAndExchange
-        : Gen[(GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
-      buyer   <- accountGen
-      seller  <- accountGen
-      matcher <- accountGen
-      ts      <- timestampGen
-      gen1: GenesisTransaction = GenesisTransaction.create(buyer.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gen2: GenesisTransaction = GenesisTransaction.create(seller.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gen3: GenesisTransaction = GenesisTransaction.create(matcher.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
-      issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
-      maybeAsset1              <- Gen.option(issue1.id())
-      maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
-      exchange <- exchangeV2GeneratorP(
-        buyer = buyer,
-        seller = seller,
-        amountAssetId = Asset.fromCompatId(maybeAsset2),
-        priceAssetId = Asset.fromCompatId(maybeAsset1),
-        orderVersions = Set(3)
-      )
-    } yield (gen1, gen2, gen3, issue1, issue2, exchange)
+    val preconditionsAndExchange: Seq[(Seq[GenesisTransaction], IssueTransaction, IssueTransaction, ExchangeTransaction)] = {
+      val buyer = TxHelpers.signer(1)
+      val seller = TxHelpers.signer(2)
+      val matcher = TxHelpers.signer(3)
 
-    forAll(preconditionsAndExchange) {
-      case (gen1, gen2, gen3, issue1, issue2, exchange) =>
-        assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2))), TestBlock.create(Seq(exchange)), fs) { blockDiffEi =>
-          blockDiffEi should produce("Order Version 3 feature has not been activated yet")
-        }
+      val genesis = Seq(buyer, seller, matcher).map(acc => TxHelpers.genesis(acc.toAddress))
+      val issue1 = TxHelpers.issue(buyer, ENOUGH_AMT, name = "asset1", version = TxVersion.V1)
+      val issue2 = TxHelpers.issue(seller, ENOUGH_AMT, name = "asset2", version = TxVersion.V1)
+
+      for {
+        maybeAsset1 <- Seq(Some(issue1.id()), None)
+        maybeAsset2 <- Seq(Some(issue2.id()), None) if maybeAsset1 != maybeAsset2
+      } yield {
+        val exchange = TxHelpers.exchange(
+          TxHelpers.order(OrderType.BUY, Asset.fromCompatId(maybeAsset2), Asset.fromCompatId(maybeAsset1), sender = buyer, matcher = matcher, version = TxVersion.V3),
+          TxHelpers.order(OrderType.SELL, Asset.fromCompatId(maybeAsset2), Asset.fromCompatId(maybeAsset1), sender = seller, matcher = matcher, version = TxVersion.V3),
+          matcher,
+          version = TxVersion.V2
+        )
+
+        (genesis, issue1, issue2, exchange)
+      }
+    }
+
+    preconditionsAndExchange.foreach { case (genesis, issue1, issue2, exchange) =>
+      assertDiffEi(Seq(TestBlock.create(genesis :+ issue1 :+ issue2)), TestBlock.create(Seq(exchange)), fs) { blockDiffEi =>
+        blockDiffEi should produce("Order Version 3 feature has not been activated yet")
+      }
     }
   }
 
   property("Preserves waves invariant, stores match info, rewards matcher") {
 
-    val preconditionsAndExchange: Gen[(GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
-      buyer  <- accountGen
-      seller <- accountGen
-      ts     <- timestampGen
-      gen1: GenesisTransaction = GenesisTransaction.create(buyer.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gen2: GenesisTransaction = GenesisTransaction.create(seller.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
-      issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
-      maybeAsset1              <- Gen.option(issue1.id()) map Asset.fromCompatId
-      maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1.compatId) map Asset.fromCompatId
-      exchange                 <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
-    } yield (gen1, gen2, issue1, issue2, exchange)
+    val preconditionsAndExchange: Seq[(Seq[GenesisTransaction], IssueTransaction, IssueTransaction, ExchangeTransaction)] = {
+      val buyer = TxHelpers.signer(1)
+      val seller = TxHelpers.signer(2)
+      val matcher = TxHelpers.signer(3)
 
-    forAll(preconditionsAndExchange) {
-      case (gen1, gen2, issue1, issue2, exchange) =>
-        assertDiffAndState(
-          Seq(TestBlock.create(Seq(gen1, gen2, issue1, issue2))),
-          TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
-          fsWithOrderFeature
-        ) {
-          case (blockDiff, _) =>
-            val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
-            totalPortfolioDiff.balance shouldBe 0
-            totalPortfolioDiff.effectiveBalance shouldBe 0
-            totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
+      val genesis = Seq(buyer, seller, matcher).map(acc => TxHelpers.genesis(acc.toAddress))
+      val issue1 = TxHelpers.issue(seller, ENOUGH_AMT, name = "asset1", version = TxVersion.V1)
+      val issue2 = TxHelpers.issue(buyer, ENOUGH_AMT, name = "asset2", version = TxVersion.V1)
 
-            blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee
-        }
+      for {
+        maybeAsset1 <- Seq(Some(issue1.id()), None)
+        maybeAsset2 <- Seq(Some(issue2.id()), None) if maybeAsset1 != maybeAsset2
+        exchange <- Seq(
+          TxHelpers.exchange(
+            TxHelpers.order(OrderType.BUY, Asset.fromCompatId(maybeAsset1), Asset.fromCompatId(maybeAsset2), sender = buyer, matcher = matcher, version = TxVersion.V1),
+            TxHelpers.order(OrderType.SELL, Asset.fromCompatId(maybeAsset1), Asset.fromCompatId(maybeAsset2), sender = seller, matcher = matcher, version = TxVersion.V1),
+            matcher,
+            version = TxVersion.V1
+          ),
+          TxHelpers.exchange(
+            TxHelpers.order(OrderType.BUY, Asset.fromCompatId(maybeAsset1), Asset.fromCompatId(maybeAsset2), sender = buyer, matcher = matcher, version = TxVersion.V1),
+            TxHelpers.order(OrderType.SELL, Asset.fromCompatId(maybeAsset1), Asset.fromCompatId(maybeAsset2), sender = seller, matcher = matcher, version = TxVersion.V1),
+            matcher,
+            version = TxVersion.V2
+          ),
+          TxHelpers.exchange(
+            TxHelpers.order(OrderType.BUY, Asset.fromCompatId(maybeAsset1), Asset.fromCompatId(maybeAsset2), sender = buyer, matcher = matcher, version = TxVersion.V2),
+            TxHelpers.order(OrderType.SELL, Asset.fromCompatId(maybeAsset1), Asset.fromCompatId(maybeAsset2), sender = seller, matcher = matcher, version = TxVersion.V2),
+            matcher,
+            version = TxVersion.V2
+          ),
+          TxHelpers.exchange(
+            TxHelpers.order(OrderType.BUY, Asset.fromCompatId(maybeAsset1), Asset.fromCompatId(maybeAsset2), sender = buyer, matcher = matcher, version = TxVersion.V3),
+            TxHelpers.order(OrderType.SELL, Asset.fromCompatId(maybeAsset1), Asset.fromCompatId(maybeAsset2), sender = seller, matcher = matcher, version = TxVersion.V3),
+            matcher,
+            version = TxVersion.V2
+          )
+        )
+      } yield (genesis, issue1, issue2, exchange)
+    }
+
+    preconditionsAndExchange.foreach { case (genesis, issue1, issue2, exchange) =>
+      assertDiffAndState(
+        Seq(TestBlock.create(genesis :+ issue1 :+ issue2)),
+        TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
+        fsWithOrderFeature
+      ) {
+        case (blockDiff, _) =>
+          val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
+          totalPortfolioDiff.balance shouldBe 0
+          totalPortfolioDiff.effectiveBalance shouldBe 0
+          totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
+
+          blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee
+      }
     }
   }
 
   property("Preserves assets invariant (matcher's fee in one of the assets of the pair or in Waves), stores match info, rewards matcher") {
 
-    val preconditionsAndExchange
-        : Gen[(GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
-      buyer   <- accountGen
-      seller  <- accountGen
-      matcher <- accountGen
-      ts      <- timestampGen
-      gen1: GenesisTransaction = GenesisTransaction.create(buyer.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gen2: GenesisTransaction = GenesisTransaction.create(seller.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gen3: GenesisTransaction = GenesisTransaction.create(matcher.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
-      issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
-      maybeAsset1              <- Gen.option(issue1.id()).map(Asset.fromCompatId)
-      maybeAsset2              <- (Gen.option(issue2.id()) suchThat (x => x != maybeAsset1.compatId)).map(Asset.fromCompatId)
-      buyMatcherFeeAssetId     <- Gen.oneOf(maybeAsset1, maybeAsset2)
-      sellMatcherFeeAssetId    <- Gen.oneOf(maybeAsset1, maybeAsset2)
-      exchange <- exchangeV2GeneratorP(
-        buyer = buyer,
-        seller = seller,
-        amountAssetId = maybeAsset2,
-        priceAssetId = maybeAsset1,
-        buyMatcherFeeAssetId = buyMatcherFeeAssetId,
-        sellMatcherFeeAssetId = sellMatcherFeeAssetId,
-        fixedMatcher = Some(matcher)
-      ) retryUntil transactionWithOrdersV3IsValid
-    } yield (gen1, gen2, gen3, issue1, issue2, exchange)
+    val preconditionsAndExchange: Seq[(Seq[GenesisTransaction], IssueTransaction, IssueTransaction, ExchangeTransaction)] = {
+      val buyer = TxHelpers.signer(1)
+      val seller = TxHelpers.signer(2)
+      val matcher = TxHelpers.signer(3)
 
-    forAll(preconditionsAndExchange) {
-      case (gen1, gen2, gen3, issue1, issue2, exchange) =>
-        assertDiffAndState(
-          Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2))),
-          TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
-          fsWithOrderFeature
-        ) {
-          case (blockDiff, _) =>
-            val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
-            totalPortfolioDiff.balance shouldBe 0
-            totalPortfolioDiff.effectiveBalance shouldBe 0
-            totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
+      val genesis = Seq(buyer, seller, matcher).map(acc => TxHelpers.genesis(acc.toAddress))
+      val issue1 = TxHelpers.issue(buyer, ENOUGH_AMT, name = "asset1", version = TxVersion.V1)
+      val issue2 = TxHelpers.issue(seller, ENOUGH_AMT, name = "asset2", version = TxVersion.V1)
 
-            val matcherPortfolio =
-              Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
+      (for {
+        maybeAsset1 <- Seq(Some(issue1.id()), None).map(Asset.fromCompatId)
+        maybeAsset2 <- Seq(Some(issue2.id()), None).map(Asset.fromCompatId) if maybeAsset1.compatId != maybeAsset2.compatId
+        buyMatcherFeeAssetId <- Seq(maybeAsset1, maybeAsset2)
+        sellMatcherFeeAssetId <- Seq(maybeAsset1, maybeAsset2)
+        exchange <- Seq(
+          TxHelpers.exchange(
+            TxHelpers.order(OrderType.BUY, maybeAsset2, maybeAsset1, amount = 100000000, sender = buyer, matcher = matcher, version = TxVersion.V1),
+            TxHelpers.order(OrderType.SELL, maybeAsset2, maybeAsset1, amount = 100000000, sender = seller, matcher = matcher, version = TxVersion.V1),
+            matcher,
+            version = TxVersion.V2
+          ),
+          TxHelpers.exchange(
+            TxHelpers.order(OrderType.BUY, maybeAsset2, maybeAsset1, amount = 100000000, sender = buyer, matcher = matcher, version = TxVersion.V2),
+            TxHelpers.order(OrderType.SELL, maybeAsset2, maybeAsset1, amount = 100000000, sender = seller, matcher = matcher, version = TxVersion.V2),
+            matcher,
+            version = TxVersion.V2
+          ),
+          TxHelpers.exchange(
+            TxHelpers.order(OrderType.BUY, maybeAsset2, maybeAsset1, feeAsset = buyMatcherFeeAssetId, amount = 100000000, sender = buyer, matcher = matcher, version = TxVersion.V3),
+            TxHelpers.order(OrderType.SELL, maybeAsset2, maybeAsset1, feeAsset = sellMatcherFeeAssetId, amount = 100000000, sender = seller, matcher = matcher, version = TxVersion.V3),
+            matcher,
+            version = TxVersion.V2
+          )
+        )
+      } yield (genesis, issue1, issue2, exchange)).distinct
+    }
 
-            val restoredMatcherPortfolio =
-              Monoid.combineAll(
-                Seq(
-                  ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee),
-                  ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee),
-                  wavesPortfolio(-exchange.fee)
-                )
+    preconditionsAndExchange.foreach { case (genesis, issue1, issue2, exchange) =>
+      assertDiffAndState(
+        Seq(TestBlock.create(genesis :+ issue1 :+ issue2)),
+        TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
+        fsWithOrderFeature
+      ) {
+        case (blockDiff, _) =>
+          val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
+          totalPortfolioDiff.balance shouldBe 0
+          totalPortfolioDiff.effectiveBalance shouldBe 0
+          totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
+
+          val matcherPortfolio =
+            Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
+
+          val restoredMatcherPortfolio =
+            Monoid.combineAll(
+              Seq(
+                ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee),
+                ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee),
+                wavesPortfolio(-exchange.fee)
               )
+            )
 
-            matcherPortfolio shouldBe restoredMatcherPortfolio
-        }
+          matcherPortfolio shouldBe restoredMatcherPortfolio
+      }
     }
   }
 
   property("Validation fails when received amount of asset is less than fee in that asset (Orders V3 are used)") {
-    val preconditionsAndExchange
-        : Gen[(GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
-      buyer   <- accountGen
-      seller  <- accountGen
-      matcher <- accountGen
-      ts      <- timestampGen
-      gen1: GenesisTransaction = GenesisTransaction.create(buyer.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gen2: GenesisTransaction = GenesisTransaction.create(seller.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gen3: GenesisTransaction = GenesisTransaction.create(matcher.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
-      issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
-      buyerIssuedAsset  = IssuedAsset(issue1.id())
-      sellerIssuedAsset = IssuedAsset(issue2.id())
-      exchange <- exchangeV2GeneratorP(
-        buyer = buyer,
-        seller = seller,
-        amountAssetId = sellerIssuedAsset,        // buyer buys sellerIssuedAsset (received asset)
-        priceAssetId = buyerIssuedAsset,          // buyer sells buyerIssuedAsset
-        buyMatcherFeeAssetId = sellerIssuedAsset, // buyer pays fee in sellerIssuedAsset (received asset)
-        sellMatcherFeeAssetId = buyerIssuedAsset,
-        fixedMatcher = Some(matcher),
-        orderVersions = Set(3)
-      ).retryUntil(ex => !transactionWithOrdersV3IsValid(ex)) // fee in sellerIssuedAsset (received asset) is greater than amount of received sellerIssuedAsset
-    } yield (gen1, gen2, gen3, issue1, issue2, exchange)
+    val preconditionsAndExchange: (Seq[GenesisTransaction], IssueTransaction, IssueTransaction, ExchangeTransaction) = {
+      val buyer = TxHelpers.signer(1)
+      val seller = TxHelpers.signer(2)
+      val matcher = TxHelpers.signer(3)
 
-    forAll(preconditionsAndExchange) {
-      case (gen1, gen2, gen3, issue1, issue2, exchange) =>
-        assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2))), TestBlock.create(Seq(exchange)), fsWithOrderFeature) {
-          blockDiffEi =>
-            blockDiffEi should produce("negative asset balance")
-        }
+      val genesis = Seq(buyer, seller, matcher).map(acc => TxHelpers.genesis(acc.toAddress))
+      val issue1 = TxHelpers.issue(buyer, ENOUGH_AMT, name = "asset1", version = TxVersion.V1)
+      val issue2 = TxHelpers.issue(seller, ENOUGH_AMT, name = "asset2", version = TxVersion.V1)
+      val buyerIssuedAsset  = issue1.asset
+      val sellerIssuedAsset = issue2.asset
+
+      val exchange = TxHelpers.exchange(
+        TxHelpers.order(OrderType.BUY, sellerIssuedAsset, buyerIssuedAsset, feeAsset = sellerIssuedAsset, fee = 10, sender = buyer, matcher = matcher, version = TxVersion.V3),
+        TxHelpers.order(OrderType.SELL, sellerIssuedAsset, buyerIssuedAsset, feeAsset = buyerIssuedAsset, sender = seller, matcher = matcher, version = TxVersion.V3),
+        matcher,
+        version = TxVersion.V2
+      )
+
+      (genesis, issue1, issue2, exchange)
+    }
+
+    val (genesis, issue1, issue2, exchange) = preconditionsAndExchange
+    assertDiffEi(Seq(TestBlock.create(genesis :+ issue1 :+ issue2)), TestBlock.create(Seq(exchange)), fsWithOrderFeature) {
+      blockDiffEi =>
+        blockDiffEi should produce("negative asset balance")
     }
   }
 
   property("Preserves assets invariant (matcher's fee in separately issued asset), stores match info, rewards matcher (Orders V3 are used)") {
 
-    val preconditionsAndExchange = for {
-      buyer   <- accountGen
-      seller  <- accountGen
-      matcher <- accountGen
-      ts      <- timestampGen
-      gen1: GenesisTransaction = GenesisTransaction.create(buyer.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gen2: GenesisTransaction = GenesisTransaction.create(seller.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gen3: GenesisTransaction = GenesisTransaction.create(matcher.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
-      issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
-      issue3: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
-      issue4: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
-      maybeAsset1              <- Gen.option(issue1.id()).map(Asset.fromCompatId)
-      maybeAsset2              <- (Gen.option(issue2.id()) suchThat (x => x != maybeAsset1.compatId)).map(Asset.fromCompatId)
-      buyMatcherFeeAssetId  = IssuedAsset(issue3.id())
-      sellMatcherFeeAssetId = IssuedAsset(issue4.id())
-      exchange <- exchangeV2GeneratorP(
-        buyer = buyer,
-        seller = seller,
-        amountAssetId = maybeAsset2,
-        priceAssetId = maybeAsset1,
-        buyMatcherFeeAssetId = buyMatcherFeeAssetId,
-        sellMatcherFeeAssetId = sellMatcherFeeAssetId,
-        fixedMatcher = Some(matcher),
-        orderVersions = Set(3)
-      )
-    } yield (gen1, gen2, gen3, issue1, issue2, issue3, issue4, exchange)
+    val preconditionsAndExchange = {
+      val buyer = TxHelpers.signer(1)
+      val seller = TxHelpers.signer(2)
+      val matcher = TxHelpers.signer(3)
 
-    forAll(preconditionsAndExchange) {
-      case (gen1, gen2, gen3, issue1, issue2, issue3, issue4, exchange) =>
-        assertDiffAndState(
-          Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2, issue3, issue4))),
-          TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
-          fsWithOrderFeature
-        ) {
-          case (blockDiff, _) =>
-            val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
-            totalPortfolioDiff.balance shouldBe 0
-            totalPortfolioDiff.effectiveBalance shouldBe 0
-            totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
+      val genesis = Seq(buyer, seller, matcher).map(acc => TxHelpers.genesis(acc.toAddress))
+      val issue1 = TxHelpers.issue(buyer, ENOUGH_AMT, name = "asset1", version = TxVersion.V1)
+      val issue2 = TxHelpers.issue(seller, ENOUGH_AMT, name = "asset2", version = TxVersion.V1)
+      val issue3 = TxHelpers.issue(buyer, ENOUGH_AMT, name = "asset3", version = TxVersion.V1)
+      val issue4 = TxHelpers.issue(seller, ENOUGH_AMT, name = "asset4", version = TxVersion.V1)
 
-            val matcherPortfolio =
-              Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
+      for {
+        maybeAsset1 <- Seq(Some(issue1.id()), None).map(Asset.fromCompatId)
+        maybeAsset2 <- Seq(Some(issue2.id()), None).map(Asset.fromCompatId) if maybeAsset1.compatId != maybeAsset2.compatId
+      } yield {
+        val buyMatcherFeeAssetId  = issue3.asset
+        val sellMatcherFeeAssetId = issue4.asset
 
-            val restoredMatcherPortfolio =
-              Monoid.combineAll(
-                Seq(
-                  ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee),
-                  ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee),
-                  wavesPortfolio(-exchange.fee)
-                )
+        val exchange = TxHelpers.exchange(
+          TxHelpers.order(OrderType.BUY, maybeAsset2, maybeAsset1, feeAsset = buyMatcherFeeAssetId, sender = buyer, matcher = matcher, version = TxVersion.V3),
+          TxHelpers.order(OrderType.SELL, maybeAsset2, maybeAsset1, feeAsset = sellMatcherFeeAssetId, sender = seller, matcher = matcher, version = TxVersion.V3),
+          matcher,
+          version = TxVersion.V2
+        )
+
+        (genesis, issue1, issue2, issue3, issue4, exchange)
+      }
+    }
+
+    preconditionsAndExchange.foreach { case (genesis, issue1, issue2, issue3, issue4, exchange) =>
+      assertDiffAndState(
+        Seq(TestBlock.create(genesis :+ issue1 :+ issue2 :+ issue3 :+ issue4)),
+        TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
+        fsWithOrderFeature
+      ) {
+        case (blockDiff, _) =>
+          val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
+          totalPortfolioDiff.balance shouldBe 0
+          totalPortfolioDiff.effectiveBalance shouldBe 0
+          totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
+
+          val matcherPortfolio =
+            Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
+
+          val restoredMatcherPortfolio =
+            Monoid.combineAll(
+              Seq(
+                ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee),
+                ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee),
+                wavesPortfolio(-exchange.fee)
               )
+            )
 
-            matcherPortfolio shouldBe restoredMatcherPortfolio
-        }
+          matcherPortfolio shouldBe restoredMatcherPortfolio
+      }
     }
   }
 
   property("Validation fails in case of attempt to pay fee in unissued asset (Orders V3 are used)") {
 
-    val preconditionsAndExchange
-        : Gen[(GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
-      buyer   <- accountGen
-      seller  <- accountGen
-      matcher <- accountGen
-      ts      <- timestampGen
-      gen1: GenesisTransaction = GenesisTransaction.create(buyer.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gen2: GenesisTransaction = GenesisTransaction.create(seller.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gen3: GenesisTransaction = GenesisTransaction.create(matcher.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
-      issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
-      maybeAsset1              <- Gen.option(issue1.id()).map(Asset.fromCompatId)
-      maybeAsset2              <- (Gen.option(issue2.id()) suchThat (x => x != maybeAsset1.compatId)).map(Asset.fromCompatId)
-      matcherFeeAssetId        <- assetIdGen retryUntil (_.nonEmpty) map (s => IssuedAsset(s.get))
-      exchange <- exchangeV2GeneratorP(
-        buyer = buyer,
-        seller = seller,
-        amountAssetId = maybeAsset2,
-        priceAssetId = maybeAsset1,
-        buyMatcherFeeAssetId = matcherFeeAssetId,
-        sellMatcherFeeAssetId = matcherFeeAssetId,
-        fixedMatcher = Some(matcher),
-        orderVersions = Set(3)
-      )
-    } yield (gen1, gen2, gen3, issue1, issue2, exchange)
+    val preconditionsAndExchange: Seq[(Seq[GenesisTransaction], IssueTransaction, IssueTransaction, ExchangeTransaction)] = {
+      val buyer = TxHelpers.signer(1)
+      val seller = TxHelpers.signer(2)
+      val matcher = TxHelpers.signer(3)
 
-    forAll(preconditionsAndExchange) {
-      case (gen1, gen2, gen3, issue1, issue2, exchange) =>
-        assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2))), TestBlock.create(Seq(exchange)), fsWithOrderFeature) {
-          blockDiffEi =>
-            blockDiffEi should produce("AccountBalanceError")
-        }
+      val genesis = Seq(buyer, seller, matcher).map(acc => TxHelpers.genesis(acc.toAddress))
+      val issue1 = TxHelpers.issue(buyer, ENOUGH_AMT, name = "asset1", version = TxVersion.V1)
+      val issue2 = TxHelpers.issue(seller, ENOUGH_AMT, name = "asset2", version = TxVersion.V1)
+
+      for {
+        maybeAsset1 <- Seq(Some(issue1.id()), None).map(Asset.fromCompatId)
+        maybeAsset2 <- Seq(Some(issue2.id()), None).map(Asset.fromCompatId) if maybeAsset1.compatId != maybeAsset2.compatId
+      } yield {
+        val matcherFeeAssetId = IssuedAsset(ByteStr.fill(32)(1))
+
+        val exchange = TxHelpers.exchange(
+          TxHelpers.order(OrderType.BUY, maybeAsset2, maybeAsset1, feeAsset = matcherFeeAssetId, sender = buyer, matcher = matcher, version = TxVersion.V3),
+          TxHelpers.order(OrderType.SELL, maybeAsset2, maybeAsset1, feeAsset = matcherFeeAssetId, sender = seller, matcher = matcher, version = TxVersion.V3),
+          matcher,
+          version = TxVersion.V2
+        )
+
+        (genesis, issue1, issue2, exchange)
+      }
+    }
+
+    preconditionsAndExchange.foreach { case (genesis, issue1, issue2, exchange) =>
+      assertDiffEi(Seq(TestBlock.create(genesis :+ issue1 :+ issue2)), TestBlock.create(Seq(exchange)), fsWithOrderFeature) {
+        blockDiffEi =>
+          blockDiffEi should produce("AccountBalanceError")
+      }
     }
   }
 
   property("Validation fails when balance of asset issued separately (asset is not in the pair) is less than fee in that asset (Orders V3 are used)") {
 
-    val preconditionsAndExchange = for {
-      buyer   <- accountGen
-      seller  <- accountGen
-      matcher <- accountGen
-      ts      <- timestampGen
-      gen1: GenesisTransaction = GenesisTransaction.create(buyer.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gen2: GenesisTransaction = GenesisTransaction.create(seller.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gen3: GenesisTransaction = GenesisTransaction.create(matcher.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
-      issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
-      issue3: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT / 1000000, buyer).map(_._1).retryUntil(_.script.isEmpty)
-      issue4: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT / 1000000, seller).map(_._1).retryUntil(_.script.isEmpty)
-      buyerIssuedAsset      = IssuedAsset(issue1.id())
-      sellerIssuedAsset     = IssuedAsset(issue2.id())
-      buyMatcherFeeAssetId  = IssuedAsset(issue3.id())
-      sellMatcherFeeAssetId = IssuedAsset(issue4.id())
-      exchange <- exchangeV2GeneratorP(
-        buyer = buyer,
-        seller = seller,
-        amountAssetId = sellerIssuedAsset,
-        priceAssetId = buyerIssuedAsset,
-        fixedMatcherFee = Some(ENOUGH_AMT / 10),
-        buyMatcherFeeAssetId = buyMatcherFeeAssetId,
-        sellMatcherFeeAssetId = sellMatcherFeeAssetId,
-        fixedMatcher = Some(matcher),
-        orderVersions = Set(3)
-      )
-    } yield (gen1, gen2, gen3, issue1, issue2, issue3, issue4, exchange)
+    val preconditionsAndExchange = {
+      val buyer = TxHelpers.signer(1)
+      val seller = TxHelpers.signer(2)
+      val matcher = TxHelpers.signer(3)
 
-    forAll(preconditionsAndExchange) {
-      case (gen1, gen2, gen3, issue1, issue2, issue3, issue4, exchange) =>
-        assertDiffEi(
-          Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2, issue3, issue4))),
-          TestBlock.create(Seq(exchange)),
-          fsWithOrderFeature
-        ) { blockDiffEi =>
-          blockDiffEi should produce("negative asset balance")
-        }
+      val genesis = Seq(buyer, seller, matcher).map(acc => TxHelpers.genesis(acc.toAddress))
+      val issue1 = TxHelpers.issue(buyer, ENOUGH_AMT, name = "asset1", version = TxVersion.V1)
+      val issue2 = TxHelpers.issue(seller, ENOUGH_AMT, name = "asset2", version = TxVersion.V1)
+      val issue3 = TxHelpers.issue(buyer, ENOUGH_AMT / 1000000, name = "asset3", version = TxVersion.V1)
+      val issue4 = TxHelpers.issue(seller, ENOUGH_AMT / 1000000, name = "asset4", version = TxVersion.V1)
+      val buyerIssuedAsset      = issue1.asset
+      val sellerIssuedAsset     = issue2.asset
+      val buyMatcherFeeAssetId  = issue3.asset
+      val sellMatcherFeeAssetId = issue4.asset
+      val exchange = TxHelpers.exchange(
+        TxHelpers.order(OrderType.BUY, sellerIssuedAsset, buyerIssuedAsset, feeAsset = buyMatcherFeeAssetId, fee = ENOUGH_AMT / 10, sender = buyer, matcher = matcher, version = TxVersion.V3),
+        TxHelpers.order(OrderType.SELL, sellerIssuedAsset, buyerIssuedAsset, feeAsset = sellMatcherFeeAssetId, fee = ENOUGH_AMT / 10, sender = seller, matcher = matcher, version = TxVersion.V3),
+        matcher,
+        version = TxVersion.V2
+      )
+
+      (genesis, issue1, issue2, issue3, issue4, exchange)
+    }
+
+    val (genesis, issue1, issue2, issue3, issue4, exchange) = preconditionsAndExchange
+    assertDiffEi(
+      Seq(TestBlock.create(genesis :+ issue1 :+ issue2 :+ issue3 :+ issue4)),
+      TestBlock.create(Seq(exchange)),
+      fsWithOrderFeature
+    ) { blockDiffEi =>
+      blockDiffEi should produce("negative asset balance")
     }
   }
 
@@ -1266,13 +1290,13 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         order2FeeAssetIssue: IssueTransaction,
         complexity: Long
     ): Unit = {
-      val order1 = TxHelpers.orderV3(
+      val order1 = TxHelpers.order(
         OrderType.BUY,
         IssuedAsset(amountAssetIssue.assetId),
         IssuedAsset(priceAssetIssue.assetId),
         IssuedAsset(order1FeeAssetIssue.assetId)
       )
-      val order2 = TxHelpers.orderV3(
+      val order2 = TxHelpers.order(
         OrderType.SELL,
         IssuedAsset(amountAssetIssue.assetId),
         IssuedAsset(priceAssetIssue.assetId),
@@ -1300,20 +1324,20 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
 
     withClue("price asset fails") {
-      val priceAssetIssue     = TxHelpers.issue(script = TestValues.rejectAssetScript)
-      val amountAssetIssue    = TxHelpers.issue(script = TestValues.assetScript)
-      val order1FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
-      val order2FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val priceAssetIssue     = TxHelpers.issue(script = Some(TestValues.rejectAssetScript))
+      val amountAssetIssue    = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val order1FeeAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val order2FeeAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
 
       test(priceAssetIssue, amountAssetIssue, order1FeeAssetIssue, order2FeeAssetIssue, TestValues.rejectAssetScriptComplexity)
 
     }
 
     withClue("amount asset fails") {
-      val priceAssetIssue     = TxHelpers.issue(script = TestValues.assetScript)
-      val amountAssetIssue    = TxHelpers.issue(script = TestValues.rejectAssetScript)
-      val order1FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
-      val order2FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val priceAssetIssue     = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val amountAssetIssue    = TxHelpers.issue(script = Some(TestValues.rejectAssetScript))
+      val order1FeeAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val order2FeeAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
 
       test(
         priceAssetIssue,
@@ -1325,10 +1349,10 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
 
     withClue("order1 matcher fee asset fails") {
-      val priceAssetIssue     = TxHelpers.issue(script = TestValues.assetScript)
-      val amountAssetIssue    = TxHelpers.issue(script = TestValues.assetScript)
-      val order1FeeAssetIssue = TxHelpers.issue(script = TestValues.rejectAssetScript)
-      val order2FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val priceAssetIssue     = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val amountAssetIssue    = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val order1FeeAssetIssue = TxHelpers.issue(script = Some(TestValues.rejectAssetScript))
+      val order2FeeAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
 
       test(
         priceAssetIssue,
@@ -1340,10 +1364,10 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
 
     withClue("order2 matcher fee asset fails") {
-      val priceAssetIssue     = TxHelpers.issue(script = TestValues.assetScript)
-      val amountAssetIssue    = TxHelpers.issue(script = TestValues.assetScript)
-      val order1FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
-      val order2FeeAssetIssue = TxHelpers.issue(script = TestValues.rejectAssetScript)
+      val priceAssetIssue     = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val amountAssetIssue    = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val order1FeeAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val order2FeeAssetIssue = TxHelpers.issue(script = Some(TestValues.rejectAssetScript))
 
       test(
         priceAssetIssue,
@@ -1381,24 +1405,24 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
     withClue("fee") {
       val tradeableAssetIssue = TxHelpers.issue()
-      val feeAssetIssue       = TxHelpers.issue(script = TestValues.assetScript)
+      val feeAssetIssue       = TxHelpers.issue(script = Some(TestValues.assetScript))
       test(tradeableAssetIssue, feeAssetIssue, 0)
     }
 
     withClue("asset") {
-      val tradeableAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val tradeableAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
       val feeAssetIssue       = TxHelpers.issue()
       test(tradeableAssetIssue, feeAssetIssue, 1)
     }
 
     withClue("fee and asset") {
-      val tradeableAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
-      val feeAssetIssue       = TxHelpers.issue(script = TestValues.assetScript)
+      val tradeableAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val feeAssetIssue       = TxHelpers.issue(script = Some(TestValues.assetScript))
       test(tradeableAssetIssue, feeAssetIssue, 1)
     }
 
     withClue("fee and asset (same asset)") {
-      val tradeableAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val tradeableAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
       test(tradeableAssetIssue, tradeableAssetIssue, 1)
     }
   }
@@ -1490,7 +1514,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     */
   def transactionWithOrdersV3IsValid(ex: ExchangeTransaction): Boolean = {
     (ex.buyOrder, ex.sellOrder) match {
-      case (_: Order, _: Order) | (_: Order, _: Order) =>
+      case (_: Order, _: Order) =>
         val isBuyerReceiveAmountGreaterThanFee =
           if (ex.buyOrder.assetPair.amountAsset == ex.buyOrder.matcherFeeAssetId) {
             ExchangeTransactionDiff.getReceiveAmount(ex.buyOrder, 8, 8, ex.amount, ex.price).explicitGet() > ex.buyMatcherFee
