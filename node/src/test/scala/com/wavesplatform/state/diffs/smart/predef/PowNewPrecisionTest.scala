@@ -1,22 +1,15 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import com.wavesplatform.TestTime
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.TxHelpers
 
 class PowNewPrecisionTest extends PropSpec with WithDomain {
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
 
   private val contract = TestCompiler(V5).compileContract(
     """
@@ -41,26 +34,27 @@ class PowNewPrecisionTest extends PropSpec with WithDomain {
     """.stripMargin
   )
 
-  private val scenario =
-    for {
-      master  <- accountGen
-      invoker <- accountGen
-      fee     <- ciFee()
-      gTx1         = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2         = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      ssTx         = SetScriptTransaction.selfSigned(1.toByte, master, Some(contract), fee, ts).explicitGet()
-      invokeTx     = () => InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, master.toAddress, None, Nil, fee, Waves, ts).explicitGet()
-    } yield (Seq(gTx1, gTx2, ssTx), invokeTx, master.toAddress)
+  private val scenario = {
+    val master = TxHelpers.signer(0)
+    val invoker = TxHelpers.signer(1)
+
+    val balances = AddrWithBalance.enoughBalances(master, invoker)
+
+    val setScript = TxHelpers.setScript(master, contract)
+    val invoke = () => TxHelpers.invoke(master.toAddress, invoker = invoker)
+
+    (balances, setScript, invoke, master.toAddress)
+  }
 
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(syncDAppCheckPaymentsHeight = 3)
+      .copy(syncDAppCheckPaymentsHeight = 4)
 
   property("pow changes precision after syncDAppCheckPaymentsHeight") {
-    val (genesisTxs, invoke, dApp) = scenario.sample.get
-    withDomain(domainSettingsWithFS(settings)) { d =>
-      d.appendBlock(genesisTxs: _*)
+    val (balances, setScript, invoke, dApp) = scenario
+    withDomain(domainSettingsWithFS(settings), balances) { d =>
+      d.appendBlock(setScript)
 
       d.appendBlock(invoke())
       d.blockchain.accountData(dApp, "result1").get.value shouldBe 9049204201489L

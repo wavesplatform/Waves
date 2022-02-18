@@ -74,16 +74,18 @@ object DataTransaction extends TransactionParser {
       data: Seq[DataEntry[_]],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, DataTransaction] =
-    create(version, sender, data, fee, timestamp, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, data, fee, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
       sender: KeyPair,
       data: Seq[DataEntry[_]],
       fee: TxAmount,
-      timestamp: TxTimestamp
+      timestamp: TxTimestamp,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, DataTransaction] =
-    signed(version, sender.publicKey, data, fee, timestamp, sender.privateKey)
+    signed(version, sender.publicKey, data, fee, timestamp, sender.privateKey, chainId)
 }
