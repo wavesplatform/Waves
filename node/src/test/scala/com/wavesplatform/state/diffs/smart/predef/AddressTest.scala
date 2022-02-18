@@ -28,13 +28,11 @@ class AddressTest extends PropSpec {
   }
 
   property("should calculate address from bytes") {
-    AddressScheme.current = new AddressScheme { override  val chainId: Byte = predef.chainId }
-
     val account = TxHelpers.signer(1)
 
     DirectiveDictionary[StdLibVersion].all.foreach { version =>
       val extractFunction = if (version >= V4) "value" else "extract"
-      val address = Address.fromPublicKey(account.publicKey)
+      val address = Address.fromPublicKey(account.publicKey, predef.chainId)
       val script =
         s"""
            | let addressString = "$address"
@@ -42,18 +40,16 @@ class AddressTest extends PropSpec {
            | let address = $extractFunction(maybeAddress)
            | address.bytes
         """.stripMargin
-      runScript(script, ctxV = version) shouldBe evaluated(ByteStr(Address.fromBytes(address.bytes).explicitGet().bytes))
+      runScript(script, ctxV = version, chainId = predef.chainId) shouldBe evaluated(ByteStr(address.bytes))
     }
   }
 
   property("should calculate address and return bytes without intermediate ref") {
-    AddressScheme.current = new AddressScheme { override  val chainId: Byte = predef.chainId }
-
     val account = TxHelpers.signer(1)
 
     DirectiveDictionary[StdLibVersion].all.foreach { version =>
       val extractFunction = if (version >= V4) "value" else "extract"
-      val address = Address.fromPublicKey(account.publicKey)
+      val address = Address.fromPublicKey(account.publicKey, predef.chainId)
       val script =
         s"""
            | let addressString = "$address"
