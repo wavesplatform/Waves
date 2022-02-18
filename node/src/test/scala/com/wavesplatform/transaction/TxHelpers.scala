@@ -72,12 +72,13 @@ object TxHelpers {
                    to: Seq[ParsedTransfer] = Seq(ParsedTransfer(secondAddress, 1.waves)),
                    asset: Asset = Waves,
                    fee: Long = TestValues.fee,
+                   timestamp: TxTimestamp = timestamp,
                    version: Byte = TxVersion.V2,
                    chainId: Byte = AddressScheme.current.chainId): MassTransferTransaction =
     MassTransferTransaction.selfSigned(version, from, asset, to, fee, timestamp, ByteStr.empty, chainId).explicitGet()
 
   def issue(issuer: KeyPair = defaultSigner,
-            amount: Long = 1000,
+            amount: Long = Long.MaxValue / 100,
             decimals: Byte = 0,
             name: String = "test",
             description: String = "description",
@@ -94,11 +95,12 @@ object TxHelpers {
   def reissue(asset: IssuedAsset,
               sender: KeyPair = defaultSigner,
               amount: Long = 1000,
+              reissuable: Boolean = true,
               fee: TxAmount = TestValues.fee,
               version: TxVersion = TxVersion.V2,
               chainId: Byte = AddressScheme.current.chainId): ReissueTransaction =
     ReissueTransaction
-      .selfSigned(version, sender, asset, amount, reissuable = true, fee, timestamp, chainId)
+      .selfSigned(version, sender, asset, amount, reissuable = reissuable, fee, timestamp, chainId)
       .explicitGet()
 
   def burn(asset: IssuedAsset,
@@ -146,7 +148,9 @@ object TxHelpers {
       fee: TxAmount = 1L,
       sender: KeyPair = defaultSigner,
       matcher: KeyPair = defaultSigner,
-      version: TxVersion = TxVersion.V3
+      timestamp: TxTimestamp = timestamp,
+      expiration: TxTimestamp = timestamp + 100000,
+      version: TxVersion = Order.V3
   ): Order = {
     Order.selfSigned(
       version,
@@ -157,13 +161,18 @@ object TxHelpers {
       amount,
       price,
       timestamp,
-      timestamp + 100000,
+      expiration,
       fee,
       feeAsset
     )
   }
 
-  def exchange(order1: Order, order2: Order, matcher: KeyPair = defaultSigner, version: TxVersion = TxVersion.V2, chainId: Byte = AddressScheme.current.chainId): ExchangeTransaction = {
+  def exchangeFromOrders(order1: Order,
+                         order2: Order,
+                         matcher: KeyPair = defaultSigner,
+                         fee: TxAmount = TestValues.fee,
+                         version: TxVersion = TxVersion.V2,
+                         chainId: Byte = AddressScheme.current.chainId): ExchangeTransaction =
     ExchangeTransaction
       .signed(
         version,
@@ -174,12 +183,36 @@ object TxHelpers {
         order1.price,
         order1.matcherFee,
         order2.matcherFee,
-        TestValues.fee,
+        fee,
         timestamp,
         chainId
       )
       .explicitGet()
-  }
+
+  def exchange(order1: Order,
+               order2: Order,
+               matcher: KeyPair = defaultSigner,
+               amount: Long = 1L,
+               price: Long = 1L,
+               buyMatcherFee: Long = 1L,
+               sellMatcherFee: Long = 1L,
+               fee: Long = TestValues.fee,
+               timestamp: Long = timestamp,
+               version: TxVersion = TxVersion.V2,
+               chainId: Byte = AddressScheme.current.chainId): ExchangeTransaction =
+    ExchangeTransaction.signed(
+      version,
+      matcher = matcher.privateKey,
+      order1 = order1,
+      order2 = order2,
+      amount = amount,
+      price = price,
+      buyMatcherFee = buyMatcherFee,
+      sellMatcherFee = sellMatcherFee,
+      fee = fee,
+      timestamp = timestamp,
+      chainId = chainId
+    ).explicitGet()
 
   def script(scriptText: String): Script = {
     val (script, _) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3(fixOverflow = true)).explicitGet()
@@ -250,7 +283,7 @@ object TxHelpers {
   def sponsor(asset: IssuedAsset,
               minSponsoredAssetFee: Option[TxAmount] = Some(TestValues.fee),
               sender: KeyPair = defaultSigner,
-              fee: TxAmount = TestValues.fee,
+              fee: TxAmount = 1.waves,
               version: TxVersion = TxVersion.V1,
               chainId: Byte = AddressScheme.current.chainId): SponsorFeeTransaction = {
     SponsorFeeTransaction.selfSigned(version, sender, asset, minSponsoredAssetFee, fee, timestamp, chainId).explicitGet()

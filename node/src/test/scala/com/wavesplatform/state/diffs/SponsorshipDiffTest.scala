@@ -113,7 +113,7 @@ class SponsorshipDiffTest extends PropSpec with WithState {
       val sponsorTxFee = (0.001 * Constants.UnitsInWave).toLong
 
       val genesis = TxHelpers.genesis(master.toAddress, 400000000)
-      val issue = TxHelpers.issue(master, Long.MaxValue / 100, version = TxVersion.V1)
+      val issue = TxHelpers.issue(master, version = TxVersion.V1)
       val sponsor = TxHelpers.sponsor(issue.asset, Some(400000), master, fee = sponsorTxFee)
       val assetOverspend = TxHelpers.transfer(master, recipient.toAddress, 1000000, feeAsset = issue.asset, fee = issue.quantity + 1, version = TxVersion.V1)
       val insufficientFee = TxHelpers.transfer(master, recipient.toAddress, 1000000, feeAsset = issue.asset, fee = sponsor.minSponsoredAssetFee.get - 1, version = TxVersion.V1)
