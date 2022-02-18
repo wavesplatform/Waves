@@ -5,6 +5,7 @@ import com.wavesplatform.account._
 import com.wavesplatform.api.http.requests.{InvokeScriptRequest, SignedInvokeScriptRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, _}
+import com.wavesplatform.crypto
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BIGINT, CONST_BYTESTR, CONST_LONG, CONST_STRING, CaseObj}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
@@ -12,12 +13,11 @@ import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.{Amount, transaction}
 import com.wavesplatform.serialization.Deser
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.NonPositiveAmount
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
-import com.wavesplatform.crypto
-import com.wavesplatform.test._
 import play.api.libs.json.{JsObject, Json}
 
 class InvokeScriptTransactionSpecification extends PropSpec {
@@ -42,7 +42,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
   }
 
   property("protobuf roundtrip") {
-    val tx = createInvoke()
+    val tx     = createInvoke()
     val caller = TxHelpers.defaultSigner
 
     val unsigned = transaction.PBTransaction(
@@ -108,80 +108,90 @@ class InvokeScriptTransactionSpecification extends PropSpec {
   }
 
   property("JSON format validation for InvokeScriptTransaction") {
-    AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
-    val tx = createInvoke()
-    val js = Json.parse(s"""{
+    val dApp = KeyPair("test5".getBytes("UTF-8")).toAddress('D')
+    val js   = Json.parse(s"""{
                          "type": 16,
-                         "id": "${tx.id()}",
-                         "sender": "${TxHelpers.defaultAddress}",
-                         "senderPublicKey": "${TxHelpers.defaultSigner.publicKey}",
-                         "fee": 500000,
+                         "id": "6z3CsQBFzV8Wfp1DDiXw5c75LrrwxktPPJTcXYBfTetN",
+                         "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
+                         "senderPublicKey": "$publicKey",
+                         "fee": 100000,
                          "feeAssetId": null,
-                         "timestamp": ${tx.timestamp},
+                         "timestamp": 1526910778245,
                          "proofs": ["x7T161SxvUxpubEAKv4UL5ucB5pquAhTryZ8Qrd347TPuQ4yqqpVMQ2B5FpeFXGnpyLvb7wGeoNsyyjh5R61u7F"],
                          "version": 1,
-                         "dApp" : "${TxHelpers.secondAddress}",
+                         "dApp" : "$dApp",
                          "call": {
-                            "function" : "test",
+                            "function" : "foo",
                              "args" : [
-                             {
-                               "type" : "integer",
-                               "value" : 1
-                             },
-                             {
-                               "type" : "string",
-                               "value" : "test_str"
-                             },
-                             {
-                               "type" : "binary",
+                             { "type" : "binary",
                                "value" : "base64:YWxpY2U="
                              }
                             ]
                           },
-                         "payment" : [
-                           {
-                             "amount" : 1,
-                             "assetId" : null
-                           },
-                           {
-                             "amount" : 2,
-                             "assetId" : "$publicKey"
-                           }
-                         ]
+                         "payment" : [{
+                            "amount" : 7,
+                            "assetId" : "$publicKey"
+                            }]
                         }
     """)
 
+    val tx = InvokeScriptTransaction
+      .selfSigned(
+        1.toByte,
+        KeyPair("test3".getBytes("UTF-8")),
+        dApp,
+        Some(
+          Terms.FUNCTION_CALL(
+            FunctionHeader.User("foo"),
+            List(Terms.CONST_BYTESTR(ByteStr(Base64.tryDecode("YWxpY2U=").get)).explicitGet())
+          )
+        ),
+        Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
+        100000,
+        Waves,
+        1526910778245L
+      )
+      .explicitGet()
+
     (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
+    TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
   }
 
   property("JSON format validation for InvokeScriptTransaction without FUNCTION_CALL") {
-    AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
-    val tx = createInvoke(None)
-    val js = Json.parse(s"""{
+    val dApp = KeyPair("test6".getBytes("UTF-8")).toAddress('D')
+    val js   = Json.parse(s"""{
                          "type": 16,
-                         "id": "${tx.id()}",
-                         "sender": "${TxHelpers.defaultAddress}",
-                         "senderPublicKey": "${TxHelpers.defaultSigner.publicKey}",
-                         "fee": 500000,
+                         "id": "4sxYQWNDmWvaLwVcmfX1Znj8RfAy7JAWnSQUFgAFFixC",
+                         "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
+                         "senderPublicKey": "$publicKey",
+                         "fee": 100000,
                          "feeAssetId": null,
-                         "timestamp": ${tx.timestamp},
+                         "timestamp": 1526910778245,
                          "proofs": ["3frswEnyFZjTzBQ5pdNEJbPzvLp7Voz8sqZT3n7xsuVDdYGcasXgFNzb8HCrpNXYoDWLsHqrUSqcQfQJ8CRWjp4U"],
                          "version": 1,
-                         "dApp" : "${TxHelpers.secondAddress}",
-                         "payment" : [
-                           {
-                             "amount" : 1,
-                             "assetId" : null
-                           },
-                           {
-                             "amount" : 2,
-                             "assetId" : "$publicKey"
-                           }
-                         ]
+                         "dApp" : "$dApp",
+                         "payment" : [{
+                            "amount" : 7,
+                            "assetId" : "$publicKey"
+                            }]
                         }
     """)
 
+    val tx = InvokeScriptTransaction
+      .selfSigned(
+        1.toByte,
+        KeyPair("test3".getBytes("UTF-8")),
+        dApp,
+        None,
+        Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
+        100000,
+        Waves,
+        1526910778245L
+      )
+      .explicitGet()
+
     (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
+    TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
   }
 
   property("Signed InvokeScriptTransactionRequest parser") {
@@ -197,7 +207,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
         )
       ),
       payment = Some(Seq(Payment(1, Waves))),
-      dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+      dApp = KeyPair("test7".getBytes("UTF-8")).toAddress('D').stringRepr,
       timestamp = 11,
       proofs =
         Proofs(List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").map(s => ByteStr.decodeBase58(s).get))
@@ -284,7 +294,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
 
   property("can't be more 5kb") {
     val largeString = "abcde" * 1024
-    val pk = PublicKey.fromBase58String(publicKey).explicitGet()
+    val pk          = KeyPair("test8".getBytes("UTF-8")).publicKey
     InvokeScriptTransaction.create(
       1.toByte,
       pk,
@@ -311,7 +321,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
         )
       ),
       payment = Some(Seq(Payment(0, Waves))),
-      dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+      dApp = KeyPair("test9".getBytes("UTF-8")).toAddress('D').stringRepr,
       timestamp = 11,
       proofs =
         Proofs(List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").map(s => ByteStr.decodeBase58(s).get))
@@ -332,7 +342,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
         )
       ),
       payment = Some(Seq(Payment(-1L, Waves))),
-      dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+      dApp = KeyPair("test10".getBytes("UTF-8")).toAddress('D').stringRepr,
       timestamp = 11,
       proofs =
         Proofs(List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").map(s => ByteStr.decodeBase58(s).get))

@@ -87,7 +87,7 @@ object Address extends ScorexLogging {
     )
   }
 
-  def fromString(addressStr: String, chainId: Byte = scheme.chainId): Either[ValidationError, Address] = {
+  def fromString(addressStr: String, chainId: Option[Byte] = Some(scheme.chainId)): Either[ValidationError, Address] = {
     val base58String = if (addressStr.startsWith(Prefix)) addressStr.drop(Prefix.length) else addressStr
     for {
       _ <- Either.cond(
@@ -96,7 +96,7 @@ object Address extends ScorexLogging {
         InvalidAddress(s"Wrong address string length: max=$AddressStringLength, actual: ${base58String.length}")
       )
       byteArray <- Base58.tryDecodeWithLimit(base58String).toEither.left.map(ex => InvalidAddress(s"Unable to decode base58: ${ex.getMessage}"))
-      address   <- fromBytes(byteArray, chainId)
+      address   <- fromBytes(byteArray, chainId.getOrElse(byteArray(1)))
     } yield address
   }
 
