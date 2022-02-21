@@ -6,8 +6,11 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Diff
+import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.utils.base58Length
+import eu.timepit.refined.api.{Refined, RefinedTypeOps}
+import eu.timepit.refined.numeric.Interval
 
 package object transaction {
   val AssetIdLength: Int       = com.wavesplatform.crypto.DigestLength
@@ -28,6 +31,9 @@ package object transaction {
   type TxAmount    = Long
   type TxTimestamp = Long
   type TxByteArray = Array[Byte]
+
+  type TxExchangeAmount = Long Refined Interval.OpenClosed[0, Order.MaxAmount.type ]
+  object TxExchangeAmount extends RefinedTypeOps[TxExchangeAmount, Long]
 
   implicit class TransactionValidationOps[T <: Transaction](val tx: T) extends AnyVal {
     def validatedNel(implicit validator: TxValidator[T]): ValidatedNel[ValidationError, T] = validator.validate(tx)

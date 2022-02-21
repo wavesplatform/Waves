@@ -72,8 +72,8 @@ object ExchangeTransactionDiff {
       Diff(
         portfolios = portfolios,
         orderFills = Map(
-          tx.buyOrder.id()  -> VolumeAndFee(tx.amount, tx.buyMatcherFee),
-          tx.sellOrder.id() -> VolumeAndFee(tx.amount, tx.sellMatcherFee)
+          tx.buyOrder.id()  -> VolumeAndFee(tx.amount.value, tx.buyMatcherFee),
+          tx.sellOrder.id() -> VolumeAndFee(tx.amount.value, tx.sellMatcherFee)
         ),
         scriptsRun = scripts
       )
@@ -139,10 +139,10 @@ object ExchangeTransactionDiff {
       amountDecimals = if (tx.version < TxVersion.V3) 8 else tx.buyOrder.assetPair.amountAsset.fold(8)(ia => assets(ia).fold(8)(_.decimals))
       priceDecimals  = if (tx.version < TxVersion.V3) 8 else tx.buyOrder.assetPair.priceAsset.fold(8)(ia => assets(ia).fold(8)(_.decimals))
       _                     <- isPriceValid(amountDecimals, priceDecimals)
-      buyPriceAssetChange   <- getSpendAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount, tx.price).map(-_)
-      buyAmountAssetChange  <- getReceiveAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount, tx.price)
-      sellPriceAssetChange  <- getReceiveAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount, tx.price)
-      sellAmountAssetChange <- getSpendAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount, tx.price).map(-_)
+      buyPriceAssetChange   <- getSpendAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount.value, tx.price).map(-_)
+      buyAmountAssetChange  <- getReceiveAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount.value, tx.price)
+      sellPriceAssetChange  <- getReceiveAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount.value, tx.price)
+      sellAmountAssetChange <- getSpendAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount.value, tx.price).map(-_)
       priceDiff  = getAssetDiff(tx.buyOrder.assetPair.priceAsset, buyPriceAssetChange, sellPriceAssetChange)
       amountDiff = getAssetDiff(tx.buyOrder.assetPair.amountAsset, buyAmountAssetChange, sellAmountAssetChange)
     } yield Monoid.combineAll(Seq(feeDiff, priceDiff, amountDiff))
@@ -153,8 +153,8 @@ object ExchangeTransactionDiff {
     val filledBuy  = blockchain.filledVolumeAndFee(exTrans.buyOrder.id())
     val filledSell = blockchain.filledVolumeAndFee(exTrans.sellOrder.id())
 
-    val buyTotal  = filledBuy.volume + exTrans.amount
-    val sellTotal = filledSell.volume + exTrans.amount
+    val buyTotal  = filledBuy.volume + exTrans.amount.value
+    val sellTotal = filledSell.volume + exTrans.amount.value
 
     lazy val buyAmountValid  = exTrans.buyOrder.amount >= buyTotal
     lazy val sellAmountValid = exTrans.sellOrder.amount >= sellTotal

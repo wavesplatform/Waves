@@ -166,6 +166,8 @@ object Dependencies {
       monixModule("reactive").value,
       nettyHandler,
       "com.typesafe.scala-logging"                       %% "scala-logging" % "3.9.4",
+      "eu.timepit" %% "refined"                 % "0.9.28",
+      "eu.timepit" %% "refined-cats"            % "0.9.28",
       akkaModule("testkit")                              % Test,
       akkaHttpModule("akka-http-testkit")                % Test,
       leveldbJava().exclude("com.google.guava", "guava") % Test

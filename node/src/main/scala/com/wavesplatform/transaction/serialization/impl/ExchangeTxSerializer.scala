@@ -1,12 +1,11 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
-import com.wavesplatform.transaction.{Proofs, TxVersion}
+import com.wavesplatform.transaction.{Proofs, TxExchangeAmount, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -17,7 +16,7 @@ object ExchangeTxSerializer {
     BaseTxJson.toJson(tx) ++ Json.obj(
       "order1"         -> order1.json(),
       "order2"         -> order2.json(),
-      "amount"         -> amount,
+      "amount"         -> amount.value,
       "price"          -> price,
       "buyMatcherFee"  -> buyMatcherFee,
       "sellMatcherFee" -> sellMatcherFee
@@ -36,7 +35,7 @@ object ExchangeTxSerializer {
           order1.bytes(),
           order2.bytes(),
           Longs.toByteArray(price),
-          Longs.toByteArray(amount),
+          Longs.toByteArray(amount.value),
           Longs.toByteArray(buyMatcherFee),
           Longs.toByteArray(sellMatcherFee),
           Longs.toByteArray(fee),
@@ -56,7 +55,7 @@ object ExchangeTxSerializer {
           orderMark(order2.version),
           order2.bytes(),
           Longs.toByteArray(price),
-          Longs.toByteArray(amount),
+          Longs.toByteArray(amount.value),
           Longs.toByteArray(buyMatcherFee),
           Longs.toByteArray(sellMatcherFee),
           Longs.toByteArray(fee),
@@ -88,7 +87,7 @@ object ExchangeTxSerializer {
       val sellMatcherFee = buf.getLong
       val fee            = buf.getLong
       val timestamp      = buf.getLong
-      ExchangeTransaction(TxVersion.V1, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty, AddressScheme.current.chainId)
+      ExchangeTransaction(TxVersion.V1, order1, order2, TxExchangeAmount.unsafeFrom(amount), price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty, AddressScheme.current.chainId)
     }
 
     def parseV2(buf: ByteBuffer): ExchangeTransaction = {
@@ -100,7 +99,7 @@ object ExchangeTxSerializer {
       val sellMatcherFee = buf.getLong
       val fee            = buf.getLong
       val timestamp      = buf.getLong
-      ExchangeTransaction(TxVersion.V2, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty, AddressScheme.current.chainId)
+      ExchangeTransaction(TxVersion.V2, order1, order2, TxExchangeAmount.unsafeFrom(amount), price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty, AddressScheme.current.chainId)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

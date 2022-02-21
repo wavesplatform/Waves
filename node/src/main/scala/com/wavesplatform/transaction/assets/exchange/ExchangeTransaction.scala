@@ -1,9 +1,11 @@
 package com.wavesplatform.transaction.assets.exchange
 
+import cats.syntax.either._
 import com.wavesplatform.account.{AddressScheme, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.ExchangeTxSerializer
 import com.wavesplatform.transaction.validation.impl.ExchangeTxValidator
@@ -16,7 +18,7 @@ case class ExchangeTransaction(
     version: TxVersion,
     order1: Order,
     order2: Order,
-    amount: Long,
+    amount: TxExchangeAmount,
     price: Long,
     buyMatcherFee: Long,
     sellMatcherFee: Long,
@@ -76,7 +78,11 @@ object ExchangeTransaction extends TransactionParser {
       proofs: Proofs = Proofs.empty,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ExchangeTransaction] =
-    ExchangeTransaction(version, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs, chainId).validatedEither
+    for {
+      amount <- TxExchangeAmount.from(amount)
+        .leftMap(_ => GenericError(s"amount should be in interval (0; ${Order.MaxAmount}]"))
+      tx <- ExchangeTransaction(version, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs, chainId).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,

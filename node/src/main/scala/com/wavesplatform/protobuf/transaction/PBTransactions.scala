@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Proofs, TxValidationError}
+import com.wavesplatform.transaction.{Proofs, TxExchangeAmount, TxValidationError}
 import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{transaction => vt}
 import scalapb.UnknownFieldSet.empty
@@ -434,7 +434,7 @@ object PBTransactions {
           version.toByte,
           PBOrders.vanilla(buyOrder),
           PBOrders.vanilla(sellOrder),
-          amount,
+          TxExchangeAmount.unsafeFrom(amount),
           price,
           buyMatcherFee,
           sellMatcherFee,
@@ -537,7 +537,7 @@ object PBTransactions {
       case tx: vt.assets.exchange.ExchangeTransaction =>
         import tx._
         val data = ExchangeTransactionData(
-          amount,
+          amount.value,
           price,
           buyMatcherFee,
           sellMatcherFee,

@@ -13,8 +13,6 @@ object ExchangeTxValidator extends TxValidator[ExchangeTransaction] {
 
     V.seq(tx)(
       V.fee(fee),
-      V.positiveAmount(amount, "assets"),
-      V.cond(amount <= Order.MaxAmount, GenericError("amount too large")),
       V.cond(price > 0, GenericError("price should be > 0")),
       V.cond(price <= Order.MaxAmount, GenericError("price too large")),
       V.cond(sellMatcherFee <= Order.MaxAmount, GenericError("sellMatcherFee too large")),

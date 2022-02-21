@@ -560,7 +560,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       val buyFee     = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue
       val sellFee    = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue
       val trans =
-        ExchangeTransaction(1.toByte, o1, o2, matchedAmount, price, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100, Proofs.empty, chainId)
+        ExchangeTransaction(1.toByte, o1, o2, TxExchangeAmount.unsafeFrom(matchedAmount), price, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100, Proofs.empty, chainId)
           .signWith(matcher.privateKey)
 
       trans

@@ -1,7 +1,6 @@
 package com.wavesplatform.it.api
 
 import java.net.InetSocketAddress
-
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
@@ -20,7 +19,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.transaction.{Asset, TxExchangeAmount, TxVersion}
 import io.grpc.Status.Code
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
@@ -398,20 +397,18 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }
 
-    def broadcastExchange(
-        matcher: KeyPair,
-        order1: Order,
-        order2: Order,
-        amount: Long,
-        price: Long,
-        buyMatcherFee: Long,
-        sellMatcherFee: Long,
-        fee: Long,
-        version: Byte = 2,
-        waitForTx: Boolean = false,
-        amountsAsStrings: Boolean = false,
-        validate: Boolean = true
-    ): Transaction = {
+    def broadcastExchange(matcher: KeyPair,
+                          order1: Order,
+                          order2: Order,
+                          amount: TxExchangeAmount,
+                          price: Long,
+                          buyMatcherFee: Long,
+                          sellMatcherFee: Long,
+                          fee: Long,
+                          version: Byte = 2,
+                          waitForTx: Boolean = false,
+                          amountsAsStrings: Boolean = false,
+                          validate: Boolean = true): Transaction = {
       maybeWaitForTransaction(
         sync(
           async(n).broadcastExchange(

@@ -247,7 +247,7 @@ class ChainIdSpecification extends PropSpec {
             TxVersion.V3,
             Order.sell(Order.V3, sender, sender.publicKey, pair, amount, amount, ts, ts + ts, fee),
             Order.buy(Order.V3, sender, sender.publicKey, pair, amount, amount, ts, ts + ts, fee),
-            amount,
+            TxExchangeAmount.unsafeFrom(amount),
             amount,
             fee,
             fee,

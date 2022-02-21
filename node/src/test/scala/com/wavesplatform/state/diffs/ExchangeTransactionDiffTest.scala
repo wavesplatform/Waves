@@ -597,7 +597,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
     forAll(preconditions) {
       case (gen1, gen2, issue1, exchange) =>
-        whenever(exchange.amount > 300000) {
+        whenever(exchange.amount.value > 300000) {
           assertDiffAndState(
             Seq(TestBlock.create(Seq(gen1, gen2, issue1))),
             TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
@@ -1230,7 +1230,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
               amount     <- Gen.choose(Math.min(sellAmount, buyAmount) / 2000, Math.min(sellAmount, buyAmount) / 1000)
             } yield tx
               .copy(
-                amount = amount,
+                amount = TxExchangeAmount.unsafeFrom(amount),
                 order1 = tx.buyOrder.copy(amount = sellAmount).signWith(buyer.privateKey),
                 order2 = tx.sellOrder.copy(amount = buyAmount).signWith(seller.privateKey),
                 buyMatcherFee = (BigInt(tx.fee) * amount / buyAmount).toLong,
@@ -1517,12 +1517,12 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       case (_: Order, _: Order) =>
         val isBuyerReceiveAmountGreaterThanFee =
           if (ex.buyOrder.assetPair.amountAsset == ex.buyOrder.matcherFeeAssetId) {
-            ExchangeTransactionDiff.getReceiveAmount(ex.buyOrder, 8, 8, ex.amount, ex.price).explicitGet() > ex.buyMatcherFee
+            ExchangeTransactionDiff.getReceiveAmount(ex.buyOrder, 8, 8, ex.amount.value, ex.price).explicitGet() > ex.buyMatcherFee
           } else true
 
         val isSellerReceiveAmountGreaterThanFee =
           if (ex.sellOrder.assetPair.amountAsset == ex.sellOrder.matcherFeeAssetId) {
-            ExchangeTransactionDiff.getReceiveAmount(ex.sellOrder, 8, 8, ex.amount, ex.price).explicitGet() > ex.sellMatcherFee
+            ExchangeTransactionDiff.getReceiveAmount(ex.sellOrder, 8, 8, ex.amount.value, ex.price).explicitGet() > ex.sellMatcherFee
           } else true
 
         isBuyerReceiveAmountGreaterThanFee && isSellerReceiveAmountGreaterThanFee
