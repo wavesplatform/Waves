@@ -15,7 +15,7 @@ import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.{TxExchangeAmount, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -319,7 +319,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         dAppKP,
         sellOrder,
         buyOrder,
-        amount = buyOrder.amount,
+        amount = TxExchangeAmount.unsafeFrom(buyOrder.amount),
         price = buyOrder.price,
         buyMatcherFee = smartMatcherFee,
         sellMatcherFee = smartMatcherFee,
@@ -401,7 +401,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           dAppKP,
           buy,
           sell,
-          buy.amount,
+          TxExchangeAmount.unsafeFrom(buy.amount),
           buy.price,
           buy.matcherFee,
           sell.matcherFee,
@@ -430,7 +430,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           dAppKP,
           buy,
           sell,
-          buy.amount,
+          TxExchangeAmount.unsafeFrom(buy.amount),
           buy.price,
           buy.matcherFee,
           sell.matcherFee,

@@ -12,7 +12,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.{TxExchangeAmount, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
 import scala.concurrent.duration._
@@ -82,7 +82,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
         sender.keyPair,
         sellOrder,
         buyOrder,
-        buyOrder.amount,
+        TxExchangeAmount.unsafeFrom(buyOrder.amount),
         buyOrder.price,
         matcherFee,
         matcherFee,
@@ -147,7 +147,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
         sender.keyPair,
         sellOrder,
         buyOrder,
-        buyOrder.amount,
+        TxExchangeAmount.unsafeFrom(buyOrder.amount),
         buyOrder.price,
         matcherFee,
         matcherFee * 10,
@@ -163,7 +163,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
       sender.keyPair,
       sellOrder,
       buyOrder,
-      buyOrder.amount,
+      TxExchangeAmount.unsafeFrom(buyOrder.amount),
       buyOrder.price,
       matcherFee,
       matcherFee,
