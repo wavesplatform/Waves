@@ -19,9 +19,9 @@ case class ExchangeTransaction(
     order1: Order,
     order2: Order,
     amount: TxExchangeAmount,
-    price: Long,
-    buyMatcherFee: Long,
-    sellMatcherFee: Long,
+    price: TxExchangePrice,
+    buyMatcherFee: TxMatcherFee,
+    sellMatcherFee: TxMatcherFee,
     fee: Long,
     timestamp: Long,
     proofs: Proofs,
@@ -80,7 +80,13 @@ object ExchangeTransaction extends TransactionParser {
   ): Either[ValidationError, ExchangeTransaction] =
     for {
       amount <- TxExchangeAmount.from(amount)
-        .leftMap(_ => GenericError(s"amount should be in interval (0; ${Order.MaxAmount}]"))
+        .leftMap(_ => GenericError(TxExchangeAmount.errMsg))
+      price <- TxExchangePrice.from(price)
+        .leftMap(_ => GenericError(TxExchangePrice.errMsg))
+      sellMatcherFee <- TxMatcherFee.from(sellMatcherFee)
+        .leftMap(_ => GenericError(s"sell ${TxMatcherFee.errMsg}"))
+      buyMatcherFee <- TxMatcherFee.from(buyMatcherFee)
+        .leftMap(_ => GenericError(s"buy ${TxMatcherFee.errMsg}"))
       tx <- ExchangeTransaction(version, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 

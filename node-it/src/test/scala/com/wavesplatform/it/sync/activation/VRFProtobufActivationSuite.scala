@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.activation
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, StateCheckFailed}
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
@@ -12,7 +12,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.transaction.{TxExchangeAmount, TxVersion}
+import com.wavesplatform.transaction.{TxExchangePrice, TxMatcherFee, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
 import scala.concurrent.duration._
@@ -82,10 +82,10 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
         sender.keyPair,
         sellOrder,
         buyOrder,
-        TxExchangeAmount.unsafeFrom(buyOrder.amount),
-        buyOrder.price,
-        matcherFee,
-        matcherFee,
+        buyOrder.amount,
+        TxExchangePrice.unsafeFrom(buyOrder.price.value),
+        TxMatcherFee.unsafeFrom(matcherFee),
+        TxMatcherFee.unsafeFrom(matcherFee),
         matcherFee,
         validate = false
       )
@@ -147,10 +147,10 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
         sender.keyPair,
         sellOrder,
         buyOrder,
-        TxExchangeAmount.unsafeFrom(buyOrder.amount),
-        buyOrder.price,
-        matcherFee,
-        matcherFee * 10,
+        buyOrder.amount,
+        TxExchangePrice.unsafeFrom(buyOrder.price.value),
+        TxMatcherFee.unsafeFrom(matcherFee),
+        TxMatcherFee.unsafeFrom(matcherFee * 10),
         matcherFee * 10,
         validate = false
       )
@@ -163,10 +163,10 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
       sender.keyPair,
       sellOrder,
       buyOrder,
-      TxExchangeAmount.unsafeFrom(buyOrder.amount),
-      buyOrder.price,
-      matcherFee,
-      matcherFee,
+      buyOrder.amount,
+      TxExchangePrice.unsafeFrom(buyOrder.price.value),
+      TxMatcherFee.unsafeFrom(matcherFee),
+      TxMatcherFee.unsafeFrom(matcherFee),
       matcherFee,
       version = TxVersion.V3,
       waitForTx = true
@@ -224,7 +224,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
       ts,
       ts + Order.MaxLiveTime,
       matcherFee
-    )
+    ).explicitGet()
     val sellOrder = Order.sell(
       version = TxVersion.V2,
       sender.keyPair,
@@ -235,7 +235,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
       ts,
       ts + Order.MaxLiveTime,
       matcherFee
-    )
+    ).explicitGet()
     (buyOrder, sellOrder)
   }
 }

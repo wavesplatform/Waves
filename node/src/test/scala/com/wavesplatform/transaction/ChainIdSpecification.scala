@@ -245,12 +245,12 @@ class ChainIdSpecification extends PropSpec {
         validateFromOtherNetwork(
           ExchangeTransaction(
             TxVersion.V3,
-            Order.sell(Order.V3, sender, sender.publicKey, pair, amount, amount, ts, ts + ts, fee),
-            Order.buy(Order.V3, sender, sender.publicKey, pair, amount, amount, ts, ts + ts, fee),
+            Order.sell(Order.V3, sender, sender.publicKey, pair, amount, amount, ts, ts + ts, fee).explicitGet(),
+            Order.buy(Order.V3, sender, sender.publicKey, pair, amount, amount, ts, ts + ts, fee).explicitGet(),
             TxExchangeAmount.unsafeFrom(amount),
-            amount,
-            fee,
-            fee,
+            TxExchangePrice.unsafeFrom(amount),
+            TxMatcherFee.unsafeFrom(fee),
+            TxMatcherFee.unsafeFrom(fee),
             fee,
             ts,
             Proofs.empty,

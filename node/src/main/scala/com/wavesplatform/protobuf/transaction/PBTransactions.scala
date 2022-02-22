@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Proofs, TxExchangeAmount, TxValidationError}
+import com.wavesplatform.transaction.{Proofs, TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxValidationError}
 import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{transaction => vt}
 import scalapb.UnknownFieldSet.empty
@@ -208,19 +208,23 @@ object PBTransactions {
         vt.lease.LeaseCancelTransaction.create(version.toByte, sender, leaseId.toByteStr, feeAmount, timestamp, proofs, chainId)
 
       case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(order1, order2), `empty`)) =>
-        vt.assets.exchange.ExchangeTransaction.create(
-          version.toByte,
-          PBOrders.vanilla(order1),
-          PBOrders.vanilla(order2),
-          amount,
-          price,
-          buyMatcherFee,
-          sellMatcherFee,
-          feeAmount,
-          timestamp,
-          proofs,
-          chainId
-        )
+        for {
+          order1 <- PBOrders.vanilla(order1)
+          order2 <- PBOrders.vanilla(order2)
+          tx <- vt.assets.exchange.ExchangeTransaction.create(
+            version.toByte,
+            order1,
+            order2,
+            amount,
+            price,
+            buyMatcherFee,
+            sellMatcherFee,
+            feeAmount,
+            timestamp,
+            proofs,
+            chainId
+          )
+        } yield tx
 
       case Data.DataTransaction(dt) =>
         vt.DataTransaction.create(version.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs, chainId)
@@ -432,12 +436,12 @@ object PBTransactions {
       case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder), `empty`)) =>
         vt.assets.exchange.ExchangeTransaction(
           version.toByte,
-          PBOrders.vanilla(buyOrder),
-          PBOrders.vanilla(sellOrder),
+          PBOrders.vanilla(buyOrder).explicitGet(),
+          PBOrders.vanilla(sellOrder).explicitGet(),
           TxExchangeAmount.unsafeFrom(amount),
-          price,
-          buyMatcherFee,
-          sellMatcherFee,
+          TxExchangePrice.unsafeFrom(price),
+          TxMatcherFee.unsafeFrom(buyMatcherFee),
+          TxMatcherFee.unsafeFrom(sellMatcherFee),
           feeAmount,
           timestamp,
           proofs,
@@ -538,9 +542,9 @@ object PBTransactions {
         import tx._
         val data = ExchangeTransactionData(
           amount.value,
-          price,
-          buyMatcherFee,
-          sellMatcherFee,
+          price.value,
+          buyMatcherFee.value,
+          sellMatcherFee.value,
           Seq(PBOrders.protobuf(order1), PBOrders.protobuf(order2))
         )
         PBTransactions.create(tx.sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Exchange(data))

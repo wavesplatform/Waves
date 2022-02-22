@@ -11,7 +11,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.{TxExchangeAmount, TxVersion}
+import com.wavesplatform.transaction.{TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxVersion}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils._
@@ -63,29 +63,29 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val amount     = 1
 
       val pair = AssetPair.createAssetPair("WAVES", assetId).get
-      val buy  = Order.buy(buyVersion, buyer, matcher.publicKey, pair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee)
-      val sell = Order.sell(sellVersion, seller, matcher.publicKey, pair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee)
+      val buy  = Order.buy(buyVersion, buyer, matcher.publicKey, pair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee).explicitGet()
+      val sell = Order.sell(sellVersion, seller, matcher.publicKey, pair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee).explicitGet()
 
-      val buyFee  = (BigInt(matcherFee) * amount / buy.amount).toLong
-      val sellFee = (BigInt(matcherFee) * amount / sell.amount).toLong
+      val buyFee  = (BigInt(matcherFee) * amount / buy.amount.value).toLong
+      val sellFee = (BigInt(matcherFee) * amount / sell.amount.value).toLong
 
       val protoVersion = exchangeVersion > TxVersion.V2
 
       assertApiError(
-        sender.broadcastExchange(matcher, sell, sell, TxExchangeAmount.unsafeFrom(amount), sellPrice, buyFee, sellFee, matcherFee, exchangeVersion, validate = false),
+        sender.broadcastExchange(matcher, sell, sell, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(sellPrice), TxMatcherFee.unsafeFrom(buyFee), TxMatcherFee.unsafeFrom(sellFee), matcherFee, exchangeVersion, validate = false),
         if (protoVersion) CustomValidationError("buyOrder should has OrderType.BUY") else CustomValidationError("order1 should have OrderType.BUY")
       )
 
       assertApiError(
-        sender.broadcastExchange(matcher, buy, buy, TxExchangeAmount.unsafeFrom(amount), buyPrice, buyFee, sellFee, matcherFee, exchangeVersion, validate = false),
+        sender.broadcastExchange(matcher, buy, buy, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(buyPrice), TxMatcherFee.unsafeFrom(buyFee), TxMatcherFee.unsafeFrom(sellFee), matcherFee, exchangeVersion, validate = false),
         CustomValidationError("sellOrder should has OrderType.SELL")
       )
 
       assertApiError {
         if (protoVersion)
-          sender.broadcastExchange(matcher, sell, buy, TxExchangeAmount.unsafeFrom(amount), sellPrice, buyFee, sellFee, matcherFee, exchangeVersion)
+          sender.broadcastExchange(matcher, sell, buy, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(sellPrice), TxMatcherFee.unsafeFrom(buyFee), TxMatcherFee.unsafeFrom(sellFee), matcherFee, exchangeVersion)
         else
-          sender.broadcastExchange(matcher, buy, sell, TxExchangeAmount.unsafeFrom(amount), sellPrice, buyFee, sellFee, matcherFee, exchangeVersion)
+          sender.broadcastExchange(matcher, buy, sell, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(sellPrice), TxMatcherFee.unsafeFrom(buyFee), TxMatcherFee.unsafeFrom(sellFee), matcherFee, exchangeVersion)
       } { error =>
         error.id shouldBe StateCheckFailed.Id
         error.statusCode shouldBe StateCheckFailed.Code.intValue
@@ -161,8 +161,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val buyAmount  = 40000000
       val sellAmount = 40000000
       val assetPair  = AssetPair.createAssetPair("WAVES", assetId.toString).get
-      val buy        = Order.buy(o1ver, buyer, matcher.publicKey, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder1)
-      val sell       = Order.sell(o2ver, seller, matcher.publicKey, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder2)
+      val buy        = Order.buy(o1ver, buyer, matcher.publicKey, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder1).explicitGet()
+      val sell       = Order.sell(o2ver, seller, matcher.publicKey, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder2).explicitGet()
       val amount     = 40000000
 
       val tx =
@@ -174,8 +174,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
             order2 = sell,
             amount = amount,
             price = sellPrice,
-            buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
-            sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
+            buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount.value).toLong,
+            sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount.value).toLong,
             fee = matcherFee,
             timestamp = ntpTime.correctedTime()
           )
@@ -239,14 +239,14 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     val nftOtherAssetPair = AssetPair.createAssetPair(nftAsset, dec6AssetId).get
 
     val sellNftForWaves =
-      Order.sell(4.toByte, seller, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves)
+      Order.sell(4.toByte, seller, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves).explicitGet()
     val buyNftForWaves =
-      Order.buy(4.toByte, buyer, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves)
+      Order.buy(4.toByte, buyer, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves).explicitGet()
 
     val sellNftForOtherAsset =
-      Order.sell(4.toByte, buyer, matcher.publicKey, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves)
+      Order.sell(4.toByte, buyer, matcher.publicKey, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves).explicitGet()
     val buyNftForOtherAsset =
-      Order.buy(4.toByte, seller, matcher.publicKey, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves)
+      Order.buy(4.toByte, seller, matcher.publicKey, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves).explicitGet()
 
     val sellerAddress = sellerKeyPair.toAddress.toString
     val sellerBalance = sender.balanceDetails(sellerAddress).regular
@@ -262,8 +262,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
           order2 = sellNftForWaves,
           amount = amount,
           price = nftWavesPrice,
-          buyMatcherFee = (BigInt(matcherFee) * amount / sellNftForWaves.amount).toLong,
-          sellMatcherFee = (BigInt(matcherFee) * amount / sellNftForWaves.amount).toLong,
+          buyMatcherFee = (BigInt(matcherFee) * amount / sellNftForWaves.amount.value).toLong,
+          sellMatcherFee = (BigInt(matcherFee) * amount / sellNftForWaves.amount.value).toLong,
           fee = matcherFee,
           timestamp = ntpTime.correctedTime()
         )
@@ -288,8 +288,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
           order2 = sellNftForOtherAsset,
           amount = amount,
           price = nftForAssetPrice,
-          buyMatcherFee = (BigInt(matcherFee) * amount / buyNftForOtherAsset.amount).toLong,
-          sellMatcherFee = (BigInt(matcherFee) * amount / buyNftForOtherAsset.amount).toLong,
+          buyMatcherFee = (BigInt(matcherFee) * amount / buyNftForOtherAsset.amount.value).toLong,
+          sellMatcherFee = (BigInt(matcherFee) * amount / buyNftForOtherAsset.amount.value).toLong,
           fee = matcherFee,
           timestamp = ntpTime.correctedTime()
         )

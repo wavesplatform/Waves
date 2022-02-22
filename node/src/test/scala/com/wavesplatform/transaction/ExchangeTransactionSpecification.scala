@@ -213,7 +213,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
           expirationTimestamp,
           buyMatcherFee,
           if (buyV == 3) buyerMatcherFeeAssetId else Waves
-        )
+        ).explicitGet()
         val sell = Order.sell(
           sellV,
           sender2,
@@ -225,7 +225,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
           expirationTimestamp,
           sellMatcherFee,
           if (sellV == 3) sellerMatcherFeeAssetId else Waves
-        )
+        ).explicitGet()
 
         def create(
             matcher: KeyPair = sender1,
@@ -284,23 +284,15 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
         create(fee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
 
         create(buyOrder = buy.copy(orderType = OrderType.SELL)) shouldBe Left(GenericError("order1 should have OrderType.BUY"))
-        create(buyOrder = buy.copy(amount = 0)) shouldBe an[Left[_, _]]
-        create(buyOrder = buy.copy(amount = -1)) shouldBe an[Left[_, _]]
-        create(buyOrder = buy.copy(amount = Order.MaxAmount + 1)) shouldBe an[Left[_, _]]
         create(buyOrder = buy.copy(assetPair = buy.assetPair.copy(amountAsset = sell.assetPair.priceAsset))) shouldBe an[Left[_, _]]
         create(buyOrder = buy.copy(expiration = 1L)) shouldBe an[Left[_, _]]
         create(buyOrder = buy.copy(expiration = buy.expiration + 1)) shouldBe an[Left[_, _]]
-        create(buyOrder = buy.copy(price = -1)) shouldBe an[Left[_, _]]
         create(buyOrder = buy.copy(matcherPublicKey = sender2.publicKey)) shouldBe an[Left[_, _]]
 
         create(sellOrder = sell.copy(orderType = OrderType.BUY)) shouldBe Left(GenericError("sellOrder should has OrderType.SELL"))
-        create(sellOrder = sell.copy(amount = 0)) shouldBe an[Left[_, _]]
-        create(sellOrder = sell.copy(amount = -1)) shouldBe an[Left[_, _]]
-        create(sellOrder = sell.copy(amount = Order.MaxAmount + 1)) shouldBe an[Left[_, _]]
         create(sellOrder = sell.copy(assetPair = sell.assetPair.copy(priceAsset = buy.assetPair.amountAsset))) shouldBe an[Left[_, _]]
         create(sellOrder = sell.copy(expiration = 1L)) shouldBe an[Left[_, _]]
         create(sellOrder = sell.copy(expiration = sell.expiration + 1)) shouldBe an[Left[_, _]]
-        create(sellOrder = sell.copy(price = -1)) shouldBe an[Left[_, _]]
         create(sellOrder = sell.copy(matcherPublicKey = sender2.publicKey)) shouldBe an[Left[_, _]]
 
         create(sellOrder = buy, buyOrder = sell) shouldBe Left(GenericError("order1 should have OrderType.BUY"))
@@ -317,7 +309,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
 
   def createExTx(buy: Order, sell: Order, price: Long, matcher: KeyPair, version: TxVersion): Either[ValidationError, ExchangeTransaction] = {
     val matcherFee = 300000L
-    val amount     = math.min(buy.amount, sell.amount)
+    val amount     = math.min(buy.amount.value, sell.amount.value)
 
     if (version == 1) {
       ExchangeTransaction.signed(
@@ -327,8 +319,8 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
         order2 = sell,
         amount = amount,
         price = price,
-        buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
-        sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
+        buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount.value).toLong,
+        sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount.value).toLong,
         fee = matcherFee,
         timestamp = ntpTime.correctedTime()
       )
@@ -340,8 +332,8 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
         order2 = sell,
         amount = amount,
         price = price,
-        buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
-        sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
+        buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount.value).toLong,
+        sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount.value).toLong,
         fee = matcherFee,
         timestamp = ntpTime.correctedTime()
       )
@@ -371,7 +363,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
             expirationTimestamp,
             matcherFee,
             if (sellV == 3) sellerMatcherFeeAssetId else Waves
-          )
+          ).explicitGet()
         val buy =
           Order.buy(
             buyV,
@@ -384,14 +376,14 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
             expirationTimestamp,
             matcherFee,
             if (buyV == 3) buyerMatcherFeeAssetId else Waves
-          )
+          ).explicitGet()
 
         createExTx(buy, sell, sellPrice, matcher, exchangeV) shouldBe an[Right[_, _]]
 
         val sell1 =
           if (sellV == 3) {
-            Order.sell(sellV, sender2, matcher.publicKey, pair, 1, buyPrice, time, time - 1, matcherFee, sellerMatcherFeeAssetId)
-          } else Order.sell(sellV, sender2, matcher.publicKey, pair, 1, buyPrice, time, time - 1, matcherFee)
+            Order.sell(sellV, sender2, matcher.publicKey, pair, 1, buyPrice, time, time - 1, matcherFee, sellerMatcherFeeAssetId).explicitGet()
+          } else Order.sell(sellV, sender2, matcher.publicKey, pair, 1, buyPrice, time, time - 1, matcherFee).explicitGet()
 
         createExTx(buy, sell1, buyPrice, matcher, exchangeV) shouldBe Left(OrderValidationError(sell1, "expiration should be > currentTime"))
     }
@@ -454,11 +446,11 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.BUY,
-      2,
-      6000000000L,
+      TxExchangeAmount.unsafeFrom(2),
+      TxOrderPrice.unsafeFrom(6000000000L),
       1526992336241L,
       1529584336241L,
-      1,
+      TxMatcherFee.unsafeFrom(1),
       proofs = Proofs(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
     )
 
@@ -468,11 +460,11 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.SELL,
-      3,
-      5000000000L,
+      TxExchangeAmount.unsafeFrom(3),
+      TxOrderPrice.unsafeFrom(5000000000L),
       1526992336241L,
       1529584336241L,
-      2,
+      TxMatcherFee.unsafeFrom(2),
       proofs = Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
     )
 
@@ -550,11 +542,11 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.BUY,
-      2,
-      6000000000L,
+      TxExchangeAmount.unsafeFrom(2),
+      TxOrderPrice.unsafeFrom(6000000000L),
       1526992336241L,
       1529584336241L,
-      1,
+      TxMatcherFee.unsafeFrom(1),
       proofs = Proofs(Seq(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get))
     )
 
@@ -564,11 +556,11 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.SELL,
-      3,
-      5000000000L,
+      TxExchangeAmount.unsafeFrom(3),
+      TxOrderPrice.unsafeFrom(5000000000L),
       1526992336241L,
       1529584336241L,
-      2,
+      TxMatcherFee.unsafeFrom(2),
       proofs = Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
     )
 
@@ -647,11 +639,11 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.BUY,
-      2,
-      6000000000L,
+      TxExchangeAmount.unsafeFrom(2),
+      TxOrderPrice.unsafeFrom(6000000000L),
       1526992336241L,
       1529584336241L,
-      1,
+      TxMatcherFee.unsafeFrom(1),
       extractAssetId("9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       Proofs(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
     )
@@ -662,11 +654,11 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.SELL,
-      3,
-      5000000000L,
+      TxExchangeAmount.unsafeFrom(3),
+      TxOrderPrice.unsafeFrom(5000000000L),
       1526992336241L,
       1529584336241L,
-      2,
+      TxMatcherFee.unsafeFrom(2),
       proofs = Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
     )
 

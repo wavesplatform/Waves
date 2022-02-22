@@ -72,8 +72,8 @@ object ExchangeTransactionDiff {
       Diff(
         portfolios = portfolios,
         orderFills = Map(
-          tx.buyOrder.id()  -> VolumeAndFee(tx.amount.value, tx.buyMatcherFee),
-          tx.sellOrder.id() -> VolumeAndFee(tx.amount.value, tx.sellMatcherFee)
+          tx.buyOrder.id()  -> VolumeAndFee(tx.amount.value, tx.buyMatcherFee.value),
+          tx.sellOrder.id() -> VolumeAndFee(tx.amount.value, tx.sellMatcherFee.value)
         ),
         scriptsRun = scripts
       )
@@ -88,15 +88,14 @@ object ExchangeTransactionDiff {
         }.toEither.leftMap(x => GenericError(x.getMessage))
 
       def orderPrice(order: Order, amountDecimals: Int, priceDecimals: Int) =
-        if (tx.version >= TxVersion.V3 && order.version < Order.V4) convertPrice(order.price, amountDecimals, priceDecimals)
-        else Right(order.price)
+        if (tx.version >= TxVersion.V3 && order.version < Order.V4) convertPrice(order.price.value, amountDecimals, priceDecimals)
+        else Right(order.price.value)
 
       for {
-        _              <- Either.cond(tx.price != 0L, (), GenericError("price should be > 0"))
         buyOrderPrice  <- orderPrice(tx.buyOrder, amountDecimals, priceDecimals)
         sellOrderPrice <- orderPrice(tx.sellOrder, amountDecimals, priceDecimals)
-        _              <- Either.cond(tx.price <= buyOrderPrice, (), GenericError("price should be <= buyOrder.price"))
-        _              <- Either.cond(tx.price >= sellOrderPrice, (), GenericError("price should be >= sellOrder.price"))
+        _              <- Either.cond(tx.price.value <= buyOrderPrice, (), GenericError("price should be <= buyOrder.price"))
+        _              <- Either.cond(tx.price.value >= sellOrderPrice, (), GenericError("price should be >= sellOrder.price"))
       } yield ()
     }
 
@@ -120,8 +119,8 @@ object ExchangeTransactionDiff {
     val matcherPortfolio =
       Monoid.combineAll(
         Seq(
-          getOrderFeePortfolio(tx.buyOrder, tx.buyMatcherFee),
-          getOrderFeePortfolio(tx.sellOrder, tx.sellMatcherFee),
+          getOrderFeePortfolio(tx.buyOrder, tx.buyMatcherFee.value),
+          getOrderFeePortfolio(tx.sellOrder, tx.sellMatcherFee.value),
           Portfolio.waves(-tx.fee)
         )
       )
@@ -129,8 +128,8 @@ object ExchangeTransactionDiff {
     val feeDiff = Monoid.combineAll(
       Seq(
         Map(matcher -> matcherPortfolio),
-        Map(buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee)),
-        Map(seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee))
+        Map(buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee.value)),
+        Map(seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee.value))
       )
     )
 
@@ -139,10 +138,10 @@ object ExchangeTransactionDiff {
       amountDecimals = if (tx.version < TxVersion.V3) 8 else tx.buyOrder.assetPair.amountAsset.fold(8)(ia => assets(ia).fold(8)(_.decimals))
       priceDecimals  = if (tx.version < TxVersion.V3) 8 else tx.buyOrder.assetPair.priceAsset.fold(8)(ia => assets(ia).fold(8)(_.decimals))
       _                     <- isPriceValid(amountDecimals, priceDecimals)
-      buyPriceAssetChange   <- getSpendAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount.value, tx.price).map(-_)
-      buyAmountAssetChange  <- getReceiveAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount.value, tx.price)
-      sellPriceAssetChange  <- getReceiveAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount.value, tx.price)
-      sellAmountAssetChange <- getSpendAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount.value, tx.price).map(-_)
+      buyPriceAssetChange   <- getSpendAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount.value, tx.price.value).map(-_)
+      buyAmountAssetChange  <- getReceiveAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount.value, tx.price.value)
+      sellPriceAssetChange  <- getReceiveAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount.value, tx.price.value)
+      sellAmountAssetChange <- getSpendAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount.value, tx.price.value).map(-_)
       priceDiff  = getAssetDiff(tx.buyOrder.assetPair.priceAsset, buyPriceAssetChange, sellPriceAssetChange)
       amountDiff = getAssetDiff(tx.buyOrder.assetPair.amountAsset, buyAmountAssetChange, sellAmountAssetChange)
     } yield Monoid.combineAll(Seq(feeDiff, priceDiff, amountDiff))
@@ -156,8 +155,8 @@ object ExchangeTransactionDiff {
     val buyTotal  = filledBuy.volume + exTrans.amount.value
     val sellTotal = filledSell.volume + exTrans.amount.value
 
-    lazy val buyAmountValid  = exTrans.buyOrder.amount >= buyTotal
-    lazy val sellAmountValid = exTrans.sellOrder.amount >= sellTotal
+    lazy val buyAmountValid  = exTrans.buyOrder.amount.value >= buyTotal
+    lazy val sellAmountValid = exTrans.sellOrder.amount.value >= sellTotal
 
     def isFeeValid(feeTotal: Long, amountTotal: Long, maxfee: Long, maxAmount: Long, order: Order): Boolean = {
       feeTotal <= (order match {
@@ -168,19 +167,19 @@ object ExchangeTransactionDiff {
 
     lazy val buyFeeValid =
       isFeeValid(
-        feeTotal = filledBuy.fee + exTrans.buyMatcherFee,
+        feeTotal = filledBuy.fee + exTrans.buyMatcherFee.value,
         amountTotal = buyTotal,
-        maxfee = exTrans.buyOrder.matcherFee,
-        maxAmount = exTrans.buyOrder.amount,
+        maxfee = exTrans.buyOrder.matcherFee.value,
+        maxAmount = exTrans.buyOrder.amount.value,
         order = exTrans.buyOrder
       )
 
     lazy val sellFeeValid =
       isFeeValid(
-        feeTotal = filledSell.fee + exTrans.sellMatcherFee,
+        feeTotal = filledSell.fee + exTrans.sellMatcherFee.value,
         amountTotal = sellTotal,
-        maxfee = exTrans.sellOrder.matcherFee,
-        maxAmount = exTrans.sellOrder.amount,
+        maxfee = exTrans.sellOrder.matcherFee.value,
+        maxAmount = exTrans.sellOrder.amount.value,
         order = exTrans.sellOrder
       )
 
@@ -203,7 +202,7 @@ object ExchangeTransactionDiff {
       if (order.orderType == OrderType.SELL) matchAmount
       else {
         val spend = (BigDecimal(matchAmount) * matchPrice * BigDecimal(10).pow(priceDecimals - amountDecimals - 8)).toBigInt
-        if (order.getSpendAssetId == Waves && !(spend + order.matcherFee).isValidLong) {
+        if (order.getSpendAssetId == Waves && !(spend + order.matcherFee.value).isValidLong) {
           throw new ArithmeticException("BigInteger out of long range")
         } else spend.bigInteger.longValueExact()
       }

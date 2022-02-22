@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TxExchangeAmount, TxVersion}
+import com.wavesplatform.transaction.{Asset, TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxVersion}
 import io.grpc.Status.Code
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
@@ -401,9 +401,9 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
                           order1: Order,
                           order2: Order,
                           amount: TxExchangeAmount,
-                          price: Long,
-                          buyMatcherFee: Long,
-                          sellMatcherFee: Long,
+                          price: TxExchangePrice,
+                          buyMatcherFee: TxMatcherFee,
+                          sellMatcherFee: TxMatcherFee,
                           fee: Long,
                           version: Byte = 2,
                           waitForTx: Boolean = false,

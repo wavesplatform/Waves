@@ -57,7 +57,7 @@ class VerifierSpecification
     ntpTime.getTimestamp() + 200000,
     fee,
     feeAsset
-  )
+  ).explicitGet()
 
   private val sharedParamGen = for {
     sender  <- accountGen

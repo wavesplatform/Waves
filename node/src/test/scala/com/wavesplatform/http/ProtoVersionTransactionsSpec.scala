@@ -172,8 +172,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val seller    = accountGen.sample.get
       val assetPair = assetPairGen.sample.get
 
-      val buyOrder  = Order.buy(Order.V3, buyer, account.publicKey, assetPair, Order.MaxAmount / 2, 100L, Now, Now + Order.MaxLiveTime, MinFee * 3)
-      val sellOrder = Order.sell(Order.V3, seller, account.publicKey, assetPair, Order.MaxAmount / 2, 100L, Now, Now + Order.MaxLiveTime, MinFee * 3)
+      val buyOrder  = Order.buy(Order.V3, buyer, account.publicKey, assetPair, Order.MaxAmount / 2, 100L, Now, Now + Order.MaxLiveTime, MinFee * 3).explicitGet()
+      val sellOrder = Order.sell(Order.V3, seller, account.publicKey, assetPair, Order.MaxAmount / 2, 100L, Now, Now + Order.MaxLiveTime, MinFee * 3).explicitGet()
 
       val exchangeTx =
         ExchangeTransaction

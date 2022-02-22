@@ -160,7 +160,7 @@ object TxHelpers {
       timestamp + 100000,
       fee,
       feeAsset
-    )
+    ).explicitGet()
   }
 
   def exchange(order1: Order, order2: Order, matcher: KeyPair = defaultSigner, version: TxVersion = TxVersion.V2, chainId: Byte = AddressScheme.current.chainId): ExchangeTransaction = {
@@ -170,10 +170,10 @@ object TxHelpers {
         matcher.privateKey,
         order1,
         order2,
-        order1.amount,
-        order1.price,
-        order1.matcherFee,
-        order2.matcherFee,
+        order1.amount.value,
+        order1.price.value,
+        order1.matcherFee.value,
+        order2.matcherFee.value,
         TestValues.fee,
         timestamp,
         chainId

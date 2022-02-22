@@ -120,11 +120,11 @@ package object smartcontract {
     val sellPrice   = (0.50 * Order.PriceConstant).toLong
     val (buy, sell) = orders(pair, ord1Ver, ord2Ver, orderFee, time, buyer, seller, matcher)
 
-    val amount = math.min(buy.amount, sell.amount)
+    val amount = math.min(buy.amount.value, sell.amount.value)
 
     val matcherFee     = exTxFee
-    val buyMatcherFee  = (BigInt(orderFee) * amount / buy.amount).toLong
-    val sellMatcherFee = (BigInt(orderFee) * amount / sell.amount).toLong
+    val buyMatcherFee  = (BigInt(orderFee) * amount / buy.amount.value).toLong
+    val sellMatcherFee = (BigInt(orderFee) * amount / sell.amount.value).toLong
 
     val tx = ExchangeTransaction
       .signed(
@@ -156,8 +156,8 @@ package object smartcontract {
     val buyAmount           = 2
     val sellAmount          = 3
 
-    val buy  = Order.buy(ord1Ver, buyer, matcher.publicKey, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee)
-    val sell = Order.sell(ord2Ver, seller, matcher.publicKey, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee)
+    val buy  = Order.buy(ord1Ver, buyer, matcher.publicKey, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee).explicitGet()
+    val sell = Order.sell(ord2Ver, seller, matcher.publicKey, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee).explicitGet()
 
     (buy, sell)
   }

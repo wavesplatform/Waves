@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion}
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxExchangeAmount, TxMatcherFee, TxOrderPrice, TxVersion}
 import com.wavesplatform.utils._
 import org.scalatest.Informing
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -36,11 +36,11 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
     AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
     OrderType.BUY,
-    2,
-    60.waves,
+    TxExchangeAmount.unsafeFrom(2),
+    TxOrderPrice.unsafeFrom(60.waves),
     tsOrderFrom,
     tsOrderTo,
-    1,
+    TxMatcherFee.unsafeFrom(1),
     proofs = Proofs(Seq(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get))
   )
 
@@ -50,11 +50,11 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
     AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
     OrderType.BUY,
-    2,
-    60.waves,
+    TxExchangeAmount.unsafeFrom(2),
+    TxOrderPrice.unsafeFrom(60.waves),
     tsOrderFrom,
     tsOrderTo,
-    1,
+    TxMatcherFee.unsafeFrom(1),
     proofs = Proofs(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
   )
 
@@ -64,11 +64,11 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
     AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
     OrderType.SELL,
-    3,
-    50.waves,
+    TxExchangeAmount.unsafeFrom(3),
+    TxOrderPrice.unsafeFrom(50.waves),
     tsOrderFrom,
     tsOrderTo,
-    2,
+    TxMatcherFee.unsafeFrom(2),
     proofs = Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
   )
 

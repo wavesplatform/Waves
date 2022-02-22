@@ -13,10 +13,6 @@ object ExchangeTxValidator extends TxValidator[ExchangeTransaction] {
 
     V.seq(tx)(
       V.fee(fee),
-      V.cond(price > 0, GenericError("price should be > 0")),
-      V.cond(price <= Order.MaxAmount, GenericError("price too large")),
-      V.cond(sellMatcherFee <= Order.MaxAmount, GenericError("sellMatcherFee too large")),
-      V.cond(buyMatcherFee <= Order.MaxAmount, GenericError("buyMatcherFee too large")),
       V.cond(fee <= Order.MaxAmount, GenericError("fee too large")),
       V.cond(isProtobufVersion || order1.orderType == OrderType.BUY, GenericError("order1 should have OrderType.BUY")),
       V.cond(buyOrder.orderType == OrderType.BUY, GenericError("buyOrder should has OrderType.BUY")),

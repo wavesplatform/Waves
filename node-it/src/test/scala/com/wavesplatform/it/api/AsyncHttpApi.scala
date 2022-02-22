@@ -29,7 +29,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, TxExchangeAmount, TxVersion}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxVersion}
 import org.asynchttpclient.Dsl.{delete => _delete, get => _get, post => _post, put => _put}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
@@ -738,19 +738,17 @@ object AsyncHttpApi extends Assertions {
           .json()
       )
 
-    def broadcastExchange(
-        matcher: KeyPair,
-        order1: Order,
-        order2: Order,
-        amount: TxExchangeAmount,
-        price: Long,
-        buyMatcherFee: Long,
-        sellMatcherFee: Long,
-        fee: Long,
-        version: Byte,
-        amountsAsStrings: Boolean = false,
-        validate: Boolean = true
-    ): Future[Transaction] = {
+    def broadcastExchange(matcher: KeyPair,
+                          order1: Order,
+                          order2: Order,
+                          amount: TxExchangeAmount,
+                          price: TxExchangePrice,
+                          buyMatcherFee: TxMatcherFee,
+                          sellMatcherFee: TxMatcherFee,
+                          fee: Long,
+                          version: Byte,
+                          amountsAsStrings: Boolean = false,
+                          validate: Boolean = true): Future[Transaction] = {
       val tx = ExchangeTx(
         version = version,
         order1 = order1,

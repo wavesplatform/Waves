@@ -162,7 +162,7 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
       timestamp = ts,
       expiration = ts + Order.MaxLiveTime,
       matcherFee = matcherFee
-    )
+    ).explicitGet()
     val sell = Order.sell(
       Order.V2,
       sender = seller,
@@ -173,7 +173,7 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
       timestamp = ts,
       expiration = ts + Order.MaxLiveTime,
       matcherFee = matcherFee
-    )
+    ).explicitGet()
 
     val tx = ExchangeTransaction
       .signed(

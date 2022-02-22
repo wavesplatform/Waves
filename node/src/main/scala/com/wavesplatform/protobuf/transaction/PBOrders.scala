@@ -1,34 +1,43 @@
 package com.wavesplatform.protobuf.transaction
 
+import cats.syntax.either._
 import com.wavesplatform.account.{AddressScheme, PublicKey}
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.order.AssetPair
+import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.{TxExchangeAmount, TxMatcherFee, TxOrderPrice}
 import com.wavesplatform.{transaction => vt}
 
 object PBOrders {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 
-  def vanilla(order: PBOrder, version: Int = 0): VanillaOrder = {
-    VanillaOrder(
-      if (version == 0) order.version.toByte else version.toByte,
-      PublicKey(order.senderPublicKey.toByteArray),
-      PublicKey(order.matcherPublicKey.toByteArray),
-      vt.assets.exchange
-        .AssetPair(PBAmounts.toVanillaAssetId(order.getAssetPair.amountAssetId), PBAmounts.toVanillaAssetId(order.getAssetPair.priceAssetId)),
-      order.orderSide match {
-        case PBOrder.Side.BUY             => vt.assets.exchange.OrderType.BUY
-        case PBOrder.Side.SELL            => vt.assets.exchange.OrderType.SELL
-        case PBOrder.Side.Unrecognized(v) => throw new IllegalArgumentException(s"Unknown order type: $v")
-      },
-      order.amount,
-      order.price,
-      order.timestamp,
-      order.expiration,
-      order.getMatcherFee.longAmount,
-      PBAmounts.toVanillaAssetId(order.getMatcherFee.assetId),
-      order.proofs.map(_.toByteStr)
-    )
-  }
+  def vanilla(order: PBOrder, version: Int = 0): Either[ValidationError, VanillaOrder] =
+    for {
+      amount <- TxExchangeAmount.from(order.amount).leftMap(_ => GenericError(TxExchangeAmount.errMsg))
+      price <- TxOrderPrice.from(order.price).leftMap(_ => GenericError(TxOrderPrice.errMsg))
+      matcherFee <- TxMatcherFee.from(order.getMatcherFee.longAmount).leftMap(_ => GenericError(TxMatcherFee.errMsg))
+    } yield {
+      VanillaOrder(
+        if (version == 0) order.version.toByte else version.toByte,
+        PublicKey(order.senderPublicKey.toByteArray),
+        PublicKey(order.matcherPublicKey.toByteArray),
+        vt.assets.exchange
+          .AssetPair(PBAmounts.toVanillaAssetId(order.getAssetPair.amountAssetId), PBAmounts.toVanillaAssetId(order.getAssetPair.priceAssetId)),
+        order.orderSide match {
+          case PBOrder.Side.BUY             => vt.assets.exchange.OrderType.BUY
+          case PBOrder.Side.SELL            => vt.assets.exchange.OrderType.SELL
+          case PBOrder.Side.Unrecognized(v) => throw new IllegalArgumentException(s"Unknown order type: $v")
+        },
+        amount,
+        price,
+        order.timestamp,
+        order.expiration,
+        matcherFee,
+        PBAmounts.toVanillaAssetId(order.getMatcherFee.assetId),
+        order.proofs.map(_.toByteStr)
+      )
+    }
 
   def protobuf(order: VanillaOrder): PBOrder = {
     PBOrder(
@@ -40,11 +49,11 @@ object PBOrders {
         case vt.assets.exchange.OrderType.BUY  => PBOrder.Side.BUY
         case vt.assets.exchange.OrderType.SELL => PBOrder.Side.SELL
       },
-      order.amount,
-      order.price,
+      order.amount.value,
+      order.price.value,
       order.timestamp,
       order.expiration,
-      Some((order.matcherFeeAssetId, order.matcherFee)),
+      Some((order.matcherFeeAssetId, order.matcherFee.value)),
       order.version,
       order.proofs.map(_.toByteString)
     )
