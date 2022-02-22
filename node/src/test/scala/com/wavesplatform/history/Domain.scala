@@ -1,6 +1,5 @@
 package com.wavesplatform.history
 
-import cats.syntax.option._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
@@ -51,6 +50,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   lazy val wallet  = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
+
     /**
       * @return Tuple of (asset, feeInAsset, feeInWaves)
       * @see [[com.wavesplatform.state.diffs.FeeValidation#getMinFee(com.wavesplatform.state.Blockchain, com.wavesplatform.transaction.Transaction)]]
@@ -109,7 +109,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def nftList(address: Address): Seq[(IssuedAsset, AssetDescription)] = db.withResource { resource =>
     AddressPortfolio
-      .nftIterator(resource, address, blockchainUpdater.bestLiquidDiff.orEmpty, None, blockchainUpdater.assetDescription)
+      .nftIterator(resource, address, blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), None, blockchainUpdater.assetDescription)
       .toSeq
   }
 
@@ -283,7 +283,12 @@ object Domain {
 
   def portfolio(address: Address, db: DB, blockchainUpdater: BlockchainUpdaterImpl): Seq[(IssuedAsset, Long)] = db.withResource { resource =>
     AddressPortfolio
-      .assetBalanceIterator(resource, address, blockchainUpdater.bestLiquidDiff.orEmpty, id => blockchainUpdater.assetDescription(id).exists(!_.nft))
+      .assetBalanceIterator(
+        resource,
+        address,
+        blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+        id => blockchainUpdater.assetDescription(id).exists(!_.nft)
+      )
       .toSeq
   }
 }

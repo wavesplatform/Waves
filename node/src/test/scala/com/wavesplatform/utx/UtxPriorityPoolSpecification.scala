@@ -1,7 +1,6 @@
 package com.wavesplatform.utx
 
 import cats.data.NonEmptyList
-import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
@@ -163,7 +162,7 @@ class UtxPriorityPoolSpecification
         new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
 
       def createDiff(): Diff =
-        Monoid.combineAll((1 to 5).map(_ => Diff.empty.bindTransaction(TxHelpers.issue())))
+        (1 to 5).map(_ => Diff.empty.bindTransaction(TxHelpers.issue())).reduce(_.combine(_).explicitGet())
 
       utx.setPriorityDiffs(Seq(createDiff(), createDiff())) // 10 total
       utx.priorityPool.nextMicroBlockSize(3) shouldBe 5

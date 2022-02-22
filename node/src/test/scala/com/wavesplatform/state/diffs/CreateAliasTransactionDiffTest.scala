@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import cats._
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
@@ -42,7 +41,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
       case (gen, aliasTx, _, _, anotherAliasTx) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(anotherAliasTx)), fs) {
           case (blockDiff, newState) =>
-            val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
+            val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
             totalPortfolioDiff.balance shouldBe 0
             totalPortfolioDiff.effectiveBalance shouldBe 0
 

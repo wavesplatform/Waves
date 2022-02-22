@@ -1,8 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
 import cats.instances.list._
-import cats.instances.map._
-import cats.syntax.semigroup._
 import cats.syntax.traverse._
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
@@ -16,8 +14,8 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
+import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -244,6 +242,11 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
         diff.portfolios.filter(_._2 != overlappedPortfolio) shouldBe totalPortfolios.filter(_._2 != overlappedPortfolio)
       }
     }
+  }
+
+  private implicit class Ops(m: Map[Address, Portfolio]) {
+    def |+|(m2: Map[Address, Portfolio]): Map[Address, Portfolio] =
+      Diff.combine(m, m2).explicitGet()
   }
 
   property("complexity border") {

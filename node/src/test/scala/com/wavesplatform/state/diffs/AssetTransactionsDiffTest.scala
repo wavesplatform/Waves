@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import cats._
 import com.wavesplatform.BlocksTransactionsHelpers
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
@@ -45,7 +44,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
       case ((gen, issue), (reissue, burn)) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue, burn))) {
           case (blockDiff, newState) =>
-            val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
+            val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
 
             totalPortfolioDiff.balance shouldBe 0
             totalPortfolioDiff.effectiveBalance shouldBe 0
@@ -312,7 +311,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
       case (gen, issue, transfer, _, _) =>
         assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, transfer)), smartEnabledFS) {
           case (blockDiff, newState) =>
-            val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
+            val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
             totalPortfolioDiff.assets(IssuedAsset(issue.id())) shouldEqual issue.quantity
             newState.balance(newState.resolveAlias(transfer.recipient).explicitGet(), IssuedAsset(issue.id())) shouldEqual transfer.amount
         }
@@ -484,7 +483,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
       case (gen, issue, _, _, _) =>
         assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue)), rideV4Activated) {
           case (blockDiff, _) =>
-            val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
+            val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
             totalPortfolioDiff.assets(IssuedAsset(issue.id())) shouldEqual issue.quantity
         }
     }

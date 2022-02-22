@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithState
@@ -220,7 +219,7 @@ class ScriptsCountTest extends PropSpec with WithState with Inside {
             val newDiff  = TransactionDiffer(Some(tx.timestamp), tx.timestamp)(newState, tx).resultE.explicitGet()
             val oldRuns  = ScriptsCountTest.calculateLegacy(newState, tx)
             if (newDiff.scriptsRun != oldRuns) throw new IllegalArgumentException(s"$tx ${newDiff.scriptsRun} != $oldRuns")
-            Monoid.combine(diff, newDiff)
+            diff.combine(newDiff).explicitGet()
           }
       }
 

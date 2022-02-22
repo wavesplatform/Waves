@@ -1,9 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import scala.util.{Random, Try}
-
-import cats.{Order => _, _}
-import com.wavesplatform.{crypto, TestValues}
+import cats.{Order => _}
 import com.wavesplatform.account.{Address, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
@@ -24,18 +21,21 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ExchangeTransactionDiff.getOrderFeePortfolio
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.utils._
+import com.wavesplatform.{TestValues, crypto}
 import org.scalacheck.Gen
 import org.scalatest.{EitherValues, Inside}
+
+import scala.util.{Random, Try}
 
 class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain with EitherValues {
 
@@ -236,7 +236,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           fsWithOrderFeature
         ) {
           case (blockDiff, _) =>
-            val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
+            val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
             totalPortfolioDiff.balance shouldBe 0
             totalPortfolioDiff.effectiveBalance shouldBe 0
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
@@ -282,22 +282,21 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           fsWithOrderFeature
         ) {
           case (blockDiff, _) =>
-            val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
+            val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
             totalPortfolioDiff.balance shouldBe 0
             totalPortfolioDiff.effectiveBalance shouldBe 0
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
             val matcherPortfolio =
-              Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
+              blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values
+                .fold(Portfolio())(_.combine(_).explicitGet())
 
             val restoredMatcherPortfolio =
-              Monoid.combineAll(
                 Seq(
                   ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee),
                   ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee),
                   wavesPortfolio(-exchange.fee)
-                )
-              )
+                ).fold(Portfolio())(_.combine(_).explicitGet())
 
             matcherPortfolio shouldBe restoredMatcherPortfolio
         }
@@ -377,22 +376,21 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           fsWithOrderFeature
         ) {
           case (blockDiff, _) =>
-            val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
+            val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
             totalPortfolioDiff.balance shouldBe 0
             totalPortfolioDiff.effectiveBalance shouldBe 0
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
             val matcherPortfolio =
-              Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
+              blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values
+                .fold(Portfolio())(_.combine(_).explicitGet())
 
             val restoredMatcherPortfolio =
-              Monoid.combineAll(
                 Seq(
                   ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee),
                   ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee),
                   wavesPortfolio(-exchange.fee)
-                )
-              )
+                ).fold(Portfolio())(_.combine(_).explicitGet())
 
             matcherPortfolio shouldBe restoredMatcherPortfolio
         }
@@ -495,16 +493,15 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           fsOrderMassTransfer
         ) {
           case (blockDiff, _) =>
-            val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
+            val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
 
             totalPortfolioDiff.balance shouldBe 0
             totalPortfolioDiff.effectiveBalance shouldBe 0
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-            val combinedPortfolio = Monoid
-              .combineAll(
-                exchanges.map(ex => getOrderFeePortfolio(bigBuyOrder, ex.buyMatcherFee))
-              )
+            val combinedPortfolio =
+              exchanges.map(ex => getOrderFeePortfolio(bigBuyOrder, ex.buyMatcherFee)).fold(Portfolio())(_.combine(_).explicitGet())
+
 
             val feeSumPaidByBuyer =
               bigBuyOrder.matcherFeeAssetId
@@ -580,7 +577,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             fsWithOrderFeature
           ) {
             case (blockDiff, _) =>
-              val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
+              val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
               totalPortfolioDiff.balance shouldBe 0
               totalPortfolioDiff.effectiveBalance shouldBe 0
               totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
