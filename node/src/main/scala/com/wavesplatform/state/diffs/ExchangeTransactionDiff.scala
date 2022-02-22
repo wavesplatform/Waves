@@ -1,18 +1,17 @@
 package com.wavesplatform.state.diffs
 
-import scala.util.{Right, Try}
-
-import cats.instances.map._
-import cats.kernel.Monoid
+import cats.implicits.toFoldableOps
 import cats.syntax.either._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
+import com.wavesplatform.transaction.{Asset, TxVersion}
+
+import scala.util.{Right, Try}
 
 object ExchangeTransactionDiff {
 
@@ -31,7 +30,7 @@ object ExchangeTransactionDiff {
         _ <- Right(())
         smartTradesEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading)
         smartAssetsEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets)
-        assetsScripted      = assets.values.count(_.flatMap(_.script).isDefined)
+        assetsScripted     = assets.values.count(_.flatMap(_.script).isDefined)
         _ <- Either.cond(
           smartAssetsEnabled || assetsScripted == 0,
           (),
@@ -52,12 +51,12 @@ object ExchangeTransactionDiff {
       } yield (assetsScripted, buyerScripted, sellerScripted)
 
     for {
-      buyerAndSellerScripted          <- smartFeaturesChecks()
-      portfolios <- getPortfolios(blockchain, tx)
-      tx         <- enoughVolume(tx, blockchain)
+      buyerAndSellerScripted <- smartFeaturesChecks()
+      portfolios             <- getPortfolios(blockchain, tx)
+      tx                     <- enoughVolume(tx, blockchain)
       scripts = {
         val (assetsScripted, buyerScripted, sellerScripted) = buyerAndSellerScripted
-        val matcherScripted = Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
+        val matcherScripted                                 = Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
         // Don't count before Ride4DApps activation
         val ordersScripted = Seq(buyerScripted, sellerScripted)
@@ -110,29 +109,29 @@ object ExchangeTransactionDiff {
     val buyer: Address   = tx.buyOrder.sender.toAddress
     val seller: Address  = tx.sellOrder.sender.toAddress
 
-    def getAssetDiff(asset: Asset, buyAssetChange: Long, sellAssetChange: Long): Map[Address, Portfolio] = {
-      Monoid.combine(
+    def getAssetDiff(asset: Asset, buyAssetChange: Long, sellAssetChange: Long): Either[String, Map[Address, Portfolio]] = {
+      Diff.combine(
         Map(buyer  -> Portfolio.build(asset, buyAssetChange)),
         Map(seller -> Portfolio.build(asset, sellAssetChange))
       )
     }
 
-    val matcherPortfolio =
-      Monoid.combineAll(
-        Seq(
-          getOrderFeePortfolio(tx.buyOrder, tx.buyMatcherFee),
-          getOrderFeePortfolio(tx.sellOrder, tx.sellMatcherFee),
-          Portfolio.waves(-tx.fee)
-        )
-      )
-
-    val feeDiff = Monoid.combineAll(
+    val matcherPortfolioE =
       Seq(
-        Map(matcher -> matcherPortfolio),
-        Map(buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee)),
-        Map(seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee))
+        getOrderFeePortfolio(tx.buyOrder, tx.buyMatcherFee),
+        getOrderFeePortfolio(tx.sellOrder, tx.sellMatcherFee),
+        Portfolio.waves(-tx.fee)
+      ).foldM(Portfolio())(_.combine(_))
+
+    val feeDiffE =
+      matcherPortfolioE.flatMap(
+        matcherPortfolio =>
+          Seq(
+            Map(matcher -> matcherPortfolio),
+            Map(buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee)),
+            Map(seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee))
+          ).foldM(Map.empty[Address, Portfolio])(Diff.combine)
       )
-    )
 
     for {
       _ <- Either.cond(assets.values.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
@@ -143,9 +142,11 @@ object ExchangeTransactionDiff {
       buyAmountAssetChange  <- getReceiveAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount, tx.price)
       sellPriceAssetChange  <- getReceiveAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount, tx.price)
       sellAmountAssetChange <- getSpendAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount, tx.price).map(-_)
-      priceDiff  = getAssetDiff(tx.buyOrder.assetPair.priceAsset, buyPriceAssetChange, sellPriceAssetChange)
-      amountDiff = getAssetDiff(tx.buyOrder.assetPair.amountAsset, buyAmountAssetChange, sellAmountAssetChange)
-    } yield Monoid.combineAll(Seq(feeDiff, priceDiff, amountDiff))
+      priceDiff             <- getAssetDiff(tx.buyOrder.assetPair.priceAsset, buyPriceAssetChange, sellPriceAssetChange).leftMap(GenericError(_))
+      amountDiff            <- getAssetDiff(tx.buyOrder.assetPair.amountAsset, buyAmountAssetChange, sellAmountAssetChange).leftMap(GenericError(_))
+      feeDiff               <- feeDiffE.leftMap(GenericError(_))
+      totalDiff             <- Diff.combine(feeDiff, priceDiff).flatMap(Diff.combine(_, amountDiff)).leftMap(GenericError(_))
+    } yield totalDiff
   }
 
   private def enoughVolume(exTrans: ExchangeTransaction, blockchain: Blockchain): Either[ValidationError, ExchangeTransaction] = {

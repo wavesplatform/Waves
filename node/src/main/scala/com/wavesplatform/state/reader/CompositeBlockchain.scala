@@ -8,6 +8,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
@@ -32,7 +33,7 @@ final class CompositeBlockchain private (
     inner.balance(address, assetId) + diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
 
   override def leaseBalance(address: Address): LeaseBalance =
-    cats.Monoid.combine(inner.leaseBalance(address), diff.portfolios.getOrElse(address, Portfolio.empty).lease)
+    inner.leaseBalance(address).combine(diff.portfolios.getOrElse(address, Portfolio.empty).lease).explicitGet()
 
   override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] =
     maybeDiff
@@ -40,7 +41,7 @@ final class CompositeBlockchain private (
       .getOrElse(inner.assetScript(asset))
 
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] =
-    CompositeBlockchain.assetDescription(asset, maybeDiff.orEmpty, inner.assetDescription(asset), inner.assetScript(asset), height)
+    CompositeBlockchain.assetDescription(asset, maybeDiff.getOrElse(Diff()), inner.assetDescription(asset), inner.assetScript(asset), height)
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] =
     inner

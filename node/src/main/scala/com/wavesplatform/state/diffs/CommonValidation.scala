@@ -1,27 +1,27 @@
 package com.wavesplatform.state.diffs
 
-import scala.util.{Left, Right}
-
-import cats._
+import cats.implicits.toBifunctorOps
 import com.wavesplatform.account.{Address, AddressScheme}
-import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.features.OverdraftValidationProvider._
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
+
+import scala.util.{Left, Right}
 
 object CommonValidation {
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain, blockTime: Long, tx: T): Either[ValidationError, T] =
@@ -43,33 +43,37 @@ object CommonValidation {
           case Waves                => Portfolio(-feeAmount, LeaseBalance.empty, Map.empty)
         }
 
-        val spendings       = Monoid.combine(amountDiff, feeDiff)
-        val oldWavesBalance = blockchain.balance(sender, Waves)
+        amountDiff
+          .combine(feeDiff)
+          .leftMap(GenericError(_))
+          .flatMap { spendings =>
+            val oldWavesBalance = blockchain.balance(sender, Waves)
 
-        val newWavesBalance     = oldWavesBalance + spendings.balance
-        val feeUncheckedBalance = oldWavesBalance + amountDiff.balance
+            val newWavesBalance     = oldWavesBalance + spendings.balance
+            val feeUncheckedBalance = oldWavesBalance + amountDiff.balance
 
-        val overdraftFilter = allowFeeOverdraft && feeUncheckedBalance >= 0
-        if (!overdraftFilter && newWavesBalance < 0) {
-          Left(
-            GenericError(
-              "Attempt to transfer unavailable funds: Transaction application leads to " +
-                s"negative waves balance to (at least) temporary negative state, current balance equals $oldWavesBalance, " +
-                s"spends equals ${spendings.balance}, result is $newWavesBalance"
-            )
-          )
-        } else {
-          val balanceError = spendings.assets.collectFirst {
-            case (aid, delta) if delta < 0 && blockchain.balance(sender, aid) + delta < 0 =>
-              val availableBalance = blockchain.balance(sender, aid)
-              GenericError(
-                "Attempt to transfer unavailable funds: Transaction application leads to negative asset " +
-                  s"'$aid' balance to (at least) temporary negative state, current balance is $availableBalance, " +
-                  s"spends equals $delta, result is ${availableBalance + delta}"
+            val overdraftFilter = allowFeeOverdraft && feeUncheckedBalance >= 0
+            if (!overdraftFilter && newWavesBalance < 0) {
+              Left(
+                GenericError(
+                  "Attempt to transfer unavailable funds: Transaction application leads to " +
+                    s"negative waves balance to (at least) temporary negative state, current balance equals $oldWavesBalance, " +
+                    s"spends equals ${spendings.balance}, result is $newWavesBalance"
+                )
               )
+            } else {
+              val balanceError = spendings.assets.collectFirst {
+                case (aid, delta) if delta < 0 && blockchain.balance(sender, aid) + delta < 0 =>
+                  val availableBalance = blockchain.balance(sender, aid)
+                  GenericError(
+                    "Attempt to transfer unavailable funds: Transaction application leads to negative asset " +
+                      s"'$aid' balance to (at least) temporary negative state, current balance is $availableBalance, " +
+                      s"spends equals $delta, result is ${availableBalance + delta}"
+                  )
+              }
+              balanceError.fold[Either[ValidationError, T]](Right(tx))(Left(_))
+            }
           }
-          balanceError.fold[Either[ValidationError, T]](Right(tx))(Left(_))
-        }
       }
 
       tx match {

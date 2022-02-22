@@ -1,8 +1,7 @@
 package com.wavesplatform.state.diffs
 
+import cats.implicits.{toBifunctorOps, toFoldableOps}
 import cats.instances.list._
-import cats.instances.map._
-import cats.syntax.semigroup._
 import cats.syntax.traverse._
 import com.wavesplatform.account.Address
 import com.wavesplatform.lang.ValidationError
@@ -29,28 +28,33 @@ object MassTransferTransactionDiff {
     portfoliosEi.flatMap { list: List[(Map[Address, Portfolio], Long)] =>
       val sender   = Address.fromPublicKey(tx.sender)
       val foldInit = (Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)), 0L)
-      val (recipientPortfolios, totalAmount) = list.fold(foldInit) { (u, v) =>
-        (u._1 combine v._1, u._2 + v._2)
-      }
-      val completePortfolio =
-        recipientPortfolios
-          .combine(
-            tx.assetId
-              .fold(Map(sender -> Portfolio(-totalAmount, LeaseBalance.empty, Map.empty))) { asset =>
-                Map(sender -> Portfolio(0, LeaseBalance.empty, Map(asset -> -totalAmount)))
-              }
+      list
+        .foldM(foldInit) { (u, v) =>
+          Diff.combine(u._1, v._1).map((_, u._2 + v._2))
+        }
+        .flatMap {
+          case (recipientPortfolios, totalAmount) =>
+            Diff.combine(
+              recipientPortfolios,
+              tx.assetId
+                .fold(Map(sender -> Portfolio(-totalAmount, LeaseBalance.empty, Map.empty))) { asset =>
+                  Map(sender -> Portfolio(0, LeaseBalance.empty, Map(asset -> -totalAmount)))
+                }
+            )
+        }
+        .leftMap(GenericError(_))
+        .flatMap { completePortfolio =>
+          val assetIssued =
+            tx.assetId match {
+              case Waves                  => true
+              case asset @ IssuedAsset(_) => blockchain.assetDescription(asset).isDefined
+            }
+          Either.cond(
+            assetIssued,
+            Diff(portfolios = completePortfolio, scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)),
+            GenericError(s"Attempt to transfer a nonexistent asset")
           )
-
-      val assetIssued = tx.assetId match {
-        case Waves                  => true
-        case asset @ IssuedAsset(_) => blockchain.assetDescription(asset).isDefined
-      }
-
-      Either.cond(
-        assetIssued,
-        Diff(portfolios = completePortfolio, scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)),
-        GenericError(s"Attempt to transfer a nonexistent asset")
-      )
+        }
     }
   }
 }

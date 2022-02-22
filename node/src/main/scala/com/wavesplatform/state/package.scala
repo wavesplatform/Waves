@@ -1,5 +1,6 @@
 package com.wavesplatform
 
+import cats.implicits.toBifunctorOps
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
@@ -11,7 +12,8 @@ import scala.reflect.ClassTag
 import scala.util.Try
 
 package object state {
-  def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
+  def safeSum(x: Long, y: Long): Either[String, Long] =
+    Try(Math.addExact(x, y)).toEither.leftMap(_.toString)
 
   implicit class Cast[A](a: A) {
     def cast[B: ClassTag]: Option[B] = {

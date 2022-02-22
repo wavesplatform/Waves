@@ -1,6 +1,7 @@
 package com.wavesplatform.state
 
 import cats.data.Ior
+import cats.implicits.{catsSyntaxEitherId, catsSyntaxTuple2Semigroupal}
 import cats.instances.map._
 import cats.kernel.{Monoid, Semigroup}
 import cats.syntax.semigroup._
@@ -16,17 +17,13 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 
 import scala.collection.immutable.VectorMap
 
-case class LeaseBalance(in: Long, out: Long)
+case class LeaseBalance(in: Long, out: Long) {
+  def combine(that: LeaseBalance): Either[String, LeaseBalance] =
+    (safeSum(in, that.in), safeSum(out, that.out)).mapN(LeaseBalance(_, _))
+}
 
 object LeaseBalance {
   val empty: LeaseBalance = LeaseBalance(0, 0)
-
-  implicit val m: Monoid[LeaseBalance] = new Monoid[LeaseBalance] {
-    override def empty: LeaseBalance = LeaseBalance.empty
-
-    override def combine(x: LeaseBalance, y: LeaseBalance): LeaseBalance =
-      LeaseBalance(safeSum(x.in, y.in), safeSum(x.out, y.out))
-  }
 }
 
 case class VolumeAndFee(volume: Long, fee: Long)
@@ -158,32 +155,44 @@ case class Diff(
     scriptsRun: Int = 0,
     scriptsComplexity: Long = 0,
     scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
-)
+) {
+  def combine(newer: Diff): Either[String, Diff] =
+    Diff
+      .combine(portfolios, newer.portfolios)
+      .map(
+        portfolios =>
+          Diff(
+            transactions = transactions ++ newer.transactions,
+            portfolios = portfolios,
+            issuedAssets = issuedAssets ++ newer.issuedAssets,
+            updatedAssets = updatedAssets |+| newer.updatedAssets,
+            aliases = aliases ++ newer.aliases,
+            orderFills = orderFills.combine(newer.orderFills),
+            leaseState = leaseState ++ newer.leaseState,
+            scripts = scripts ++ newer.scripts,
+            assetScripts = assetScripts ++ newer.assetScripts,
+            accountData = accountData.combine(newer.accountData),
+            sponsorship = sponsorship.combine(newer.sponsorship),
+            scriptsRun = scriptsRun + newer.scriptsRun,
+            scriptResults = scriptResults.combine(newer.scriptResults),
+            scriptsComplexity = scriptsComplexity + newer.scriptsComplexity
+          )
+      )
+}
 
 object Diff {
   val empty: Diff = Diff()
 
-  implicit val diffMonoid: Monoid[Diff] = new Monoid[Diff] {
-    override def empty: Diff = Diff.empty
-
-    override def combine(older: Diff, newer: Diff): Diff =
-      Diff(
-        transactions = older.transactions ++ newer.transactions,
-        portfolios = older.portfolios.combine(newer.portfolios),
-        issuedAssets = older.issuedAssets ++ newer.issuedAssets,
-        updatedAssets = older.updatedAssets |+| newer.updatedAssets,
-        aliases = older.aliases ++ newer.aliases,
-        orderFills = older.orderFills.combine(newer.orderFills),
-        leaseState = older.leaseState ++ newer.leaseState,
-        scripts = older.scripts ++ newer.scripts,
-        assetScripts = older.assetScripts ++ newer.assetScripts,
-        accountData = older.accountData.combine(newer.accountData),
-        sponsorship = older.sponsorship.combine(newer.sponsorship),
-        scriptsRun = older.scriptsRun + newer.scriptsRun,
-        scriptResults = older.scriptResults.combine(newer.scriptResults),
-        scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity
-      )
-  }
+  def combine(portfolios1: Map[Address, Portfolio], portfolios2: Map[Address, Portfolio]): Either[String, Map[Address, Portfolio]] =
+    portfolios2.foldLeft(portfolios1.asRight[String]) {
+      case (Right(combinedPortfolios), (address, nextPortfolio)) =>
+        if (combinedPortfolios.contains(address))
+          combinedPortfolios(address).combine(nextPortfolio).map(r => combinedPortfolios + (address -> r))
+        else
+          Right(combinedPortfolios + (address -> nextPortfolio))
+      case (Left(error), _) =>
+        Left(error)
+    }
 
   implicit class DiffExt(private val d: Diff) extends AnyVal {
     def errorMessage(txId: ByteStr): Option[InvokeScriptResult.ErrorMessage] =

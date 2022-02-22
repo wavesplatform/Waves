@@ -1,8 +1,8 @@
 package com.wavesplatform.state
 
 import cats.Monoid
+import cats.implicits.{catsSyntaxSemigroup, catsSyntaxTuple2Semigroupal}
 import cats.instances.map._
-import cats.kernel.CommutativeSemigroup
 import com.wavesplatform.state.diffs.BlockDiffer.Fraction
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset._
@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.Asset._
 import scala.collection.immutable.Map
 
 case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empty, assets: Map[IssuedAsset, Long] = Map.empty) {
-  lazy val effectiveBalance: Long = safeSum(balance, lease.in) - lease.out
+  lazy val effectiveBalance: Long = 0 //safeSum(balance, lease.in) - lease.out
   lazy val spendableBalance: Long = balance - lease.out
 
   lazy val isEmpty: Boolean = this == Portfolio.empty
@@ -19,6 +19,10 @@ case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empt
     case Waves                  => balance
     case asset @ IssuedAsset(_) => assets.getOrElse(asset, 0L)
   }
+
+  def combine(that: Portfolio): Either[String, Portfolio] =
+    (safeSum(balance, that.balance), lease.combine(that.lease))
+      .mapN(Portfolio(_, _, assets |+| that.assets))
 }
 
 object Portfolio {
@@ -32,19 +36,6 @@ object Portfolio {
   }
 
   val empty: Portfolio = Portfolio()
-
-  implicit val longSemigroup: CommutativeSemigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
-
-  implicit val monoid: Monoid[Portfolio] = new Monoid[Portfolio] {
-    override val empty: Portfolio = Portfolio.empty
-
-    override def combine(older: Portfolio, newer: Portfolio): Portfolio =
-      Portfolio(
-        balance = safeSum(older.balance, newer.balance),
-        lease = Monoid.combine(older.lease, newer.lease),
-        assets = Monoid.combine(older.assets, newer.assets)
-      )
-  }
 
   implicit class PortfolioExt(val self: Portfolio) extends AnyVal {
     def spendableBalanceOf(assetId: Asset): Long = assetId.fold(self.spendableBalance)(self.assets.getOrElse(_, 0L))

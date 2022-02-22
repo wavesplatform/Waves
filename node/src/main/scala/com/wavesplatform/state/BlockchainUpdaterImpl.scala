@@ -1,9 +1,5 @@
 package com.wavesplatform.state
 
-import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
-
-import cats.instances.map._
-import cats.kernel.Monoid
 import cats.syntax.either._
 import cats.syntax.option._
 import com.wavesplatform.account.{Address, Alias}
@@ -11,6 +7,7 @@ import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.Storage
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
@@ -29,6 +26,8 @@ import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceSt
 import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
+
+import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 class BlockchainUpdaterImpl(
     leveldb: Blockchain with Storage,
@@ -737,7 +736,8 @@ class BlockchainUpdaterImpl(
 }
 
 object BlockchainUpdaterImpl {
-  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]) = Monoid.combine(p1, p2.map { case (k, v) => k -> v.negate })
+  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]) =
+    Diff.combine(p1, p2.map { case (k, v) => k -> v.negate }).explicitGet()
 
   private def displayFeatures(s: Set[Short]): String =
     s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"

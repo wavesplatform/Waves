@@ -1,14 +1,9 @@
 package com.wavesplatform.utx
 
-import java.time.Duration
-import java.time.temporal.ChronoUnit
-import java.util.concurrent.ConcurrentHashMap
-
-import cats.Monoid
-import cats.syntax.monoid._
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.lang.ValidationError
@@ -35,6 +30,9 @@ import monix.execution.atomic.AtomicBoolean
 import monix.execution.schedulers.SchedulerService
 import org.slf4j.LoggerFactory
 
+import java.time.Duration
+import java.time.temporal.ChronoUnit
+import java.util.concurrent.ConcurrentHashMap
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters._
 import scala.util.{Left, Right}
@@ -339,7 +337,7 @@ class UtxPoolImpl(
 
                         PackResult(
                           Some(r.transactions.fold(Seq(tx))(tx +: _)),
-                          r.totalDiff.combine(newDiff),
+                          r.totalDiff.combine(newDiff).explicitGet(),
                           updatedConstraint,
                           r.iterations + 1,
                           newCheckedAddresses,
@@ -396,7 +394,7 @@ class UtxPoolImpl(
         }
       }
 
-      loop(PackResult(None, Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty, Set.empty))
+      loop(PackResult(None, Diff.empty, initialConstraint, 0, Set.empty, Set.empty, Set.empty))
     }
 
     log.trace(

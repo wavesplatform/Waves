@@ -2,13 +2,12 @@ package com.wavesplatform.utx
 
 import java.time.Duration
 import java.time.temporal.ChronoUnit
-
 import scala.annotation.tailrec
-
 import cats.kernel.Monoid
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Transaction
@@ -119,7 +118,7 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
     val oldTxs = priorityTransactions.toSet
 
     priorityDiffs = f(priorityDiffs).filterNot(_.diff.transactions.isEmpty)
-    priorityDiffsCombined = Monoid.combineAll(validPriorityDiffs)
+    priorityDiffsCombined = validPriorityDiffs.fold(Diff())(_.combine(_).explicitGet())
 
     val newTxs = priorityTransactions.toSet
 

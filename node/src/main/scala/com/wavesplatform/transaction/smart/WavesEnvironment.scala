@@ -1,7 +1,6 @@
 package com.wavesplatform.transaction.smart
 
 import cats.syntax.either._
-import cats.syntax.semigroup._
 import com.wavesplatform.account
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.block.BlockHeader
@@ -375,7 +374,7 @@ class DAppEnvironment(
         scriptResults = Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))),
         scriptsRun = diff.scriptsRun + 1
       )
-      currentDiff = currentDiff |+| fixedDiff
+      currentDiff = currentDiff.combine(fixedDiff).explicitGet()
       mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions
