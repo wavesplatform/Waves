@@ -66,11 +66,12 @@ object CreateAliasTransaction extends TransactionParser {
       timestamp: TxTimestamp,
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, TransactionT] = {
     for {
       fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
       tx <- CreateAliasTransaction(version, sender, aliasName, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
+  }
 
   def signed(
       version: TxVersion,
