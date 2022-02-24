@@ -15,7 +15,6 @@ object DataTxValidator extends TxValidator[DataTransaction] {
       V.cond(data.length <= MaxEntryCount && data.forall(_.isValid(version)), TxValidationError.TooBigArray),
       V.cond(data.forall(_.key.nonEmpty), TxValidationError.EmptyDataKey),
       V.cond(data.map(_.key) == data.map(_.key).distinct, TxValidationError.DuplicatedDataKeys),
-      V.fee(fee),
       V.byVersion(tx)(
         TxVersion.V1 -> { () =>
           V.seq(tx)(

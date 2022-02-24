@@ -1,9 +1,9 @@
 package com.wavesplatform.transaction
-import com.wavesplatform.account.PublicKey
+import com.google.protobuf.ByteString
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.test.PropSpec
 import play.api.libs.json.Json
@@ -76,15 +76,16 @@ class IssueTransactionV1Specification extends PropSpec {
     val tx = IssueTransaction(
       TxVersion.V1,
       PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-      "Gigacoin".utf8Bytes,
-      "Gigacoin".utf8Bytes,
-      10000000000L,
+      ByteString.copyFromUtf8("Gigacoin"),
+      ByteString.copyFromUtf8("Gigacoin"),
+      TxAmount.unsafeFrom(10000000000L),
       8.toByte,
       true,
       script = None,
-      100000000,
+      TxAmount.unsafeFrom(100000000),
       1526287561757L,
-      Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get)
+      Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get),
+      AddressScheme.current.chainId
     )
 
     tx.json() shouldEqual js

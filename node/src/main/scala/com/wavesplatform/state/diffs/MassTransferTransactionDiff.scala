@@ -28,7 +28,7 @@ object MassTransferTransactionDiff {
 
     portfoliosEi.flatMap { list: List[(Map[Address, Portfolio], Long)] =>
       val sender   = Address.fromPublicKey(tx.sender)
-      val foldInit = (Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)), 0L)
+      val foldInit = (Map(sender -> Portfolio(-tx.fee.value, LeaseBalance.empty, Map.empty)), 0L)
       val (recipientPortfolios, totalAmount) = list.fold(foldInit) { (u, v) =>
         (u._1 combine v._1, u._2 + v._2)
       }

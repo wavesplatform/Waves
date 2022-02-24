@@ -1,10 +1,9 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
-import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs, Transaction, TxVersion}
+import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs, Transaction, TxAmount, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -21,7 +20,7 @@ object CreateAliasTxSerializer {
     lazy val base = Bytes.concat(
       sender.arr,
       Deser.serializeArrayWithLength(alias.bytes),
-      Longs.toByteArray(fee),
+      Longs.toByteArray(fee.value),
       Longs.toByteArray(timestamp)
     )
 
@@ -45,7 +44,7 @@ object CreateAliasTxSerializer {
         val buf       = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
         val sender    = buf.getPublicKey
         val alias     = buf.getAlias
-        val fee       = buf.getLong
+        val fee       = TxAmount.unsafeFrom(buf.getLong)
         val timestamp = buf.getLong
         val signature = buf.getSignature
         CreateAliasTransaction(Transaction.V1, sender, alias.name, fee, timestamp, Proofs(signature), alias.chainId)
@@ -54,7 +53,7 @@ object CreateAliasTxSerializer {
         val buf       = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
         val sender    = buf.getPublicKey
         val alias     = buf.getAlias
-        val fee       = buf.getLong
+        val fee       = TxAmount.unsafeFrom(buf.getLong)
         val timestamp = buf.getLong
         val proofs    = buf.getProofs
         CreateAliasTransaction(Transaction.V2, sender, alias.name, fee, timestamp, proofs, alias.chainId)

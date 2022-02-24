@@ -347,7 +347,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       List(CONST_BYTESTR(ByteStr.fromBytes(1, 2, 3)).explicitGet()),
       payment.toSeq,
       if (selfSend) dApp else invoker,
-      sponsored.map(s => Sponsorship.fromWaves(fee, s.minSponsoredAssetFee.get)).getOrElse(fee),
+      sponsored.map(s => Sponsorship.fromWaves(fee, s.minSponsoredAssetFee.get.value)).getOrElse(fee),
       sponsored.map(_.asset).getOrElse(Waves),
       txVersion
     )
@@ -531,7 +531,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       d.appendBlock(ci)
       d.liquidDiff.scriptsRun shouldBe 2
       d.blockchain.balance(thirdAddress, Waves) shouldBe amount
-      d.blockchain.balance(invokerAddress, asset) shouldBe (issue.quantity - 1)
+      d.blockchain.balance(invokerAddress, asset) shouldBe (issue.quantity.value - 1)
       d.blockchain.balance(dAppAddress, asset) shouldBe 1
     }
   }
@@ -597,7 +597,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(issue, ci), Block.ProtoBlockVersion)) {
       case (blockDiff, newState) =>
         blockDiff.scriptsRun shouldBe 3
-        newState.balance(dAppAddress, asset) shouldBe (issue.quantity - amount)
+        newState.balance(dAppAddress, asset) shouldBe (issue.quantity.value - amount)
         newState.balance(thirdAddress, asset) shouldBe amount
     }
   }
@@ -734,7 +734,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val sponsorAsset             = IssuedAsset(sponsorIssue.id())
     val sponsor                  = TxHelpers.sponsor(sponsorAsset, sender = dApp)
     val (genesis, setScript, ci) = preconditionsAndSetContract(dAppWithTransfers(), sponsored = Some(sponsor))
-    val t                        = TxHelpers.transfer(dApp, invokerAddress, sponsorIssue.quantity / 2, sponsorAsset)
+    val t                        = TxHelpers.transfer(dApp, invokerAddress, sponsorIssue.quantity.value / 2, sponsorAsset)
 
     testDiffAndState(
       Seq(TestBlock.create(genesis ++ Seq(sponsorIssue, t, sponsor, setScript))),
@@ -744,8 +744,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         blockDiff.scriptsRun shouldBe 1
         blockDiff.errorMessage(ci.id()) shouldBe None
         newState.balance(thirdAddress, Waves) shouldBe amount
-        newState.balance(ci.sender.toAddress, sponsorAsset) shouldBe (sponsorIssue.quantity / 2 - ci.fee)
-        newState.balance(dAppAddress, sponsorAsset) shouldBe (sponsorIssue.quantity - sponsorIssue.quantity / 2 + ci.fee)
+        newState.balance(ci.sender.toAddress, sponsorAsset) shouldBe (sponsorIssue.quantity.value / 2 - ci.fee.value)
+        newState.balance(dAppAddress, sponsorAsset) shouldBe (sponsorIssue.quantity.value - sponsorIssue.quantity.value / 2 + ci.fee.value)
     }
   }
 
@@ -929,7 +929,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(issue, ci), Block.ProtoBlockVersion), from = V4) {
       case (blockDiff, newState) =>
         blockDiff.scriptsRun shouldBe 3
-        newState.balance(dAppAddress, IssuedAsset(issue.id())) shouldBe (issue.quantity - amount)
+        newState.balance(dAppAddress, IssuedAsset(issue.id())) shouldBe (issue.quantity.value - amount)
         newState.balance(thirdAddress, IssuedAsset(issue.id())) shouldBe amount
     }
   }
@@ -1206,7 +1206,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val issueTx = TxHelpers.issue(dApp, script = Some(throwingAsset))
 
     val feeInWaves = TestValues.invokeFee
-    val feeInAsset = Sponsorship.fromWaves(feeInWaves, sponsorTx.minSponsoredAssetFee.get)
+    val feeInAsset = Sponsorship.fromWaves(feeInWaves, sponsorTx.minSponsoredAssetFee.get.value)
 
     Seq(
       (feeInWaves, Waves, issueContract, List.empty[EXPR]),        // insufficient fee
@@ -1224,7 +1224,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         val g2Tx = TxHelpers.genesis(invokerAddress)
         val g3Tx = TxHelpers.genesis(thirdAddress)
 
-        val tTx = TxHelpers.transfer(thirdAcc, invokerAddress, sponsorIssue.quantity, sponsorAsset)
+        val tTx = TxHelpers.transfer(thirdAcc, invokerAddress, sponsorIssue.quantity.value, sponsorAsset)
 
         val script = ContractScript(V4, contract).explicitGet()
         val ssTx   = TxHelpers.setScript(dApp, script)
@@ -1238,7 +1238,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
           case (diff, state) =>
             diff.scriptsRun shouldBe 0
             diff.portfolios(invoke.sender.toAddress).balanceOf(invoke.feeAssetId)
-            state.balance(invoke.sender.toAddress, invoke.feeAssetId) shouldBe invoke.feeAssetId.fold(g2Tx.amount)(_ => sponsorIssue.quantity) - invoke.fee
+            state.balance(invoke.sender.toAddress, invoke.feeAssetId) shouldBe invoke.feeAssetId.fold(g2Tx.amount.value)(_ => sponsorIssue.quantity.value) - invoke.fee.value
             state.transactionInfo(invoke.id()).map(r => r._2 -> r._1.succeeded) shouldBe Some((invoke, false))
         }
     }
@@ -1252,10 +1252,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val iTx            = TxHelpers.issue(thirdAcc)
     val sponsoredAsset = IssuedAsset(iTx.assetId)
     val sTx            = TxHelpers.sponsor(sponsoredAsset, sender = thirdAcc)
-    val tTx            = TxHelpers.transfer(thirdAcc, dAppAddress, iTx.quantity / 1)
+    val tTx            = TxHelpers.transfer(thirdAcc, dAppAddress, iTx.quantity.value / 1)
 
     val wavesFee     = TestValues.invokeFee(1)
-    val sponsoredFee = Sponsorship.fromWaves(wavesFee, sTx.minSponsoredAssetFee.get)
+    val sponsoredFee = Sponsorship.fromWaves(wavesFee, sTx.minSponsoredAssetFee.get.value)
 
     Seq((Waves, wavesFee), (sponsoredAsset, sponsoredFee))
       .foreach {

@@ -50,7 +50,6 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
         GenericError(s"Callable function name size = $callableNameSize bytes must be less than ${ContractLimits.MaxDeclarationNameInBytes}")
       ),
       checkAmounts(payments),
-      V.fee(fee),
       Try(checkLength)
         .toEither
         .leftMap(err => GenericError(err.getMessage))

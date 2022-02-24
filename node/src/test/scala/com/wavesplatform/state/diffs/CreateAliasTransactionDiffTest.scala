@@ -120,8 +120,8 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
           if (transfer.sender.toAddress != aliasTx.sender.toAddress) {
             val recipientPortfolioDiff = blockDiff.portfolios(aliasTx.sender.toAddress)
             transfer.assetId match {
-              case aid @ IssuedAsset(_) => recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance.empty, Map(aid -> transfer.amount))
-              case Waves                => recipientPortfolioDiff shouldBe Portfolio(transfer.amount, LeaseBalance.empty, Map.empty)
+              case aid @ IssuedAsset(_) => recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance.empty, Map(aid -> transfer.amount.value))
+              case Waves                => recipientPortfolioDiff shouldBe Portfolio(transfer.amount.value, LeaseBalance.empty, Map.empty)
             }
           }
       }
@@ -133,7 +133,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
       assertDiffEi(Seq(TestBlock.create(genesis :+ issue1 :+ issue2 :+ aliasTx)), TestBlock.create(Seq(lease))) { blockDiffEi =>
         if (lease.sender.toAddress != aliasTx.sender.toAddress) {
           val recipientPortfolioDiff = blockDiffEi.explicitGet().portfolios(aliasTx.sender.toAddress)
-          recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance(lease.amount, 0), Map.empty)
+          recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance(lease.amount.value, 0), Map.empty)
         } else {
           blockDiffEi should produce("Cannot lease to self")
         }

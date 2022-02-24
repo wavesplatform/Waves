@@ -14,22 +14,21 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxVersion}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.utils._
 import play.api.libs.json.{JsNumber, JsObject, JsString, Json}
 
 class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
-  private lazy val exchAsset: IssueTransaction = IssueTransaction(
+  private lazy val exchAsset: IssueTransaction = IssueTransaction.selfSigned(
     TxVersion.V1,
-    sender = sender.keyPair.publicKey,
-    "myasset".utf8Bytes,
-    "my asset description".utf8Bytes,
+    sender = sender.keyPair,
+    "myasset",
+    "my asset description",
     quantity = someAssetAmount,
     decimals = 2,
     reissuable = true,
     script = None,
     fee = 1.waves,
     timestamp = System.currentTimeMillis()
-  ).signWith(sender.keyPair.privateKey)
+  ).explicitGet()
 
   private def acc0 = firstKeyPair
   private def acc1 = secondKeyPair
@@ -116,18 +115,18 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     val assetDescription = "my asset description"
 
-    val IssueTx: IssueTransaction = IssueTransaction(
+    val IssueTx: IssueTransaction = IssueTransaction.selfSigned(
       TxVersion.V1,
-      buyer.publicKey,
-      "myasset".utf8Bytes,
-      assetDescription.utf8Bytes,
+      buyer,
+      "myasset",
+      assetDescription,
       quantity = someAssetAmount,
       decimals = 8,
       reissuable = true,
       script = None,
       fee = 1.waves,
       timestamp = System.currentTimeMillis()
-    ).signWith(buyer.privateKey)
+    ).explicitGet()
 
     val assetId = IssueTx.id()
 
@@ -135,7 +134,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     nodes.waitForHeightAriseAndTxPresent(assetId.toString)
 
-    sender.transfer(firstKeyPair, secondKeyPair.toAddress.toString, IssueTx.quantity / 2, assetId = Some(assetId.toString), waitForTx = true)
+    sender.transfer(firstKeyPair, secondKeyPair.toAddress.toString, IssueTx.quantity.value / 2, assetId = Some(assetId.toString), waitForTx = true)
 
     for ((o1ver, o2ver, matcherFeeOrder1, matcherFeeOrder2) <- Seq(
            (1: Byte, 3: Byte, Waves, IssuedAsset(assetId)),

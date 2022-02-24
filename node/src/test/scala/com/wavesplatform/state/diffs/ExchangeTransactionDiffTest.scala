@@ -33,7 +33,6 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.utils._
 import org.scalacheck.Gen
 import org.scalatest.{EitherValues, Inside}
 
@@ -269,7 +268,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           totalPortfolioDiff.effectiveBalance shouldBe 0
           totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-          blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee.value + exchange.sellMatcherFee.value - exchange.fee
+          blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee.value + exchange.sellMatcherFee.value - exchange.fee.value
       }
     }
   }
@@ -333,7 +332,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
               Seq(
                 ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee.value),
                 ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee.value),
-                wavesPortfolio(-exchange.fee)
+                wavesPortfolio(-exchange.fee.value)
               )
             )
 
@@ -422,7 +421,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
               Seq(
                 ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee.value),
                 ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee.value),
-                wavesPortfolio(-exchange.fee)
+                wavesPortfolio(-exchange.fee.value)
               )
             )
 
@@ -609,7 +608,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
               totalPortfolioDiff.effectiveBalance shouldBe 0
               totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-              blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee.value + exchange.sellMatcherFee.value - exchange.fee
+              blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee.value + exchange.sellMatcherFee.value - exchange.fee.value
           }
 
           assertDiffEi(
@@ -683,7 +682,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         val tx = createExTx(buy, sell, price, matcher, Ts).explicitGet()
         assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(tx)), fs) {
           case (blockDiff, state) =>
-            blockDiff.portfolios(tx.sender.toAddress).balance shouldBe tx.buyMatcherFee.value + tx.sellMatcherFee.value - tx.fee
+            blockDiff.portfolios(tx.sender.toAddress).balance shouldBe tx.buyMatcherFee.value + tx.sellMatcherFee.value - tx.fee.value
             state.balance(tx.sender.toAddress) shouldBe 1L
         }
     }
@@ -712,7 +711,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           sender = buyer,
           matcher = matcher.publicKey,
           pair = assetPair,
-          amount = issue1.quantity + 1,
+          amount = issue1.quantity.value + 1,
           price = price,
           timestamp = Ts,
           expiration = Ts + 1,
@@ -723,7 +722,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           sender = seller,
           matcher = matcher.publicKey,
           pair = assetPair,
-          amount = issue1.quantity + 1,
+          amount = issue1.quantity.value + 1,
           price = price,
           timestamp = Ts,
           expiration = Ts + 1,
@@ -781,7 +780,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           import diff.portfolios
           portfolios(buyer.toAddress).balance shouldBe (-41L + 425532L)
           portfolios(seller.toAddress).balance shouldBe (-300000L - 425532L)
-          portfolios(matcher.toAddress).balance shouldBe (+41L + 300000L - tx.fee)
+          portfolios(matcher.toAddress).balance shouldBe (+41L + 300000L - tx.fee.value)
       }
     }
   }
@@ -968,10 +967,10 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       genesis = GenesisTransaction.create(MATCHER.toAddress, Long.MaxValue, ts).explicitGet()
       tr1     = createWavesTransfer(MATCHER, buyer.toAddress, Long.MaxValue / 3, enoughFee, ts + 1).explicitGet()
       tr2     = createWavesTransfer(MATCHER, seller.toAddress, Long.MaxValue / 3, enoughFee, ts + 2).explicitGet()
-      asset1 = IssueTransaction(TxVersion.V2, buyer.publicKey, "Asset#1".utf8Bytes, Array.emptyByteArray, 1000000, 8, false, None, enoughFee, ts + 3)
-        .signWith(buyer.privateKey)
-      asset2 = IssueTransaction(TxVersion.V2, seller.publicKey, "Asset#2".utf8Bytes, Array.emptyByteArray, 1000000, 8, false, None, enoughFee, ts + 4)
-        .signWith(seller.privateKey)
+      asset1 = IssueTransaction.selfSigned(TxVersion.V2, buyer, "Asset#1", "", 1000000, 8, false, None, enoughFee, ts + 3)
+        .explicitGet()
+      asset2 = IssueTransaction.selfSigned(TxVersion.V2, seller, "Asset#2", "", 1000000, 8, false, None, enoughFee, ts + 4)
+        .explicitGet()
       setMatcherScript = SetScriptTransaction
         .selfSigned(1.toByte, MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
         .explicitGet()
@@ -1177,7 +1176,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             version = TxVersion.V3,
             buyMatcherFee = TxMatcherFee.unsafeFrom(fee),
             sellMatcherFee = TxMatcherFee.unsafeFrom(fee),
-            fee = fee,
+            fee = TxAmount.unsafeFrom(fee),
             order1 = tx.order1.copy(version = Order.V4, matcherFee = TxMatcherFee.unsafeFrom(fee)).signWith(buyer.privateKey),
             order2 = tx.order2.copy(version = Order.V4, matcherFee = TxMatcherFee.unsafeFrom(fee)).signWith(seller.privateKey)
           )
@@ -1233,13 +1232,13 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
                 amount = TxExchangeAmount.unsafeFrom(amount),
                 order1 = tx.buyOrder.copy(amount = TxExchangeAmount.unsafeFrom(sellAmount)).signWith(buyer.privateKey),
                 order2 = tx.sellOrder.copy(amount = TxExchangeAmount.unsafeFrom(buyAmount)).signWith(seller.privateKey),
-                buyMatcherFee = TxMatcherFee.unsafeFrom((BigInt(tx.fee) * amount / buyAmount).toLong),
-                sellMatcherFee = TxMatcherFee.unsafeFrom((BigInt(tx.fee) * amount / sellAmount).toLong)
+                buyMatcherFee = TxMatcherFee.unsafeFrom((BigInt(tx.fee.value) * amount / buyAmount).toLong),
+                sellMatcherFee = TxMatcherFee.unsafeFrom((BigInt(tx.fee.value) * amount / sellAmount).toLong)
               )
               .signWith(MATCHER.privateKey)
           }
         buyerBalance   = Map(Waves -> ENOUGH_AMT, asset         -> 0L)
-        sellerBalance  = Map(Waves -> (ENOUGH_AMT - fee), asset -> iTx.quantity)
+        sellerBalance  = Map(Waves -> (ENOUGH_AMT - fee), asset -> iTx.quantity.value)
         matcherBalance = Map(Waves -> ENOUGH_AMT, asset         -> 0L)
       } yield (eTx, (buyerBalance, sellerBalance, matcherBalance), Seq(gTx1, gTx2, gTx3, iTx), throwingScript)
 
@@ -1251,7 +1250,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithBlockV5) {
           case (diff, state) =>
             diff.scriptsRun shouldBe 0
-            diff.portfolios(exchange.sender.toAddress).balance shouldBe -exchange.fee
+            diff.portfolios(exchange.sender.toAddress).balance shouldBe -exchange.fee.value
             diff.portfolios.get(exchange.buyOrder.sender.toAddress) shouldBe None
             diff.portfolios.get(exchange.sellOrder.sender.toAddress) shouldBe None
 
@@ -1270,7 +1269,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
                 state.balance(exchange.sellOrder.sender.toAddress, asset) shouldBe balance
             }
 
-            state.balance(exchange.sender.toAddress, Waves) shouldBe matcherBalance(Waves) - exchange.fee
+            state.balance(exchange.sender.toAddress, Waves) shouldBe matcherBalance(Waves) - exchange.fee.value
             matcherBalance.collect { case b @ (IssuedAsset(_), _) => b }.foreach {
               case (asset, balance) =>
                 diff.portfolios(exchange.sender.toAddress).balanceOf(asset) shouldBe 0L
@@ -1470,10 +1469,10 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       genesis = GenesisTransaction.create(MATCHER.toAddress, Long.MaxValue, ts).explicitGet()
       tr1     = createWavesTransfer(MATCHER, buyer.toAddress, Long.MaxValue / 3, enoughFee, ts + 1).explicitGet()
       tr2     = createWavesTransfer(MATCHER, seller.toAddress, Long.MaxValue / 3, enoughFee, ts + 2).explicitGet()
-      asset1 = IssueTransaction(TxVersion.V2, buyer.publicKey, "Asset#1".utf8Bytes, Array.emptyByteArray, 1000000, 8, false, None, enoughFee, ts + 3)
-        .signWith(buyer.privateKey)
-      asset2 = IssueTransaction(TxVersion.V2, seller.publicKey, "Asset#2".utf8Bytes, Array.emptyByteArray, 1000000, 8, false, None, enoughFee, ts + 4)
-        .signWith(seller.privateKey)
+      asset1 = IssueTransaction.selfSigned(TxVersion.V2, buyer, "Asset#1", "", 1000000, 8, false, None, enoughFee, ts + 3)
+        .explicitGet()
+      asset2 = IssueTransaction.selfSigned(TxVersion.V2, seller, "Asset#2", "", 1000000, 8, false, None, enoughFee, ts + 4)
+        .explicitGet()
       setMatcherScript = SetScriptTransaction
         .selfSigned(1.toByte, MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
         .explicitGet()
@@ -1649,7 +1648,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             1.toByte,
             sender = buyer,
             assetId = IssuedAsset(issueTx2.id()),
-            transfers = sellers.map(seller => ParsedTransfer(seller.toAddress, issueTx2.quantity / sellOrdersCount)),
+            transfers = sellers.map(seller => ParsedTransfer(seller.toAddress, issueTx2.quantity.value / sellOrdersCount)),
             fee = 1000L,
             genesisTimestamp + 1000L,
             ByteStr.empty

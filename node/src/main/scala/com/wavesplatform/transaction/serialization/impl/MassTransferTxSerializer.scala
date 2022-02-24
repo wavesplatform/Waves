@@ -1,13 +1,12 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.serialization._
-import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.{TxAmount, TxVersion}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.utils.byteStrFormat
@@ -43,7 +42,7 @@ object MassTransferTxSerializer {
           Shorts.toByteArray(transfers.size.toShort),
           Bytes.concat(transferBytes: _*),
           Longs.toByteArray(timestamp),
-          Longs.toByteArray(fee),
+          Longs.toByteArray(fee.value),
           Deser.serializeArrayWithLength(attachment.arr)
         )
 
@@ -76,7 +75,7 @@ object MassTransferTxSerializer {
     val assetId    = buf.getAsset
     val transfers  = parseTransfers(buf)
     val timestamp  = buf.getLong // Timestamp before fee
-    val fee        = buf.getLong
+    val fee        = TxAmount.unsafeFrom(buf.getLong)
     val attachment = Deser.parseArrayWithLength(buf)
     val proofs     = buf.getProofs
     MassTransferTransaction(TxVersion.V1, sender, assetId, transfers, fee, timestamp, ByteStr(attachment), proofs, AddressScheme.current.chainId)

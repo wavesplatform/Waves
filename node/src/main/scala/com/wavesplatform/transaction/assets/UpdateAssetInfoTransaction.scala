@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.assets
 
+import cats.syntax.either._
 import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -30,7 +31,7 @@ case class UpdateAssetInfoTransaction(
     with ProvenTransaction
     with ProtobufOnly { self =>
 
-  override def assetFee: (Asset, TxAmount) = (feeAsset, feeAmount)
+  override def assetFee: (Asset, Long) = (feeAsset, feeAmount.value)
 
   override def builder: UpdateAssetInfoTransaction.type = UpdateAssetInfoTransaction
 
@@ -76,24 +77,26 @@ object UpdateAssetInfoTransaction extends TransactionParser {
       name: String,
       description: String,
       timestamp: TxTimestamp,
-      feeAmount: TxAmount,
+      feeAmount: Long,
       feeAsset: Asset,
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, UpdateAssetInfoTransaction] = {
-    UpdateAssetInfoTransaction(
-      version,
-      sender,
-      IssuedAsset(assetId),
-      name,
-      description,
-      timestamp,
-      feeAmount,
-      feeAsset,
-      proofs,
-      chainId
-    ).validatedEither
-  }
+  ): Either[ValidationError, UpdateAssetInfoTransaction] =
+    for {
+      fee <- TxAmount.from(feeAmount).leftMap(_ => TxValidationError.InsufficientFee())
+      tx <- UpdateAssetInfoTransaction(
+        version,
+        sender,
+        IssuedAsset(assetId),
+        name,
+        description,
+        timestamp,
+        fee,
+        feeAsset,
+        proofs,
+        chainId
+      ).validatedEither
+    } yield tx
 
   def selfSigned(
       version: Byte,
@@ -102,7 +105,7 @@ object UpdateAssetInfoTransaction extends TransactionParser {
       name: String,
       description: String,
       timestamp: TxTimestamp,
-      feeAmount: TxAmount,
+      feeAmount: Long,
       feeAsset: Asset,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, UpdateAssetInfoTransaction] =

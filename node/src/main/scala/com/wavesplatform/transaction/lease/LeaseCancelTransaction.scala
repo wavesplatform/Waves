@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.lease
 
+import cats.syntax.either._
 import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -50,18 +51,21 @@ object LeaseCancelTransaction extends TransactionParser {
       version: TxVersion,
       sender: PublicKey,
       leaseId: ByteStr,
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransactionT] =
-    LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, proofs, chainId).validatedEither
+    for {
+      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
+      tx <- LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, proofs, chainId).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
       leaseId: ByteStr,
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       signer: PrivateKey,
       chainId: Byte = AddressScheme.current.chainId
@@ -72,7 +76,7 @@ object LeaseCancelTransaction extends TransactionParser {
       version: TxVersion,
       sender: KeyPair,
       leaseId: ByteStr,
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransactionT] =

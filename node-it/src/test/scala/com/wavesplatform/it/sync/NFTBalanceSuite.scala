@@ -12,7 +12,6 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.utils._
 import play.api.libs.json._
 
 import scala.concurrent.Future.traverse
@@ -158,33 +157,33 @@ object NFTBalanceSuite {
   def fillPortfolio(issuer: KeyPair, nft: Int, simple: Int): (List[IssueTransaction], List[IssueTransaction]) = {
 
     val simpleAssets = List.fill[IssueTransaction](simple) {
-      IssueTransaction(
+      IssueTransaction.selfSigned(
         TxVersion.V1,
-        issuer.publicKey,
-        "SimpleAsset".utf8Bytes,
-        s"Simple Test Asset ${Random.nextInt(1000)}".utf8Bytes,
+        issuer,
+        "SimpleAsset",
+        s"Simple Test Asset ${Random.nextInt(1000)}",
         1000,
         8,
         reissuable = true,
         script = None,
         1.waves,
         System.currentTimeMillis()
-      ).signWith(issuer.privateKey)
+      ).explicitGet()
     }
 
     val nonFungibleAssets = List.fill[IssueTransaction](nft) {
-      IssueTransaction(
+      IssueTransaction.selfSigned(
         TxVersion.V1,
-        issuer.publicKey,
-        "NonFungibleAsset".utf8Bytes,
-        s"NFT Test Asset ${Random.nextInt(1000)}".utf8Bytes,
+        issuer,
+        "NonFungibleAsset",
+        s"NFT Test Asset ${Random.nextInt(1000)}",
         1,
         0,
         reissuable = false,
         script = None,
         1.waves,
         System.currentTimeMillis()
-      ).signWith(issuer.privateKey)
+      ).explicitGet()
     }
 
     (simpleAssets, nonFungibleAssets)

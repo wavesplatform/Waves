@@ -12,7 +12,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.{Proofs, TxAmount}
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -385,7 +385,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         accountA.publicKey,
         IssuedAsset(ByteStr.decodeBase58(assetWithScript).get),
         Some(unchangeableScript),
-        setAssetScriptFee + smartFee,
+        TxAmount.unsafeFrom(setAssetScriptFee + smartFee),
         System.currentTimeMillis,
         Proofs.empty,
         accountA.toAddress.chainId
@@ -407,7 +407,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         accountA.publicKey,
         IssuedAsset(ByteStr.decodeBase58(assetWithScript).get),
         Some(script),
-        setAssetScriptFee + smartFee,
+        TxAmount.unsafeFrom(setAssetScriptFee + smartFee),
         System.currentTimeMillis,
         Proofs.empty,
         accountA.toAddress.chainId

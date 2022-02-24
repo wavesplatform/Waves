@@ -143,7 +143,7 @@ object CommonAccountsApi extends ScorexLogging {
               lt.id(),
               lt.sender.toAddress,
               blockchain.resolveAlias(lt.recipient).explicitGet(),
-              lt.amount,
+              lt.amount.value,
               leaseHeight,
               LeaseInfo.Status.Active
             )

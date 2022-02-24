@@ -186,8 +186,8 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
 
         val dAppAddress = invokeTx.dAppAddressOrAlias.asInstanceOf[Address]
         val basePortfolios = Map(
-          TestBlock.defaultSigner.toAddress -> Portfolio(invokeTx.fee),
-          invokeTx.senderAddress            -> Portfolio(-invokeTx.fee)
+          TestBlock.defaultSigner.toAddress -> Portfolio(invokeTx.fee.value),
+          invokeTx.senderAddress            -> Portfolio(-invokeTx.fee.value)
         )
         val paymentsPortfolios = Map(
           invokeTx.senderAddress -> Portfolio(assets = Map(asset -> -1)),

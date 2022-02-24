@@ -31,7 +31,7 @@ object AssetTransactionsDiff extends ScorexLogging {
     }
 
     val staticInfo = AssetStaticInfo(TransactionId @@ tx.id(), tx.sender, tx.decimals, blockchain.isNFT(tx))
-    val volumeInfo = AssetVolumeInfo(tx.reissuable, BigInt(tx.quantity))
+    val volumeInfo = AssetVolumeInfo(tx.reissuable, BigInt(tx.quantity.value))
     val info       = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
 
     val asset = IssuedAsset(tx.id())
@@ -44,7 +44,7 @@ object AssetTransactionsDiff extends ScorexLogging {
         .map(
           script =>
             Diff(
-              portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
+              portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee.value, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity.value))),
               issuedAssets = Map(asset             -> NewAssetInfo(staticInfo, info, volumeInfo)),
               assetScripts = Map(asset             -> script.map(AssetScriptInfo.tupled)),
               scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
@@ -67,7 +67,7 @@ object AssetTransactionsDiff extends ScorexLogging {
         Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
     } yield
       Diff(
-        portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
+        portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee.value, lease = LeaseBalance.empty, assets = Map.empty)),
         assetScripts = Map(tx.asset          -> script.map(AssetScriptInfo.tupled)),
         scriptsRun = scriptsRun
       )
@@ -80,24 +80,24 @@ object AssetTransactionsDiff extends ScorexLogging {
 
   def reissue(blockchain: Blockchain, blockTime: Long)(tx: ReissueTransaction): Either[ValidationError, Diff] =
     DiffsCommon
-      .processReissue(blockchain, tx.sender.toAddress, blockTime, tx.fee, Reissue(tx.asset.id, tx.reissuable, tx.quantity))
+      .processReissue(blockchain, tx.sender.toAddress, blockTime, tx.fee.value, Reissue(tx.asset.id, tx.reissuable, tx.quantity.value))
       .map(_ |+| Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
 
   def burn(blockchain: Blockchain)(tx: BurnTransaction): Either[ValidationError, Diff] =
     DiffsCommon
-      .processBurn(blockchain, tx.sender.toAddress, tx.fee, Burn(tx.asset.id, tx.quantity))
+      .processBurn(blockchain, tx.sender.toAddress, tx.fee.value, Burn(tx.asset.id, tx.quantity.value))
       .map(_ |+| Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
 
   def sponsor(blockchain: Blockchain)(tx: SponsorFeeTransaction): Either[ValidationError, Diff] =
     DiffsCommon
-      .processSponsor(blockchain, tx.sender.toAddress, tx.fee, SponsorFee(tx.asset.id, tx.minSponsoredAssetFee))
+      .processSponsor(blockchain, tx.sender.toAddress, tx.fee.value, SponsorFee(tx.asset.id, tx.minSponsoredAssetFee.map(_.value)))
       .map(_ |+| Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
 
   def updateInfo(blockchain: Blockchain)(tx: UpdateAssetInfoTransaction): Either[ValidationError, Diff] =
     DiffsCommon.validateAsset(blockchain, tx.assetId, tx.sender.toAddress, issuerOnly = true) >> {
       lazy val portfolioUpdate = tx.feeAsset match {
-        case ia @ IssuedAsset(_) => Portfolio(0L, LeaseBalance.empty, Map(ia -> -tx.feeAmount))
-        case Asset.Waves         => Portfolio(balance = -tx.feeAmount, LeaseBalance.empty, Map.empty)
+        case ia @ IssuedAsset(_) => Portfolio(0L, LeaseBalance.empty, Map(ia -> -tx.feeAmount.value))
+        case Asset.Waves         => Portfolio(balance = -tx.feeAmount.value, LeaseBalance.empty, Map.empty)
       }
 
       val minUpdateInfoInterval = blockchain.settings.functionalitySettings.minAssetInfoUpdateInterval

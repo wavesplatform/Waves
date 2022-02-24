@@ -68,12 +68,12 @@ object RealTransactionWrapper {
       target: AttachedPaymentTarget
   ): Either[ExecutionError, Tx] =
     (tx: @unchecked) match {
-      case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient).asRight
+      case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount.value, g.recipient).asRight
       case t: TransferTransaction => mapTransferTx(t).asRight
       case i: IssueTransaction =>
         Tx.Issue(
             proven(i),
-            i.quantity,
+            i.quantity.value,
             i.name.toByteStr,
             i.description.toByteStr,
             i.reissuable,
@@ -81,9 +81,9 @@ object RealTransactionWrapper {
             i.script.map(_.bytes())
           )
           .asRight
-      case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.asset.id, r.reissuable).asRight
-      case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity, b.asset.id).asRight
-      case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount, b.recipient).asRight
+      case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity.value, r.asset.id, r.reissuable).asRight
+      case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity.value, b.asset.id).asRight
+      case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount.value, b.recipient).asRight
       case b: LeaseCancelTransaction => Tx.LeaseCancel(proven(b), b.leaseId).asRight
       case b: CreateAliasTransaction => Tx.CreateAlias(proven(b), b.alias.name).asRight
       case ms: MassTransferTransaction =>
@@ -98,9 +98,9 @@ object RealTransactionWrapper {
           .asRight
       case ss: SetScriptTransaction      => Tx.SetScript(proven(ss), ss.script.map(_.bytes())).asRight
       case ss: SetAssetScriptTransaction => Tx.SetAssetScript(proven(ss), ss.asset.id, ss.script.map(_.bytes())).asRight
-      case p: PaymentTransaction         => Tx.Payment(proven(p), p.amount, p.recipient).asRight
+      case p: PaymentTransaction         => Tx.Payment(proven(p), p.amount.value, p.recipient).asRight
       case e: ExchangeTransaction        => Tx.Exchange(proven(e), e.amount.value, e.price.value, e.buyMatcherFee.value, e.sellMatcherFee.value, e.buyOrder, e.sellOrder).asRight
-      case s: SponsorFeeTransaction      => Tx.Sponsorship(proven(s), s.asset.id, s.minSponsoredAssetFee).asRight
+      case s: SponsorFeeTransaction      => Tx.Sponsorship(proven(s), s.asset.id, s.minSponsoredAssetFee.map(_.value)).asRight
       case d: DataTransaction =>
         Tx.Data(
             proven(d),
@@ -136,7 +136,7 @@ object RealTransactionWrapper {
       proven(t),
       feeAssetId = t.feeAssetId.compatId,
       assetId = t.assetId.compatId,
-      amount = t.amount,
+      amount = t.amount.value,
       recipient = t.recipient,
       attachment = t.attachment
     )

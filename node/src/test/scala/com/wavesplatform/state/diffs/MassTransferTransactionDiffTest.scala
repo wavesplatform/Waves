@@ -47,7 +47,7 @@ class MassTransferTransactionDiffTest extends PropSpec with WithState {
             assertBalanceInvariant(totalDiff)
 
             val totalAmount = transfer.transfers.map(_.amount).sum
-            val fees        = issue.fee + transfer.fee
+            val fees        = issue.fee.value + transfer.fee.value
             transfer.assetId match {
               case aid @ IssuedAsset(_) =>
                 newState.balance(transfer.sender.toAddress) shouldBe ENOUGH_AMT - fees

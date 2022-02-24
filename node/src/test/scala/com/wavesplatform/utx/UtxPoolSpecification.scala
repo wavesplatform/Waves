@@ -828,7 +828,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           acc  <- accountGen
           acc1 <- accountGen
           tx1  <- transfer(acc, ENOUGH_AMT / 3, ntpTime)
-          txs  <- Gen.nonEmptyListOf(transfer(acc1, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
+          txs  <- Gen.nonEmptyListOf(transfer(acc1, 10000000L, ntpTime).suchThat(_.fee.value < tx1.fee.value))
         } yield (tx1, txs)
 
         forAll(gen) {

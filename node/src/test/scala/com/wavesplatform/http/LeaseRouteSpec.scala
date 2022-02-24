@@ -130,7 +130,7 @@ class LeaseRouteSpec
       }
     }
 
-  private def toDetails(lt: LeaseTransaction) = LeaseDetails(lt.sender, lt.recipient, lt.amount, LeaseDetails.Status.Active, lt.id(), 1)
+  private def toDetails(lt: LeaseTransaction) = LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Active, lt.id(), 1)
 
   private def leaseGen(sender: KeyPair, maxAmount: Long, timestamp: Long): Gen[LeaseTransaction] =
     for {
@@ -382,7 +382,7 @@ class LeaseRouteSpec
             lease.id(),
             lease.sender.toAddress,
             lease.recipient.asInstanceOf[Address],
-            lease.amount,
+            lease.amount.value,
             1,
             LeaseInfo.Status.Canceled,
             Some(2),

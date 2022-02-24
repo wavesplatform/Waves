@@ -55,8 +55,8 @@ class TransferTransactionV2Specification extends PropSpec {
   property("VersionedTransferTransactionSpecification id doesn't depend on proof") {
     forAll(accountGen, accountGen, proofsGen, proofsGen, attachmentGen) {
       case (_, acc2, proofs1, proofs2, attachment) =>
-        val tx1 = TransferTransaction(2.toByte, acc2.publicKey, acc2.toAddress, Waves, 1, Waves, 1, attachment, 1, proofs1, acc2.toAddress.chainId)
-        val tx2 = TransferTransaction(2.toByte, acc2.publicKey, acc2.toAddress, Waves, 1, Waves, 1, attachment, 1, proofs2, acc2.toAddress.chainId)
+        val tx1 = TransferTransaction(2.toByte, acc2.publicKey, acc2.toAddress, Waves, TxAmount.unsafeFrom(1), Waves, TxAmount.unsafeFrom(1), attachment, 1, proofs1, acc2.toAddress.chainId)
+        val tx2 = TransferTransaction(2.toByte, acc2.publicKey, acc2.toAddress, Waves, TxAmount.unsafeFrom(1), Waves, TxAmount.unsafeFrom(1), attachment, 1, proofs2, acc2.toAddress.chainId)
         tx1.id() shouldBe tx2.id()
     }
   }
@@ -100,9 +100,9 @@ class TransferTransactionV2Specification extends PropSpec {
       PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
       Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet(),
       Waves,
-      100000000,
+      TxAmount.unsafeFrom(100000000),
       Waves,
-      100000000,
+      TxAmount.unsafeFrom(100000000),
       ByteStr.decodeBase58("4t2Xazb2SX").get,
       1526641218066L,
       Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)),

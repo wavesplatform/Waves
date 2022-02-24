@@ -66,7 +66,7 @@ object TxHelpers {
                        fee: Long = TestValues.fee,
                        feeAsset: Asset = Waves,
                        version: Byte = TxVersion.V2): TransferTransaction =
-    TransferTransaction(version, from.publicKey, to, asset, amount, feeAsset, fee, ByteStr.empty, timestamp, Proofs.empty, to.chainId)
+    TransferTransaction(version, from.publicKey, to, asset, TxAmount.unsafeFrom(amount), feeAsset, TxAmount.unsafeFrom(fee), ByteStr.empty, timestamp, Proofs.empty, to.chainId)
 
   def massTransfer(from: KeyPair = defaultSigner,
                    to: Seq[ParsedTransfer] = Seq(ParsedTransfer(secondAddress, 1.waves)),
@@ -94,7 +94,7 @@ object TxHelpers {
   def reissue(asset: IssuedAsset,
               sender: KeyPair = defaultSigner,
               amount: Long = 1000,
-              fee: TxAmount = TestValues.fee,
+              fee: Long = TestValues.fee,
               version: TxVersion = TxVersion.V2,
               chainId: Byte = AddressScheme.current.chainId): ReissueTransaction =
     ReissueTransaction
@@ -104,7 +104,7 @@ object TxHelpers {
   def burn(asset: IssuedAsset,
            amount: Long = 1,
            sender: KeyPair = defaultSigner,
-           fee: TxAmount = TestValues.fee,
+           fee: Long = TestValues.fee,
            version: TxVersion = TxVersion.V3,
            chainId: Byte = AddressScheme.current.chainId): BurnTransaction =
     BurnTransaction.selfSigned(version, sender, asset, amount, fee, timestamp, chainId).explicitGet()
@@ -123,7 +123,7 @@ object TxHelpers {
   def dataSingle(account: KeyPair = defaultSigner, key: String = "test", value: String = "test"): DataTransaction =
     data(account, Seq(StringDataEntry(key, value)))
 
-  def data(account: KeyPair, entries: Seq[DataEntry[_]], fee: TxAmount = TestValues.fee * 3, version: TxVersion = TxVersion.V1): DataTransaction =
+  def data(account: KeyPair, entries: Seq[DataEntry[_]], fee: Long = TestValues.fee * 3, version: TxVersion = TxVersion.V1): DataTransaction =
     DataTransaction.selfSigned(version, account, entries, fee, timestamp).explicitGet()
 
   def dataV2(account: KeyPair, entries: Seq[DataEntry[_]], fee: Long = TestValues.fee * 3, chainId: Byte = AddressScheme.current.chainId): DataTransaction =
@@ -141,9 +141,9 @@ object TxHelpers {
       amountAsset: Asset,
       priceAsset: Asset,
       feeAsset: Asset = Waves,
-      amount: TxAmount = 1L,
-      price: TxAmount = 1L,
-      fee: TxAmount = 1L,
+      amount: Long = 1L,
+      price: Long = 1L,
+      fee: Long = 1L,
       sender: KeyPair = defaultSigner,
       matcher: KeyPair = defaultSigner,
       version: TxVersion = TxVersion.V3
@@ -204,7 +204,7 @@ object TxHelpers {
   def setAssetScript(acc: KeyPair,
                      asset: IssuedAsset,
                      script: Script,
-                     fee: TxAmount = TestValues.fee,
+                     fee: Long = TestValues.fee,
                      timestamp: TxTimestamp = timestamp,
                      version: TxVersion = TxVersion.V1,
                      chainId: Byte = AddressScheme.current.chainId): SetAssetScriptTransaction = {
@@ -231,7 +231,7 @@ object TxHelpers {
 
   def lease(sender: KeyPair = defaultSigner,
             recipient: AddressOrAlias = secondAddress,
-            amount: TxAmount = 10.waves,
+            amount: Long = 10.waves,
             fee: Long = TestValues.fee,
             timestamp: TxTimestamp = timestamp,
             version: TxVersion = TxVersion.V2): LeaseTransaction = {
@@ -248,9 +248,9 @@ object TxHelpers {
   }
 
   def sponsor(asset: IssuedAsset,
-              minSponsoredAssetFee: Option[TxAmount] = Some(TestValues.fee),
+              minSponsoredAssetFee: Option[Long] = Some(TestValues.fee),
               sender: KeyPair = defaultSigner,
-              fee: TxAmount = TestValues.fee,
+              fee: Long = TestValues.fee,
               version: TxVersion = TxVersion.V1,
               chainId: Byte = AddressScheme.current.chainId): SponsorFeeTransaction = {
     SponsorFeeTransaction.selfSigned(version, sender, asset, minSponsoredAssetFee, fee, timestamp, chainId).explicitGet()

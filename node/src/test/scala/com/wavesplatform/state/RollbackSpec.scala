@@ -222,18 +222,18 @@ class RollbackSpec extends FreeSpec with WithDomain {
         withDomain(balances = Seq(AddrWithBalance(sender.toAddress, initialBalance))) { d =>
           val genesisBlockId = d.lastBlockId
           val issueTransaction =
-            IssueTransaction(
+            IssueTransaction.selfSigned(
               TxVersion.V1,
-              sender.publicKey,
-              "test".utf8Bytes,
-              Array.emptyByteArray,
+              sender,
+              "test",
+              "",
               assetAmount,
               8,
               reissuable = true,
               script = None,
               1,
               nextTs
-            ).signWith(sender.privateKey)
+            ).explicitGet()
 
           d.appendBlock(
             TestBlock.create(
@@ -276,18 +276,18 @@ class RollbackSpec extends FreeSpec with WithDomain {
           val genesisBlockId = d.lastBlockId
 
           val issueTransaction =
-            IssueTransaction(
+            IssueTransaction.selfSigned(
               TxVersion.V1,
-              sender.publicKey,
-              name.utf8Bytes,
-              description.utf8Bytes,
+              sender,
+              name,
+              description,
               2000,
               8.toByte,
               reissuable = true,
               script = None,
               1,
               nextTs
-            ).signWith(sender.privateKey)
+            ).explicitGet()
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe empty
 
           d.appendBlock(
@@ -780,7 +780,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
         case (dApp, invoker, setScript) =>
           withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SmartAccounts -> 0, SynchronousCalls -> 0), Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoker.toAddress))) { d =>
             val leaseAmount = smallFeeGen.sample.get
-            val leaseTx     = LeaseTransaction.selfSigned(2.toByte, dApp, invoker.toAddress, leaseAmount, setScript.fee, nextTs).explicitGet()
+            val leaseTx     = LeaseTransaction.selfSigned(2.toByte, dApp, invoker.toAddress, leaseAmount, setScript.fee.value, nextTs).explicitGet()
             val leaseId     = leaseTx.id()
 
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript, leaseTx)))
@@ -881,8 +881,8 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
           val blockIdWithSponsor = d.lastBlockId
 
-          d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe sponsor1.minSponsoredAssetFee.get
-          d.balance(sender.toAddress, IssuedAsset(issueTransaction.id())) shouldEqual issueTransaction.quantity
+          d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe sponsor1.minSponsoredAssetFee.get.value
+          d.balance(sender.toAddress, IssuedAsset(issueTransaction.id())) shouldEqual issueTransaction.quantity.value
 
           d.appendBlock(
             TestBlock.create(
@@ -896,8 +896,8 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
           d.rollbackTo(blockIdWithSponsor)
 
-          d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe sponsor1.minSponsoredAssetFee.get
-          d.balance(sender.toAddress, IssuedAsset(issueTransaction.id())) shouldEqual issueTransaction.quantity
+          d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe sponsor1.minSponsoredAssetFee.get.value
+          d.balance(sender.toAddress, IssuedAsset(issueTransaction.id())) shouldEqual issueTransaction.quantity.value
 
           d.appendBlock(
             TestBlock.create(
@@ -907,8 +907,8 @@ class RollbackSpec extends FreeSpec with WithDomain {
             )
           )
 
-          d.balance(sender.toAddress, IssuedAsset(issueTransaction.id())) shouldEqual issueTransaction.quantity
-          d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe sponsor2.minSponsoredAssetFee.get
+          d.balance(sender.toAddress, IssuedAsset(issueTransaction.id())) shouldEqual issueTransaction.quantity.value
+          d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe sponsor2.minSponsoredAssetFee.get.value
 
           d.rollbackTo(blockIdWithIssue)
 
@@ -933,28 +933,28 @@ class RollbackSpec extends FreeSpec with WithDomain {
           d.carryFee shouldBe carry(0)
 
           val issueBlockId = appendBlock(issue)
-          d.carryFee shouldBe carry(issue.fee)
+          d.carryFee shouldBe carry(issue.fee.value)
 
           val sponsorBlockId = appendBlock(sponsor1)
-          d.carryFee shouldBe carry(sponsor1.fee)
+          d.carryFee shouldBe carry(sponsor1.fee.value)
 
           appendBlock(transfer)
-          d.carryFee shouldBe carry(transfer.fee)
+          d.carryFee shouldBe carry(transfer.fee.value)
 
           d.rollbackTo(sponsorBlockId)
-          d.carryFee shouldBe carry(sponsor1.fee)
+          d.carryFee shouldBe carry(sponsor1.fee.value)
 
           d.rollbackTo(issueBlockId)
-          d.carryFee shouldBe carry(issue.fee)
+          d.carryFee shouldBe carry(issue.fee.value)
 
           val transferBlockId = appendBlock(transfer)
-          d.carryFee shouldBe carry(transfer.fee)
+          d.carryFee shouldBe carry(transfer.fee.value)
 
           appendBlock(sponsor2)
-          d.carryFee shouldBe carry(sponsor2.fee)
+          d.carryFee shouldBe carry(sponsor2.fee.value)
 
           d.rollbackTo(transferBlockId)
-          d.carryFee shouldBe carry(transfer.fee)
+          d.carryFee shouldBe carry(transfer.fee.value)
         }
     }
 

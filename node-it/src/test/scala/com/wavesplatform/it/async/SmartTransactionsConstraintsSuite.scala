@@ -79,7 +79,7 @@ class SmartTransactionsConstraintsSuite extends BaseFreeSpec with TransferSendin
     version = Some(TxVersion.V1),
     senderPublicKey = tx.sender.toString,
     script = tx.script.map(_.bytes().base64),
-    fee = tx.fee,
+    fee = tx.fee.value,
     timestamp = tx.timestamp,
     proofs = tx.proofs
   )

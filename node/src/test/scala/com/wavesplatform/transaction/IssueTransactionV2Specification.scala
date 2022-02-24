@@ -1,7 +1,8 @@
 package com.wavesplatform.transaction
 
 import cats.kernel.Monoid
-import com.wavesplatform.account.PublicKey
+import com.google.protobuf.ByteString
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -16,7 +17,6 @@ import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state.HistoryTest
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.utils._
 import com.wavesplatform.{WithDB, crypto}
 import org.scalatest.EitherValues
 import play.api.libs.json.Json
@@ -104,15 +104,16 @@ class IssueTransactionV2Specification
     val tx = IssueTransaction(
       TxVersion.V2,
       PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-      "Gigacoin".utf8Bytes,
-      "Gigacoin".utf8Bytes,
-      10000000000L,
+      ByteString.copyFromUtf8("Gigacoin"),
+      ByteString.copyFromUtf8("Gigacoin"),
+      TxAmount.unsafeFrom(10000000000L),
       8.toByte,
       reissuable = true,
       None,
-      100000000,
+      TxAmount.unsafeFrom(100000000),
       1526287561757L,
-      Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get))
+      Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get)),
+      AddressScheme.current.chainId
     )
 
     tx.json() shouldEqual js

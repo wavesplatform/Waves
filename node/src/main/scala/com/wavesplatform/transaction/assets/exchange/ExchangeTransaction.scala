@@ -22,7 +22,7 @@ case class ExchangeTransaction(
     price: TxExchangePrice,
     buyMatcherFee: TxMatcherFee,
     sellMatcherFee: TxMatcherFee,
-    fee: Long,
+    fee: TxAmount,
     timestamp: Long,
     proofs: Proofs,
     chainId: Byte
@@ -79,6 +79,7 @@ object ExchangeTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ExchangeTransaction] =
     for {
+      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
       amount <- TxExchangeAmount.from(amount)
         .leftMap(_ => GenericError(TxExchangeAmount.errMsg))
       price <- TxExchangePrice.from(price)

@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.http.ApiError._
@@ -31,7 +31,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Proofs, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, TxHelpers, TxVersion}
 import com.wavesplatform.{BlockGen, TestTime, TestValues, TestWallet}
 import monix.reactive.Observable
 import org.scalacheck.Gen._
@@ -787,18 +787,16 @@ class TransactionsRouteSpec
       val seed = new Array[Byte](32)
       Random.nextBytes(seed)
       val sender: KeyPair = KeyPair(seed)
-      val ist = InvokeScriptTransaction(
+      val ist = InvokeScriptTransaction.selfSigned(
         TxVersion.V1,
-        sender.publicKey,
+        sender,
         sender.toAddress,
         None,
         Seq.empty,
         500000L,
         Asset.Waves,
-        testTime.getTimestamp(),
-        Proofs.empty,
-        AddressScheme.current.chainId
-      ).signWith(sender.privateKey)
+        testTime.getTimestamp()
+      ).explicitGet()
       f(sender, ist)
     }
 

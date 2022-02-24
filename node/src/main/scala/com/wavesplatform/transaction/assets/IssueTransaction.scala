@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.assets
 
+import cats.syntax.either._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -61,37 +62,6 @@ object IssueTransaction extends TransactionParser {
   implicit def sign(tx: IssueTransaction, privateKey: PrivateKey): IssueTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-  def apply(
-      version: TxVersion,
-      sender: PublicKey,
-      nameBytes: Array[Byte],
-      descriptionBytes: Array[Byte],
-      quantity: Long,
-      decimals: Byte,
-      reissuable: Boolean,
-      script: Option[Script],
-      fee: Long,
-      timestamp: Long,
-      proofs: Proofs = Proofs.empty,
-      chainId: Byte = AddressScheme.current.chainId
-  ): IssueTransaction = {
-    require(version <= 2, "bytes in name and description are only supported in versions <= 3")
-    IssueTransaction(
-      version,
-      sender,
-      ByteString.copyFrom(nameBytes),
-      ByteString.copyFrom(descriptionBytes),
-      quantity,
-      decimals,
-      reissuable,
-      script,
-      fee,
-      timestamp,
-      proofs,
-      chainId
-    )
-  }
-
   def create(
       version: TxVersion,
       sender: PublicKey,
@@ -106,20 +76,24 @@ object IssueTransaction extends TransactionParser {
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, IssueTransaction] =
-    IssueTransaction(
-      version,
-      sender,
-      ByteString.copyFromUtf8(name),
-      ByteString.copyFromUtf8(description),
-      quantity,
-      decimals,
-      reissuable,
-      script,
-      fee,
-      timestamp,
-      proofs,
-      chainId
-    ).validatedEither
+    for {
+      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
+      quantity <- TxAmount.from(quantity).leftMap(_ => TxValidationError.NonPositiveAmount(quantity, "assets"))
+      tx <- IssueTransaction(
+        version,
+        sender,
+        ByteString.copyFromUtf8(name),
+        ByteString.copyFromUtf8(description),
+        quantity,
+        decimals,
+        reissuable,
+        script,
+        fee,
+        timestamp,
+        proofs,
+        chainId
+      ).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,

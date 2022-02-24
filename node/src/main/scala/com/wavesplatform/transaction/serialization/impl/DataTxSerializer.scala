@@ -2,14 +2,13 @@ package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets.UTF_8
-
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization._
 import com.wavesplatform.state.DataEntry.Type
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.{DataTransaction, TxVersion}
+import com.wavesplatform.transaction.{DataTransaction, TxAmount, TxVersion}
 import com.wavesplatform.utils.StringBytes
 import play.api.libs.json.{JsObject, Json}
 
@@ -32,7 +31,7 @@ object DataTxSerializer {
           Shorts.toByteArray(data.size.toShort),
           Bytes.concat(data.map(serializeEntry): _*),
           Longs.toByteArray(timestamp),
-          Longs.toByteArray(fee)
+          Longs.toByteArray(fee.value)
         )
 
       case _ =>
@@ -69,7 +68,7 @@ object DataTxSerializer {
     val sender    = buf.getPublicKey
     val data      = parseDataEntries(buf)
     val timestamp = buf.getLong // Timestamp before fee
-    val fee       = buf.getLong
+    val fee       = TxAmount.unsafeFrom(buf.getLong)
     DataTransaction(TxVersion.V1, sender, data, fee, timestamp, buf.getProofs, AddressScheme.current.chainId)
   }
 

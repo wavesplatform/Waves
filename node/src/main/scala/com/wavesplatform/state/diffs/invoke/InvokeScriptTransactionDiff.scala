@@ -238,7 +238,7 @@ object InvokeScriptTransactionDiff {
             tx.sender,
             payments,
             tx.id(),
-            tx.fee,
+            tx.fee.value,
             tx.feeAssetId.compatId
           )
 

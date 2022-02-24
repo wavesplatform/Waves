@@ -92,11 +92,11 @@ object Order {
       matcher: PublicKey,
       assetPair: AssetPair,
       orderType: OrderType,
-      amount: TxAmount,
-      price: TxAmount,
+      amount: Long,
+      price: Long,
       timestamp: TxTimestamp,
       expiration: TxTimestamp,
-      matcherFee: TxAmount,
+      matcherFee: Long,
       matcherFeeAssetId: Asset = Asset.Waves
   ): Either[ValidationError, Order] =
     for {
@@ -112,11 +112,11 @@ object Order {
       sender: KeyPair,
       matcher: PublicKey,
       pair: AssetPair,
-      amount: TxAmount,
-      price: TxAmount,
+      amount: Long,
+      price: Long,
       timestamp: TxTimestamp,
       expiration: TxTimestamp,
-      matcherFee: TxAmount,
+      matcherFee: Long,
       matcherFeeAssetId: Asset = Waves
   ): Either[ValidationError, Order] =
     Order.selfSigned(version, sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
@@ -126,11 +126,11 @@ object Order {
       sender: KeyPair,
       matcher: PublicKey,
       pair: AssetPair,
-      amount: TxAmount,
-      price: TxAmount,
+      amount: Long,
+      price: Long,
       timestamp: TxTimestamp,
       expiration: TxTimestamp,
-      matcherFee: TxAmount,
+      matcherFee: Long,
       matcherFeeAssetId: Asset = Waves
   ): Either[ValidationError, Order] =
     Order.selfSigned(version, sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)

@@ -66,8 +66,8 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
             Diff.empty.copy(
               transactions = invokeInfo(false),
               portfolios = Map(
-                invoke.senderAddress -> Portfolio(-invoke.fee),
-                miner                -> Portfolio((setScriptTx.fee * 0.6 + invoke.fee * 0.4).toLong + 6.waves)
+                invoke.senderAddress -> Portfolio(-invoke.fee.value),
+                miner                -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
               ),
               scriptsComplexity = 8,
               scriptResults = Map(invoke.id() -> InvokeScriptResult(error = Some(ErrorMessage(1, expectingMessage))))
@@ -77,9 +77,9 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
             Diff.empty.copy(
               transactions = invokeInfo(true),
               portfolios = Map(
-                invoke.senderAddress -> Portfolio(-invoke.fee, assets = Map(asset -> 0)),
+                invoke.senderAddress -> Portfolio(-invoke.fee.value, assets = Map(asset -> 0)),
                 dAppAddress          -> Portfolio.build(asset, 0),
-                miner                -> Portfolio((setScriptTx.fee * 0.6 + invoke.fee * 0.4).toLong + 6.waves)
+                miner                -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
               ),
               scriptsRun = 1,
               scriptsComplexity = 18,

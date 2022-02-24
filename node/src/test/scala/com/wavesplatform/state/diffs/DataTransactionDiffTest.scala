@@ -49,7 +49,7 @@ class DataTransactionDiffTest extends PropSpec with WithState {
     assertDiffAndState(Seq(genesis), blocks(0), fs) {
       case (totalDiff, state) =>
         assertBalanceInvariant(totalDiff)
-        state.balance(sender.toAddress) shouldBe (ENOUGH_AMT - txs(0).fee)
+        state.balance(sender.toAddress) shouldBe (ENOUGH_AMT - txs(0).fee.value)
         state.accountData(sender.toAddress, item1.key) shouldBe Some(item1)
     }
 
@@ -57,7 +57,7 @@ class DataTransactionDiffTest extends PropSpec with WithState {
     assertDiffAndState(Seq(genesis, blocks(0)), blocks(1), fs) {
       case (totalDiff, state) =>
         assertBalanceInvariant(totalDiff)
-        state.balance(sender.toAddress) shouldBe (ENOUGH_AMT - txs.take(2).map(_.fee).sum)
+        state.balance(sender.toAddress) shouldBe (ENOUGH_AMT - txs.take(2).map(_.fee.value).sum)
         state.accountData(sender.toAddress, item1.key) shouldBe Some(item1)
         state.accountData(sender.toAddress, item2.key) shouldBe Some(item2)
     }
@@ -66,7 +66,7 @@ class DataTransactionDiffTest extends PropSpec with WithState {
     assertDiffAndState(Seq(genesis, blocks(0), blocks(1)), blocks(2), fs) {
       case (totalDiff, state) =>
         assertBalanceInvariant(totalDiff)
-        state.balance(sender.toAddress) shouldBe (ENOUGH_AMT - txs.map(_.fee).sum)
+        state.balance(sender.toAddress) shouldBe (ENOUGH_AMT - txs.map(_.fee.value).sum)
         state.accountData(sender.toAddress, item1.key) shouldBe Some(item3)
         state.accountData(sender.toAddress, item2.key) shouldBe Some(item2)
     }

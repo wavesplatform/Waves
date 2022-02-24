@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.smart
 
+import cats.syntax.either._
 import com.wavesplatform.account._
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -54,18 +55,21 @@ object SetScriptTransaction extends TransactionParser {
       version: TxVersion,
       sender: PublicKey,
       script: Option[Script],
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetScriptTransaction] =
-    SetScriptTransaction(version, sender, script, fee, timestamp, proofs, chainId).validatedEither
+    for {
+      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
+      tx <- SetScriptTransaction(version, sender, script, fee, timestamp, proofs, chainId).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
       script: Option[Script],
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       signer: PrivateKey,
       chainId: Byte = AddressScheme.current.chainId
@@ -76,7 +80,7 @@ object SetScriptTransaction extends TransactionParser {
       version: TxVersion,
       sender: KeyPair,
       script: Option[Script],
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetScriptTransaction] =

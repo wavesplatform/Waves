@@ -1,7 +1,6 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
@@ -13,7 +12,7 @@ import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.transaction.{Asset, TxAmount, TxVersion}
 import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
 import scala.util.Try
@@ -61,7 +60,7 @@ object InvokeScriptTxSerializer {
           dAppAddressOrAlias.bytes,
           Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
           Deser.serializeArrays(payments.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
-          Longs.toByteArray(fee),
+          Longs.toByteArray(fee.value),
           feeAssetId.byteRepr,
           Longs.toByteArray(timestamp)
         )
@@ -92,7 +91,7 @@ object InvokeScriptTxSerializer {
     val dApp         = buf.getAddressOrAlias
     val functionCall = Deser.parseOption(buf)(Serde.deserialize(_).explicitGet().asInstanceOf[FUNCTION_CALL])
     val payments     = Deser.parseArrays(buf).map(parsePayment)
-    val fee          = buf.getLong
+    val fee          = TxAmount.unsafeFrom(buf.getLong)
     val feeAssetId   = buf.getAsset
     val timestamp    = buf.getLong
     InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId, timestamp, buf.getProofs, chainId)

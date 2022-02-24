@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.utils.base58Length
 import eu.timepit.refined.api.{Refined, RefinedTypeOps}
-import eu.timepit.refined.numeric.{Interval, Positive}
+import eu.timepit.refined.numeric.{Interval, NonNegative, Positive}
 
 package object transaction {
   val AssetIdLength: Int       = com.wavesplatform.crypto.DigestLength
@@ -28,9 +28,14 @@ package object transaction {
     val V2: TxVersion = 2.toByte
     val V3: TxVersion = 3.toByte
   }
-  type TxAmount    = Long
   type TxTimestamp = Long
   type TxByteArray = Array[Byte]
+
+  type TxAmount = Long Refined Positive
+  object TxAmount extends RefinedTypeOps[TxAmount, Long]
+
+  type TxQuantity = Long Refined NonNegative
+  object TxQuantity extends RefinedTypeOps[TxQuantity, Long]
 
   type TxOrderPrice = Long Refined Positive
   object TxOrderPrice extends RefinedTypeOps[TxOrderPrice, Long] {

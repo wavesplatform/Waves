@@ -31,7 +31,7 @@ object SetScriptTransactionDiff {
         .traverseTap(checkOverflow(blockchain, _))
     } yield
       Diff(
-        portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
+        portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value, LeaseBalance.empty, Map.empty)),
         scripts = Map(tx.sender.toAddress    -> scriptWithComplexities),
         scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
       )

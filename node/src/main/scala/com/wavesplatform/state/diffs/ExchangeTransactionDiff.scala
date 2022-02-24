@@ -121,7 +121,7 @@ object ExchangeTransactionDiff {
         Seq(
           getOrderFeePortfolio(tx.buyOrder, tx.buyMatcherFee.value),
           getOrderFeePortfolio(tx.sellOrder, tx.sellMatcherFee.value),
-          Portfolio.waves(-tx.fee)
+          Portfolio.waves(-tx.fee.value)
         )
       )
 

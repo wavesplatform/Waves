@@ -1,11 +1,12 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Longs}
+import com.google.protobuf.ByteString
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{Proofs, TxVersion}
+import com.wavesplatform.transaction.{Proofs, TxAmount, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -16,7 +17,7 @@ object IssueTxSerializer {
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"     -> id().toString,
       "name"        -> name.toStringUtf8,
-      "quantity"    -> quantity,
+      "quantity"    -> quantity.value,
       "reissuable"  -> reissuable,
       "decimals"    -> decimals,
       "description" -> description.toStringUtf8
@@ -30,10 +31,10 @@ object IssueTxSerializer {
       sender.arr,
       Deser.serializeArrayWithLength(name.toByteArray),
       Deser.serializeArrayWithLength(description.toByteArray),
-      Longs.toByteArray(quantity),
+      Longs.toByteArray(quantity.value),
       Array(decimals),
       Deser.serializeBoolean(reissuable),
-      Longs.toByteArray(fee),
+      Longs.toByteArray(fee.value),
       Longs.toByteArray(timestamp)
     )
 
@@ -57,22 +58,25 @@ object IssueTxSerializer {
       val sender      = buf.getPublicKey
       val name        = Deser.parseArrayWithLength(buf)
       val description = Deser.parseArrayWithLength(buf)
-      val quantity    = buf.getLong
+      val quantity    = TxAmount.unsafeFrom(buf.getLong)
       val decimals    = buf.getByte
       val reissuable  = buf.getBoolean
-      val fee         = buf.getLong
+      val fee         = TxAmount.unsafeFrom(buf.getLong)
       val timestamp   = buf.getLong
+
       IssueTransaction(
         version,
         sender,
-        name,
-        description,
+        ByteString.copyFrom(name),
+        ByteString.copyFrom(description),
         quantity,
         decimals,
         reissuable,
         None,
         fee,
         timestamp,
+        Proofs.empty,
+        AddressScheme.current.chainId
       )
     }
 

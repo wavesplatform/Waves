@@ -15,7 +15,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
+import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxAmount}
 import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.wallet.Wallet
 import org.scalacheck.{Gen => G}
@@ -206,9 +206,9 @@ class AssetsBroadcastRouteSpec
         sender = senderPrivateKey.publicKey,
         recipient = receiverPrivateKey.toAddress,
         assetId = Asset.Waves,
-        amount = 1.waves,
+        amount = TxAmount.unsafeFrom(1.waves),
         feeAssetId = Asset.Waves,
-        fee = 0.3.waves,
+        fee = TxAmount.unsafeFrom(0.3.waves),
         attachment = ByteStr.empty,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs(Seq.empty),
@@ -241,8 +241,8 @@ class AssetsBroadcastRouteSpec
       Base58.encode(tx.sender.arr),
       assetId.maybeBase58Repr,
       recipient.stringRepr,
-      amount,
-      fee,
+      amount.value,
+      fee.value,
       feeAssetId.maybeBase58Repr,
       timestamp,
       Some(Base58.encode(attachment.arr)),
@@ -256,9 +256,9 @@ class AssetsBroadcastRouteSpec
       Base58.encode(tx.sender.arr),
       assetId.maybeBase58Repr,
       recipient.stringRepr,
-      amount,
+      amount.value,
       feeAssetId.maybeBase58Repr,
-      fee,
+      fee.value,
       timestamp,
       Some(Base58.encode(attachment.arr)),
       proofs.proofs.map(_.toString).toList

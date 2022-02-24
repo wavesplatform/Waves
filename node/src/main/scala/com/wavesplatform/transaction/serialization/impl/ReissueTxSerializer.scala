@@ -1,12 +1,11 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.assets.ReissueTransaction
-import com.wavesplatform.transaction.{Proofs, TxVersion}
+import com.wavesplatform.transaction.{Proofs, TxAmount, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -16,7 +15,7 @@ object ReissueTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"    -> asset.id.toString,
-      "quantity"   -> quantity,
+      "quantity"   -> quantity.value,
       "reissuable" -> reissuable
     ) ++ (if (tx.version == TxVersion.V2) Json.obj("chainId" -> chainId) else Json.obj())
   }
@@ -26,9 +25,9 @@ object ReissueTxSerializer {
     lazy val baseBytes = Bytes.concat(
       sender.arr,
       asset.id.arr,
-      Longs.toByteArray(quantity),
+      Longs.toByteArray(quantity.value),
       if (reissuable) Array(1: Byte) else Array(0: Byte),
-      Longs.toByteArray(fee),
+      Longs.toByteArray(fee.value),
       Longs.toByteArray(timestamp)
     )
 
@@ -59,9 +58,9 @@ object ReissueTxSerializer {
     def parseCommonPart(version: TxVersion, buf: ByteBuffer): ReissueTransaction = {
       val sender     = buf.getPublicKey
       val asset      = buf.getIssuedAsset
-      val quantity   = buf.getLong
+      val quantity   = TxAmount.unsafeFrom(buf.getLong)
       val reissuable = buf.getBoolean
-      val fee        = buf.getLong
+      val fee        = TxAmount.unsafeFrom(buf.getLong)
       val timestamp  = buf.getLong
       ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, Nil, AddressScheme.current.chainId)
     }

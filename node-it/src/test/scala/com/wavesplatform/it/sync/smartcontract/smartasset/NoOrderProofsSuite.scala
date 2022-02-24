@@ -8,7 +8,7 @@ import com.wavesplatform.it.sync.{someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.{Proofs, TxAmount}
 import com.wavesplatform.transaction.assets.BurnTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -81,9 +81,9 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
       firstKeyPair.publicKey,
       thirdKeyPair.toAddress,
       IssuedAsset(ByteStr.decodeBase58(assetWProofs).get),
-      1,
+      TxAmount.unsafeFrom(1),
       Waves,
-      smartMinFee, ByteStr.empty,
+      TxAmount.unsafeFrom(smartMinFee), ByteStr.empty,
       System.currentTimeMillis + 10.minutes.toMillis,
       Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8")))),
       AddressScheme.current.chainId

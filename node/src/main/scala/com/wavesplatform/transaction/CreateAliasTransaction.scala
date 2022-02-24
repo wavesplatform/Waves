@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction
 
+import cats.syntax.either._
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -61,24 +62,27 @@ object CreateAliasTransaction extends TransactionParser {
       version: TxVersion,
       sender: PublicKey,
       aliasName: String,
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransactionT] =
-    CreateAliasTransaction(version, sender, aliasName, fee, timestamp, proofs, chainId).validatedEither
+    for {
+      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
+      tx <- CreateAliasTransaction(version, sender, aliasName, fee, timestamp, proofs, chainId).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
       alias: String,
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       signer: PrivateKey,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransactionT] =
     create(version, sender, alias, fee, timestamp, Nil, chainId).map(_.signWith(signer))
 
-  def selfSigned(version: TxVersion, sender: KeyPair, aliasName: String, fee: TxAmount, timestamp: TxTimestamp, chainId: Byte = AddressScheme.current.chainId): Either[ValidationError, TransactionT] =
+  def selfSigned(version: TxVersion, sender: KeyPair, aliasName: String, fee: Long, timestamp: TxTimestamp, chainId: Byte = AddressScheme.current.chainId): Either[ValidationError, TransactionT] =
     signed(version, sender.publicKey, aliasName, fee, timestamp, sender.privateKey, chainId)
 }

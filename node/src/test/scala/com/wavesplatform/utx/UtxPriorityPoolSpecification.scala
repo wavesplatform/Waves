@@ -43,8 +43,8 @@ class UtxPriorityPoolSpecification
         val asDiffs = txs.map {
           case tt: TransferTransaction =>
             val pfs = Map(
-              tt.sender.toAddress                -> -(tt.fee + tt.amount),
-              tt.recipient.asInstanceOf[Address] -> tt.amount
+              tt.sender.toAddress                -> -(tt.fee.value + tt.amount.value),
+              tt.recipient.asInstanceOf[Address] -> tt.amount.value
             ).view.mapValues(Portfolio.waves).toMap
             Diff(portfolios = pfs).bindTransaction(tt)
 
@@ -59,8 +59,8 @@ class UtxPriorityPoolSpecification
       acc1        <- accountGen
       acc2        <- accountGen
       tx1         <- transferV2(acc, ENOUGH_AMT / 3, ntpTime)
-      nonScripted <- Gen.nonEmptyListOf(transferV2(acc1, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
-      scripted    <- Gen.nonEmptyListOf(transferV2(acc2, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
+      nonScripted <- Gen.nonEmptyListOf(transferV2(acc1, 10000000L, ntpTime).suchThat(_.fee.value < tx1.fee.value))
+      scripted    <- Gen.nonEmptyListOf(transferV2(acc2, 10000000L, ntpTime).suchThat(_.fee.value < tx1.fee.value))
     } yield (tx1, nonScripted, scripted)
 
     def createState(scripted: Address, settings: WavesSettings = WavesSettings.default(), setBalance: Boolean = true): Blockchain = {
@@ -139,8 +139,8 @@ class UtxPriorityPoolSpecification
     val genDependent = for {
       acc  <- accountGen
       acc1 <- accountGen
-      tx1  <- transferV2WithRecipient(acc, acc1.publicKey, ENOUGH_AMT / 3, ntpTime).suchThat(_.amount > 20000000L)
-      tx2  <- transferV2(acc1, tx1.amount / 2, ntpTime)
+      tx1  <- transferV2WithRecipient(acc, acc1.publicKey, ENOUGH_AMT / 3, ntpTime).suchThat(_.amount.value > 20000000L)
+      tx2  <- transferV2(acc1, tx1.amount.value / 2, ntpTime)
     } yield (tx1, tx2)
 
     "takes into account priority txs when pack" in forAll(genDependent) {

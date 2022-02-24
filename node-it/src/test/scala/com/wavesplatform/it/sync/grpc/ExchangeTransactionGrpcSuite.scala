@@ -112,18 +112,18 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   }
 
   test("cannot exchange non-issued assets") {
-    val exchAsset: IssueTransaction = IssueTransaction(
+    val exchAsset: IssueTransaction = IssueTransaction.selfSigned(
       TxVersion.V1,
-      sender.publicKey,
-      "myasset".utf8Bytes,
-      "my asset description".utf8Bytes,
+      sender.keyPair,
+      "myasset",
+      "my asset description",
       quantity = someAssetAmount,
       decimals = 2,
       reissuable = true,
       script = None,
       fee = 1.waves,
       timestamp = System.currentTimeMillis()
-    ).signWith(sender.keyPair.privateKey)
+    ).explicitGet()
     for ((o1ver, o2ver, tver) <- versions) {
 
       val assetId             = exchAsset.id().toString

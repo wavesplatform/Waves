@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.utils
 
-import com.wavesplatform.account.{Address, PublicKey}
+import com.google.protobuf.ByteString
+import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -19,8 +20,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxExchangeAmount, TxMatcherFee, TxOrderPrice, TxVersion}
-import com.wavesplatform.utils._
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxAmount, TxExchangeAmount, TxMatcherFee, TxOrderPrice, TxVersion}
 import org.scalatest.Informing
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -162,29 +162,31 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   private lazy val issueV1 = IssueTransaction(
     TxVersion.V1,
     publicKey,
-    "Gigacoin".utf8Bytes,
-    "Gigacoin".utf8Bytes,
-    someAssetAmount,
+    ByteString.copyFromUtf8("Gigacoin"),
+    ByteString.copyFromUtf8("Gigacoin"),
+    TxAmount.unsafeFrom(someAssetAmount),
     8.toByte,
     true,
     script = None,
-    issueFee,
+    TxAmount.unsafeFrom(issueFee),
     ts,
-    Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get)
+    Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get),
+    AddressScheme.current.chainId
   )
 
   private lazy val issueV2 = IssueTransaction(
     TxVersion.V2,
     publicKey,
-    "Gigacoin".utf8Bytes,
-    "Gigacoin".utf8Bytes,
-    someAssetAmount,
+    ByteString.copyFromUtf8("Gigacoin"),
+      ByteString.copyFromUtf8("Gigacoin"),
+    TxAmount.unsafeFrom(someAssetAmount),
     8.toByte,
     true,
     None,
-    issueFee,
+    TxAmount.unsafeFrom(issueFee),
     ts,
-    Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get))
+    Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get)),
+    AddressScheme.current.chainId
   )
 
   private lazy val leasecancelV1 = LeaseCancelTransaction
@@ -324,9 +326,9 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     publicKey,
     recipient,
     Waves,
-    1900000,
+    TxAmount.unsafeFrom(1900000),
     Waves,
-    minFee,
+    TxAmount.unsafeFrom(minFee),
     ByteStr.empty,
     ts,
     Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get)),
@@ -338,9 +340,9 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     publicKey,
     recipient,
     Waves,
-    100000000,
+    TxAmount.unsafeFrom(100000000),
     Waves,
-    minFee,
+    TxAmount.unsafeFrom(minFee),
     ByteStr.empty,
     ts,
     Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)),

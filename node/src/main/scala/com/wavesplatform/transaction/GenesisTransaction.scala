@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction
 
-import cats.data.Validated
+import cats.syntax.either._
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
@@ -14,7 +14,7 @@ import play.api.libs.json.JsObject
 
 import scala.util.Try
 
-case class GenesisTransaction private (recipient: Address, amount: TxAmount, timestamp: TxTimestamp, signature: ByteStr, chainId: Byte)
+case class GenesisTransaction private (recipient: Address, amount: TxQuantity, timestamp: TxTimestamp, signature: ByteStr, chainId: Byte)
     extends Transaction {
   override val builder                 = GenesisTransaction
   override val assetFee: (Asset, Long) = (Waves, 0)
@@ -39,7 +39,6 @@ object GenesisTransaction extends TransactionParser {
   implicit val validator: TxValidator[GenesisTransaction] =
     tx =>
       TxConstraints.seq(tx)(
-        Validated.condNel(tx.amount >= 0, tx, TxValidationError.NegativeAmount(tx.amount, "waves")),
         TxConstraints.addressChainId(tx.recipient, tx.chainId)
       )
 
@@ -51,6 +50,10 @@ object GenesisTransaction extends TransactionParser {
 
   def create(recipient: Address, amount: Long, timestamp: Long): Either[ValidationError, GenesisTransaction] = {
     val signature = ByteStr(GenesisTransaction.generateSignature(recipient, amount, timestamp))
-    GenesisTransaction(recipient, amount, timestamp, signature, recipient.chainId).validatedEither
+
+    for {
+      amount <- TxQuantity.from(amount).leftMap(_ => TxValidationError.NegativeAmount(amount, "waves"))
+      tx <- GenesisTransaction(recipient, amount, timestamp, signature, recipient.chainId).validatedEither
+    } yield tx
   }
 }

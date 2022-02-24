@@ -74,8 +74,8 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
         TxHelpers.leaseCancel(lease.id(), master, timestamp = ts + 1, version = TxVersion.V1)
       )
       leaseCancel2 <- Seq(
-        TxHelpers.leaseCancel(lease.id(), master, fee = leaseCancel.fee + 1, timestamp = ts + 1),
-        TxHelpers.leaseCancel(lease.id(), master, fee = leaseCancel.fee + 1, timestamp = ts + 1, version = TxVersion.V1)
+        TxHelpers.leaseCancel(lease.id(), master, fee = leaseCancel.fee.value + 1, timestamp = ts + 1),
+        TxHelpers.leaseCancel(lease.id(), master, fee = leaseCancel.fee.value + 1, timestamp = ts + 1, version = TxVersion.V1)
       )
     } yield {
       // ensure recipient has enough effective balance
@@ -173,8 +173,8 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
       assertDiffAndState(Seq(TestBlock.create(genesis :+ lease)), TestBlock.create(blockTime, Seq(unleaseOther)), settings) {
         case (totalDiff, _) =>
           totalDiff.portfolios.get(lease.sender.toAddress) shouldBe None
-          total(totalDiff.portfolios(lease.recipient.asInstanceOf[Address]).lease) shouldBe -lease.amount
-          total(totalDiff.portfolios(unleaseOther.sender.toAddress).lease) shouldBe lease.amount
+          total(totalDiff.portfolios(lease.recipient.asInstanceOf[Address]).lease) shouldBe -lease.amount.value
+          total(totalDiff.portfolios(unleaseOther.sender.toAddress).lease) shouldBe lease.amount.value
       }
     }
   }

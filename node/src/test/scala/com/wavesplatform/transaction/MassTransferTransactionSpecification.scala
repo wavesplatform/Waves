@@ -85,16 +85,16 @@ class MassTransferTransactionSpecification extends PropSpec {
     forAll(massTransferGen) {
       case MassTransferTransaction(_, sender, assetId, transfers, fee, timestamp, attachment, proofs, _) =>
         val tooManyTransfers   = List.fill(MaxTransferCount + 1)(ParsedTransfer(sender.toAddress, 1L))
-        val tooManyTransfersEi = create(1.toByte, sender, assetId, tooManyTransfers, fee, timestamp, attachment, proofs)
+        val tooManyTransfersEi = create(1.toByte, sender, assetId, tooManyTransfers, fee.value, timestamp, attachment, proofs)
         tooManyTransfersEi shouldBe Left(GenericError(s"Number of transfers ${tooManyTransfers.length} is greater than $MaxTransferCount"))
 
         val negativeTransfer   = List(ParsedTransfer(sender.toAddress, -1L))
-        val negativeTransferEi = create(1.toByte, sender, assetId, negativeTransfer, fee, timestamp, attachment, proofs)
+        val negativeTransferEi = create(1.toByte, sender, assetId, negativeTransfer, fee.value, timestamp, attachment, proofs)
         negativeTransferEi shouldBe Left(GenericError("One of the transfers has negative amount"))
 
         val oneHalf    = Long.MaxValue / 2 + 1
         val overflow   = List.fill(2)(ParsedTransfer(sender.toAddress, oneHalf))
-        val overflowEi = create(1.toByte, sender, assetId, overflow, fee, timestamp, attachment, proofs)
+        val overflowEi = create(1.toByte, sender, assetId, overflow, fee.value, timestamp, attachment, proofs)
         overflowEi shouldBe Left(TxValidationError.OverflowError)
 
         val feeOverflow   = List(ParsedTransfer(sender.toAddress, oneHalf))
@@ -102,7 +102,7 @@ class MassTransferTransactionSpecification extends PropSpec {
         feeOverflowEi shouldBe Left(TxValidationError.OverflowError)
 
         val longAttachment   = ByteStr(Array.fill(TransferTransaction.MaxAttachmentSize + 1)(1: Byte))
-        val longAttachmentEi = create(1.toByte, sender, assetId, transfers, fee, timestamp, longAttachment, proofs)
+        val longAttachmentEi = create(1.toByte, sender, assetId, transfers, fee.value, timestamp, longAttachment, proofs)
         longAttachmentEi shouldBe Left(TxValidationError.TooBigArray)
 
         val noFeeEi = create(1.toByte, sender, assetId, feeOverflow, 0, timestamp, attachment, proofs)

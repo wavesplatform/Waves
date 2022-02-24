@@ -1,15 +1,15 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidName, NonPositiveAmount, TooBigArrayAllocation}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.IssueTransactionInfo
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{Proofs, TxVersion}
+import com.wavesplatform.transaction.TxVersion
 import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.{JsNull, JsString, JsValue, Json}
 
@@ -115,20 +115,18 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     test(s"Try to put incorrect script=$script") {
       for (v <- issueTxSupportedVersions) {
         val json = {
-          val tx = IssueTransaction(
+          val tx = IssueTransaction.selfSigned(
             TxVersion.V1,
-            firstKeyPair.publicKey,
-            ByteString.copyFromUtf8("123"),
-            ByteString.EMPTY,
+            firstKeyPair,
+            "123",
+            "",
             1,
             2,
             false,
             None,
             issueFee,
-            System.currentTimeMillis(),
-            Proofs.empty,
-            AddressScheme.current.chainId
-          )
+            System.currentTimeMillis()
+          ).explicitGet()
           tx.json() ++ Json.obj("script" -> script)
         }
 

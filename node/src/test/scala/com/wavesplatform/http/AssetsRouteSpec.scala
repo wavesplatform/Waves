@@ -205,11 +205,11 @@ class AssetsRouteSpec
       description = smartAssetTx.description,
       decimals = smartAssetTx.decimals,
       reissuable = smartAssetTx.reissuable,
-      totalVolume = smartAssetTx.quantity,
+      totalVolume = smartAssetTx.quantity.value,
       lastUpdatedAt = Height @@ 0,
       script = Some(AssetScriptInfo(script, Script.estimate(script, ScriptEstimatorV1, useContractVerifierLimit = false).explicitGet())),
       sponsorship = 0,
-      nft = smartAssetTx.decimals == 0 && smartAssetTx.quantity == 1 && !smartAssetTx.reissuable
+      nft = smartAssetTx.decimals == 0 && smartAssetTx.quantity.value == 1 && !smartAssetTx.reissuable
     )
   )
 
@@ -270,11 +270,11 @@ class AssetsRouteSpec
       description = sillyAssetTx.description,
       decimals = sillyAssetTx.decimals,
       reissuable = sillyAssetTx.reissuable,
-      totalVolume = sillyAssetTx.quantity,
+      totalVolume = sillyAssetTx.quantity.value,
       lastUpdatedAt = Height @@ 0,
       script = None,
       sponsorship = 0,
-      nft = sillyAssetTx.decimals == 0 && sillyAssetTx.quantity == 1 && !sillyAssetTx.reissuable
+      nft = sillyAssetTx.decimals == 0 && sillyAssetTx.quantity.value == 1 && !sillyAssetTx.reissuable
     )
   )
 

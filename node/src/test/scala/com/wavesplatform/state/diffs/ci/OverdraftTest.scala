@@ -112,7 +112,7 @@ class OverdraftTest extends PropSpec with WithState {
       val setDApp = TxHelpers.setScript(master, payingAssetDApp(version, issue.assetId))
 
       val count    = ContractLimits.MaxAttachedPaymentAmount
-      val payments = (1 to count).map(_ => Payment(issue.quantity / count + 1, IssuedAsset(issue.id())))
+      val payments = (1 to count).map(_ => Payment(issue.quantity.value / count + 1, IssuedAsset(issue.id())))
       val invoke = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker, payments = payments)
 
       assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(invoke)), allActivatedSettings) {
@@ -138,7 +138,7 @@ class OverdraftTest extends PropSpec with WithState {
       dApp = master.toAddress,
       func = None,
       invoker = invoker,
-      payments = if (withPayment) List(Payment(issue.quantity, IssuedAsset(issue.id()))) else Nil,
+      payments = if (withPayment) List(Payment(issue.quantity.value, IssuedAsset(issue.id()))) else Nil,
       fee = if (withEnoughFee) InvokeFee else 1,
       version = TxVersion.V1
     )
