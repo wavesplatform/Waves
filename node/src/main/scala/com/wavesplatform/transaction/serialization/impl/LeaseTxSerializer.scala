@@ -39,7 +39,7 @@ object LeaseTxSerializer {
   def parseBytes(bytes: Array[Byte]): Try[LeaseTransaction] = Try {
     def parseCommonPart(version: TxVersion, buf: ByteBuffer): LeaseTransaction = {
       val sender    = buf.getPublicKey
-      val recipient = buf.getAddressOrAlias
+      val recipient = buf.getAddressOrAlias()
       val amount    = TxAmount.unsafeFrom(buf.getLong)
       val fee       = TxAmount.unsafeFrom(buf.getLong)
       val timestamp = buf.getLong

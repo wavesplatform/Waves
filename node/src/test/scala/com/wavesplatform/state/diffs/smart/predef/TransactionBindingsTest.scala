@@ -529,7 +529,7 @@ class TransactionBindingsTest
   }
 
   property("ExchangeTransaction binding") {
-    val tx = TxHelpers.exchange(
+    val tx = TxHelpers.exchangeFromOrders(
       TxHelpers.orderV3(OrderType.BUY, IssuedAsset(ByteStr.fill(32)(1))),
       TxHelpers.orderV3(OrderType.SELL, IssuedAsset(ByteStr.fill(32)(1)))
     )

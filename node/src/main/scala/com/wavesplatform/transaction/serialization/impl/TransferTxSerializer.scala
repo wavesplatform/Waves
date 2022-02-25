@@ -58,7 +58,7 @@ object TransferTxSerializer {
       val ts         = buf.getLong
       val amount     = TxAmount.unsafeFrom(buf.getLong)
       val fee        = TxAmount.unsafeFrom(buf.getLong)
-      val recipient  = buf.getAddressOrAlias
+      val recipient  = buf.getAddressOrAlias()
       val attachment = buf.getByteArrayWithLength
 
       TransferTransaction(version, sender, recipient, assetId, amount, feeAssetId, fee, ByteStr(attachment), ts, Proofs.empty, recipient.chainId)

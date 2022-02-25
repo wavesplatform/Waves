@@ -123,7 +123,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
       val issuer = TxHelpers.signer(1)
 
       val genesis = TxHelpers.genesis(issuer.toAddress)
-      val issue = TxHelpers.issue(issuer, Long.MaxValue / 100, version = TxVersion.V1)
+      val issue = TxHelpers.issue(issuer, version = TxVersion.V1)
       val asset = IssuedAsset(issue.id())
       val reissue = TxHelpers.reissue(asset, issuer, Long.MaxValue, version = TxVersion.V1)
 
@@ -147,7 +147,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
       val issuer = TxHelpers.signer(1)
 
       val genesis = TxHelpers.genesis(issuer.toAddress)
-      val issue = TxHelpers.issue(issuer, Long.MaxValue / 100, version = TxVersion.V1)
+      val issue = TxHelpers.issue(issuer, version = TxVersion.V1)
       val asset = IssuedAsset(issue.id())
       val reissue = TxHelpers.reissue(asset, issuer, Long.MaxValue, version = TxVersion.V1)
 
