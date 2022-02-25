@@ -50,7 +50,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
       d.appendBlock(TxHelpers.genesis(issuer.toAddress, 100.waves))
       val issueTransactions = Seq.tabulate(4) { i =>
         TxHelpers.issue(issuer, 1000 * (i + 1), 2, name = s"ISSUE_$i")
-      }
+      } :+ TxHelpers.issue(issuer, 1, reissuable = false)
       d.appendBlock(issueTransactions: _*)
 
       route.anyParamTest(routePath(s"/balance/${issuer.toAddress}"), "id")(issueTransactions.reverseIterator.map(_.id().toString).toSeq: _*) {
@@ -62,6 +62,11 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
             case (jso, tx) =>
               (jso \ "balance").as[Long] shouldEqual tx.quantity
               (jso \ "assetId").as[ByteStr] shouldEqual tx.id()
+              (jso \ "reissuable").as[Boolean] shouldBe tx.reissuable
+              (jso \ "minSponsoredAssetFee").asOpt[Long] shouldEqual None
+              (jso \ "sponsorBalance").asOpt[Long] shouldEqual None
+              (jso \ "quantity").as[Long] shouldEqual tx.quantity
+              (jso \ "issueTransaction").as[JsObject] shouldEqual tx.json()
           }
 
       }
@@ -86,7 +91,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
                                                |}""".stripMargin)
       })
 
-      withClue("old GET portfolio")(Get(routePath(s"/balance/${issuer.toAddress}")) ~> route ~> check { // portfolio
+      withClue("old GET portfolio does not include NFT")(Get(routePath(s"/balance/${issuer.toAddress}")) ~> route ~> check { // portfolio
         status shouldBe StatusCodes.OK
         val allBalances = (responseAs[JsValue] \ "balances")
           .as[Seq[JsObject]]
@@ -95,7 +100,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
           }
           .toMap
 
-        val balancesAfterIssue = issueTransactions.map { it =>
+        val balancesAfterIssue = issueTransactions.init.map { it =>
           it.id() -> it.quantity
         }.toMap
 
@@ -254,7 +259,15 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
       TxHelpers.issue(issuer, 1, name = s"NFT_0$i", reissuable = false, fee = 0.001.waves)
     }
     d.appendBlock(TxHelpers.genesis(issuer.toAddress, 100.waves))
-    d.appendBlock(nfts: _*)
+    val nonNFT = TxHelpers.issue(issuer, 100, 2.toByte)
+    d.appendBlock((nfts :+ nonNFT): _*)
+
+    Get(routePath(s"/balance/${issuer.toAddress}/${nonNFT.id()}")) ~> route ~> check {
+      val balance = responseAs[JsObject]
+      (balance \ "address").as[String] shouldEqual issuer.toAddress.toString
+      (balance \ "balance").as[Long] shouldEqual nonNFT.quantity
+      (balance \ "assetId").as[String] shouldEqual nonNFT.id().toString
+    }
 
     Get(routePath(s"/nft/${issuer.toAddress}/limit/5")) ~> route ~> check {
       status shouldBe StatusCodes.OK
