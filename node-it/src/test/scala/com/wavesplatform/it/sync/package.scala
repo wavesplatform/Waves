@@ -85,7 +85,7 @@ package object sync {
       tx.name.toStringUtf8,
       tx.description.toStringUtf8,
       quantity.value,
-      decimals,
+      decimals.value,
       reissuable,
       tx.script.map(_.bytes().base64),
       fee.value,

@@ -29,7 +29,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, TxAmount, TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxQuantity, TxVersion}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, TxAmount, TxDecimals, TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxQuantity, TxVersion}
 import org.asynchttpclient.Dsl.{delete => _delete, get => _get, post => _post, put => _put}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
@@ -416,7 +416,7 @@ object AsyncHttpApi extends Assertions {
           ByteString.copyFromUtf8(name),
           ByteString.copyFromUtf8(description),
           TxAmount.unsafeFrom(quantity),
-          decimals,
+          TxDecimals.unsafeFrom(decimals),
           reissuable,
           script.map(s => ScriptReader.fromBytes(Base64.decode(s)).explicitGet()),
           TxAmount.unsafeFrom(fee),

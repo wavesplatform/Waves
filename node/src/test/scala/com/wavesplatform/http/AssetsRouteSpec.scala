@@ -203,13 +203,13 @@ class AssetsRouteSpec
       issuer = smartAssetTx.sender,
       name = smartAssetTx.name,
       description = smartAssetTx.description,
-      decimals = smartAssetTx.decimals,
+      decimals = smartAssetTx.decimals.value,
       reissuable = smartAssetTx.reissuable,
       totalVolume = smartAssetTx.quantity.value,
       lastUpdatedAt = Height @@ 0,
       script = Some(AssetScriptInfo(script, Script.estimate(script, ScriptEstimatorV1, useContractVerifierLimit = false).explicitGet())),
       sponsorship = 0,
-      nft = smartAssetTx.decimals == 0 && smartAssetTx.quantity.value == 1 && !smartAssetTx.reissuable
+      nft = smartAssetTx.decimals.value == 0 && smartAssetTx.quantity.value == 1 && !smartAssetTx.reissuable
     )
   )
 
@@ -268,13 +268,13 @@ class AssetsRouteSpec
       issuer = sillyAssetTx.sender,
       name = sillyAssetTx.name,
       description = sillyAssetTx.description,
-      decimals = sillyAssetTx.decimals,
+      decimals = sillyAssetTx.decimals.value,
       reissuable = sillyAssetTx.reissuable,
       totalVolume = sillyAssetTx.quantity.value,
       lastUpdatedAt = Height @@ 0,
       script = None,
       sponsorship = 0,
-      nft = sillyAssetTx.decimals == 0 && sillyAssetTx.quantity.value == 1 && !sillyAssetTx.reissuable
+      nft = sillyAssetTx.decimals.value == 0 && sillyAssetTx.quantity.value == 1 && !sillyAssetTx.reissuable
     )
   )
 
@@ -303,7 +303,7 @@ class AssetsRouteSpec
     (response \ "issuer").as[String] shouldBe tx.sender.toAddress.toString
     (response \ "name").as[String] shouldBe tx.name.toStringUtf8
     (response \ "description").as[String] shouldBe tx.description.toStringUtf8
-    (response \ "decimals").as[Int] shouldBe tx.decimals
+    (response \ "decimals").as[Int] shouldBe tx.decimals.value
     (response \ "reissuable").as[Boolean] shouldBe tx.reissuable
     (response \ "quantity").as[BigDecimal] shouldBe desc.totalVolume
     (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty

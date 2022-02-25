@@ -37,7 +37,7 @@ class SignedRequestsTest extends FunSuite {
     tx.name.toStringUtf8 shouldBe "string"
     tx.description.toStringUtf8 shouldBe "string"
     tx.reissuable shouldBe true
-    tx.decimals shouldBe 2
+    tx.decimals.value shouldBe 2
     tx.fee.value shouldBe 100000L
     tx.quantity.value shouldBe 100000L
     tx.timestamp shouldBe 1484064349669L

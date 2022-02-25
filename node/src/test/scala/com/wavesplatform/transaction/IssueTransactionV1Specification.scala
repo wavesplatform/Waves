@@ -79,7 +79,7 @@ class IssueTransactionV1Specification extends PropSpec {
       ByteString.copyFromUtf8("Gigacoin"),
       ByteString.copyFromUtf8("Gigacoin"),
       TxAmount.unsafeFrom(10000000000L),
-      8.toByte,
+      TxDecimals.unsafeFrom(8.toByte),
       true,
       script = None,
       TxAmount.unsafeFrom(100000000),

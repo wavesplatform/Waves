@@ -107,7 +107,7 @@ class IssueTransactionV2Specification
       ByteString.copyFromUtf8("Gigacoin"),
       ByteString.copyFromUtf8("Gigacoin"),
       TxAmount.unsafeFrom(10000000000L),
-      8.toByte,
+      TxDecimals.unsafeFrom(8.toByte),
       reissuable = true,
       None,
       TxAmount.unsafeFrom(100000000),

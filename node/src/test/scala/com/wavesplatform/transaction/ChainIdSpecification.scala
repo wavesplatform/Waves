@@ -270,7 +270,7 @@ class ChainIdSpecification extends PropSpec {
             ByteString.copyFromUtf8("name"),
             ByteString.copyFromUtf8("description"),
             quantity,
-            8: Byte,
+            TxDecimals.unsafeFrom(8: Byte),
             true,
             None,
             fee,

@@ -232,7 +232,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
             issue.sender,
             issue.name,
             issue.description,
-            issue.decimals,
+            issue.decimals.value,
             issue.reissuable,
             BigInt(issue.quantity.value),
             Height @@ 2,
@@ -246,7 +246,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
                 )
             ),
             0L,
-            issue.decimals == 0 && issue.quantity.value == 1 && !issue.reissuable
+            issue.decimals.value == 0 && issue.quantity.value == 1 && !issue.reissuable
           )
         )
         blockDiff.transactions.contains(issue.id()) shouldBe true
