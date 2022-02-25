@@ -137,7 +137,9 @@ inScope(Global)(
     crossPaths := false,
     dependencyOverrides ++= Dependencies.enforcedVersions.value,
     cancelable := true,
-    parallelExecution := false,
+    parallelExecution := true,
+    Test / fork := true,
+    Test / testForkedParallel := true,
     testListeners := Seq.empty, // Fix for doubled test reports
     /* http://www.scalatest.org/user_guide/using_the_runner
      * o - select the standard output reporter
