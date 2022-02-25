@@ -269,7 +269,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
       (balance \ "assetId").as[String] shouldEqual nonNFT.id().toString
     }
 
-    Get(routePath(s"/nft/${issuer.toAddress}/limit/5")) ~> route ~> check {
+    Get(routePath(s"/nft/${issuer.toAddress}/limit/6")) ~> route ~> check {
       status shouldBe StatusCodes.OK
       val nftList = responseAs[Seq[JsObject]]
       nftList.size shouldEqual nfts.size
