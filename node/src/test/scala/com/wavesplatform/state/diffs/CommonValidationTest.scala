@@ -181,7 +181,7 @@ class CommonValidationTest extends PropSpec with WithState {
         TxHelpers.lease(master, invChainAlias, amount, version = TxVersion.V3),
         TxHelpers.invoke(invChainAddr, invoker = master),
         TxHelpers.invoke(invChainAlias, invoker = master),
-        TxHelpers.exchange(
+        TxHelpers.exchangeFromOrders(
           TxHelpers.order(OrderType.BUY, asset, Waves, Waves, amount, 1_0000_0000L, 1L, master),
           TxHelpers.order(OrderType.SELL, asset, Waves, Waves, amount, 1_0000_0000L, 1L, recipient),
           master,

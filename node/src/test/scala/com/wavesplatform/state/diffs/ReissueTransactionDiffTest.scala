@@ -20,7 +20,7 @@ class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValu
 
   private val beforeActivationScenario = {
     val (issuer, b1) = genesis
-    val issue = TxHelpers.issue(issuer, Long.MaxValue / 100, version = TxVersion.V1)
+    val issue = TxHelpers.issue(issuer, version = TxVersion.V1)
     reissueTx(issuer, issue.asset, BeforeActivationFee).map { reissue =>
       val b2 = TestBlock.create(
         ntpNow,
@@ -46,8 +46,8 @@ class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValu
 
   private val afterActivationScenario = {
     val (issuer, b1) = genesis
-    val issue1 = TxHelpers.issue(issuer, Long.MaxValue / 100, name = "asset1", version = TxVersion.V1)
-    val issue2 = TxHelpers.issue(issuer, Long.MaxValue / 100, name = "asset2", version = TxVersion.V1)
+    val issue1 = TxHelpers.issue(issuer, name = "asset1", version = TxVersion.V1)
+    val issue2 = TxHelpers.issue(issuer, name = "asset2", version = TxVersion.V1)
 
     reissueTx(issuer, issue1.asset, AfterActivationFee).map { reissue =>
       val b2 = TestBlock.create(
