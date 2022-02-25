@@ -96,7 +96,7 @@ object TxHelpers {
               sender: KeyPair = defaultSigner,
               amount: Long = 1000,
               reissuable: Boolean = true,
-              fee: TxAmount = TestValues.fee,
+              fee: Long = TestValues.fee,
               version: TxVersion = TxVersion.V2,
               chainId: Byte = AddressScheme.current.chainId): ReissueTransaction =
     ReissueTransaction
@@ -170,7 +170,7 @@ object TxHelpers {
   def exchangeFromOrders(order1: Order,
                          order2: Order,
                          matcher: KeyPair = defaultSigner,
-                         fee: TxAmount = TestValues.fee,
+                         fee: Long = TestValues.fee,
                          version: TxVersion = TxVersion.V2,
                          chainId: Byte = AddressScheme.current.chainId): ExchangeTransaction =
     ExchangeTransaction
@@ -283,7 +283,7 @@ object TxHelpers {
   def sponsor(asset: IssuedAsset,
               minSponsoredAssetFee: Option[Long] = Some(TestValues.fee),
               sender: KeyPair = defaultSigner,
-              fee: TxAmount = 1.waves,
+              fee: Long = 1.waves,
               version: TxVersion = TxVersion.V1,
               chainId: Byte = AddressScheme.current.chainId): SponsorFeeTransaction = {
     SponsorFeeTransaction.selfSigned(version, sender, asset, minSponsoredAssetFee, fee, timestamp, chainId).explicitGet()

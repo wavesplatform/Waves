@@ -43,7 +43,7 @@ object GenesisTxSerializer {
     require(buf.getByte == GenesisTransaction.typeId, "transaction type mismatch")
     val timestamp = buf.getLong
     val recipient = buf.getAddress()
-    val amount    = buf.getLong
+    val amount    = TxQuantity.unsafeFrom(buf.getLong)
     GenesisTransaction(recipient, amount, timestamp, ByteStr(GenesisTransaction.generateSignature(recipient, amount.value, timestamp)), recipient.chainId)
   }
 }

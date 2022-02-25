@@ -86,7 +86,7 @@ class AssetsBroadcastRouteSpec
           posting(ir.copy(quantity = q)) should produce(NonPositiveAmount(s"$q of assets"))
         }
         forAll(invalidDecimals) { d =>
-          posting(ir.copy(decimals = d)) should produce(GenericError(s"decimals should be in interval [0; ${IssueTransaction.MaxAssetDecimals}]"))
+          posting(ir.copy(decimals = d)) should produce(InvalidDecimals(d.toString))
         }
         forAll(longDescription) { d =>
           posting(ir.copy(description = d)) should produce(TooBigArrayAllocation)
