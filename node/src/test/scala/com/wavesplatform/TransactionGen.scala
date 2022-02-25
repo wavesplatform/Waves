@@ -300,9 +300,6 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     r      <- issueReissueBurnGeneratorP(amount, amount, amount, sender)
   } yield r
 
-  def issueReissueBurnGeneratorP(issueQuantity: Long, sender: KeyPair): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] =
-    issueReissueBurnGeneratorP(issueQuantity, issueQuantity, issueQuantity, sender)
-
   def createLegacyIssue(
       issuer: KeyPair,
       nameBytes: Array[Byte],
@@ -362,24 +359,6 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       burn                                                                  <- createBurn(sender, issue.asset, burnQuantity, fee, timestamp)
     } yield (issue, reissue, burn)
   }
-
-  def issueGen(sender: KeyPair, fixedQuantity: Option[Long] = None, fixedDecimals: Option[Byte] = None): Gen[IssueTransaction] =
-    for {
-      (_, assetName, description, quantity, decimals, _, _, timestamp) <- issueParamGen
-    } yield {
-      IssueTransaction(
-        TxVersion.V1,
-        sender.publicKey,
-        assetName,
-        description,
-        fixedQuantity.getOrElse(quantity),
-        fixedDecimals.getOrElse(decimals),
-        reissuable = false,
-        script = None,
-        1 * Constants.UnitsInWave,
-        timestamp
-      ).signWith(sender.privateKey)
-    }
 
   val issueGen: Gen[IssueTransaction]     = issueReissueBurnGen.map(_._1)
   val reissueGen: Gen[ReissueTransaction] = issueReissueBurnGen.map(_._2)
@@ -523,20 +502,6 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       )
     )
   } yield r
-
-  def exchangeGeneratorP(
-      buyer: KeyPair,
-      seller: KeyPair,
-      amountAssetId: Asset,
-      priceAssetId: Asset,
-      fixedMatcherFee: Option[Long] = None,
-      fixedMatcher: Option[KeyPair] = None
-  ): Gen[ExchangeTransaction] = {
-    Gen.oneOf(
-      exchangeV1GeneratorP(buyer, seller, amountAssetId, priceAssetId, fixedMatcher = fixedMatcher, fixedMatcherFee = fixedMatcherFee),
-      exchangeV2GeneratorP(buyer, seller, amountAssetId, priceAssetId, fixedMatcher = fixedMatcher, fixedMatcherFee = fixedMatcherFee)
-    )
-  }
 
   def exchangeV1GeneratorP(
       buyer: KeyPair,

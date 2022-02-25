@@ -33,7 +33,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
   private val dAppAddress    = dApp.toAddress
   private val thirdAddress   = thirdAcc.toAddress
 
-  property("Crosscontract call (same accaunt)") {
+  property("Crosscontract call (same account)") {
     val script =
       TestCompiler(V5).compileContract(
         s"""
@@ -116,7 +116,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  property("Crosscontract call (two accaunts)") {
+  property("Crosscontract call (two accounts)") {
     val script =
       TestCompiler(V5).compileContract(
         s"""
@@ -414,7 +414,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  property("Crosscontract call (two accaunts, double call)") {
+  property("Crosscontract call (two accounts, double call)") {
     val script = TestCompiler(V5).compileContract(
       s"""
              | @Callable(i)
@@ -1053,8 +1053,8 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
            """.stripMargin
       }
 
-    val paymentIssue  = TxHelpers.issue(dApp, script = Some(paymentScript))
-    val transferIssue = TxHelpers.issue(dApp, script = Some(transferScript))
+    val paymentIssue  = TxHelpers.issue(dApp, startBalance, script = Some(paymentScript))
+    val transferIssue = TxHelpers.issue(dApp, startBalance, script = Some(transferScript))
 
     val gTx1 = TxHelpers.genesis(dAppAddress)
     val gTx2 = TxHelpers.genesis(invokerAddress)

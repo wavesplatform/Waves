@@ -184,7 +184,7 @@ class DebugApiRouteSpec
       }
 
       val route = routeWithBlockchain(blockchain)
-      val tx    = TxHelpers.exchange(TxHelpers.orderV3(OrderType.BUY, TestValues.asset), TxHelpers.orderV3(OrderType.SELL, TestValues.asset))
+      val tx    = TxHelpers.exchangeFromOrders(TxHelpers.orderV3(OrderType.BUY, TestValues.asset), TxHelpers.orderV3(OrderType.SELL, TestValues.asset))
       jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
         val json = Json.parse(responseAs[String])
         (json \ "valid").as[Boolean] shouldBe false

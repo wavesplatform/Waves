@@ -86,7 +86,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
         d.appendBlock(issue)
 
         val subscription = repo.createSubscriptionObserver(SubscribeRequest.of(1, 0))
-        val exchange     = TxHelpers.exchange(TxHelpers.orderV3(OrderType.BUY, issue.asset), TxHelpers.orderV3(OrderType.SELL, issue.asset))
+        val exchange     = TxHelpers.exchangeFromOrders(TxHelpers.orderV3(OrderType.BUY, issue.asset), TxHelpers.orderV3(OrderType.SELL, issue.asset))
         d.appendBlock(exchange)
 
         subscription.lastAppendEvent(d.blockchain).transactionMetadata should matchPattern {
@@ -372,7 +372,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
     "should handle rollback properly" in {
       val transfer = TxHelpers.transfer()
       val lease    = TxHelpers.lease()
-      val issue    = TxHelpers.issue()
+      val issue    = TxHelpers.issue(amount = 1000)
       val reissue  = TxHelpers.reissue(issue.asset)
       val data     = TxHelpers.dataSingle()
 
