@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.{AddressScheme, KeyPair}
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidName, NonPositiveAmount, TooBigArrayAllocation}
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidDecimals, InvalidName, NonPositiveAmount}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.IssueTransactionInfo
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -142,9 +142,9 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     Table(
       ("assetVal", "decimals", "message"),
       (0L, 2, NonPositiveAmount("0 of assets").assertive(true)),
-      (1L, 9, TooBigArrayAllocation.assertive()),
+      (1L, 9, InvalidDecimals("9").assertive(true)),
       (-1L, 1, NonPositiveAmount("-1 of assets").assertive(true)),
-      (1L, -1, TooBigArrayAllocation.assertive())
+      (1L, -1, InvalidDecimals("-1").assertive(true))
     )
 
   forAll(invalidAssetValue) { (assetVal: Long, decimals: Int, message: AssertiveApiError) =>

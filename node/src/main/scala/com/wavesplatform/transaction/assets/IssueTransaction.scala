@@ -79,7 +79,7 @@ object IssueTransaction extends TransactionParser {
     for {
       fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
       quantity <- TxAmount.from(quantity).leftMap(_ => TxValidationError.NonPositiveAmount(quantity, "assets"))
-      decimals <- TxDecimals.from(decimals).leftMap(_ => TxValidationError.GenericError(TxDecimals.errMsg))
+      decimals <- TxDecimals.from(decimals).leftMap(_ => TxValidationError.InvalidDecimals(decimals))
       tx <- IssueTransaction(
         version,
         sender,

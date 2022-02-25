@@ -18,6 +18,7 @@ object TxValidationError {
   case class InvalidAddress(reason: String)                    extends ValidationError
   case class NegativeAmount(amount: Long, of: String)          extends ValidationError
   case class NonPositiveAmount(amount: Long, of: String)       extends ValidationError
+  case class InvalidDecimals(decimals: Byte)                   extends ValidationError
   case class NegativeMinFee(minFee: Long, of: String)          extends ValidationError
   case class InsufficientFee(msg: String = "insufficient fee") extends ValidationError
   case object TooBigArray                                      extends ValidationError
