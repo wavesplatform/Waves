@@ -6,7 +6,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{Proofs, TxAmount, TxVersion}
+import com.wavesplatform.transaction.{Proofs, TxAmount, TxDecimals, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -19,7 +19,7 @@ object IssueTxSerializer {
       "name"        -> name.toStringUtf8,
       "quantity"    -> quantity.value,
       "reissuable"  -> reissuable,
-      "decimals"    -> decimals,
+      "decimals"    -> decimals.value,
       "description" -> description.toStringUtf8
     ) ++ (if (version >= TxVersion.V2) Json.obj("script" -> script.map(_.bytes().base64)) else JsObject.empty) ++
       (if (version == TxVersion.V2) Json.obj("chainId"   -> chainId) else JsObject.empty)
@@ -32,7 +32,7 @@ object IssueTxSerializer {
       Deser.serializeArrayWithLength(name.toByteArray),
       Deser.serializeArrayWithLength(description.toByteArray),
       Longs.toByteArray(quantity.value),
-      Array(decimals),
+      Array(decimals.value),
       Deser.serializeBoolean(reissuable),
       Longs.toByteArray(fee.value),
       Longs.toByteArray(timestamp)
@@ -59,7 +59,7 @@ object IssueTxSerializer {
       val name        = Deser.parseArrayWithLength(buf)
       val description = Deser.parseArrayWithLength(buf)
       val quantity    = TxAmount.unsafeFrom(buf.getLong)
-      val decimals    = buf.getByte
+      val decimals    = TxDecimals.unsafeFrom(buf.getByte)
       val reissuable  = buf.getBoolean
       val fee         = TxAmount.unsafeFrom(buf.getLong)
       val timestamp   = buf.getLong

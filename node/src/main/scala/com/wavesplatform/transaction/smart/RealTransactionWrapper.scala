@@ -77,7 +77,7 @@ object RealTransactionWrapper {
             i.name.toByteStr,
             i.description.toByteStr,
             i.reissuable,
-            i.decimals,
+            i.decimals.value,
             i.script.map(_.bytes())
           )
           .asRight

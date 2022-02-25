@@ -23,7 +23,7 @@ case class IssueTransaction(
     name: ByteString,
     description: ByteString,
     quantity: TxAmount,
-    decimals: Byte,
+    decimals: TxDecimals,
     reissuable: Boolean,
     script: Option[Script],
     fee: TxAmount,
@@ -79,6 +79,7 @@ object IssueTransaction extends TransactionParser {
     for {
       fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
       quantity <- TxAmount.from(quantity).leftMap(_ => TxValidationError.NonPositiveAmount(quantity, "assets"))
+      decimals <- TxDecimals.from(decimals).leftMap(_ => TxValidationError.GenericError(TxDecimals.errMsg))
       tx <- IssueTransaction(
         version,
         sender,

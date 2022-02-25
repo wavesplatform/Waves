@@ -152,7 +152,7 @@ object Blockchain {
         .blockHeader(atHeight)
         .flatMap(header => if (header.header.version >= Block.ProtoBlockVersion) blockchain.hitSource(atHeight) else None)
 
-    def isNFT(issueTransaction: IssueTransaction): Boolean = isNFT(issueTransaction.quantity.value, issueTransaction.decimals, issueTransaction.reissuable)
+    def isNFT(issueTransaction: IssueTransaction): Boolean = isNFT(issueTransaction.quantity.value, issueTransaction.decimals.value, issueTransaction.reissuable)
     def isNFT(issueAction: Issue): Boolean                 = isNFT(issueAction.quantity, issueAction.decimals, issueAction.isReissuable)
     def isNFT(quantity: Long, decimals: Int, reissuable: Boolean): Boolean =
       isFeatureActivated(BlockchainFeatures.ReduceNFTFee) && quantity == 1 && decimals == 0 && !reissuable

@@ -30,7 +30,7 @@ object AssetTransactionsDiff extends ScorexLogging {
       !activated || (isValid(tx.name) && isValid(tx.description))
     }
 
-    val staticInfo = AssetStaticInfo(TransactionId @@ tx.id(), tx.sender, tx.decimals, blockchain.isNFT(tx))
+    val staticInfo = AssetStaticInfo(TransactionId @@ tx.id(), tx.sender, tx.decimals.value, blockchain.isNFT(tx))
     val volumeInfo = AssetVolumeInfo(tx.reissuable, BigInt(tx.quantity.value))
     val info       = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
 

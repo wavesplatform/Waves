@@ -118,7 +118,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
           val tx = IssueTransaction.selfSigned(
             TxVersion.V1,
             firstKeyPair,
-            "123",
+            "1234",
             "",
             1,
             2,

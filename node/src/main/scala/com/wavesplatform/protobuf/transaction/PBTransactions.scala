@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Proofs, TxAmount, TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxQuantity, TxValidationError}
+import com.wavesplatform.transaction.{Proofs, TxAmount, TxDecimals, TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxQuantity, TxValidationError}
 import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{transaction => vt}
 import scalapb.UnknownFieldSet.empty
@@ -370,7 +370,7 @@ object PBTransactions {
           name.toByteString,
           description.toByteString,
           TxAmount.unsafeFrom(quantity),
-          decimals.toByte,
+          TxDecimals.unsafeFrom(decimals.toByte),
           reissuable,
           toVanillaScript(script),
           TxAmount.unsafeFrom(feeAmount),
@@ -469,7 +469,7 @@ object PBTransactions {
           version.toByte,
           sender,
           IssuedAsset(assetId.toByteStr),
-          Option(TxAmount.unsafeFrom(minFee)),
+          Some(minFee).filter(_ > 0).map(TxAmount.unsafeFrom),
           TxAmount.unsafeFrom(feeAmount),
           timestamp,
           proofs,
@@ -551,7 +551,7 @@ object PBTransactions {
 
       case tx: vt.assets.IssueTransaction =>
         import tx._
-        val data = IssueTransactionData(name.toStringUtf8, description.toStringUtf8, quantity.value, decimals, reissuable, toPBScript(script))
+        val data = IssueTransactionData(name.toStringUtf8, description.toStringUtf8, quantity.value, decimals.value, reissuable, toPBScript(script))
         PBTransactions.create(sender, chainId, fee.value, tx.assetFee._1, timestamp, version, proofs, Data.Issue(data))
 
       case tx: vt.assets.ReissueTransaction =>
