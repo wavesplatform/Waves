@@ -60,12 +60,12 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
           .zip(issueTransactions.reverse)
           .foreach {
             case (jso, tx) =>
-              (jso \ "balance").as[Long] shouldEqual tx.quantity
+              (jso \ "balance").as[Long] shouldEqual tx.quantity.value
               (jso \ "assetId").as[ByteStr] shouldEqual tx.id()
               (jso \ "reissuable").as[Boolean] shouldBe tx.reissuable
               (jso \ "minSponsoredAssetFee").asOpt[Long] shouldEqual None
               (jso \ "sponsorBalance").asOpt[Long] shouldEqual None
-              (jso \ "quantity").as[Long] shouldEqual tx.quantity
+              (jso \ "quantity").as[Long] shouldEqual tx.quantity.value
               (jso \ "issueTransaction").as[JsObject] shouldEqual tx.json()
           }
 
@@ -101,7 +101,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
           .toMap
 
         val balancesAfterIssue = issueTransactions.init.map { it =>
-          it.id() -> it.quantity
+          it.id() -> it.quantity.value
         }.toMap
 
         allBalances shouldEqual balancesAfterIssue
@@ -265,7 +265,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
     Get(routePath(s"/balance/${issuer.toAddress}/${nonNFT.id()}")) ~> route ~> check {
       val balance = responseAs[JsObject]
       (balance \ "address").as[String] shouldEqual issuer.toAddress.toString
-      (balance \ "balance").as[Long] shouldEqual nonNFT.quantity
+      (balance \ "balance").as[Long] shouldEqual nonNFT.quantity.value
       (balance \ "assetId").as[String] shouldEqual nonNFT.id().toString
     }
 
