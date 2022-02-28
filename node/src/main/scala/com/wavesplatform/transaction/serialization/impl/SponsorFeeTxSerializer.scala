@@ -51,10 +51,10 @@ object SponsorFeeTxSerializer {
 
     val sender               = buf.getPublicKey
     val asset                = buf.getIssuedAsset
-    val minSponsoredAssetFee = TxAmount.unsafeFrom(buf.getLong)
+    val minSponsoredAssetFee = Some(buf.getLong).filter(_ != 0).map(TxAmount.unsafeFrom)
     val fee                  = TxAmount.unsafeFrom(buf.getLong)
     val timestamp            = buf.getLong
     val proofs               = buf.getProofs
-    SponsorFeeTransaction(TxVersion.V1, sender, asset, Some(minSponsoredAssetFee), fee, timestamp, proofs, AddressScheme.current.chainId)
+    SponsorFeeTransaction(TxVersion.V1, sender, asset, minSponsoredAssetFee, fee, timestamp, proofs, AddressScheme.current.chainId)
   }
 }
