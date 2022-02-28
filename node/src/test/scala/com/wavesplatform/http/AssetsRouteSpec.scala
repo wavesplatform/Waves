@@ -186,7 +186,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
       val response = responseAs[JsObject]
       (response \ "items").as[JsObject] shouldBe Json.obj(
         transfers.map(pt => pt.address.toString -> (pt.amount: JsValueWrapper)) :+
-          (issuer.toAddress.toString -> (issueTransaction.quantity - transfers.map(_.amount).sum: JsValueWrapper)): _*
+          (issuer.toAddress.toString -> (issueTransaction.quantity.value - transfers.map(_.amount).sum: JsValueWrapper)): _*
       )
     }
 
@@ -239,9 +239,9 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
               sender.publicKey,
               issueTransaction.name,
               issueTransaction.description,
-              issueTransaction.decimals,
+              issueTransaction.decimals.value,
               reissuable,
-              issueTransaction.quantity,
+              issueTransaction.quantity.value,
               Height(d.blockchain.height),
               script.map(s => AssetScriptInfo(s, 1L)),
               0L,
