@@ -1327,7 +1327,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
     withClue("fee") {
       val tradeableAssetIssue = TxHelpers.issue()
-      val feeAssetIssue       = TxHelpers.issue(script = Some(TestValues.assetScript))
+      val feeAssetIssue       = TxHelpers.issue( script = Some(TestValues.assetScript))
       test(tradeableAssetIssue, feeAssetIssue, 0)
     }
 

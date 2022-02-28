@@ -4,7 +4,7 @@ import cats.syntax.option._
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
-import com.wavesplatform.api.common.{AddressPortfolio, AddressTransactions, CommonBlocksApi, CommonTransactionsApi}
+import com.wavesplatform.api.common._
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -316,6 +316,18 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     wallet,
     _ => Future.successful(TracedResult(Right(true))),
     h => blocksApi.blockAtHeight(h)
+  )
+
+  val accountsApi: CommonAccountsApi = CommonAccountsApi(
+    () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+    db,
+    blockchain
+  )
+
+  val assetsApi: CommonAssetsApi = CommonAssetsApi(
+    () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+    db,
+    blockchain
   )
 }
 

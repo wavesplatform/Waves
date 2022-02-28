@@ -62,7 +62,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
                         |{-# SCRIPT_TYPE ACCOUNT #-}
                         |
                         |@Callable(i)
-                        |func default() = {    
+                        |func default() = {
                         |  if (${genExpr(1500, result = true)}) then [
                         |    ScriptTransfer(i.caller, 15, base58'${TestValues.asset}')
                         |  ] else []
@@ -93,7 +93,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
                         |{-# SCRIPT_TYPE ACCOUNT #-}
                         |
                         |@Callable(i)
-                        |func default() = {    
+                        |func default() = {
                         |  if (${genExpr(1500, result = true)}) then [
                         |    ScriptTransfer(i.caller, 15, base58'${TestValues.asset}')
                         |  ] else []

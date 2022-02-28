@@ -17,7 +17,7 @@ import com.wavesplatform.state.{DataEntry, StringDataEntry}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
-import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction, UpdateAssetInfoTransaction}
+import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
