@@ -5,6 +5,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
+import com.wavesplatform.lang.v1.parser.Parser.GenericMethod
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
 import com.wavesplatform.test._
@@ -545,6 +546,28 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
         CONST_LONG(AnyPos, 0)
       )
     )
+  }
+
+  property("getter and accessor with index from variable") {
+    parse("x.y[ind]") shouldBe FUNCTION_CALL(
+      AnyPos,
+      PART.VALID(AnyPos, "getElement"),
+      List(
+        GETTER(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "x")), PART.VALID(AnyPos, "y")),
+        REF(AnyPos, PART.VALID(AnyPos, "ind"), None, None)
+      )
+    )
+  }
+
+  property("generic methods") {
+    GenericMethod.KnownMethods.foreach { methodName =>
+      parse(s"x.$methodName[Int]") shouldBe GENERIC_FUNCTION_CALL(
+        AnyPos,
+        REF(AnyPos, PART.VALID(AnyPos, "x"), None, None),
+        PART.VALID(AnyPos, methodName),
+        Single(PART.VALID(AnyPos, "Int"), None)
+      )
+    }
   }
 
   property("function call and accessor") {
