@@ -3,17 +3,17 @@ package com.wavesplatform.lang.compiler
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.Common.*
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.v1.FunctionHeader.User
+import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms, TestCompiler}
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Types.*
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms, TestCompiler, Types}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
@@ -23,7 +23,7 @@ import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Common, Global}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 
 import scala.util.Try
 
@@ -569,6 +569,41 @@ class ExpressionCompilerV1Test extends PropSpec {
         "Undefined field `_1` of variable of type `Any` in 19-23; " +
         "Undefined field `_2` of variable of type `Any` in 27-31" +
         "]"
+    )
+  }
+
+  property("get list element by index from variable where list is element of tuple") {
+    val script =
+      """
+        |let t = (1, [2, 3, 4], 5)
+        |let ind = 1
+        |t._2[ind] == 3
+        |""".stripMargin
+
+    ExpressionCompiler.compile(script, compilerContextV4) shouldBe Right(
+      (
+        LET_BLOCK(
+          LET("t", FUNCTION_CALL(Native(1301), List(CONST_LONG(1), FUNCTION_CALL(Native(1100), List(CONST_LONG(2), FUNCTION_CALL(Native(1100), List(CONST_LONG(3), FUNCTION_CALL(Native(1100), List(CONST_LONG(4), REF("nil"))))))), CONST_LONG(5)))),
+          LET_BLOCK(
+            LET("ind", CONST_LONG(1)),
+            FUNCTION_CALL(Native(0), List(FUNCTION_CALL(Native(401), List(GETTER(REF("t"), "_2"), REF("ind"))), CONST_LONG(3)))
+          )
+        ),
+        Types.BOOLEAN
+      )
+    )
+  }
+
+  property("trying to get list element from unknown getter") {
+    val script =
+      """
+        |let t = (1, [2, 3, 4], 5)
+        |let ind = 1
+        |t.some[ind] == 3
+        |""".stripMargin
+
+    ExpressionCompiler.compile(script, compilerContextV4) should produce(
+      "Compilation failed: [Non-matching types: expected: List[T], actual: Nothing in 39-50; Undefined field `some` of variable of type `(Int, List[Int], Int)` in 39-45]"
     )
   }
 
