@@ -55,7 +55,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithState {
           portfolio.balance shouldBe expectedBalance
           state.generatingBalance(leaser.toAddress, state.lastBlockId) shouldBe 0
           portfolio.lease shouldBe LeaseBalance(0, expectedBalance)
-          portfolio.effectiveBalance shouldBe 0
+          portfolio.effectiveBalance.explicitGet() shouldBe 0
         }
     }
   }

@@ -21,7 +21,7 @@ class GenesisTransactionDiffTest extends PropSpec with WithState {
       assertDiffAndState(Seq.empty, TestBlock.create(gtxs)) { (blockDiff, _) =>
         val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.balance shouldBe gtxs.map(_.amount).sum
-        totalPortfolioDiff.effectiveBalance shouldBe gtxs.map(_.amount).sum
+        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe gtxs.map(_.amount).sum
         totalPortfolioDiff.assets shouldBe Map.empty
 
         gtxs.foreach { gtx =>

@@ -28,7 +28,7 @@ class PaymentTransactionDiffTest extends PropSpec with WithState {
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(paymentV2)), settings) { (blockDiff, newState) =>
           val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
           totalPortfolioDiff.balance shouldBe 0
-          totalPortfolioDiff.effectiveBalance shouldBe 0
+          totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
         }
     }
   }

@@ -238,7 +238,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           case (blockDiff, _) =>
             val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
             totalPortfolioDiff.balance shouldBe 0
-            totalPortfolioDiff.effectiveBalance shouldBe 0
+            totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
             blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee
@@ -284,7 +284,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           case (blockDiff, _) =>
             val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
             totalPortfolioDiff.balance shouldBe 0
-            totalPortfolioDiff.effectiveBalance shouldBe 0
+            totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
             val matcherPortfolio =
@@ -378,7 +378,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           case (blockDiff, _) =>
             val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
             totalPortfolioDiff.balance shouldBe 0
-            totalPortfolioDiff.effectiveBalance shouldBe 0
+            totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
             val matcherPortfolio =
@@ -496,7 +496,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
 
             totalPortfolioDiff.balance shouldBe 0
-            totalPortfolioDiff.effectiveBalance shouldBe 0
+            totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
             val combinedPortfolio =
@@ -579,7 +579,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             case (blockDiff, _) =>
               val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
               totalPortfolioDiff.balance shouldBe 0
-              totalPortfolioDiff.effectiveBalance shouldBe 0
+              totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
               totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
               blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee

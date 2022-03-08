@@ -145,7 +145,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
   def assertBalanceInvariant(diff: Diff): Unit = {
     val portfolioDiff = diff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
     portfolioDiff.balance shouldBe 0
-    portfolioDiff.effectiveBalance shouldBe 0
+    portfolioDiff.effectiveBalance.explicitGet() shouldBe 0
     portfolioDiff.assets.values.foreach(_ shouldBe 0)
   }
 
