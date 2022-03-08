@@ -28,7 +28,7 @@ trait CommonAccountsApi {
 
   def effectiveBalance(address: Address, confirmations: Int = 0): Long
 
-  def balanceDetails(address: Address): BalanceDetails
+  def balanceDetails(address: Address): Either[String, BalanceDetails]
 
   def assetBalance(address: Address, asset: IssuedAsset): Long
 
@@ -65,15 +65,17 @@ object CommonAccountsApi extends ScorexLogging {
       blockchain.effectiveBalance(address, confirmations)
     }
 
-    override def balanceDetails(address: Address): BalanceDetails = {
+    override def balanceDetails(address: Address): Either[String, BalanceDetails] = {
       val portfolio = blockchain.wavesPortfolio(address)
-      BalanceDetails(
-        portfolio.balance,
-        blockchain.generatingBalance(address),
-        portfolio.balance - portfolio.lease.out,
-        portfolio.effectiveBalance,
-        portfolio.lease.in,
-        portfolio.lease.out
+      portfolio.effectiveBalance.map(effectiveBalance =>
+        BalanceDetails(
+          portfolio.balance,
+          blockchain.generatingBalance(address),
+          portfolio.balance - portfolio.lease.out,
+          effectiveBalance,
+          portfolio.lease.in,
+          portfolio.lease.out
+        )
       )
     }
 

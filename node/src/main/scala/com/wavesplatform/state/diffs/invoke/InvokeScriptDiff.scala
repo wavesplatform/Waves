@@ -198,7 +198,6 @@ object InvokeScriptDiff {
                   invocationRoot
                 )
                 for {
-                  diff <- traced(environment.currentDiff.combine(paymentsPartToResolve).leftMap(GenericError(_)))
                   evaluated <- CoevalR(
                     evaluateV2(
                       version,
@@ -210,6 +209,7 @@ object InvokeScriptDiff {
                       remainingComplexity
                     ).map(TracedResult(_))
                   )
+                  diff <- traced(environment.currentDiff.combine(paymentsPartToResolve).leftMap(GenericError(_)))
                 } yield (diff, evaluated, environment.availableActions, environment.availableData, environment.availableDataSize)
               })
             }

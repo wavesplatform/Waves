@@ -10,8 +10,8 @@ import com.wavesplatform.transaction.Asset._
 import scala.collection.immutable.Map
 
 case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empty, assets: Map[IssuedAsset, Long] = Map.empty) {
-  lazy val effectiveBalance: Long = 0 //safeSum(balance, lease.in) - lease.out
-  lazy val spendableBalance: Long = balance - lease.out
+  lazy val effectiveBalance: Either[String, Long] = safeSum(balance, lease.in).map(_ - lease.out)
+  lazy val spendableBalance: Long                 = balance - lease.out
 
   lazy val isEmpty: Boolean = this == Portfolio.empty
 

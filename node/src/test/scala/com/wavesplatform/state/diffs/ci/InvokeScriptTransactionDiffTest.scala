@@ -1205,7 +1205,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithState with DBCac
       r <- preconditionsAndSetContract(
         contractGen,
         invokerGen = Gen.oneOf(Seq(invoker)),
-        payment = Some(Payment(Long.MaxValue, Waves)),
+        payment = Some(Payment(ENOUGH_AMT, Waves)),
         feeGen = ciFee(1)
       )
     } yield (r._1, r._2, r._3)) {

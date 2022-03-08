@@ -145,11 +145,12 @@ class WavesEnvironment(
       }
       address <- blockchain.resolveAlias(aoa)
       portfolio = currentBlockchain().wavesPortfolio(address)
+      effectiveBalance <- portfolio.effectiveBalance
     } yield Environment.BalanceDetails(
       portfolio.balance - portfolio.lease.out,
       portfolio.balance,
       blockchain.generatingBalance(address),
-      portfolio.effectiveBalance
+      effectiveBalance
     )).left.map(_.toString)
   }
 
