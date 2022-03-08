@@ -30,10 +30,12 @@ final class CompositeBlockchain private (
   def diff: Diff = maybeDiff.getOrElse(Diff.empty)
 
   override def balance(address: Address, assetId: Asset): Long =
-    inner.balance(address, assetId) + diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
+    safeSum(inner.balance(address, assetId), diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId))
+      .explicitGet()
 
   override def leaseBalance(address: Address): LeaseBalance =
-    inner.leaseBalance(address).combine(diff.portfolios.getOrElse(address, Portfolio.empty).lease).explicitGet()
+    inner.leaseBalance(address).combine(diff.portfolios.getOrElse(address, Portfolio.empty).lease)
+      .explicitGet()
 
   override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] =
     maybeDiff
