@@ -414,7 +414,7 @@ class BlockchainUpdaterImpl(
       lt        <- leaseTransactions
       ltMeta    <- transactionMeta(lt.id()).toSeq
       recipient <- leveldb.resolveAlias(lt.recipient).toSeq
-    } yield lt.id() -> Diff.empty.copy(
+    } yield lt.id() -> Diff(
       portfolios = Map(
         lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount), Map.empty),
         recipient           -> Portfolio(0, LeaseBalance(-lt.amount, 0), Map.empty)

@@ -295,7 +295,7 @@ object InvokeScriptDiff {
               diff
                 .copy(scriptsComplexity = 0)
                 .combine(actionsDiff)
-                .flatMap(_.combine(Diff.empty.copy(scriptsComplexity = paymentsComplexity)))
+                .flatMap(_.combine(Diff(scriptsComplexity = paymentsComplexity)))
                 .leftMap(GenericError(_))
             )
 

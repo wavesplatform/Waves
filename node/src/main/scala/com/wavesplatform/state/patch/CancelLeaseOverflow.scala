@@ -12,6 +12,6 @@ case object CancelLeaseOverflow extends PatchAtHeight('W' -> 795000) {
       case (address, lb) =>
         Address.fromString(address).explicitGet() -> Portfolio(lease = lb)
     }
-    Diff.empty.copy(portfolios = pfs, leaseState = patch.leaseStates)
+    Diff(portfolios = pfs, leaseState = patch.leaseStates)
   }
 }

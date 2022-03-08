@@ -133,7 +133,7 @@ object TransactionDiffer {
       } yield ()
 
   private def verifierDiff(blockchain: Blockchain, tx: Transaction) =
-    Verifier(blockchain)(tx).map(complexity => Diff.empty.copy(scriptsComplexity = complexity))
+    Verifier(blockchain)(tx).map(complexity => Diff(scriptsComplexity = complexity))
 
   private def assetsVerifierDiff(
       blockchain: Blockchain,
@@ -219,7 +219,7 @@ object TransactionDiffer {
             .assetDescription(asset)
             .toRight(GenericError(s"Asset $asset should be issued before it can be traded"))
       }
-      orderDiff = Diff.empty.copy(portfolios = Map(order.sender.toAddress -> Portfolio.build(order.matcherFeeAssetId, -matcherFee)))
+      orderDiff = Diff(portfolios = Map(order.sender.toAddress -> Portfolio.build(order.matcherFeeAssetId, -matcherFee)))
       _ <- validateBalance(blockchain, ExchangeTransaction.typeId, orderDiff)
     } yield ()
 
@@ -248,7 +248,7 @@ object TransactionDiffer {
             }
         }
         .flatMap(_.foldM(Map.empty[Address, Portfolio])(Diff.combine).leftMap(GenericError(_)))
-      paymentsDiff = Diff.empty.copy(portfolios = portfolios)
+      paymentsDiff = Diff(portfolios = portfolios)
       _ <- BalanceDiffValidation(blockchain)(paymentsDiff)
     } yield ()
 
@@ -274,7 +274,7 @@ object TransactionDiffer {
       calledAddresses = scriptResult.map(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes)).getOrElse(Nil)
     } yield {
       val affectedAddresses = portfolios.keySet ++ maybeDApp ++ calledAddresses
-      Diff.empty.copy(
+      Diff(
         transactions = VectorMap((tx.id(), NewTransactionInfo(tx, affectedAddresses, applied = false, spentComplexity))),
         portfolios = portfolios,
         scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),

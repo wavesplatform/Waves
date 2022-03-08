@@ -82,7 +82,7 @@ object BlockDiffer extends ScorexLogging {
         initialFeeFromThisBlock <- initialFeeFromThisBlockE
         totalReward             <- minerReward.combine(initialFeeFromThisBlock).flatMap(_.combine(feeFromPreviousBlock))
         patches                 <- patchesDiff(blockchainWithNewBlock)
-        resultDiff              <- Diff.empty.copy(portfolios = Map(block.sender.toAddress -> totalReward)).combine(patches)
+        resultDiff              <- Diff(portfolios = Map(block.sender.toAddress -> totalReward)).combine(patches)
       } yield resultDiff
 
     for {
@@ -187,7 +187,7 @@ object BlockDiffer extends ScorexLogging {
               val carry = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
 
               val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
-              val minerDiff     = Diff.empty.copy(portfolios = Map(blockGenerator -> minerPortfolio))
+              val minerDiff     = Diff(portfolios = Map(blockGenerator -> minerPortfolio))
 
               val result = for {
                 diff          <- currDiff.combine(thisTxDiff).flatMap(_.combine(minerDiff))
