@@ -146,7 +146,7 @@ class DebugApiRouteSpec
 
       val route = routeWithBlockchain(blockchain)
 
-      val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, Long.MaxValue)
+      val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, ENOUGH_AMT)
       validatePost(tx) ~> route ~> check {
         val json = Json.parse(responseAs[String])
         (json \ "valid").as[Boolean] shouldBe false
