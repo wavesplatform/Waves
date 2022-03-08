@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import cats.implicits.toBifunctorOps
+import cats.implicits.{catsSyntaxEitherId, toBifunctorOps}
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
@@ -8,12 +8,24 @@ import com.wavesplatform.utils.Paged
 import play.api.libs.json._
 import supertagged.TaggedType
 
+import scala.collection.immutable.Map
 import scala.reflect.ClassTag
 import scala.util.Try
 
 package object state {
   def safeSum(x: Long, y: Long): Either[String, Long] =
     Try(Math.addExact(x, y)).toEither.leftMap(_.toString)
+
+  def safeSumMap[A, B](a: Map[A, B], b: Map[A, B], combine: (B, B) => Either[String, B]): Either[String, Map[A, B]] =
+    a.foldLeft(b.asRight[String]) {
+      case (Right(resultMap), (key, next)) =>
+        if (resultMap.contains(key))
+          combine(resultMap(key), next).map(r => resultMap + (key -> r))
+        else
+          Right(resultMap + (key -> next))
+      case (Left(error), _) =>
+        Left(error)
+    }
 
   implicit class Cast[A](a: A) {
     def cast[B: ClassTag]: Option[B] = {

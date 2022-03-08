@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import cats.data.Ior
-import cats.implicits.{catsSyntaxEitherId, catsSyntaxTuple2Semigroupal}
+import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.instances.map._
 import cats.kernel.{Monoid, Semigroup}
 import cats.syntax.semigroup._
@@ -184,15 +184,7 @@ object Diff {
   val empty: Diff = Diff()
 
   def combine(portfolios1: Map[Address, Portfolio], portfolios2: Map[Address, Portfolio]): Either[String, Map[Address, Portfolio]] =
-    portfolios2.foldLeft(portfolios1.asRight[String]) {
-      case (Right(combinedPortfolios), (address, nextPortfolio)) =>
-        if (combinedPortfolios.contains(address))
-          combinedPortfolios(address).combine(nextPortfolio).map(r => combinedPortfolios + (address -> r))
-        else
-          Right(combinedPortfolios + (address -> nextPortfolio))
-      case (Left(error), _) =>
-        Left(error)
-    }
+    safeSumMap[Address, Portfolio](portfolios1, portfolios2, _.combine(_))
 
   implicit class DiffExt(private val d: Diff) extends AnyVal {
     def errorMessage(txId: ByteStr): Option[InvokeScriptResult.ErrorMessage] =

@@ -1,7 +1,6 @@
 package com.wavesplatform.state
 
 import cats.Monoid
-import cats.implicits.{catsSyntaxSemigroup, catsSyntaxTuple2Semigroupal}
 import cats.instances.map._
 import com.wavesplatform.state.diffs.BlockDiffer.Fraction
 import com.wavesplatform.transaction.Asset
@@ -21,8 +20,11 @@ case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empt
   }
 
   def combine(that: Portfolio): Either[String, Portfolio] =
-    (safeSum(balance, that.balance), lease.combine(that.lease))
-      .mapN(Portfolio(_, _, assets |+| that.assets))
+    for {
+      balance <- safeSum(balance, that.balance)
+      lease   <- lease.combine(that.lease)
+      assets  <- safeSumMap(assets, that.assets, safeSum)
+    } yield Portfolio(balance, lease, assets)
 }
 
 object Portfolio {
