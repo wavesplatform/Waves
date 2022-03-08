@@ -311,10 +311,9 @@ class BlockchainUpdaterImpl(
 
                         val prevHitSource = ng.hitSource
 
-                        val liquidDiffWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidDiff)
-
-                        val referencedBlockchain =
-                          CompositeBlockchain(
+                        for {
+                          liquidDiffWithCancelledLeases <- ng.cancelExpiredLeases(referencedLiquidDiff).leftMap(GenericError(_))
+                          referencedBlockchain = CompositeBlockchain(
                             leveldb,
                             liquidDiffWithCancelledLeases,
                             referencedForgedBlock,
@@ -322,18 +321,16 @@ class BlockchainUpdaterImpl(
                             carry,
                             reward
                           )
-                        val maybeDiff = BlockDiffer
-                          .fromBlock(
-                            referencedBlockchain,
-                            Some(referencedForgedBlock),
-                            block,
-                            constraint,
-                            hitSource,
-                            verify
-                          )
-
-                        maybeDiff.map {
-                          differResult =>
+                          differResult <- BlockDiffer
+                            .fromBlock(
+                              referencedBlockchain,
+                              Some(referencedForgedBlock),
+                              block,
+                              constraint,
+                              hitSource,
+                              verify
+                            )
+                        } yield {
                             val tempBlockchain = CompositeBlockchain(
                               referencedBlockchain,
                               differResult.diff,
