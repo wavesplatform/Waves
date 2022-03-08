@@ -2,8 +2,7 @@ package com.wavesplatform.state
 
 import com.wavesplatform.TestValues
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.test.FunSuite
+import com.wavesplatform.test.{FunSuite, produce}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
 import java.nio.charset.StandardCharsets
@@ -51,6 +50,6 @@ class PortfolioTest extends FunSuite {
     val assetId = TestValues.asset
     val arg1    = Portfolio(0L, LeaseBalance.empty, Map(assetId -> (Long.MaxValue - 1L)))
     val arg2    = Portfolio(0L, LeaseBalance.empty, Map(assetId -> (Long.MaxValue - 2L)))
-    arg1.combine(arg2).explicitGet().assets(assetId) shouldBe Long.MinValue
+    arg1.combine(arg2) should produce("long overflow")
   }
 }
