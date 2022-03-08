@@ -43,37 +43,33 @@ object CommonValidation {
           case Waves                => Portfolio(-feeAmount, LeaseBalance.empty, Map.empty)
         }
 
-        amountDiff
-          .combine(feeDiff)
-          .leftMap(GenericError(_))
-          .flatMap { spendings =>
-            val oldWavesBalance = blockchain.balance(sender, Waves)
+        val checkedTx = for {
+          spendings <- amountDiff.combine(feeDiff)
+          oldWavesBalance = blockchain.balance(sender, Waves)
 
-            val newWavesBalance     = oldWavesBalance + spendings.balance
-            val feeUncheckedBalance = oldWavesBalance + amountDiff.balance
+          newWavesBalance     <- safeSum(oldWavesBalance, spendings.balance)
+          feeUncheckedBalance <- safeSum(oldWavesBalance, amountDiff.balance)
 
-            val overdraftFilter = allowFeeOverdraft && feeUncheckedBalance >= 0
-            if (!overdraftFilter && newWavesBalance < 0) {
-              Left(
-                GenericError(
-                  "Attempt to transfer unavailable funds: Transaction application leads to " +
-                    s"negative waves balance to (at least) temporary negative state, current balance equals $oldWavesBalance, " +
-                    s"spends equals ${spendings.balance}, result is $newWavesBalance"
-                )
-              )
-            } else {
-              val balanceError = spendings.assets.collectFirst {
-                case (aid, delta) if delta < 0 && blockchain.balance(sender, aid) + delta < 0 =>
-                  val availableBalance = blockchain.balance(sender, aid)
-                  GenericError(
-                    "Attempt to transfer unavailable funds: Transaction application leads to negative asset " +
-                      s"'$aid' balance to (at least) temporary negative state, current balance is $availableBalance, " +
-                      s"spends equals $delta, result is ${availableBalance + delta}"
-                  )
-              }
-              balanceError.fold[Either[ValidationError, T]](Right(tx))(Left(_))
+          overdraftFilter = allowFeeOverdraft && feeUncheckedBalance >= 0
+          _ <- Either.cond(
+            overdraftFilter || newWavesBalance >= 0,
+            (),
+            "Attempt to transfer unavailable funds: Transaction application leads to " +
+              s"negative waves balance to (at least) temporary negative state, current balance equals $oldWavesBalance, " +
+              s"spends equals ${spendings.balance}, result is $newWavesBalance"
+          )
+          _ <- spendings.assets
+            .collectFirst {
+              case (aid, delta) if delta < 0 && blockchain.balance(sender, aid) + delta < 0 =>
+                val availableBalance = blockchain.balance(sender, aid)
+                "Attempt to transfer unavailable funds: Transaction application leads to negative asset " +
+                  s"'$aid' balance to (at least) temporary negative state, current balance is $availableBalance, " +
+                  s"spends equals $delta, result is ${availableBalance + delta}"
             }
-          }
+            .toLeft(())
+        } yield tx
+
+        checkedTx.leftMap(GenericError(_))
       }
 
       tx match {
