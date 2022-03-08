@@ -1,5 +1,6 @@
 package com.wavesplatform.api.common
 
+import cats.implicits.toBifunctorOps
 import com.google.common.collect.AbstractIterator
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.Address
@@ -31,7 +32,12 @@ trait BalanceDistribution {
             .flatMap(address => resource.get(Keys.addressId(address)))
             .fold(Array.emptyByteArray)(id => Longs.toByteArray(id.toLong + 1))
         )
-        Observable.fromIterator(Task(new BalanceIterator(resource, globalPrefix, addressId, balanceOf, height, overrides).asScala.filter(_._2 > 0)))
+        Observable
+          .fromIterator(Task(new BalanceIterator(resource, globalPrefix, addressId, balanceOf, height, overrides).asScala))
+          .flatMap {
+            case (address, value) => Observable.fromEither(value.bimap(new RuntimeException(_), (address, _)))
+          }
+          .filter(_._2 > 0)
       }
 }
 
@@ -43,14 +49,14 @@ object BalanceDistribution {
       balanceOf: Portfolio => Long,
       height: Int,
       private var pendingPortfolios: Map[Address, Portfolio]
-  ) extends AbstractIterator[(Address, Long)] {
+  ) extends AbstractIterator[(Address, Either[String, Long])] {
     @inline
     private def stillSameAddress(expected: AddressId): Boolean = resource.iterator.hasNext && {
       val maybeNext = resource.iterator.peekNext().getKey
       maybeNext.startsWith(globalPrefix) && addressId(maybeNext) == expected
     }
     @tailrec
-    private def findNextBalance(): Option[(Address, Long)] = {
+    private def findNextBalance(): Option[(Address, Either[String, Long])] = {
       if (!resource.iterator.hasNext) None
       else {
         val current = resource.iterator.next()
@@ -70,22 +76,22 @@ object BalanceDistribution {
             }
           }
 
-          val adjustedBalance = safeSum(balance, pendingPortfolios.get(address).fold(0L)(balanceOf)).explicitGet()
+          val adjustedBalance = safeSum(balance, pendingPortfolios.get(address).fold(0L)(balanceOf))
           pendingPortfolios -= address
 
-          if (currentHeight <= height && adjustedBalance > 0) Some(address -> adjustedBalance)
+          if (adjustedBalance.isLeft || currentHeight <= height && adjustedBalance.explicitGet() > 0) Some(address -> adjustedBalance)
           else findNextBalance()
         }
       }
     }
 
-    override def computeNext(): (Address, Long) = findNextBalance() match {
+    override def computeNext(): (Address, Either[String, Long]) = findNextBalance() match {
       case Some(balance) => balance
       case None =>
         if (pendingPortfolios.nonEmpty) {
           val (address, portfolio) = pendingPortfolios.head
           pendingPortfolios -= address
-          address -> balanceOf(portfolio)
+          address -> Right(balanceOf(portfolio))
         } else {
           endOfData()
         }
