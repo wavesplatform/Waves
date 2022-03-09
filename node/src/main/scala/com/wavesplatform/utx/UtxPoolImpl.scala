@@ -3,7 +3,6 @@ package com.wavesplatform.utx
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.lang.ValidationError
@@ -271,6 +270,21 @@ class UtxPoolImpl(
       }
   }
 
+  private def removeInvalid(
+      r: PackResult,
+      tx: Transaction,
+      checkedAddresses: Set[Address],
+      error: ValidationError
+  ): PackResult = {
+    TxStateActions.removeInvalid(tx, error)
+    r.copy(
+      iterations = r.iterations + 1,
+      validatedTransactions = r.validatedTransactions + tx.id(),
+      checkedAddresses = checkedAddresses,
+      removedTransactions = r.removedTransactions + tx.id()
+    )
+  }
+
   private def pack(differ: (Blockchain, Transaction) => TracedResult[ValidationError, Diff])(
       initialConstraint: MultiDimensionalMiningConstraint,
       strategy: PackStrategy,
@@ -335,15 +349,20 @@ class UtxPoolImpl(
                             log.trace(s"Packing transaction ${tx.id()}")
                         }
 
-                        PackResult(
-                          Some(r.transactions.fold(Seq(tx))(tx +: _)),
-                          r.totalDiff.combine(newDiff).explicitGet(),
-                          updatedConstraint,
-                          r.iterations + 1,
-                          newCheckedAddresses,
-                          r.validatedTransactions + tx.id(),
-                          r.removedTransactions
-                        )
+                        r.totalDiff
+                          .combine(newDiff)
+                          .fold(
+                            error => removeInvalid(r, tx, newCheckedAddresses, GenericError(error)),
+                            PackResult(
+                              Some(r.transactions.fold(Seq(tx))(tx +: _)),
+                              _,
+                              updatedConstraint,
+                              r.iterations + 1,
+                              newCheckedAddresses,
+                              r.validatedTransactions + tx.id(),
+                              r.removedTransactions
+                            )
+                          )
                       }
 
                     case Left(TransactionValidationError(AlreadyInTheState(txId, _), tx)) if r.validatedTransactions.contains(tx.id()) =>
@@ -352,13 +371,7 @@ class UtxPoolImpl(
                       r
 
                     case Left(error) =>
-                      TxStateActions.removeInvalid(tx, error)
-                      r.copy(
-                        iterations = r.iterations + 1,
-                        validatedTransactions = r.validatedTransactions + tx.id(),
-                        checkedAddresses = newCheckedAddresses,
-                        removedTransactions = r.removedTransactions + tx.id()
-                      )
+                      removeInvalid(r, tx, newCheckedAddresses, error)
                   }
                 }
               }
