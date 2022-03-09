@@ -15,12 +15,10 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
+import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import org.scalacheck.Gen
 import org.scalatest.Inside
 
 class ListParamInvokeTest extends PropSpec with WithState with Inside {
@@ -50,53 +48,47 @@ class ListParamInvokeTest extends PropSpec with WithState with Inside {
         ),
         None
       )
-    forAll(paymentPreconditions(ContractScript(V3, v3DApp).explicitGet())) {
-      case (genesis, setScript, invoke, _) =>
-        assertDiffEi(Seq(TestBlock.create(genesis :+ setScript)), TestBlock.create(Seq(invoke)), features(withV4 = false)) {
-          _ should produce("All arguments of InvokeScript must be one of the types: Int, ByteVector, Boolean, String")
-        }
+
+    val (genesis, setScript, invoke, _) = paymentPreconditions(ContractScript(V3, v3DApp).explicitGet())
+    assertDiffEi(Seq(TestBlock.create(genesis :+ setScript)), TestBlock.create(Seq(invoke)), features(withV4 = false)) {
+      _ should produce("All arguments of InvokeScript must be one of the types: Int, ByteVector, Boolean, String")
     }
   }
 
   property("pass list args") {
-    forAll(paymentPreconditions(dApp(V4))) {
-      case (genesis, setScript, invoke, dAppAddress) =>
-        assertDiffAndState(Seq(TestBlock.create(genesis :+ setScript)), TestBlock.create(Seq(invoke)), features(withV4 = true)) {
-          case (_, blockchain) =>
-            blockchain.accountData(dAppAddress, "entry1").get.value shouldBe "value1"
-            blockchain.accountData(dAppAddress, "entry2").get.value shouldBe "value2"
-        }
+    val (genesis, setScript, invoke, dAppAddress) = paymentPreconditions(dApp(V4))
+    assertDiffAndState(Seq(TestBlock.create(genesis :+ setScript)), TestBlock.create(Seq(invoke)), features(withV4 = true)) {
+      case (_, blockchain) =>
+        blockchain.accountData(dAppAddress, "entry1").get.value shouldBe "value1"
+        blockchain.accountData(dAppAddress, "entry2").get.value shouldBe "value2"
     }
   }
 
-  private def paymentPreconditions(dApp: Script): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, Address)] =
-    for {
-      master  <- accountGen
-      invoker <- accountGen
-      ts      <- timestampGen
-      fee     <- ciFee(1)
-    } yield {
-      val functionCall =
-        Some(
-          FUNCTION_CALL(
-            User("f"),
-            List(ARR(IndexedSeq(
-              CONST_STRING("value1").explicitGet(),
-              CONST_STRING("value2").explicitGet()
-            ), false).explicitGet())
-          )
-        )
-      for {
-        genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
-        genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
-        setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp), fee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, functionCall, Nil, fee, Waves, ts + 3)
-      } yield (List(genesis, genesis2), setDApp, ci, master.toAddress)
-    }.explicitGet()
+  private def paymentPreconditions(dApp: Script): (Seq[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, Address) = {
+    val master = TxHelpers.signer(0)
+    val invoker = TxHelpers.signer(1)
+
+    val genesis = Seq(
+      TxHelpers.genesis(master.toAddress),
+      TxHelpers.genesis(invoker.toAddress)
+    )
+    val setScript = TxHelpers.setScript(master, dApp)
+
+    val invoke = TxHelpers.invoke(
+      dApp = master.toAddress,
+      func = Some("f"),
+      args = Seq(ARR(IndexedSeq(CONST_STRING("value1").explicitGet(), CONST_STRING("value2").explicitGet()), false).explicitGet()),
+      invoker = invoker,
+      fee = TxHelpers.ciFee(1),
+      version = TxVersion.V1
+    )
+    (genesis, setScript, invoke, master.toAddress)
+  }
 
   private def dApp(version: StdLibVersion): Script = {
     val result =
       if (version == V3)
+
         """
           |WriteSet([
           |  DataEntry("entry1", args[0]),

@@ -3,6 +3,7 @@ package com.wavesplatform.api.common
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -14,10 +15,7 @@ import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxHel
 import com.wavesplatform.{BlocksTransactionsHelpers, history}
 import monix.execution.Scheduler.Implicits.global
 
-class CommonAccountApiSpec
-    extends FreeSpec
-    with WithDomain
-    with BlocksTransactionsHelpers {
+class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransactionsHelpers {
 
   "Data stream" - {
     "handles non-existent address" in {
@@ -142,40 +140,39 @@ class CommonAccountApiSpec
   }
 
   "Lease info" - {
-    "shows info of lease made through invoke" in withDomain(domainSettingsWithPreactivatedFeatures(BlockchainFeatures.SynchronousCalls, BlockchainFeatures.Ride4DApps)) { d =>
-      val dAppScript = TestCompiler(V5).compileContract(
-        s"""
-           |{-# STDLIB_VERSION 5 #-}
-           |{-# SCRIPT_TYPE ACCOUNT #-}
-           |{-# CONTENT_TYPE DAPP #-}
-           |
-           |@Callable(i)
-           |func test() = {
-           |  [Lease(Address(base58'${TxHelpers.defaultAddress}'), 1, 1)]
-           |}
-           |""".stripMargin
-      )
+    "shows info of lease made through invoke" in
+      withDomain(DomainPresets.RideV5, AddrWithBalance.enoughBalances(TxHelpers.defaultSigner, TxHelpers.secondSigner)) { d =>
+        val dAppScript = TestCompiler(V5).compileContract(
+          s"""
+             |{-# STDLIB_VERSION 5 #-}
+             |{-# SCRIPT_TYPE ACCOUNT #-}
+             |{-# CONTENT_TYPE DAPP #-}
+             |
+             |@Callable(i)
+             |func default() = {
+             |  [Lease(Address(base58'${TxHelpers.defaultAddress}'), 1, 1)]
+             |}
+             |""".stripMargin
+        )
 
-      val invoke = TxHelpers.invoke(TxHelpers.secondAddress, "test")
-      d.appendBlock(
-        TxHelpers.genesis(TxHelpers.defaultAddress),
-        TxHelpers.genesis(TxHelpers.secondAddress),
-        TxHelpers.setScript(TxHelpers.secondSigner, dAppScript),
-        invoke
-      )
+        val invoke = TxHelpers.invoke(TxHelpers.secondAddress)
+        d.appendBlock(
+          TxHelpers.setScript(TxHelpers.secondSigner, dAppScript),
+          invoke
+        )
 
-      val api = CommonAccountsApi(() => Diff.empty, d.db, d.blockchain)
-      val leaseId = Lease.calculateId(
-        Lease(
-          Recipient.Address(ByteStr(TxHelpers.defaultAddress.bytes)),
-          1,
-          1
-        ),
-        invoke.id()
-      )
-      api.leaseInfo(leaseId) shouldBe Some(
-        LeaseInfo(leaseId, invoke.id(), TxHelpers.secondAddress, TxHelpers.defaultAddress, 1, 1, LeaseInfo.Status.Active)
-      )
-    }
+        val api = CommonAccountsApi(() => Diff.empty, d.db, d.blockchain)
+        val leaseId = Lease.calculateId(
+          Lease(
+            Recipient.Address(ByteStr(TxHelpers.defaultAddress.bytes)),
+            1,
+            1
+          ),
+          invoke.id()
+        )
+        api.leaseInfo(leaseId) shouldBe Some(
+          LeaseInfo(leaseId, invoke.id(), TxHelpers.secondAddress, TxHelpers.defaultAddress, 1, 2, LeaseInfo.Status.Active)
+        )
+      }
   }
 }

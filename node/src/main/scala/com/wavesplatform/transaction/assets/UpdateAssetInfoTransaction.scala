@@ -103,7 +103,8 @@ object UpdateAssetInfoTransaction extends TransactionParser {
       description: String,
       timestamp: TxTimestamp,
       feeAmount: TxAmount,
-      feeAsset: Asset
+      feeAsset: Asset,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, UpdateAssetInfoTransaction] =
-    create(version, sender.publicKey, assetId, name, description, timestamp, feeAmount, feeAsset, Proofs.empty).map(_.signWith(sender.privateKey))
+    create(version, sender.publicKey, assetId, name, description, timestamp, feeAmount, feeAsset, Proofs.empty, chainId).map(_.signWith(sender.privateKey))
 }

@@ -1,18 +1,13 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.wavesplatform.TestTime
 import com.wavesplatform.account.Address
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test._
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import org.scalamock.scalatest.MockFactory
+import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.{EitherValues, Inside}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
@@ -22,13 +17,9 @@ class SyncDAppForbidOldVersionsTest
     with Inside
     with WithState
     with DBCacheSettings
-    with MockFactory
     with WithDomain
     with EitherValues {
   import DomainPresets._
-
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
 
   private def proxyDAppScript(callingDApp: Address): Script =
     TestCompiler(V5).compileContract(
@@ -56,31 +47,27 @@ class SyncDAppForbidOldVersionsTest
     )
   }
 
-  private def scenario(version: StdLibVersion) =
-    for {
-      invoker     <- accountGen
-      callingDApp <- accountGen
-      proxyDApp   <- accountGen
-      fee         <- ciFee()
-      gTx1     = GenesisTransaction.create(callingDApp.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx3     = GenesisTransaction.create(proxyDApp.toAddress, ENOUGH_AMT, ts).explicitGet()
-      ssTx     = SetScriptTransaction.selfSigned(1.toByte, callingDApp, Some(callingDAppScript(version)), fee, ts).explicitGet()
-      ssTx2    = SetScriptTransaction.selfSigned(1.toByte, proxyDApp, Some(proxyDAppScript(callingDApp.toAddress)), fee, ts).explicitGet()
-      invokeTx = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, proxyDApp.toAddress, None, Nil, fee, Waves, ts).explicitGet()
-    } yield (Seq(gTx1, gTx2, gTx3, ssTx, ssTx2), invokeTx, proxyDApp.toAddress, callingDApp.toAddress)
-
   property("sync call is forbidden for V3 and V4 DApps") {
-    Seq(V3, V4)
-      .foreach { callingDAppVersion =>
-        val (preparingTxs, invoke, proxyDApp, callingDApp) = scenario(callingDAppVersion).sample.get
-        withDomain(RideV5) { d =>
-          d.appendBlock(preparingTxs: _*)
-          (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include(
-            s"DApp $proxyDApp invoked DApp $callingDApp that uses RIDE $callingDAppVersion, " +
-              s"but dApp-to-dApp invocation requires version 5 or higher"
-          )
-        }
+    Seq(V3, V4).foreach { callingDAppVersion =>
+      val invoker = TxHelpers.signer(0)
+      val callingDApp = TxHelpers.signer(1)
+      val proxyDApp = TxHelpers.signer(2)
+
+      val balances = AddrWithBalance.enoughBalances(invoker, callingDApp, proxyDApp)
+
+      val preparingTxs = Seq(
+        TxHelpers.setScript(callingDApp, callingDAppScript(callingDAppVersion)),
+        TxHelpers.setScript(proxyDApp, proxyDAppScript(callingDApp.toAddress))
+      )
+      val invoke = TxHelpers.invoke(proxyDApp.toAddress, func = None, invoker = invoker)
+
+      withDomain(RideV5, balances) { d =>
+        d.appendBlock(preparingTxs: _*)
+        d.appendBlockE(invoke) should produce(
+          s"DApp ${proxyDApp.toAddress} invoked DApp ${callingDApp.toAddress} that uses RIDE $callingDAppVersion, " +
+            s"but dApp-to-dApp invocation requires version 5 or higher"
+        )
       }
+    }
   }
 }

@@ -785,7 +785,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           case ((genesisTxs, setScripts), i) =>
             val account   = TxHelpers.signer(i)
             val script    = dApp(genesisTxs.headOption.map(_.recipient))
-            val genesis   = TxHelpers.genesis(account.toAddress, ENOUGH_AMT)
+            val genesis   = TxHelpers.genesis(account.toAddress)
             val setScript = TxHelpers.setScript(account, script)
             (genesis :: genesisTxs, setScript :: setScripts)
         }
@@ -793,7 +793,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         d.appendBlock(genesisTxs: _*)
         d.appendBlock(setScripts: _*)
 
-        val invoke = TxHelpers.invoke(genesisTxs.head.recipient, "default")
+        val invoke = TxHelpers.invoke(genesisTxs.head.recipient, Some("default"))
         val utx    = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings)
         utx.putIfNew(invoke, forceValidate = true).resultE.explicitGet() shouldBe true
         utx.removeAll(Seq(invoke))
@@ -816,7 +816,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         val transfer1 = TxHelpers.transfer(amount = 10.waves)
         val transfer2 = TxHelpers.transfer(amount = 10.waves) // Double spend
 
-        d.utxPool.priorityPool.setPriorityDiffs(Seq(d.transactionDiff(transfer1)))
+        d.utxPool.priorityPool.setPriorityDiffs(Seq(d.createDiff(transfer1)))
         d.utxPool.addTransaction(transfer2, verify = false)
 
         d.utxPool.cleanUnconfirmed()

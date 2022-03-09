@@ -54,10 +54,11 @@ object AddressOrAlias {
     }
   }
 
-  def fromString(s: String): Either[ValidationError, AddressOrAlias] = {
+  def fromString(s: String, checkChainId: Boolean = true): Either[ValidationError, AddressOrAlias] = {
     if (s.startsWith(Alias.Prefix))
       Alias.fromString(s)
-    else Address.fromString(s)
+    else
+      Address.fromString(s, if (checkChainId) Some(AddressScheme.current.chainId) else None)
   }
 
   def fromRide(r: Recipient): Either[ValidationError, AddressOrAlias] =

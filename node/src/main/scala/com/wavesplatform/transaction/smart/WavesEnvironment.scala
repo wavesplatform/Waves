@@ -104,7 +104,7 @@ class WavesEnvironment(
       address <- recipient match {
         case Address(bytes) =>
           com.wavesplatform.account.Address
-            .fromBytes(bytes.arr)
+            .fromBytes(bytes.arr, chainId)
             .toOption
         case Alias(name) =>
           com.wavesplatform.account.Alias
@@ -211,7 +211,7 @@ class WavesEnvironment(
 
   override def addressFromString(addressStr: String): Either[String, Address] =
     account.Address
-      .fromString(addressStr)
+      .fromString(addressStr, Some(chainId))
       .bimap(
         _.toString,
         address => Address(ByteStr(address.bytes))
