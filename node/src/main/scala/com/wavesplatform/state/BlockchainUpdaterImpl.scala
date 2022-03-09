@@ -1,6 +1,5 @@
 package com.wavesplatform.state
 
-import cats.implicits.toTraverseOps
 import cats.syntax.either._
 import cats.syntax.option._
 import com.wavesplatform.account.{Address, Alias}
@@ -8,6 +7,7 @@ import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.Storage
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
@@ -359,8 +359,8 @@ class BlockchainUpdaterImpl(
                         Left(BlockAppendError(errorText, block))
                       }
                   }
-            }).flatMap {
-              _.traverse {
+            }).map {
+              _ map {
                 case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, _), discDiffs, reward, hitSource) =>
                   val newHeight   = leveldb.height + 1
                   val prevNgState = ngState
@@ -378,17 +378,16 @@ class BlockchainUpdaterImpl(
                       cancelLeases(collectLeasesToCancel(newHeight), newHeight)
                     )
                   )
-                  notifyChangedSpendable(prevNgState, ngState).map { _ =>
-                    publishLastBlockInfo()
+                  notifyChangedSpendable(prevNgState, ngState)
+                  publishLastBlockInfo()
 
-                    if ((block.header.timestamp > time
-                          .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (newHeight % 100 == 0)) {
-                      log.info(s"New height: $newHeight")
-                    }
-
-                    discDiffs
+                  if ((block.header.timestamp > time
+                        .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (newHeight % 100 == 0)) {
+                    log.info(s"New height: $newHeight")
                   }
-              }.map(_.getOrElse(Nil))
+
+                  discDiffs
+              } getOrElse Nil
             }
         )
     }
@@ -453,35 +452,30 @@ class BlockchainUpdaterImpl(
     result match {
       case Right(_) =>
         log.info(s"Blockchain rollback to $blockId succeeded")
-        notifyChangedSpendable(prevNgState, ngState).flatMap { _ =>
-          publishLastBlockInfo()
-          miner.scheduleMining()
-          result
-        }
+        notifyChangedSpendable(prevNgState, ngState)
+        publishLastBlockInfo()
+        miner.scheduleMining()
 
       case Left(error) =>
         log.error(s"Blockchain rollback to $blockId failed: ${error.err}")
-        result
     }
+    result
   }
 
-  private def notifyChangedSpendable(prevNgState: Option[NgState], newNgState: Option[NgState]): Either[GenericError, Unit] = {
+  private def notifyChangedSpendable(prevNgState: Option[NgState], newNgState: Option[NgState]): Unit = {
     val changedPortfolios = (prevNgState, newNgState) match {
       case (Some(p), Some(n)) => diff(p.bestLiquidDiff.portfolios, n.bestLiquidDiff.portfolios)
-      case (Some(x), _)       => Right(x.bestLiquidDiff.portfolios)
-      case (_, Some(x))       => Right(x.bestLiquidDiff.portfolios)
-      case _                  => Right(Map.empty)
+      case (Some(x), _)       => x.bestLiquidDiff.portfolios
+      case (_, Some(x))       => x.bestLiquidDiff.portfolios
+      case _                  => Map.empty
     }
 
-    changedPortfolios.bimap(
-      GenericError(_),
-      _.foreach {
-        case (addr, p) =>
-          p.assetIds.view
-            .filter(x => p.spendableBalanceOf(x) != 0)
-            .foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
-      }
-    )
+    changedPortfolios.foreach {
+      case (addr, p) =>
+        p.assetIds.view
+          .filter(x => p.spendableBalanceOf(x) != 0)
+          .foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
+    }
   }
 
   override def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, BlockId] = writeLock {
@@ -739,8 +733,8 @@ class BlockchainUpdaterImpl(
 }
 
 object BlockchainUpdaterImpl {
-  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]): Either[String, Map[Address, Portfolio]] =
-    Diff.combine(p1, p2.map { case (k, v) => k -> v.negate })
+  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]) =
+    Diff.combine(p1, p2.map { case (k, v) => k -> v.negate }).explicitGet()
 
   private def displayFeatures(s: Set[Short]): String =
     s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"
