@@ -76,7 +76,7 @@ object BalanceDistribution {
             }
           }
 
-          val adjustedBalance = safeSum(balance, pendingPortfolios.get(address).fold(0L)(balanceOf))
+          val adjustedBalance = safeSum(balance, pendingPortfolios.get(address).fold(0L)(balanceOf), "Next distribution balance")
           pendingPortfolios -= address
 
           if (adjustedBalance.isLeft || currentHeight <= height && adjustedBalance.explicitGet() > 0) Some(address -> adjustedBalance)

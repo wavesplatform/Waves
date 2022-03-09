@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.Asset._
 import scala.collection.immutable.Map
 
 case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empty, assets: Map[IssuedAsset, Long] = Map.empty) {
-  lazy val effectiveBalance: Either[String, Long] = safeSum(balance, lease.in).map(_ - lease.out)
+  lazy val effectiveBalance: Either[String, Long] = safeSum(balance, lease.in, "Effective balance").map(_ - lease.out)
   lazy val spendableBalance: Long                 = balance - lease.out
 
   lazy val isEmpty: Boolean = this == Portfolio.empty
@@ -21,9 +21,9 @@ case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empt
 
   def combine(that: Portfolio): Either[String, Portfolio] =
     for {
-      balance <- safeSum(balance, that.balance)
+      balance <- safeSum(balance, that.balance, "Portfolio balance")
       lease   <- lease.combine(that.lease)
-      assets  <- safeSumMap(assets, that.assets, safeSum)
+      assets  <- safeSumMap(assets, that.assets, safeSum(_, _, "Portfolio assets balance"))
     } yield Portfolio(balance, lease, assets)
 }
 

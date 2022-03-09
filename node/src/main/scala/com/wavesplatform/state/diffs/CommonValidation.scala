@@ -47,8 +47,8 @@ object CommonValidation {
           spendings <- amountDiff.combine(feeDiff)
           oldWavesBalance = blockchain.balance(sender, Waves)
 
-          newWavesBalance     <- safeSum(oldWavesBalance, spendings.balance)
-          feeUncheckedBalance <- safeSum(oldWavesBalance, amountDiff.balance)
+          newWavesBalance     <- safeSum(oldWavesBalance, spendings.balance, "Spendings")
+          feeUncheckedBalance <- safeSum(oldWavesBalance, amountDiff.balance, "Transfer amount")
 
           overdraftFilter = allowFeeOverdraft && feeUncheckedBalance >= 0
           _ <- Either.cond(

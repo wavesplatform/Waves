@@ -29,9 +29,10 @@ final class CompositeBlockchain private (
 
   def diff: Diff = maybeDiff.getOrElse(Diff.empty)
 
-  override def balance(address: Address, assetId: Asset): Long =
-    safeSum(inner.balance(address, assetId), diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId))
-      .explicitGet()
+  override def balance(address: Address, assetId: Asset): Long = {
+    val diffBalance = diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
+    safeSum(inner.balance(address, assetId), diffBalance, "Composite blockchain balance")
+      .explicitGet()}
 
   override def leaseBalance(address: Address): LeaseBalance =
     inner.leaseBalance(address).combine(diff.portfolios.getOrElse(address, Portfolio.empty).lease)

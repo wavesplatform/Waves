@@ -13,8 +13,8 @@ import scala.reflect.ClassTag
 import scala.util.Try
 
 package object state {
-  def safeSum(x: Long, y: Long): Either[String, Long] =
-    Try(Math.addExact(x, y)).toEither.leftMap(_.toString)
+  def safeSum(x: Long, y: Long, source: String): Either[String, Long] =
+    Try(Math.addExact(x, y)).toEither.leftMap(_ => s"$source sum overflow")
 
   def safeSumMap[A, B](a: Map[A, B], b: Map[A, B], combine: (B, B) => Either[String, B]): Either[String, Map[A, B]] =
     a.foldLeft(b.asRight[String]) {

@@ -50,6 +50,6 @@ class PortfolioTest extends FunSuite {
     val assetId = TestValues.asset
     val arg1    = Portfolio(0L, LeaseBalance.empty, Map(assetId -> (Long.MaxValue - 1L)))
     val arg2    = Portfolio(0L, LeaseBalance.empty, Map(assetId -> (Long.MaxValue - 2L)))
-    arg1.combine(arg2) should produce("long overflow")
+    arg1.combine(arg2) should produce("Portfolio assets balance sum overflow")
   }
 }

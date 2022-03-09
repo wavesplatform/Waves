@@ -1,7 +1,6 @@
 package com.wavesplatform.state
 
 import cats.data.Ior
-import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.instances.map._
 import cats.kernel.{Monoid, Semigroup}
 import cats.syntax.semigroup._
@@ -19,7 +18,10 @@ import scala.collection.immutable.VectorMap
 
 case class LeaseBalance(in: Long, out: Long) {
   def combine(that: LeaseBalance): Either[String, LeaseBalance] =
-    (safeSum(in, that.in), safeSum(out, that.out)).mapN(LeaseBalance(_, _))
+    for {
+      in  <- safeSum(in, that.in, "Lease in")
+      out <- safeSum(out, that.out, "Lease out")
+    } yield LeaseBalance(in, out)
 }
 
 object LeaseBalance {
