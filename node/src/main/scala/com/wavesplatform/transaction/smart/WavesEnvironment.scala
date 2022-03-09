@@ -370,12 +370,13 @@ class DAppEnvironment(
         if (reentrant) calledAddresses else calledAddresses + invoke.senderAddress,
         invocationTracker
       )(invoke)
-    } yield {
-      val fixedDiff = diff.copy(
+      fixedDiff = diff.copy(
         scriptResults = Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))),
         scriptsRun = diff.scriptsRun + 1
       )
-      currentDiff = currentDiff.combine(fixedDiff).explicitGet()
+      newCurrentDiff <- traced(currentDiff.combine(fixedDiff).leftMap(GenericError(_)))
+    } yield {
+      currentDiff = newCurrentDiff
       mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions
