@@ -28,9 +28,7 @@ import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.utils._
 import com.wavesplatform.{TestValues, crypto}
-import org.scalacheck.Gen
 import org.scalatest.{EitherValues, Inside}
 
 import scala.util.{Random, Try}

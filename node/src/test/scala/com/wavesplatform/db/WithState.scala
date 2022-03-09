@@ -1,12 +1,10 @@
 package com.wavesplatform.db
 
-import cats.Monoid
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.history.Domain
@@ -15,20 +13,12 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{
-  BlockchainSettings,
-  FunctionalitySettings,
-  TestSettings,
-  WavesSettings,
-  loadConfig,
-  TestFunctionalitySettings => TFS
-}
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT, produce}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Portfolio}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.{NTPTime, TestHelpers}
 import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
 import com.wavesplatform.{NTPTime, TestHelpers}
 import monix.reactive.Observer

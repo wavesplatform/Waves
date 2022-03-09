@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.common.utils.EitherExt2
-import cats.Monoid
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
