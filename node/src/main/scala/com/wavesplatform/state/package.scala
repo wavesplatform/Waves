@@ -23,8 +23,8 @@ package object state {
           combine(resultMap(key), next).map(r => resultMap + (key -> r))
         else
           Right(resultMap + (key -> next))
-      case (Left(error), _) =>
-        Left(error)
+      case (e @ Left(_), _) =>
+        e
     }
 
   implicit class Cast[A](a: A) {
