@@ -1,5 +1,7 @@
 package com.wavesplatform.state
 
+import cats.implicits.catsSyntaxSemigroup
+import cats.kernel.Semigroup
 import cats.syntax.either._
 import cats.syntax.option._
 import com.wavesplatform.account.{Address, Alias}
@@ -7,7 +9,6 @@ import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.Storage
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
@@ -733,8 +734,11 @@ class BlockchainUpdaterImpl(
 }
 
 object BlockchainUpdaterImpl {
-  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]) =
-    Diff.combine(p1, p2.map { case (k, v) => k -> v.negate }).explicitGet()
+  private implicit val portfolioDiffCombine: Semigroup[Portfolio] = (x: Portfolio, y: Portfolio) =>
+    Portfolio(x.balance + y.balance, LeaseBalance.empty, x.assets |+| y.assets)
+
+  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]): Map[Address, Portfolio] =
+    p1 |+| p2.map { case (k, v) => k -> v.negate }
 
   private def displayFeatures(s: Set[Short]): String =
     s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"
