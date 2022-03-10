@@ -82,7 +82,7 @@ class DebugApiRouteSpec
         case 2 => Some(testStateHash)
         case _ => None
       },
-      () => blockchain
+      () => Right(blockchain)
     )
   import debugApiRoute._
 
@@ -109,7 +109,7 @@ class DebugApiRouteSpec
 
   routePath("/validate") - {
     def routeWithBlockchain(blockchain: Blockchain with NG) =
-      debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => blockchain).route
+      debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => Right(blockchain)).route
 
     def validatePost(tx: TransferTransaction) =
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString()))
@@ -628,7 +628,7 @@ class DebugApiRouteSpec
       val route = debugApiRoute
         .copy(
           blockchain = blockchain,
-          priorityPoolBlockchain = () => blockchain
+          priorityPoolBlockchain = () => Right(blockchain)
         )
         .route
 
@@ -800,7 +800,7 @@ class DebugApiRouteSpec
       val route = debugApiRoute
         .copy(
           blockchain = blockchain,
-          priorityPoolBlockchain = () => blockchain
+          priorityPoolBlockchain = () => Right(blockchain)
         )
         .route
 
