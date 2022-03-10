@@ -1,18 +1,20 @@
 package com.wavesplatform.utx
 
-import java.time.Duration
-import java.time.temporal.ChronoUnit
-import scala.annotation.tailrec
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
+
+import java.time.Duration
+import java.time.temporal.ChronoUnit
+import scala.annotation.tailrec
 
 final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging with OptimisticLockable {
   import UtxPriorityPool._
@@ -26,8 +28,8 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
   def priorityTransactions: Seq[Transaction] = priorityDiffs.flatMap(_.diff.transactionsValues)
   def priorityTransactionIds: Seq[ByteStr]   = priorityTransactions.map(_.id())
 
-  def compositeBlockchain: Blockchain =
-    if (priorityDiffs.isEmpty) realBlockchain
+  def compositeBlockchain: Either[GenericError, Blockchain] =
+    if (priorityDiffs.isEmpty) Right(realBlockchain)
     else CompositeBlockchain(realBlockchain, priorityDiffsCombined)
 
   def lockedWrite[T](f: => T): T =

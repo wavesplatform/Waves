@@ -162,6 +162,7 @@ object InvokeScriptDiff {
 
           result <- for {
             paymentsPart <- traced(InvokeDiffsCommon.paymentsPart(tx, tx.dAppAddress, Map()))
+            blockchainWithPayments <- traced(CompositeBlockchain(blockchain, paymentsPart))
             (diff, (scriptResult, log), availableActions, availableData, availableDataSize) <- {
               stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
                 val height = blockchain.height
@@ -181,7 +182,7 @@ object InvokeScriptDiff {
                   AddressScheme.current.chainId,
                   Coeval.evalOnce(input),
                   Coeval(height),
-                  blockchain,
+                  blockchainWithPayments,
                   tthis,
                   directives,
                   tx.root,
@@ -215,10 +216,10 @@ object InvokeScriptDiff {
             }
             _ = invocationRoot.setLog(log)
 
-            _ = if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
-              checkDiffBalances(diff, blockchain)
+            newBlockchain <- traced(CompositeBlockchain(blockchain, diff))
 
-            newBlockchain = CompositeBlockchain(blockchain, diff)
+            _ = if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
+              checkDiffBalances(diff, newBlockchain)
 
             _ <- traced {
               val newBalance = newBlockchain.balance(invoker)
@@ -300,7 +301,7 @@ object InvokeScriptDiff {
             )
 
             _ = if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
-              checkDiffBalances(resultDiff, blockchain)
+              checkDiffBalances(resultDiff, newBlockchain)
 
             _ = invocationRoot.setResult(scriptResult)
           } yield (resultDiff, evaluated, remainingActions1, remainingData1, remainingDataSize1)
@@ -315,25 +316,23 @@ object InvokeScriptDiff {
     }
   }
 
-  private def checkDiffBalances(diff: Diff, blockchain: Blockchain): Unit = {
-    val newBlockchain = CompositeBlockchain(blockchain, diff)
+  private def checkDiffBalances(diff: Diff, blockchain: Blockchain): Unit =
     diff.portfolios.toList.foreach {
       case (address, portfolio) =>
         if (portfolio.balance < 0) {
-          val newBalance = newBlockchain.balance(address)
+          val newBalance = blockchain.balance(address)
           if (newBalance < 0)
             throw RejectException(balanceError(address, newBalance, Waves))
         }
         portfolio.assets.foreach {
           case (asset, amount) =>
             if (amount < 0) {
-              val newBalance = newBlockchain.balance(address, asset)
+              val newBalance = blockchain.balance(address, asset)
               if (newBalance < 0)
                 throw RejectException(balanceError(address, newBalance, asset))
             }
         }
     }
-  }
 
   private def balanceError(address: Address, balance: Long, asset: Asset) = {
     val assetInfo = asset match {

@@ -9,6 +9,7 @@ import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.Storage
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
@@ -211,22 +212,23 @@ class BlockchainUpdaterImpl(
                     val miningConstraints = MiningConstraints(leveldb, height)
                     val reward            = nextReward()
 
-                    val referencedBlockchain = CompositeBlockchain(leveldb, reward)
-                    BlockDiffer
-                      .fromBlock(
-                        referencedBlockchain,
-                        leveldb.lastBlock,
-                        block,
-                        miningConstraints.total,
-                        hitSource,
-                        verify
-                      )
-                      .map { r =>
-                        val updatedBlockchain = CompositeBlockchain(leveldb, r.diff, block, hitSource, r.carry, reward)
-                        miner.scheduleMining(Some(updatedBlockchain))
-                        blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, reward, referencedBlockchain)
-                        Option((r, Nil, reward, hitSource))
-                      }
+                    for {
+                      referencedBlockchain <- CompositeBlockchain(leveldb, reward)
+                      r <- BlockDiffer
+                        .fromBlock(
+                          referencedBlockchain,
+                          leveldb.lastBlock,
+                          block,
+                          miningConstraints.total,
+                          hitSource,
+                          verify
+                        )
+                      updatedBlockchain <- CompositeBlockchain(leveldb, r.diff, block, hitSource, r.carry, reward)
+                    } yield {
+                      miner.scheduleMining(Some(updatedBlockchain))
+                      blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, reward, referencedBlockchain)
+                      Option((r, Nil, reward, hitSource))
+                    }
                 }
               case Some(ng) =>
                 if (ng.base.header.reference == block.header.reference) {
@@ -236,25 +238,26 @@ class BlockchainUpdaterImpl(
 
                     blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, leveldb.height)
 
-                    val referencedBlockchain = CompositeBlockchain(leveldb, ng.reward)
-                    BlockDiffer
+                    for {
+                      referencedBlockchain <- CompositeBlockchain(leveldb, ng.reward)
+                      r <- BlockDiffer
                       .fromBlock(
-                        referencedBlockchain,
-                        leveldb.lastBlock,
-                        block,
-                        miningConstraints.total,
-                        hitSource,
-                        verify
+                      referencedBlockchain,
+                      leveldb.lastBlock,
+                      block,
+                      miningConstraints.total,
+                      hitSource,
+                      verify
                       )
-                      .map { r =>
-                        log.trace(
-                          s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})"
-                        )
-                        val (mbs, diffs) = ng.allDiffs.unzip
-                        log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
-                        blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, referencedBlockchain)
-                        Some((r, diffs, ng.reward, hitSource))
-                      }
+                    } yield {
+                      log.trace(
+                        s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})"
+                      )
+                      val (mbs, diffs) = ng.allDiffs.unzip
+                      log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
+                      blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, referencedBlockchain)
+                      Some((r, diffs, ng.reward, hitSource))
+                    }
                   } else if (areVersionsOfSameBlock(block, ng.base)) {
                     if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
                       log.trace(s"Existing liquid block is better than new one, discarding $block")
@@ -266,17 +269,18 @@ class BlockchainUpdaterImpl(
 
                       blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, leveldb.height)
 
-                      val referencedBlockchain = CompositeBlockchain(leveldb, ng.reward)
-                      BlockDiffer
+                      for {
+                        referencedBlockchain <- CompositeBlockchain(leveldb, ng.reward)
+                        r <- BlockDiffer
                         .fromBlock(
-                          referencedBlockchain,
-                          leveldb.lastBlock,
-                          block,
-                          miningConstraints.total,
-                          hitSource,
-                          verify
+                        referencedBlockchain,
+                        leveldb.lastBlock,
+                        block,
+                        miningConstraints.total,
+                        hitSource,
+                        verify
                         )
-                        .map { r =>
+                      } yield {
                           blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, referencedBlockchain)
                           Some((r, Nil, ng.reward, hitSource))
                         }
@@ -314,7 +318,7 @@ class BlockchainUpdaterImpl(
 
                         for {
                           liquidDiffWithCancelledLeases <- ng.cancelExpiredLeases(referencedLiquidDiff).leftMap(GenericError(_))
-                          referencedBlockchain = CompositeBlockchain(
+                          referencedBlockchain <- CompositeBlockchain(
                             leveldb,
                             liquidDiffWithCancelledLeases,
                             referencedForgedBlock,
@@ -331,28 +335,28 @@ class BlockchainUpdaterImpl(
                               hitSource,
                               verify
                             )
+                          tempBlockchain <- CompositeBlockchain(
+                            referencedBlockchain,
+                            differResult.diff,
+                            block,
+                            hitSource,
+                            differResult.carry,
+                            reward
+                          )
                         } yield {
-                            val tempBlockchain = CompositeBlockchain(
-                              referencedBlockchain,
-                              differResult.diff,
-                              block,
-                              hitSource,
-                              differResult.carry,
-                              reward
-                            )
-                            miner.scheduleMining(Some(tempBlockchain))
+                          miner.scheduleMining(Some(tempBlockchain))
 
-                            blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, referencedBlockchain)
+                          blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, referencedBlockchain)
 
-                            leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
-                            BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
-                            TxsInBlockchainStats.record(ng.transactions.size)
-                            val (discardedMbs, discardedDiffs) = discarded.unzip
-                            if (discardedMbs.nonEmpty) {
-                              log.trace(s"Discarded microblocks: $discardedMbs")
-                            }
+                          leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
+                          BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
+                          TxsInBlockchainStats.record(ng.transactions.size)
+                          val (discardedMbs, discardedDiffs) = discarded.unzip
+                          if (discardedMbs.nonEmpty) {
+                            log.trace(s"Discarded microblocks: $discardedMbs")
+                          }
 
-                            Some((differResult, discardedDiffs, reward, hitSource))
+                          Some((differResult, discardedDiffs, reward, hitSource))
                         }
                       } else {
                         val errorText = s"Forged block has invalid signature. Base: ${ng.base}, requested reference: ${block.header.reference}"
@@ -677,7 +681,7 @@ class BlockchainUpdaterImpl(
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readLock {
     to.fold(ngState.map(_.bestLiquidDiff))(id => ngState.map(_.diffFor(id)._1))
-      .fold[Blockchain](leveldb)(CompositeBlockchain(leveldb, _))
+      .fold[Blockchain](leveldb)(CompositeBlockchain(leveldb, _).explicitGet())
       .balanceSnapshots(address, from, to)
   }
 
@@ -721,7 +725,7 @@ class BlockchainUpdaterImpl(
   }
 
   private[this] def compositeBlockchain =
-    ngState.fold(leveldb: Blockchain)(CompositeBlockchain(leveldb, _))
+    ngState.fold(leveldb: Blockchain)(CompositeBlockchain(leveldb, _).explicitGet())
 
   //noinspection ScalaStyle,TypeAnnotation
   private[this] object metrics {

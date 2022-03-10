@@ -1,8 +1,5 @@
 package com.wavesplatform.api.http
 
-import java.net.{InetAddress, InetSocketAddress, URI}
-import java.util.concurrent.ConcurrentMap
-
 import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.Accept
@@ -36,6 +33,8 @@ import monix.execution.Scheduler
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
+import java.net.{InetAddress, InetSocketAddress, URI}
+import java.util.concurrent.ConcurrentMap
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
@@ -61,7 +60,7 @@ case class DebugApiRoute(
     configRoot: ConfigObject,
     loadBalanceHistory: Address => Seq[(Int, Long)],
     loadStateHash: Int => Option[StateHash],
-    priorityPoolBlockchain: () => Blockchain
+    priorityPoolBlockchain: () => Either[GenericError, Blockchain]
 ) extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -221,33 +220,32 @@ case class DebugApiRoute(
       val parsedTransaction = TransactionFactory.fromSignedRequest(jsv)
 
       val tracedDiff = for {
+        b <- TracedResult(blockchain)
         tx   <- TracedResult(parsedTransaction)
-        diff <- TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
-      } yield (tx, diff)
+        diff <- TransactionDiffer.forceValidate(b.lastBlockTimestamp, time.correctedTime())(b, tx)
+      } yield (tx, diff, b)
 
       val error = tracedDiff.resultE match {
-        case Right((tx, diff)) => diff.errorMessage(tx.id()).map(em => GenericError(em.text))
+        case Right((tx, diff, _)) => diff.errorMessage(tx.id()).map(em => GenericError(em.text))
         case Left(err)         => Some(err)
       }
 
       val transactionJson = parsedTransaction.fold(_ => jsv, _.json())
 
       val serializer = tracedDiff.resultE
-        .fold(_ => this.serializer, {
-          case (_, diff) =>
-            val compositeBlockchain = CompositeBlockchain(blockchain, diff)
-            this.serializer.copy(blockchain = compositeBlockchain)
-        })
+        .flatMap { case (_, diff, _) => blockchain.flatMap(CompositeBlockchain(_, diff)) }
+        .fold(_ => this.serializer, blockchain => this.serializer.copy(blockchain = blockchain))
 
       val extendedJson = tracedDiff.resultE
         .fold(
           _ => jsv, {
-            case (tx, diff) =>
+            case (tx, diff, blockchain) =>
               val meta = tx match {
                 case ist: InvokeScriptTransaction =>
                   val result = diff.scriptResults.get(ist.id())
                   TransactionMeta.Invoke(Height(blockchain.height), ist, succeeded = true, diff.scriptsComplexity, result)
-                case tx => TransactionMeta.Default(Height(blockchain.height), tx, succeeded = true, diff.scriptsComplexity)
+                case tx =>
+                  TransactionMeta.Default(Height(blockchain.height), tx, succeeded = true, diff.scriptsComplexity)
               }
               serializer.transactionWithMetaJson(meta)
           }
@@ -260,7 +258,7 @@ case class DebugApiRoute(
           case ist: InvokeScriptTrace => ist.maybeLoggedJson(logged = true)(serializer.invokeScriptResultWrites)
           case trace                  => trace.loggedJson
         },
-        "height" -> blockchain.height
+        "height" -> this.blockchain.height
       )
 
       error.fold(response ++ extendedJson)(

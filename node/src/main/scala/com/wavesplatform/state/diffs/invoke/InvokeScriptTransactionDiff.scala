@@ -131,6 +131,7 @@ object InvokeScriptTransactionDiff {
         MainScriptResult(invocationDiff, scriptResult, log, availableActions, availableData, availableDataSize, limit) <- executeMainScript()
         otherIssues = invocationDiff.scriptResults.get(tx.id()).fold(Seq.empty[Issue])(allIssues)
 
+        cBlokchain <- TracedResult(CompositeBlockchain(blockchain, invocationDiff))
         doProcessActions = InvokeDiffsCommon.processActions(
           _,
           version,
@@ -138,7 +139,7 @@ object InvokeScriptTransactionDiff {
           pk,
           _,
           tx,
-          CompositeBlockchain(blockchain, invocationDiff),
+          cBlokchain,
           blockTime,
           isSyncCall = false,
           limitedExecution,
@@ -242,12 +243,12 @@ object InvokeScriptTransactionDiff {
           )
 
           paymentsPart <- TracedResult(if (version < V5) Right(Diff.empty) else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()))
-
+          blockchainWithPayments <- TracedResult(CompositeBlockchain(blockchain, paymentsPart))
           environment = new DAppEnvironment(
             AddressScheme.current.chainId,
             Coeval.evalOnce(input),
             Coeval.evalOnce(blockchain.height),
-            blockchain,
+            blockchainWithPayments,
             tthis,
             directives,
             Some(tx),

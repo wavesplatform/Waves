@@ -289,7 +289,7 @@ object DAppEnvironment {
 }
 
 // Not thread safe
-class DAppEnvironment(
+class DAppEnvironment (
     nByte: Byte,
     in: Coeval[Environment.InputEntity],
     h: Coeval[Int],
@@ -310,9 +310,9 @@ class DAppEnvironment(
     val invocationRoot: DAppEnvironment.InvocationTreeTracker
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.map(_.id()).getOrElse(ByteStr.empty)) {
 
-  private[this] var mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
+  private[this] var mutableBlockchain: Blockchain = blockchain
 
-  override def currentBlockchain(): CompositeBlockchain = this.mutableBlockchain
+  override def currentBlockchain(): Blockchain = this.mutableBlockchain
 
   override def callScript(
       dApp: Address,
@@ -375,9 +375,10 @@ class DAppEnvironment(
         scriptsRun = diff.scriptsRun + 1
       )
       newCurrentDiff <- traced(currentDiff.combine(fixedDiff).leftMap(GenericError(_)))
+      newMutableBlockchain <- traced(CompositeBlockchain(blockchain, newCurrentDiff))
     } yield {
       currentDiff = newCurrentDiff
-      mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
+      mutableBlockchain = newMutableBlockchain
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions
       availableData = remainingData

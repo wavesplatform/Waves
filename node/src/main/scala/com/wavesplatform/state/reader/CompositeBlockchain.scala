@@ -1,42 +1,41 @@
 package com.wavesplatform.state.reader
 
 import cats.data.Ior
+import cats.implicits.{catsSyntaxEitherId, toTraverseOps}
 import cats.syntax.option._
 import cats.syntax.semigroup._
+import cats.syntax.bifunctor._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state._
+import com.wavesplatform.state.{safeSum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
+import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 
 final class CompositeBlockchain private (
     inner: Blockchain,
-    maybeDiff: Option[Diff] = None,
-    blockMeta: Option[(SignedBlockHeader, ByteStr)] = None,
-    carry: Long = 0,
-    reward: Option[Long] = None
+    maybeDiff: Option[Diff],
+    compositePortfolios: Map[Address, Portfolio],
+    blockMeta: Option[(SignedBlockHeader, ByteStr)],
+    carry: Long,
+    reward: Option[Long]
 ) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
 
   def diff: Diff = maybeDiff.getOrElse(Diff.empty)
 
-  override def balance(address: Address, assetId: Asset): Long = {
-    val diffBalance = diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
-    safeSum(inner.balance(address, assetId), diffBalance, "Composite blockchain balance")
-      .explicitGet()}
+  override def balance(address: Address, assetId: Asset): Long =
+    compositePortfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
 
   override def leaseBalance(address: Address): LeaseBalance =
-    inner.leaseBalance(address).combine(diff.portfolios.getOrElse(address, Portfolio.empty).lease)
-      .explicitGet()
+    compositePortfolios.getOrElse(address, Portfolio.empty).lease
 
   override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] =
     maybeDiff
@@ -158,8 +157,8 @@ final class CompositeBlockchain private (
 }
 
 object CompositeBlockchain {
-  def apply(inner: Blockchain, ngState: NgState): CompositeBlockchain =
-    new CompositeBlockchain(
+  def apply(inner: Blockchain, ngState: NgState): Either[GenericError, CompositeBlockchain] =
+    apply(
       inner,
       Some(ngState.bestLiquidDiff),
       Some(SignedBlockHeader(ngState.bestLiquidBlock.header, ngState.bestLiquidBlock.signature) -> ngState.hitSource),
@@ -167,11 +166,11 @@ object CompositeBlockchain {
       ngState.reward
     )
 
-  def apply(inner: Blockchain, reward: Option[Long]): CompositeBlockchain =
-    new CompositeBlockchain(inner, carry = inner.carryFee, reward = reward)
+  def apply(inner: Blockchain, reward: Option[Long]): Either[GenericError, CompositeBlockchain] =
+    apply(inner, carry = inner.carryFee, reward = reward)
 
-  def apply(inner: Blockchain, diff: Diff): CompositeBlockchain =
-    new CompositeBlockchain(inner, Some(diff))
+  def apply(inner: Blockchain, diff: Diff): Either[GenericError, CompositeBlockchain] =
+    apply(inner, Some(diff))
 
   def apply(
       inner: Blockchain,
@@ -180,8 +179,35 @@ object CompositeBlockchain {
       hitSource: ByteStr,
       carry: Long,
       reward: Option[Long]
-  ): CompositeBlockchain =
-    new CompositeBlockchain(inner, Some(diff), Some(SignedBlockHeader(newBlock.header, newBlock.signature) -> hitSource), carry, reward)
+  ): Either[GenericError, CompositeBlockchain] =
+    apply(inner, Some(diff), Some(SignedBlockHeader(newBlock.header, newBlock.signature) -> hitSource), carry, reward)
+
+  private def apply(
+      inner: Blockchain,
+      maybeDiff: Option[Diff] = None,
+      blockMeta: Option[(SignedBlockHeader, ByteStr)] = None,
+      carry: Long = 0,
+      reward: Option[Long] = None
+  ): Either[GenericError, CompositeBlockchain] =
+    maybeDiff
+      .fold(Map[Address, Portfolio]().asRight[String])(
+        _.portfolios.toSeq
+          .traverse {
+            case (address, portfolio) =>
+              val compositePortfolio =
+                for {
+                  waves <- safeSum(inner.balance(address, Waves), portfolio.balance, "Composite blockchain balance")
+                  assets <- portfolio.assets.toSeq.traverse {
+                    case (asset, balance) =>
+                      safeSum(inner.balance(address, asset), balance, s"Composite blockchain asset $asset balance").map(asset -> _)
+                  }
+                  lease <- inner.leaseBalance(address).combine(portfolio.lease)
+                } yield Portfolio(waves, lease, assets.toMap)
+              compositePortfolio.map(address -> _)
+          }
+          .map(_.toMap)
+      )
+      .bimap(GenericError(_), new CompositeBlockchain(inner, maybeDiff, _, blockMeta, carry, reward))
 
   private def assetDescription(
       asset: IssuedAsset,
