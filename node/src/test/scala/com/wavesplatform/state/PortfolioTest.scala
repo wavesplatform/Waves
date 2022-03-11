@@ -47,14 +47,14 @@ class PortfolioTest extends FunSuite {
   }
 
   test("prevents overflow of Waves") {
-    Portfolio(Long.MaxValue - 1L).combine(Portfolio(Long.MaxValue - 2L)) shouldBe Left("Portfolio balance sum overflow")
+    Portfolio(Long.MaxValue - 1L).combine(Portfolio(Long.MaxValue - 2L)) shouldBe Left("Waves balance sum overflow")
   }
 
   test("prevents overflow of assets") {
     val assetId = TestValues.asset
     val arg1    = Portfolio(0L, LeaseBalance.empty, Map(assetId -> (Long.MaxValue - 1L)))
     val arg2    = Portfolio(0L, LeaseBalance.empty, Map(assetId -> (Long.MaxValue - 2L)))
-    arg1.combine(arg2) shouldBe Left("Portfolio assets balance sum overflow")
+    arg1.combine(arg2) shouldBe Left("Assets balance sum overflow")
   }
 
   test("prevents overflow of lease in balances") {

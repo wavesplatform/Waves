@@ -208,10 +208,10 @@ object CompositeBlockchain {
             case (address, portfolio) =>
               val compositePortfolio =
                 for {
-                  waves <- safeSum(inner.balance(address, Waves), portfolio.balance, "Composite blockchain balance")
+                  waves <- safeSum(inner.balance(address, Waves), portfolio.balance, "Waves balance")
                   assets <- portfolio.assets.toSeq.traverse {
                     case (asset, balance) =>
-                      safeSum(inner.balance(address, asset), balance, s"Composite blockchain asset $asset balance").map(asset -> _)
+                      safeSum(inner.balance(address, asset), balance, s"Asset $asset balance").map(asset -> _)
                   }
                   lease <- inner.leaseBalance(address).combine(portfolio.lease)
                 } yield Portfolio(waves, lease, assets.toMap)

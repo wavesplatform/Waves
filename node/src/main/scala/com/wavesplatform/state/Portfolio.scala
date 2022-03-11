@@ -21,9 +21,9 @@ case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empt
 
   def combine(that: Portfolio): Either[String, Portfolio] =
     for {
-      balance <- safeSum(balance, that.balance, "Portfolio balance")
+      balance <- safeSum(balance, that.balance, "Waves balance")
       lease   <- lease.combine(that.lease)
-      assets  <- safeSumMap(assets, that.assets, safeSum(_, _, "Portfolio assets balance"))
+      assets  <- safeSumMap(assets, that.assets, safeSum(_, _, "Assets balance"))
     } yield Portfolio(balance, lease, assets)
 }
 
