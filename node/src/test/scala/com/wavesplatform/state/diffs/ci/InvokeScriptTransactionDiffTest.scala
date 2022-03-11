@@ -991,6 +991,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       .anyNumberOfTimes()
     (blockchain.accountScript _).expects(invoke.sender.toAddress).returning(None).anyNumberOfTimes()
     (blockchain.hasAccountScript _).expects(invoke.sender.toAddress).returning(false).anyNumberOfTimes()
+    (blockchain.balance _).expects(*, Waves).returning(ENOUGH_AMT)
+    (blockchain.leaseBalance _).expects(*).returning(LeaseBalance.empty)
     (() => blockchain.activatedFeatures)
       .expects()
       .returning(Map(BlockchainFeatures.Ride4DApps.id -> 0))
@@ -1037,6 +1039,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
           )
         )
       )
+      .anyNumberOfTimes()
     InvokeScriptTransactionDiff
       .apply(blockchain, invoke.timestamp, limitedExecution = false)(invoke)
       .resultE should produce("is already issued")
