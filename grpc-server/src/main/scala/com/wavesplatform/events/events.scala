@@ -352,7 +352,7 @@ object StateUpdate {
 
   def atomic(blockchainBeforeWithMinerReward: Blockchain, diff: Diff): StateUpdate = {
     val blockchain      = blockchainBeforeWithMinerReward
-    val blockchainAfter = CompositeBlockchain(blockchain, diff)
+    val blockchainAfter = CompositeBlockchain(blockchain, diff).explicitGet()
 
     val PortfolioUpdates(updatedBalances, updatedLeaseBalances) = DiffToStateApplier.portfolios(blockchain, diff)
 
@@ -468,11 +468,11 @@ object StateUpdate {
       .foldLeft((Seq.empty[StateUpdate], parentDiff)) {
         case ((updates, accDiff), txDiff) =>
           (
-            updates :+ atomic(CompositeBlockchain(blockchainBeforeWithMinerReward, accDiff), txDiff),
+            updates :+ atomic(CompositeBlockchain(blockchainBeforeWithMinerReward, accDiff).explicitGet(), txDiff),
             accDiff.combine(txDiff).explicitGet()
           )
       }
-    val blockchainAfter = CompositeBlockchain(blockchainBeforeWithMinerReward, totalDiff)
+    val blockchainAfter = CompositeBlockchain(blockchainBeforeWithMinerReward, totalDiff).explicitGet()
     val metadata        = transactionsMetadata(blockchainAfter, totalDiff)
     val refAssets       = referencedAssets(blockchainAfter, txsStateUpdates)
     (parentStateUpdateWithMinerReward, txsStateUpdates, metadata, refAssets)
