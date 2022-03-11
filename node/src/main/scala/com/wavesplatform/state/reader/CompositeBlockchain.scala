@@ -2,9 +2,9 @@ package com.wavesplatform.state.reader
 
 import cats.data.Ior
 import cats.implicits.{catsSyntaxEitherId, toTraverseOps}
+import cats.syntax.bifunctor._
 import cats.syntax.option._
 import cats.syntax.semigroup._
-import cats.syntax.bifunctor._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
@@ -32,10 +32,22 @@ final class CompositeBlockchain private (
   def diff: Diff = maybeDiff.getOrElse(Diff.empty)
 
   override def balance(address: Address, assetId: Asset): Long =
-    compositePortfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
+    compositePortfolios
+      .get(address)
+      .flatMap(
+        p =>
+          assetId match {
+            case asset: IssuedAsset => p.assets.get(asset)
+            case Waves              => Some(p.balance)
+          }
+      )
+      .getOrElse(inner.balance(address, assetId))
 
   override def leaseBalance(address: Address): LeaseBalance =
-    compositePortfolios.getOrElse(address, Portfolio.empty).lease
+    compositePortfolios
+      .get(address)
+      .map(_.lease)
+      .getOrElse(inner.leaseBalance(address))
 
   override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] =
     maybeDiff
@@ -207,7 +219,10 @@ object CompositeBlockchain {
           }
           .map(_.toMap)
       )
-      .bimap(GenericError(_), new CompositeBlockchain(inner, maybeDiff, _, blockMeta, carry, reward))
+      .bimap(
+        GenericError(_),
+        new CompositeBlockchain(inner, maybeDiff, _, blockMeta, carry, reward)
+      )
 
   private def assetDescription(
       asset: IssuedAsset,
