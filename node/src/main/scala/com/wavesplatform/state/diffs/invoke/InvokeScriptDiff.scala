@@ -217,13 +217,13 @@ object InvokeScriptDiff {
             }
             _ = invocationRoot.setLog(log)
 
-            newBlockchain <- traced(CompositeBlockchain(blockchain, diff))
+            blockchainAfterEvaluation <- traced(CompositeBlockchain(blockchain, diff))
 
             _ = if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
-              checkDiffBalances(diff, newBlockchain)
+              checkDiffBalances(diff, blockchainAfterEvaluation)
 
             _ <- traced {
-              val newBalance = newBlockchain.balance(invoker)
+              val newBalance = blockchainAfterEvaluation.balance(invoker)
               Either.cond(
                 blockchain.height < blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight || newBalance >= 0,
                 (),
@@ -242,7 +242,7 @@ object InvokeScriptDiff {
                     pk,
                     storingComplexity.toInt,
                     tx,
-                    newBlockchain,
+                    blockchainAfterEvaluation,
                     blockTime,
                     isSyncCall = true,
                     limitedExecution,
@@ -301,8 +301,9 @@ object InvokeScriptDiff {
                 .leftMap(GenericError(_))
             )
 
+            blockchainAfterActions <- traced(CompositeBlockchain(blockchain, resultDiff))
             _ = if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
-              checkDiffBalances(resultDiff, newBlockchain)
+              checkDiffBalances(resultDiff, blockchainAfterActions)
 
             _ = invocationRoot.setResult(scriptResult)
           } yield (resultDiff, evaluated, remainingActions1, remainingData1, remainingDataSize1)
