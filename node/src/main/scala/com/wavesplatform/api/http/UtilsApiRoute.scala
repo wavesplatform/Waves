@@ -323,6 +323,7 @@ object UtilsApiRoute {
               Coeval.raiseError(new IllegalStateException("No input entity available")),
               Coeval.evalOnce(blockchain.height),
               blockchain,
+              blockchain,
               Coproduct[Environment.Tthis](Recipient.Address(ByteStr(address.bytes))),
               ds,
               tx = None,

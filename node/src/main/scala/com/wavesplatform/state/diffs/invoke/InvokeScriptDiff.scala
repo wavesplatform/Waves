@@ -182,6 +182,7 @@ object InvokeScriptDiff {
                   AddressScheme.current.chainId,
                   Coeval.evalOnce(input),
                   Coeval(height),
+                  blockchain,
                   blockchainWithPayments,
                   tthis,
                   directives,

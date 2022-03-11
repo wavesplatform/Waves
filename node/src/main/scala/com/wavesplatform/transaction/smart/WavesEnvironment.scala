@@ -294,6 +294,7 @@ class DAppEnvironment (
     in: Coeval[Environment.InputEntity],
     h: Coeval[Int],
     blockchain: Blockchain,
+    blockchainWithPayments: Blockchain,
     tthis: Environment.Tthis,
     ds: DirectiveSet,
     tx: Option[InvokeScriptTransaction],
@@ -310,7 +311,7 @@ class DAppEnvironment (
     val invocationRoot: DAppEnvironment.InvocationTreeTracker
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.map(_.id()).getOrElse(ByteStr.empty)) {
 
-  private[this] var mutableBlockchain: Blockchain = blockchain
+  private[this] var mutableBlockchain: Blockchain = blockchainWithPayments
 
   override def currentBlockchain(): Blockchain = this.mutableBlockchain
 
