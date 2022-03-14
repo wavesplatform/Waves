@@ -71,7 +71,7 @@ object TxHelpers {
   def massTransfer(from: KeyPair = defaultSigner,
                    to: Seq[ParsedTransfer] = Seq(ParsedTransfer(secondAddress, 1.waves)),
                    asset: Asset = Waves,
-                   fee: Long = TestValues.fee,
+                   fee: Long = FeeConstants(MassTransferTransaction.typeId) * FeeUnit,
                    timestamp: TxTimestamp = timestamp,
                    version: Byte = TxVersion.V2,
                    chainId: Byte = AddressScheme.current.chainId): MassTransferTransaction =
