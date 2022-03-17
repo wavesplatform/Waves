@@ -1,31 +1,18 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.Address
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4, V5}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.EitherValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class CallableV5LimitTest
-    extends PropSpec
-    with ScalaCheckPropertyChecks
-    with TransactionGen
-    with WithDomain
-    with EitherValues {
+class CallableV5LimitTest extends PropSpec with ScalaCheckPropertyChecks with WithDomain with EitherValues {
 
-  import DomainPresets._
-
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
+  import DomainPresets.*
 
   private def contract(grothCount: Int, version: StdLibVersion) = TestCompiler(version).compileContract(
     s"""
@@ -59,40 +46,26 @@ class CallableV5LimitTest
      """.stripMargin
   )
 
-  private val scenario =
-    for {
-      dApp     <- accountGen
-      syncDApp <- accountGen
-      invoker  <- accountGen
-      fee      <- ciFee()
-      gTx1                  = GenesisTransaction.create(dApp.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2                  = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx3                  = GenesisTransaction.create(syncDApp.toAddress, ENOUGH_AMT, ts).explicitGet()
-      setAcceptableScript   = SetScriptTransaction.selfSigned(1.toByte, dApp, Some(contract(5, V5)), fee, ts).explicitGet()
-      setProhibitedScript   = SetScriptTransaction.selfSigned(1.toByte, dApp, Some(contract(6, V5)), fee, ts).explicitGet()
-      setProhibitedV4Script = SetScriptTransaction.selfSigned(1.toByte, dApp, Some(contract(5, V4)), fee, ts).explicitGet()
-      setSyncDApp           = SetScriptTransaction.selfSigned(1.toByte, syncDApp, Some(syncDAppScript(dApp.toAddress)), fee, ts).explicitGet()
-      invoke                = Signed.invokeScript(TxVersion.V3, invoker, dApp.toAddress, None, Nil, fee, Waves, ts)
-      syncInvoke            = Signed.invokeScript(TxVersion.V3, invoker, syncDApp.toAddress, None, Nil, fee, Waves, ts)
-    } yield (Seq(gTx1, gTx2, gTx3), setAcceptableScript, setProhibitedScript, setProhibitedV4Script, setSyncDApp, invoke, syncInvoke)
-
   property("callable limit is 10000 from V5") {
-    val (genesisTxs, setAcceptable, setProhibitedScript, setProhibitedV4Script, setSyncDApp, invoke, syncInvoke) = scenario.sample.get
-    withDomain(RideV4) { d =>
-      d.appendBlock(genesisTxs*)
-      (the[RuntimeException] thrownBy d.appendBlock(setProhibitedV4Script)).getMessage should include(
-        "Contract function (default) is too complex: 9528 > 4000"
-      )
+    val dApp     = TxHelpers.signer(0)
+    val syncDApp = TxHelpers.signer(1)
+    val invoker  = TxHelpers.signer(2)
+    val balances = AddrWithBalance.enoughBalances(dApp, syncDApp, invoker)
+
+    val setAcceptableScript   = TxHelpers.setScript(dApp, contract(5, V5))
+    val setProhibitedScript   = TxHelpers.setScript(dApp, contract(6, V5))
+    val setProhibitedV4Script = TxHelpers.setScript(dApp, contract(5, V4))
+    val setSyncDApp           = TxHelpers.setScript(syncDApp, syncDAppScript(dApp.toAddress))
+    val invoke                = TxHelpers.invoke(dApp.toAddress, func = None, invoker = invoker)
+    val syncInvoke            = TxHelpers.invoke(syncDApp.toAddress, func = None, invoker = invoker)
+
+    withDomain(RideV4, balances) { d =>
+      d.appendBlockE(setProhibitedV4Script) should produce("Contract function (default) is too complex: 9528 > 4000")
     }
-    withDomain(RideV5) { d =>
-      d.appendBlock(genesisTxs*)
-      (the[RuntimeException] thrownBy d.appendBlock(setProhibitedV4Script)).getMessage should include(
-        "Contract function (default) is too complex: 9528 > 4000"
-      )
-      (the[RuntimeException] thrownBy d.appendBlock(setProhibitedScript)).getMessage should include(
-        "Contract function (default) is too complex: 11432 > 10000"
-      )
-      d.appendBlock(setAcceptable, invoke)
+    withDomain(RideV5, balances) { d =>
+      d.appendBlockE(setProhibitedV4Script) should produce("Contract function (default) is too complex: 9528 > 4000")
+      d.appendBlockE(setProhibitedScript) should produce("Contract function (default) is too complex: 11432 > 10000")
+      d.appendBlock(setAcceptableScript, invoke)
       d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
 
       d.appendBlock(setSyncDApp, syncInvoke)

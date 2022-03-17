@@ -128,9 +128,10 @@ object IssueTransaction extends TransactionParser {
       script: Option[Script],
       fee: Long,
       timestamp: Long,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, IssueTransaction] =
-    create(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
@@ -142,9 +143,10 @@ object IssueTransaction extends TransactionParser {
       reissuable: Boolean,
       script: Option[Script],
       fee: Long,
-      timestamp: Long
+      timestamp: Long,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, IssueTransaction] =
-    signed(version, sender.publicKey, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender.privateKey)
+    signed(version, sender.publicKey, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender.privateKey, chainId)
 
   override def parseBytes(bytes: Array[TxType]): Try[IssueTransaction] = IssueTxSerializer.parseBytes(bytes)
 

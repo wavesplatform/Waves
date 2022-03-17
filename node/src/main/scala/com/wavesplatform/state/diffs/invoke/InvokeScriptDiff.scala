@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs.invoke
 
 import scala.util.Right
-
 import cats.Id
 import cats.instances.list.*
 import cats.syntax.either.*
@@ -33,6 +32,7 @@ import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.{TransactionType, TxValidationError}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.*
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
@@ -89,6 +89,16 @@ object InvokeScriptDiff {
               ValidationError.ScriptRunsLimitError(s"DApp calls limit = ${ContractLimits.MaxSyncDAppCalls(version)} is exceeded")
             )
           )
+          _ <- traced {
+            if (blockchain.height >= blockchain.settings.functionalitySettings.forbidSyncDAppNegativePaymentHeight) {
+              tx.payments.find { case Payment(amount, _) =>
+                amount < 0
+              }.map(payment => Left(GenericError(s"DApp $invoker invoked DApp $dAppAddress with attached ${payment.assetId.fold("WAVES")(a => s"token $a")} amount = ${payment.amount}")))
+                .getOrElse(Right(()))
+            } else {
+              Right(())
+            }
+          }
           invocationComplexity <- traced {
             InvokeDiffsCommon.getInvocationComplexity(blockchain, tx.funcCall, callableComplexities, dAppAddress)
           }

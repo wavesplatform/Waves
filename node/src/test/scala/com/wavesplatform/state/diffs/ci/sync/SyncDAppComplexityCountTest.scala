@@ -1,12 +1,11 @@
 package com.wavesplatform.state.diffs.ci.sync
 
-import cats.instances.list._
-import cats.instances.map._
-import cats.syntax.semigroup._
-import cats.syntax.traverse._
+import cats.instances.list.*
+import cats.instances.map.*
+import cats.syntax.semigroup.*
+import cats.syntax.traverse.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -16,21 +15,16 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
-import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, ci}
-import com.wavesplatform.test.{PropSpec, _}
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
-import org.scalacheck.Gen
+import com.wavesplatform.transaction.{Transaction, TxHelpers}
 
 class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
-  import DomainPresets._
+  import DomainPresets.*
 
   private def dApp(otherDApps: List[Address], paymentAsset: Option[IssuedAsset], transferAsset: Option[IssuedAsset], condition: String): Script =
     TestCompiler(V5).compileContract(s"""
@@ -103,85 +97,63 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
       raiseError: Boolean,
       sequentialCalls: Boolean,
       invokeExpression: Boolean
-  ): Gen[(Seq[Transaction], InvokeTransaction, IssuedAsset, Address)] =
-    for {
-      invoker  <- accountGen
-      dAppAccs <- Gen.listOfN(dAppCount, accountGen)
-      ts       <- timestampGen
-      fee <- ciFee(
+  ): (Seq[Transaction], InvokeTransaction, IssuedAsset, Address) = {
+    val invoker = TxHelpers.signer(0)
+    val dAppAccs = (1 to dAppCount).map(idx => TxHelpers.signer(idx))
+
+      val fee = TxHelpers.ciFee(
         sc = (if (withVerifier) 1 else 0) + (if (withPayment) 1 else 0) + (if (withThroughTransfer) 1 else 0),
         freeCall = invokeExpression
       )
-      assetIssue = IssueTransaction
-        .selfSigned(
-          2.toByte,
-          invoker,
-          "Payment asset",
-          "",
-          ENOUGH_AMT,
-          8,
-          reissuable = true,
-          Some(assetScript(if (raiseError) sigVerify else groth)),
-          fee,
-          ts + 1
-        )
-        .explicitGet()
-      asset   = IssuedAsset(assetIssue.id())
-      payment = List(Payment(1L, asset))
 
-      dAppGenesisTxs = dAppAccs.flatMap(
-        a =>
-          List(
-            GenesisTransaction.create(a.toAddress, ENOUGH_AMT, ts).explicitGet(),
-            TransferTransaction.selfSigned(TxVersion.V2, invoker, a.toAddress, asset, 10, Waves, fee, ByteStr.empty, ts).explicitGet()
-        )
+    val invokerGenesis = TxHelpers.genesis(invoker.toAddress)
+    val assetIssue = TxHelpers.issue(invoker, ENOUGH_AMT, script = Some(assetScript(if (raiseError) sigVerify else groth)), fee = fee)
+    val asset   = IssuedAsset(assetIssue.id())
+    val payment = List(Payment(1, asset))
+
+    val dAppGenesisTxs = dAppAccs.flatMap { dAppAcc =>
+      List(
+        TxHelpers.genesis(dAppAcc.toAddress),
+        TxHelpers.transfer(invoker, dAppAcc.toAddress, 10, asset, fee = fee)
       )
-      invokerGenesis = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-
-      setScriptTxs = dAppAccs.foldLeft(List.empty[SetScriptTransaction]) {
-        case (txs, currentAcc) =>
-          val isLast      = txs.size == dAppAccs.size - 1
-          val callPayment = if (withThroughPayment) Some(asset) else None
-          val transfer    = if (withThroughTransfer) Some(asset) else None
-          val condition   = if (raiseError) if (txs.nonEmpty) "true" else "false" else groth
-          val script =
-            if (sequentialCalls)
-              if (isLast)
-                Some(dApp(txs.map(_.sender.toAddress), callPayment, transfer, condition))
-              else
-                Some(dApp(Nil, callPayment, transfer, condition))
+    }
+    val setScriptTxs = dAppAccs.foldLeft(List.empty[SetScriptTransaction]) {
+      case (txs, currentAcc) =>
+        val isLast      = txs.size == dAppAccs.size - 1
+        val callPayment = if (withThroughPayment) Some(asset) else None
+        val transfer    = if (withThroughTransfer) Some(asset) else None
+        val condition   = if (raiseError) if (txs.nonEmpty) "true" else "false" else groth
+        val script =
+          if (sequentialCalls)
+            if (isLast)
+              dApp(txs.map(_.sender.toAddress), callPayment, transfer, condition)
             else
-              Some(dApp(txs.headOption.map(_.sender.toAddress).toList, callPayment, transfer, condition))
+              dApp(Nil, callPayment, transfer, condition)
+          else
+            dApp(txs.headOption.map(_.sender.toAddress).toList, callPayment, transfer, condition)
 
-          val nextTx = SetScriptTransaction.selfSigned(1.toByte, currentAcc, script, fee, ts + 5).explicitGet()
-          nextTx :: txs
+        val nextTx = TxHelpers.setScript(currentAcc, script, fee)
+        nextTx :: txs
       }
 
-      setVerifier = if (withVerifier)
-        List(SetScriptTransaction.selfSigned(1.toByte, invoker, Some(verifierScript), fee, ts + 5).explicitGet())
-      else
-        Nil
+    val setVerifier = if (withVerifier) List(TxHelpers.setScript(invoker, verifierScript)) else Nil
 
-      invokeScriptTx = Signed
-        .invokeScript(
-          TxVersion.V3,
-          invoker,
-          dAppAccs.last.toAddress,
-          None,
-          if (withPayment) payment else Nil,
-          fee,
-          Waves,
-          ts + 10
-        )
+    val invokeTx = TxHelpers.invoke(
+      dApp = dAppAccs.last.toAddress,
+      func = None,
+      payments = if (withPayment) payment else Nil,
+      invoker = invoker,
+      fee = TxHelpers.ciFee(sc = (if (withVerifier) 1 else 0) + (if (withPayment) 1 else 0) + (if (withThroughTransfer) 1 else 0))
+    )
+    val invokeExpressionTx = ci.toInvokeExpression(setScriptTxs.head, invoker, Some(fee))
 
-      invokeExpressionTx = ci.toInvokeExpression(setScriptTxs.head, invoker, Some(fee))
-    } yield
-      (
-        Seq(invokerGenesis, assetIssue) ++ setVerifier ++ dAppGenesisTxs ++ setScriptTxs,
-        if (invokeExpression) invokeExpressionTx else invokeScriptTx,
-        asset,
-        dAppAccs.head.toAddress
-      )
+    (
+      Seq(invokerGenesis, assetIssue) ++ setVerifier ++ dAppGenesisTxs ++ setScriptTxs,
+      if (invokeExpression) invokeExpressionTx else invokeTx,
+      asset,
+      dAppAccs.head.toAddress
+    )
+  }
 
   private def assert(
       dAppCount: Int,
@@ -197,7 +169,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
       invokeExpression: Boolean = false
   ): Unit = {
     val (preparingTxs, invokeTx, asset, lastCallingDApp) =
-      scenario(dAppCount, withPayment, withThroughPayment, withThroughTransfer, withVerifier, raiseError, sequentialCalls, invokeExpression).sample.get
+      scenario(dAppCount, withPayment, withThroughPayment, withThroughTransfer, withVerifier, raiseError, sequentialCalls, invokeExpression)
     assertDiffEi(
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion),

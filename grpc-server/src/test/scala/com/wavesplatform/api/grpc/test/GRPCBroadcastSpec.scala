@@ -2,7 +2,6 @@ package com.wavesplatform.api.grpc.test
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.Duration
-
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.test.{FlatSpec, TestTime}
@@ -19,7 +18,7 @@ import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.utils.EthTxGenerator
-import com.wavesplatform.utils.{DiffMatchers, EthHelpers, EthSetChainId}
+import com.wavesplatform.utils.{DiffMatchers, EthHelpers}
 import io.grpc.StatusException
 import monix.execution.Scheduler
 import monix.reactive.Observable
@@ -32,7 +31,6 @@ class GRPCBroadcastSpec
     with PathMockFactory
     with BlockchainStubHelpers
     with EthHelpers
-    with EthSetChainId
     with DiffMatchers {
   // Fake NTP time
   val FakeTime: TestTime = TestTime(100)
@@ -42,12 +40,12 @@ class GRPCBroadcastSpec
 
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
-      sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
+      sh.creditBalance(ethBuyOrder.senderAddress, *)
+      sh.creditBalance(ethSellOrder.senderAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
-    val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, TxVersion.V3, 100)
+    val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
     FakeTime.setTime(transaction.timestamp)
     blockchain.assertBroadcast(transaction)
   }

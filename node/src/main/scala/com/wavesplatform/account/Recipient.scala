@@ -8,11 +8,11 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient}
+import com.wavesplatform.lang.v1.traits.domain.Recipient as RideRecipient
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidAddress}
 import com.wavesplatform.utils.{base58Length, EthEncoding, StringBytes}
-import play.api.libs.json._
+import play.api.libs.json.*
 
 sealed trait AddressOrAlias {
   def chainId: Byte
@@ -43,9 +43,11 @@ object AddressOrAlias {
       case RideRecipient.Alias(name)    => Alias.create(name)
     }
 
-  def fromString(s: String): Either[ValidationError, AddressOrAlias] = s match {
-    case alias if alias.startsWith(Alias.Prefix) => Alias.fromString(s)
-    case address                                 => Address.fromString(address)
+  def fromString(s: String, checkChainId: Boolean = true): Either[ValidationError, AddressOrAlias] = {
+    if (s.startsWith(Alias.Prefix))
+      Alias.fromString(s)
+    else
+      Address.fromString(s, if (checkChainId) Some(AddressScheme.current.chainId) else None)
   }
 
   def fromBytes(buf: Array[Byte]): Either[ValidationError, AddressOrAlias] = buf.headOption match {
@@ -135,7 +137,7 @@ object Address {
     )
   }
 
-  def fromString(addressStr: String): Either[ValidationError, Address] = {
+  def fromString(addressStr: String, chainId: Option[Byte] = Some(scheme.chainId)): Either[ValidationError, Address] = {
     val base58String = if (addressStr.startsWith(Prefix)) addressStr.drop(Prefix.length) else addressStr
     for {
       _ <- Either.cond(
@@ -144,7 +146,7 @@ object Address {
         InvalidAddress(s"Wrong address string length: max=$AddressStringLength, actual: ${base58String.length}")
       )
       byteArray <- Base58.tryDecodeWithLimit(base58String).toEither.left.map(ex => InvalidAddress(s"Unable to decode base58: ${ex.getMessage}"))
-      address   <- fromBytes(byteArray)
+      address   <- fromBytes(byteArray, chainId.getOrElse(byteArray(1)))
     } yield address
   }
 

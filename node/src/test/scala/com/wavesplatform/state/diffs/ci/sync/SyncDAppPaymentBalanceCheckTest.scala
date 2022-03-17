@@ -1,26 +1,17 @@
 package com.wavesplatform.state.diffs.ci.sync
 
-import com.wavesplatform.TransactionGenBase
 import com.wavesplatform.account.Address
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures._
+import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.TxHelpers
 
-class SyncDAppPaymentBalanceCheckTest extends PropSpec with WithDomain with TransactionGenBase {
-
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
+class SyncDAppPaymentBalanceCheckTest extends PropSpec with WithDomain {
 
   private def sigVerify(c: Boolean) =
     s""" strict c = ${if (c) (1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ") else "true"} """
@@ -50,20 +41,6 @@ class SyncDAppPaymentBalanceCheckTest extends PropSpec with WithDomain with Tran
        """.stripMargin
     )
 
-  private def scenario(bigComplexityDApp1: Boolean, bigComplexityDApp2: Boolean) =
-    for {
-      invoker <- accountGen
-      dApp1   <- accountGen
-      dApp2   <- accountGen
-      fee     <- ciFee()
-      gTx1     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2     = GenesisTransaction.create(dApp1.toAddress, fee, ts).explicitGet()
-      gTx3     = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
-      ssTx1    = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script(dApp2.toAddress, bigComplexityDApp1)), fee, ts).explicitGet()
-      ssTx2    = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp2Script(bigComplexityDApp2)), fee, ts).explicitGet()
-      invokeTx = () => Signed.invokeScript(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts)
-    } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx2), invokeTx)
-
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls, RideV6)
@@ -73,16 +50,26 @@ class SyncDAppPaymentBalanceCheckTest extends PropSpec with WithDomain with Tran
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)
     } {
-      val (preparingTxs, invoke) = scenario(bigComplexityDApp1, bigComplexityDApp2).sample.get
+      val invoker = TxHelpers.signer(0)
+      val dApp1   = TxHelpers.signer(1)
+      val dApp2   = TxHelpers.signer(2)
 
-      withDomain(domainSettingsWithFS(settings)) { d =>
-        d.appendBlock(preparingTxs: _*)
+      val balances = AddrWithBalance.enoughBalances(invoker, dApp2) :+ AddrWithBalance(dApp1.toAddress, 0.01.waves)
 
-        val invoke1 = invoke()
+      val setScript1 = TxHelpers.setScript(dApp1, dApp1Script(dApp2.toAddress, bigComplexityDApp1))
+      val setScript2 = TxHelpers.setScript(dApp2, dApp2Script(bigComplexityDApp2))
+
+      val preparingTxs = Seq(setScript1, setScript2)
+
+      val invoke = TxHelpers.invoke(dApp1.toAddress, func = None, invoker = invoker)
+
+      withDomain(domainSettingsWithFS(settings), balances) { d =>
+        d.appendBlock(preparingTxs*)
+
         if (!bigComplexityDApp1 && !bigComplexityDApp2) {
-          d.appendAndCatchError(invoke1).toString should include("negative waves balance")
+          d.appendAndCatchError(invoke).toString should include("negative waves balance")
         } else {
-          d.appendAndAssertFailed(invoke1)
+          d.appendAndAssertFailed(invoke)
         }
       }
     }
