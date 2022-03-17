@@ -1,29 +1,18 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.utils.Signed
-import org.scalacheck.Gen
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import org.scalatest.EitherValues
 
 class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
-  import DomainPresets._
-
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
+  import DomainPresets.*
 
   private val u1 = "\ud87e"
   private val u2 = "\udc1a"
@@ -176,49 +165,43 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
   private def allVersions(lastVersion: StdLibVersion)     = DirectiveDictionary[StdLibVersion].all.filter(_ <= lastVersion)
   private def allDAppVersions(lastVersion: StdLibVersion) = allVersions(lastVersion).filter(_ >= V3)
 
-  private def scenario(lastVersion: StdLibVersion) =
-    for {
-      recipient <- accountGen
-      invoker   <- accountGen
-      availableVersions     = allVersions(lastVersion)
-      availableDAppVersions = allDAppVersions(lastVersion)
-      accWithFix    <- Gen.listOfN(availableVersions.size, accountGen).map(_.zip(availableVersions))
-      accWithNoFix  <- Gen.listOfN(versionsBeforeActivation.size, accountGen).map(_.zip(versionsBeforeActivation))
-      dAppWithFix   <- Gen.listOfN(availableDAppVersions.size, accountGen).map(_.zip(availableDAppVersions))
-      dAppWithNoFix <- Gen.listOfN(dAppVersionsBeforeActivation.size, accountGen).map(_.zip(dAppVersionsBeforeActivation))
-      fee           <- ciFee()
-      genesisTxs = (accWithFix ::: accWithNoFix ::: dAppWithFix ::: dAppWithNoFix)
-        .map(a => GenesisTransaction.create(a._1.toAddress, ENOUGH_AMT, ts).explicitGet())
-      invokerGenesis   = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      setNoFixVerifier = accWithNoFix.map(a => SetScriptTransaction.selfSigned(1.toByte, a._1, Some(checkNoFixScript(a._2)), fee, ts).explicitGet())
-      setFixVerifier   = accWithFix.map(a => SetScriptTransaction.selfSigned(1.toByte, a._1, Some(checkFixScript(a._2)), fee, ts).explicitGet())
-      setNoFixDApp     = dAppWithNoFix.map(a => SetScriptTransaction.selfSigned(1.toByte, a._1, Some(checkNoFixDAppScript(a._2)), fee, ts).explicitGet())
-      setFixDApp       = dAppWithFix.map(a => SetScriptTransaction.selfSigned(1.toByte, a._1, Some(checkFixDAppScript(a._2)), fee, ts).explicitGet())
-      checkFixVerifier = accWithFix.map(
-        a =>
-          TransferTransaction
-            .selfSigned(TxVersion.V2, a._1, recipient.toAddress, Waves, 1, Waves, fee, ByteStr.empty, ts)
-            .explicitGet()
-      )
-      checkNoFixVerifier = accWithNoFix.map(
-        a =>
-          TransferTransaction
-            .selfSigned(TxVersion.V2, a._1, recipient.toAddress, Waves, 1, Waves, fee, ByteStr.empty, ts)
-            .explicitGet()
-      )
-      checkFixDApp = dAppWithFix
-        .map(a => Signed.invokeScript(TxVersion.V2, invoker, a._1.toAddress, None, Nil, fee, Waves, ts))
-      checkNoFixDApp = dAppWithNoFix.map(a => Signed.invokeScript(TxVersion.V2, invoker, a._1.toAddress, None, Nil, fee, Waves, ts))
-    } yield (
-      invokerGenesis :: genesisTxs,
+  private def scenario(lastVersion: StdLibVersion) = {
+    val recipient = TxHelpers.signer(0)
+    val invoker = TxHelpers.signer(1)
+
+    val availableVersions     = allVersions(lastVersion)
+    val availableDAppVersions = allDAppVersions(lastVersion)
+
+    val accWithFix = (1 to availableVersions.size).map(idx => TxHelpers.signer(idx + 1)).zip(availableVersions).toList
+    val accWithNoFix = (1 to versionsBeforeActivation.size).map(idx => TxHelpers.signer(idx + availableVersions.size + 1)).zip(versionsBeforeActivation).toList
+    val dAppWithFix = (1 to availableDAppVersions.size).map(idx => TxHelpers.signer(idx + availableVersions.size + versionsBeforeActivation.size + 1)).zip(availableDAppVersions).toList
+    val dAppWithNoFix = (1 to dAppVersionsBeforeActivation.size).map(idx => TxHelpers.signer(idx + availableVersions.size + versionsBeforeActivation.size + availableDAppVersions.size + 1)).zip(dAppVersionsBeforeActivation).toList
+
+    val genesis = (accWithFix ::: accWithNoFix ::: dAppWithFix ::: dAppWithNoFix)
+      .map { case (acc, _) => TxHelpers.genesis(acc.toAddress) }
+    val invokerGenesis = TxHelpers.genesis(invoker.toAddress)
+
+    val setNoFixVerifier = accWithNoFix.map { case (acc, v) => TxHelpers.setScript(acc, checkNoFixScript(v)) }
+    val setFixVerifier = accWithFix.map { case (acc, v) => TxHelpers.setScript(acc, checkFixScript(v)) }
+    val setNoFixDApp = dAppWithNoFix.map { case (acc, v) => TxHelpers.setScript(acc, checkNoFixDAppScript(v)) }
+    val setFixDApp = dAppWithFix.map { case (acc, v) => TxHelpers.setScript(acc, checkFixDAppScript(v)) }
+
+    val checkFixVerifier = accWithFix.map { case (acc, _) => TxHelpers.transfer(acc, recipient.toAddress, 1) }
+    val checkNoFixVerifier = accWithNoFix.map { case (acc, _) => TxHelpers.transfer(acc, recipient.toAddress, 1) }
+    val checkFixDApp = dAppWithFix.map { case (acc, _) => TxHelpers.invoke(acc.toAddress, func = None, invoker = invoker) }
+    val checkNoFixDApp = dAppWithNoFix.map { case (acc, _) => TxHelpers.invoke(acc.toAddress, func = None, invoker = invoker) }
+
+    (
+      invokerGenesis :: genesis,
       setNoFixVerifier ::: setNoFixDApp,
       setFixVerifier ::: setFixDApp,
       checkNoFixVerifier ::: checkNoFixDApp,
       checkFixVerifier ::: checkFixDApp
     )
+  }
 
   private def assertNoFix(d: Domain): Unit = {
-    val (genesisTxs, setNoFix, _, checkNoFix, _) = scenario(V5).sample.get
+    val (genesisTxs, setNoFix, _, checkNoFix, _) = scenario(V5)
     d.appendBlock(genesisTxs*)
     d.appendBlock(setNoFix*)
     d.appendBlock(checkNoFix*)
@@ -226,7 +209,7 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
   }
 
   private def assertFix(d: Domain, lastVersion: StdLibVersion): Unit = {
-    val (genesisTxs, setNoFix, setFix, checkNoFix, checkFix) = scenario(lastVersion).sample.get
+    val (genesisTxs, setNoFix, setFix, checkNoFix, checkFix) = scenario(lastVersion)
     d.appendBlock(genesisTxs*)
     d.appendBlock(setFix*)
     d.appendBlock(checkFix*)

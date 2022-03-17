@@ -4,10 +4,6 @@ import java.time.Duration
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 
-import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
-import scala.util.{Left, Right}
-
 import cats.Monoid
 import cats.syntax.monoid._
 import com.wavesplatform.ResponsivenessLogs
@@ -38,6 +34,10 @@ import monix.execution.ExecutionModel
 import monix.execution.atomic.AtomicBoolean
 import monix.execution.schedulers.SchedulerService
 import org.slf4j.LoggerFactory
+
+import scala.annotation.tailrec
+import scala.jdk.CollectionConverters._
+import scala.util.{Left, Right}
 
 //noinspection ScalaStyle
 class UtxPoolImpl(
@@ -509,10 +509,6 @@ class UtxPoolImpl(
     import scala.concurrent.duration._
     cleanupScheduler.shutdown()
     cleanupScheduler.awaitTermination(10 seconds)
-  }
-
-  override def finalize(): Unit = {
-    cleanupScheduler.shutdown()
   }
 
   //noinspection TypeAnnotation

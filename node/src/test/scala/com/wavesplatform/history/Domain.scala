@@ -15,8 +15,8 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -48,11 +48,11 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   val transactionDiffer: Transaction => TracedResult[ValidationError, Diff] =
     TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
 
-  def transactionDiff(tx: Transaction): Diff =
-    transactionDiffer(tx).resultE.explicitGet()
-
   lazy val utxPool: UtxPoolImpl = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings)
   lazy val wallet: Wallet       = Wallet(settings.walletSettings.copy(file = None))
+
+  def createDiffE(tx: Transaction): Either[ValidationError, Diff] = transactionDiffer(tx).resultE
+  def createDiff(tx: Transaction): Diff                           = createDiffE(tx).explicitGet()
 
   object commonApi {
 
@@ -64,7 +64,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       transactions.calculateFee(tx).explicitGet()
 
     def calculateWavesFee(tx: Transaction): TxAmount = {
-      val (Waves, _, feeInWaves) = (calculateFee(tx): @unchecked)
+      val (Waves, _, feeInWaves) = calculateFee(tx): @unchecked
       feeInWaves
     }
 
@@ -192,7 +192,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     val block  = createBlock(Block.PlainBlockVersion, txs)
     val result = appendBlockE(block)
     txs.foreach { tx =>
-      require(blockchain.transactionInfo(tx.id()).isEmpty, s"should not pass: $tx")
+      assert(blockchain.transactionInfo(tx.id()).isEmpty, s"should not pass: $tx")
     }
     result.left.getOrElse(throw new RuntimeException(s"Block appended successfully: $txs"))
   }
@@ -204,7 +204,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
         throw new RuntimeException(s"Should be success: $err")
 
       case Right(_) =>
-        txs.foreach(tx => require(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx"))
+        txs.foreach(tx => assert(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx"))
         lastBlock
     }
   }
@@ -337,8 +337,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       appendBlock(TxHelpers.transfer(to = to, amount = amount))
     }
 
-    def issueAsset(script: Script = null): IssuedAsset = {
-      val transaction = TxHelpers.issue(script = script)
+    def issueAsset(issuer: KeyPair = defaultSigner, script: Script = null, amount: Long = 1000): IssuedAsset = {
+      val transaction = TxHelpers.issue(issuer, script = Option(script), amount = amount)
       appendBlock(transaction)
       IssuedAsset(transaction.id())
     }
@@ -347,8 +347,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       appendBlock(TxHelpers.setScript(account, script))
     }
 
-    def setData(account: KeyPair, entries: DataEntry[_]*): Unit = {
-      appendBlock(entries.map(TxHelpers.dataEntry(account, _)): _*)
+    def setData(account: KeyPair, entries: DataEntry[?]*): Unit = {
+      appendBlock(entries.map(TxHelpers.dataEntry(account, _))*)
     }
 
     def transfer(account: KeyPair, to: Address, amount: TxAmount, asset: Asset): Unit = {
@@ -372,6 +372,18 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     wallet,
     _ => Future.successful(TracedResult(Right(true))),
     h => blocksApi.blockAtHeight(h)
+  )
+
+  val accountsApi: CommonAccountsApi = CommonAccountsApi(
+    () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+    db,
+    blockchain
+  )
+
+  val assetsApi: CommonAssetsApi = CommonAssetsApi(
+    () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+    db,
+    blockchain
   )
 }
 

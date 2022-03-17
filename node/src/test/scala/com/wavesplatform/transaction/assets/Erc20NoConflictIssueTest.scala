@@ -12,7 +12,7 @@ import org.scalatest.matchers.should.Matchers
 class Erc20NoConflictIssueTest extends FreeSpec with Matchers with BlockchainStubHelpers with PathMockFactory {
   "Erc20 should be unique" - {
     "in invoke" in {
-      val tx      = TxHelpers.invoke(TxHelpers.defaultAddress, "test", fee = 100900000)
+      val tx      = TxHelpers.invoke(TxHelpers.defaultAddress, Some("test"), fee = 100900000)
       val assetId = IssuedAsset(Issue.calculateId(1, "test", isReissuable = true, "test", 1, 1, tx.id()))
 
       val blockchain = createBlockchainStub { b =>

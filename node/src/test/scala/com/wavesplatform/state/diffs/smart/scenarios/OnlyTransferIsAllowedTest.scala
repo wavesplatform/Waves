@@ -3,12 +3,19 @@ package com.wavesplatform.state.diffs.smart.scenarios
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.state.diffs.smart._
-import com.wavesplatform.test._
+import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.diffs.smart.*
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers}
+import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.transfer.TransferTransaction
 
 class OnlyTransferIsAllowedTest extends PropSpec with WithState {
 
@@ -27,13 +34,22 @@ class OnlyTransferIsAllowedTest extends PropSpec with WithState {
     val untyped         = Parser.parseExpr(scriptText).get.value
     val transferAllowed = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untyped).explicitGet()._1
 
-    forAll(preconditionsTransferAndLease(transferAllowed)) {
-      case (genesis, script, lease, transfer) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(
-          totalDiffEi => totalDiffEi should produce("TransactionNotAllowedByScript")
-        )
-    }
+    val (genesis, script, lease, transfer) = preconditions(transferAllowed)
+    assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
+    assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(
+      totalDiffEi => totalDiffEi should produce("TransactionNotAllowedByScript")
+    )
   }
 
+  private def preconditions(typed: EXPR): (GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction) = {
+    val master = TxHelpers.signer(1)
+    val recipient = TxHelpers.signer(2)
+
+    val genesis = TxHelpers.genesis(master.toAddress)
+    val setScript = TxHelpers.setScript(master, ExprScript(typed).explicitGet())
+    val transfer = TxHelpers.transfer(master, recipient.toAddress, ENOUGH_AMT / 2)
+    val lease = TxHelpers.lease(master, recipient.toAddress, ENOUGH_AMT / 2)
+
+    (genesis, setScript, lease, transfer)
+  }
 }

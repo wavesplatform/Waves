@@ -66,9 +66,10 @@ object SponsorFeeTransaction extends TransactionParser {
       minSponsoredAssetFee: Option[TxAmount],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SponsorFeeTransaction] =
-    create(version, sender, asset, minSponsoredAssetFee, fee, timestamp, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, asset, minSponsoredAssetFee, fee, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
@@ -76,7 +77,8 @@ object SponsorFeeTransaction extends TransactionParser {
       asset: IssuedAsset,
       minSponsoredAssetFee: Option[TxAmount],
       fee: TxAmount,
-      timestamp: TxTimestamp
+      timestamp: TxTimestamp,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SponsorFeeTransaction] =
-    signed(version, sender.publicKey, asset, minSponsoredAssetFee, fee, timestamp, sender.privateKey)
+    signed(version, sender.publicKey, asset, minSponsoredAssetFee, fee, timestamp, sender.privateKey, chainId)
 }
