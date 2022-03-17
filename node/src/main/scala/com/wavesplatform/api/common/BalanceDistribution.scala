@@ -70,11 +70,17 @@ object BalanceDistribution {
             }
           }
 
-          val adjustedBalance = safeSum(balance, pendingPortfolios.get(address).fold(0L)(balanceOf), "Next distribution balance").explicitGet()
+          val adjustedBalanceE = safeSum(balance, pendingPortfolios.get(address).fold(0L)(balanceOf), "Next distribution balance")
           pendingPortfolios -= address
 
-          if (currentHeight <= height && adjustedBalance > 0) Some(address -> adjustedBalance)
-          else findNextBalance()
+          if (adjustedBalanceE.isRight) {
+            val adjustedBalance = adjustedBalanceE.explicitGet()
+            if (currentHeight <= height && adjustedBalance > 0)
+              Some(address -> adjustedBalance)
+            else
+              findNextBalance()
+          } else
+            findNextBalance()
         }
       }
     }
