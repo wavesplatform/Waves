@@ -17,10 +17,10 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.utils.{EthHelpers, EthSetChainId}
+import com.wavesplatform.utils.EthHelpers
 
-class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers with EthSetChainId {
-  import DomainPresets._
+class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers {
+  import DomainPresets.*
 
   private val time = new TestTime
   private def ts   = time.getTimestamp()
@@ -79,7 +79,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
       token   <- Seq(None, Some(ERC20Address(asset.id.take(20))))
     } {
       val transfer    = EthereumTransaction.Transfer(token, transferAmount, recipient.toAddress)
-      val ethTransfer = EthereumTransaction(transfer, TestEthRawTransaction, TestEthSignature, 'E'.toByte)
+      val ethTransfer = EthereumTransaction(transfer, TestEthRawTransaction, TestEthSignature, 'T'.toByte)
       val ethSender   = ethTransfer.senderAddress()
       val preTransfer = TransferTransaction.selfSigned(2.toByte, recipient, ethSender, asset, ENOUGH_AMT, Waves, fee, ByteStr.empty, ts).explicitGet()
 
@@ -120,7 +120,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
     val recipient = accountGen.sample.get
 
     val dummyTransfer    = EthereumTransaction.Transfer(None, transferAmount, recipient.toAddress)
-    val dummyEthTransfer = EthereumTransaction(dummyTransfer, TestEthRawTransaction, TestEthSignature, 'E'.toByte) // needed to pass into asset script
+    val dummyEthTransfer = EthereumTransaction(dummyTransfer, TestEthRawTransaction, TestEthSignature, 'T'.toByte) // needed to pass into asset script
     val ethSender        = dummyEthTransfer.senderAddress()
 
     val genesis1 = GenesisTransaction.create(ethSender, ENOUGH_AMT, ts).explicitGet()

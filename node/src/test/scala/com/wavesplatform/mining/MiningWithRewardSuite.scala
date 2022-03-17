@@ -160,7 +160,6 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       case (blockchainUpdater, db) =>
         Task {
           blockchainUpdater.shutdown()
-          db.close()
         }
     }
 }

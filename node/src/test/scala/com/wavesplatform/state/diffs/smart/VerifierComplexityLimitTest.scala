@@ -1,25 +1,17 @@
 package com.wavesplatform.state.diffs.smart
 
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures.{BlockV5, SynchronousCalls}
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.EitherValues
 
 class VerifierComplexityLimitTest extends PropSpec with WithDomain with EitherValues {
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
 
   private val verifier = TestCompiler(V5).compileExpression {
     s"""
@@ -33,42 +25,44 @@ class VerifierComplexityLimitTest extends PropSpec with WithDomain with EitherVa
   private def features(fix: Boolean) =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(estimatorSumOverflowFixHeight = if (fix) 2 else 999)
+      .copy(estimatorSumOverflowFixHeight = if (fix) 3 else 999)
 
   property("account verifier evaluation should be limited after RideV6 activation") {
-    val account1  = accountGen.sample.get
-    val account2  = accountGen.sample.get
-    val fee       = ciFee().sample.get
-    val genesis   = GenesisTransaction.create(account1.toAddress, ENOUGH_AMT, ts).explicitGet()
-    val setScript = SetScriptTransaction.selfSigned(1.toByte, account1, Some(verifier), fee, ts).explicitGet()
-    val checkTx   = () => TransferTransaction.selfSigned(2.toByte, account1, account2.toAddress, Waves, 1, Waves, fee, ByteStr.empty, ts).explicitGet()
+    val account1 = TxHelpers.signer(1)
+    val account2 = TxHelpers.signer(2)
 
-    withDomain(domainSettingsWithFS(features(fix = false))) { d =>
-      d.appendBlock(genesis, setScript)
-      (the[RuntimeException] thrownBy d.appendBlock(checkTx())).getMessage should include("Explicit script termination")
+    val balances = AddrWithBalance.enoughBalances(account1)
+
+    val setScript = TxHelpers.setScript(account1, verifier)
+    val checkTx = () => TxHelpers.transfer(account1, account2.toAddress, 1)
+
+    withDomain(domainSettingsWithFS(features(fix = false)), balances) { d =>
+      d.appendBlock(setScript)
+      d.appendBlockE(checkTx()) should produce("Explicit script termination")
     }
-    withDomain(domainSettingsWithFS(features(fix = true))) { d =>
-      d.appendBlock(genesis, setScript)
-      (the[RuntimeException] thrownBy d.appendBlock(checkTx())).getMessage should include("Verifier complexity limit = 2000 is exceeded")
+    withDomain(domainSettingsWithFS(features(fix = true)), balances) { d =>
+      d.appendBlock(setScript)
+      d.appendBlockE(checkTx()) should produce("Verifier complexity limit = 2000 is exceeded")
     }
   }
 
   property("asset verifier evaluation should be limited after RideV6 activation") {
-    val account1  = accountGen.sample.get
-    val account2  = accountGen.sample.get
-    val fee       = ciFee().sample.get
-    val genesis   = GenesisTransaction.create(account1.toAddress, ENOUGH_AMT, ts).explicitGet()
-    val setScript = IssueTransaction.selfSigned(2.toByte, account1, "name", "", 1, 0, true, Some(verifier), fee, ts).explicitGet()
-    val asset     = IssuedAsset(setScript.id())
-    val checkTx   = () => TransferTransaction.selfSigned(2.toByte, account1, account2.toAddress, asset, 1, Waves, fee, ByteStr.empty, ts).explicitGet()
+    val account1 = TxHelpers.signer(1)
+    val account2 = TxHelpers.signer(2)
 
-    withDomain(domainSettingsWithFS(features(fix = false))) { d =>
-      d.appendBlock(genesis, setScript)
-      (the[RuntimeException] thrownBy d.appendBlock(checkTx())).getMessage should include("Explicit script termination")
+    val balances = AddrWithBalance.enoughBalances(account1)
+
+    val issue = TxHelpers.issue(account1, 1, script = Some(verifier))
+    val asset     = IssuedAsset(issue.id())
+    val checkTx = () => TxHelpers.transfer(account1, account2.toAddress, 1, asset)
+
+    withDomain(domainSettingsWithFS(features(fix = false)), balances) { d =>
+      d.appendBlock(issue)
+      d.appendBlockE(checkTx()) should produce("Explicit script termination")
     }
-    withDomain(domainSettingsWithFS(features(fix = true))) { d =>
-      d.appendBlock(genesis, setScript)
-      (the[RuntimeException] thrownBy d.appendBlock(checkTx())).getMessage should include("Verifier complexity limit = 4000 is exceeded")
+    withDomain(domainSettingsWithFS(features(fix = true)), balances) { d =>
+      d.appendBlock(issue)
+      d.appendBlockE(checkTx()) should produce("Verifier complexity limit = 4000 is exceeded")
     }
   }
 }

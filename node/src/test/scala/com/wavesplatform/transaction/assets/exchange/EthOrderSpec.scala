@@ -8,7 +8,7 @@ import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
-import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, EthSetChainId, JsonMatchers}
+import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
 import play.api.libs.json.{JsObject, Json}
@@ -18,7 +18,7 @@ class EthOrderSpec
     with BeforeAndAfterAll
     with PathMockFactory
     with BlockchainStubHelpers
-    with EthSetChainId
+    with EthHelpers
     with DiffMatchers
     with JsonMatchers {
   import EthOrderSpec.{ethBuyOrder, ethSellOrder}
@@ -40,7 +40,7 @@ class EthOrderSpec
 
     val signature =
       EthEncoding.toBytes(
-        "0xe4b329ea85ab9b82fda55f6bf063170864fbb66651dbf5d7e8278a79df2a46d26400f966b49c5a46c82cea590538569dc058facaa43b6246b3dce0d37fae6b4a1b"
+        "0xdac6583ff5596ab9583b3d52ad3242a17fe4a2c7f7e937f3e75544e16012521706c5ee2aaa9faefce03c6566b8c1f8c8a6a98b4760e71ed24ae22f0a12f52b441c"
       )
 
     val result = EthOrders.recoverEthSignerKey(testOrder, signature)
@@ -83,13 +83,13 @@ class EthOrderSpec
   it should "work in exchange transaction" in {
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
-      sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
+      sh.creditBalance(ethBuyOrder.senderAddress, *)
+      sh.creditBalance(ethSellOrder.senderAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
     val differ      = blockchain.stub.transactionDiffer(TestTime(100))
-    val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, TxVersion.V3, 100)
+    val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
     val diff        = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
   }
@@ -98,7 +98,7 @@ class EthOrderSpec
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
+      sh.creditBalance(ethSellOrder.senderAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
@@ -117,7 +117,7 @@ class EthOrderSpec
     )
 
     val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
-    val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, TxVersion.V3, 100)
+    val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
     val diff        = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
   }
@@ -155,18 +155,18 @@ class EthOrderSpec
     StubHelpers(blockchain).creditBalance(sellOrder.senderAddress, *)
 
     val transaction = TxHelpers
-      .exchange(buyOrder, sellOrder, TxVersion.V3, 100)
+      .exchange(buyOrder, sellOrder, price = 100, buyMatcherFee = buyOrder.matcherFee, sellMatcherFee = sellOrder.matcherFee, version = TxVersion.V3, timestamp = 100)
       .copy(proofs = TxHelpers.signature("4WrABDgkk9JraBLNQK4LTq7LWqVLgLzAEv8fr1rjr4ovca7224EBzLrEgcHdtHscGpQbLsk39ttQfqHMVLr9tXcB"))
 
     transaction.json() should matchJson("""{
                                           |  "type": 7,
-                                          |  "id": "GNz9EGRPNroTXhQ4Kjz2Qb4u3oBoRdteRTYwsHfDHJW5",
+                                          |  "id": "GtWWteMgnVYeAq4BSbqw9aFM3K17zHrYsij14VtJiVdL",
                                           |  "fee": 1000000,
                                           |  "feeAssetId": null,
                                           |  "timestamp": 100,
                                           |  "version": 3,
-                                          |  "chainId": 69,
-                                          |  "sender": "3FrCwv8uFRxQazhX6Lno45aZ68Bof6ScaeF",
+                                          |  "chainId": 84,
+                                          |  "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                           |  "senderPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
                                           |  "proofs": [
                                           |    "4WrABDgkk9JraBLNQK4LTq7LWqVLgLzAEv8fr1rjr4ovca7224EBzLrEgcHdtHscGpQbLsk39ttQfqHMVLr9tXcB"
@@ -174,7 +174,7 @@ class EthOrderSpec
                                           |  "order1": {
                                           |    "version": 3,
                                           |    "id": "75YqwVQbiQmLMQBE61W1aLcsaAUnWbzM5Udh9Z4mXUBf",
-                                          |    "sender": "3FrCwv8uFRxQazhX6Lno45aZ68Bof6ScaeF",
+                                          |    "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                           |    "senderPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
                                           |    "matcherPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
                                           |    "assetPair": {
@@ -195,9 +195,9 @@ class EthOrderSpec
                                           |  },
                                           |  "order2": {
                                           |    "version": 4,
-                                          |    "id": "8274Mc8WiNQdP3YhinBGkEX79AcZe5th51DJCTW8rEUZ",
-                                          |    "sender": "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
-                                          |    "senderPublicKey": "5vwTDMooR7Hp57MekN7qHz7fHNVrkn2Nx4CiWdq4cyBR4LNnZWYAr7UfBbzhmSvtNkv6e45aJ4Q4aKCSinyHVw33",
+                                          |    "id": "6tXL591oH3mnwgFcbxqQnqHBF1oQ1Cc6hdLuBU6FB6UG",
+                                          |    "sender": "3MvELtsVTCQWjjzVVWLVHDaSDNGxoviwjng",
+                                          |    "senderPublicKey": "CHzosnszumJmrh9Yd86Dgf6THq2adzK3RuRmwAWBoU5KdsGJjQmPERHjFLB2eHkDNVnq17cYPk3RZaSiLRkcU96",
                                           |    "matcherPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
                                           |    "assetPair": {
                                           |      "amountAsset": "5fQPsn8hoaVddFG26cWQ5QFdqxWtUPNaZ9zH2E6LYzFn",
@@ -232,7 +232,7 @@ class EthOrderSpec
 
     val differ = TransactionDiffer(Some(1L), 100L)(blockchain, _)
     val transaction = TxHelpers
-      .exchange(ethBuyOrder, ethSellOrder, TxVersion.V3, 100)
+      .exchange(ethBuyOrder, ethSellOrder, version = TxVersion.V3, timestamp = 100)
       .copy(
         order2 = ethSellOrder.copy(orderAuthentication =
           EthSignature(
@@ -250,7 +250,7 @@ class EthOrderSpec
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
+      sh.creditBalance(ethSellOrder.senderAddress, *)
 
       // TODO: something more smart ?
       val script = TxHelpers.script("""
@@ -277,7 +277,7 @@ class EthOrderSpec
     )
 
     val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
-    val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, TxVersion.V3, 100)
+    val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
     val diff        = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
   }
@@ -286,7 +286,8 @@ class EthOrderSpec
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
+      sh.creditBalance(ethBuyOrder.senderAddress, *)
+      sh.creditBalance(ethSellOrder.senderAddress, *)
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(
@@ -306,7 +307,7 @@ class EthOrderSpec
     }
 
     val differ      = blockchain.stub.transactionDiffer(TestTime(100))
-    val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, TxVersion.V3, 100)
+    val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
     val diff        = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
   }
