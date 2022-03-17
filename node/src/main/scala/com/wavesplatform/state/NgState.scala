@@ -1,16 +1,15 @@
 package com.wavesplatform.state
 
+import java.util.concurrent.TimeUnit
+
 import cats.implicits.toFoldableOps
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.NgState.{CachedMicroDiff, MicroBlockInfo, NgStateCaches}
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
-
-import java.util.concurrent.TimeUnit
 
 object NgState {
   case class MicroBlockInfo(totalBlockId: BlockId, microBlock: MicroBlock) {
@@ -77,7 +76,7 @@ case class NgState(
               case Some(MicroBlockInfo(blockId, current)) =>
                 val (prevDiff, prevCarry, prevTotalFee)                   = this.diffFor(current.reference)
                 val CachedMicroDiff(currDiff, currCarry, currTotalFee, _) = this.microDiffs(blockId)
-                (prevDiff.combine(currDiff).explicitGet(), prevCarry + currCarry, prevTotalFee + currTotalFee)
+                (prevDiff.unsafeCombine(currDiff), prevCarry + currCarry, prevTotalFee + currTotalFee)
 
               case None =>
                 (Diff.empty, 0L, 0L)

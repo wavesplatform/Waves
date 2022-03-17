@@ -1,6 +1,7 @@
 package com.wavesplatform
 
-import cats.implicits.{catsSyntaxEitherId, toBifunctorOps}
+import cats.{Id, Monad}
+import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
@@ -16,16 +17,20 @@ package object state {
   def safeSum(x: Long, y: Long, source: String): Either[String, Long] =
     Try(Math.addExact(x, y)).toEither.leftMap(_ => s"$source sum overflow")
 
-  def safeSumMap[A, B](a: Map[A, B], b: Map[A, B], combine: (B, B) => Either[String, B]): Either[String, Map[A, B]] =
-    a.foldLeft(b.asRight[String]) {
-      case (Right(resultMap), (key, next)) =>
-        if (resultMap.contains(key))
-          combine(resultMap(key), next).map(r => resultMap + (key -> r))
-        else
-          Right(resultMap + (key -> next))
-      case (e @ Left(_), _) =>
-        e
+  def sumMapF[F[_]: Monad, A, B](a: Map[A, B], b: Map[A, B], combine: (B, B) => F[B]): F[Map[A, B]] =
+    a.foldLeft(b.pure[F]) {
+      case (resultMapF, (key, next)) =>
+        resultMapF.flatMap(
+          resultMap =>
+            if (resultMap.contains(key))
+              combine(resultMap(key), next).map(r => resultMap + (key -> r))
+            else
+              (resultMap + (key -> next)).pure[F]
+        )
     }
+
+  implicit val safeSummarizer: Summarizer[Either[String, *]] = safeSum(_, _, _)
+  implicit val unsafeSummarizer: Summarizer[Id]              = (x, y, _) => x + y
 
   implicit class Cast[A](a: A) {
     def cast[B: ClassTag]: Option[B] = {

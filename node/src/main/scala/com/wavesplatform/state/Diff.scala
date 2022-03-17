@@ -1,9 +1,9 @@
 package com.wavesplatform.state
 
 import cats.data.Ior
-import cats.instances.map._
+import cats.implicits._
 import cats.kernel.{Monoid, Semigroup}
-import cats.syntax.semigroup._
+import cats.{Id, Monad}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -17,10 +17,10 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 import scala.collection.immutable.VectorMap
 
 case class LeaseBalance(in: Long, out: Long) {
-  def combine(that: LeaseBalance): Either[String, LeaseBalance] =
+  def combineF[F[_]: Monad](that: LeaseBalance)(implicit s: Summarizer[F]): F[LeaseBalance] =
     for {
-      in  <- safeSum(in, that.in, "Lease in")
-      out <- safeSum(out, that.out, "Lease out")
+      in  <- s.sum(in, that.in, "Lease in")
+      out <- s.sum(out, that.out, "Lease out")
     } yield LeaseBalance(in, out)
 }
 
@@ -159,8 +159,14 @@ case class Diff(
     scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
 ) {
   def combine(newer: Diff): Either[String, Diff] =
+    combineF[Either[String, *]](newer)
+
+  def unsafeCombine(newer: Diff): Diff =
+    combineF[Id](newer)
+
+  private def combineF[F[_]: Monad: Summarizer](newer: Diff): F[Diff] =
     Diff
-      .combine(portfolios, newer.portfolios)
+      .combineF[F](portfolios, newer.portfolios)
       .map(
         portfolios =>
           Diff(
@@ -178,7 +184,7 @@ case class Diff(
             scriptsRun = scriptsRun + newer.scriptsRun,
             scriptResults = scriptResults.combine(newer.scriptResults),
             scriptsComplexity = scriptsComplexity + newer.scriptsComplexity
-          )
+        )
       )
 }
 
@@ -186,7 +192,10 @@ object Diff {
   val empty: Diff = Diff()
 
   def combine(portfolios1: Map[Address, Portfolio], portfolios2: Map[Address, Portfolio]): Either[String, Map[Address, Portfolio]] =
-    safeSumMap[Address, Portfolio](portfolios1, portfolios2, _.combine(_))
+    combineF[Either[String, *]](portfolios1, portfolios2)
+
+  def combineF[F[_]: Monad: Summarizer](portfolios1: Map[Address, Portfolio], portfolios2: Map[Address, Portfolio]): F[Map[Address, Portfolio]] =
+    sumMapF[F, Address, Portfolio](portfolios1, portfolios2, _.combineF[F](_))
 
   implicit class DiffExt(private val d: Diff) extends AnyVal {
     def errorMessage(txId: ByteStr): Option[InvokeScriptResult.ErrorMessage] =

@@ -21,7 +21,7 @@ object BalanceDiffValidation extends ScorexLogging {
       lazy val oldWaves = b.balance(acc, Waves)
       lazy val oldLease = b.leaseBalance(acc)
       oldLease
-        .combine(portfolioDiff.lease)
+        .combineF[Either[String, *]](portfolioDiff.lease)
         .map(
           lease =>
             (if (balance < 0) {

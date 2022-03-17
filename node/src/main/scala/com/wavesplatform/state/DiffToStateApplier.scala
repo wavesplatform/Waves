@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
+import cats.Id
 import com.wavesplatform.account.Address
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 
@@ -37,7 +37,7 @@ object DiffToStateApplier {
 
       // leases
       if (portfolioDiff.lease != LeaseBalance.empty) {
-        leases += address -> blockchain.leaseBalance(address).combine(portfolioDiff.lease).explicitGet()
+        leases += address -> blockchain.leaseBalance(address).combineF[Id](portfolioDiff.lease)
       }
     }
 

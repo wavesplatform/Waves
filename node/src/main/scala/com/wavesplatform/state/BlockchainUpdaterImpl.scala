@@ -1,5 +1,7 @@
 package com.wavesplatform.state
 
+import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
+
 import cats.implicits.catsSyntaxSemigroup
 import cats.kernel.Semigroup
 import cats.syntax.either._
@@ -9,7 +11,6 @@ import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.Storage
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
@@ -28,8 +29,6 @@ import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceSt
 import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
-
-import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 class BlockchainUpdaterImpl(
     leveldb: Blockchain with Storage,
@@ -681,7 +680,7 @@ class BlockchainUpdaterImpl(
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readLock {
     to.fold(ngState.map(_.bestLiquidDiff))(id => ngState.map(_.diffFor(id)._1))
-      .fold[Blockchain](leveldb)(CompositeBlockchain(leveldb, _).explicitGet())
+      .fold[Blockchain](leveldb)(CompositeBlockchain.unsafe(leveldb, _))
       .balanceSnapshots(address, from, to)
   }
 
@@ -725,7 +724,7 @@ class BlockchainUpdaterImpl(
   }
 
   private[this] def compositeBlockchain =
-    ngState.fold(leveldb: Blockchain)(CompositeBlockchain(leveldb, _).explicitGet())
+    ngState.fold(leveldb: Blockchain)(CompositeBlockchain.unsafe(leveldb, _))
 
   //noinspection ScalaStyle,TypeAnnotation
   private[this] object metrics {

@@ -1,10 +1,8 @@
 package com.wavesplatform.state.reader
 
 import cats.data.Ior
-import cats.implicits.{catsSyntaxEitherId, toTraverseOps}
-import cats.syntax.bifunctor._
-import cats.syntax.option._
-import cats.syntax.semigroup._
+import cats.implicits.{toTraverseOps, _}
+import cats.{Id, Monad}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
@@ -12,7 +10,7 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.{safeSum, _}
+import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
@@ -39,7 +37,7 @@ final class CompositeBlockchain private (
           assetId match {
             case asset: IssuedAsset => p.assets.get(asset)
             case Waves              => Some(p.balance)
-          }
+        }
       )
       .getOrElse(inner.balance(address, assetId))
 
@@ -201,26 +199,47 @@ object CompositeBlockchain {
       carry: Long = 0,
       reward: Option[Long] = None
   ): Either[GenericError, CompositeBlockchain] =
+    applyF[Either[String, *]](inner, maybeDiff, blockMeta, carry, reward)
+      .leftMap(GenericError(_))
+
+  def unsafe(inner: Blockchain, ngState: NgState): CompositeBlockchain =
+    applyF[Id](
+      inner,
+      Some(ngState.bestLiquidDiff),
+      Some(SignedBlockHeader(ngState.bestLiquidBlock.header, ngState.bestLiquidBlock.signature) -> ngState.hitSource),
+      ngState.carryFee,
+      ngState.reward
+    )
+
+  def unsafe(inner: Blockchain, diff: Diff): CompositeBlockchain =
+    applyF[Id](inner, Some(diff))
+
+  private def applyF[F[_]: Monad](
+      inner: Blockchain,
+      maybeDiff: Option[Diff],
+      blockMeta: Option[(SignedBlockHeader, ByteStr)] = None,
+      carry: Long = 0,
+      reward: Option[Long] = None
+  )(implicit s: Summarizer[F]): F[CompositeBlockchain] =
     maybeDiff
-      .fold(Map[Address, Portfolio]().asRight[String])(
+      .fold(Map[Address, Portfolio]().pure[F])(
         _.portfolios.toSeq
           .traverse {
             case (address, portfolio) =>
               val compositePortfolio =
                 for {
-                  waves <- safeSum(inner.balance(address, Waves), portfolio.balance, "Waves balance")
+                  waves <- s.sum(inner.balance(address, Waves), portfolio.balance, "Waves balance")
                   assets <- portfolio.assets.toSeq.traverse {
                     case (asset, balance) =>
-                      safeSum(inner.balance(address, asset), balance, s"Asset $asset balance").map(asset -> _)
+                      s.sum(inner.balance(address, asset), balance, s"Asset $asset balance").map(asset -> _)
                   }
-                  lease <- inner.leaseBalance(address).combine(portfolio.lease)
+                  lease <- inner.leaseBalance(address).combineF[F](portfolio.lease)
                 } yield Portfolio(waves, lease, assets.toMap)
               compositePortfolio.map(address -> _)
           }
           .map(_.toMap)
       )
-      .bimap(
-        GenericError(_),
+      .map(
         new CompositeBlockchain(inner, maybeDiff, _, blockMeta, carry, reward)
       )
 

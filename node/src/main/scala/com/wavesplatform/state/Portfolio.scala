@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
-import cats.Monoid
-import cats.instances.map._
+import cats.{Monad, Monoid}
+import cats.implicits._
 import com.wavesplatform.state.diffs.BlockDiffer.Fraction
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset._
@@ -20,10 +20,13 @@ case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empt
   }
 
   def combine(that: Portfolio): Either[String, Portfolio] =
+    combineF[Either[String, *]](that)
+
+  def combineF[F[_]: Monad](that: Portfolio)(implicit s: Summarizer[F]): F[Portfolio] =
     for {
-      balance <- safeSum(balance, that.balance, "Waves balance")
-      lease   <- lease.combine(that.lease)
-      assets  <- safeSumMap(assets, that.assets, safeSum(_, _, "Assets balance"))
+      balance <- s.sum(balance, that.balance, "Waves balance")
+      lease   <- lease.combineF[F](that.lease)
+      assets  <- sumMapF(assets, that.assets, s.sum(_, _, "Assets balance"))
     } yield Portfolio(balance, lease, assets)
 }
 
