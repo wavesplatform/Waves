@@ -12,6 +12,8 @@ object CreateAliasTransactionDiff {
   def apply(blockchain: Blockchain)(tx: CreateAliasTransaction): Either[ValidationError, Diff] =
     if (blockchain.isFeatureActivated(BlockchainFeatures.DataTransaction, blockchain.height) && !blockchain.canCreateAlias(tx.alias))
       Left(GenericError("Alias already claimed"))
+    else if (blockchain.height > blockchain.settings.functionalitySettings.allowMultipleProofsInCreateAliasUntil && tx.proofs.size > 1)
+      Left(GenericError("Invalid proofs size"))
     else
       Right(
         Diff(

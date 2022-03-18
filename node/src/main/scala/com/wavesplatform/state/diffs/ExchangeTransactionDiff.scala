@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs
 
 import scala.util.{Right, Try}
-
 import cats.instances.map._
 import cats.kernel.Monoid
 import cats.syntax.either._
@@ -11,7 +10,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, InsufficientFee, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
 
 object ExchangeTransactionDiff {
@@ -134,6 +133,12 @@ object ExchangeTransactionDiff {
     )
 
     for {
+      _ <- Either.cond(
+        blockchain.height < blockchain.settings.functionalitySettings.forbidNegativeMatcherFee ||
+          tx.buyMatcherFee >= 0 && tx.sellMatcherFee >= 0,
+        (),
+        InsufficientFee("Matcher fee can not be negative")
+      )
       _ <- Either.cond(assets.values.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
       amountDecimals = if (tx.version < TxVersion.V3) 8 else tx.buyOrder.assetPair.amountAsset.fold(8)(ia => assets(ia).fold(8)(_.decimals))
       priceDecimals  = if (tx.version < TxVersion.V3) 8 else tx.buyOrder.assetPair.priceAsset.fold(8)(ia => assets(ia).fold(8)(_.decimals))
