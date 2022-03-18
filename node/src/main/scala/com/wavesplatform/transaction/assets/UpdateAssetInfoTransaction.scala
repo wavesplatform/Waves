@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.assets
 
-import cats.syntax.either._
 import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -83,7 +82,7 @@ object UpdateAssetInfoTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, UpdateAssetInfoTransaction] =
     for {
-      fee <- TxAmount.from(feeAmount).leftMap(_ => TxValidationError.InsufficientFee)
+      fee <- TxAmount(feeAmount)(TxValidationError.InsufficientFee)
       tx <- UpdateAssetInfoTransaction(
         version,
         sender,

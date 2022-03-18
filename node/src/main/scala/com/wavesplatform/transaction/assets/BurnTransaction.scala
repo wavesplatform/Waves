@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.assets
 
-import cats.syntax.either._
 import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -66,8 +65,8 @@ object BurnTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, BurnTransaction] =
     for {
-      quantity <- TxQuantity.from(quantity).leftMap(_ => TxValidationError.NegativeAmount(quantity, "assets"))
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
+      quantity <- TxQuantity(quantity)(TxValidationError.NegativeAmount(quantity, "assets"))
+      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
       tx <- BurnTransaction(version, sender, asset, quantity, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 

@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction
 
-import cats.syntax.either._
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -68,7 +67,7 @@ object CreateAliasTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransactionT] = {
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
+      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
       tx <- CreateAliasTransaction(version, sender, aliasName, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
   }

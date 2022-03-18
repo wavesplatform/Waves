@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction
 
-import cats.syntax.either._
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -60,8 +59,8 @@ object PaymentTransaction extends TransactionParser {
       signature: ByteStr
   ): Either[ValidationError, PaymentTransaction] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
-      amount <- TxAmount.from(amount).leftMap(_ => TxValidationError.NonPositiveAmount(amount, "waves"))
+      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
+      amount <- TxAmount(amount)(TxValidationError.NonPositiveAmount(amount, "waves"))
       tx <- PaymentTransaction(sender, recipient, amount, fee, timestamp, signature, recipient.chainId).validatedEither
     } yield tx
 }

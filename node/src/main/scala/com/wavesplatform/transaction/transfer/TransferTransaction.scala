@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.transfer
 
-import cats.syntax.either._
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -79,8 +78,8 @@ object TransferTransaction extends TransactionParser {
       proofs: Proofs
   ): Either[ValidationError, TransferTransaction] =
     for {
-      amount <- TxAmount.from(amount).leftMap(_ => TxValidationError.NonPositiveAmount(amount, asset.maybeBase58Repr.getOrElse("waves")))
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
+      amount <- TxAmount(amount)(TxValidationError.NonPositiveAmount(amount, asset.maybeBase58Repr.getOrElse("waves")))
+      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
       tx <- TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs, recipient.chainId).validatedEither
     } yield tx
 

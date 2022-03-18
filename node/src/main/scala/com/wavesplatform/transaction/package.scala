@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.utils.base58Length
-import eu.timepit.refined.api.{Refined, RefinedTypeOps}
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.{Interval, NonNegative, Positive}
 
 package object transaction {

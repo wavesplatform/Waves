@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.assets
 
-import cats.syntax.either._
 import cats.syntax.traverse._
 import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
@@ -67,8 +66,8 @@ object SponsorFeeTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SponsorFeeTransaction] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
-      minSponsoredAssetFee <- minSponsoredAssetFee.traverse(fee => TxAmount.from(fee).leftMap(_ => NegativeMinFee(fee, "asset")))
+      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
+      minSponsoredAssetFee <- minSponsoredAssetFee.traverse(fee => TxAmount(fee)(NegativeMinFee(fee, "asset")))
       tx <- SponsorFeeTransaction(version, sender, asset, minSponsoredAssetFee, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 

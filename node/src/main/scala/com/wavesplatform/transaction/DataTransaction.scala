@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction
 
-import cats.syntax.either._
 import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -68,7 +67,7 @@ object DataTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, DataTransaction] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
+      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
       tx <- DataTransaction(version, sender, data, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 

@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.assets
 
-import cats.syntax.either._
 import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -68,8 +67,8 @@ object ReissueTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ReissueTransaction] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
-      quantity <- TxAmount.from(quantity).leftMap(_ => TxValidationError.NonPositiveAmount(quantity, "assets"))
+      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
+      quantity <- TxAmount(quantity)(TxValidationError.NonPositiveAmount(quantity, "assets"))
       tx <-ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 

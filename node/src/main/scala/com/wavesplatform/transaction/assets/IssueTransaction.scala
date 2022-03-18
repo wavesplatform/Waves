@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.assets
 
-import cats.syntax.either._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -77,9 +76,9 @@ object IssueTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, IssueTransaction] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
-      quantity <- TxAmount.from(quantity).leftMap(_ => TxValidationError.NonPositiveAmount(quantity, "assets"))
-      decimals <- TxDecimals.from(decimals).leftMap(_ => TxValidationError.InvalidDecimals(decimals))
+      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
+      quantity <- TxAmount(quantity)(TxValidationError.NonPositiveAmount(quantity, "assets"))
+      decimals <- TxDecimals(decimals)(TxValidationError.InvalidDecimals(decimals))
       tx <- IssueTransaction(
         version,
         sender,

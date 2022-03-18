@@ -1,7 +1,6 @@
 package com.wavesplatform.transaction.transfer
 
 import cats.instances.list._
-import cats.syntax.either._
 import cats.syntax.traverse._
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
@@ -93,7 +92,7 @@ object MassTransferTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, MassTransferTransaction] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
+      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
       tx <- MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, attachment, proofs, chainId).validatedEither
     } yield tx
 

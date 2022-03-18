@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.lease
 
-import cats.syntax.either._
 import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -57,8 +56,8 @@ object LeaseTransaction extends TransactionParser {
       proofs: Proofs
   ): Either[ValidationError, TransactionT] = {
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
-      amount <- TxAmount.from(amount).leftMap(_ => TxValidationError.NonPositiveAmount(amount, "waves"))
+      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
+      amount <- TxAmount(amount)(TxValidationError.NonPositiveAmount(amount, "waves"))
       tx <- LeaseTransaction(version, sender, recipient, amount, fee, timestamp, proofs, recipient.chainId).validatedEither
     } yield tx
 

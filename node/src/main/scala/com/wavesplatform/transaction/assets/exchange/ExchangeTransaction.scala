@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import cats.syntax.either._
 import com.wavesplatform.account.{AddressScheme, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -79,15 +78,11 @@ object ExchangeTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ExchangeTransaction] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
-      amount <- TxExchangeAmount.from(amount)
-        .leftMap(_ => GenericError(TxExchangeAmount.errMsg))
-      price <- TxExchangePrice.from(price)
-        .leftMap(_ => GenericError(TxExchangePrice.errMsg))
-      sellMatcherFee <- TxMatcherFee.from(sellMatcherFee)
-        .leftMap(_ => GenericError(s"sell ${TxMatcherFee.errMsg}"))
-      buyMatcherFee <- TxMatcherFee.from(buyMatcherFee)
-        .leftMap(_ => GenericError(s"buy ${TxMatcherFee.errMsg}"))
+      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
+      amount <- TxExchangeAmount(amount)(GenericError(TxExchangeAmount.errMsg))
+      price <- TxExchangePrice(price)(GenericError(TxExchangePrice.errMsg))
+      sellMatcherFee <- TxMatcherFee(sellMatcherFee)(GenericError(s"sell ${TxMatcherFee.errMsg}"))
+      buyMatcherFee <- TxMatcherFee(buyMatcherFee)(GenericError(s"buy ${TxMatcherFee.errMsg}"))
       tx <- ExchangeTransaction(version, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 

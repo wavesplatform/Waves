@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.lease
 
-import cats.syntax.either._
 import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -57,7 +56,7 @@ object LeaseCancelTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransactionT] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
+      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
       tx <- LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 

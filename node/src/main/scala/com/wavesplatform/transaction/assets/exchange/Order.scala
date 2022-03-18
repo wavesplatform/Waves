@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import cats.syntax.either._
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -100,9 +99,9 @@ object Order {
       matcherFeeAssetId: Asset = Asset.Waves
   ): Either[ValidationError, Order] =
     for {
-      amount <- TxExchangeAmount.from(amount).leftMap(_ => GenericError(s"Order validation error: ${TxExchangeAmount.errMsg}"))
-      price <- TxOrderPrice.from(price).leftMap(_ => GenericError(s"Order validation error: ${TxOrderPrice.errMsg}"))
-      matcherFee <- TxMatcherFee.from(matcherFee).leftMap(_ => GenericError(s"Order validation error: ${TxMatcherFee.errMsg}"))
+      amount <- TxExchangeAmount(amount)(GenericError(s"Order validation error: ${TxExchangeAmount.errMsg}"))
+      price <- TxOrderPrice(price)(GenericError(s"Order validation error: ${TxOrderPrice.errMsg}"))
+      matcherFee <- TxMatcherFee(matcherFee)(GenericError(s"Order validation error: ${TxMatcherFee.errMsg}"))
     } yield {
       Order(version, sender.publicKey, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId).signWith(sender.privateKey)
     }

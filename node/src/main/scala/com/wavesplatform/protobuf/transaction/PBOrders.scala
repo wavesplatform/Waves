@@ -1,6 +1,5 @@
 package com.wavesplatform.protobuf.transaction
 
-import cats.syntax.either._
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf._
@@ -15,9 +14,9 @@ object PBOrders {
 
   def vanilla(order: PBOrder, version: Int = 0): Either[ValidationError, VanillaOrder] =
     for {
-      amount <- TxExchangeAmount.from(order.amount).leftMap(_ => GenericError(TxExchangeAmount.errMsg))
-      price <- TxOrderPrice.from(order.price).leftMap(_ => GenericError(TxOrderPrice.errMsg))
-      matcherFee <- TxMatcherFee.from(order.getMatcherFee.longAmount).leftMap(_ => GenericError(TxMatcherFee.errMsg))
+      amount <- TxExchangeAmount(order.amount)(GenericError(TxExchangeAmount.errMsg))
+      price <- TxOrderPrice(order.price)(GenericError(TxOrderPrice.errMsg))
+      matcherFee <- TxMatcherFee(order.getMatcherFee.longAmount)(GenericError(TxMatcherFee.errMsg))
       orderType <- vanillaOrderType(order.orderSide)
     } yield {
       VanillaOrder(

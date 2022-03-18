@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.smart
 
-import cats.syntax.either._
 import com.wavesplatform.account._
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -84,7 +83,7 @@ object InvokeScriptTransaction extends TransactionParser {
       proofs: Proofs
   ): Either[ValidationError, InvokeScriptTransaction] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
+      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
       tx <- InvokeScriptTransaction(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs, dappAddress.chainId).validatedEither
     } yield  tx
 

@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction
 
-import cats.syntax.either._
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
@@ -52,7 +51,7 @@ object GenesisTransaction extends TransactionParser {
     val signature = ByteStr(GenesisTransaction.generateSignature(recipient, amount, timestamp))
 
     for {
-      amount <- TxQuantity.from(amount).leftMap(_ => TxValidationError.NegativeAmount(amount, "waves"))
+      amount <- TxQuantity(amount)(TxValidationError.NegativeAmount(amount, "waves"))
       tx <- GenesisTransaction(recipient, amount, timestamp, signature, recipient.chainId).validatedEither
     } yield tx
   }
