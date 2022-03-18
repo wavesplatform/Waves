@@ -68,7 +68,7 @@ object ReissueTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ReissueTransaction] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
+      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
       quantity <- TxAmount.from(quantity).leftMap(_ => TxValidationError.NonPositiveAmount(quantity, "assets"))
       tx <-ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, proofs, chainId).validatedEither
     } yield tx

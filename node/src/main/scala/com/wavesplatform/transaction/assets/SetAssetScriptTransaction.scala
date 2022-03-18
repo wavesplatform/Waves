@@ -67,7 +67,7 @@ object SetAssetScriptTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetAssetScriptTransaction] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
+      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
       tx <- SetAssetScriptTransaction(version, sender, assetId, script, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 

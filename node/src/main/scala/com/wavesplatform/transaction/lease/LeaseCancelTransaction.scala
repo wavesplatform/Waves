@@ -57,7 +57,7 @@ object LeaseCancelTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransactionT] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
+      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
       tx <- LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 

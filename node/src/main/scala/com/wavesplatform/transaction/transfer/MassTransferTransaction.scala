@@ -93,7 +93,7 @@ object MassTransferTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, MassTransferTransaction] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
+      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
       tx <- MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, attachment, proofs, chainId).validatedEither
     } yield tx
 

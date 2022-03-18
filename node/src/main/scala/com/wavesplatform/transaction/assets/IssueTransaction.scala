@@ -77,7 +77,7 @@ object IssueTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, IssueTransaction] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
+      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
       quantity <- TxAmount.from(quantity).leftMap(_ => TxValidationError.NonPositiveAmount(quantity, "assets"))
       decimals <- TxDecimals.from(decimals).leftMap(_ => TxValidationError.InvalidDecimals(decimals))
       tx <- IssueTransaction(

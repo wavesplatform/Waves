@@ -67,7 +67,7 @@ object SponsorFeeTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SponsorFeeTransaction] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
+      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
       minSponsoredAssetFee <- minSponsoredAssetFee.traverse(fee => TxAmount.from(fee).leftMap(_ => NegativeMinFee(fee, "asset")))
       tx <- SponsorFeeTransaction(version, sender, asset, minSponsoredAssetFee, fee, timestamp, proofs, chainId).validatedEither
     } yield tx

@@ -20,7 +20,7 @@ object TxValidationError {
   case class NonPositiveAmount(amount: Long, of: String)       extends ValidationError
   case class InvalidDecimals(decimals: Byte)                   extends ValidationError
   case class NegativeMinFee(minFee: Long, of: String)          extends ValidationError
-  case class InsufficientFee(msg: String = "insufficient fee") extends ValidationError
+  case object InsufficientFee                                  extends ValidationError
   case object TooBigArray                                      extends ValidationError
   case object InvalidName                                      extends ValidationError
   case object InvalidAssetId                                   extends ValidationError

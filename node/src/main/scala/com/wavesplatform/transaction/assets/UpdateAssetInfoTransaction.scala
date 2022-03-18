@@ -83,7 +83,7 @@ object UpdateAssetInfoTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, UpdateAssetInfoTransaction] =
     for {
-      fee <- TxAmount.from(feeAmount).leftMap(_ => TxValidationError.InsufficientFee())
+      fee <- TxAmount.from(feeAmount).leftMap(_ => TxValidationError.InsufficientFee)
       tx <- UpdateAssetInfoTransaction(
         version,
         sender,

@@ -79,7 +79,7 @@ object ExchangeTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ExchangeTransaction] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
+      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
       amount <- TxExchangeAmount.from(amount)
         .leftMap(_ => GenericError(TxExchangeAmount.errMsg))
       price <- TxExchangePrice.from(price)

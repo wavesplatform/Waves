@@ -1,7 +1,8 @@
 package com.wavesplatform.it.api
 
-import java.util.NoSuchElementException
+import com.google.common.primitives.{Bytes, Longs}
 
+import java.util.NoSuchElementException
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
@@ -17,10 +18,13 @@ import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.transaction.Transaction.Data
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.transaction.{Asset, Proofs, TxVersion}
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
 import monix.execution.Scheduler
@@ -95,9 +99,29 @@ object AsyncGrpcApi {
 
       script match {
         case Left(_) => transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.EMPTY)))
-        case _ =>
-          val proofs =
-            crypto.sign(source.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+        case Right(sc) =>
+          val baseBytes = Bytes.concat(
+            source.publicKey.arr,
+            Deser.serializeArrayWithLength(name.getBytes),
+            Deser.serializeArrayWithLength(description.getBytes),
+            Longs.toByteArray(quantity),
+            Array(decimals.toByte),
+            Deser.serializeBoolean(reissuable),
+            Longs.toByteArray(fee),
+            Longs.toByteArray(unsigned.timestamp)
+          )
+
+          val bodyBytes = version match {
+            case TxVersion.V1 => Bytes.concat(Array(IssueTransaction.typeId), baseBytes)
+            case TxVersion.V2 =>
+              Bytes.concat(Array(IssueTransaction.typeId, version.toByte, chainId), baseBytes, Deser.serializeOptionOfArrayWithLength(sc)(_.bytes().arr))
+            case _ =>
+              val data = IssueTransactionData(name, description, quantity, decimals, reissuable, toPBScript(script))
+              val tx = PBTransactions.create(source.publicKey, chainId, fee, Waves, unsigned.timestamp, version, Proofs.empty, Data.Issue(data)).getTransaction
+              PBUtils.encodeDeterministic(tx)
+          }
+
+          val proofs = crypto.sign(source.privateKey, bodyBytes)
           transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
       }
     }

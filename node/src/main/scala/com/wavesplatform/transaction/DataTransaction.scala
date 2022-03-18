@@ -68,7 +68,7 @@ object DataTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, DataTransaction] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
+      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
       tx <- DataTransaction(version, sender, data, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 

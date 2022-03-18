@@ -153,6 +153,27 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
     }
   }
 
+  val invalidAssetValue =
+    Table(
+      ("assetVal", "decimals", "message"),
+      (0L, 2, "non-positive amount"),
+      (1L, IssueTransaction.MaxAssetDecimals + 1, "invalid decimals value: 9, decimals should be in interval \\[0; 8\\]"),
+      (-1L, 1, "non-positive amount"),
+      (1L, -1, "invalid decimals value: -1, decimals should be in interval \\[0; 8\\]")
+    )
+
+  forAll(invalidAssetValue) { (assetVal: Long, decimals: Int, error: String) =>
+    test(s"Not able to create asset total token='$assetVal', decimals='$decimals' ") {
+      val assetName          = "myasset2"
+      val decimalBytes: Byte = decimals.toByte
+      assertGrpcError(
+        sender.broadcastIssue(issuer, assetName, assetVal, decimalBytes, reissuable = false, issueFee),
+        s"$error",
+        Code.INVALID_ARGUMENT
+      )
+    }
+  }
+
   val tooSmallAssetName = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MinAssetNameLength - 1).mkString
   val tooBigAssetName   = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MaxAssetNameLength + 1).mkString
   val invalid_assets_names =

@@ -67,7 +67,7 @@ object BurnTransaction extends TransactionParser {
   ): Either[ValidationError, BurnTransaction] =
     for {
       quantity <- TxQuantity.from(quantity).leftMap(_ => TxValidationError.NegativeAmount(quantity, "assets"))
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
+      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
       tx <- BurnTransaction(version, sender, asset, quantity, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 

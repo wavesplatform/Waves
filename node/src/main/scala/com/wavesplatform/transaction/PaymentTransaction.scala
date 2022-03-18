@@ -60,7 +60,7 @@ object PaymentTransaction extends TransactionParser {
       signature: ByteStr
   ): Either[ValidationError, PaymentTransaction] =
     for {
-      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee())
+      fee <- TxAmount.from(fee).leftMap(_ => TxValidationError.InsufficientFee)
       amount <- TxAmount.from(amount).leftMap(_ => TxValidationError.NonPositiveAmount(amount, "waves"))
       tx <- PaymentTransaction(sender, recipient, amount, fee, timestamp, signature, recipient.chainId).validatedEither
     } yield tx
