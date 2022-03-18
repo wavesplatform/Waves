@@ -10,8 +10,8 @@ import scala.annotation.tailrec
 import scala.collection.mutable.Queue
 
 package object compiler {
-  val IsInstanceOf = "$isInstanceOf"
-  val TuplePrefix  = "$Tuple"
+  val IsInstanceOf = s"$$isInstanceOf"
+  val TuplePrefix  = s"$$Tuple"
 
   type CompileM[A] = TaskM[CompilerContext, CompilationError, A]
 
