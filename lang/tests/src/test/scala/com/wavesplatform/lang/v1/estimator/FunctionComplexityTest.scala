@@ -40,7 +40,7 @@ class FunctionComplexityTest extends PropSpec {
     directives.foreach { ds =>
       val ctx = lazyContexts(ds).value()
       ctx.functions
-        .filterNot(_.name.startsWith("%"))
+        .filterNot(_.name.startsWith("$"))
         .foreach { function =>
           val expr = FUNCTION_CALL(function.header, List.fill(function.args.size)(Terms.TRUE))
           val estimatedCost = ScriptEstimatorV3(fixOverflow = true)(

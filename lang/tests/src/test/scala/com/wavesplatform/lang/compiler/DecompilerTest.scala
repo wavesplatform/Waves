@@ -1056,26 +1056,26 @@ class DecompilerTest extends PropSpec {
          |
          |func g () = {
          |    let @ = f()
-         |    if (%isInstanceOf(@, "Boolean"))
+         |    if ($$isInstanceOf(@, "Boolean"))
          |        then @
          |        else unit
          |    }
          |
          |let a = if ({
          |    let @ = g()
-         |    if (%isInstanceOf(@, "Boolean"))
+         |    if ($$isInstanceOf(@, "Boolean"))
          |        then @
          |        else throw("Couldn't cast Boolean|Unit to Boolean")
          |    })
          |    then {
          |        let @ = f()
-         |        if (%isInstanceOf(@, "Boolean"))
+         |        if ($$isInstanceOf(@, "Boolean"))
          |            then @
          |            else throw("Couldn't cast Boolean to Boolean")
          |        }
          |    else false
          |let @ = a
-         |if (%isInstanceOf(@, "Boolean"))
+         |if ($$isInstanceOf(@, "Boolean"))
          |    then @
          |    else unit
        """

@@ -30,7 +30,8 @@ object JsAPI {
     )
 
   private def cryptoContext(version: StdLibVersion) = CryptoContext.build(Global, version).withEnvironment[Environment]
-  private def pureContext(version: StdLibVersion)   = PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment]
+  private def pureContext(version: StdLibVersion) =
+    PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment]
 
   private val fullDAppContext: Map[StdLibVersion, CTX[Environment]] =
     DirectiveDictionary[StdLibVersion].all
@@ -61,24 +62,27 @@ object JsAPI {
             "name" -> v._1,
             "type" -> typeRepr(v._2._1),
             "doc"  -> DocSource.varData((v._1, ver))
-          )
+        )
       )
       .toJSArray
 
   @JSExportTopLevel("getFunctionsDoc")
   def getFunctionsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     buildScriptContext(DirectiveDictionary[StdLibVersion].idMap(ver), isTokenContext, isContract).functions
-      .filterNot(_.name.startsWith("%"))
-      .map(f => {
-        val (funcDoc, paramsDoc, _) = DocSource.funcData((f.name, f.signature.args.map(_._2.toString).toList, ver))
-        js.Dynamic.literal(
-          "name"       -> f.name,
-          "doc"        -> funcDoc,
-          "resultType" -> typeRepr(f.signature.result),
-          "args" -> (f.args zip f.signature.args zip paramsDoc).map { arg =>
-            js.Dynamic.literal("name" -> arg._1._1, "type" -> typeRepr(arg._1._2._2), "doc" -> arg._2)
-          }.toJSArray
-        )
+      .flatMap(f => {
+        DocSource.funcData
+          .get((f.name, f.signature.args.map(_._2.toString).toList, ver))
+          .map {
+            case (funcDoc, paramsDoc, _) =>
+              js.Dynamic.literal(
+                "name"       -> f.name,
+                "doc"        -> funcDoc,
+                "resultType" -> typeRepr(f.signature.result),
+                "args" -> (f.args zip f.signature.args zip paramsDoc).map { arg =>
+                  js.Dynamic.literal("name" -> arg._1._1, "type" -> typeRepr(arg._1._2._2), "doc" -> arg._2)
+                }.toJSArray
+              )
+          }
       })
       .toJSArray
 
