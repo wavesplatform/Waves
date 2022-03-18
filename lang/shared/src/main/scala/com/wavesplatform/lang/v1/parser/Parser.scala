@@ -6,7 +6,7 @@ import cats.instances.option._
 import cats.syntax.either._
 import cats.syntax.traverse._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.ContractLimits
+import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
@@ -96,8 +96,10 @@ object Parser {
       .filter { case (_, x, _) => !keywords.contains(x) }
       .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
+  def declNameP[_: P]: P[Unit] = "_".? ~~ char ~~ ("_".? ~~ (digit | char)).repX() ~~ "_".?
+
   def correctLFunName[_: P]: P[PART[String]] =
-    (Index ~~ (char ~~ ("_".? ~~ (digit | char)).repX()).! ~~ Index)
+    (Index ~~ declNameP.! ~~ Index)
       .filter { case (_, x, _) => !keywords.contains(x) }
       .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
@@ -111,7 +113,7 @@ object Parser {
   }
 
   def anyVarName(implicit c: fastparse.P[Any]): P[PART[String]] = {
-    def nameP(implicit c: fastparse.P[Any]): P[Unit] = char ~~ (digit | char).repX()
+    def nameP(implicit c: fastparse.P[Any]): P[Unit] = declNameP
     genericVarName(nameP(_))
   }
 
@@ -208,7 +210,7 @@ object Parser {
     case (s, elements, f) =>
       FUNCTION_CALL(
         Pos(s, f),
-        PART.VALID(Pos(s, f), s"_Tuple${elements.length}"),
+        PART.VALID(Pos(s, f), s"${compiler.TuplePrefix}${elements.length}"),
         elements.toList
       )
   }

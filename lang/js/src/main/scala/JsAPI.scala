@@ -55,7 +55,6 @@ object JsAPI {
   @JSExportTopLevel("getVarsDoc")
   def getVarsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     buildScriptContext(DirectiveDictionary[StdLibVersion].idMap(ver), isTokenContext, isContract).vars
-      .filterNot(_._1.startsWith("_"))
       .map(
         v =>
           js.Dynamic.literal(
@@ -69,7 +68,7 @@ object JsAPI {
   @JSExportTopLevel("getFunctionsDoc")
   def getFunctionsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     buildScriptContext(DirectiveDictionary[StdLibVersion].idMap(ver), isTokenContext, isContract).functions
-      .filterNot(_.name.startsWith("_"))
+      .filterNot(_.name.startsWith("%"))
       .map(f => {
         val (funcDoc, paramsDoc, _) = DocSource.funcData((f.name, f.signature.args.map(_._2.toString).toList, ver))
         js.Dynamic.literal(
