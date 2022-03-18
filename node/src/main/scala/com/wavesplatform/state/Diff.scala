@@ -194,7 +194,10 @@ object Diff {
   def combine(portfolios1: Map[Address, Portfolio], portfolios2: Map[Address, Portfolio]): Either[String, Map[Address, Portfolio]] =
     combineF[Either[String, *]](portfolios1, portfolios2)
 
-  def combineF[F[_]: Monad: Summarizer](portfolios1: Map[Address, Portfolio], portfolios2: Map[Address, Portfolio]): F[Map[Address, Portfolio]] =
+  def unsafeCombine(portfolios1: Map[Address, Portfolio], portfolios2: Map[Address, Portfolio]): Map[Address, Portfolio] =
+    combineF[Id](portfolios1, portfolios2)
+
+  private def combineF[F[_]: Monad: Summarizer](portfolios1: Map[Address, Portfolio], portfolios2: Map[Address, Portfolio]): F[Map[Address, Portfolio]] =
     sumMapF[F, Address, Portfolio](portfolios1, portfolios2, _.combineF[F](_))
 
   implicit class DiffExt(private val d: Diff) extends AnyVal {
