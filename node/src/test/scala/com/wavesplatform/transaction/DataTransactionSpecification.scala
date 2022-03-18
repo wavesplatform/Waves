@@ -174,10 +174,10 @@ class DataTransactionSpecification extends PropSpec {
         duplicateKeysEi shouldBe Left(TxValidationError.DuplicatedDataKeys)
 
         val noFeeEi = DataTransaction.create(1.toByte, sender, data, 0, timestamp, proofs)
-        noFeeEi shouldBe Left(TxValidationError.InsufficientFee())
+        noFeeEi shouldBe Left(TxValidationError.InsufficientFee)
 
         val negativeFeeEi = DataTransaction.create(1.toByte, sender, data, -100, timestamp, proofs)
-        negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee())
+        negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee)
     }
   }
 

@@ -80,7 +80,7 @@ class AssetsBroadcastRouteSpec
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("issue"), v) ~> route
 
         forAll(nonPositiveLong) { q =>
-          posting(ir.copy(fee = q)) should produce(InsufficientFee())
+          posting(ir.copy(fee = q)) should produce(InsufficientFee)
         }
         forAll(nonPositiveLong) { q =>
           posting(ir.copy(quantity = q)) should produce(NonPositiveAmount(s"$q of assets"))
@@ -98,7 +98,7 @@ class AssetsBroadcastRouteSpec
           posting(ir.copy(name = name)) should produce(InvalidName)
         }
         forAll(nonPositiveLong) { fee =>
-          posting(ir.copy(fee = fee)) should produce(InsufficientFee())
+          posting(ir.copy(fee = fee)) should produce(InsufficientFee)
         }
       }
     }
@@ -112,7 +112,7 @@ class AssetsBroadcastRouteSpec
           posting(rr.copy(quantity = q)) should produce(NonPositiveAmount(s"$q of assets"))
         }
         forAll(nonPositiveLong) { fee =>
-          posting(rr.copy(fee = fee)) should produce(InsufficientFee())
+          posting(rr.copy(fee = fee)) should produce(InsufficientFee)
         }
       }
     }
@@ -128,7 +128,7 @@ class AssetsBroadcastRouteSpec
           posting(br.copy(amount = q)) should produce(NegativeAmount(s"$q of assets"))
         }
         forAll(nonPositiveLong) { fee =>
-          posting(br.copy(fee = fee)) should produce(InsufficientFee())
+          posting(br.copy(fee = fee)) should produce(InsufficientFee)
         }
       }
     }
@@ -162,7 +162,7 @@ class AssetsBroadcastRouteSpec
           )
         }
         forAll(nonPositiveLong) { fee =>
-          posting(tr.copy(fee = fee)) should produce(InsufficientFee())
+          posting(tr.copy(fee = fee)) should produce(InsufficientFee)
         }
       }
     }

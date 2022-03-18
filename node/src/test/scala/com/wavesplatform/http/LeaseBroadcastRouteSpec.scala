@@ -62,7 +62,7 @@ class LeaseBroadcastRouteSpec
         posting(lease.copy(recipient = a)) should produce(InvalidAddress)
       }
       forAll(nonPositiveLong) { fee =>
-        posting(lease.copy(fee = fee)) should produce(InsufficientFee())
+        posting(lease.copy(fee = fee)) should produce(InsufficientFee)
       }
       forAll(posNum[Long]) { quantity =>
         posting(lease.copy(amount = quantity, fee = Long.MaxValue)) should produce(OverflowError)
@@ -79,7 +79,7 @@ class LeaseBroadcastRouteSpec
         posting(cancel.copy(senderPublicKey = pk)) should produce(InvalidAddress)
       }
       forAll(nonPositiveLong) { fee =>
-        posting(cancel.copy(fee = fee)) should produce(InsufficientFee())
+        posting(cancel.copy(fee = fee)) should produce(InsufficientFee)
       }
     }
   }

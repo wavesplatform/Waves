@@ -46,7 +46,7 @@ class AliasBroadcastRouteSpec
         posting(toJson(req.copy(senderPublicKey = s))) should produce(InvalidAddress)
       }
       forAll(nonPositiveLong) { q =>
-        posting(toJson(req.copy(fee = q))) should produce(InsufficientFee())
+        posting(toJson(req.copy(fee = q))) should produce(InsufficientFee)
       }
       forAll(invalidAliasStringByLength) { q =>
         val obj = toJson(req).as[JsObject] ++ Json.obj("alias" -> JsString(q))

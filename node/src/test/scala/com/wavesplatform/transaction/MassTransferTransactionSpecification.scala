@@ -106,10 +106,10 @@ class MassTransferTransactionSpecification extends PropSpec {
         longAttachmentEi shouldBe Left(TxValidationError.TooBigArray)
 
         val noFeeEi = create(1.toByte, sender, assetId, feeOverflow, 0, timestamp, attachment, proofs)
-        noFeeEi shouldBe Left(TxValidationError.InsufficientFee())
+        noFeeEi shouldBe Left(TxValidationError.InsufficientFee)
 
         val negativeFeeEi = create(1.toByte, sender, assetId, feeOverflow, -100, timestamp, attachment, proofs)
-        negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee())
+        negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee)
 
         val differentChainIds = Seq(ParsedTransfer(sender.toAddress, 100), ParsedTransfer(sender.toAddress('?'.toByte), 100))
         val invalidChainIdEi  = create(1.toByte, sender, assetId, differentChainIds, 100, timestamp, attachment, proofs)
