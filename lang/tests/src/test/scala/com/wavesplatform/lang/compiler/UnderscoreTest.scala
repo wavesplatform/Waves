@@ -55,8 +55,8 @@ class UnderscoreTest extends PropSpec {
   }
 
   property("internal functions can't be used directly") {
-    compile(" $Tuple2(1, 1) ") should produce("can't parse the expression")
-    compile(""" $isInstanceOf(1, "Int") """) should produce("can't parse the expression")
+    compile(s" $$Tuple2(1, 1) ") should produce("can't parse the expression")
+    compile(s""" $$isInstanceOf(1, "Int") """) should produce("can't parse the expression")
   }
 
   property("internal functions names don't affect compiled expression") {
@@ -68,11 +68,75 @@ class UnderscoreTest extends PropSpec {
       """.stripMargin
     ) shouldBe Right(
       LET_BLOCK(
-        LET("$match0", CONST_LONG(1)),
+        LET(s"$$match0", CONST_LONG(1)),
         IF(
-          FUNCTION_CALL(Native(1), List(REF("$match0"), CONST_STRING("Int").explicitGet())), // Native(1) is isInstanceOf
+          FUNCTION_CALL(Native(1), List(REF(s"$$match0"), CONST_STRING("Int").explicitGet())), // Native(1) is isInstanceOf
           CONST_BOOLEAN(true),
           FUNCTION_CALL(Native(2), List(CONST_STRING("Match error").explicitGet()))
+        )
+      ))
+  }
+
+  property("FOLD with underscores") {
+    compile(
+      s"""
+         | func _s_u_m_(_a_a_:Int, _b_b_:Int) = _a_a_ + _b_b_
+         | let _a_r_r_ = [1, 2, 3, 4, 5]
+         | FOLD<1>(_a_r_r_, 9, _s_u_m_)
+      """.stripMargin
+    ) shouldBe Right(
+      BLOCK(
+        FUNC("_s_u_m_", List("_a_a_", "_b_b_"), FUNCTION_CALL(Native(100), List(REF("_a_a_"), REF("_b_b_")))),
+        LET_BLOCK(
+          LET(
+            "_a_r_r_",
+            FUNCTION_CALL(
+              Native(1100),
+              List(
+                CONST_LONG(1),
+                FUNCTION_CALL(
+                  Native(1100),
+                  List(
+                    CONST_LONG(2),
+                    FUNCTION_CALL(Native(1100),
+                                  List(CONST_LONG(3),
+                                       FUNCTION_CALL(Native(1100),
+                                                     List(CONST_LONG(4), FUNCTION_CALL(Native(1100), List(CONST_LONG(5), REF("nil")))))))
+                  )
+                )
+              )
+            )
+          ),
+          BLOCK(
+            LET(s"$$l", REF("_a_r_r_")),
+            BLOCK(
+              LET(s"$$s", FUNCTION_CALL(Native(400), List(REF(s"$$l")))),
+              BLOCK(
+                LET(s"$$acc0", CONST_LONG(9)),
+                BLOCK(
+                  FUNC(
+                    "$f0_1",
+                    List(s"$$a", s"$$i"),
+                    IF(
+                      FUNCTION_CALL(Native(103), List(REF(s"$$i"), REF(s"$$s"))),
+                      REF(s"$$a"),
+                      FUNCTION_CALL(User("_s_u_m_"), List(REF(s"$$a"), FUNCTION_CALL(Native(401), List(REF(s"$$l"), REF(s"$$i")))))
+                    )
+                  ),
+                  BLOCK(
+                    FUNC(
+                      "$f0_2",
+                      List(s"$$a", s"$$i"),
+                      IF(FUNCTION_CALL(Native(103), List(REF(s"$$i"), REF(s"$$s"))),
+                         REF(s"$$a"),
+                         FUNCTION_CALL(Native(2), List(CONST_STRING("List size exceeds 1").explicitGet())))
+                    ),
+                    FUNCTION_CALL(User(s"$$f0_2"), List(FUNCTION_CALL(User(s"$$f0_1"), List(REF(s"$$acc0"), CONST_LONG(0))), CONST_LONG(1)))
+                  )
+                )
+              )
+            )
+          )
         )
       ))
   }

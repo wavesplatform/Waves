@@ -135,10 +135,6 @@ object Parser {
   def falseP[_: P]: P[FALSE]      = P(Index ~~ "false".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => FALSE(Pos(start, end)) }
   def curlyBracesP[_: P]: P[EXPR] = P("{" ~ baseExpr ~ "}")
 
-  def refP[_: P]: P[REF] = P(correctVarName).map { x =>
-    REF(Pos(x.position.start, x.position.end), x)
-  }
-
   def lfunP[_: P]: P[REF] = P(correctLFunName).map { x =>
     REF(Pos(x.position.start, x.position.end), x)
   }
@@ -179,7 +175,7 @@ object Parser {
   }
 
   def foldP[_: P]: P[EXPR] =
-    (Index ~~ P("FOLD<") ~~ Index ~~ digit.repX(1).! ~~ Index ~~ ">(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ refP ~ ")" ~~ Index)
+    (Index ~~ P("FOLD<") ~~ Index ~~ digit.repX(1).! ~~ Index ~~ ">(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ lfunP ~ ")" ~~ Index)
       .map {
         case (start, limStart, limit, limEnd, list, acc, f, end) =>
           val lim = limit.toInt
