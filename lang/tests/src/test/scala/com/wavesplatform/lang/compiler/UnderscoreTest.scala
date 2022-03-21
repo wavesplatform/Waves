@@ -55,8 +55,8 @@ class UnderscoreTest extends PropSpec {
   }
 
   property("internal functions can't be used directly") {
-    compile(" %Tuple2(1, 1) ") should produce("can't parse the expression")
-    compile(""" %isInstanceOf(1, "Int") """) should produce("can't parse the expression")
+    compile(" $Tuple2(1, 1) ") should produce("can't parse the expression")
+    compile(""" $isInstanceOf(1, "Int") """) should produce("can't parse the expression")
   }
 
   property("internal functions names don't affect compiled expression") {
