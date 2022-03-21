@@ -80,7 +80,8 @@ object ExchangeTransaction extends TransactionParser {
       buyMatcherFee: Long,
       sellMatcherFee: Long,
       fee: Long,
-      timestamp: Long
+      timestamp: Long,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ExchangeTransaction] =
-    create(version, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).map(_.signWith(matcher))
+    create(version, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty, chainId).map(_.signWith(matcher))
 }

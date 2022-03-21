@@ -4,6 +4,7 @@ import com.wavesplatform.api.http.{ApiMarshallers, TransactionsApiRoute}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.V5
@@ -13,7 +14,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Asset, GenesisTransaction}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.{BlockGen, TestWallet}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
@@ -67,8 +68,7 @@ class SpentComplexitySpec
       BlockchainFeatures.SynchronousCalls
     )
 
-  private val sender             = testWallet.generateNewAccount().get
-  private val genesisTransaction = GenesisTransaction.create(sender.toAddress, 10_000_00000000L, ntpTime.getTimestamp()).explicitGet()
+  private val sender = testWallet.generateNewAccount().get
 
   private def route(d: Domain) =
     seal(
@@ -76,73 +76,77 @@ class SpentComplexitySpec
     )
 
   "Invocation" - {
-    "does not count verifier complexity when InvokeScript is sent from smart account" in withDomain(settings) { d =>
-      val invokeTx = Signed.invokeScript(2.toByte, sender, sender.toAddress, None, Seq.empty, 90_0000L, Asset.Waves, ntpTime.getTimestamp())
+    "does not count verifier complexity when InvokeScript is sent from smart account" in
+      withDomain(settings, Seq(AddrWithBalance(sender.toAddress, 10_000_00000000L))) { d =>
+        val invokeTx = Signed
+          .invokeScript(2.toByte, sender, sender.toAddress, None, Seq.empty, 90_0000L, Asset.Waves, ntpTime.getTimestamp())
 
-      d.appendBlock(
-        genesisTransaction,
-        SetScriptTransaction.selfSigned(2.toByte, sender, Some(contract), 100_0000L, ntpTime.getTimestamp()).explicitGet(),
-        invokeTx
-      )
+        d.appendBlock(
+          SetScriptTransaction.selfSigned(2.toByte, sender, Some(contract), 100_0000L, ntpTime.getTimestamp()).explicitGet(),
+          invokeTx
+        )
 
-      Get(s"/transactions/info/${invokeTx.id()}") ~> route(d) ~> check {
-        (responseAs[JsObject] \ "spentComplexity").as[Long] shouldBe 2
+        Get(s"/transactions/info/${invokeTx.id()}") ~> route(d) ~> check {
+          (responseAs[JsObject] \ "spentComplexity").as[Long] shouldBe 2
+        }
       }
-    }
 
-    "counts asset script complexity when smart asset payment is attached" in withDomain(settings) { d =>
-      val issue = IssueTransaction
-        .selfSigned(2.toByte, sender, "TEST", "", 1000_00L, 2.toByte, false, Some(assetScript), 1_00000000L, ntpTime.getTimestamp())
-        .explicitGet()
-
+    "counts asset script complexity when smart asset payment is attached" in {
       val recipient = testWallet.generateNewAccount().get
-      val transferAsset = TransferTransaction
-        .selfSigned(2.toByte, sender, recipient.toAddress, issue.asset, 50_00L, Waves, 40_0000L, ByteStr.empty, ntpTime.getTimestamp())
-        .explicitGet()
 
-      val invokeTx = Signed.invokeScript(2.toByte, recipient, sender.toAddress, None, Seq(InvokeScriptTransaction.Payment(50_00L, issue.asset)), 90_0000L, Asset.Waves, ntpTime.getTimestamp())
+      withDomain(settings, Seq(AddrWithBalance(sender.toAddress, 10_000_00000000L), AddrWithBalance(recipient.toAddress, 10_00000000L))) { d =>
+        val issue = IssueTransaction
+          .selfSigned(2.toByte, sender, "TEST", "", 1000_00L, 2.toByte, false, Some(assetScript), 1_00000000L, ntpTime.getTimestamp())
+          .explicitGet()
 
-      d.appendBlock(
-        genesisTransaction,
-        GenesisTransaction.create(recipient.toAddress, 10_00000000L, ntpTime.getTimestamp()).explicitGet(),
-        issue,
-        transferAsset,
-        SetScriptTransaction.selfSigned(2.toByte, sender, Some(contract), 100_0000L, ntpTime.getTimestamp()).explicitGet(),
-        invokeTx
-      )
+        val transferAsset = TransferTransaction
+          .selfSigned(2.toByte, sender, recipient.toAddress, issue.asset, 50_00L, Waves, 40_0000L, ByteStr.empty, ntpTime.getTimestamp())
+          .explicitGet()
 
-      Get(s"/transactions/info/${invokeTx.id()}") ~> route(d) ~> check {
-        (responseAs[JsObject] \ "spentComplexity").as[Long] shouldBe 2
+        val invokeTx = Signed
+          .invokeScript(2.toByte, recipient, sender.toAddress, None, Seq(InvokeScriptTransaction.Payment(50_00L, issue.asset)), 90_0000L, Asset.Waves, ntpTime.getTimestamp())
+
+        d.appendBlock(
+          issue,
+          transferAsset,
+          SetScriptTransaction.selfSigned(2.toByte, sender, Some(contract), 100_0000L, ntpTime.getTimestamp()).explicitGet(),
+          invokeTx
+        )
+
+        Get(s"/transactions/info/${invokeTx.id()}") ~> route(d) ~> check {
+          (responseAs[JsObject] \ "spentComplexity").as[Long] shouldBe 2
+        }
       }
     }
   }
 
-  "Does not count smart asset complexity for transfer" in withDomain(settings) { d =>
-    val issue = IssueTransaction
-      .selfSigned(2.toByte, sender, "TEST", "", 1000_00L, 2.toByte, false, Some(assetScript), 1_00000000L, ntpTime.getTimestamp())
-      .explicitGet()
-
+  "Does not count smart asset complexity for transfer" in {
     val recipient = testWallet.generateNewAccount().get
-    val transferAsset = TransferTransaction
-      .selfSigned(2.toByte, sender, recipient.toAddress, issue.asset, 50_00L, Waves, 40_0000L, ByteStr.empty, ntpTime.getTimestamp())
-      .explicitGet()
 
-    val returnFrom = TransferTransaction
-      .selfSigned(2.toByte, recipient, sender.toAddress, issue.asset, 49_00L, Waves, 40_0000L, ByteStr.empty, ntpTime.getTimestamp())
-      .explicitGet()
+    withDomain(settings, Seq(AddrWithBalance(sender.toAddress, 10_000_00000000L), AddrWithBalance(recipient.toAddress, 10_00000000L))) { d =>
+      val issue = IssueTransaction
+        .selfSigned(2.toByte, sender, "TEST", "", 1000_00L, 2.toByte, false, Some(assetScript), 1_00000000L, ntpTime.getTimestamp())
+        .explicitGet()
 
-    d.appendBlock(
-      genesisTransaction,
-      GenesisTransaction.create(recipient.toAddress, 10_00000000L, ntpTime.getTimestamp()).explicitGet(),
-      issue,
-      transferAsset,
-      returnFrom
-    )
+      val transferAsset = TransferTransaction
+        .selfSigned(2.toByte, sender, recipient.toAddress, issue.asset, 50_00L, Waves, 40_0000L, ByteStr.empty, ntpTime.getTimestamp())
+        .explicitGet()
 
-    val currentRoute = route(d)
+      val returnFrom = TransferTransaction
+        .selfSigned(2.toByte, recipient, sender.toAddress, issue.asset, 49_00L, Waves, 40_0000L, ByteStr.empty, ntpTime.getTimestamp())
+        .explicitGet()
 
-    Get(routePath(s"/info/${transferAsset.id()}")) ~> currentRoute ~> check {
-      (responseAs[JsObject] \ "spentComplexity").as[Long] shouldBe 0
+      d.appendBlock(
+        issue,
+        transferAsset,
+        returnFrom
+      )
+
+      val currentRoute = route(d)
+
+      Get(routePath(s"/info/${transferAsset.id()}")) ~> currentRoute ~> check {
+        (responseAs[JsObject] \ "spentComplexity").as[Long] shouldBe 0
+      }
     }
   }
 }

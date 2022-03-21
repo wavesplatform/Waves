@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
-import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, EthSetChainId, JsonMatchers}
+import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, Inside}
 import org.web3j.crypto.{RawTransaction, Sign, SignedRawTransaction, TransactionEncoder}
@@ -28,7 +28,6 @@ class EthereumTransactionSpec
     with PathMockFactory
     with BlockchainStubHelpers
     with EthHelpers
-    with EthSetChainId
     with DiffMatchers
     with JsonMatchers
     with Inside {
@@ -47,18 +46,17 @@ class EthereumTransactionSpec
     val assetTransfer = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 1, TestValues.asset)
     val invoke        = EthTxGenerator.generateEthInvoke(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, "test", Nil, Nil)
 
-    EthChainId.unset() // Set to 'T'
 
     inside(EthereumTransaction(transfer.toSignedRawTransaction).explicitGet().payload) {
-      case t: EthereumTransaction.Transfer => t.recipient.chainId shouldBe 'E'.toByte
+      case t: EthereumTransaction.Transfer => t.recipient.chainId shouldBe 'T'.toByte
     }
 
     inside(EthereumTransaction(assetTransfer.toSignedRawTransaction).explicitGet().payload) {
-      case t: EthereumTransaction.Transfer => t.recipient.chainId shouldBe 'E'.toByte
+      case t: EthereumTransaction.Transfer => t.recipient.chainId shouldBe 'T'.toByte
     }
 
     inside(EthereumTransaction(invoke.toSignedRawTransaction).explicitGet().payload) {
-      case t: EthereumTransaction.Invocation => t.dApp.chainId shouldBe 'E'.toByte
+      case t: EthereumTransaction.Invocation => t.dApp.chainId shouldBe 'T'.toByte
     }
   }
 
@@ -313,7 +311,7 @@ class EthereumTransactionSpec
     Json.toJson(diff.scriptResults.values.head) should matchJson("""{
                                                                    |  "data" : [ ],
                                                                    |  "transfers" : [ {
-                                                                   |    "address" : "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
+                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
                                                                    |    "asset" : null,
                                                                    |    "amount" : 123
                                                                    |  } ],
@@ -403,7 +401,7 @@ class EthereumTransactionSpec
     Json.toJson(diff.scriptResults.values.head) should matchJson("""{
                                                                    |  "data" : [ ],
                                                                    |  "transfers" : [ {
-                                                                   |    "address" : "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
+                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
                                                                    |    "asset" : null,
                                                                    |    "amount" : 123
                                                                    |  } ],
@@ -450,7 +448,7 @@ class EthereumTransactionSpec
     Json.toJson(diff.scriptResults.values.head) should matchJson("""{
                                                                    |  "data" : [ ],
                                                                    |  "transfers" : [ {
-                                                                   |    "address" : "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
+                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
                                                                    |    "asset" : null,
                                                                    |    "amount" : 123
                                                                    |  } ],
@@ -540,7 +538,7 @@ class EthereumTransactionSpec
     Json.toJson(diff.scriptResults.values.head) should matchJson("""{
                                                                    |  "data" : [ ],
                                                                    |  "transfers" : [ {
-                                                                   |    "address" : "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
+                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
                                                                    |    "asset" : null,
                                                                    |    "amount" : 123
                                                                    |  } ],
@@ -594,12 +592,12 @@ class EthereumTransactionSpec
     Json.toJson(diff.scriptResults.values.head) should matchJson(s"""{
                                                                    |  "data" : [ ],
                                                                    |  "transfers" : [ {
-                                                                   |    "address" : "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
+                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
                                                                    |    "asset" : null,
                                                                    |    "amount" : 123
                                                                    |  },
                                                                    |   {
-                                                                   |    "address" : "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
+                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
                                                                    |    "asset" : "$TestAsset",
                                                                    |    "amount" : 123
                                                                    |  }],

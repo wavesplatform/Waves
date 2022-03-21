@@ -1,25 +1,18 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.wavesplatform.TransactionGenBase
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures.*
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.TxHelpers
 
-class EvaluatorFunctionCallScopeTest extends PropSpec with WithDomain with TransactionGenBase {
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
+class EvaluatorFunctionCallScopeTest extends PropSpec with WithDomain {
 
-  private val dApp1Script: Script =
+  private val dAppScript: Script =
     TestCompiler(V5).compileContract(
       s"""
          | @Callable(i)
@@ -35,33 +28,27 @@ class EvaluatorFunctionCallScopeTest extends PropSpec with WithDomain with Trans
        """.stripMargin
     )
 
-  private val scenario =
-    for {
-      invoker <- accountGen
-      dApp1   <- accountGen
-      fee     <- ciFee()
-      gTx1     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2     = GenesisTransaction.create(dApp1.toAddress, ENOUGH_AMT, ts).explicitGet()
-      ssTx1    = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script), fee, ts).explicitGet()
-      invokeTx = () => Signed.invokeScript(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts)
-    } yield (Seq(gTx1, gTx2, ssTx1), invokeTx, dApp1.toAddress)
-
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(estimatorSumOverflowFixHeight = 3)
+      .copy(estimatorSumOverflowFixHeight = 4)
 
   property("arg of the first function should NOT overlap var accessed from body of the second function AFTER fix") {
-    val (preparingTxs, invoke, dApp) = scenario.sample.get
-    withDomain(domainSettingsWithFS(settings)) { d =>
-      d.appendBlock(preparingTxs *)
+    val invoker = TxHelpers.signer(0)
+    val dApp    = TxHelpers.signer(1)
+    val balances = AddrWithBalance.enoughBalances(invoker, dApp)
+
+    val setScript = TxHelpers.setScript(dApp, dAppScript)
+    val invoke = () => TxHelpers.invoke(dApp.toAddress, func = None, invoker = invoker)
+
+    withDomain(domainSettingsWithFS(settings), balances) { d =>
+      d.appendBlock(setScript)
 
       d.appendBlock(invoke())
-      d.blockchain.accountData(dApp, "key").get.value shouldBe 1
+      d.blockchain.accountData(dApp.toAddress, "key").get.value shouldBe 1
 
-      val transaction = invoke()
-      d.appendBlock(transaction)
-      d.blockchain.accountData(dApp, "key").get.value shouldBe 4
+      d.appendBlock(invoke())
+      d.blockchain.accountData(dApp.toAddress, "key").get.value shouldBe 4
     }
   }
 }

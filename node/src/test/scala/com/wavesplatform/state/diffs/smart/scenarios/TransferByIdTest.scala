@@ -7,6 +7,7 @@ import com.wavesplatform.lang.directives.values.{Expression, V3}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.compilerContext
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -14,12 +15,11 @@ import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
-import org.scalacheck.Gen
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxHelpers, TxVersion}
 
 class TransferByIdTest extends PropSpec with WithState {
 
-  val scriptSrc =
+  val scriptSrc: String =
     s"""
        |match tx {
        |  case dtx: DataTransaction =>
@@ -32,33 +32,35 @@ class TransferByIdTest extends PropSpec with WithState {
        |}
      """.stripMargin
 
-  val expr = {
+  val expr: EXPR = {
     val parsed = Parser.parseExpr(scriptSrc).get.value
     ExpressionCompiler(compilerContext(V3, Expression, isAssetScript = false), parsed).explicitGet()._1
   }
 
-  def preconditions: Gen[(GenesisTransaction, TransferTransaction, SetScriptTransaction, DataTransaction)] =
-    for {
-      master    <- accountGen
-      recipient <- accountGen
-      ts        <- positiveIntGen
-      genesis = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-      setScript <- selfSignedSetScriptTransactionGenP(master, ExprScript(V3, expr).explicitGet())
-      transfer <- Gen.oneOf[TransferTransaction](
-        transferGeneratorP(ts, master, recipient.toAddress, ENOUGH_AMT / 2),
-        transferGeneratorPV2(ts, master, recipient.toAddress, ENOUGH_AMT / 2)
-      )
-      data <- dataTransactionGenP(master, List(BinaryDataEntry("transfer_id", transfer.id())))
-    } yield (genesis, transfer, setScript, data)
-
   property("Transfer by id works fine") {
-    forAll(preconditions) {
-      case (genesis, transfer, setScript, data) =>
-        assertDiffEi(
-          Seq(TestBlock.create(Seq(genesis, transfer))),
-          TestBlock.create(Seq(setScript, data)),
-          smartEnabledFS
-        )(_ shouldBe an[Right[_, _]])
+    preconditions.foreach { case (genesis, transfer, setScript, data) =>
+      assertDiffEi(
+        Seq(TestBlock.create(Seq(genesis, transfer))),
+        TestBlock.create(Seq(setScript, data)),
+        smartEnabledFS
+      )(_ shouldBe an[Right[_, _]])
+    }
+  }
+
+  private def preconditions: Seq[(GenesisTransaction, TransferTransaction, SetScriptTransaction, DataTransaction)] = {
+    val master = TxHelpers.signer(1)
+    val recipient = TxHelpers.signer(2)
+
+    val genesis = TxHelpers.genesis(master.toAddress)
+    val setScript = TxHelpers.setScript(master, ExprScript(V3, expr).explicitGet())
+
+    Seq(
+      TxHelpers.transfer(master, recipient.toAddress, ENOUGH_AMT / 2),
+      TxHelpers.transfer(master, recipient.toAddress, ENOUGH_AMT / 2, version = TxVersion.V1)
+    ).map { transfer =>
+      val data = TxHelpers.data(master, Seq(BinaryDataEntry("transfer_id", transfer.id())))
+
+      (genesis, transfer, setScript, data)
     }
   }
 }

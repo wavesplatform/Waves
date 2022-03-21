@@ -47,11 +47,14 @@ class TransactionBroadcastSpec
   private val route = seal(transactionsApiRoute.route)
 
   "exchange" - {
-    "accepted with ETH signed orders" in EthChainId.withEChainId {
+    "accepted with ETH signed orders" in {
+      import com.wavesplatform.transaction.assets.exchange.EthOrderSpec.{ethBuyOrder, ethSellOrder}
+
       val blockchain = createBlockchainStub { blockchain =>
         val sh = StubHelpers(blockchain)
         sh.creditBalance(TxHelpers.matcher.toAddress, *)
-        sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
+        sh.creditBalance(ethBuyOrder.senderAddress, *)
+        sh.creditBalance(ethSellOrder.senderAddress, *)
         sh.issueAsset(ByteStr(EthStubBytes32))
       }
 
@@ -59,21 +62,20 @@ class TransactionBroadcastSpec
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = transactionPublisher).route
 
-      import com.wavesplatform.transaction.assets.exchange.EthOrderSpec.{ethBuyOrder, ethSellOrder}
-      val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, TxVersion.V3, 100)
+      val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, price = 100, buyMatcherFee = ethBuyOrder.matcherFee, sellMatcherFee = ethSellOrder.matcherFee, version = TxVersion.V3, timestamp = 100)
       testTime.setTime(100)
       val validResponseJson =
         s"""{
            |  "type" : 7,
            |  "id" : "${transaction.id()}",
-           |  "sender" : "3FrCwv8uFRxQazhX6Lno45aZ68Bof6ScaeF",
+           |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
            |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
            |  "fee" : 1000000,
            |  "feeAssetId" : null,
            |  "timestamp" : 100,
            |  "proofs" : [ "${transaction.signature}" ],
            |  "version" : 3,
-           |  "chainId" : 69,
+           |  "chainId" : 84,
            |  "order1" : {
            |    "version" : 4,
            |    "id" : "${ethBuyOrder.id()}",
@@ -197,7 +199,7 @@ class TransactionBroadcastSpec
     }
 
     "generates valid trace with vars" in {
-      val invoke        = TxHelpers.invoke(TxHelpers.defaultAddress, "test")
+      val invoke        = TxHelpers.invoke(TxHelpers.defaultAddress, Some("test"), version = TxVersion.V1)
       val leaseCancelId = ByteStr(bytes32gen.sample.get)
 
       val amount1    = 100
@@ -268,7 +270,7 @@ class TransactionBroadcastSpec
              |  "id" : "${invoke.id()}",
              |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
              |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-             |  "fee" : 1000000,
+             |  "fee" : 500000,
              |  "feeAssetId" : null,
              |  "timestamp" : ${invoke.timestamp},
              |  "proofs" : [ "${invoke.signature}" ],

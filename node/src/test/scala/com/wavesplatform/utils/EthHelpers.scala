@@ -1,13 +1,11 @@
 package com.wavesplatform.utils
 
 import java.math.BigInteger
-
-import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.{EthereumTransaction, TxHelpers}
 import com.wavesplatform.transaction.assets.exchange.OrderAuthentication
 import com.wavesplatform.transaction.utils.EthTxGenerator
-import org.scalatest.{BeforeAndAfterEach, Suite}
 import org.web3j.crypto.{Bip32ECKeyPair, RawTransaction, SignedRawTransaction}
 import org.web3j.crypto.Sign.SignatureData
 
@@ -33,32 +31,14 @@ trait EthHelpers {
     )
 
   val TestEthSignature: SignatureData =
-    EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, 'E'.toByte)(TestEthRawTransaction).signatureData
+    EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, 'T'.toByte)(TestEthRawTransaction).signatureData
 
   object EthChainId {
     val byte: Byte = 'E'.toByte
-
-    def set(): Unit = {
-      AddressScheme.current = new AddressScheme {
-        val chainId: Byte = EthChainId.byte
-      }
-    }
-
-    def unset(): Unit = {
-      AddressScheme.current = new AddressScheme {
-        val chainId: Byte = 'T'.toByte
-      }
-    }
-
-    def withEChainId[T](f: => T): T = {
-      this.set()
-      try f
-      finally this.unset()
-    }
   }
 
   implicit class TxHelpersEthExt(helpers: TxHelpers.type) {
-    import com.wavesplatform.transaction.utils.EthConverters._
+    import com.wavesplatform.transaction.utils.EthConverters.*
     def defaultEthSigner: Bip32ECKeyPair = helpers.defaultSigner.toEthKeyPair
     def defaultEthAddress: Address       = helpers.defaultSigner.toEthWavesAddress
   }
@@ -68,13 +48,3 @@ trait EthHelpers {
   }
 }
 
-trait EthSetChainId extends BeforeAndAfterEach with EthHelpers { self: Suite =>
-  abstract override protected def beforeEach(): Unit = {
-    super.beforeEach()
-    EthChainId.set()
-  }
-  abstract override protected def afterEach(): Unit = {
-    EthChainId.unset()
-    super.afterEach()
-  }
-}

@@ -152,7 +152,6 @@ class ScriptCacheTest extends FreeSpec with WithDB {
       bcu.shutdown()
     } finally {
       bcu.shutdown()
-      db.close()
     }
   }
 }

@@ -113,6 +113,6 @@ class DataTransactionNewLimitsSpec extends FlatSpec with WithDomain {
     d.helpers.creditWavesToDefaultSigner()
     d.helpers.creditWavesFromDefaultSigner(dAppAccount.toAddress)
     d.helpers.setScript(dAppAccount, script)
-    d.appendAndAssertSucceed(TxHelpers.invoke(dAppAccount.toAddress, "default"))
+    d.appendAndAssertSucceed(TxHelpers.invoke(dAppAccount.toAddress, Some("default")))
   }
 }
