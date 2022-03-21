@@ -514,8 +514,21 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
     parse("x.y.z") shouldBe GETTER(AnyPos, GETTER(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "x")), PART.VALID(AnyPos, "y")), PART.VALID(AnyPos, "z"))
   }
 
-  property("array accessor") {
+  property("array accessor with constant index") {
     parse("x[0]") shouldBe FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "getElement"), List(REF(AnyPos, PART.VALID(AnyPos, "x")), CONST_LONG(AnyPos, 0)))
+  }
+
+  property("array accessor with index from variable") {
+    parse("x[ind]") shouldBe FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "getElement"), List(REF(AnyPos, PART.VALID(AnyPos, "x")), REF(AnyPos, PART.VALID(AnyPos, "ind"))))
+    parse(
+      """
+        |x[
+        |# comment
+        |ind
+        |#comment
+        |]
+        |""".stripMargin
+    ) shouldBe FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "getElement"), List(REF(AnyPos, PART.VALID(AnyPos, "x")), REF(AnyPos, PART.VALID(AnyPos, "ind"))))
   }
 
   property("multiple array accessors") {
