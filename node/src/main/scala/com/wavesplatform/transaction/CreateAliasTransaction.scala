@@ -13,18 +13,16 @@ import play.api.libs.json.JsObject
 
 import scala.util.Try
 
-final case class CreateAliasTransaction(
-    version: TxVersion,
-    sender: PublicKey,
-    aliasName: String,
-    fee: TxAmount,
-    timestamp: TxTimestamp,
-    proofs: Proofs,
-    chainId: Byte
-) extends SigProofsSwitch
-    with VersionedTransaction
-    with TxWithFee.InWaves
-    with LegacyPBSwitch.V3 {
+final case class CreateAliasTransaction(version: TxVersion,
+                                        sender: PublicKey,
+                                        aliasName: String,
+                                        fee: TxPositiveAmount,
+                                        timestamp: TxTimestamp,
+                                        proofs: Proofs,
+                                        chainId: Byte) extends SigProofsSwitch
+  with VersionedTransaction
+  with TxWithFee.InWaves
+  with LegacyPBSwitch.V3 {
 
   lazy val alias: Alias = Alias.createWithChainId(aliasName, chainId).explicitGet()
 
@@ -67,7 +65,7 @@ object CreateAliasTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransactionT] = {
     for {
-      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
       tx <- CreateAliasTransaction(version, sender, aliasName, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
   }

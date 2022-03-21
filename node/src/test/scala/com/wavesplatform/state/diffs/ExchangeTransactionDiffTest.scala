@@ -1327,7 +1327,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             version = TxVersion.V3,
             buyMatcherFee = TxMatcherFee.unsafeFrom(fee),
             sellMatcherFee = TxMatcherFee.unsafeFrom(fee),
-            fee = TxAmount.unsafeFrom(fee),
+            fee = TxPositiveAmount.unsafeFrom(fee),
             order1 = tx.order1.copy(version = Order.V4, matcherFee = TxMatcherFee.unsafeFrom(fee)).signWith(buyer.privateKey),
             order2 = tx.order2.copy(version = Order.V4, matcherFee = TxMatcherFee.unsafeFrom(fee)).signWith(seller.privateKey)
           ).signWith(matcher.privateKey)
@@ -1597,68 +1597,6 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     withClue("fee and asset (same asset)") {
       val tradeableAssetIssue = TxHelpers.issue(script = Some(TestValues.assetScript))
       test(tradeableAssetIssue, tradeableAssetIssue, 1)
-    }
-  }
-
-  property("buyMatcherFee/sellMatcherFee validation") {
-    val sender = testWallet.generateNewAccount().get
-    def mkIssueTx: IssueTransaction =
-      IssueTransaction.selfSigned(2.toByte, sender, "IA_01", "", 100, 2, true, None, 1.waves, ntpTime.getTimestamp()).explicitGet()
-    val priceAsset  = mkIssueTx
-    val amountAsset = mkIssueTx
-    val assetPair   = AssetPair(priceAsset.asset, amountAsset.asset)
-
-    def mkOrder(orderType: OrderType): Order = Order.selfSigned(
-      3.toByte,
-      sender,
-      sender.publicKey,
-      assetPair,
-      orderType,
-      1,
-      1,
-      ntpTime.getTimestamp(),
-      ntpTime.getTimestamp() + 100000,
-      100
-    )
-
-    def mkExchangeTx: ExchangeTransaction =
-      ExchangeTransaction
-        .signed(
-          2.toByte,
-          sender.privateKey,
-          mkOrder(OrderType.BUY),
-          mkOrder(OrderType.SELL),
-          1,
-          1,
-          -9223372036854775807L,
-          -(50.waves + 1),
-          0.003.waves,
-          ntpTime.getTimestamp()
-        )
-        .explicitGet()
-
-    withDomain(
-      DomainPresets.RideV5.copy(
-        blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
-          functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(
-            forbidNegativeMatcherFee = 3
-          )
-        )
-      )
-    ) { d =>
-      d.appendBlock(
-        GenesisTransaction.create(sender.toAddress, 2.003.waves, ntpTime.getTimestamp()).explicitGet(),
-        priceAsset,
-        amountAsset
-      )
-
-      d.balance(sender.toAddress) shouldBe 0.003.waves
-
-      d.appendBlock(mkExchangeTx)
-
-      d.balance(sender.toAddress) shouldBe 50.003.waves
-
-      d.appendBlockE(mkExchangeTx) should produce("Matcher fee can not be negative")
     }
   }
 

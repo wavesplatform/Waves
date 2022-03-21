@@ -32,11 +32,11 @@ package object transaction {
   type TxTimestamp = Long
   type TxByteArray = Array[Byte]
 
-  type TxAmount = Long Refined Positive
-  object TxAmount extends RefinedTypeOps[TxAmount, Long]
+  type TxPositiveAmount = Long Refined Positive
+  object TxPositiveAmount extends RefinedTypeOps[TxPositiveAmount, Long]
 
-  type TxQuantity = Long Refined NonNegative
-  object TxQuantity extends RefinedTypeOps[TxQuantity, Long]
+  type TxNonNegativeAmount = Long Refined NonNegative
+  object TxNonNegativeAmount extends RefinedTypeOps[TxNonNegativeAmount, Long]
 
   type TxDecimals = Byte Refined Interval.Closed[0, IssueTransaction.MaxAssetDecimals.type ]
   object TxDecimals extends RefinedTypeOps[TxDecimals, Byte] {

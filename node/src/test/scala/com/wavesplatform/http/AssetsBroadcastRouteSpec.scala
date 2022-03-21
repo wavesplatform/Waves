@@ -15,7 +15,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxAmount}
+import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxPositiveAmount}
 import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.wallet.Wallet
 import org.scalacheck.{Gen => G}
@@ -206,9 +206,9 @@ class AssetsBroadcastRouteSpec
         sender = senderPrivateKey.publicKey,
         recipient = receiverPrivateKey.toAddress,
         assetId = Asset.Waves,
-        amount = TxAmount.unsafeFrom(1.waves),
+        amount = TxPositiveAmount.unsafeFrom(1.waves),
         feeAssetId = Asset.Waves,
-        fee = TxAmount.unsafeFrom(0.3.waves),
+        fee = TxPositiveAmount.unsafeFrom(0.3.waves),
         attachment = ByteStr.empty,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs(Seq.empty),

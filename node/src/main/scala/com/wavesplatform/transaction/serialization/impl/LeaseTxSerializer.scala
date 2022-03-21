@@ -5,7 +5,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{Proofs, TxAmount, TxVersion}
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -40,8 +40,8 @@ object LeaseTxSerializer {
     def parseCommonPart(version: TxVersion, buf: ByteBuffer): LeaseTransaction = {
       val sender    = buf.getPublicKey
       val recipient = buf.getAddressOrAlias()
-      val amount    = TxAmount.unsafeFrom(buf.getLong)
-      val fee       = TxAmount.unsafeFrom(buf.getLong)
+      val amount    = TxPositiveAmount.unsafeFrom(buf.getLong)
+      val fee       = TxPositiveAmount.unsafeFrom(buf.getLong)
       val timestamp = buf.getLong
       LeaseTransaction(version, sender, recipient, amount, fee, timestamp, Nil, recipient.chainId)
     }

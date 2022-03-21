@@ -14,13 +14,13 @@ import play.api.libs.json._
 import scala.util.Try
 
 case class DataTransaction(
-    version: TxVersion,
-    sender: PublicKey,
-    data: Seq[DataEntry[_]],
-    fee: TxAmount,
-    timestamp: TxTimestamp,
-    proofs: Proofs,
-    chainId: Byte
+                            version: TxVersion,
+                            sender: PublicKey,
+                            data: Seq[DataEntry[_]],
+                            fee: TxPositiveAmount,
+                            timestamp: TxTimestamp,
+                            proofs: Proofs,
+                            chainId: Byte
 ) extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
@@ -67,7 +67,7 @@ object DataTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, DataTransaction] =
     for {
-      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
       tx <- DataTransaction(version, sender, data, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 

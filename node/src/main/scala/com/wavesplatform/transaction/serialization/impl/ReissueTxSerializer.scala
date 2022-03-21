@@ -5,7 +5,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.assets.ReissueTransaction
-import com.wavesplatform.transaction.{Proofs, TxAmount, TxVersion}
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -58,9 +58,9 @@ object ReissueTxSerializer {
     def parseCommonPart(version: TxVersion, buf: ByteBuffer): ReissueTransaction = {
       val sender     = buf.getPublicKey
       val asset      = buf.getIssuedAsset
-      val quantity   = TxAmount.unsafeFrom(buf.getLong)
+      val quantity   = TxPositiveAmount.unsafeFrom(buf.getLong)
       val reissuable = buf.getBoolean
-      val fee        = TxAmount.unsafeFrom(buf.getLong)
+      val fee        = TxPositiveAmount.unsafeFrom(buf.getLong)
       val timestamp  = buf.getLong
       ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, Nil, AddressScheme.current.chainId)
     }

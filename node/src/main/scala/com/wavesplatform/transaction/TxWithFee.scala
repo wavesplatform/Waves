@@ -3,7 +3,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.transaction.Asset.Waves
 
 sealed trait TxWithFee {
-  def fee: TxAmount
+  def fee: TxPositiveAmount
   def assetFee: (Asset, Long) // TODO: Delete or rework
 }
 

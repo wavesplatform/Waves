@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.serialization._
-import com.wavesplatform.transaction.{PaymentTransaction, TxAmount}
+import com.wavesplatform.transaction.{PaymentTransaction, TxPositiveAmount}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -48,8 +48,8 @@ object PaymentTxSerializer {
     val timestamp = buf.getLong
     val sender    = buf.getPublicKey
     val recipient = buf.getAddress()
-    val amount    = TxAmount.unsafeFrom(buf.getLong)
-    val fee       = TxAmount.unsafeFrom(buf.getLong)
+    val amount    = TxPositiveAmount.unsafeFrom(buf.getLong)
+    val fee       = TxPositiveAmount.unsafeFrom(buf.getLong)
     val signature = buf.getSignature
     PaymentTransaction(sender, recipient, amount, fee, timestamp, signature, recipient.chainId)
   }

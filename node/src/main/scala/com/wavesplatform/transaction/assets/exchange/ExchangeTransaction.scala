@@ -13,24 +13,22 @@ import play.api.libs.json.JsObject
 
 import scala.util.Try
 
-case class ExchangeTransaction(
-    version: TxVersion,
-    order1: Order,
-    order2: Order,
-    amount: TxExchangeAmount,
-    price: TxExchangePrice,
-    buyMatcherFee: TxMatcherFee,
-    sellMatcherFee: TxMatcherFee,
-    fee: TxAmount,
-    timestamp: Long,
-    proofs: Proofs,
-    chainId: Byte
-) extends VersionedTransaction
-    with ProvenTransaction
-    with TxWithFee.InWaves
-    with FastHashId
-    with SigProofsSwitch
-    with LegacyPBSwitch.V3 {
+case class ExchangeTransaction(version: TxVersion,
+                               order1: Order,
+                               order2: Order,
+                               amount: TxExchangeAmount,
+                               price: TxExchangePrice,
+                               buyMatcherFee: TxMatcherFee,
+                               sellMatcherFee: TxMatcherFee,
+                               fee: TxPositiveAmount,
+                               timestamp: Long,
+                               proofs: Proofs,
+                               chainId: Byte) extends VersionedTransaction
+  with ProvenTransaction
+  with TxWithFee.InWaves
+  with FastHashId
+  with SigProofsSwitch
+  with LegacyPBSwitch.V3 {
 
   val (buyOrder, sellOrder) = if (order1.orderType == OrderType.BUY) (order1, order2) else (order2, order1)
 
@@ -78,7 +76,7 @@ object ExchangeTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ExchangeTransaction] =
     for {
-      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
       amount <- TxExchangeAmount(amount)(GenericError(TxExchangeAmount.errMsg))
       price <- TxExchangePrice(price)(GenericError(TxExchangePrice.errMsg))
       sellMatcherFee <- TxMatcherFee(sellMatcherFee)(GenericError(s"sell ${TxMatcherFee.errMsg}"))

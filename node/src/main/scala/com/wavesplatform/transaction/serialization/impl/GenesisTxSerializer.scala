@@ -5,7 +5,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization._
-import com.wavesplatform.transaction.{GenesisTransaction, TxQuantity}
+import com.wavesplatform.transaction.{GenesisTransaction, TxNonNegativeAmount}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -43,7 +43,7 @@ object GenesisTxSerializer {
     require(buf.getByte == GenesisTransaction.typeId, "transaction type mismatch")
     val timestamp = buf.getLong
     val recipient = buf.getAddress()
-    val amount    = TxQuantity.unsafeFrom(buf.getLong)
+    val amount    = TxNonNegativeAmount.unsafeFrom(buf.getLong)
     GenesisTransaction(recipient, amount, timestamp, ByteStr(GenesisTransaction.generateSignature(recipient, amount.value, timestamp)), recipient.chainId)
   }
 }

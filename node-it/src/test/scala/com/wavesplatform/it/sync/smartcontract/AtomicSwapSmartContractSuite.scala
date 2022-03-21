@@ -12,7 +12,7 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Proofs, TxAmount}
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer._
@@ -144,9 +144,9 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         sender = swapBC1.publicKey,
         recipient = BobBC1.toAddress,
         assetId = Waves,
-        amount = TxAmount.unsafeFrom(transferAmount),
+        amount = TxPositiveAmount.unsafeFrom(transferAmount),
         feeAssetId = Waves,
-        fee = TxAmount.unsafeFrom(setScriptFee + smartFee),
+        fee = TxPositiveAmount.unsafeFrom(setScriptFee + smartFee),
         attachment = ByteStr.empty,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs.empty,

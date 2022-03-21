@@ -19,15 +19,15 @@ import play.api.libs.json.{JsObject, Json}
 import scala.util.{Either, Try}
 
 case class MassTransferTransaction(
-    version: TxVersion,
-    sender: PublicKey,
-    assetId: Asset,
-    transfers: Seq[ParsedTransfer],
-    fee: TxAmount,
-    timestamp: TxTimestamp,
-    attachment: ByteStr,
-    proofs: Proofs,
-    chainId: Byte
+                                    version: TxVersion,
+                                    sender: PublicKey,
+                                    assetId: Asset,
+                                    transfers: Seq[ParsedTransfer],
+                                    fee: TxPositiveAmount,
+                                    timestamp: TxTimestamp,
+                                    attachment: ByteStr,
+                                    proofs: Proofs,
+                                    chainId: Byte
 ) extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
@@ -92,7 +92,7 @@ object MassTransferTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, MassTransferTransaction] =
     for {
-      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
       tx <- MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, attachment, proofs, chainId).validatedEither
     } yield tx
 

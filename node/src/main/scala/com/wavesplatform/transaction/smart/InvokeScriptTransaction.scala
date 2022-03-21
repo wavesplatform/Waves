@@ -19,16 +19,16 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 case class InvokeScriptTransaction(
-    version: TxVersion,
-    sender: PublicKey,
-    dAppAddressOrAlias: AddressOrAlias,
-    funcCallOpt: Option[FUNCTION_CALL],
-    payments: Seq[Payment],
-    fee: TxAmount,
-    feeAssetId: Asset,
-    override val timestamp: TxTimestamp,
-    proofs: Proofs,
-    chainId: Byte
+                                    version: TxVersion,
+                                    sender: PublicKey,
+                                    dAppAddressOrAlias: AddressOrAlias,
+                                    funcCallOpt: Option[FUNCTION_CALL],
+                                    payments: Seq[Payment],
+                                    fee: TxPositiveAmount,
+                                    feeAssetId: Asset,
+                                    override val timestamp: TxTimestamp,
+                                    proofs: Proofs,
+                                    chainId: Byte
 ) extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InCustomAsset
@@ -83,7 +83,7 @@ object InvokeScriptTransaction extends TransactionParser {
       proofs: Proofs
   ): Either[ValidationError, InvokeScriptTransaction] =
     for {
-      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
       tx <- InvokeScriptTransaction(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs, dappAddress.chainId).validatedEither
     } yield  tx
 

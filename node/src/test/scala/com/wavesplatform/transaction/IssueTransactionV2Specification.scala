@@ -106,11 +106,11 @@ class IssueTransactionV2Specification
       PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
       ByteString.copyFromUtf8("Gigacoin"),
       ByteString.copyFromUtf8("Gigacoin"),
-      TxAmount.unsafeFrom(10000000000L),
+      TxPositiveAmount.unsafeFrom(10000000000L),
       TxDecimals.unsafeFrom(8.toByte),
       reissuable = true,
       None,
-      TxAmount.unsafeFrom(100000000),
+      TxPositiveAmount.unsafeFrom(100000000),
       1526287561757L,
       Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get)),
       AddressScheme.current.chainId

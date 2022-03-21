@@ -16,17 +16,17 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 case class TransferTransaction(
-    version: TxVersion,
-    sender: PublicKey,
-    recipient: AddressOrAlias,
-    assetId: Asset,
-    amount: TxAmount,
-    feeAssetId: Asset,
-    fee: TxAmount,
-    attachment: ByteStr,
-    timestamp: TxTimestamp,
-    proofs: Proofs,
-    chainId: Byte
+                                version: TxVersion,
+                                sender: PublicKey,
+                                recipient: AddressOrAlias,
+                                assetId: Asset,
+                                amount: TxPositiveAmount,
+                                feeAssetId: Asset,
+                                fee: TxPositiveAmount,
+                                attachment: ByteStr,
+                                timestamp: TxTimestamp,
+                                proofs: Proofs,
+                                chainId: Byte
 ) extends VersionedTransaction
     with SigProofsSwitch
     with FastHashId
@@ -78,8 +78,8 @@ object TransferTransaction extends TransactionParser {
       proofs: Proofs
   ): Either[ValidationError, TransferTransaction] =
     for {
-      amount <- TxAmount(amount)(TxValidationError.NonPositiveAmount(amount, asset.maybeBase58Repr.getOrElse("waves")))
-      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
+      amount <- TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, asset.maybeBase58Repr.getOrElse("waves")))
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
       tx <- TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs, recipient.chainId).validatedEither
     } yield tx
 

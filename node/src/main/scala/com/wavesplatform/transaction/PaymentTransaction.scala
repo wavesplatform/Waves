@@ -13,13 +13,13 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 case class PaymentTransaction private (
-    sender: PublicKey,
-    recipient: Address,
-    amount: TxAmount,
-    fee: TxAmount,
-    timestamp: TxTimestamp,
-    signature: ByteStr,
-    chainId: Byte
+                                        sender: PublicKey,
+                                        recipient: Address,
+                                        amount: TxPositiveAmount,
+                                        fee: TxPositiveAmount,
+                                        timestamp: TxTimestamp,
+                                        signature: ByteStr,
+                                        chainId: Byte
 ) extends SignedTransaction
     with TxWithFee.InWaves {
 
@@ -59,8 +59,8 @@ object PaymentTransaction extends TransactionParser {
       signature: ByteStr
   ): Either[ValidationError, PaymentTransaction] =
     for {
-      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
-      amount <- TxAmount(amount)(TxValidationError.NonPositiveAmount(amount, "waves"))
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      amount <- TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, "waves"))
       tx <- PaymentTransaction(sender, recipient, amount, fee, timestamp, signature, recipient.chainId).validatedEither
     } yield tx
 }

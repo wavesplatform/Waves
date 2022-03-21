@@ -8,7 +8,7 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization._
 import com.wavesplatform.state.DataEntry.Type
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.{DataTransaction, TxAmount, TxVersion}
+import com.wavesplatform.transaction.{DataTransaction, TxPositiveAmount, TxVersion}
 import com.wavesplatform.utils.StringBytes
 import play.api.libs.json.{JsObject, Json}
 
@@ -68,7 +68,7 @@ object DataTxSerializer {
     val sender    = buf.getPublicKey
     val data      = parseDataEntries(buf)
     val timestamp = buf.getLong // Timestamp before fee
-    val fee       = TxAmount.unsafeFrom(buf.getLong)
+    val fee       = TxPositiveAmount.unsafeFrom(buf.getLong)
     DataTransaction(TxVersion.V1, sender, data, fee, timestamp, buf.getProofs, AddressScheme.current.chainId)
   }
 

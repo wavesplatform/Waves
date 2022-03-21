@@ -14,15 +14,15 @@ import play.api.libs.json.JsObject
 import scala.util._
 
 case class ReissueTransaction(
-    version: TxVersion,
-    sender: PublicKey,
-    asset: IssuedAsset,
-    quantity: TxAmount,
-    reissuable: Boolean,
-    fee: TxAmount,
-    timestamp: TxTimestamp,
-    proofs: Proofs,
-    chainId: Byte
+                               version: TxVersion,
+                               sender: PublicKey,
+                               asset: IssuedAsset,
+                               quantity: TxPositiveAmount,
+                               reissuable: Boolean,
+                               fee: TxPositiveAmount,
+                               timestamp: TxTimestamp,
+                               proofs: Proofs,
+                               chainId: Byte
 ) extends VersionedTransaction
     with ProvenTransaction
     with SigProofsSwitch
@@ -67,8 +67,8 @@ object ReissueTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ReissueTransaction] =
     for {
-      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
-      quantity <- TxAmount(quantity)(TxValidationError.NonPositiveAmount(quantity, "assets"))
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      quantity <- TxPositiveAmount(quantity)(TxValidationError.NonPositiveAmount(quantity, "assets"))
       tx <-ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 

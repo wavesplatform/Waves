@@ -5,7 +5,7 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
-import com.wavesplatform.transaction.{Proofs, TxAmount, TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxVersion}
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -85,7 +85,7 @@ object ExchangeTxSerializer {
       val amount         = TxExchangeAmount.unsafeFrom(buf.getLong)
       val buyMatcherFee  = TxMatcherFee.unsafeFrom(buf.getLong)
       val sellMatcherFee = TxMatcherFee.unsafeFrom(buf.getLong)
-      val fee            = TxAmount.unsafeFrom(buf.getLong)
+      val fee            = TxPositiveAmount.unsafeFrom(buf.getLong)
       val timestamp      = buf.getLong
       ExchangeTransaction(TxVersion.V1, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty, AddressScheme.current.chainId)
     }
@@ -97,7 +97,7 @@ object ExchangeTxSerializer {
       val amount         = TxExchangeAmount.unsafeFrom(buf.getLong)
       val buyMatcherFee  = TxMatcherFee.unsafeFrom(buf.getLong)
       val sellMatcherFee = TxMatcherFee.unsafeFrom(buf.getLong)
-      val fee            = TxAmount.unsafeFrom(buf.getLong)
+      val fee            = TxPositiveAmount.unsafeFrom(buf.getLong)
       val timestamp      = buf.getLong
       ExchangeTransaction(TxVersion.V2, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty, AddressScheme.current.chainId)
     }

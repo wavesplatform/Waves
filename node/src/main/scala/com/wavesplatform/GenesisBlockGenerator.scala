@@ -13,7 +13,7 @@ import com.wavesplatform.consensus.{FairPoSCalculator, NxtPoSCalculator, PoSCalc
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
-import com.wavesplatform.transaction.{GenesisTransaction, TxQuantity}
+import com.wavesplatform.transaction.{GenesisTransaction, TxNonNegativeAmount}
 import com.wavesplatform.utils._
 import com.wavesplatform.wallet.Wallet
 import net.ceedubs.ficus.Ficus._
@@ -111,7 +111,7 @@ object GenesisBlockGenerator extends App {
 
   val genesisTxs: Seq[GenesisTransaction] = shares.flatMap {
     case (addrInfo, part) =>
-      TxQuantity.from(part)
+      TxNonNegativeAmount.from(part)
         .toOption
         .map(amount => GenesisTransaction(addrInfo.accountAddress, amount, timestamp, ByteStr.empty, settings.chainId.toByte))
   }

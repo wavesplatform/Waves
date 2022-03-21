@@ -12,14 +12,14 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 final case class LeaseTransaction(
-    version: TxVersion,
-    sender: PublicKey,
-    recipient: AddressOrAlias,
-    amount: TxAmount,
-    fee: TxAmount,
-    timestamp: TxTimestamp,
-    proofs: Proofs,
-    chainId: Byte
+                                   version: TxVersion,
+                                   sender: PublicKey,
+                                   recipient: AddressOrAlias,
+                                   amount: TxPositiveAmount,
+                                   fee: TxPositiveAmount,
+                                   timestamp: TxTimestamp,
+                                   proofs: Proofs,
+                                   chainId: Byte
 ) extends SigProofsSwitch
     with VersionedTransaction
     with TxWithFee.InWaves
@@ -56,8 +56,8 @@ object LeaseTransaction extends TransactionParser {
       proofs: Proofs
   ): Either[ValidationError, TransactionT] = {
     for {
-      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
-      amount <- TxAmount(amount)(TxValidationError.NonPositiveAmount(amount, "waves"))
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      amount <- TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, "waves"))
       tx <- LeaseTransaction(version, sender, recipient, amount, fee, timestamp, proofs, recipient.chainId).validatedEither
     } yield tx
 

@@ -5,7 +5,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.assets.BurnTransaction
-import com.wavesplatform.transaction.{Proofs, TxAmount, TxQuantity, TxVersion}
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxNonNegativeAmount, TxVersion}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -46,8 +46,8 @@ object BurnTxSerializer {
     def parseCommonPart(version: TxVersion, buf: ByteBuffer): BurnTransaction = {
       val sender    = buf.getPublicKey
       val asset     = buf.getIssuedAsset
-      val quantity  = TxQuantity.unsafeFrom(buf.getLong)
-      val fee       = TxAmount.unsafeFrom(buf.getLong)
+      val quantity  = TxNonNegativeAmount.unsafeFrom(buf.getLong)
+      val fee       = TxPositiveAmount.unsafeFrom(buf.getLong)
       val timestamp = buf.getLong
       BurnTransaction(version, sender, asset, quantity, fee, timestamp, Nil, AddressScheme.current.chainId)
     }

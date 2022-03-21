@@ -6,7 +6,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{Proofs, TxAmount, TxDecimals, TxVersion}
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxDecimals, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -58,10 +58,10 @@ object IssueTxSerializer {
       val sender      = buf.getPublicKey
       val name        = Deser.parseArrayWithLength(buf)
       val description = Deser.parseArrayWithLength(buf)
-      val quantity    = TxAmount.unsafeFrom(buf.getLong)
+      val quantity    = TxPositiveAmount.unsafeFrom(buf.getLong)
       val decimals    = TxDecimals.unsafeFrom(buf.getByte)
       val reissuable  = buf.getBoolean
-      val fee         = TxAmount.unsafeFrom(buf.getLong)
+      val fee         = TxPositiveAmount.unsafeFrom(buf.getLong)
       val timestamp   = buf.getLong
 
       IssueTransaction(

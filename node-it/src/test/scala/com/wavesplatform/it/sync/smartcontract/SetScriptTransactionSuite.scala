@@ -11,7 +11,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Proofs, TxAmount}
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -97,9 +97,9 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           sender = contract.publicKey,
           recipient = acc3.toAddress,
           assetId = Waves,
-          amount = TxAmount.unsafeFrom(1000),
+          amount = TxPositiveAmount.unsafeFrom(1000),
           feeAssetId = Waves,
-          fee = TxAmount.unsafeFrom(minFee + 0.004.waves),
+          fee = TxPositiveAmount.unsafeFrom(minFee + 0.004.waves),
           attachment = ByteStr.empty,
           timestamp = System.currentTimeMillis(),
           proofs = Proofs.empty,

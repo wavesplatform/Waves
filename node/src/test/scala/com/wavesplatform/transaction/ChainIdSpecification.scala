@@ -25,7 +25,7 @@ class ChainIdSpecification extends PropSpec {
   private val addressFromOther = Address.fromBytes(Base58.tryDecodeWithLimit("3P3oxTkpCWJgCr6SJrBzdP5N8jFqHCiy7L2").get, otherChainId).explicitGet()
   private val addressOrAlias   = Gen.oneOf(aliasFromOther, addressFromOther)
 
-  private def addressOrAliasWithVersion(vs: Set[TxVersion]): Gen[(AddressOrAlias, TxVersion, KeyPair, TxAmount, TxAmount, TxTimestamp)] =
+  private def addressOrAliasWithVersion(vs: Set[TxVersion]): Gen[(AddressOrAlias, TxVersion, KeyPair, TxPositiveAmount, TxPositiveAmount, TxTimestamp)] =
     for {
       addressOrAlias <- addressOrAlias
       version        <- Gen.oneOf(vs.toSeq)
@@ -33,7 +33,7 @@ class ChainIdSpecification extends PropSpec {
       amount         <- Gen.choose(1, 10000000L)
       fee            <- Gen.choose(1000000L, 10000000L)
       ts             <- Gen.choose(1, 1000000L)
-    } yield (addressOrAlias, version, sender, TxAmount.unsafeFrom(amount), TxAmount.unsafeFrom(fee), ts)
+    } yield (addressOrAlias, version, sender, TxPositiveAmount.unsafeFrom(amount), TxPositiveAmount.unsafeFrom(fee), ts)
 
   private def validateFromOtherNetwork(tx: Transaction): Unit = {
     tx.chainId should not be AddressScheme.current.chainId
@@ -178,7 +178,7 @@ class ChainIdSpecification extends PropSpec {
       case (_, _, _, amount, _, ts) =>
         GenesisTransaction(
           addressFromOther,
-          TxQuantity.unsafeFrom(amount.value),
+          TxNonNegativeAmount.unsafeFrom(amount.value),
           ts,
           ByteStr.empty,
           AddressScheme.current.chainId
@@ -194,7 +194,7 @@ class ChainIdSpecification extends PropSpec {
             TxVersion.V3,
             sender.publicKey,
             IssuedAsset(ByteStr(bytes32gen.sample.get)),
-            TxQuantity.unsafeFrom(amount.value),
+            TxNonNegativeAmount.unsafeFrom(amount.value),
             fee,
             ts,
             Proofs.empty,

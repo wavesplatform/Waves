@@ -13,7 +13,7 @@ import play.api.libs.json.JsObject
 
 import scala.util.Try
 
-case class GenesisTransaction private (recipient: Address, amount: TxQuantity, timestamp: TxTimestamp, signature: ByteStr, chainId: Byte)
+case class GenesisTransaction private (recipient: Address, amount: TxNonNegativeAmount, timestamp: TxTimestamp, signature: ByteStr, chainId: Byte)
     extends Transaction {
   override val builder                 = GenesisTransaction
   override val assetFee: (Asset, Long) = (Waves, 0)
@@ -51,7 +51,7 @@ object GenesisTransaction extends TransactionParser {
     val signature = ByteStr(GenesisTransaction.generateSignature(recipient, amount, timestamp))
 
     for {
-      amount <- TxQuantity(amount)(TxValidationError.NegativeAmount(amount, "waves"))
+      amount <- TxNonNegativeAmount(amount)(TxValidationError.NegativeAmount(amount, "waves"))
       tx <- GenesisTransaction(recipient, amount, timestamp, signature, recipient.chainId).validatedEither
     } yield tx
   }

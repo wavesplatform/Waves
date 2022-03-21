@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Proofs, TxAmount, TxDecimals, TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxQuantity, TxValidationError}
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxDecimals, TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxNonNegativeAmount, TxValidationError}
 import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{transaction => vt}
 import scalapb.UnknownFieldSet.empty
@@ -324,14 +324,14 @@ object PBTransactions {
     val signature = proofs.toSignature
     data match {
       case Data.Genesis(GenesisTransactionData(recipient, amount, `empty`)) =>
-        vt.GenesisTransaction(PBRecipients.toAddress(recipient.toByteArray, chainId).explicitGet(), TxQuantity.unsafeFrom(amount), timestamp, signature, chainId)
+        vt.GenesisTransaction(PBRecipients.toAddress(recipient.toByteArray, chainId).explicitGet(), TxNonNegativeAmount.unsafeFrom(amount), timestamp, signature, chainId)
 
       case Data.Payment(PaymentTransactionData(recipient, amount, `empty`)) =>
         vt.PaymentTransaction(
           sender,
           PBRecipients.toAddress(recipient.toByteArray, chainId).explicitGet(),
-          TxAmount.unsafeFrom(amount),
-          TxAmount.unsafeFrom(feeAmount),
+          TxPositiveAmount.unsafeFrom(amount),
+          TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
           signature,
           chainId
@@ -343,9 +343,9 @@ object PBTransactions {
           sender,
           recipient.toAddressOrAlias(chainId).explicitGet(),
           amount.vanillaAssetId,
-          TxAmount.unsafeFrom(amount.longAmount),
+          TxPositiveAmount.unsafeFrom(amount.longAmount),
           feeAssetId,
-          TxAmount.unsafeFrom(feeAmount),
+          TxPositiveAmount.unsafeFrom(feeAmount),
           attachment.toByteStr,
           timestamp,
           proofs,
@@ -357,7 +357,7 @@ object PBTransactions {
           version.toByte,
           sender,
           alias,
-          TxAmount.unsafeFrom(feeAmount),
+          TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
           Proofs(signature),
           chainId
@@ -369,11 +369,11 @@ object PBTransactions {
           sender,
           name.toByteString,
           description.toByteString,
-          TxAmount.unsafeFrom(quantity),
+          TxPositiveAmount.unsafeFrom(quantity),
           TxDecimals.unsafeFrom(decimals.toByte),
           reissuable,
           toVanillaScript(script),
-          TxAmount.unsafeFrom(feeAmount),
+          TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
           proofs,
           chainId
@@ -384,16 +384,16 @@ object PBTransactions {
           version.toByte,
           sender,
           IssuedAsset(assetId.toByteStr),
-          TxAmount.unsafeFrom(amount),
+          TxPositiveAmount.unsafeFrom(amount),
           reissuable,
-          TxAmount.unsafeFrom(feeAmount),
+          TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
           proofs,
           chainId
         )
 
       case Data.Burn(BurnTransactionData(Some(Amount(assetId, amount, `empty`)), `empty`)) =>
-        vt.assets.BurnTransaction(version.toByte, sender, IssuedAsset(assetId.toByteStr), TxQuantity.unsafeFrom(amount), TxAmount.unsafeFrom(feeAmount), timestamp, proofs, chainId)
+        vt.assets.BurnTransaction(version.toByte, sender, IssuedAsset(assetId.toByteStr), TxNonNegativeAmount.unsafeFrom(amount), TxPositiveAmount.unsafeFrom(feeAmount), timestamp, proofs, chainId)
 
       case Data.SetAssetScript(SetAssetScriptTransactionData(assetId, script, `empty`)) =>
         vt.assets.SetAssetScriptTransaction(
@@ -401,7 +401,7 @@ object PBTransactions {
           sender,
           IssuedAsset(assetId.toByteStr),
           toVanillaScript(script),
-          TxAmount.unsafeFrom(feeAmount),
+          TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
           proofs,
           chainId
@@ -412,7 +412,7 @@ object PBTransactions {
           version.toByte,
           sender,
           toVanillaScript(script),
-          TxAmount.unsafeFrom(feeAmount),
+          TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
           proofs,
           chainId
@@ -423,15 +423,15 @@ object PBTransactions {
           version.toByte,
           sender,
           recipient.toAddressOrAlias(chainId).explicitGet(),
-          TxAmount.unsafeFrom(amount),
-          TxAmount.unsafeFrom(feeAmount),
+          TxPositiveAmount.unsafeFrom(amount),
+          TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
           proofs,
           chainId
         )
 
       case Data.LeaseCancel(LeaseCancelTransactionData(leaseId, `empty`)) =>
-        vt.lease.LeaseCancelTransaction(version.toByte, sender, leaseId.toByteStr, TxAmount.unsafeFrom(feeAmount), timestamp, proofs, chainId)
+        vt.lease.LeaseCancelTransaction(version.toByte, sender, leaseId.toByteStr, TxPositiveAmount.unsafeFrom(feeAmount), timestamp, proofs, chainId)
 
       case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder), `empty`)) =>
         vt.assets.exchange.ExchangeTransaction(
@@ -442,14 +442,14 @@ object PBTransactions {
           TxExchangePrice.unsafeFrom(price),
           TxMatcherFee.unsafeFrom(buyMatcherFee),
           TxMatcherFee.unsafeFrom(sellMatcherFee),
-          TxAmount.unsafeFrom(feeAmount),
+          TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
           proofs,
           chainId
         )
 
       case Data.DataTransaction(dt) =>
-        vt.DataTransaction(version.toByte, sender, dt.data.toList.map(toVanillaDataEntry), TxAmount.unsafeFrom(feeAmount), timestamp, proofs, chainId)
+        vt.DataTransaction(version.toByte, sender, dt.data.toList.map(toVanillaDataEntry), TxPositiveAmount.unsafeFrom(feeAmount), timestamp, proofs, chainId)
 
       case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction(
@@ -457,7 +457,7 @@ object PBTransactions {
           sender,
           PBAmounts.toVanillaAssetId(mt.assetId),
           mt.transfers.flatMap(t => t.getRecipient.toAddressOrAlias(chainId).toOption.map(ParsedTransfer(_, t.amount))).toList,
-          TxAmount.unsafeFrom(feeAmount),
+          TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
           mt.attachment.toByteStr,
           proofs,
@@ -469,8 +469,8 @@ object PBTransactions {
           version.toByte,
           sender,
           IssuedAsset(assetId.toByteStr),
-          Some(minFee).filter(_ > 0).map(TxAmount.unsafeFrom),
-          TxAmount.unsafeFrom(feeAmount),
+          Some(minFee).filter(_ > 0).map(TxPositiveAmount.unsafeFrom),
+          TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
           proofs,
           chainId
@@ -488,7 +488,7 @@ object PBTransactions {
             .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
             .map(_.explicitGet().asInstanceOf[FUNCTION_CALL]),
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
-          TxAmount.unsafeFrom(feeAmount),
+          TxPositiveAmount.unsafeFrom(feeAmount),
           feeAssetId,
           timestamp,
           proofs,
@@ -503,7 +503,7 @@ object PBTransactions {
           name,
           description,
           timestamp,
-          TxAmount.unsafeFrom(feeAmount),
+          TxPositiveAmount.unsafeFrom(feeAmount),
           feeAssetId,
           proofs,
           chainId

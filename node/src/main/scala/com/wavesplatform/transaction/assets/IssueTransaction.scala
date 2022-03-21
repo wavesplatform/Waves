@@ -17,18 +17,18 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 case class IssueTransaction(
-    version: TxVersion,
-    sender: PublicKey,
-    name: ByteString,
-    description: ByteString,
-    quantity: TxAmount,
-    decimals: TxDecimals,
-    reissuable: Boolean,
-    script: Option[Script],
-    fee: TxAmount,
-    timestamp: TxTimestamp,
-    proofs: Proofs,
-    chainId: Byte
+                             version: TxVersion,
+                             sender: PublicKey,
+                             name: ByteString,
+                             description: ByteString,
+                             quantity: TxPositiveAmount,
+                             decimals: TxDecimals,
+                             reissuable: Boolean,
+                             script: Option[Script],
+                             fee: TxPositiveAmount,
+                             timestamp: TxTimestamp,
+                             proofs: Proofs,
+                             chainId: Byte
 ) extends VersionedTransaction
     with ProvenTransaction
     with FastHashId
@@ -76,8 +76,8 @@ object IssueTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, IssueTransaction] =
     for {
-      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
-      quantity <- TxAmount(quantity)(TxValidationError.NonPositiveAmount(quantity, "assets"))
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      quantity <- TxPositiveAmount(quantity)(TxValidationError.NonPositiveAmount(quantity, "assets"))
       decimals <- TxDecimals(decimals)(TxValidationError.InvalidDecimals(decimals))
       tx <- IssueTransaction(
         version,

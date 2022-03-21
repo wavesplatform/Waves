@@ -20,7 +20,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxAmount, TxDecimals, TxExchangeAmount, TxMatcherFee, TxOrderPrice, TxVersion}
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxPositiveAmount, TxDecimals, TxExchangeAmount, TxMatcherFee, TxOrderPrice, TxVersion}
 import org.scalatest.Informing
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -164,11 +164,11 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     publicKey,
     ByteString.copyFromUtf8("Gigacoin"),
     ByteString.copyFromUtf8("Gigacoin"),
-    TxAmount.unsafeFrom(someAssetAmount),
+    TxPositiveAmount.unsafeFrom(someAssetAmount),
     TxDecimals.unsafeFrom(8.toByte),
     true,
     script = None,
-    TxAmount.unsafeFrom(issueFee),
+    TxPositiveAmount.unsafeFrom(issueFee),
     ts,
     Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get),
     AddressScheme.current.chainId
@@ -179,11 +179,11 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     publicKey,
     ByteString.copyFromUtf8("Gigacoin"),
       ByteString.copyFromUtf8("Gigacoin"),
-    TxAmount.unsafeFrom(someAssetAmount),
+    TxPositiveAmount.unsafeFrom(someAssetAmount),
     TxDecimals.unsafeFrom(8.toByte),
     true,
     None,
-    TxAmount.unsafeFrom(issueFee),
+    TxPositiveAmount.unsafeFrom(issueFee),
     ts,
     Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get)),
     AddressScheme.current.chainId
@@ -326,9 +326,9 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     publicKey,
     recipient,
     Waves,
-    TxAmount.unsafeFrom(1900000),
+    TxPositiveAmount.unsafeFrom(1900000),
     Waves,
-    TxAmount.unsafeFrom(minFee),
+    TxPositiveAmount.unsafeFrom(minFee),
     ByteStr.empty,
     ts,
     Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get)),
@@ -340,9 +340,9 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     publicKey,
     recipient,
     Waves,
-    TxAmount.unsafeFrom(100000000),
+    TxPositiveAmount.unsafeFrom(100000000),
     Waves,
-    TxAmount.unsafeFrom(minFee),
+    TxPositiveAmount.unsafeFrom(minFee),
     ByteStr.empty,
     ts,
     Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)),

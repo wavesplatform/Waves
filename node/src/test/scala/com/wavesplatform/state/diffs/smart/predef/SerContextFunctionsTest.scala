@@ -12,7 +12,7 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEn
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{DataTransaction, Proofs, TxAmount}
+import com.wavesplatform.transaction.{DataTransaction, Proofs, TxPositiveAmount}
 
 class SerContextFunctionsTest extends PropSpec {
   property("check serialization of script with all functions") {
@@ -39,9 +39,9 @@ class SerContextFunctionsTest extends PropSpec {
         PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         recipient,
         Waves,
-        TxAmount.unsafeFrom(100000000),
+        TxPositiveAmount.unsafeFrom(100000000),
         Waves,
-        TxAmount.unsafeFrom(100000000),
+        TxPositiveAmount.unsafeFrom(100000000),
         ByteStr.decodeBase58("4t2Xazb2SX").get,
         1526641218066L,
         Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)),

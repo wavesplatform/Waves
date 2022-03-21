@@ -5,7 +5,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Proofs, TxAmount, TxVersion}
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion}
 import com.wavesplatform.utils.byteStrFormat
 import play.api.libs.json.{JsObject, Json}
 
@@ -56,8 +56,8 @@ object TransferTxSerializer {
       val assetId    = buf.getAsset
       val feeAssetId = buf.getAsset
       val ts         = buf.getLong
-      val amount     = TxAmount.unsafeFrom(buf.getLong)
-      val fee        = TxAmount.unsafeFrom(buf.getLong)
+      val amount     = TxPositiveAmount.unsafeFrom(buf.getLong)
+      val fee        = TxPositiveAmount.unsafeFrom(buf.getLong)
       val recipient  = buf.getAddressOrAlias()
       val attachment = buf.getByteArrayWithLength
 

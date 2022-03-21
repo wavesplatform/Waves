@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.lease.LeaseCancelTransaction
-import com.wavesplatform.transaction.{Proofs, TxAmount, TxVersion}
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -39,7 +39,7 @@ object LeaseCancelTxSerializer {
   def parseBytes(bytes: Array[Byte]): Try[LeaseCancelTransaction] = Try {
     def parseCommonPart(version: TxVersion, buf: ByteBuffer): LeaseCancelTransaction = {
       val sender    = buf.getPublicKey
-      val fee       = TxAmount.unsafeFrom(buf.getLong)
+      val fee       = TxPositiveAmount.unsafeFrom(buf.getLong)
       val timestamp = buf.getLong
       val leaseId   = buf.getByteArray(crypto.DigestLength)
       LeaseCancelTransaction(version, sender, ByteStr(leaseId), fee, timestamp, Nil, AddressScheme.current.chainId)

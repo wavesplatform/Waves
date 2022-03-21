@@ -66,7 +66,7 @@ object TxHelpers {
                        fee: Long = TestValues.fee,
                        feeAsset: Asset = Waves,
                        version: Byte = TxVersion.V2): TransferTransaction =
-    TransferTransaction(version, from.publicKey, to, asset, TxAmount.unsafeFrom(amount), feeAsset, TxAmount.unsafeFrom(fee), ByteStr.empty, timestamp, Proofs.empty, to.chainId)
+    TransferTransaction(version, from.publicKey, to, asset, TxPositiveAmount.unsafeFrom(amount), feeAsset, TxPositiveAmount.unsafeFrom(fee), ByteStr.empty, timestamp, Proofs.empty, to.chainId)
 
   def massTransfer(from: KeyPair = defaultSigner,
                    to: Seq[ParsedTransfer] = Seq(ParsedTransfer(secondAddress, 1.waves)),

@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
-import com.wavesplatform.transaction.{TxAmount, TxVersion}
+import com.wavesplatform.transaction.{TxPositiveAmount, TxVersion}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import play.api.libs.json.{JsObject, Json}
 
@@ -49,7 +49,7 @@ object SetScriptTxSerializer {
 
     val sender    = buf.getPublicKey
     val script    = buf.getScript
-    val fee       = TxAmount.unsafeFrom(buf.getLong)
+    val fee       = TxPositiveAmount.unsafeFrom(buf.getLong)
     val timestamp = buf.getLong
     val proofs    = buf.getProofs
     SetScriptTransaction(TxVersion.V1, sender, script, fee, timestamp, proofs, AddressScheme.current.chainId)

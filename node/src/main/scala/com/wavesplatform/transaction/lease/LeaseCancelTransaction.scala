@@ -14,13 +14,13 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 final case class LeaseCancelTransaction(
-    version: TxVersion,
-    sender: PublicKey,
-    leaseId: ByteStr,
-    fee: TxAmount,
-    timestamp: TxTimestamp,
-    proofs: Proofs,
-    chainId: Byte
+                                         version: TxVersion,
+                                         sender: PublicKey,
+                                         leaseId: ByteStr,
+                                         fee: TxPositiveAmount,
+                                         timestamp: TxTimestamp,
+                                         proofs: Proofs,
+                                         chainId: Byte
 ) extends SigProofsSwitch
     with VersionedTransaction
     with TxWithFee.InWaves
@@ -56,7 +56,7 @@ object LeaseCancelTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransactionT] =
     for {
-      fee <- TxAmount(fee)(TxValidationError.InsufficientFee)
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
       tx <- LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 
