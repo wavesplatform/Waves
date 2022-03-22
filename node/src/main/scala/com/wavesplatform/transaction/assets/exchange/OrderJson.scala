@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Asset, Proofs, TxExchangeAmount, TxMatcherFee, TxOrderPrice, TxVersion}
+import com.wavesplatform.transaction.{Asset, Proofs, TxExchangeAmount, TxOrderPrice, TxVersion}
 import play.api.libs.json._
 
 import scala.util.{Failure, Success}
@@ -51,7 +51,7 @@ object OrderJson {
       price: TxOrderPrice,
       timestamp: Long,
       expiration: Long,
-      matcherFee: TxMatcherFee,
+      matcherFee: Long,
       signature: Option[Array[Byte]],
       proofs: Option[Array[Array[Byte]]],
       version: Option[Byte]
@@ -76,7 +76,7 @@ object OrderJson {
       price: TxOrderPrice,
       timestamp: Long,
       expiration: Long,
-      matcherFee: TxMatcherFee,
+      matcherFee: Long,
       signature: Option[Array[Byte]],
       proofs: Option[Array[Array[Byte]]],
       version: TxVersion,
@@ -126,10 +126,7 @@ object OrderJson {
       } and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "expiration").read[Long] and
-      (JsPath \ "matcherFee").read[Long].map(TxMatcherFee.from).flatMapResult {
-        case Right(matcherFee) => JsSuccess(matcherFee)
-        case _ => JsError(TxMatcherFee.errMsg)
-      } and
+      (JsPath \ "matcherFee").read[Long] and
       (JsPath \ "signature").readNullable[Array[Byte]] and
       (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
       (JsPath \ "version").readNullable[Byte]
@@ -151,10 +148,7 @@ object OrderJson {
       } and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "expiration").read[Long] and
-      (JsPath \ "matcherFee").read[Long].map(TxMatcherFee.from).flatMapResult {
-        case Right(matcherFee) => JsSuccess(matcherFee)
-        case _ => JsError(TxMatcherFee.errMsg)
-      } and
+      (JsPath \ "matcherFee").read[Long] and
       (JsPath \ "signature").readNullable[Array[Byte]] and
       (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
       (JsPath \ "version").read[Byte] and

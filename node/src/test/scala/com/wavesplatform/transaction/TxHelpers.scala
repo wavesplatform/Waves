@@ -181,8 +181,8 @@ object TxHelpers {
         order2,
         order1.amount.value,
         order1.price.value,
-        order1.matcherFee.value,
-        order2.matcherFee.value,
+        order1.matcherFee,
+        order2.matcherFee,
         fee,
         timestamp,
         chainId

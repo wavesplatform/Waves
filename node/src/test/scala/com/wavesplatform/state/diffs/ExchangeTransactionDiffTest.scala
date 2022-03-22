@@ -334,7 +334,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           totalPortfolioDiff.effectiveBalance shouldBe 0
           totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-          blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee.value + exchange.sellMatcherFee.value - exchange.fee.value
+          blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee.value
       }
     }
   }
@@ -413,8 +413,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         val restoredMatcherPortfolio =
           Monoid.combineAll(
             Seq(
-              ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee.value),
-              ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee.value),
+              ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee),
+              ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee),
               wavesPortfolio(-exchange.fee.value)
             )
           )
@@ -525,8 +525,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         val restoredMatcherPortfolio =
           Monoid.combineAll(
             Seq(
-              ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee.value),
-              ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee.value),
+              ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee),
+              ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee),
               wavesPortfolio(-exchange.fee.value)
             )
           )
@@ -650,14 +650,14 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
         val combinedPortfolio = Monoid
           .combineAll(
-            exchanges.map(ex => getOrderFeePortfolio(bigBuyOrder, ex.buyMatcherFee.value))
+            exchanges.map(ex => getOrderFeePortfolio(bigBuyOrder, ex.buyMatcherFee))
           )
 
         val feeSumPaidByBuyer =
           bigBuyOrder.matcherFeeAssetId
             .fold(combinedPortfolio.balance)(combinedPortfolio.assets)
 
-        (feeSumPaidByBuyer <= exchanges.head.buyOrder.matcherFee.value) shouldBe true
+        (feeSumPaidByBuyer <= exchanges.head.buyOrder.matcherFee) shouldBe true
     }
   }
 
@@ -762,7 +762,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         totalPortfolioDiff.effectiveBalance shouldBe 0
         totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-        blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee.value + exchange.sellMatcherFee.value - exchange.fee.value
+        blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee.value
       }
 
       assertDiffEi(
@@ -776,7 +776,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
   }
 
   def createExTx(buy: Order, sell: Order, price: Long, matcher: KeyPair): ExchangeTransaction = {
-    val mf     = buy.matcherFee.value
+    val mf     = buy.matcherFee
     val amount = math.min(buy.amount.value, sell.amount.value)
     TxHelpers.exchange(
       order1 = buy,
@@ -786,7 +786,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       price = price,
       buyMatcherFee = (BigInt(mf) * amount / buy.amount.value).toLong,
       sellMatcherFee = (BigInt(mf) * amount / sell.amount.value).toLong,
-      fee = buy.matcherFee.value
+      fee = buy.matcherFee
     )
   }
 
@@ -811,7 +811,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     val tx = createExTx(buy, sell, buy.price.value, matcher)
     assertDiffAndState(Seq(TestBlock.create(genesis :+ issue)), TestBlock.create(Seq(tx)), fs) {
       case (blockDiff, state) =>
-        blockDiff.portfolios(tx.sender.toAddress).balance shouldBe tx.buyMatcherFee.value + tx.sellMatcherFee.value - tx.fee.value
+        blockDiff.portfolios(tx.sender.toAddress).balance shouldBe tx.buyMatcherFee + tx.sellMatcherFee - tx.fee.value
         state.balance(tx.sender.toAddress) shouldBe 1L
     }
   }
@@ -906,7 +906,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       price = 238,
       buyMatcherFee = 41,
       sellMatcherFee = 300000,
-      fee = buy.matcherFee.value,
+      fee = buy.matcherFee,
       version = TxVersion.V1
     )
 
@@ -1325,11 +1325,11 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         val fixed = tx
           .copy(
             version = TxVersion.V3,
-            buyMatcherFee = TxMatcherFee.unsafeFrom(fee),
-            sellMatcherFee = TxMatcherFee.unsafeFrom(fee),
+            buyMatcherFee = fee,
+            sellMatcherFee = fee,
             fee = TxPositiveAmount.unsafeFrom(fee),
-            order1 = tx.order1.copy(version = Order.V4, matcherFee = TxMatcherFee.unsafeFrom(fee)).signWith(buyer.privateKey),
-            order2 = tx.order2.copy(version = Order.V4, matcherFee = TxMatcherFee.unsafeFrom(fee)).signWith(seller.privateKey)
+            order1 = tx.order1.copy(version = Order.V4, matcherFee = fee).signWith(buyer.privateKey),
+            order2 = tx.order2.copy(version = Order.V4, matcherFee = fee).signWith(seller.privateKey)
           ).signWith(matcher.privateKey)
         val reversed = fixed
           .copy(
@@ -1405,8 +1405,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           amount = TxExchangeAmount.unsafeFrom(amount),
           order1 = tx.buyOrder.copy(amount = TxExchangeAmount.unsafeFrom(sellAmount)).signWith(buyer.privateKey),
           order2 = tx.sellOrder.copy(amount = TxExchangeAmount.unsafeFrom(buyAmount)).signWith(seller.privateKey),
-          buyMatcherFee = TxMatcherFee.unsafeFrom((BigInt(tx.fee.value) * amount / buyAmount).toLong),
-          sellMatcherFee = TxMatcherFee.unsafeFrom((BigInt(tx.fee.value) * amount / sellAmount).toLong)
+          buyMatcherFee = (BigInt(tx.fee.value) * amount / buyAmount).toLong,
+          sellMatcherFee = (BigInt(tx.fee.value) * amount / sellAmount).toLong
         ).signWith(matcher.privateKey)
 
         val buyerBalance   = Map(Waves -> ENOUGH_AMT, issue.asset         -> 0L)
@@ -1600,6 +1600,66 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
   }
 
+  property("buyMatcherFee/sellMatcherFee validation") {
+    val sender = testWallet.generateNewAccount().get
+    def mkIssueTx: IssueTransaction =
+      IssueTransaction.selfSigned(2.toByte, sender, "IA_01", "", 100, 2, true, None, 1.waves, ntpTime.getTimestamp()).explicitGet()
+    val priceAsset  = mkIssueTx
+    val amountAsset = mkIssueTx
+    val assetPair   = AssetPair(priceAsset.asset, amountAsset.asset)
+
+    def mkOrder(orderType: OrderType): Order = Order.selfSigned(
+      3.toByte,
+      sender,
+      sender.publicKey,
+      assetPair,
+      orderType,
+      1,
+      1,
+      ntpTime.getTimestamp(),
+      ntpTime.getTimestamp() + 100000,
+      100
+    ).explicitGet()
+
+    def mkExchangeTx: ExchangeTransaction =
+      ExchangeTransaction.signed(
+        2.toByte,
+        sender.privateKey,
+        mkOrder(OrderType.BUY),
+        mkOrder(OrderType.SELL),
+        1,
+        1,
+        -9223372036854775807L,
+        -(50.waves + 1),
+        0.003.waves,
+        ntpTime.getTimestamp()
+      ).explicitGet()
+
+    withDomain(
+      DomainPresets.RideV5.copy(
+        blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
+          functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(
+            forbidNonPositiveMatcherFee = 3
+          )
+        )
+      )
+    ) { d =>
+      d.appendBlock(
+        GenesisTransaction.create(sender.toAddress, 2.003.waves, ntpTime.getTimestamp()).explicitGet(),
+        priceAsset,
+        amountAsset
+      )
+
+      d.balance(sender.toAddress) shouldBe 0.003.waves
+
+      d.appendBlock(mkExchangeTx)
+
+      d.balance(sender.toAddress) shouldBe 50.003.waves
+
+      d.appendBlockE(mkExchangeTx) should produce("Matcher fee can not be negative")
+    }
+  }
+
   def script(caseType: String, v: Boolean): Seq[String] = Seq(true, false).map { full =>
     val expr =
       s"""
@@ -1727,12 +1787,12 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       case (_: Order, _: Order) =>
         val isBuyerReceiveAmountGreaterThanFee =
           if (ex.buyOrder.assetPair.amountAsset == ex.buyOrder.matcherFeeAssetId) {
-            ExchangeTransactionDiff.getReceiveAmount(ex.buyOrder, 8, 8, ex.amount.value, ex.price.value).explicitGet() > ex.buyMatcherFee.value
+            ExchangeTransactionDiff.getReceiveAmount(ex.buyOrder, 8, 8, ex.amount.value, ex.price.value).explicitGet() > ex.buyMatcherFee
           } else true
 
         val isSellerReceiveAmountGreaterThanFee =
           if (ex.sellOrder.assetPair.amountAsset == ex.sellOrder.matcherFeeAssetId) {
-            ExchangeTransactionDiff.getReceiveAmount(ex.sellOrder, 8, 8, ex.amount.value, ex.price.value).explicitGet() > ex.sellMatcherFee.value
+            ExchangeTransactionDiff.getReceiveAmount(ex.sellOrder, 8, 8, ex.amount.value, ex.price.value).explicitGet() > ex.sellMatcherFee
           } else true
 
         isBuyerReceiveAmountGreaterThanFee && isSellerReceiveAmountGreaterThanFee
@@ -1849,8 +1909,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         amount = sellOrder.amount.value,
         price = bigBuyOrder.price.value,
         buyMatcherFee = buyMatcherFee,
-        sellMatcherFee = sellOrder.matcherFee.value,
-        fee = (bigBuyOrder.matcherFee.value + sellOrder.matcherFee.value) / 2
+        sellMatcherFee = sellOrder.matcherFee,
+        fee = (bigBuyOrder.matcherFee + sellOrder.matcherFee) / 2
       )
     }
 

@@ -71,8 +71,8 @@ object ExchangeTransactionDiff {
       Diff(
         portfolios = portfolios,
         orderFills = Map(
-          tx.buyOrder.id()  -> VolumeAndFee(tx.amount.value, tx.buyMatcherFee.value),
-          tx.sellOrder.id() -> VolumeAndFee(tx.amount.value, tx.sellMatcherFee.value)
+          tx.buyOrder.id()  -> VolumeAndFee(tx.amount.value, tx.buyMatcherFee),
+          tx.sellOrder.id() -> VolumeAndFee(tx.amount.value, tx.sellMatcherFee)
         ),
         scriptsRun = scripts
       )
@@ -118,8 +118,8 @@ object ExchangeTransactionDiff {
     val matcherPortfolio =
       Monoid.combineAll(
         Seq(
-          getOrderFeePortfolio(tx.buyOrder, tx.buyMatcherFee.value),
-          getOrderFeePortfolio(tx.sellOrder, tx.sellMatcherFee.value),
+          getOrderFeePortfolio(tx.buyOrder, tx.buyMatcherFee),
+          getOrderFeePortfolio(tx.sellOrder, tx.sellMatcherFee),
           Portfolio.waves(-tx.fee.value)
         )
       )
@@ -127,12 +127,18 @@ object ExchangeTransactionDiff {
     val feeDiff = Monoid.combineAll(
       Seq(
         Map(matcher -> matcherPortfolio),
-        Map(buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee.value)),
-        Map(seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee.value))
+        Map(buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee)),
+        Map(seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee))
       )
     )
 
     for {
+      _ <- Either.cond(
+        blockchain.height < blockchain.settings.functionalitySettings.forbidNonPositiveMatcherFee ||
+          tx.buyMatcherFee > 0 && tx.sellMatcherFee > 0,
+        (),
+        GenericError("Matcher fee can not be negative or zero")
+      )
       _ <- Either.cond(assets.values.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
       amountDecimals = if (tx.version < TxVersion.V3) 8 else tx.buyOrder.assetPair.amountAsset.fold(8)(ia => assets(ia).fold(8)(_.decimals))
       priceDecimals  = if (tx.version < TxVersion.V3) 8 else tx.buyOrder.assetPair.priceAsset.fold(8)(ia => assets(ia).fold(8)(_.decimals))
@@ -166,18 +172,18 @@ object ExchangeTransactionDiff {
 
     lazy val buyFeeValid =
       isFeeValid(
-        feeTotal = filledBuy.fee + exTrans.buyMatcherFee.value,
+        feeTotal = filledBuy.fee + exTrans.buyMatcherFee,
         amountTotal = buyTotal,
-        maxfee = exTrans.buyOrder.matcherFee.value,
+        maxfee = exTrans.buyOrder.matcherFee,
         maxAmount = exTrans.buyOrder.amount.value,
         order = exTrans.buyOrder
       )
 
     lazy val sellFeeValid =
       isFeeValid(
-        feeTotal = filledSell.fee + exTrans.sellMatcherFee.value,
+        feeTotal = filledSell.fee + exTrans.sellMatcherFee,
         amountTotal = sellTotal,
-        maxfee = exTrans.sellOrder.matcherFee.value,
+        maxfee = exTrans.sellOrder.matcherFee,
         maxAmount = exTrans.sellOrder.amount.value,
         order = exTrans.sellOrder
       )
@@ -201,7 +207,7 @@ object ExchangeTransactionDiff {
       if (order.orderType == OrderType.SELL) matchAmount
       else {
         val spend = (BigDecimal(matchAmount) * matchPrice * BigDecimal(10).pow(priceDecimals - amountDecimals - 8)).toBigInt
-        if (order.getSpendAssetId == Waves && !(spend + order.matcherFee.value).isValidLong) {
+        if (order.getSpendAssetId == Waves && !(spend + order.matcherFee).isValidLong) {
           throw new ArithmeticException("BigInteger out of long range")
         } else spend.bigInteger.longValueExact()
       }

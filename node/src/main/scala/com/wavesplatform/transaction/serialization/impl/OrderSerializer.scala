@@ -5,7 +5,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.protobuf.transaction.PBOrders
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
-import com.wavesplatform.transaction.{Proofs, TxExchangeAmount, TxMatcherFee, TxOrderPrice}
+import com.wavesplatform.transaction.{Proofs, TxExchangeAmount, TxOrderPrice}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import play.api.libs.json.{JsObject, Json}
 
@@ -26,7 +26,7 @@ object OrderSerializer {
       "price"            -> price.value,
       "timestamp"        -> timestamp,
       "expiration"       -> expiration,
-      "matcherFee"       -> matcherFee.value,
+      "matcherFee"       -> matcherFee,
       "signature"        -> proofs.toSignature.toString,
       "proofs"           -> proofs.proofs.map(_.toString)
     ) ++ (if (version >= Order.V3) Json.obj("matcherFeeAssetId" -> matcherFeeAssetId) else JsObject.empty)
@@ -46,7 +46,7 @@ object OrderSerializer {
           Longs.toByteArray(amount.value),
           Longs.toByteArray(timestamp),
           Longs.toByteArray(expiration),
-          Longs.toByteArray(matcherFee.value)
+          Longs.toByteArray(matcherFee)
         )
 
       case Order.V2 =>
@@ -60,7 +60,7 @@ object OrderSerializer {
           Longs.toByteArray(amount.value),
           Longs.toByteArray(timestamp),
           Longs.toByteArray(expiration),
-          Longs.toByteArray(matcherFee.value)
+          Longs.toByteArray(matcherFee)
         )
 
       case Order.V3 =>
@@ -74,7 +74,7 @@ object OrderSerializer {
           Longs.toByteArray(amount.value),
           Longs.toByteArray(timestamp),
           Longs.toByteArray(expiration),
-          Longs.toByteArray(matcherFee.value),
+          Longs.toByteArray(matcherFee),
           matcherFeeAssetId.byteRepr
         )
 
@@ -102,7 +102,7 @@ object OrderSerializer {
       val timestamp  = buf.getLong
       val expiration = buf.getLong
       val matcherFee = buf.getLong
-      Order(version, sender, matcher, assetPair, orderType, TxExchangeAmount.unsafeFrom(amount), TxOrderPrice.unsafeFrom(price), timestamp, expiration, TxMatcherFee.unsafeFrom(matcherFee))
+      Order(version, sender, matcher, assetPair, orderType, TxExchangeAmount.unsafeFrom(amount), TxOrderPrice.unsafeFrom(price), timestamp, expiration, matcherFee)
     }
 
     version match {

@@ -101,13 +101,13 @@ class OrderSpecification extends PropSpec with ValidationMatcher with NTPTime {
     versions.foreach { version =>
       val matcherFeeAsset = if (version == 3) IssuedAsset(ByteStr.fill(32)(3)) else Waves
 
-      Order.buy(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, 0, matcherFeeAsset) shouldBe an[Left[_, _]]
-      Order.buy(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, -1, matcherFeeAsset) shouldBe an[Left[_, _]]
-      Order.buy(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, Order.MaxAmount + 1, matcherFeeAsset) shouldBe an[Left[_, _]]
+      Order.buy(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, 0, matcherFeeAsset).explicitGet().isValid(ntpTime.correctedTime()) shouldBe not(valid)
+      Order.buy(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, -1, matcherFeeAsset).explicitGet().isValid(ntpTime.correctedTime()) shouldBe not(valid)
+      Order.buy(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, Order.MaxAmount + 1, matcherFeeAsset).explicitGet().isValid(ntpTime.correctedTime()) shouldBe not(valid)
 
-      Order.sell(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, 0, matcherFeeAsset) shouldBe an[Left[_, _]]
-      Order.sell(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, -1, matcherFeeAsset) shouldBe an[Left[_, _]]
-      Order.sell(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, Order.MaxAmount + 1, matcherFeeAsset) shouldBe an[Left[_, _]]
+      Order.sell(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, 0, matcherFeeAsset).explicitGet().isValid(ntpTime.correctedTime()) shouldBe not(valid)
+      Order.sell(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, -1, matcherFeeAsset).explicitGet().isValid(ntpTime.correctedTime()) shouldBe not(valid)
+      Order.sell(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, Order.MaxAmount + 1, matcherFeeAsset).explicitGet().isValid(ntpTime.correctedTime()) shouldBe not(valid)
     }
   }
 
@@ -156,7 +156,7 @@ class OrderSpecification extends PropSpec with ValidationMatcher with NTPTime {
         Verifier.verifyAsEllipticCurveSignature(order.copy(price = TxOrderPrice.unsafeFrom(order.price.value + 1))) should produce(err)
         Verifier.verifyAsEllipticCurveSignature(order.copy(amount = TxExchangeAmount.unsafeFrom(order.amount.value + 1))) should produce(err)
         Verifier.verifyAsEllipticCurveSignature(order.copy(expiration = order.expiration + 1)) should produce(err)
-        Verifier.verifyAsEllipticCurveSignature(order.copy(matcherFee = TxMatcherFee.unsafeFrom(order.matcherFee.value + 1))) should produce(err)
+        Verifier.verifyAsEllipticCurveSignature(order.copy(matcherFee = order.matcherFee + 1)) should produce(err)
         Verifier.verifyAsEllipticCurveSignature(order.copy(proofs = Proofs(Seq(ByteStr(pka.publicKey.arr ++ pka.publicKey.arr))))) should produce(err)
     }
   }

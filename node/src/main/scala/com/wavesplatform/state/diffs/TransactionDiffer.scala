@@ -119,8 +119,8 @@ object TransactionDiffer {
         _ <- tx match {
           case etx: ExchangeTransaction =>
             for {
-              _ <- validateOrder(blockchain, etx.buyOrder, etx.buyMatcherFee.value)
-              _ <- validateOrder(blockchain, etx.sellOrder, etx.sellMatcherFee.value)
+              _ <- validateOrder(blockchain, etx.buyOrder, etx.buyMatcherFee)
+              _ <- validateOrder(blockchain, etx.sellOrder, etx.sellMatcherFee)
 
               // Balance overflow check
               _ <- if (blockchain.height >= blockchain.settings.functionalitySettings.estimatorSumOverflowFixHeight) {

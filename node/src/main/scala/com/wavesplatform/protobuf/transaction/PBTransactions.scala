@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxDecimals, TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxNonNegativeAmount, TxValidationError}
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxDecimals, TxExchangeAmount, TxExchangePrice, TxNonNegativeAmount, TxValidationError}
 import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{transaction => vt}
 import scalapb.UnknownFieldSet.empty
@@ -440,8 +440,8 @@ object PBTransactions {
           PBOrders.vanilla(sellOrder).explicitGet(),
           TxExchangeAmount.unsafeFrom(amount),
           TxExchangePrice.unsafeFrom(price),
-          TxMatcherFee.unsafeFrom(buyMatcherFee),
-          TxMatcherFee.unsafeFrom(sellMatcherFee),
+          buyMatcherFee,
+          sellMatcherFee,
           TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
           proofs,
@@ -543,8 +543,8 @@ object PBTransactions {
         val data = ExchangeTransactionData(
           amount.value,
           price.value,
-          buyMatcherFee.value,
-          sellMatcherFee.value,
+          buyMatcherFee,
+          sellMatcherFee,
           Seq(PBOrders.protobuf(order1), PBOrders.protobuf(order2))
         )
         PBTransactions.create(tx.sender, chainId, fee.value, tx.assetFee._1, timestamp, version, proofs, Data.Exchange(data))

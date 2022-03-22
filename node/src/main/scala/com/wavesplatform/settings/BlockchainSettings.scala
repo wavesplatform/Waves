@@ -79,6 +79,7 @@ case class FunctionalitySettings(
     estimationOverflowFixHeight: Int = 0,
     estimatorSumOverflowFixHeight: Int = 0,
     forbidSyncDAppNegativePaymentHeight: Int = 0,
+    forbidNonPositiveMatcherFee: Int = 0,
     allowMultipleProofsInCreateAliasUntil: Int = Int.MaxValue
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int        = blockVersion3AfterHeight
@@ -114,6 +115,7 @@ case class FunctionalitySettings(
 }
 
 object FunctionalitySettings {
+  // FIXME: add forbidNonPositiveMatcherFee activation height
   val MAINNET = apply(
     featureCheckBlocksPeriod = 5000,
     blocksForFeatureActivation = 4000,
@@ -131,6 +133,7 @@ object FunctionalitySettings {
     allowMultipleProofsInCreateAliasUntil = 3029980
   )
 
+  // FIXME: add forbidNonPositiveMatcherFee activation height
   val TESTNET = apply(
     featureCheckBlocksPeriod = 3000,
     blocksForFeatureActivation = 2700,

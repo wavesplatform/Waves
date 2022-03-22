@@ -50,7 +50,7 @@ object RealTransactionWrapper {
       price = o.price.value,
       timestamp = o.timestamp,
       expiration = o.expiration,
-      matcherFee = o.matcherFee.value,
+      matcherFee = o.matcherFee,
       bodyBytes = ByteStr(o.bodyBytes()),
       proofs = o.proofs.proofs.map(a => ByteStr(a.arr)).toIndexedSeq,
       matcherFeeAssetId = o.matcherFeeAssetId.compatId
@@ -99,7 +99,7 @@ object RealTransactionWrapper {
       case ss: SetScriptTransaction      => Tx.SetScript(proven(ss), ss.script.map(_.bytes())).asRight
       case ss: SetAssetScriptTransaction => Tx.SetAssetScript(proven(ss), ss.asset.id, ss.script.map(_.bytes())).asRight
       case p: PaymentTransaction         => Tx.Payment(proven(p), p.amount.value, p.recipient).asRight
-      case e: ExchangeTransaction        => Tx.Exchange(proven(e), e.amount.value, e.price.value, e.buyMatcherFee.value, e.sellMatcherFee.value, e.buyOrder, e.sellOrder).asRight
+      case e: ExchangeTransaction        => Tx.Exchange(proven(e), e.amount.value, e.price.value, e.buyMatcherFee, e.sellMatcherFee, e.buyOrder, e.sellOrder).asRight
       case s: SponsorFeeTransaction      => Tx.Sponsorship(proven(s), s.asset.id, s.minSponsoredAssetFee.map(_.value)).asRight
       case d: DataTransaction =>
         Tx.Data(

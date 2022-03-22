@@ -18,8 +18,8 @@ case class ExchangeTransaction(version: TxVersion,
                                order2: Order,
                                amount: TxExchangeAmount,
                                price: TxExchangePrice,
-                               buyMatcherFee: TxMatcherFee,
-                               sellMatcherFee: TxMatcherFee,
+                               buyMatcherFee: Long,
+                               sellMatcherFee: Long,
                                fee: TxPositiveAmount,
                                timestamp: Long,
                                proofs: Proofs,
@@ -79,8 +79,6 @@ object ExchangeTransaction extends TransactionParser {
       fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
       amount <- TxExchangeAmount(amount)(GenericError(TxExchangeAmount.errMsg))
       price <- TxExchangePrice(price)(GenericError(TxExchangePrice.errMsg))
-      sellMatcherFee <- TxMatcherFee(sellMatcherFee)(GenericError(s"sell ${TxMatcherFee.errMsg}"))
-      buyMatcherFee <- TxMatcherFee(buyMatcherFee)(GenericError(s"buy ${TxMatcherFee.errMsg}"))
       tx <- ExchangeTransaction(version, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 

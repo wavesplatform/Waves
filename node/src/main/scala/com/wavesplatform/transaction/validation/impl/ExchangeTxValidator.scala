@@ -12,6 +12,8 @@ object ExchangeTxValidator extends TxValidator[ExchangeTransaction] {
     import tx._
 
     V.seq(tx)(
+      V.cond(sellMatcherFee <= Order.MaxAmount, GenericError("sellMatcherFee too large")),
+      V.cond(buyMatcherFee <= Order.MaxAmount, GenericError("buyMatcherFee too large")),
       V.cond(fee.value <= Order.MaxAmount, GenericError("fee too large")),
       V.cond(isProtobufVersion || order1.orderType == OrderType.BUY, GenericError("order1 should have OrderType.BUY")),
       V.cond(buyOrder.orderType == OrderType.BUY, GenericError("buyOrder should has OrderType.BUY")),

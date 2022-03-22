@@ -42,7 +42,7 @@ class OrderJsonSpecification extends PropSpec {
         o.assetPair.priceAsset.compatId.get shouldBe ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
         o.price.value shouldBe 3
         o.amount.value shouldBe 1
-        o.matcherFee.value shouldBe 2
+        o.matcherFee shouldBe 2
         o.timestamp shouldBe 0
         o.expiration shouldBe 0
         o.signature shouldBe ByteStr(Base58.decode("signature"))
@@ -77,7 +77,7 @@ class OrderJsonSpecification extends PropSpec {
         o.assetPair.priceAsset shouldBe IssuedAsset(ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get)
         o.price.value shouldBe 3
         o.amount.value shouldBe 1
-        o.matcherFee.value shouldBe 2
+        o.matcherFee shouldBe 2
         o.timestamp shouldBe 0
         o.expiration shouldBe 0
         o.signature shouldBe ByteStr(Base58.decode("signature"))

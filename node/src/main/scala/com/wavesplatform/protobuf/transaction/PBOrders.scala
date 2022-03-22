@@ -6,7 +6,7 @@ import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.order.AssetPair
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.OrderType
-import com.wavesplatform.transaction.{TxExchangeAmount, TxMatcherFee, TxOrderPrice}
+import com.wavesplatform.transaction.{TxExchangeAmount, TxOrderPrice}
 import com.wavesplatform.{transaction => vt}
 
 object PBOrders {
@@ -16,7 +16,6 @@ object PBOrders {
     for {
       amount <- TxExchangeAmount(order.amount)(GenericError(TxExchangeAmount.errMsg))
       price <- TxOrderPrice(order.price)(GenericError(TxOrderPrice.errMsg))
-      matcherFee <- TxMatcherFee(order.getMatcherFee.longAmount)(GenericError(TxMatcherFee.errMsg))
       orderType <- vanillaOrderType(order.orderSide)
     } yield {
       VanillaOrder(
@@ -30,7 +29,7 @@ object PBOrders {
         price,
         order.timestamp,
         order.expiration,
-        matcherFee,
+        order.getMatcherFee.longAmount,
         PBAmounts.toVanillaAssetId(order.getMatcherFee.assetId),
         order.proofs.map(_.toByteStr)
       )
@@ -50,7 +49,7 @@ object PBOrders {
       order.price.value,
       order.timestamp,
       order.expiration,
-      Some((order.matcherFeeAssetId, order.matcherFee.value)),
+      Some((order.matcherFeeAssetId, order.matcherFee)),
       order.version,
       order.proofs.map(_.toByteString)
     )

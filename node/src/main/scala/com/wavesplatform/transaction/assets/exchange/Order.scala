@@ -27,7 +27,7 @@ case class Order(
     price: TxOrderPrice,
     timestamp: TxTimestamp,
     expiration: TxTimestamp,
-    matcherFee: TxMatcherFee,
+    matcherFee: Long,
     matcherFeeAssetId: Asset = Waves,
     proofs: Proofs = Proofs.empty
 ) extends Proven {
@@ -37,10 +37,12 @@ case class Order(
 
   def isValid(atTime: Long): Validation = {
     assetPair.isValid &&
-    (timestamp > 0) :| "timestamp should be > 0" &&
-    (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
-    (expiration >= atTime) :| "expiration should be > currentTime" &&
-    (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves"
+      (matcherFee > 0) :| "matcherFee should be > 0" &&
+      (matcherFee < MaxAmount) :| "matcherFee too large" &&
+      (timestamp > 0) :| "timestamp should be > 0" &&
+      (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
+      (expiration >= atTime) :| "expiration should be > currentTime" &&
+      (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves"
   }
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.bodyBytes(this))
@@ -101,7 +103,6 @@ object Order {
     for {
       amount <- TxExchangeAmount(amount)(GenericError(s"Order validation error: ${TxExchangeAmount.errMsg}"))
       price <- TxOrderPrice(price)(GenericError(s"Order validation error: ${TxOrderPrice.errMsg}"))
-      matcherFee <- TxMatcherFee(matcherFee)(GenericError(s"Order validation error: ${TxMatcherFee.errMsg}"))
     } yield {
       Order(version, sender.publicKey, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId).signWith(sender.privateKey)
     }
