@@ -59,7 +59,7 @@ class EthereumTransactionRollbackSpec extends FlatSpec with WithDomain with EthH
     d.helpers.setScript(TxHelpers.defaultSigner, script)
 
     val (initHeight, initStateSnapshot) = d.makeStateSolid()
-    val invoke = TxHelpers.invoke(TxHelpers.defaultAddress, "foo", fee = 1_0050_0000)
+    val invoke = TxHelpers.invoke(TxHelpers.defaultAddress, Some("foo"), fee = 1_0050_0000)
     d.appendBlock(invoke)
 
     d.rollbackTo(initHeight)

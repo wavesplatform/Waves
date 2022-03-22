@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.api.http.assets
 
-import com.wavesplatform.api.http.requests._
+import com.wavesplatform.api.http.requests.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script

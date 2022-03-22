@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.smart.eth
 
-import cats.implicits._
+import cats.implicits.*
 import com.esaulpaugh.headlong.abi.{Function, Tuple}
 import com.esaulpaugh.headlong.util.FastHex
 import com.wavesplatform.account.PublicKey
@@ -13,7 +13,7 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V5}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
-import com.wavesplatform.lang.v1.traits.domain.AttachedPayments._
+import com.wavesplatform.lang.v1.traits.domain.AttachedPayments.*
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
@@ -24,10 +24,10 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.utils.{EthHelpers, EthSetChainId}
+import com.wavesplatform.utils.EthHelpers
 
-class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with EthSetChainId {
-  import DomainPresets._
+class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
+  import DomainPresets.*
 
   private val time = new TestTime
   private def ts   = time.getTimestamp()
@@ -98,7 +98,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with E
 
   private def hexData(script: Script, assets: Seq[IssuedAsset]) = {
     val signature = ABIConverter(script).funcByMethodId.collectFirst { case (_, f) if f.name == "default" => f }.get
-    val args      = new Tuple(passingArg, Array[Tuple](assets.map(a => new Tuple(a.id.arr, paymentAmount)): _*))
+    val args      = new Tuple(passingArg, Array[Tuple](assets.map(a => new Tuple(a.id.arr, paymentAmount))*))
     val call      = new Function(signature.ethSignature).encodeCall(args).array()
     FastHex.encodeToString(call, 0, call.length)
   }
@@ -109,7 +109,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with E
     val dApp2 = accountGen.sample.get
 
     val dummyInvoke    = EthereumTransaction.Invocation(dApp.toAddress, "")
-    val dummyEthInvoke = EthereumTransaction(dummyInvoke, TestEthRawTransaction, TestEthSignature, 'E'.toByte) // needed to pass into asset script
+    val dummyEthInvoke = EthereumTransaction(dummyInvoke, TestEthRawTransaction, TestEthSignature, 'T'.toByte) // needed to pass into asset script
     val invoker        = dummyEthInvoke.senderAddress()
     val invokerPk      = dummyEthInvoke.signerPublicKey()
 
@@ -140,7 +140,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with E
   private def assert(dAppVersion: StdLibVersion, assetScriptVersion: StdLibVersion, paymentCount: Int, syncCall: Boolean = false) = {
     val (preparingTxs, ethInvoke, dApp, dApp2, assets) = preconditions(dAppVersion, assetScriptVersion, paymentCount, syncCall)
     withDomain(RideV6) { d =>
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs*)
       d.appendBlock(ethInvoke)
 
       d.liquidDiff.errorMessage(ethInvoke.id()) shouldBe None
