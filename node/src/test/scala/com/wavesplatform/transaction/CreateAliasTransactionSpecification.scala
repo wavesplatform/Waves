@@ -5,16 +5,17 @@ import com.wavesplatform.account.{Alias, KeyPair, PublicKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.transaction.serialization.impl.CreateAliasTxSerializer
+import com.wavesplatform.transaction.serialization.impl.{CreateAliasTxSerializer, PBTransactionSerializer}
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain.*
-import com.wavesplatform.lang.directives.values.V5
+import com.wavesplatform.lang.directives.values.{V5, V6}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import play.api.libs.json.Json
 
-import scala.util.Random
+import scala.util.{Failure, Random, Success}
 
 class CreateAliasTransactionSpecification extends PropSpec with WithDomain {
 
@@ -29,6 +30,23 @@ class CreateAliasTransactionSpecification extends PropSpec with WithDomain {
     forAll(createAliasGen) { tx: CreateAliasTransaction =>
       val recovered = TransactionParsers.parseBytes(tx.bytes()).get
       recovered shouldEqual tx
+    }
+  }
+
+  property("CreateAliasTransaction PB serialization roundtrip") {
+    val kp1 = KeyPair(Longs.toByteArray(Random.nextLong()))
+    val kp2 = KeyPair(Longs.toByteArray(Random.nextLong()))
+
+    val cat = CreateAliasTransaction(3.toByte, TxHelpers.signer(1).publicKey, "abc12345", 0.001.waves, System.currentTimeMillis(), Proofs.empty, 'T'.toByte)
+    val signedCreateAlias = cat.copy(
+      proofs = cat.signWith(kp1.privateKey).proofs.proofs ++ cat.signWith(kp2.privateKey).proofs.proofs
+    )
+    PBTransactionSerializer.parseBytes(PBTransactionSerializer.bytes(signedCreateAlias)) match {
+      case Success(tx@CreateAliasTransaction(_, _, _, _, _, proofs, _)) =>
+        tx shouldBe signedCreateAlias
+        proofs shouldBe signedCreateAlias.proofs
+      case Success(tx) => fail(s"Unexpected transaction type: ${tx.tpe.transactionName}")
+      case Failure(exception) => fail(exception)
     }
   }
 
@@ -102,7 +120,7 @@ class CreateAliasTransactionSpecification extends PropSpec with WithDomain {
     js shouldEqual tx.json()
   }
 
-  property("Multiple proofs") {
+  property("Multiple proofs before RideV6 activation") {
     withDomain(DomainPresets.RideV5.copy(
       blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
         functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(
@@ -142,6 +160,36 @@ class CreateAliasTransactionSpecification extends PropSpec with WithDomain {
 
       d.blockchainUpdater
         .processBlock(d.createBlock(Block.PlainBlockVersion, Seq(signedCreateAlias2))) should produce("Invalid proofs size")
+    }
+  }
+
+  property("Multiple proofs after RideV6 activation") {
+    val sender = TxHelpers.signer(1)
+    withDomain(DomainPresets.RideV6.copy(
+      blockchainSettings = DomainPresets.RideV6.blockchainSettings.copy(
+        functionalitySettings = DomainPresets.RideV6.blockchainSettings.functionalitySettings.copy(
+          allowMultipleProofsInCreateAliasUntil = 0
+        )
+      )
+    ), AddrWithBalance.enoughBalances(sender)) { d =>
+      val kp1 = KeyPair(Longs.toByteArray(Random.nextLong()))
+      val kp2 = KeyPair(Longs.toByteArray(Random.nextLong()))
+
+      val cat = CreateAliasTransaction(3.toByte, sender.publicKey, "abc12345", 0.001.waves, System.currentTimeMillis(), Proofs.empty, 'T'.toByte)
+      val signedCreateAlias = cat.copy(
+        proofs = cat.signWith(kp1.privateKey).proofs.proofs ++ cat.signWith(kp2.privateKey).proofs.proofs
+      )
+      d.appendBlockE(signedCreateAlias) should produce("Transactions from non-scripted accounts must have exactly 1 proof")
+
+      val verifier = TestCompiler(V6).compileExpression(
+        """{-# STDLIB_VERSION 6 #-}
+          |{-# CONTENT_TYPE EXPRESSION #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |
+          |true
+          |""".stripMargin)
+      d.appendBlock(TxHelpers.setScript(sender, verifier, version = TxVersion.V2))
+      d.appendAndAssertSucceed(signedCreateAlias)
     }
   }
 }
