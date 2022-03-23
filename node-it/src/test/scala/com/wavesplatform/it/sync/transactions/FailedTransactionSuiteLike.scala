@@ -296,8 +296,8 @@ object FailedTransactionSuiteLike {
         sell,
         buy.amount.value,
         buy.price.value,
-        buy.matcherFee.value,
-        sell.matcherFee.value,
+        buy.matcherFee,
+        sell.matcherFee,
         fee,
         ts
       )

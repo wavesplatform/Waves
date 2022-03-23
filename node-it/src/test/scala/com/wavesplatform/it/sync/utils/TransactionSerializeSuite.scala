@@ -20,7 +20,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxPositiveAmount, TxDecimals, TxExchangeAmount, TxMatcherFee, TxOrderPrice, TxVersion}
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxPositiveAmount, TxDecimals, TxExchangeAmount, TxOrderPrice, TxVersion}
 import org.scalatest.Informing
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -40,7 +40,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     TxOrderPrice.unsafeFrom(60.waves),
     tsOrderFrom,
     tsOrderTo,
-    TxMatcherFee.unsafeFrom(1),
+    1,
     proofs = Proofs(Seq(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get))
   )
 
@@ -54,7 +54,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     TxOrderPrice.unsafeFrom(60.waves),
     tsOrderFrom,
     tsOrderTo,
-    TxMatcherFee.unsafeFrom(1),
+    1,
     proofs = Proofs(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
   )
 
@@ -68,7 +68,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     TxOrderPrice.unsafeFrom(50.waves),
     tsOrderFrom,
     tsOrderTo,
-    TxMatcherFee.unsafeFrom(2),
+    2,
     proofs = Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
   )
 

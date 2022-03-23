@@ -29,7 +29,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, TxPositiveAmount, TxDecimals, TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxNonNegativeAmount, TxVersion}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, TxPositiveAmount, TxDecimals, TxExchangeAmount, TxExchangePrice, TxNonNegativeAmount, TxVersion}
 import org.asynchttpclient.Dsl.{delete => _delete, get => _get, post => _post, put => _put}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
@@ -743,8 +743,8 @@ object AsyncHttpApi extends Assertions {
                           order2: Order,
                           amount: TxExchangeAmount,
                           price: TxExchangePrice,
-                          buyMatcherFee: TxMatcherFee,
-                          sellMatcherFee: TxMatcherFee,
+                          buyMatcherFee: Long,
+                          sellMatcherFee: Long,
                           fee: Long,
                           version: Byte,
                           amountsAsStrings: Boolean = false,

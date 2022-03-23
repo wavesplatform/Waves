@@ -11,7 +11,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.{TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxVersion}
+import com.wavesplatform.transaction.{TxExchangeAmount, TxExchangePrice, TxVersion}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange._
 import play.api.libs.json.{JsNumber, JsObject, JsString, Json}
@@ -71,20 +71,20 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val protoVersion = exchangeVersion > TxVersion.V2
 
       assertApiError(
-        sender.broadcastExchange(matcher, sell, sell, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(sellPrice), TxMatcherFee.unsafeFrom(buyFee), TxMatcherFee.unsafeFrom(sellFee), matcherFee, exchangeVersion, validate = false),
+        sender.broadcastExchange(matcher, sell, sell, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(sellPrice), buyFee, sellFee, matcherFee, exchangeVersion, validate = false),
         if (protoVersion) CustomValidationError("buyOrder should has OrderType.BUY") else CustomValidationError("order1 should have OrderType.BUY")
       )
 
       assertApiError(
-        sender.broadcastExchange(matcher, buy, buy, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(buyPrice), TxMatcherFee.unsafeFrom(buyFee), TxMatcherFee.unsafeFrom(sellFee), matcherFee, exchangeVersion, validate = false),
+        sender.broadcastExchange(matcher, buy, buy, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(buyPrice), buyFee, sellFee, matcherFee, exchangeVersion, validate = false),
         CustomValidationError("sellOrder should has OrderType.SELL")
       )
 
       assertApiError {
         if (protoVersion)
-          sender.broadcastExchange(matcher, sell, buy, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(sellPrice), TxMatcherFee.unsafeFrom(buyFee), TxMatcherFee.unsafeFrom(sellFee), matcherFee, exchangeVersion)
+          sender.broadcastExchange(matcher, sell, buy, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(sellPrice), buyFee, sellFee, matcherFee, exchangeVersion)
         else
-          sender.broadcastExchange(matcher, buy, sell, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(sellPrice), TxMatcherFee.unsafeFrom(buyFee), TxMatcherFee.unsafeFrom(sellFee), matcherFee, exchangeVersion)
+          sender.broadcastExchange(matcher, buy, sell, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(sellPrice), buyFee, sellFee, matcherFee, exchangeVersion)
       } { error =>
         error.id shouldBe StateCheckFailed.Id
         error.statusCode shouldBe StateCheckFailed.Code.intValue

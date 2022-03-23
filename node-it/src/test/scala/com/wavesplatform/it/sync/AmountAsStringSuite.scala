@@ -9,7 +9,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.{CreateAliasTransaction, TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxVersion}
+import com.wavesplatform.transaction.{CreateAliasTransaction, TxExchangeAmount, TxExchangePrice, TxVersion}
 import org.asynchttpclient.Response
 import org.scalatest
 import org.scalatest.Assertion
@@ -97,7 +97,7 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
     ).explicitGet()
     nodes.waitForHeightArise()
     val exchangeTx =
-      sender.broadcastExchange(exchanger, buyOrder, sellOrder, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(price), TxMatcherFee.unsafeFrom(matcherFee), TxMatcherFee.unsafeFrom(matcherFee), matcherFee, amountsAsStrings = true)
+      sender.broadcastExchange(exchanger, buyOrder, sellOrder, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(price), matcherFee, matcherFee, matcherFee, amountsAsStrings = true)
     checkExchangeTx(exchangeTx)
 
     val utxExchangeTxInfoById = sender.utxById(exchangeTx.id, amountsAsStrings = true)
