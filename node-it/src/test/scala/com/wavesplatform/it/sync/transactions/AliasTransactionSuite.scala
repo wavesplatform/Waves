@@ -24,6 +24,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     NodeConfigs
       .Builder(Default, 2, Seq.empty)
       .overrideBase(_.preactivatedFeatures((RideV6.id, 0)))
+      .overrideBase(_.raw(s"waves.blockchain.custom.functionality.allow-multiple-proofs-in-create-alias-until = 0"))
       .buildNonConflicting()
 
   var version: Byte = 1
