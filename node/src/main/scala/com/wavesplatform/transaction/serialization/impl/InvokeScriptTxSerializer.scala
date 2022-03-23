@@ -3,7 +3,6 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 import scala.util.Try
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -76,10 +75,9 @@ object InvokeScriptTxSerializer {
     val buf = ByteBuffer.wrap(bytes)
     require(buf.getByte == 0 && buf.getByte == InvokeScriptTransaction.typeId && buf.getByte == 1, "transaction type mismatch")
     val chainId = buf.getByte
-    require(chainId == AddressScheme.current.chainId, "chainId mismatch")
 
     val sender       = buf.getPublicKey
-    val dApp         = buf.getAddressOrAlias
+    val dApp         = buf.getAddressOrAlias(chainId)
     val functionCall = Deser.parseOption(buf)(SerdeV1.deserializeFunctionCall(_).explicitGet())
     val payments     = Deser.parseArrays(buf).map(parsePayment)
     val fee          = buf.getLong

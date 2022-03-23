@@ -12,7 +12,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Expressions.EXPR
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.lang.{Global, utils}
@@ -26,7 +25,7 @@ import com.wavesplatform.transaction.{DataTransaction, Proofs}
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 
-class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with TypedScriptGen {
+class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
   private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, DirectiveSet.contractDirectiveSet, ByteStr.empty)
 
   private def estimate(

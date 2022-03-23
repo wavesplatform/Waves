@@ -2,11 +2,11 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.Ficus.*
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import net.ceedubs.ficus.readers.ValueReader
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 case class RewardsSettings(
     term: Int,
@@ -74,7 +74,8 @@ case class FunctionalitySettings(
     minBlockTime: FiniteDuration = 15.seconds,
     delayDelta: Int = 8,
     estimationOverflowFixHeight: Int = 0,
-    estimatorSumOverflowFixHeight: Int = 0
+    estimatorSumOverflowFixHeight: Int = 0,
+    forbidSyncDAppNegativePaymentHeight: Int = 0
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
@@ -118,7 +119,8 @@ object FunctionalitySettings {
     lastTimeBasedForkParameter = 1530161445559L,
     estimatorPreCheckHeight = 1847610,
     estimationOverflowFixHeight = 2858710,
-    estimatorSumOverflowFixHeight = 2897510
+    estimatorSumOverflowFixHeight = 2897510,
+    forbidSyncDAppNegativePaymentHeight = 2959447
   )
 
   val TESTNET: FunctionalitySettings = apply(
@@ -129,7 +131,8 @@ object FunctionalitySettings {
     lastTimeBasedForkParameter = 1492560000000L,
     estimatorPreCheckHeight = 817380,
     estimationOverflowFixHeight = 1793770,
-    estimatorSumOverflowFixHeight = 1832520
+    estimatorSumOverflowFixHeight = 1832520,
+    forbidSyncDAppNegativePaymentHeight = 1894600
   )
 
   val STAGENET: FunctionalitySettings = apply(

@@ -7,7 +7,7 @@ import com.wavesplatform.features.BlockchainFeature
 import com.wavesplatform.state.{Blockchain, Diff}
 import play.api.libs.json.{Json, Reads}
 
-trait PatchDataLoader extends {
+trait PatchDataLoader {
   protected def readPatchData[T: Reads](): T =
     Json
       .parse(

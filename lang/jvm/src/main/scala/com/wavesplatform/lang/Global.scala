@@ -127,6 +127,9 @@ object Global extends BaseGlobal {
     tryEither {
       val base    = toJBig(b, bp)
       val exp     = toJBig(e, ep)
+
+
+
       val context = if (useNewPrecision) bigMathContext else oldBigMathContext
       val res = if (exp == BigDecimal(0.5).bigDecimal) {
         BigDecimalMath.sqrt(base, context)

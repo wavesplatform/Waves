@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -11,13 +10,9 @@ import com.wavesplatform.lang.utils.compilerContext
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxValidationError.ScriptExecutionError
-import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, TxValidationError, TxVersion}
-import com.wavesplatform.utils._
+import com.wavesplatform.transaction.{TxHelpers, TxValidationError}
 import org.scalatest.Inside
 
 class TransactionValidationErrorPrintTest extends PropSpec with Inside with WithState {
@@ -66,60 +61,37 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
 
     val seed     = Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet()
     val master   = Address.fromString("3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu").explicitGet()
-    val genesis1 = GenesisTransaction.create(master, 1000000000, 0).explicitGet()
-    val genesis2 = GenesisTransaction.create(KeyPair(master.bytes).toAddress, 1000000000, 0).explicitGet()
+    val genesis1 = TxHelpers.genesis(master, 1000000000, timestamp = 0)
+    val genesis2 = TxHelpers.genesis(KeyPair(master.bytes).toAddress, 1000000000, timestamp = 0)
 
-    val issueTransaction = IssueTransaction(
-      TxVersion.V2,
-      KeyPair(seed.bytes).publicKey,
-      "name".utf8Bytes,
-      "description".utf8Bytes,
-      100,
-      0.toByte,
-      false,
-      Some(preTypedScript),
-      10000000,
-      0
-    ).signWith(KeyPair(seed.bytes).privateKey)
+    val issueTransaction = TxHelpers.issue(
+      issuer = KeyPair(seed.bytes),
+      amount = 100,
+      name = "name",
+      reissuable = false,
+      script = Some(preTypedScript),
+      fee = 10000000,
+      timestamp = 0
+    )
 
-    val preTransferTransaction = TransferTransaction
-      .selfSigned(
-        version = 2.toByte,
-        sender = KeyPair(seed.bytes),
-        recipient = KeyPair(master.bytes).toAddress,
-        asset = IssuedAsset(issueTransaction.id()),
-        amount = 1,
-        feeAsset = Waves,
-        fee = 10000000,
-        attachment = ByteStr.empty,
-        timestamp = 0
-      )
-      .explicitGet()
+    val preTransferTransaction = TxHelpers.transfer(
+      from = KeyPair(seed.bytes),
+      to = KeyPair(master.bytes).toAddress,
+      amount = 1,
+      asset = issueTransaction.asset,
+      fee = 10000000,
+      timestamp = 0
+    )
 
-    val preSetAssetScriptTransaction = SetAssetScriptTransaction
-      .selfSigned(
-        version = 1.toByte,
-        sender = KeyPair(seed.bytes),
-        asset = IssuedAsset(issueTransaction.id()),
-        script = Some(typedScript),
-        fee = 10000000,
-        timestamp = 0
-      )
-      .explicitGet()
+    val preSetAssetScriptTransaction = TxHelpers.setAssetScript(
+      acc = KeyPair(seed.bytes),
+      asset = issueTransaction.asset,
+      script = typedScript,
+      fee = 10000000,
+      timestamp = 0
+    )
 
-    val transferTransaction = TransferTransaction
-      .selfSigned(
-        version = 2.toByte,
-        sender = KeyPair(master.bytes),
-        recipient = master,
-        asset = IssuedAsset(issueTransaction.id()),
-        amount = 1,
-        feeAsset = Waves,
-        fee = 10000000,
-        attachment = ByteStr.empty,
-        timestamp = 0
-      )
-      .explicitGet()
+    val transferTransaction = TxHelpers.transfer(KeyPair(master.bytes), master, 1, issueTransaction.asset, fee = 10000000, timestamp = 0)
 
     assertDiffEi(
       Seq(TestBlock.create(Seq(genesis1, genesis2, issueTransaction, preTransferTransaction, preSetAssetScriptTransaction))),
