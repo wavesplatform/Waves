@@ -229,7 +229,7 @@ class AssetsRouteSpec
     }
   }
 
-  routePath(s"/details/{id} - issued by invoke expression") in routeTest(DomainPresets.RideV6) { (d, route) =>
+  routePath(s"/details/{id} - issued by invoke expression") in routeTest(DomainPresets.ContinuationTransaction) { (d, route) =>
     val tx = TxHelpers.invokeExpression(
       expression = TestCompiler(V6).compileFreeCall(
         s"""

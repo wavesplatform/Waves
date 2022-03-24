@@ -9,7 +9,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.{V5, V6}
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -56,7 +55,7 @@ class LeaseRouteSpec
   private def withRoute(balances: Seq[AddrWithBalance])
                        (f: (Domain, Route) => Unit): Unit =
     withDomain(
-      settings = domainSettingsWithPreactivatedFeatures(BlockchainFeatures.implemented.flatMap(BlockchainFeatures.feature).toSeq*),
+      settings = DomainPresets.ContinuationTransaction,
       balances = balances
     ) { d =>
       f(d, route(d).route)

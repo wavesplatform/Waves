@@ -646,10 +646,12 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
   }
 
-  routePath(s"/script/compileCode after ${BlockchainFeatures.RideV6}") in {
+  routePath(s"/script/compileCode after ${BlockchainFeatures.ContinuationTransaction}") in {
     val blockchain = stub[Blockchain]("blockchain")
     val route      = seal(utilsApi.copy(blockchain = blockchain).route)
-    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0, BlockchainFeatures.RideV6.id -> 0))
+    (() => blockchain.activatedFeatures).when().returning(
+      Map(BlockchainFeatures.SynchronousCalls.id -> 0, BlockchainFeatures.RideV6.id -> 0, BlockchainFeatures.ContinuationTransaction.id -> 0)
+    )
 
     Post(routePath("/script/compileCode"), freeCall) ~> route ~> check {
       val json = responseAs[JsValue]

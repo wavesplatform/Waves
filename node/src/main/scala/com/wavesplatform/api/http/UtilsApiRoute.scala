@@ -11,7 +11,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.{RideV6, SynchronousCalls}
+import com.wavesplatform.features.BlockchainFeatures.{ContinuationTransaction, RideV6, SynchronousCalls}
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.EvaluatorFixProvider.*
 import com.wavesplatform.features.RideVersionProvider.RideVersionBlockchainExt
@@ -77,7 +77,7 @@ case class UtilsApiRoute(
     result
       .filterOrElse(
         {
-          case (e: ExprScript, _) => !e.isFreeCall || blockchain.isFeatureActivated(RideV6)
+          case (e: ExprScript, _) => !e.isFreeCall || blockchain.isFeatureActivated(ContinuationTransaction)
           case _                  => true
         },
         "Invoke Expression Transaction is not activated yet"
