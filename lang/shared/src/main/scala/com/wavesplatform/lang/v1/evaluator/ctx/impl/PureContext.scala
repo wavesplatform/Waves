@@ -24,7 +24,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.evaluator.{ContextfulUserFunction, ContextfulVal}
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation.*
-import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
+import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader, compiler}
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
@@ -450,7 +450,7 @@ object PureContext {
     }
 
   lazy val _isInstanceOf: BaseFunction[NoContext] =
-    NativeFunction("_isInstanceOf", 1, ISINSTANCEOF, BOOLEAN, ("obj", TYPEPARAM('T')), ("of", STRING)) {
+    NativeFunction(compiler.IsInstanceOf, 1, ISINSTANCEOF, BOOLEAN, ("obj", TYPEPARAM('T')), ("of", STRING)) {
       case (value: EVALUATED) :: CONST_STRING(expectedType) :: Nil =>
         Right(CONST_BOOLEAN(value.getType.name == expectedType))
       case _ =>
@@ -458,7 +458,7 @@ object PureContext {
     }
 
   lazy val _getType: BaseFunction[NoContext] =
-    NativeFunction("_getType", 1, GET_TYPE, BOOLEAN, ("obj", TYPEPARAM('T'))) {
+    NativeFunction(compiler.GetType, 1, GET_TYPE, BOOLEAN, ("obj", TYPEPARAM('T'))) {
       case (value: EVALUATED) :: Nil =>
         CONST_STRING(value.getType.name)
       case xs =>
@@ -1503,7 +1503,7 @@ object PureContext {
       ('A'.toInt until 'A'.toInt + resultSize).map(t => TYPEPARAM(t.toByte)).toList
 
     NativeFunction(
-      s"_Tuple$resultSize",
+      s"${compiler.TuplePrefix}$resultSize",
       1,
       (CREATE_TUPLE + resultSize - 2).toShort,
       PARAMETERIZEDTUPLE(typeParams),

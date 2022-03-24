@@ -39,7 +39,7 @@ class FunctionComplexityTest extends PropSpec {
       }.toMap
     val unusedDocCosts =
       functions
-        .filterNot(_.name.startsWith("_"))
+        .filterNot(_.name.startsWith("$"))
         .foldLeft(docCosts) { case (remainingDocCosts, function) =>
           val arg  = CONST_STRING("throw").explicitGet()
           val expr = FUNCTION_CALL(function.header, List.fill(function.args.size)(arg))
