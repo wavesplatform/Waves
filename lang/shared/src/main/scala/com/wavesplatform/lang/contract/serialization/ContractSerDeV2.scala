@@ -2,6 +2,7 @@ package com.wavesplatform.lang.contract.serialization
 
 import cats.instances.list.*
 import cats.syntax.either.*
+import cats.syntax.option.*
 import cats.syntax.traverse.*
 import com.google.protobuf.{CodedInputStream, CodedOutputStream}
 import com.wavesplatform.lang.contract.DApp
@@ -34,8 +35,11 @@ object ContractSerDeV2 extends ContractSerDe {
         out.writeUInt32NoTag(c.callableFuncs.size)
         c.callableFuncs.foreach(cFunc => serializeAnnotatedFunction(out, cFunc.u, cFunc.annotation.invocationArgName))
 
-        c.verifierFuncOpt.foreach { vf =>
-          serializeAnnotatedFunction(out, vf.u, vf.annotation.invocationArgName)
+        c.verifierFuncOpt match {
+          case None => out.writeRawByte(0)
+          case Some(vf) =>
+            out.writeRawByte(1)
+            serializeAnnotatedFunction(out, vf.u, vf.annotation.invocationArgName)
         }
 
         out.flush()
@@ -49,7 +53,7 @@ object ContractSerDeV2 extends ContractSerDe {
       meta            <- deserializeMeta(in)
       decs            <- deserializeList[DECLARATION](in, deserializeDeclaration)
       callableFuncs   <- deserializeList(in, deserializeCallableFunction)
-      verifierFuncOpt <- deserializeVerifierFunction(in)
+      verifierFuncOpt <- deserializeOption(in, deserializeVerifierFunction)
     } yield DApp(meta, decs, callableFuncs, verifierFuncOpt)
   }
 
@@ -102,15 +106,11 @@ object ContractSerDeV2 extends ContractSerDe {
   private[lang] def deserializeVerifiableAnnotation(in: CodedInputStream): Either[String, VerifierAnnotation] =
     tryEi(VerifierAnnotation(in.readString()))
 
-  private def deserializeVerifierFunction(in: CodedInputStream): Either[String, Option[VerifierFunction]] =
-    if (!in.isAtEnd) {
-      for {
-        a <- deserializeVerifiableAnnotation(in)
-        f <- deserializeFunction(in)
-      } yield Some(VerifierFunction(a, f))
-    } else {
-      Right(None)
-    }
+  private def deserializeVerifierFunction(in: CodedInputStream): Either[String, VerifierFunction] =
+    for {
+      a <- deserializeVerifiableAnnotation(in)
+      f <- deserializeFunction(in)
+    } yield VerifierFunction(a, f)
 
   private[lang] def deserializeList[A](in: CodedInputStream, df: CodedInputStream => Either[String, A]): Either[String, List[A]] = {
     val len = in.readUInt32()
@@ -119,5 +119,14 @@ object ContractSerDeV2 extends ContractSerDe {
     } else {
       Left(s"At position ${in.getTotalBytesRead()} array of arguments too big.")
     }
+  }
+
+  private[lang] def deserializeOption[A](in: CodedInputStream, df: CodedInputStream => Either[String, A]): Either[String, Option[A]] = {
+    tryEi(in.readRawByte())
+      .flatMap {
+        case 0 => Right(None)
+        case 1 => df(in).map(_.some)
+        case _ => Left(s"At position ${in.getTotalBytesRead()} unknown option flag value")
+      }
   }
 }
