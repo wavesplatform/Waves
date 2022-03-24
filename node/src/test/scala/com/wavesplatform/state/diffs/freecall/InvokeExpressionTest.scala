@@ -44,7 +44,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
                                              |[]
                                              |""".stripMargin)
 
-    withDomain(DomainPresets.RideV6) { d =>
+    withDomain(DomainPresets.ContinuationTransaction) { d =>
       d.helpers.creditWavesToDefaultSigner()
       d.appendAndAssertSucceed(TxHelpers.invokeExpression(script))
       d.appendAndCatchError(TxHelpers.invokeExpression(bigScript)).toString should include("Contract function (default) is too complex: 52130 > 52000")
