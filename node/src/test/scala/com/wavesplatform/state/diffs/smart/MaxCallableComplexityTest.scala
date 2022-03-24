@@ -31,19 +31,19 @@ class MaxCallableComplexityTest extends PropSpec with WithDomain with Transactio
     }
   }
 
-  property("max callable complexity for dApp script callable (V6) is 26000") {
+  property("max callable complexity for dApp script callable (V6) is 52000") {
     val dApp = accountGen.sample.get
     val invoker = accountGen.sample.get
     withDomain(DomainPresets.RideV6) { d =>
       val genDApp = GenesisTransaction.create(dApp.toAddress, ENOUGH_AMT, ts).explicitGet()
       val genInvoker = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      val setScript = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(largeScript(V6, 100)), 0.01.waves, ts).explicitGet()
-      val setLargeScript = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(largeScript(V6, 150)), 0.01.waves, ts).explicitGet()
+      val setScript = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(largeScript(V6, 285)), 0.01.waves, ts).explicitGet()
+      val setLargeScript = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(largeScript(V6, 300)), 0.01.waves, ts).explicitGet()
 
       d.appendBlock(genDApp, genInvoker, setScript)
       val invokeDiff = d.transactionDiffer(invokeScript(invoker, dApp.toAddress, "test")).resultE.explicitGet()
-      invokeDiff.scriptsComplexity shouldBe 18100
-      intercept[Exception](d.appendBlock(setLargeScript)).getMessage should include("Contract function (test) is too complex: 27151 > 26000")
+      invokeDiff.scriptsComplexity shouldBe 51585
+      d.appendAndCatchError(setLargeScript).toString should include("Contract function (test) is too complex: 54301 > 52000")
     }
   }
 
