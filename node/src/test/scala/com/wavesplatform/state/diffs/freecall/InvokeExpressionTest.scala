@@ -10,6 +10,7 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, NewAssetInfo}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
@@ -27,6 +28,28 @@ import play.api.libs.json.Json
 class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with WithDomain with EitherValues with JsonMatchers {
   import DomainPresets.{RideV6, ContinuationTransaction}
   import InvokeExpressionTest.*
+
+  property("can use max contract complexity") {
+    def sigVerifyList(size: Int): String = (1 to size).map(_ => "sigVerify(base58'', base58'', base58'')").mkString("[", ", ", "]")
+
+    val script = TxHelpers.freeCallScript(s"""
+                                             |strict a = ${sigVerifyList(ContractLimits.MaxTotalInvokeComplexity(StdLibVersion.V6) / 181)}
+                                             |[]
+                                             |""".stripMargin)
+
+    TxHelpers.estimate(script) shouldBe 51949
+
+    val bigScript = TxHelpers.freeCallScript(s"""
+                                             |strict a = ${sigVerifyList(ContractLimits.MaxTotalInvokeComplexity(StdLibVersion.V6) / 181 + 1)}
+                                             |[]
+                                             |""".stripMargin)
+
+    withDomain(DomainPresets.RideV6) { d =>
+      d.helpers.creditWavesToDefaultSigner()
+      d.appendAndAssertSucceed(TxHelpers.invokeExpression(script))
+      d.appendAndCatchError(TxHelpers.invokeExpression(bigScript)).toString should include("Contract function (default) is too complex: 52130 > 52000")
+    }
+  }
 
   property("cannot create transaction objects") {
     val orderConstructor =
@@ -270,10 +293,10 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
   }
 
   property("complexity limit") {
-    val (genesisTxs, invoke) = scenario(sigVerifyCount = 150)
+    val (genesisTxs, invoke) = scenario(sigVerifyCount = 300)
     withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
-      intercept[Exception](d.appendBlock(invoke)).getMessage should include("Contract function (default) is too complex: 27167 > 26000")
+      d.appendAndCatchError(invoke).toString should include("Contract function (default) is too complex: 54317 > 52000")
     }
   }
 
