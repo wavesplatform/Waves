@@ -235,12 +235,17 @@ object ContractScriptCompactor {
   }
 
   private def processList[A](list: List[A], state: State, compF: (A, State) => CompactionResult[A]): CompactionResult[List[A]] = {
-    val result = list.foldLeft(CompactionResult(Vector.empty[A], state)) {
-      case (CompactionResult(compList, state), elem) =>
-        val compArgRes = compF(elem, state)
-        CompactionResult(compList :+ compArgRes.value, compArgRes.state)
+    @tailrec
+    def loop(list: List[A], compF: (A, State) => CompactionResult[A], acc: CompactionResult[Vector[A]]): CompactionResult[List[A]] = {
+      list match {
+        case Nil => acc.copy(value = acc.value.toList)
+        case head :: tail =>
+          val compArgRes = compF(head, acc.state)
+          loop(tail, compF, CompactionResult(acc.value :+ compArgRes.value, compArgRes.state))
+      }
     }
-    result.copy(value = result.value.toList)
+
+    loop(list, compF, CompactionResult(Vector.empty[A], state))
   }
 
   case class State(counter: Int, originalNames: Map[String, String])
