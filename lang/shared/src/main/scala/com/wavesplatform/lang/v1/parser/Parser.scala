@@ -177,13 +177,6 @@ object Parser {
     case (_, id, None, _)                                           => id
   }
 
-  def foldNativeP[A: P]: P[EXPR] =
-    (Index ~~ P("fold_") ~~ digit.repX(1).! ~~ "(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ refP ~ ")" ~~ Index)
-      .map {
-        case (start, limit, list, acc, f, end) =>
-          FOLD(Pos(start, end), limit.toInt, list, acc, f, isNative = true)
-      }
-
   def foldMacroP[A: P]: P[EXPR] =
     (Index ~~ P("FOLD<") ~~ Index ~~ digit.repX(1).! ~~ Index ~~ ">(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ refP ~ ")" ~~ Index)
       .map {
@@ -194,7 +187,7 @@ object Parser {
           else if (lim > MaxListLengthV4)
             INVALID(Pos(limStart, limEnd), s"List size limit in FOLD is too big, $lim must be less or equal $MaxListLengthV4")
           else
-            FOLD(Pos(start, end), lim, list, acc, f, isNative = false)
+            FOLD(Pos(start, end), lim, list, acc, f)
       }
 
   def list[A: P]: P[EXPR] = (Index ~~ P("[") ~ functionCallArgs ~ P("]") ~~ Index).map {
@@ -517,7 +510,7 @@ object Parser {
 
   def baseAtom[A: P](epn: fastparse.P[Any] => P[EXPR]) = {
     def ep[AA: P](implicit c: fastparse.P[Any]) = epn(c)
-    comment ~ P(foldNativeP | foldMacroP | ifP | matchP | ep | maybeAccessP) ~ comment
+    comment ~ P(foldMacroP | ifP | matchP | ep | maybeAccessP) ~ comment
   }
 
   def baseExpr[A: P] = P(strictLetBlockP | binaryOp(baseAtom(block(_))(_), opsByPriority))
@@ -527,7 +520,7 @@ object Parser {
 
   def singleBaseAtom[A: P] =
     comment ~
-      P(foldNativeP | foldMacroP | ifP | matchP | maybeAccessP) ~
+      P(foldMacroP | ifP | matchP | maybeAccessP) ~
       comment
 
   def singleBaseExpr[A: P] = P(binaryOp(singleBaseAtom(_), opsByPriority))

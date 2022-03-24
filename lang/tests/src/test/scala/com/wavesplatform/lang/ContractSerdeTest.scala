@@ -143,40 +143,8 @@ class ContractSerdeTest extends FreeSpec {
       )
     }
 
-    "full contract with meta" in serializers.foreach { ser =>
-      roundTrip(
-        DApp(
-          DAppMeta(
-            version = 1,
-            List(
-              CallableFuncSignature(ByteString.copyFrom(Array[Byte](0, 1, 2, 3))),
-              CallableFuncSignature(ByteString.copyFrom(Array[Byte](3, 2, 1, 0))),
-              CallableFuncSignature(ByteString.EMPTY)
-            )
-          ),
-          List(
-            LET("letName", CONST_BOOLEAN(true)),
-            FUNC("funcName", List("arg1", "arg2"), CONST_BOOLEAN(false))
-          ),
-          List(
-            CallableFunction(
-              CallableAnnotation("whoooo"),
-              FUNC("anotherFunc", List("argssss"), CONST_BOOLEAN(true))
-            ),
-            CallableFunction(
-              CallableAnnotation("whoooo"),
-              FUNC("default", List(), CONST_BOOLEAN(false))
-            )
-          ),
-          Some(
-            VerifierFunction(
-              VerifierAnnotation("hmmm"),
-              FUNC("funcAgain", List("arg"), CONST_BOOLEAN(false))
-            )
-          )
-        ),
-        ser
-      )
+    "full contract with meta roundtrip" in serializers.foreach { ser =>
+      roundTrip(fullContractWithMeta, ser)
     }
   }
 
@@ -206,4 +174,58 @@ class ContractSerdeTest extends FreeSpec {
         )
     }
   }
+
+  "bytes" - {
+    "full contract serialization" in {
+      ContractSerDeV1.serialize(fullContractWithMeta).explicitGet() shouldBe Array[Byte](
+        0, 0, 0, 0, 0, 0, 0, 20, 8, 1, 18, 6, 10, 4, 0, 1, 2, 3, 18, 6, 10, 4, 3, 2, 1, 0, 18, 0, 0, 0, 0, 2, 0, 0, 0,
+        0, 7, 108, 101, 116, 78, 97, 109, 101, 6, 1, 0, 0, 0, 8, 102, 117, 110, 99, 78, 97, 109, 101, 0, 0, 0, 2, 0, 0, 0,
+        4, 97, 114, 103, 49, 0, 0, 0, 4, 97, 114, 103, 50, 7, 0, 0, 0, 2, 0, 0, 0, 6, 119, 104, 111, 111, 111, 111, 1, 0,
+        0, 0, 11, 97, 110, 111, 116, 104, 101, 114, 70, 117, 110, 99, 0, 0, 0, 1, 0, 0, 0, 7, 97, 114, 103, 115, 115, 115,
+        115, 6, 0, 0, 0, 6, 119, 104, 111, 111, 111, 111, 1, 0, 0, 0, 7, 100, 101, 102, 97, 117, 108, 116, 0, 0, 0, 0, 7,
+        0, 0, 0, 1, 0, 0, 0, 4, 104, 109, 109, 109, 1, 0, 0, 0, 9, 102, 117, 110, 99, 65, 103, 97, 105, 110, 0, 0, 0, 1, 0,
+        0, 0, 3, 97, 114, 103, 7
+      )
+
+      ContractSerDeV2.serialize(fullContractWithMeta).explicitGet() shouldBe Array[Byte](
+       20, 8, 1, 18, 6, 10, 4, 0, 1, 2, 3, 18, 6, 10, 4, 3, 2, 1, 0, 18, 0, 2, 0, 7, 108, 101, 116, 78, 97, 109, 101,
+        6, 1, 8, 102, 117, 110, 99, 78, 97, 109, 101, 2, 4, 97, 114, 103, 49, 4, 97, 114, 103, 50, 7, 2, 6, 119, 104, 111,
+        111, 111, 111, 1, 11, 97, 110, 111, 116, 104, 101, 114, 70, 117, 110, 99, 1, 7, 97, 114, 103, 115, 115, 115, 115,
+        6, 6, 119, 104, 111, 111, 111, 111, 1, 7, 100, 101, 102, 97, 117, 108, 116, 0, 7, 1, 4, 104, 109, 109, 109, 1, 9,
+        102, 117, 110, 99, 65, 103, 97, 105, 110, 1, 3, 97, 114, 103, 7
+      )
+    }
+  }
+
+  private def fullContractWithMeta: DApp =
+    DApp(
+      DAppMeta(
+        version = 1,
+        List(
+          CallableFuncSignature(ByteString.copyFrom(Array[Byte](0, 1, 2, 3))),
+          CallableFuncSignature(ByteString.copyFrom(Array[Byte](3, 2, 1, 0))),
+          CallableFuncSignature(ByteString.EMPTY)
+        )
+      ),
+      List(
+        LET("letName", CONST_BOOLEAN(true)),
+        FUNC("funcName", List("arg1", "arg2"), CONST_BOOLEAN(false))
+      ),
+      List(
+        CallableFunction(
+          CallableAnnotation("whoooo"),
+          FUNC("anotherFunc", List("argssss"), CONST_BOOLEAN(true))
+        ),
+        CallableFunction(
+          CallableAnnotation("whoooo"),
+          FUNC("default", List(), CONST_BOOLEAN(false))
+        )
+      ),
+      Some(
+        VerifierFunction(
+          VerifierAnnotation("hmmm"),
+          FUNC("funcAgain", List("arg"), CONST_BOOLEAN(false))
+        )
+      )
+    )
 }

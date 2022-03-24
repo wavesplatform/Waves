@@ -2,11 +2,9 @@ package com.wavesplatform.lang.v1
 
 import cats.Eval
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext
 import com.wavesplatform.lang.v1.task.TaskMT
 import com.wavesplatform.lang.{EvalF, ExecutionError, TrampolinedExecResult}
-import monix.eval.Coeval
 
 package object evaluator {
   type EvalM[F[_], C[_[_]], A] = TaskMT[F, LoggedEvaluationContext[C, F], ExecutionError, A]
@@ -25,5 +23,4 @@ package object evaluator {
   type LogCallback[F[_]]    = LetExecResult[F] => Unit
   type LetLogCallback[F[_]] = String => LogCallback[F]
 
-  type InternalCall[F[_]] = (String, List[EVALUATED], Int) => Coeval[F[(Either[ExecutionError, EVALUATED], Int)]]
 }

@@ -199,7 +199,7 @@ object SerdeV2 extends Serde[CodedInputStream, CodedOutputStream] {
       case FUNCTION_CALL(header, args) =>
         val n = Coeval.now[Unit] {
           out.writeRawByte(E_FUNCALL)
-          out.writeFunctionHeaderOptimized(header)
+          out.writeFunctionHeader(header)
           out.writeRawByte(args.size.toByte)
         }
         args.foldLeft(n)((acc, arg) => serAux(out, acc, arg, allowObjects))

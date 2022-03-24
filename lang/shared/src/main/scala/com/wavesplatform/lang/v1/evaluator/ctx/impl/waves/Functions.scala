@@ -1,22 +1,22 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import cats.syntax.applicative._
-import cats.syntax.either._
-import cats.syntax.functor._
+import cats.syntax.applicative.*
+import cats.syntax.either.*
+import cats.syntax.functor.*
 import cats.{Id, Monad}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{scriptTransfer => _, _}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.{addressOrAliasType, addressType, commonDataEntryType, optionAddress, _}
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Types.*
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{scriptTransfer as _, *}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.{addressOrAliasType, addressType, commonDataEntryType, optionAddress, *}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, notImplemented, unit}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
-import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction, FunctionIds, InternalCall}
+import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction, FunctionIds}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
@@ -586,8 +586,7 @@ object Functions {
         override def evaluate[F[_]: Monad](
             env: Environment[F],
             args: List[EVALUATED],
-            availableComplexity: Int,
-            evaluateUserFunction: InternalCall[F]
+            availableComplexity: Int
         )(implicit m: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] = {
           val dAppBytes = args match {
             case (dApp: CaseObj) :: _ if dApp.caseType == addressType =>
