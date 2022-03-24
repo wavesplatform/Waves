@@ -39,7 +39,7 @@ object Serialize {
   }
 
   implicit class CodedOutputStreamOps(val self: CodedOutputStream) extends AnyVal {
-    def writeFunctionHeaderOptimized(h: FunctionHeader): Unit = h match {
+    def writeFunctionHeader(h: FunctionHeader): Unit = h match {
       case FunctionHeader.Native(id) =>
         self.writeRawByte(FH_NATIVE)
         self.writeUInt32NoTag(id)
