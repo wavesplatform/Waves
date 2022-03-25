@@ -379,7 +379,7 @@ object UtilsApiRoute {
               limit,
               remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
               availableActions = ContractLimits.MaxCallableActionsAmount(script.stdLibVersion),
-              availableData = ContractLimits.MaxWriteSetSize(script.stdLibVersion),
+              availableData = ContractLimits.MaxWriteSetSize,
               availableDataSize = ContractLimits.MaxTotalWriteSetSizeInBytes,
               currentDiff = Diff.empty,
               invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(address, null, Nil))

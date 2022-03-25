@@ -278,8 +278,8 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
     }
   }
 
-  property("issue with 29 transfers") {
-    val (genesisTxs, invoke) = scenario(transfersCount = 29)
+  property("issue with 99 transfers") {
+    val (genesisTxs, invoke) = scenario(transfersCount = 99)
     withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       d.appendBlock(invoke)
@@ -287,8 +287,8 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
     }
   }
 
-  property("issue with 30 transfers") {
-    val (genesisTxs, invoke) = scenario(transfersCount = 30)
+  property("issue with 100 transfers") {
+    val (genesisTxs, invoke) = scenario(transfersCount = 100)
     withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       d.appendAndCatchError(invoke).toString should include("Actions count limit is exceeded")

@@ -621,12 +621,20 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     }
   }
 
-  property("can't make more than 10 payments") {
-    val (genesis, setScript, ci) = preconditionsAndSetContract(dAppWithTransfers(assets = List.fill(11)(Waves)))
+  Seq(V3, V4, V5, V6).foreach { version =>
+    property(s"can't make more than ${ContractLimits.MaxCallableActionsAmount(version)} payments for V${version.id}") {
+      val (genesis, setScript, ci) =
+        preconditionsAndSetContract(
+          dAppWithTransfers(
+            assets = List.fill(ContractLimits.MaxCallableActionsAmount(version) + 1)(Waves),
+            version = version
+          ),
+          version = version
+        )
 
-    testDiff(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci))) {
-      _ should produceRejectOrFailedDiff("Actions count limit is exceeded")
-
+      testDiff(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), from = version) {
+        _ should produceRejectOrFailedDiff("Actions count limit is exceeded")
+      }
     }
   }
 
@@ -876,7 +884,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
   }
 
   property("can't write more than 100 entries") {
-    val (genesis, setScript, ci) = preconditionsAndSetContract(writeSet(ContractLimits.MaxWriteSetSize(V4) + 1))
+    val (genesis, setScript, ci) = preconditionsAndSetContract(writeSet(ContractLimits.MaxWriteSetSize + 1))
     testDiff(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci))) {
       _ should produceRejectOrFailedDiff("Stored data count limit is exceeded")
 
@@ -884,7 +892,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
   }
 
   property("can write 100 entries") {
-    val (genesis, setScript, ci) = preconditionsAndSetContract(writeSet(ContractLimits.MaxWriteSetSize(V4)))
+    val (genesis, setScript, ci) = preconditionsAndSetContract(writeSet(ContractLimits.MaxWriteSetSize))
     testDiff(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci))) {
       _.explicitGet()
 
@@ -1444,7 +1452,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         .map(_ => "ScriptTransfer(inv.caller, 10, a)")
         .mkString(",")} ]
                           | else if (i == "invalid data entries" && check) then
-                          |   [ ${(0 to ContractLimits.MaxWriteSetSize(V4))
+                          |   [ ${(0 to ContractLimits.MaxWriteSetSize)
         .map(x => s"""IntegerEntry("val", $x)""")
         .mkString(",")},ScriptTransfer(inv.caller, 10, a)]
                           | else []
