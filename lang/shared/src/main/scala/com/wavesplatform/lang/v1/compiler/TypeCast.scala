@@ -6,10 +6,9 @@ import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.*
 import com.wavesplatform.lang.v1.parser.Expressions.Pos
+import com.wavesplatform.lang.v1.parser.Parser.GenericMethod.{ExactAs, As}
 
 object TypeCast {
-  val ExactAs = "exactAs"
-  val As      = "as"
 
   def apply(p: Pos, name: String, expr: CompilationStepResultExpr, targetType: FINAL, provideRuntimeTypeOnError: Boolean): CompilationStepResultExpr =
     name match {

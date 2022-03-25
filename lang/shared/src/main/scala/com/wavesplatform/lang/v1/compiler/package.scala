@@ -1,15 +1,19 @@
 package com.wavesplatform.lang.v1
 
 import cats.Id
-import cats.syntax.applicative._
-import com.wavesplatform.lang.v1.compiler.Terms._
+import cats.syntax.applicative.*
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.task.TaskM
-import com.wavesplatform.lang.v1.task.imports._
+import com.wavesplatform.lang.v1.task.imports.*
 
 import scala.annotation.tailrec
 import scala.collection.mutable.Queue
 
 package object compiler {
+  val IsInstanceOf = s"$$isInstanceOf"
+  val TuplePrefix  = s"$$Tuple"
+  val GetType = s"$$getType"
+
   type CompileM[A] = TaskM[CompilerContext, CompilationError, A]
 
   implicit class EiExt[A](ei: Either[CompilationError, A]) {
