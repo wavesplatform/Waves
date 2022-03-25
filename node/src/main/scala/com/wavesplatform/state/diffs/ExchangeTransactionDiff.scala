@@ -150,8 +150,7 @@ object ExchangeTransactionDiff {
 
     for {
       _ <- Either.cond(
-        blockchain.height < blockchain.settings.functionalitySettings.forbidNegativeMatcherFee ||
-          tx.buyMatcherFee >= 0 && tx.sellMatcherFee >= 0,
+        tx.buyMatcherFee >= 0 && tx.sellMatcherFee >= 0,
         (),
         InsufficientFee("Matcher fee can not be negative")
       )

@@ -76,7 +76,6 @@ case class FunctionalitySettings(
     estimationOverflowFixHeight: Int = 0,
     estimatorSumOverflowFixHeight: Int = 0,
     forbidSyncDAppNegativePaymentHeight: Int = 0,
-    forbidNegativeMatcherFee: Int = 0,
     allowMultipleProofsInCreateAliasUntil: Int = Int.MaxValue
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
@@ -123,7 +122,6 @@ object FunctionalitySettings {
     estimationOverflowFixHeight = 2858710,
     estimatorSumOverflowFixHeight = 2897510,
     forbidSyncDAppNegativePaymentHeight = 2959447,
-    forbidNegativeMatcherFee = 2991300,
     allowMultipleProofsInCreateAliasUntil = 3029980
   )
 
@@ -137,7 +135,6 @@ object FunctionalitySettings {
     estimationOverflowFixHeight = 1793770,
     estimatorSumOverflowFixHeight = 1832520,
     forbidSyncDAppNegativePaymentHeight = 1894600,
-    forbidNegativeMatcherFee = 1926200,
     allowMultipleProofsInCreateAliasUntil = 1964900
   )
 
