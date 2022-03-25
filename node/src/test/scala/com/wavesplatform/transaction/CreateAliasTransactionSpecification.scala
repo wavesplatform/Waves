@@ -51,11 +51,10 @@ class CreateAliasTransactionSpecification extends PropSpec with WithDomain {
   }
 
   property("The same aliases from different senders have the same id") {
-    forAll(accountGen, accountGen, aliasGen, timestampGen) {
-      case (a1: KeyPair, a2: KeyPair, a: Alias, t: Long) =>
-        val tx1 = CreateAliasTransaction.selfSigned(1.toByte, a1, a.name, MinIssueFee, t).explicitGet()
-        val tx2 = CreateAliasTransaction.selfSigned(1.toByte, a2, a.name, MinIssueFee, t).explicitGet()
-        tx1.id() shouldBe tx2.id()
+    forAll(accountGen, accountGen, aliasGen, timestampGen) { case (a1: KeyPair, a2: KeyPair, a: Alias, t: Long) =>
+      val tx1 = CreateAliasTransaction.selfSigned(1.toByte, a1, a.name, MinIssueFee, t).explicitGet()
+      val tx2 = CreateAliasTransaction.selfSigned(1.toByte, a2, a.name, MinIssueFee, t).explicitGet()
+      tx1.id() shouldBe tx2.id()
     }
   }
 
@@ -121,23 +120,32 @@ class CreateAliasTransactionSpecification extends PropSpec with WithDomain {
   }
 
   property("Multiple proofs before RideV6 activation") {
-    withDomain(DomainPresets.RideV5.copy(
-      blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
-        functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(
-          allowMultipleProofsInCreateAliasUntil = 2
+    withDomain(
+      DomainPresets.RideV5.copy(
+        blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
+          functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(
+            allowMultipleProofsInCreateAliasUntil = 2
+          )
         )
       )
-    )) { d =>
+    ) { d =>
       val sender = KeyPair(Longs.toByteArray(Random.nextLong()))
       d.appendBlock(
         GenesisTransaction.create(sender.toAddress, 100.waves, System.currentTimeMillis()).explicitGet(),
-        SetScriptTransaction.selfSigned(2.toByte, sender, Some(TestCompiler(V5).compileExpression(
-          """{-# STDLIB_VERSION 5 #-}
-            |{-# CONTENT_TYPE EXPRESSION #-}
-            |{-# SCRIPT_TYPE ACCOUNT #-}
-            |
-            |true
-            |""".stripMargin)), 0.01.waves, System.currentTimeMillis()).explicitGet()
+        SetScriptTransaction
+          .selfSigned(
+            2.toByte,
+            sender,
+            Some(TestCompiler(V5).compileExpression("""{-# STDLIB_VERSION 5 #-}
+                                                      |{-# CONTENT_TYPE EXPRESSION #-}
+                                                      |{-# SCRIPT_TYPE ACCOUNT #-}
+                                                      |
+                                                      |true
+                                                      |""".stripMargin)),
+            0.01.waves,
+            System.currentTimeMillis()
+          )
+          .explicitGet()
       )
 
       val kp1 = KeyPair(Longs.toByteArray(Random.nextLong()))
