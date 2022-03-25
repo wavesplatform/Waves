@@ -12,6 +12,7 @@ import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.{DataEntry, StringDataEntry}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -249,6 +250,12 @@ object TxHelpers {
       case other              => throw new IllegalStateException(s"Not an expression: $other")
     }
 
+  def freeCallScript(scriptText: String, version: StdLibVersion = StdLibVersion.V6): ExprScriptImpl =
+    TestCompiler(version).compileFreeCall(scriptText) match {
+      case es: ExprScriptImpl => es
+      case other              => throw new IllegalStateException(s"Not an expression: $other")
+    }
+
   def scriptV5(scriptText: String): ContractScriptImpl =
     script(s"""
               |{-# STDLIB_VERSION 5 #-}
@@ -270,6 +277,18 @@ object TxHelpers {
       case cs: ContractScriptImpl => cs
       case other                  => throw new IllegalStateException(s"Not a contract: $other")
     }
+
+  def estimate(script: Script): Int =
+    math.toIntExact(
+      Script
+        .estimate(
+          script,
+          ScriptEstimatorV3(fixOverflow = true, overhead = false),
+          fixEstimateOfVerifier = true,
+          useContractVerifierLimit = false
+        )
+        .explicitGet()
+    )
 
   def setScript(acc: KeyPair, script: Script, fee: Long = TestValues.fee, version: TxVersion = TxVersion.V1, chainId: Byte = AddressScheme.current.chainId): SetScriptTransaction = {
     SetScriptTransaction.selfSigned(version, acc, Some(script), fee, timestamp, chainId).explicitGet()

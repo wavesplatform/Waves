@@ -1,19 +1,17 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.data.EitherT
-import cats.implicits._
+import cats.implicits.*
 import cats.{Eval, Id, Monad, StackSafeMonad}
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.FunctionHeader.User
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, NOTHING}
 import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, Simple}
 import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.Lenses
-import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.task.imports._
+import com.wavesplatform.lang.v1.evaluator.ctx.*
+import com.wavesplatform.lang.v1.task.imports.*
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{CoevalF, EvalF, ExecutionError}
-import monix.eval.Coeval
 
 import scala.collection.mutable.ListBuffer
 import scala.util.Try
@@ -110,7 +108,7 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: M
                     .pure[F]
                   Eval.now(EitherT(r).map(EitherT(_)).flatten.value)
                 case f: Extended[C] =>
-                  f.evaluate(ctx.ec.environment, args, Int.MaxValue, evaluateHighOrder(ctx, _, _, _))
+                  f.evaluate(ctx.ec.environment, args, Int.MaxValue)
                     .map(_.map(_._1))
                     .to[Eval]
               }
@@ -132,18 +130,6 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: M
         )
         .getOrElse(raiseError[F, LoggedEvaluationContext[C, F], ExecutionError, EVALUATED](s"function '$header' not found"))
     } yield (ctx.ec, result)
-
-  private def evaluateHighOrder(
-    ctx: LoggedEvaluationContext[C, F],
-    function: String,
-    args: List[EVALUATED],
-    limit: Int
-  ): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] =
-    Coeval.from(
-      evalExpr(FUNCTION_CALL(User(function), args))
-        .run(ctx)
-        .map { case (_, r) => r.map((_, 0)) }
-    )
 
   private def evalExprWithCtx(t: EXPR): EvalM[F, C, (EvaluationContext[C, F], EVALUATED)] =
     t match {

@@ -1608,7 +1608,7 @@ class IntegrationTest extends PropSpec with Inside {
            | f(a) == a
          """.stripMargin
 
-      eval(script, version = V3) should produce(s"Can't find a function '_Tuple$size'")
+      eval(script, version = V3) should produce(s"Can't find a function '$$Tuple$size'")
       eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
     }
 

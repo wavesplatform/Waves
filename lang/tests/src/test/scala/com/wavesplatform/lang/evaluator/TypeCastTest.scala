@@ -89,10 +89,6 @@ class TypeCastTest extends EvaluatorSpec {
     )
   }
 
-  property("generic function error") {
-    eval("func f(a: Any) = a.some[Int]") should produce("Can't find a generic function some[T]")
-  }
-
   property("type casts in one scope") {
     eval(
       """

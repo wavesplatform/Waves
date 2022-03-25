@@ -155,7 +155,7 @@ object Expressions {
 
   case class GENERIC_FUNCTION_CALL(position: Pos, expr: EXPR, name: PART[String], `type`: Type, resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
 
-  case class FOLD(position: Pos, limit: Int, list: EXPR, acc: EXPR, func: REF, isNative: Boolean, resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
+  case class FOLD(position: Pos, limit: Int, list: EXPR, acc: EXPR, func: REF, resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
 
   sealed trait Pattern {
     def isRest: Boolean = false
