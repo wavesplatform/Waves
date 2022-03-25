@@ -5,6 +5,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
@@ -12,9 +14,8 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.{WalletSettings, WavesSettings}
-import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
@@ -25,43 +26,28 @@ import monix.reactive.Observable
 
 class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
 
-  val minerAcc: KeyPair = accountGen.sample.get
-
-  property("miner account can't have any script before RideV6 feature activation") {
-    withDomain(DomainPresets.RideV5) { d =>
-
-      val miner = createMiner(d)
-      val genesis = GenesisTransaction.create(minerAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
-
-      d.appendBlock(genesis)
-
-      d.appendBlock(setScript(accountScript))
-      miner.getNextBlockGenerationOffset(minerAcc) should produce(errMsgBeforeRideV6)
-
-      d.appendBlock(setScript(dAppScriptWithVerifier))
-      miner.getNextBlockGenerationOffset(minerAcc) should produce(errMsgBeforeRideV6)
-
-      d.appendBlock(setScript(dAppScriptWithoutVerifier))
-      miner.getNextBlockGenerationOffset(minerAcc) should produce(errMsgBeforeRideV6)
-    }
-  }
+  val minerAcc: KeyPair = TxHelpers.signer(1)
 
   property("miner account can have any script after RideV6 feature activation") {
-    withDomain(DomainPresets.RideV6) { d =>
+    Seq(
+      dAppScriptWithVerifier(true),
+      dAppScriptWithVerifier(false),
+      dAppScriptWithoutVerifier,
+      accountScript(true),
+      accountScript(false)
+    ).foreach { script =>
+      withDomain(
+        DomainPresets.RideV5.setFeaturesHeight((BlockchainFeatures.RideV6, 3)),
+        AddrWithBalance.enoughBalances(minerAcc)
+      ) { d =>
+        val miner = createMiner(d)
 
-      val miner = createMiner(d)
-      val genesis = GenesisTransaction.create(minerAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
+        d.appendBlock(setScript(script))
+        miner.getNextBlockGenerationOffset(minerAcc) should produce(errMsgBeforeRideV6)
 
-      d.appendBlock(genesis)
-
-      d.appendBlock(setScript(accountScript))
-      miner.getNextBlockGenerationOffset(minerAcc) should beRight
-
-      d.appendBlock(setScript(dAppScriptWithVerifier))
-      miner.getNextBlockGenerationOffset(minerAcc) should beRight
-
-      d.appendBlock(setScript(dAppScriptWithoutVerifier))
-      miner.getNextBlockGenerationOffset(minerAcc) should beRight
+        d.appendBlock()
+        miner.getNextBlockGenerationOffset(minerAcc) should beRight
+      }
     }
   }
 
@@ -90,17 +76,17 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
   private def setScript(script: Script): SetScriptTransaction =
     SetScriptTransaction.selfSigned(TxVersion.V2, minerAcc, Some(script), 0.01.waves, ts).explicitGet()
 
-  private def accountScript: ExprScript =
-    TestCompiler(V5).compileExpression("true")
+  private def accountScript(result: Boolean): ExprScript =
+    TestCompiler(V5).compileExpression(result.toString)
 
-  private def dAppScriptWithVerifier: ContractScriptImpl = {
+  private def dAppScriptWithVerifier(result: Boolean): ContractScriptImpl = {
     val expr =
-      """
+      s"""
         |@Callable(i)
         |func c() = []
         |
         |@Verifier(tx)
-        |func v() = true
+        |func v() = $result
         |""".stripMargin
     TestCompiler(V5).compileContract(expr)
   }
