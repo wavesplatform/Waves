@@ -188,7 +188,7 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
     compileContractFromExpr(expr, version)
   }
 
-  private def compileContractFromExpr(expr: Expressions.DAPP, stdLibVersion: StdLibVersion = V3): DApp = {
+  private def compileContractFromExpr(expr: Expressions.DAPP, stdLibVersion: StdLibVersion): DApp = {
     val ctx = {
       utils.functionCosts(stdLibVersion)
       Monoid
