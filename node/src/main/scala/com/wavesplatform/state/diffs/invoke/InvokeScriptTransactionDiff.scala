@@ -252,7 +252,7 @@ object InvokeScriptTransactionDiff {
             ContractLimits.MaxTotalInvokeComplexity(version),
             ContractLimits.MaxSyncDAppCalls(version),
             ContractLimits.MaxCallableActionsAmount(version),
-            ContractLimits.MaxWriteSetSize(version),
+            ContractLimits.MaxWriteSetSize,
             ContractLimits.MaxTotalWriteSetSizeInBytes,
             if (version < V5) Diff.empty else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()),
             invocationTracker

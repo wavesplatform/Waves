@@ -7,13 +7,14 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.util.AddressOrAliasExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values.V5
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V4, V5, V6}
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, produceRejectOrFailedDiff}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{Authorized, CreateAliasTransaction, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -24,23 +25,11 @@ import scala.util.Random
 
 class LeaseActionDiffTest extends PropSpec with WithDomain {
 
-  private def features(activateV5: Boolean): FunctionalitySettings = {
-    val v5ForkO = if (activateV5) Seq(BlockchainFeatures.SynchronousCalls) else Seq()
-    val parameters =
-      Seq(
-        BlockchainFeatures.SmartAccounts,
-        BlockchainFeatures.SmartAssets,
-        BlockchainFeatures.Ride4DApps,
-        BlockchainFeatures.BlockV5
-      ) ++ v5ForkO
-    TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = parameters.map(_.id -> 0).toMap)
-  }
+  private val v4Features = features(V4)
+  private val v5Features = features(V5)
 
-  private val v4Features = features(activateV5 = false)
-  private val v5Features = features(activateV5 = true)
-
-  private def dApp(body: String): Script = TestCompiler(V5).compileContract(s"""
-    | {-# STDLIB_VERSION 5       #-}
+  private def dApp(body: String, version: StdLibVersion = V5): Script = TestCompiler(version).compileContract(s"""
+    | {-# STDLIB_VERSION ${version.id} #-}
     | {-# CONTENT_TYPE   DAPP    #-}
     | {-# SCRIPT_TYPE    ACCOUNT #-}
     |
@@ -117,16 +106,22 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
        """.stripMargin
     )
 
-  private def multipleLeaseCancelsDApp(leaseIds: Seq[ByteStr]): Script =
+  private def multipleLeaseCancelsDApp(leaseIds: Seq[ByteStr], version: StdLibVersion = V5): Script =
     dApp(
       s"""
          | [
          |   ${leaseIds.map(id => s"LeaseCancel(base58'$id')").mkString(", ")}
          | ]
-       """.stripMargin
+       """.stripMargin,
+      version
     )
 
-  private def multipleActionsDApp(recipient: Recipient, amount: Long, leaseCount: Int, leaseCancelCount: Int, transfersCount: Int): Script =
+  private def multipleActionsDApp(recipient: Recipient,
+                                  amount: Long,
+                                  leaseCount: Int,
+                                  leaseCancelCount: Int,
+                                  transfersCount: Int,
+                                  version: StdLibVersion = V5): Script =
     dApp(
       s"""
          | ${(1 to leaseCount).map(i => s"let lease$i = Lease(${recipientStr(recipient)}, $amount, $i)").mkString("\n")}
@@ -137,7 +132,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
          |   ${if (transfersCount > 0) "," else ""}
          |   ${(1 to transfersCount).map(_ => s"ScriptTransfer(${recipientStr(recipient)}, 1, unit)").mkString(", ")}
          | ]
-       """.stripMargin
+       """.stripMargin,
+      version
     )
 
   private def recipientStr(recipient: Recipient) =
@@ -156,7 +152,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       customRecipient: Option[Recipient] = None,
       customAmount: Option[Long] = None,
       customSetScriptFee: Option[Long] = None,
-      customDApp: Option[Script] = None
+      customDApp: Option[Script] = None,
+      version: StdLibVersion = V5
   ): (Seq[Transaction], InvokeScriptTransaction, Long, Address, Address, List[LeaseTransaction], LeaseCancelTransaction) = {
     val dAppAcc = TxHelpers.signer(1)
     val invoker = TxHelpers.signer(2)
@@ -201,7 +198,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     val setScript = TxHelpers.setScript(
       acc = dAppAcc,
       script = if (useLeaseCancelDApp) {
-        multipleLeaseCancelsDApp(leasesFromDApp.map(_.id()))
+        multipleLeaseCancelsDApp(leasesFromDApp.map(_.id()), version)
       } else {
         customDApp.getOrElse(singleLeaseDApp(recipient, leaseAmount))
       },
@@ -658,36 +655,49 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"10 Lease actions") {
-    val recipient = TxHelpers.signer(3).toAddress
-    val amount    = 100
-    val dApp      = multipleActionsDApp(recipient.toRide, amount, leaseCount = 10, leaseCancelCount = 0, transfersCount = 0)
-    val (preparingTxs, invoke, _, dAppAcc, invoker, _, _) = leasePreconditions(customDApp = Some(dApp))
-    assertDiffAndState(
-      Seq(TestBlock.create(preparingTxs)),
-      TestBlock.create(Seq(invoke)),
-      v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()) shouldBe empty
-        diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee)
-        diff.portfolios(dAppAcc) shouldBe Portfolio(lease = LeaseBalance(in = 0, out = amount * 10))
-        diff.portfolios(recipient) shouldBe Portfolio(lease = LeaseBalance(in = amount * 10, out = 0))
+  Seq(V5, V6).foreach { version =>
+    property(s"${ContractLimits.MaxCallableActionsAmount(version)} Lease actions for V${version.id}") {
+      val recipient = TxHelpers.signer(3).toAddress
+      val amount    = 100
+      val dApp      = multipleActionsDApp(
+        recipient.toRide,
+        amount,
+        leaseCount = ContractLimits.MaxCallableActionsAmount(version),
+        leaseCancelCount = 0,
+        transfersCount = 0,
+        version = version
+      )
+      val (preparingTxs, invoke, _, dAppAcc, invoker, _, _) = leasePreconditions(customDApp = Some(dApp))
+      assertDiffAndState(
+        Seq(TestBlock.create(preparingTxs)),
+        TestBlock.create(Seq(invoke)),
+        features(version)
+      ) {
+        case (diff, _) =>
+          diff.errorMessage(invoke.id()) shouldBe empty
+          diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee)
+          diff.portfolios(dAppAcc) shouldBe Portfolio(lease = LeaseBalance(in = 0, out = amount * ContractLimits.MaxCallableActionsAmount(version)))
+          diff.portfolios(recipient) shouldBe Portfolio(lease = LeaseBalance(in = amount * ContractLimits.MaxCallableActionsAmount(version), out = 0))
+      }
     }
-  }
 
-  property(s"31 Lease actions") {
-    val recipient = TxHelpers.signer(3).toAddress
-    val amount    = 100
-    val dApp      = multipleActionsDApp(recipient.toRide, amount, leaseCount = 31, leaseCancelCount = 0, transfersCount = 0)
-    val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customDApp = Some(dApp))
-    assertDiffAndState(
-      Seq(TestBlock.create(preparingTxs)),
-      TestBlock.create(Seq(invoke)),
-      v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text shouldBe "Actions count limit is exceeded"
+    property(s"${ContractLimits.MaxCallableActionsAmount(version) + 1} Lease actions for V${version.id}") {
+      val recipient = TxHelpers.signer(3).toAddress
+      val amount    = 100
+      val dApp      = multipleActionsDApp(
+        recipient.toRide,
+        amount,
+        leaseCount = ContractLimits.MaxCallableActionsAmount(version) + 1,
+        leaseCancelCount = 0,
+        transfersCount = 0,
+        version = version
+      )
+      val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customDApp = Some(dApp))
+      assertDiffEi(
+        Seq(TestBlock.create(preparingTxs)),
+        TestBlock.create(Seq(invoke)),
+        features(version)
+      )(_ should produceRejectOrFailedDiff("Actions count limit is exceeded"))
     }
   }
 
@@ -818,71 +828,89 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"10 LeaseCancel actions") {
-    val (preparingTxs, invoke, _, dAppAcc, invoker, ltx, _) = leasePreconditions(useLeaseCancelDApp = true, leaseCancelCount = 10)
-    val leaseTxs = ltx.init
-    assertDiffAndState(
-      Seq(TestBlock.create(preparingTxs ++ leaseTxs)),
-      TestBlock.create(Seq(invoke)),
-      v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()) shouldBe empty
-        diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee, LeaseBalance(in = -leaseTxs.map(_.amount).sum, out = 0))
-        diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(in = 0, out = -leaseTxs.map(_.amount).sum))
+  Seq(V5, V6).foreach { version =>
+    property(s"${ContractLimits.MaxCallableActionsAmount(version)} LeaseCancel actions for V${version.id}") {
+      val (preparingTxs, invoke, _, dAppAcc, invoker, ltx, _) = leasePreconditions(useLeaseCancelDApp = true, leaseCancelCount = ContractLimits.MaxCallableActionsAmount(version), version = version)
+      val leaseTxs = ltx.init
+      assertDiffAndState(
+        Seq(TestBlock.create(preparingTxs ++ leaseTxs)),
+        TestBlock.create(Seq(invoke)),
+        features(version)
+      ) {
+        case (diff, _) =>
+          diff.errorMessage(invoke.id()) shouldBe empty
+          diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee, LeaseBalance(in = -leaseTxs.map(_.amount).sum, out = 0))
+          diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(in = 0, out = -leaseTxs.map(_.amount).sum))
+      }
+    }
+
+    property(s"${ContractLimits.MaxCallableActionsAmount(version) + 1} LeaseCancel actions for V${version.id}") {
+      val (preparingTxs, invoke, _, _, _, ltx, _) = leasePreconditions(useLeaseCancelDApp = true, leaseCancelCount = ContractLimits.MaxCallableActionsAmount(version) + 1)
+      assertDiffEi(
+        Seq(TestBlock.create(preparingTxs ++ ltx.init)),
+        TestBlock.create(Seq(invoke)),
+        features(version)
+      )(_ should produceRejectOrFailedDiff("Actions count limit is exceeded"))
     }
   }
 
-  property(s"31 LeaseCancel actions") {
-    val (preparingTxs, invoke, _, _, _, ltx, _) = leasePreconditions(useLeaseCancelDApp = true, leaseCancelCount = 31)
-    assertDiffAndState(
-      Seq(TestBlock.create(preparingTxs ++ ltx.init)),
-      TestBlock.create(Seq(invoke)),
-      v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text shouldBe "Actions count limit is exceeded"
+  Seq(V5, V6).foreach { version =>
+    property(s"${ContractLimits.MaxCallableActionsAmount(version)} multiple actions for V${version.id}") {
+      val recipient        = accountGen.sample.get.toAddress
+      val amount           = positiveLongGen.sample.get
+      val actionsCount     = ContractLimits.MaxCallableActionsAmount(version)
+      val leaseCount       = Random.nextInt(actionsCount) + 1
+      val leaseCancelCount = Random.nextInt(leaseCount).min(actionsCount - leaseCount)
+      val transfersCount   = actionsCount - leaseCancelCount - leaseCount
+      val dApp             = multipleActionsDApp(
+        recipient.toRide,
+        amount,
+        leaseCount,
+        leaseCancelCount,
+        transfersCount,
+        version
+      )
+      val leaseAmount      = (leaseCount - leaseCancelCount) * amount
+      val (preparingTxs, invoke, _, dAppAcc, invoker, _, _) = leasePreconditions(customDApp = Some(dApp))
+      assertDiffAndState(
+        Seq(TestBlock.create(preparingTxs)),
+        TestBlock.create(Seq(invoke)),
+        features(version)
+      ) {
+        case (diff, _) =>
+          diff.errorMessage(invoke.id()) shouldBe empty
+          diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee)
+          diff.portfolios(dAppAcc) shouldBe Portfolio(-transfersCount, lease = LeaseBalance(in = 0, out = leaseAmount))
+          diff.portfolios(recipient) shouldBe Portfolio(transfersCount, lease = LeaseBalance(in = leaseAmount, out = 0))
+      }
+    }
+
+    property(s"${ContractLimits.MaxCallableActionsAmount(version) + 1} multiple actions for V${version.id}") {
+      val recipient         = TxHelpers.signer(3).toAddress
+      val amount            = 100
+      val totalActionsCount = ContractLimits.MaxCallableActionsAmount(version) + 1
+      val leaseCount        = Random.nextInt(totalActionsCount) + 1
+      val leaseCancelCount  = Random.nextInt(leaseCount).min(totalActionsCount - leaseCount)
+      val transfersCount    = totalActionsCount - leaseCancelCount - leaseCount
+      val dApp              = multipleActionsDApp(
+        recipient.toRide,
+        amount,
+        leaseCount,
+        leaseCancelCount,
+        transfersCount,
+        version
+      )
+      val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customDApp = Some(dApp))
+      assertDiffEi(
+        Seq(TestBlock.create(preparingTxs)),
+        TestBlock.create(Seq(invoke)),
+        features(version)
+      )(_ should produceRejectOrFailedDiff("Actions count limit is exceeded"))
     }
   }
 
-  property(s"30 multiple actions") {
-    val recipient        = accountGen.sample.get.toAddress
-    val amount           = positiveLongGen.sample.get
-    val actionsCount     = 30
-    val leaseCount       = Random.nextInt(actionsCount) + 1
-    val leaseCancelCount = Random.nextInt(leaseCount).min(actionsCount - leaseCount)
-    val transfersCount   = actionsCount - leaseCancelCount - leaseCount
-    val dApp             = multipleActionsDApp(recipient.toRide, amount, leaseCount, leaseCancelCount, transfersCount)
-    val leaseAmount      = (leaseCount - leaseCancelCount) * amount
-    val (preparingTxs, invoke, _, dAppAcc, invoker, _, _) = leasePreconditions(customDApp = Some(dApp))
-    assertDiffAndState(
-      Seq(TestBlock.create(preparingTxs)),
-      TestBlock.create(Seq(invoke)),
-      v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()) shouldBe empty
-        diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee)
-        diff.portfolios(dAppAcc) shouldBe Portfolio(-transfersCount, lease = LeaseBalance(in = 0, out = leaseAmount))
-        diff.portfolios(recipient) shouldBe Portfolio(transfersCount, lease = LeaseBalance(in = leaseAmount, out = 0))
-    }
-  }
-
-  property(s"31 multiple actions") {
-    val recipient        = TxHelpers.signer(3).toAddress
-    val amount           = 100
-    val leaseCount       = Random.nextInt(31) + 1
-    val leaseCancelCount = Random.nextInt(leaseCount).min(31 - leaseCount)
-    val transfersCount   = 31 - leaseCancelCount - leaseCount
-    val dApp             = multipleActionsDApp(recipient.toRide, amount, leaseCount, leaseCancelCount, transfersCount)
-    val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customDApp = Some(dApp))
-    assertDiffAndState(
-      Seq(TestBlock.create(preparingTxs)),
-      TestBlock.create(Seq(invoke)),
-      v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text shouldBe "Actions count limit is exceeded"
-    }
+  private def features(version: StdLibVersion): FunctionalitySettings = {
+    val features = DomainPresets.settingsForRide(version).blockchainSettings.functionalitySettings.preActivatedFeatures
+    TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = features)
   }
 }

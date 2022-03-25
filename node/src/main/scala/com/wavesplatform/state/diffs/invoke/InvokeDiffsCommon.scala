@@ -344,9 +344,9 @@ object InvokeDiffsCommon {
   private def checkDataEntries(blockchain: Blockchain, tx: InvokeScriptLike, dataEntries: Seq[DataEntry[_]], stdLibVersion: StdLibVersion) =
     for {
       _ <- Either.cond(
-        dataEntries.length <= ContractLimits.MaxWriteSetSize(stdLibVersion),
+        dataEntries.length <= ContractLimits.MaxWriteSetSize,
         (),
-        s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize(stdLibVersion)} entries"
+        s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"
       )
       _ <- Either.cond(
         tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
