@@ -106,7 +106,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
        """.stripMargin
     )
 
-  private def multipleLeaseCancelsDApp(leaseIds: Seq[ByteStr], version: StdLibVersion = V5): Script =
+  private def multipleLeaseCancelsDApp(leaseIds: Seq[ByteStr], version: StdLibVersion): Script =
     dApp(
       s"""
          | [
@@ -121,7 +121,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
                                   leaseCount: Int,
                                   leaseCancelCount: Int,
                                   transfersCount: Int,
-                                  version: StdLibVersion = V5): Script =
+                                  version: StdLibVersion): Script =
     dApp(
       s"""
          | ${(1 to leaseCount).map(i => s"let lease$i = Lease(${recipientStr(recipient)}, $amount, $i)").mkString("\n")}
