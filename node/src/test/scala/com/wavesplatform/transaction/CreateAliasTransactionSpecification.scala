@@ -8,9 +8,11 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.serialization.impl.{CreateAliasTxSerializer, PBTransactionSerializer}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.*
-import com.wavesplatform.lang.directives.values.{V5, V6}
+import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import play.api.libs.json.Json
@@ -119,7 +121,7 @@ class CreateAliasTransactionSpecification extends PropSpec with WithDomain {
     js shouldEqual tx.json()
   }
 
-  property("Multiple proofs before RideV6 activation") {
+  property("Multiple proofs before and after allowMultipleProofsInCreateAliasUntil activation") {
     withDomain(
       DomainPresets.RideV5.copy(
         blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
@@ -171,15 +173,18 @@ class CreateAliasTransactionSpecification extends PropSpec with WithDomain {
     }
   }
 
-  property("Multiple proofs after RideV6 activation") {
+  property("Multiple proofs before and after RideV6 activation") {
     val sender = TxHelpers.signer(1)
-    withDomain(DomainPresets.RideV6.copy(
-      blockchainSettings = DomainPresets.RideV6.blockchainSettings.copy(
-        functionalitySettings = DomainPresets.RideV6.blockchainSettings.functionalitySettings.copy(
-          allowMultipleProofsInCreateAliasUntil = 0
+    withDomain(
+      DomainPresets.RideV5.copy(
+        blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
+          functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(
+            allowMultipleProofsInCreateAliasUntil = 0
+          )
         )
-      )
-    ), AddrWithBalance.enoughBalances(sender)) { d =>
+      ).setFeaturesHeight((BlockchainFeatures.RideV6, 4)),
+      AddrWithBalance.enoughBalances(sender)
+    ) { d =>
       val kp1 = KeyPair(Longs.toByteArray(Random.nextLong()))
       val kp2 = KeyPair(Longs.toByteArray(Random.nextLong()))
 
@@ -187,17 +192,46 @@ class CreateAliasTransactionSpecification extends PropSpec with WithDomain {
       val signedCreateAlias = cat.copy(
         proofs = cat.signWith(kp1.privateKey).proofs.proofs ++ cat.signWith(kp2.privateKey).proofs.proofs
       )
-      d.appendBlockE(signedCreateAlias) should produce("Transactions from non-scripted accounts must have exactly 1 proof")
 
-      val verifier = TestCompiler(V6).compileExpression(
-        """{-# STDLIB_VERSION 6 #-}
+      val verifier = TestCompiler(V5).compileExpression(
+        """{-# STDLIB_VERSION 5 #-}
           |{-# CONTENT_TYPE EXPRESSION #-}
           |{-# SCRIPT_TYPE ACCOUNT #-}
           |
           |true
           |""".stripMargin)
       d.appendBlock(TxHelpers.setScript(sender, verifier, version = TxVersion.V2))
+      d.appendBlockE(signedCreateAlias) should produceRejectOrFailedDiff("Invalid proofs size")
+      d.appendBlock()
       d.appendAndAssertSucceed(signedCreateAlias)
+    }
+  }
+
+  property("Not allow transaction with multiple proofs from account without verifier before and after RideV6 activation") {
+    val sender = TxHelpers.signer(1)
+    withDomain(
+      DomainPresets.RideV5.copy(
+        blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
+          functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(
+            allowMultipleProofsInCreateAliasUntil = 0
+          )
+        )
+      ).setFeaturesHeight((BlockchainFeatures.RideV6, 3)),
+      AddrWithBalance.enoughBalances(sender)
+    ) { d =>
+      val kp1 = KeyPair(Longs.toByteArray(Random.nextLong()))
+      val kp2 = KeyPair(Longs.toByteArray(Random.nextLong()))
+
+      val cat = CreateAliasTransaction(3.toByte, sender.publicKey, "abc12345", 0.001.waves, System.currentTimeMillis(), Proofs.empty, 'T'.toByte)
+      val signedCreateAlias = cat.copy(
+        proofs = cat.signWith(kp1.privateKey).proofs.proofs ++ cat.signWith(kp2.privateKey).proofs.proofs
+      )
+
+      val errMsg = "Transactions from non-scripted accounts must have exactly 1 proof"
+
+      d.appendBlockE(signedCreateAlias) should produceRejectOrFailedDiff(errMsg)
+      d.appendBlock()
+      d.appendBlockE(signedCreateAlias) should produceRejectOrFailedDiff(errMsg)
     }
   }
 }
