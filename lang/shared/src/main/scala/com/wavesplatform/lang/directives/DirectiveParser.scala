@@ -1,10 +1,10 @@
 package com.wavesplatform.lang.directives
 
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.lang.ExecutionError
-import fastparse.MultiLineWhitespace._
+import fastparse.MultiLineWhitespace.*
 import fastparse.Parsed.{Failure, Success}
-import fastparse._
+import fastparse.*
 
 object DirectiveParser {
 
@@ -20,7 +20,7 @@ object DirectiveParser {
       .!
 
   private def directiveValueP[A: P]: P[String] =
-    P(CharIn("a-zA-Z0-9/\\., "))
+    P(CharIn("a-zA-Z0-9_\\-/\\., "))
       .repX(1)
       .!
 
@@ -45,7 +45,7 @@ object DirectiveParser {
       .filter(_.matches(s"\\s*\\$start.*$end\\s*"))
       .map(parse(_, parser(_)))
       .foldLeft(Map[DirectiveKey, Directive]().asRight[ExecutionError]) {
-        case (err: Left[_, _], _)                                      => err
+        case (err: Left[?, ?], _)                                      => err
         case (_, _: Failure)                                           => Left(s"Directive $input has illegal format")
         case (_, Success(Left(err), _))                                => Left(err)
         case (Right(acc), Success(Right(d), _)) if acc.contains(d.key) => Left(s"Directive key ${d.key.text} is used more than once")

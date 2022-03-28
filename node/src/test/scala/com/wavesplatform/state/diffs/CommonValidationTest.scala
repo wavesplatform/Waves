@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -9,46 +8,45 @@ import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, PaymentTransaction, Proofs, Transaction, TxVersion}
-import com.wavesplatform.utils._
-import org.scalacheck.Gen
+import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
 
 class CommonValidationTest extends PropSpec with WithState {
 
   property("disallows double spending") {
-    val preconditionsAndPayment: Gen[(GenesisTransaction, TransferTransaction)] = for {
-      master    <- accountGen
-      recipient <- otherAccountGen(candidate = master)
-      ts        <- positiveIntGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-      transfer: TransferTransaction <- wavesTransferGeneratorP(master, recipient.toAddress)
-    } yield (genesis, transfer)
+    val preconditionsAndPayment: Seq[(GenesisTransaction, TransferTransaction)] = {
+      val master = TxHelpers.signer(1)
+      val recipients = Seq(master, TxHelpers.signer(2))
 
-    forAll(preconditionsAndPayment) {
-      case (genesis, transfer) =>
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis, transfer))), TestBlock.create(Seq(transfer))) { blockDiffEi =>
-          blockDiffEi should produce("AlreadyInTheState")
-        }
+      val genesis = TxHelpers.genesis(master.toAddress)
 
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transfer, transfer))) { blockDiffEi =>
-          blockDiffEi should produce("AlreadyInTheState")
-        }
+      recipients.map { recipient =>
+        val transfer = TxHelpers.transfer(master, recipient.toAddress, version = TxVersion.V1)
+        (genesis, transfer)
+      }
+    }
+
+    preconditionsAndPayment.foreach { case (genesis, transfer) =>
+      assertDiffEi(Seq(TestBlock.create(Seq(genesis, transfer))), TestBlock.create(Seq(transfer))) { blockDiffEi =>
+        blockDiffEi should produce("AlreadyInTheState")
+      }
+
+      assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transfer, transfer))) { blockDiffEi =>
+        blockDiffEi should produce("AlreadyInTheState")
+      }
     }
   }
 
   private def sponsoredTransactionsCheckFeeTest(feeInAssets: Boolean, feeAmount: Long)(f: Either[ValidationError, Unit] => Any): Unit = {
     val settings = createSettings(BlockchainFeatures.FeeSponsorship -> 0)
-    val gen      = sponsorAndSetScriptGen(sponsorship = true, smartToken = false, smartAccount = false, feeInAssets, feeAmount)
+    val gen      = sponsorAndSetScript(sponsorship = true, smartToken = false, smartAccount = false, feeInAssets, feeAmount)
     forAll(gen) {
       case (genesisBlock, transferTx) =>
         withLevelDBWriter(settings) { blockchain =>
@@ -71,16 +69,13 @@ class CommonValidationTest extends PropSpec with WithState {
 
   private def smartAccountCheckFeeTest(feeInAssets: Boolean, feeAmount: Long)(f: Either[ValidationError, Unit] => Any): Unit = {
     val settings = createSettings(BlockchainFeatures.SmartAccounts -> 0)
-    val gen      = sponsorAndSetScriptGen(sponsorship = false, smartToken = false, smartAccount = true, feeInAssets, feeAmount)
-    forAll(gen) {
-      case (genesisBlock, transferTx) =>
-        withLevelDBWriter(settings) { blockchain =>
-          val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
-            BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited, genesisBlock.header.generationSignature).explicitGet()
-          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, genesisBlock)
+    val (genesisBlock, transferTx) = sponsorAndSetScript(sponsorship = false, smartToken = false, smartAccount = true, feeInAssets, feeAmount)
+    withLevelDBWriter(settings) { blockchain =>
+      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
+        BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited, genesisBlock.header.generationSignature).explicitGet()
+      blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, genesisBlock)
 
-          f(FeeValidation(blockchain, transferTx))
-        }
+      f(FeeValidation(blockchain, transferTx))
     }
   }
 
@@ -88,121 +83,69 @@ class CommonValidationTest extends PropSpec with WithState {
     smartAccountCheckFeeTest(feeInAssets = false, feeAmount = 400000)(_.explicitGet())
   }
 
-  private def sponsorAndSetScriptGen(sponsorship: Boolean, smartToken: Boolean, smartAccount: Boolean, feeInAssets: Boolean, feeAmount: Long) =
-    for {
-      richAcc      <- accountGen
-      recipientAcc <- accountGen
-      ts = System.currentTimeMillis()
-    } yield {
-      val script = ExprScript(TRUE).explicitGet()
+  private def sponsorAndSetScript(sponsorship: Boolean, smartToken: Boolean, smartAccount: Boolean, feeInAssets: Boolean, feeAmount: Long) = {
+    val richAcc = TxHelpers.signer(1)
+    val recipientAcc = TxHelpers.signer(2)
 
-      val genesisTx = GenesisTransaction.create(richAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
+    val script = ExprScript(TRUE).explicitGet()
 
-      val issueTx =
-        if (smartToken)
-          IssueTransaction(
-            TxVersion.V2,
-            richAcc.publicKey,
-            "test".utf8Bytes,
-            "desc".utf8Bytes,
-            Long.MaxValue,
-            2,
-            reissuable = false,
-            Some(script),
-            Constants.UnitsInWave,
-            ts
-          ).signWith(richAcc.privateKey)
-        else
-          IssueTransaction(
-            TxVersion.V1,
-            richAcc.publicKey,
-            "test".utf8Bytes,
-            "desc".utf8Bytes,
-            Long.MaxValue,
-            2,
-            reissuable = false,
-            script = None,
-            Constants.UnitsInWave,
-            ts
-          ).signWith(richAcc.privateKey)
-
-      val transferWavesTx = TransferTransaction.selfSigned(1.toByte, richAcc, recipientAcc.toAddress, Waves, 10 * Constants.UnitsInWave, Waves, 1 * Constants.UnitsInWave, ByteStr.empty, ts)
-        .explicitGet()
-
-      val transferAssetTx = TransferTransaction
-        .selfSigned(
-          1.toByte,
-          richAcc,
-          recipientAcc.toAddress,
-          IssuedAsset(issueTx.id()),
-          100,
-          Waves,
-          if (smartToken) {
-            1 * Constants.UnitsInWave + ScriptExtraFee
-          } else {
-            1 * Constants.UnitsInWave
-          }, ByteStr.empty,
-          ts
-        )
-        .explicitGet()
-
-      val sponsorTx =
-        if (sponsorship)
-          Seq(
-            SponsorFeeTransaction
-              .selfSigned(1.toByte, richAcc, IssuedAsset(issueTx.id()), Some(10), if (smartToken) {
-                Constants.UnitsInWave + ScriptExtraFee
-              } else {
-                Constants.UnitsInWave
-              }, ts)
-              .explicitGet()
-          )
-        else Seq.empty
-
-      val setScriptTx =
-        if (smartAccount)
-          Seq(
-            SetScriptTransaction
-              .selfSigned(1.toByte, recipientAcc, Some(script), 1 * Constants.UnitsInWave, ts)
-              .explicitGet()
-          )
-        else Seq.empty
-
-      val transferBackTx = TransferTransaction.selfSigned(
-          1.toByte,
-          recipientAcc,
-          richAcc.toAddress,
-          IssuedAsset(issueTx.id()),
-          1,
-          if (feeInAssets) IssuedAsset(issueTx.id()) else Waves,
-          feeAmount, ByteStr.empty,
-          ts
-        )
-        .explicitGet()
-
-      (TestBlock.create(Vector[Transaction](genesisTx, issueTx, transferWavesTx, transferAssetTx) ++ sponsorTx ++ setScriptTx), transferBackTx)
+    val genesis = TxHelpers.genesis(richAcc.toAddress)
+    val issue = if (smartToken) {
+      TxHelpers.issue(richAcc, Long.MaxValue, 2, script = Some(script), reissuable = false, fee = Constants.UnitsInWave)
+    } else {
+      TxHelpers.issue(richAcc, Long.MaxValue, 2, script = None, reissuable = false, fee = Constants.UnitsInWave, version = TxVersion.V1)
     }
+    val transferWaves = TxHelpers.transfer(richAcc, recipientAcc.toAddress, 10 * Constants.UnitsInWave, fee = Constants.UnitsInWave, version = TxVersion.V1)
+    val transferAssetFee = if (smartToken) {
+      1 * Constants.UnitsInWave + ScriptExtraFee
+    } else {
+      1 * Constants.UnitsInWave
+    }
+    val transferAsset = TxHelpers.transfer(richAcc, recipientAcc.toAddress, 100, issue.asset, fee = transferAssetFee, version = TxVersion.V1)
+    val sponsorTxFee = if (smartToken) {
+      Constants.UnitsInWave + ScriptExtraFee
+    } else {
+      Constants.UnitsInWave
+    }
+    val sponsor =
+      if (sponsorship) {
+        Seq(TxHelpers.sponsor(issue.asset, Some(10), richAcc, fee = sponsorTxFee))
+      } else {
+        Seq.empty
+      }
+    val setScript =
+      if (smartAccount) {
+        Seq(TxHelpers.setScript(recipientAcc, script, fee = Constants.UnitsInWave))
+      } else {
+        Seq.empty
+      }
+
+    val transferBack = TxHelpers.transfer(
+      from = recipientAcc,
+      to = richAcc.toAddress,
+      amount = 1,
+      asset = issue.asset,
+      fee = feeAmount,
+      feeAsset = if (feeInAssets) issue.asset else Waves,
+      version = TxVersion.V1
+    )
+
+    (TestBlock.create(Vector[Transaction](genesis, issue, transferWaves, transferAsset) ++ sponsor ++ setScript), transferBack)
+  }
 
   private def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): FunctionalitySettings =
     TestFunctionalitySettings.Enabled
-      .copy(
-        preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }.toMap,
-        blocksForFeatureActivation = 1,
-        featureCheckBlocksPeriod = 1
-      )
+      .copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }.toMap)
 
   private def smartTokensCheckFeeTest(feeInAssets: Boolean, feeAmount: Long)(f: Either[ValidationError, Unit] => Any): Unit = {
     val settings = createSettings(BlockchainFeatures.SmartAccounts -> 0, BlockchainFeatures.SmartAssets -> 0)
-    val gen      = sponsorAndSetScriptGen(sponsorship = false, smartToken = true, smartAccount = false, feeInAssets, feeAmount)
-    forAll(gen) {
-      case (genesisBlock, transferTx) =>
-        withLevelDBWriter(settings) { blockchain =>
-          val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
-            BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited, genesisBlock.header.generationSignature).explicitGet()
-          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, genesisBlock)
+    val (genesisBlock, transferTx) = sponsorAndSetScript(sponsorship = false, smartToken = true, smartAccount = false, feeInAssets, feeAmount)
+    withLevelDBWriter(settings) { blockchain =>
+      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
+        BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited, genesisBlock.header.generationSignature).explicitGet()
+      blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, genesisBlock)
 
-          f(FeeValidation(blockchain, transferTx))
-        }
+      f(FeeValidation(blockchain, transferTx))
     }
   }
 
@@ -211,83 +154,53 @@ class CommonValidationTest extends PropSpec with WithState {
   }
 
   property("disallows other network") {
-    val preconditionsAndPayment: Gen[(GenesisTransaction, Transaction)] = for {
-      master    <- accountGen
-      recipient <- accountGen
-      timestamp <- positiveLongGen
-      amount    <- smallFeeGen
-      script    <- scriptGen
-      asset     <- bytes32gen.map(bs => IssuedAsset(ByteStr(bs)))
-      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, timestamp).explicitGet()
+    val preconditionsAndPayment: Seq[(GenesisTransaction, Transaction)] = {
+      val master = TxHelpers.signer(1)
+      val recipient = TxHelpers.signer(2)
 
-      invChainId <- invalidChainIdGen
-      invChainAddr  = recipient.toAddress(invChainId)
-      invChainAlias = Alias.createWithChainId("test", invChainId).explicitGet()
-      invChainAddrOrAlias <- Gen.oneOf(invChainAddr, invChainAlias)
+      val amount = 100.waves
+      val script = ExprScript(TRUE).explicitGet()
+      val asset = IssuedAsset(ByteStr.fill(32)(1))
 
-      tx <- Gen.oneOf(
-        GenesisTransaction.create(invChainAddr, amount, timestamp).explicitGet(),
-        PaymentTransaction.create(master, invChainAddr, amount, amount, timestamp).explicitGet(),
-        TransferTransaction(
-          TxVersion.V3,
-          master.publicKey,
-          invChainAddrOrAlias,
-          Waves,
-          amount,
-          Waves,
-          amount,
-          ByteStr.empty,
-          timestamp,
-          Proofs.empty,
-          invChainId
-        ).signWith(master.privateKey),
-        CreateAliasTransaction(TxVersion.V3, master.publicKey, invChainAlias.name, amount, timestamp, Proofs.empty, invChainId).signWith(master.privateKey),
-        LeaseTransaction(TxVersion.V3, master.publicKey, invChainAddrOrAlias, amount, amount, timestamp, Proofs.empty, invChainId).signWith(master.privateKey),
-        InvokeScriptTransaction(TxVersion.V2, master.publicKey, invChainAddrOrAlias, None, Nil, amount, Waves, timestamp, Proofs.empty, invChainId)
-          .signWith(master.privateKey),
-        exchangeV1GeneratorP(master, recipient, asset, Waves, None, invChainId).sample.get,
-        IssueTransaction(
-          TxVersion.V2,
-          master.publicKey,
-          ByteString.copyFrom(asset.id.arr),
-          ByteString.copyFrom(asset.id.arr),
-          amount,
-          8: Byte,
-          reissuable = true,
-          None,
-          amount,
-          timestamp,
-          Proofs.empty,
-          invChainId
-        ).signWith(master.privateKey),
-        MassTransferTransaction(
-          TxVersion.V2,
-          master.publicKey,
-          Waves,
-          Seq(ParsedTransfer(invChainAddrOrAlias, amount)),
-          amount,
-          timestamp,
-          ByteStr.empty,
-          Proofs.empty,
-          invChainId
-        ).signWith(master.privateKey),
-        LeaseCancelTransaction(TxVersion.V3, master.publicKey, asset.id, amount, timestamp, Proofs.empty, invChainId).signWith(master.privateKey),
-        SetScriptTransaction(TxVersion.V2, master.publicKey, Some(script), amount, timestamp, Proofs.empty, invChainId).signWith(master.privateKey),
-        SetAssetScriptTransaction(TxVersion.V2, master.publicKey, asset, Some(script), amount, timestamp, Proofs.empty, invChainId).signWith(master.privateKey),
-        BurnTransaction(TxVersion.V2, master.publicKey, asset, amount, amount, timestamp, Proofs.empty, invChainId).signWith(master.privateKey),
-        ReissueTransaction(TxVersion.V2, master.publicKey, asset, amount, reissuable = false, amount, timestamp, Proofs.empty, invChainId).signWith(master.privateKey),
-        SponsorFeeTransaction(TxVersion.V2, master.publicKey, asset, Some(amount), amount, timestamp, Proofs.empty, invChainId).signWith(master.privateKey),
-        UpdateAssetInfoTransaction(TxVersion.V2, master.publicKey, asset, "1", "2", timestamp, amount, Waves, Proofs.empty, invChainId).signWith(master.privateKey),
-        DataTransaction(TxVersion.V2, master.publicKey, Nil, amount, timestamp, Proofs.empty, invChainId).signWith(master.privateKey)
-      )
-    } yield (genesis, tx)
+      val genesis = TxHelpers.genesis(master.toAddress)
 
-    forAll(preconditionsAndPayment) {
-      case (genesis, tx) =>
-        tx.chainId should not be AddressScheme.current.chainId
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(tx))) { blockDiffEi =>
-          blockDiffEi should produce("Address belongs to another network")
-        }
+      val invChainId = '#'.toByte
+      val invChainAddr  = recipient.toAddress(invChainId)
+      val invChainAlias = Alias.createWithChainId("test", invChainId).explicitGet()
+      Seq(
+        TxHelpers.genesis(invChainAddr, amount),
+        TxHelpers.payment(master, invChainAddr, amount),
+        TxHelpers.transfer(master, invChainAddr, amount, version = TxVersion.V3, chainId = invChainId),
+        TxHelpers.transfer(master, invChainAlias, amount, version = TxVersion.V3, chainId = invChainId),
+        TxHelpers.createAlias(invChainAlias.name, master, version = TxVersion.V3, chainId = invChainId),
+        TxHelpers.lease(master, invChainAddr, amount, version = TxVersion.V3),
+        TxHelpers.lease(master, invChainAlias, amount, version = TxVersion.V3),
+        TxHelpers.invoke(invChainAddr, invoker = master),
+        TxHelpers.invoke(invChainAlias, invoker = master),
+        TxHelpers.exchangeFromOrders(
+          TxHelpers.order(OrderType.BUY, asset, Waves, Waves, amount, 1_0000_0000L, fee = 1L, sender = master),
+          TxHelpers.order(OrderType.SELL, asset, Waves, Waves, amount, 1_0000_0000L, fee = 1L, sender = recipient),
+          master,
+          chainId = invChainId
+        ),
+        TxHelpers.issue(master, amount, chainId = invChainId),
+        TxHelpers.massTransfer(master, Seq(ParsedTransfer(invChainAddr, amount)), chainId = invChainId),
+        TxHelpers.leaseCancel(asset.id, master, version = TxVersion.V3, chainId = invChainId),
+        TxHelpers.setScript(master, script, version = TxVersion.V2, chainId = invChainId),
+        TxHelpers.setAssetScript(master, asset, script, version = TxVersion.V2, chainId = invChainId),
+        TxHelpers.burn(asset, amount, master, version = TxVersion.V2, chainId = invChainId),
+        TxHelpers.reissue(asset, master, amount, chainId = invChainId),
+        TxHelpers.sponsor(asset, Some(amount), master, version = TxVersion.V2, chainId = invChainId),
+        TxHelpers.updateAssetInfo(asset.id, sender = master, chainId = invChainId),
+        TxHelpers.dataV2(master, Seq.empty, chainId = invChainId)
+      ).map(genesis -> _)
+    }
+
+    preconditionsAndPayment.foreach { case (genesis, tx) =>
+      tx.chainId should not be AddressScheme.current.chainId
+      assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(tx))) { blockDiffEi =>
+        blockDiffEi should produce("Address belongs to another network")
+      }
     }
   }
 }

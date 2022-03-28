@@ -11,12 +11,12 @@ import scala.util.Try
 
 object CreateAliasTxSerializer {
   def toJson(tx: CreateAliasTransaction): JsObject = {
-    import tx._
+    import tx.*
     BaseTxJson.toJson(tx) ++ Json.obj("alias" -> aliasName)
   }
 
   def bodyBytes(tx: CreateAliasTransaction): Array[Byte] = {
-    import tx._
+    import tx.*
 
     lazy val base = Bytes.concat(
       sender.arr,

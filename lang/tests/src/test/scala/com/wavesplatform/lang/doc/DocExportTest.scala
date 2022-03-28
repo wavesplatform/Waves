@@ -17,7 +17,7 @@ class DocExportTest extends PropSpec {
   def buildFullContext(ds: DirectiveSet): CTX[Environment] = {
     val wavesCtx  = WavesContext.build(Global, ds)
     val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment]
-    val pureCtx = PureContext.build(ds.stdLibVersion, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment]
+    val pureCtx = PureContext.build(ds.stdLibVersion, useNewPowPrecision = true).withEnvironment[Environment]
     pureCtx |+| cryptoCtx |+| wavesCtx
   }
 
@@ -57,7 +57,7 @@ class DocExportTest extends PropSpec {
 
   def funcDoc(ctx: CTX[Environment], ver: StdLibVersion): Array[(Option[(String, List[String], Int)], String)] =
     ctx.functions
-      .filterNot(_.name.startsWith("_"))
+      .filterNot(_.name.startsWith("$"))
       .map(f => (f.name, f.signature.args.map(_._2.toString).toList))
       .map(k => (DocSource.funcData.get((k._1, k._2, ver.value.asInstanceOf[Int])), k._1))
 }

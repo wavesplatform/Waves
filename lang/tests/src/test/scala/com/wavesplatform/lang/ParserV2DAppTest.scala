@@ -298,7 +298,7 @@ class ParserV2DAppTest extends PropSpec {
         |
         |func deleteEntry(acc: List[DeleteEntry], e: String) = DeleteEntry(e) :: acc
         |
-        |func t() = delateEntry("q") :: fold_20(a10, [], deleteEntry)
+        |func t() = delateEntry("q") :: FOLD<10>(a10, [], deleteEntry)
         |
         |@Callable(i) func f() = []
         |""".stripMargin
@@ -315,7 +315,7 @@ class ParserV2DAppTest extends PropSpec {
         |
         |func deleteEntry(acc: List[DeleteEntry], e: String) = DeleteEntry(e) :: acc
         |
-        |@Callable(i) func delete100Entries() = fold_20(a10, [], deleteEntry)
+        |@Callable(i) func delete100Entries() = FOLD<10>(a10, [], deleteEntry)
         |
         |@Callable(i) func delete(k: String) = [DeleteEntry(k)]
         |""".stripMargin

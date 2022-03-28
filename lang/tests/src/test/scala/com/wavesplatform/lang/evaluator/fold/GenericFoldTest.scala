@@ -1,24 +1,18 @@
 package com.wavesplatform.lang.evaluator.fold
 
-import com.wavesplatform.lang.directives.values.{V3, V6}
+import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.evaluator.EvaluatorSpec
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import org.scalatest.Assertion
 
 class GenericFoldTest extends EvaluatorSpec {
-  private def eval(script: String => String): Either[String, Terms.EVALUATED] = {
-    val r1 = eval(script("FOLD<20>"))(V3)
-    val r2 = eval(script("fold_20"))(V6)
-    r1 shouldBe r2
-    r2
-  }
+  private def eval(script: String => String): Either[String, Terms.EVALUATED] =
+    eval(script("FOLD<20>"))(V3)
 
-  private def assertError(script: String => String, error: String => String): Assertion = {
+  private def assertError(script: String => String, error: String => String): Assertion =
     eval(script("FOLD<20>"))(V3) should produce (error("FOLD<20>"))
-    eval(script("fold_20"))(V6) should produce (error("fold_20"))
-  }
 
   property("sum") {
     eval(fold =>

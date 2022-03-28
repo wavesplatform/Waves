@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
-import com.wavesplatform.{crypto, TestWallet}
+import com.wavesplatform.{TestWallet, crypto}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.AddressApiRoute
@@ -10,6 +10,7 @@ import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.contract.DApp
@@ -71,12 +72,11 @@ class AddressRouteSpec
     message <- Gen.listOfN(length, Gen.alphaNumChar).map(_.mkString).label("message")
   } yield (account, message)
 
-  routePath("/balance/{address}/{confirmations}") in withDomain() { d =>
+  routePath("/balance/{address}/{confirmations}") in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
     val route =
       addressApiRoute.copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater)).route
     val address = TxHelpers.signer(1).toAddress
 
-    d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress))
     for (_ <- 1 until 10) d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, address))
 
     Get(routePath(s"/balance/$address/10")) ~> route ~> check {

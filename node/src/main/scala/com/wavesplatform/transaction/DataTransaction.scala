@@ -1,5 +1,7 @@
 package com.wavesplatform.transaction
 
+import scala.util.Try
+
 import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -10,8 +12,6 @@ import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import monix.eval.Coeval
 import play.api.libs.json._
-
-import scala.util.Try
 
 case class DataTransaction(
     version: TxVersion,
@@ -40,6 +40,7 @@ object DataTransaction extends TransactionParser {
 
   val MaxBytes: Int      = 150 * 1024 // uses for RIDE CONST_STRING and CONST_BYTESTR
   val MaxProtoBytes: Int = 165890 // uses for RIDE CONST_BYTESTR
+  val MaxRideV6Bytes: Int = 165835 // (DataEntry.MaxPBKeySize + DataEntry.MaxValueSize) * 5
   val MaxEntryCount: Int = 100
 
   override val typeId: TxType                    = 12: Byte
@@ -70,16 +71,18 @@ object DataTransaction extends TransactionParser {
       data: Seq[DataEntry[_]],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, DataTransaction] =
-    create(version, sender, data, fee, timestamp, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, data, fee, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
       sender: KeyPair,
       data: Seq[DataEntry[_]],
       fee: TxAmount,
-      timestamp: TxTimestamp
+      timestamp: TxTimestamp,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, DataTransaction] =
-    signed(version, sender.publicKey, data, fee, timestamp, sender.privateKey)
+    signed(version, sender.publicKey, data, fee, timestamp, sender.privateKey, chainId)
 }

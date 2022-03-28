@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.contract
@@ -13,14 +14,8 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONS
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.utils.Signed
-import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.{EitherValues, Inside}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
@@ -30,12 +25,8 @@ class DAppDataEntryTypeTest
     with Inside
     with WithState
     with DBCacheSettings
-    with MockFactory
     with WithDomain
     with EitherValues {
-
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
 
   private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -46,9 +37,7 @@ class DAppDataEntryTypeTest
       BlockchainFeatures.DataTransaction.id -> 0,
       BlockchainFeatures.BlockReward.id     -> 0,
       BlockchainFeatures.BlockV5.id         -> 0
-    ),
-    estimatorPreCheckHeight = Int.MaxValue
-  )
+    ), estimatorPreCheckHeight = Int.MaxValue)
 
   private def dApp(constructor: String): Script = {
     val value = if (constructor == "BooleanEntry") CONST_LONG(1) else CONST_BOOLEAN(true)
@@ -81,27 +70,18 @@ class DAppDataEntryTypeTest
     )
   }
 
-  private def paymentPreconditions(constructor: String): Gen[(List[Transaction], InvokeScriptTransaction)] =
-    for {
-      dAppAcc <- accountGen
-      invoker <- accountGen
-      fee     <- ciFee()
-    } yield {
-      for {
-        genesis  <- GenesisTransaction.create(dAppAcc.toAddress, ENOUGH_AMT, ts)
-        genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
-        setDApp  <- SetScriptTransaction.selfSigned(1.toByte, dAppAcc, Some(dApp(constructor)), fee, ts)
-      } yield (List(genesis, genesis2, setDApp), Signed.invokeScript(1.toByte, invoker, dAppAcc.toAddress, None, Nil, fee, Waves, ts))
-    }.explicitGet()
-
   private def assert(constructor: String) = {
-    val (preparingTxs, invoke) = paymentPreconditions(constructor).sample.get
-    withDomain(domainSettingsWithFS(fsWithV5)) { d =>
-      d.appendBlock(preparingTxs*)
+    val dAppAcc = TxHelpers.signer(0)
+    val invoker = TxHelpers.signer(1)
+    val balances = AddrWithBalance.enoughBalances(dAppAcc, invoker)
+
+    val setScript = TxHelpers.setScript(dAppAcc, dApp(constructor))
+    val invoke = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker)
+
+    withDomain(domainSettingsWithFS(fsWithV5), balances) { d =>
+      d.appendBlock(setScript)
       val value = if (constructor == "BooleanEntry") "1" else "true"
-      (the[RuntimeException] thrownBy d.appendBlock(invoke)).getMessage should include(
-        s"can't reconstruct $constructor from Map(key -> key, value -> $value)"
-      )
+      d.appendBlockE(invoke) should produce(s"can't reconstruct $constructor from Map(key -> key, value -> $value)")
     }
   }
 

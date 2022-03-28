@@ -1,23 +1,22 @@
 package com.wavesplatform.transaction.smart
 
-import scala.concurrent.duration._
-
-import cats.syntax.monoid._
+import scala.concurrent.duration.*
+import cats.syntax.monoid.*
 import com.wavesplatform.{BlockchainStubHelpers, TestValues}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.state.Portfolio
-import com.wavesplatform.test.{produce, FlatSpec, TestTime}
+import com.wavesplatform.test.{FlatSpec, TestTime, produce}
 import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.utils.EthConverters._
+import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
-import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, EthSetChainId, JsonMatchers}
+import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, Inside}
 import org.web3j.crypto.{RawTransaction, Sign, SignedRawTransaction, TransactionEncoder}
@@ -29,7 +28,6 @@ class EthereumTransactionSpec
     with PathMockFactory
     with BlockchainStubHelpers
     with EthHelpers
-    with EthSetChainId
     with DiffMatchers
     with JsonMatchers
     with Inside {
@@ -48,18 +46,17 @@ class EthereumTransactionSpec
     val assetTransfer = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 1, TestValues.asset)
     val invoke        = EthTxGenerator.generateEthInvoke(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, "test", Nil, Nil)
 
-    EthChainId.unset() // Set to 'T'
 
     inside(EthereumTransaction(transfer.toSignedRawTransaction).explicitGet().payload) {
-      case t: EthereumTransaction.Transfer => t.recipient.chainId shouldBe 'E'.toByte
+      case t: EthereumTransaction.Transfer => t.recipient.chainId shouldBe 'T'.toByte
     }
 
     inside(EthereumTransaction(assetTransfer.toSignedRawTransaction).explicitGet().payload) {
-      case t: EthereumTransaction.Transfer => t.recipient.chainId shouldBe 'E'.toByte
+      case t: EthereumTransaction.Transfer => t.recipient.chainId shouldBe 'T'.toByte
     }
 
     inside(EthereumTransaction(invoke.toSignedRawTransaction).explicitGet().payload) {
-      case t: EthereumTransaction.Invocation => t.dApp.chainId shouldBe 'E'.toByte
+      case t: EthereumTransaction.Invocation => t.dApp.chainId shouldBe 'T'.toByte
     }
   }
 
@@ -269,7 +266,7 @@ class EthereumTransactionSpec
     transaction.senderAddress() shouldBe senderAccount.toWavesAddress
   }
 
-  it should "work with all types of arguments" in {
+  it should "work with all types of arguments except unions" in {
     val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
     val dAppAccount    = TxHelpers.secondSigner
     val blockchain = createBlockchainStub { blockchain =>
@@ -285,7 +282,7 @@ class EthereumTransactionSpec
           |{-# CONTENT_TYPE DAPP #-}
           |
           |@Callable (i)
-          |func deposit(amount: Int, bs: ByteVector, str: String, bool: Boolean, list: List[Int], union: ByteVector|String) = {
+          |func deposit(amount: Int, bs: ByteVector, str: String, bool: Boolean, list: List[Int]) = {
           |  [
           |    ScriptTransfer(i.caller, amount, unit)
           |  ]
@@ -305,8 +302,7 @@ class EthereumTransactionSpec
         Arg.Bytes(ByteStr.empty),
         Arg.Str("123"),
         Arg.Bool(true),
-        Arg.List(Arg.Integer(0), Seq(Arg.Integer(123))),
-        Arg.Union(0, Seq(Arg.Str("123"), Arg.Bytes(ByteStr.empty)))
+        Arg.List(Arg.Integer(0), Seq(Arg.Integer(123)))
       ),
       Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
     )
@@ -315,7 +311,7 @@ class EthereumTransactionSpec
     Json.toJson(diff.scriptResults.values.head) should matchJson("""{
                                                                    |  "data" : [ ],
                                                                    |  "transfers" : [ {
-                                                                   |    "address" : "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
+                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
                                                                    |    "asset" : null,
                                                                    |    "amount" : 123
                                                                    |  } ],
@@ -327,6 +323,43 @@ class EthereumTransactionSpec
                                                                    |  "leaseCancels" : [ ],
                                                                    |  "invokes" : [ ]
                                                                    |}""".stripMargin)
+  }
+
+  it should "not work with union type" in {
+    val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
+    val dAppAccount    = TxHelpers.secondSigner
+    val blockchain = createBlockchainStub { blockchain =>
+      val sh = StubHelpers(blockchain)
+      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
+      sh.creditBalance(invokerAccount.toWavesAddress, *)
+      sh.creditBalance(dAppAccount.toAddress, *)
+      sh.issueAsset(ByteStr(EthStubBytes32))
+
+      val script = TxHelpers.script(
+        """{-# STDLIB_VERSION 4 #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |
+          |@Callable (i)
+          |func test(union: String|Int) = []
+          |""".stripMargin
+      )
+      sh.setScript(dAppAccount.toAddress, script)
+    }
+
+    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
+    val transaction = EthTxGenerator.generateEthInvoke(
+      invokerAccount,
+      dAppAccount.toAddress,
+      "test",
+      Seq(
+        Arg.Integer(123)
+      ),
+      Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
+    )
+
+    val diff = differ(transaction).resultE
+    diff should produce("Function not defined: 1f9773e9")
   }
 
   it should "work with no arguments" in {
@@ -368,7 +401,7 @@ class EthereumTransactionSpec
     Json.toJson(diff.scriptResults.values.head) should matchJson("""{
                                                                    |  "data" : [ ],
                                                                    |  "transfers" : [ {
-                                                                   |    "address" : "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
+                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
                                                                    |    "asset" : null,
                                                                    |    "amount" : 123
                                                                    |  } ],
@@ -415,7 +448,7 @@ class EthereumTransactionSpec
     Json.toJson(diff.scriptResults.values.head) should matchJson("""{
                                                                    |  "data" : [ ],
                                                                    |  "transfers" : [ {
-                                                                   |    "address" : "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
+                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
                                                                    |    "asset" : null,
                                                                    |    "amount" : 123
                                                                    |  } ],
@@ -505,7 +538,7 @@ class EthereumTransactionSpec
     Json.toJson(diff.scriptResults.values.head) should matchJson("""{
                                                                    |  "data" : [ ],
                                                                    |  "transfers" : [ {
-                                                                   |    "address" : "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
+                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
                                                                    |    "asset" : null,
                                                                    |    "amount" : 123
                                                                    |  } ],
@@ -559,12 +592,12 @@ class EthereumTransactionSpec
     Json.toJson(diff.scriptResults.values.head) should matchJson(s"""{
                                                                    |  "data" : [ ],
                                                                    |  "transfers" : [ {
-                                                                   |    "address" : "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
+                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
                                                                    |    "asset" : null,
                                                                    |    "amount" : 123
                                                                    |  },
                                                                    |   {
-                                                                   |    "address" : "3G9uRSP4uVjTFjGZixYW4arBZUKWHxjnfeW",
+                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
                                                                    |    "asset" : "$TestAsset",
                                                                    |    "amount" : 123
                                                                    |  }],

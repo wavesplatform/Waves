@@ -226,7 +226,7 @@ class NarrowTransactionGenerator(
             val sender      = randomFrom(accounts).get
             val aliasString = NarrowTransactionGenerator.generateAlias()
             logOption(
-              CreateAliasTransaction.selfSigned(correctVersion(TxVersion.V2), sender, Alias.create(aliasString).explicitGet(), 500000L, timestamp)
+              CreateAliasTransaction.selfSigned(correctVersion(TxVersion.V2), sender, aliasString, 500000L, timestamp)
             )
 
           case TransactionType.MassTransfer =>

@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account._
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -72,10 +72,11 @@ object CreateAliasTransaction extends TransactionParser {
       alias: String,
       fee: TxAmount,
       timestamp: TxTimestamp,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransactionT] =
-    create(version, sender, alias, fee, timestamp, Nil).map(_.signWith(signer))
+    create(version, sender, alias, fee, timestamp, Nil, chainId).map(_.signWith(signer))
 
-  def selfSigned(version: TxVersion, sender: KeyPair, aliasName: String, fee: TxAmount, timestamp: TxTimestamp): Either[ValidationError, TransactionT] =
-    signed(version, sender.publicKey, aliasName, fee, timestamp, sender.privateKey)
+  def selfSigned(version: TxVersion, sender: KeyPair, aliasName: String, fee: TxAmount, timestamp: TxTimestamp, chainId: Byte = AddressScheme.current.chainId): Either[ValidationError, TransactionT] =
+    signed(version, sender.publicKey, aliasName, fee, timestamp, sender.privateKey, chainId)
 }

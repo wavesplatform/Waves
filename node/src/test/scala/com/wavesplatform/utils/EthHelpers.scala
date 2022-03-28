@@ -1,12 +1,11 @@
 package com.wavesplatform.utils
 
 import java.math.BigInteger
-
-import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.{EthereumTransaction, TxHelpers}
+import com.wavesplatform.transaction.assets.exchange.OrderAuthentication
 import com.wavesplatform.transaction.utils.EthTxGenerator
-import org.scalatest.{BeforeAndAfterEach, Suite}
 import org.web3j.crypto.{Bip32ECKeyPair, RawTransaction, SignedRawTransaction}
 import org.web3j.crypto.Sign.SignatureData
 
@@ -14,13 +13,11 @@ trait EthHelpers {
   val EthStubBytes32: Array[Byte] = Array.fill(32)(EthChainId.byte)
 
   object EthSignature {
-    def apply(str: String): Option[ByteStr] = Some(ByteStr(EthEncoding.toBytes(str)))
+    def apply(str: String): OrderAuthentication.Eip712Signature = OrderAuthentication.Eip712Signature(ByteStr(EthEncoding.toBytes(str)))
   }
 
   val TestEthOrdersPublicKey: PublicKey = PublicKey(
-    EthEncoding.toBytes(
-      "0xd10a150ba9a535125481e017a09c2ac6a1ab43fc43f7ab8f0d44635106672dd7de4f775c06b730483862cbc4371a646d86df77b3815593a846b7272ace008c42"
-    )
+    EthEncoding.toBytes(TxHelpers.defaultEthSigner.getPublicKey.toString(16))
   )
 
   val TestEthRawTransaction: RawTransaction =
@@ -34,32 +31,14 @@ trait EthHelpers {
     )
 
   val TestEthSignature: SignatureData =
-    EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, 'E'.toByte)(TestEthRawTransaction).signatureData
+    EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, 'T'.toByte)(TestEthRawTransaction).signatureData
 
   object EthChainId {
     val byte: Byte = 'E'.toByte
-
-    def set(): Unit = {
-      AddressScheme.current = new AddressScheme {
-        val chainId: Byte = EthChainId.byte
-      }
-    }
-
-    def unset(): Unit = {
-      AddressScheme.current = new AddressScheme {
-        val chainId: Byte = 'T'.toByte
-      }
-    }
-
-    def withEChainId[T](f: => T): T = {
-      this.set()
-      try f
-      finally this.unset()
-    }
   }
 
   implicit class TxHelpersEthExt(helpers: TxHelpers.type) {
-    import com.wavesplatform.transaction.utils.EthConverters._
+    import com.wavesplatform.transaction.utils.EthConverters.*
     def defaultEthSigner: Bip32ECKeyPair = helpers.defaultSigner.toEthKeyPair
     def defaultEthAddress: Address       = helpers.defaultSigner.toEthWavesAddress
   }
@@ -69,13 +48,3 @@ trait EthHelpers {
   }
 }
 
-trait EthSetChainId extends BeforeAndAfterEach with EthHelpers { self: Suite =>
-  abstract override protected def beforeEach(): Unit = {
-    super.beforeEach()
-    EthChainId.set()
-  }
-  abstract override protected def afterEach(): Unit = {
-    EthChainId.unset()
-    super.afterEach()
-  }
-}

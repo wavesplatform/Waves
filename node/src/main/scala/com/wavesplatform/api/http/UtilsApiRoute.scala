@@ -1,7 +1,6 @@
 package com.wavesplatform.api.http
 
 import java.security.SecureRandom
-
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.syntax.either.*
 import cats.syntax.semigroup.*
@@ -29,9 +28,10 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
@@ -154,7 +154,9 @@ case class UtilsApiRoute(
 
                   val compactedScript = script match {
                     case ContractScript.ContractScriptImpl(stdLibVersion, expr) if compact =>
-                      ContractScriptImpl(stdLibVersion, ContractScriptCompactor.compact(expr))
+                      val compacted = ContractScriptCompactor.compact(expr)
+
+                      ContractScriptImpl(stdLibVersion, compacted)
 
                     case _ => script
                   }
@@ -208,13 +210,14 @@ case class UtilsApiRoute(
                 script,
                 estimator(),
                 fixEstimateOfVerifier = blockchain.isFeatureActivated(RideV6),
-                useContractVerifierLimit = false
+                useContractVerifierLimit = false,
+                withCombinedContext = true
               )
               .map((script, _))
           }
       ) { result =>
         complete(
-          checkInvokeExpression(result)
+          result
             .fold(
               e => ScriptCompilerError(e), {
                 case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
@@ -314,7 +317,7 @@ object UtilsApiRoute {
   private object ScriptCallEvaluator {
     def compile(stdLibVersion: StdLibVersion)(str: String): Either[GenericError, EXPR] = {
       val ctx =
-        PureContext.build(stdLibVersion, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
+        PureContext.build(stdLibVersion, useNewPowPrecision = true).withEnvironment[Environment] |+|
           CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment] |+|
           WavesContext.build(Global, DirectiveSet(stdLibVersion, Account, Expression).explicitGet())
 
@@ -324,7 +327,7 @@ object UtilsApiRoute {
     }
 
     def parseBinaryCall(bs: ByteStr): Either[ValidationError, EXPR] = {
-      Serde
+      SerdeV1
         .deserialize(bs.arr)
         .left
         .map(GenericError(_))

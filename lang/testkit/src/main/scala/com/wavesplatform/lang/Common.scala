@@ -30,7 +30,7 @@ object Common {
 
   def ev[T <: EVALUATED](
       context: EvaluationContext[NoContext, Id] =
-        Monoid.combine(PureContext.build(V1, fixUnicodeFunctions = true, useNewPowPrecision = true).evaluationContext, addCtx.evaluationContext),
+        Monoid.combine(PureContext.build(V1, useNewPowPrecision = true).evaluationContext, addCtx.evaluationContext),
       expr: EXPR
   ): Either[ExecutionError, T] =
     new EvaluatorV1[Id, NoContext]().apply[T](context, expr)

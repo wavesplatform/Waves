@@ -1,9 +1,4 @@
-package com.wavesplatform.lang.v1
-
-import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
-
-import scala.util.Try
+package com.wavesplatform.lang.v1.serialization
 
 import cats.instances.lazyList._
 import cats.instances.list._
@@ -11,32 +6,17 @@ import cats.syntax.apply._
 import cats.syntax.traverse._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.utils.Serialize._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
+import com.wavesplatform.lang.v1.serialization.Serde._
+import com.wavesplatform.lang.utils.Serialize._
 import monix.eval.Coeval
 
-object Serde {
-  val E_LONG: Byte    = 0
-  val E_BYTES: Byte   = 1
-  val E_STRING: Byte  = 2
-  val E_IF: Byte      = 3
-  val E_BLOCK: Byte   = 4
-  val E_REF: Byte     = 5
-  val E_TRUE: Byte    = 6
-  val E_FALSE: Byte   = 7
-  val E_GETTER: Byte  = 8
-  val E_FUNCALL: Byte = 9
+import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
+import scala.util.Try
 
-  val FH_NATIVE: Byte = 0
-  val FH_USER: Byte   = 1
-
-  val E_BLOCK_V2 = 10
-  val E_ARR      = 11
-  val E_CASE_OBJ = 12
-
-  val DEC_LET  = 0
-  val DEC_FUNC = 1
+object SerdeV1 extends Serde[ByteBuffer, ByteArrayOutputStream] {
 
   def serializeDeclaration(out: ByteArrayOutputStream, dec: DECLARATION, aux: EXPR => Coeval[Unit]): Coeval[Unit] = {
     dec match {
@@ -149,12 +129,6 @@ object Serde {
     }
   }
 
-  private def evaluatedOnly(arg: Coeval[EXPR]): Coeval[EVALUATED] =
-    arg.flatMap {
-      case value: EVALUATED => Coeval.now(value)
-      case other            => Coeval.raiseError(new Exception(s"Unsupported array element: $other"))
-    }
-
   private def tooBigArray(bb: ByteBuffer) = {
     Coeval.raiseError(new Exception(s"At position ${bb.position()} array of arguments too big."))
   }
@@ -164,10 +138,10 @@ object Serde {
     val res = Try(desAux(bb, allowObjects).value()).toEither.left
       .map(_.getMessage)
     (if (all)
-       res.flatMap { r =>
-         if (bb.hasRemaining) Left(s"${bb.remaining()} bytes left")
-         else Right(r)
-       } else res)
+      res.flatMap { r =>
+        if (bb.hasRemaining) Left(s"${bb.remaining()} bytes left")
+        else Right(r)
+      } else res)
       .map((_, bb.remaining()))
   }
 

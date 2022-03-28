@@ -4,16 +4,16 @@ resolvers ++= Seq(
 )
 
 // Should go before Scala.js
-addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.4")
+addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.6")
 
-libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.11.6"
+libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.11.8"
 
 Seq(
   "com.eed3si9n"       % "sbt-assembly"             % "1.0.0",
   "com.github.sbt"     % "sbt-native-packager"      % "1.9.4",
   "se.marcuslonnberg"  % "sbt-docker"               % "1.8.2",
   "com.typesafe.sbt"   % "sbt-git"                  % "1.0.1",
-  "org.scala-js"       % "sbt-scalajs"              % "1.7.0",
+  "org.scala-js"       % "sbt-scalajs"              % "1.8.0",
   "org.portable-scala" % "sbt-scalajs-crossproject" % "1.1.0",
   "pl.project13.scala" % "sbt-jmh"                  % "0.4.3",
 ).map(addSbtPlugin)
