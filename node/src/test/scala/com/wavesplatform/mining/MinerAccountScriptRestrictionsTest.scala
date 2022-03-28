@@ -52,7 +52,7 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
   }
 
   private def errMsgBeforeRideV6 =
-    s"Account(${minerAcc.toAddress}) is scripted and therefore not allowed to forge blocks"
+    s"Account(${minerAcc.toAddress}) is scripted and not allowed to forge blocks"
 
   private def ts: Long = System.currentTimeMillis()
 

@@ -122,7 +122,7 @@ class MinerImpl(
     Either.cond(
       hasAllowedForMiningScript(account, blockchain),
       (),
-      s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks"
+      s"Account(${account.toAddress}) is scripted and not allowed to forge blocks"
     )
   }
 
