@@ -2,10 +2,10 @@ package com.wavesplatform.state
 
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
-import cats.instances.map._
+import cats.instances.map.*
 import cats.kernel.Monoid
-import cats.syntax.either._
-import cats.syntax.option._
+import cats.syntax.either.*
+import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
@@ -15,15 +15,15 @@ import com.wavesplatform.database.Storage
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
+import com.wavesplatform.metrics.{TxsInBlockchainStats, *}
 import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
-import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.*
+import com.wavesplatform.transaction.lease.*
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
@@ -31,7 +31,7 @@ import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
 
 class BlockchainUpdaterImpl(
-    leveldb: Blockchain with Storage,
+    leveldb: Blockchain & Storage,
     spendableBalanceChanged: Observer[(Address, Asset)],
     wavesSettings: WavesSettings,
     time: Time,
@@ -43,7 +43,7 @@ class BlockchainUpdaterImpl(
     with NG
     with ScorexLogging {
 
-  import com.wavesplatform.state.BlockchainUpdaterImpl._
+  import com.wavesplatform.state.BlockchainUpdaterImpl.*
   import wavesSettings.blockchainSettings.functionalitySettings
 
   private def inLock[R](l: Lock, f: => R): R = {
@@ -696,11 +696,11 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.assetScript(asset)
   }
 
-  override def accountData(acc: Address, key: String): Option[DataEntry[_]] = readLock {
+  override def accountData(acc: Address, key: String): Option[DataEntry[?]] = readLock {
     compositeBlockchain.accountData(acc, key)
   }
 
-  override def hasData(acc: Address): Boolean = {
+  override def hasData(acc: Address): Boolean = readLock {
     compositeBlockchain.hasData(acc)
   }
 

@@ -791,24 +791,27 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         utx.close()
       }
 
-      "invoke expression" in withDomain(
-        settingsWithFeatures(
+      "invoke expression" in {
+        val settings = settingsWithFeatures(
           BlockchainFeatures.Ride4DApps,
           BlockchainFeatures.BlockV5,
-          BlockchainFeatures.RideV6
+          BlockchainFeatures.RideV6,
+          BlockchainFeatures.ContinuationTransaction
         )
-      ) { d =>
-        d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, ENOUGH_AMT))
 
-        val expr   = TestCompiler(V6).compileFreeCall(""" [ BooleanEntry("check", true) ] """)
-        val invoke = TxHelpers.invokeExpression(expr)
-        val utx    = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings)
+        withDomain(settings.copy(featuresSettings = settings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))) { d =>
+          d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, ENOUGH_AMT))
 
-        utx.putIfNew(invoke).resultE.explicitGet() shouldBe true
-        utx.all shouldBe Seq(invoke)
+          val expr   = TestCompiler(V6).compileFreeCall(""" [ BooleanEntry("check", true) ] """)
+          val invoke = TxHelpers.invokeExpression(expr)
+          val utx    = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings)
 
-        val (result, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Estimate(3 seconds))
-        result shouldBe Some(Seq(invoke))
+          utx.putIfNew(invoke).resultE.explicitGet() shouldBe true
+          utx.all shouldBe Seq(invoke)
+
+          val (result, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Estimate(3 seconds))
+          result shouldBe Some(Seq(invoke))
+        }
       }
     }
 

@@ -406,7 +406,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
           )
         )
 
-      def burnFunctionCall(assetId: ByteStr, quantity: Long): (Long, Terms.FUNCTION_CALL) =
+      def burnFunctionCall(assetId: ByteStr): (Long, Terms.FUNCTION_CALL) =
         (
           1,
           Terms.FUNCTION_CALL(
@@ -489,7 +489,10 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
       "issue" in {
         scenario.foreach { case (dApp, invoker, setScript, useInvokeExpression, _) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0, RideV6 -> 0), Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoker.toAddress))) { d =>
+          withDomain(
+            createSettings(maybeActivateInvokeExpression(useInvokeExpression, Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0, RideV6 -> 0)*),
+            Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoker.toAddress))
+          ) { d =>
             val (setScriptToConvert, checkAddress) = if (useInvokeExpression) (Some(setScript), invoker.toAddress) else (None, dApp.toAddress)
             val append = appendBlock(d, invoker, dApp, setScriptToConvert) _
 
@@ -521,7 +524,10 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
       "reissue" in {
         scenario.foreach { case (dApp, invoker, setScript, useInvokeExpression, _) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0, RideV6 -> 0), Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoker.toAddress))) { d =>
+          withDomain(
+            createSettings(maybeActivateInvokeExpression(useInvokeExpression, Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0, RideV6 -> 0)*),
+            Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoker.toAddress))
+          ) { d =>
             val (setScriptToConvert, checkAddress) = if (useInvokeExpression) (Some(setScript), invoker.toAddress) else (None, dApp.toAddress)
             val append = appendBlock(d, invoker, dApp, setScriptToConvert) _
 
@@ -560,7 +566,10 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
       "burn" in {
         scenario.foreach { case (dApp, invoker, setScript, useInvokeExpression, _) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0, RideV6 -> 0), AddrWithBalance.enoughBalances(dApp, invoker)) { d =>
+          withDomain(
+            createSettings(maybeActivateInvokeExpression(useInvokeExpression, Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0, RideV6 -> 0)*),
+            AddrWithBalance.enoughBalances(dApp, invoker)
+          ) { d =>
             val (setScriptToConvert, checkAddress) = if (useInvokeExpression) (Some(setScript), invoker.toAddress) else (None, dApp.toAddress)
             val append = appendBlock(d, invoker, dApp, setScriptToConvert) _
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
@@ -576,7 +585,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             val issueBlockId = d.lastBlockId
             val issueDescription = d.blockchainUpdater.assetDescription(asset)
 
-            val (burnt, burntFc) = burnFunctionCall(asset.id, quantity)
+            val (burnt, burntFc) = burnFunctionCall(asset.id)
 
             // liquid block rollback
             append(issueBlockId, burntFc)
@@ -598,7 +607,10 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
       "sponsorFee" in {
         scenario.foreach { case (dApp, invoker, setScript, useInvokeExpression, _) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0, RideV6 -> 0), AddrWithBalance.enoughBalances(dApp, invoker)) { d =>
+          withDomain(
+            createSettings(maybeActivateInvokeExpression(useInvokeExpression, Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0, RideV6 -> 0)*),
+            AddrWithBalance.enoughBalances(dApp, invoker)
+          ) { d =>
             val setScriptToConvert = if (useInvokeExpression) Some(setScript) else None
             val append = appendBlock(d, invoker, dApp, setScriptToConvert) _
 
@@ -636,7 +648,10 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
       "lease" in {
         scenario.foreach { case (dApp, invoker, setScript, useInvokeExpression, leaseRecipientAddress) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0, RideV6 -> 0), Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoker.toAddress))) { d =>
+          withDomain(
+            createSettings(maybeActivateInvokeExpression(useInvokeExpression, Ride4DApps -> 0, BlockV5 -> 0, SynchronousCalls -> 0, RideV6 -> 0)*),
+            Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoker.toAddress))
+          ) { d =>
             val (setScriptToConvert, checkAddress, checkPk) =
               if (useInvokeExpression) (Some(setScript), invoker.toAddress, invoker.publicKey) else (None, dApp.toAddress, dApp.publicKey)
             val append = appendBlock(d, invoker, dApp, setScriptToConvert) _
@@ -761,7 +776,10 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
       "leaseCancel with lease tx" in {
         scenario.foreach { case (dApp, invoker, setScript, useInvokeExpression, leaseRecipientAddress) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SmartAccounts -> 0, SynchronousCalls -> 0, RideV6 -> 0), Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoker.toAddress))) { d =>
+          withDomain(
+            createSettings(maybeActivateInvokeExpression(useInvokeExpression, Ride4DApps -> 0, BlockV5 -> 0, SmartAccounts -> 0, SynchronousCalls -> 0, RideV6 -> 0)*),
+            Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoker.toAddress))
+          ) { d =>
             val (setScriptToConvert, leaseSender) =
               if (useInvokeExpression)
                 (Some(setScript), invoker)
@@ -791,7 +809,10 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
       "leaseCancel with lease action" in {
         scenario.foreach { case (dApp, invoker, setScript, useInvokeExpression, leaseRecipientAddress) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SmartAccounts -> 0, SynchronousCalls -> 0, RideV6 -> 0), Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoker.toAddress))) { d =>
+          withDomain(
+            createSettings(maybeActivateInvokeExpression(useInvokeExpression, Ride4DApps -> 0, BlockV5 -> 0, SmartAccounts -> 0, SynchronousCalls -> 0, RideV6 -> 0)*),
+            Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoker.toAddress))
+          ) { d =>
             d.appendBlock(setScript)
 
             val (setScriptToConvert, leaseSender) =
@@ -856,12 +877,6 @@ class RollbackSpec extends FreeSpec with WithDomain {
         d.rollbackTo(genesisBlockId)
         d.blockchainUpdater.accountScript(sender.toAddress) shouldBe empty
       }
-    }
-
-    def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): WavesSettings = {
-      val tfs = TestFunctionalitySettings.Enabled.copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }.toMap)
-
-      history.DefaultWavesSettings.copy(blockchainSettings = history.DefaultWavesSettings.blockchainSettings.copy(functionalitySettings = tfs))
     }
 
     "asset sponsorship" in {
@@ -1017,6 +1032,19 @@ class RollbackSpec extends FreeSpec with WithDomain {
       }
     }
   }
+
+  private def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): WavesSettings = {
+    val tfs = TestFunctionalitySettings.Enabled.copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }.toMap)
+
+    history.DefaultWavesSettings.copy(blockchainSettings = history.DefaultWavesSettings.blockchainSettings.copy(functionalitySettings = tfs))
+  }
+
+  private def maybeActivateInvokeExpression(useInvokeExpression: Boolean, preActivatedFeatures: (BlockchainFeature, Int)*) =
+    if (useInvokeExpression) {
+      preActivatedFeatures :+ ContinuationTransaction -> 0
+    } else {
+      preActivatedFeatures
+    }
 }
 
 object RollbackSpec {

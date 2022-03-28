@@ -256,7 +256,7 @@ class EthereumTransactionSpec
     val differ = blockchain.stub.transactionDiffer().andThen(_.resultE)
 
     val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 123, Waves)
-    differ(transaction) should produceRejectOrFailedDiff("Ride V6, MetaMask support, Invoke Expression feature has not been activated yet")
+    differ(transaction) should produceRejectOrFailedDiff(s"${BlockchainFeatures.RideV6.description} feature has not been activated yet")
   }
 
   "Ethereum invoke" should "recover correct key" in {
