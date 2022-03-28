@@ -6,10 +6,10 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.it.transactions.NodesFromDocker
 import monix.eval.Coeval
-import org.scalatest._
+import org.scalatest.*
 
 import scala.concurrent.ExecutionContext
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 trait BaseSuite
     extends ReportingTestName
@@ -17,7 +17,7 @@ trait BaseSuite
     with matchers.should.Matchers
     with CancelAfterFailure
     with BeforeAndAfterAll
-    with BeforeAndAfterEach { this: TestSuite with Nodes =>
+    with BeforeAndAfterEach { this: TestSuite & Nodes =>
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
   protected def nodeConfigs: Seq[Config] =

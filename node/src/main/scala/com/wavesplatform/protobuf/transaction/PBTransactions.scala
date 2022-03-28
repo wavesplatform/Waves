@@ -2,7 +2,7 @@ package com.wavesplatform.protobuf.transaction
 
 import scala.util.Try
 import com.google.protobuf.ByteString
-import com.wavesplatform.{transaction => vt}
+import com.wavesplatform.transaction as vt
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -12,9 +12,9 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.serialization.SerdeV1
-import com.wavesplatform.protobuf._
+import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.transaction.Transaction.Data
-import com.wavesplatform.protobuf.utils.PBImplicitConversions._
+import com.wavesplatform.protobuf.utils.PBImplicitConversions.*
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.{EthereumTransaction, Proofs, TxValidationError}
@@ -54,7 +54,7 @@ object PBTransactions {
     )
 
   def vanillaUnsafe(signedTx: PBSignedTransaction): VanillaTransaction = {
-    import com.wavesplatform.common.utils._
+    import com.wavesplatform.common.utils.*
     vanilla(signedTx, unsafe = true).explicitGet()
   }
 
@@ -145,9 +145,7 @@ object PBTransactions {
         } yield tx
 
       case Data.CreateAlias(CreateAliasTransactionData(alias, _)) =>
-        for {
-          tx <- vt.CreateAliasTransaction.create(version.toByte, sender, alias, feeAmount, timestamp, Proofs(Seq(signature)), chainId)
-        } yield tx
+        vt.CreateAliasTransaction.create(version.toByte, sender, alias, feeAmount, timestamp, proofs, chainId)
 
       case Data.Issue(IssueTransactionData(name, description, quantity, decimals, reissuable, script, `empty`)) =>
         vt.assets.IssueTransaction.create(
@@ -257,9 +255,9 @@ object PBTransactions {
         )
 
       case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments, `empty`)) =>
-        import cats.instances.either._
-        import cats.instances.option._
-        import cats.syntax.traverse._
+        import cats.instances.either.*
+        import cats.instances.option.*
+        import cats.syntax.traverse.*
 
         for {
           dApp <- PBRecipients.toAddressOrAlias(dappAddress, chainId)
@@ -339,7 +337,7 @@ object PBTransactions {
       proofs: Proofs,
       data: PBTransaction.Data
   ): VanillaTransaction = {
-    import com.wavesplatform.common.utils._
+    import com.wavesplatform.common.utils.*
 
     val signature = proofs.toSignature
     data match {
@@ -558,17 +556,17 @@ object PBTransactions {
         PBTransactions.create(sender, chainId, fee, Waves, timestamp, 1, Seq(signature), Data.Payment(data))
 
       case tx: vt.transfer.TransferTransaction =>
-        import tx._
+        import tx.*
         val data = TransferTransactionData(Some(recipient.toPB), Some((assetId, amount)), attachment.toByteString)
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, version, proofs, Data.Transfer(data))
 
       case tx: vt.CreateAliasTransaction =>
-        import tx._
+        import tx.*
         val data = CreateAliasTransactionData(alias.name)
         PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.CreateAlias(data))
 
       case tx: vt.assets.exchange.ExchangeTransaction =>
-        import tx._
+        import tx.*
         val data = ExchangeTransactionData(
           amount,
           price,
@@ -579,17 +577,17 @@ object PBTransactions {
         PBTransactions.create(tx.sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.Exchange(data))
 
       case tx: vt.assets.IssueTransaction =>
-        import tx._
+        import tx.*
         val data = IssueTransactionData(name.toStringUtf8, description.toStringUtf8, quantity, decimals, reissuable, toPBScript(script))
         PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.Issue(data))
 
       case tx: vt.assets.ReissueTransaction =>
-        import tx._
+        import tx.*
         val data = ReissueTransactionData(Some(Amount(asset.id.toByteString, quantity)), reissuable)
         PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.Reissue(data))
 
       case tx: vt.assets.BurnTransaction =>
-        import tx._
+        import tx.*
         val data = BurnTransactionData(Some(Amount(asset.id.toByteString, quantity)))
         PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.Burn(data))
 
@@ -602,12 +600,12 @@ object PBTransactions {
         PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, tx.version, proofs, Data.SetScript(data))
 
       case tx: vt.lease.LeaseTransaction =>
-        import tx._
+        import tx.*
         val data = LeaseTransactionData(Some(recipient.toPB), amount)
         PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.Lease(data))
 
       case tx: vt.lease.LeaseCancelTransaction =>
-        import tx._
+        import tx.*
         val data = LeaseCancelTransactionData(leaseId.toByteString)
         PBTransactions.create(sender, chainId, fee, tx.feeAssetId, timestamp, version, proofs, Data.LeaseCancel(data))
 
@@ -661,8 +659,8 @@ object PBTransactions {
     )
   }
 
-  def toVanillaDataEntry(de: DataTransactionData.DataEntry): com.wavesplatform.state.DataEntry[_] = {
-    import DataTransactionData.DataEntry.{Value => DEV}
+  def toVanillaDataEntry(de: DataTransactionData.DataEntry): com.wavesplatform.state.DataEntry[?] = {
+    import DataTransactionData.DataEntry.Value as DEV
 
     de.value match {
       case DEV.IntValue(num)      => IntegerDataEntry(de.key, num)
@@ -673,7 +671,7 @@ object PBTransactions {
     }
   }
 
-  def toPBDataEntry(de: com.wavesplatform.state.DataEntry[_]): DataTransactionData.DataEntry = {
+  def toPBDataEntry(de: com.wavesplatform.state.DataEntry[?]): DataTransactionData.DataEntry = {
     DataTransactionData.DataEntry(
       de.key,
       de match {
@@ -687,7 +685,7 @@ object PBTransactions {
   }
 
   def toVanillaScript(script: ByteString): Option[com.wavesplatform.lang.script.Script] = {
-    import com.wavesplatform.common.utils._
+    import com.wavesplatform.common.utils.*
     if (script.isEmpty) None else Some(ScriptReader.fromBytes(script.toByteArray).explicitGet())
   }
 

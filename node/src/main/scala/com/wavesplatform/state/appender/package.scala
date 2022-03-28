@@ -59,7 +59,7 @@ package object appender {
       _ <- Either.cond(
         !blockchainUpdater.hasAccountScript(block.sender.toAddress),
         (),
-        BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
+        BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are not allowed to forge blocks", block)
       )
       hitSource <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), block) { (height, parent) =>
         val balance = blockchainUpdater.generatingBalance(block.sender.toAddress, Some(parent))
