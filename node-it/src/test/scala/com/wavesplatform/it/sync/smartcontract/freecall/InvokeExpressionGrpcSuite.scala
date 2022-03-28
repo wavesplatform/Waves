@@ -3,10 +3,10 @@ package com.wavesplatform.it.sync.smartcontract.freecall
 import com.google.protobuf.ByteString
 import com.typesafe.config.Config
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.features.BlockchainFeatures.RideV6
+import com.wavesplatform.features.BlockchainFeatures.ContinuationTransaction
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncGrpcApi._
+import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.api.{PutDataResponse, StateChangesDetails}
 import com.wavesplatform.it.sync.grpc.GrpcBaseTransactionSuite
 import com.wavesplatform.it.sync.invokeExpressionFee
@@ -22,7 +22,7 @@ class InvokeExpressionGrpcSuite extends GrpcBaseTransactionSuite with CancelAfte
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
       .Builder(Default, 2, Seq.empty)
-      .overrideBase(_.preactivatedFeatures((RideV6.id, 1)))
+      .overrideBase(_.preactivatedFeatures((ContinuationTransaction.id, 1)))
       .buildNonConflicting()
 
   private val expr: ExprScript =

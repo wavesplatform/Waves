@@ -2,11 +2,11 @@ package com.wavesplatform.it.sync.smartcontract.freecall
 import com.typesafe.config.Config
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.StateCheckFailed
-import com.wavesplatform.features.BlockchainFeatures.RideV6
+import com.wavesplatform.features.BlockchainFeatures.ContinuationTransaction
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.{PutDataResponse, StateChangesDetails, Transaction, TransactionInfo}
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.invokeExpressionFee
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.directives.values.StdLibVersion.V6
@@ -20,7 +20,7 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((RideV6.id, 0)))
+      .overrideBase(_.preactivatedFeatures((ContinuationTransaction.id, 0)))
       .buildNonConflicting()
 
   private val expr: ExprScript =

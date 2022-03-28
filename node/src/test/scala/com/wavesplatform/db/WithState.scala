@@ -241,6 +241,9 @@ trait WithDomain extends WithState { _: Suite =>
 
     val RideV5 = RideV4.addFeatures(BlockchainFeatures.SynchronousCalls)
     val RideV6 = RideV5.addFeatures(BlockchainFeatures.RideV6)
+    val ContinuationTransaction = RideV6.addFeatures(BlockchainFeatures.ContinuationTransaction).copy(
+      featuresSettings = RideV6.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
+    )
 
     def mostRecent: WavesSettings = RideV6
 

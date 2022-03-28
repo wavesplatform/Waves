@@ -9,13 +9,12 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 
 class SyncDAppRecursionTest extends PropSpec with WithDomain {
   import DomainPresets.*
-
-  private val features = RideV6.blockchainSettings.functionalitySettings
 
   private val fc = Some(FUNCTION_CALL(User("default"), (1 to 4).map(_ => CONST_BOOLEAN(false)).toList))
 
@@ -33,7 +32,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
           ): Script = {
     val func    = if (reentrant) "reentrantInvoke" else "invoke"
     val args    = s"[sendEnd, $sendChangeDApp, $sendForceInvoke, $sendForceReentrant]"
-    val compile = if (invokeExpression) TestCompiler(V5).compileFreeCall(_) else TestCompiler(V5).compileContract(_, false)
+    val compile = if (invokeExpression) TestCompiler(V5).compileFreeCall(_) else TestCompiler(V5).compileContract(_, allowIllFormedStrings = false)
     val prefix =
       if (invokeExpression)
         "let (end, useSecondAddress, forceInvoke, forceReentrant) = (false, false, false, false)"
@@ -98,7 +97,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       assertDiffAndState(
         Seq(TestBlock.create(preparingTxs)),
         TestBlock.create(Seq(invoke)),
-        features
+        features(invokeExpression)
       ) {
         case (diff, _) =>
           diff.errorMessage(invoke.id()) shouldBe None
@@ -134,7 +133,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       assertDiffEi(
         Seq(TestBlock.create(preparingTxs)),
         TestBlock.create(Seq(invoke)),
-        features
+        features(invokeExpression)
       )(
         _ should produce(
           s"The invocation stack contains multiple invocations " +
@@ -168,7 +167,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       assertDiffEi(
         Seq(TestBlock.create(preparingTxs)),
         TestBlock.create(Seq(invoke)),
-        features
+        features()
       )(
         _ should produce(
           s"The invocation stack contains multiple invocations of the dApp at address ${invoke.dApp} with invocations of another dApp between them"
@@ -199,7 +198,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     assertDiffEi(
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
-      features
+      features()
     )(
       _ should produce(
         s"The invocation stack contains multiple invocations of the dApp at address ${invoke.dApp} with invocations of another dApp between them"
@@ -229,7 +228,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     assertDiffEi(
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
-      features
+      features()
     )(
       _ should produce(
         s"The invocation stack contains multiple invocations of the dApp at address ${setDApp3.sender.toAddress} with invocations of another dApp between them"
@@ -259,7 +258,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     assertDiffAndState(
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
-      features
+      features()
     ) {
       case (diff, _) =>
         diff.errorMessage(invoke.id.value()) shouldBe None
@@ -289,7 +288,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     assertDiffAndState(
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
-      features
+      features()
     ) {
       case (diff, _) =>
         diff.errorMessage(invoke.id.value()) shouldBe None
@@ -317,7 +316,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     assertDiffAndState(
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
-      features
+      features()
     ) {
       case (diff, _) =>
         diff.errorMessage(invoke.id.value()) shouldBe None
@@ -347,7 +346,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     assertDiffEi(
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
-      features
+      features()
     )(
       _ should produce(
         s"The invocation stack contains multiple invocations of the dApp at address $addr with invocations of another dApp between them"
@@ -379,7 +378,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     assertDiffAndState(
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
-      features
+      features()
     ) {
       case (diff, _) =>
         diff.errorMessage(invoke.id.value()) shouldBe None
@@ -411,7 +410,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     assertDiffEi(
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
-      features
+      features()
     )(
       _ should produce(
         s"The invocation stack contains multiple invocations of the dApp at address $errorAddress with invocations of another dApp between them"
@@ -444,11 +443,19 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
     assertDiffAndState(
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
-      features
+      features()
     ) {
       case (diff, _) =>
         diff.errorMessage(invoke.id.value()) shouldBe None
         diff.scriptsRun shouldBe 6
+    }
+  }
+
+  private def features(invokeExpression: Boolean = false): FunctionalitySettings = {
+    if (invokeExpression) {
+      ContinuationTransaction.blockchainSettings.functionalitySettings
+    } else {
+      RideV6.blockchainSettings.functionalitySettings
     }
   }
 }

@@ -1,49 +1,47 @@
 package com.wavesplatform.lang.v1
 
-import cats.syntax.either._
+import scala.annotation.tailrec
+import scala.util.Random
+
+import cats.syntax.either.*
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.meta.{FunctionSignatures, MetaMapper, ParsedMeta}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.serialization.{ContractSerDeV1, ContractSerDeV2}
-import com.wavesplatform.lang.directives.values.{Asset, Call, Expression, ScriptType, StdLibVersion, V1, V2, V6, DApp => DAppType}
+import com.wavesplatform.lang.directives.values.{Account, Call, Expression, ScriptType, StdLibVersion, V1, V2, V6, DApp as DAppType}
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.BaseGlobal.{ArrayView, DAppInfo}
+import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.ScriptResultSource.CallableFunction
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
-import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler}
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding.*
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding._
 import com.wavesplatform.lang.v1.serialization.{SerdeV1, SerdeV2}
 
-import scala.annotation.tailrec
-import scala.util.Random
-
-/**
-  * This is a hack class for IDEA. The Global class is in JS/JVM modules.
-  * And IDEA can't find the Global class in the "shared" module, but it must!
+/** This is a hack class for IDEA. The Global class is in JS/JVM modules. And IDEA can't find the Global class in the "shared" module, but it should!
   */
 trait BaseGlobal {
-  val MaxBase16Bytes               = 8 * 1024
-  val MaxBase16String              = 32 * 1024
+  val MaxBase16Bytes: Int = 8 * 1024
+  val MaxBase16String: Int = 32 * 1024
   val MaxBase58Bytes               = 64
   val MaxBase58String              = 100
-  val MaxBase64Bytes               = 32 * 1024
-  val MaxBase64String              = 44 * 1024
-  val MaxLiteralLength             = 12 * 1024
+  val MaxBase64Bytes: Int = 32 * 1024
+  val MaxBase64String: Int = 44 * 1024
+  val MaxLiteralLength: Int = 12 * 1024
   val MaxAddressLength             = 36
-  val MaxByteStrSizeForVerifyFuncs = 32 * 1024
+  val MaxByteStrSizeForVerifyFuncs: Int = 32 * 1024
 
-  val LetBlockVersions = Set[StdLibVersion](V1, V2)
+  val LetBlockVersions: Set[StdLibVersion] = Set[StdLibVersion](V1, V2)
 
   def base58Encode(input: Array[Byte]): Either[String, String]
   def base58Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]]
@@ -121,8 +119,8 @@ trait BaseGlobal {
       costs = utils.functionCosts(stdLibVersion, DAppType)
       complexity <- if (compErrorList.isEmpty) estimator(vars, costs, compExpr) else Either.right(0L)
     } yield (bytes, complexity, exprScript, compErrorList))
-      .recover {
-        case e => (Array.empty, 0, Expressions.SCRIPT(AnyPos, Expressions.INVALID(AnyPos, "Unknown error.")), List(Generic(0, 0, e)))
+      .recover { case e =>
+        (Array.empty, 0, Expressions.SCRIPT(AnyPos, Expressions.INVALID(AnyPos, "Unknown error.")), List(Generic(0, 0, e)))
       }
   }
 
@@ -137,20 +135,21 @@ trait BaseGlobal {
     (for {
       compRes <- ContractCompiler.compileWithParseResult(input, ctx, stdLibVersion, needCompaction, removeUnusedCode)
       (compDAppOpt, exprDApp, compErrorList) = compRes
-      complexityWithMap <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty)
-        ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator, fixEstimateOfVerifier = true)
-      else Right((0L, Map.empty[String, Long]))
+      complexityWithMap <-
+        if (compDAppOpt.nonEmpty && compErrorList.isEmpty)
+          ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator, fixEstimateOfVerifier = true)
+        else Right((0L, Map.empty[String, Long]))
       bytes <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty) serializeContract(compDAppOpt.get, stdLibVersion) else Right(Array.empty[Byte])
     } yield (bytes, complexityWithMap, exprDApp, compErrorList))
-      .recover {
-        case e => (Array.empty, (0, Map.empty), Expressions.DAPP(AnyPos, List.empty, List.empty), List(Generic(0, 0, e)))
+      .recover { case e =>
+        (Array.empty, (0, Map.empty), Expressions.DAPP(AnyPos, List.empty, List.empty), List(Generic(0, 0, e)))
       }
   }
 
-  val compileExpression =
+  val compileExpression: (String, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
     compile(_, _, _, _, _, ExpressionCompiler.compileBoolean)
 
-  val compileDecls =
+  val compileDecls: (String, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
     compile(_, _, _, _, _, ExpressionCompiler.compileDecls)
 
   private def compile(
@@ -165,7 +164,7 @@ trait BaseGlobal {
     for {
       expr <- if (isFreeCall) ContractCompiler.compileFreeCall(input, context, version) else compiler(input, context)
       bytes = serializeExpression(expr, version)
-      _ <- ExprScript.validateBytes(bytes, isFreeCall)
+      _          <- ExprScript.validateBytes(bytes, isFreeCall)
       complexity <- ExprScript.estimateExact(expr, version, isFreeCall, estimator)
     } yield (bytes, expr, complexity)
   }
@@ -178,11 +177,12 @@ trait BaseGlobal {
       estimator: ScriptEstimator
   ): Either[String, Unit] =
     for {
-      _ <- if (estimator == ScriptEstimatorV2)
-        ExprScript.estimate(expr, version, scriptType == Call, ScriptEstimatorV1, scriptType != Asset)
-      else
-        Right(())
-      _ <- ExprScript.checkComplexity(version, complexity, scriptType != Asset)
+      _ <-
+        if (estimator == ScriptEstimatorV2)
+          ExprScript.estimate(expr, version, scriptType == Call, ScriptEstimatorV1, scriptType == Account)
+        else
+          Right(())
+      _ <- ExprScript.checkComplexity(version, complexity, scriptType == Account, scriptType == Call)
       illegalBlockVersionUsage = LetBlockVersions.contains(version) &&
         com.wavesplatform.lang.v1.compiler.containsBlockV2(expr)
       _ <- Either.cond(
@@ -201,26 +201,25 @@ trait BaseGlobal {
       removeUnusedCode: Boolean
   ): Either[String, DAppInfo] =
     for {
-      dApp                                   <- ContractCompiler.compile(input, ctx, stdLibVersion, CallableFunction, needCompaction, removeUnusedCode)
-      userFunctionComplexities               <- ContractScript.estimateUserFunctions(stdLibVersion, dApp, estimator)
-      globalVariableComplexities             <- ContractScript.estimateGlobalVariables(stdLibVersion, dApp, estimator)
+      dApp                       <- ContractCompiler.compile(input, ctx, stdLibVersion, CallableFunction, needCompaction, removeUnusedCode)
+      userFunctionComplexities   <- ContractScript.estimateUserFunctions(stdLibVersion, dApp, estimator)
+      globalVariableComplexities <- ContractScript.estimateGlobalVariables(stdLibVersion, dApp, estimator)
       (maxComplexity, annotatedComplexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator, fixEstimateOfVerifier = true)
       (verifierComplexity, callableComplexities) = dApp.verifierFuncOpt.fold(
         (0L, annotatedComplexities)
       )(v => (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name))
       bytes <- serializeContract(dApp, stdLibVersion)
       _     <- ContractScript.validateBytes(bytes)
-    } yield
-      DAppInfo(
-        bytes,
-        dApp,
-        maxComplexity,
-        annotatedComplexities,
-        verifierComplexity,
-        callableComplexities,
-        userFunctionComplexities.toMap,
-        globalVariableComplexities.toMap
-      )
+    } yield DAppInfo(
+      bytes,
+      dApp,
+      maxComplexity,
+      annotatedComplexities,
+      verifierComplexity,
+      callableComplexities,
+      userFunctionComplexities.toMap,
+      globalVariableComplexities.toMap
+    )
 
   def checkContract(
       version: StdLibVersion,
@@ -230,10 +229,11 @@ trait BaseGlobal {
       estimator: ScriptEstimator
   ): Either[String, Unit] =
     for {
-      _ <- if (estimator == ScriptEstimatorV2)
-        ContractScript.estimateComplexity(version, dApp, ScriptEstimatorV1, fixEstimateOfVerifier = true)
-      else
-        Right(())
+      _ <-
+        if (estimator == ScriptEstimatorV2)
+          ContractScript.estimateComplexity(version, dApp, ScriptEstimatorV1, fixEstimateOfVerifier = true)
+        else
+          Right(())
       _ <- ContractScript.checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit = true)
     } yield ()
 
@@ -257,12 +257,10 @@ trait BaseGlobal {
 
   private def combineMetaWithDApp(meta: ParsedMeta, dApp: DApp): FunctionSignatures = {
     val argTypesWithFuncName =
-      meta.callableFuncTypes.fold(List.empty[(String, List[(String, FINAL)])])(
-        types =>
-          (types zip dApp.callableFuncs)
-            .map {
-              case (argTypes, func) =>
-                func.u.name -> (func.u.args zip argTypes)
+      meta.callableFuncTypes.fold(List.empty[(String, List[(String, FINAL)])])(types =>
+        (types zip dApp.callableFuncs)
+          .map { case (argTypes, func) =>
+            func.u.name -> (func.u.args zip argTypes)
           }
       )
     FunctionSignatures(meta.version, argTypesWithFuncName)
@@ -308,16 +306,16 @@ trait BaseGlobal {
         }
       case Ceiling =>
         Right((if (sign > 0) {
-          division + remainder.sign
-        } else {
-          division
-        }) * sign)
+                 division + remainder.sign
+               } else {
+                 division
+               }) * sign)
       case Floor =>
         Right((if (sign < 0) {
-          division + remainder.sign
-        } else {
-          division
-        }) * sign)
+                 division + remainder.sign
+               } else {
+                 division
+               }) * sign)
       case _ =>
         Left(s"unsupported rounding $rounding")
     }
@@ -330,7 +328,7 @@ trait BaseGlobal {
   def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte]
 
   def median[@specialized T](seq: Array[T])(implicit num: Integral[T]): T = {
-    import num._
+    import num.*
     @tailrec
     def findKMedianInPlace(arr: ArrayView[T], k: Int)(implicit choosePivot: ArrayView[T] => T): T = {
       val a      = choosePivot(arr)

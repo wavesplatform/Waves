@@ -2,9 +2,9 @@ package com.wavesplatform.lang.v1.estimator
 
 import com.wavesplatform.DocSource
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.BaseFunction
@@ -39,18 +39,16 @@ class FunctionComplexityTest extends PropSpec {
       }.toMap
     val unusedDocCosts =
       functions
-        .filterNot(_.name.startsWith("_"))
+        .filterNot(_.name.startsWith("$"))
         .foldLeft(docCosts) { case (remainingDocCosts, function) =>
           val arg  = CONST_STRING("throw").explicitGet()
           val expr = FUNCTION_CALL(function.header, List.fill(function.args.size)(arg))
-          val estimation =
+          val estimatedCost =
             ScriptEstimatorV3(fixOverflow = true, overhead = false)(
               varNames(ds.stdLibVersion, ds.contentType),
               functionCosts(ds.stdLibVersion, ds.contentType),
               expr
             ).explicitGet()
-          val internalCallsCost = HighOrderFunctionInfo.all.get(function.header).map(_.callLimit).getOrElse(0)
-          val estimatedCost     = estimation - internalCallsCost
 
           val name = function.name
           val args = function.signature.args.map(_._2.toString).toList

@@ -1,13 +1,14 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import com.typesafe.config.ConfigObject
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.api.http.DebugApiRoute
-import com.wavesplatform.block.SignedBlockHeader
+import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -25,7 +26,7 @@ import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash, TxMeta}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -49,20 +50,20 @@ class DebugApiRouteSpec
     with PathMockFactory
     with BlockchainStubHelpers
     with WithDomain {
-  import DomainPresets._
+  import DomainPresets.*
 
-  val wavesSettings = WavesSettings.default()
-  val configObject  = wavesSettings.config.root()
+  val wavesSettings: WavesSettings = WavesSettings.default()
+  val configObject: ConfigObject = wavesSettings.config.root()
   trait Blockchain1 extends Blockchain with NG
-  val blockchain = stub[Blockchain1]
-  val block      = TestBlock.create(Nil)
-  val testStateHash = {
+  val blockchain: Blockchain1 = stub[Blockchain1]
+  val block: Block = TestBlock.create(Nil)
+  val testStateHash: StateHash = {
     def randomHash: ByteStr = ByteStr(Array.fill(32)(Random.nextInt(256).toByte))
     val hashes              = SectionId.values.map((_, randomHash)).toMap
     StateHash(randomHash, hashes)
   }
 
-  val debugApiRoute =
+  val debugApiRoute: DebugApiRoute =
     DebugApiRoute(
       wavesSettings,
       ntpTime,
@@ -87,7 +88,7 @@ class DebugApiRouteSpec
       },
       () => blockchain
     )
-  import debugApiRoute._
+  import debugApiRoute.*
 
   routePath("/configInfo") - {
     "requires api-key header" in {
@@ -111,7 +112,7 @@ class DebugApiRouteSpec
   }
 
   routePath("/validate") - {
-    def routeWithBlockchain(blockchain: Blockchain with NG) =
+    def routeWithBlockchain(blockchain: Blockchain & NG) =
       debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => blockchain).route
 
     def validatePost(tx: TransferTransaction) =
@@ -1070,8 +1071,8 @@ class DebugApiRouteSpec
         }
       }
 
-      assert(RideV6)
-      intercept[Exception](assert(RideV5)).getMessage should include("Ride V6, MetaMask support, Invoke Expression feature has not been activated yet")
+      assert(ContinuationTransaction)
+      intercept[Exception](assert(RideV6)).getMessage should include(s"${BlockchainFeatures.ContinuationTransaction.description} feature has not been activated yet")
     }
   }
 

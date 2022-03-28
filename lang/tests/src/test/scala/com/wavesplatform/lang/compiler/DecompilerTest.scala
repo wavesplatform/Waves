@@ -1058,26 +1058,26 @@ class DecompilerTest extends PropSpec {
          |
          |func g () = {
          |    let @ = f()
-         |    if (_isInstanceOf(@, "Boolean"))
+         |    if ($$isInstanceOf(@, "Boolean"))
          |        then @
          |        else unit
          |    }
          |
          |let a = if ({
          |    let @ = g()
-         |    if (_isInstanceOf(@, "Boolean"))
+         |    if ($$isInstanceOf(@, "Boolean"))
          |        then @
          |        else throw("Couldn't cast Boolean|Unit to Boolean")
          |    })
          |    then {
          |        let @ = f()
-         |        if (_isInstanceOf(@, "Boolean"))
+         |        if ($$isInstanceOf(@, "Boolean"))
          |            then @
          |            else throw("Couldn't cast Boolean to Boolean")
          |        }
          |    else false
          |let @ = a
-         |if (_isInstanceOf(@, "Boolean"))
+         |if ($$isInstanceOf(@, "Boolean"))
          |    then @
          |    else unit
        """
@@ -1087,26 +1087,26 @@ class DecompilerTest extends PropSpec {
          |
          |func g () = {
          |    let @ = f()
-         |    if (_isInstanceOf(@, "Boolean"))
+         |    if ($$isInstanceOf(@, "Boolean"))
          |        then @
          |        else unit
          |    }
          |
          |let a = if ({
          |    let @ = g()
-         |    if (_isInstanceOf(@, "Boolean"))
+         |    if ($$isInstanceOf(@, "Boolean"))
          |        then @
-         |        else throw((_getType(g()) + " couldn't be cast to Boolean"))
+         |        else throw(($$getType(g()) + " couldn't be cast to Boolean"))
          |    })
          |    then {
          |        let @ = f()
-         |        if (_isInstanceOf(@, "Boolean"))
+         |        if ($$isInstanceOf(@, "Boolean"))
          |            then @
-         |            else throw((_getType(f()) + " couldn't be cast to Boolean"))
+         |            else throw(($$getType(f()) + " couldn't be cast to Boolean"))
          |        }
          |    else false
          |let @ = a
-         |if (_isInstanceOf(@, "Boolean"))
+         |if ($$isInstanceOf(@, "Boolean"))
          |    then @
          |    else unit
        """
@@ -1115,26 +1115,5 @@ class DecompilerTest extends PropSpec {
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V6)
       .foreach(assertDecompile(script, decompiledV6, _))
-  }
-
-  property("native fold") {
-    val script =
-      s"""
-         | func sum(a:Int, b:Int) = a + b
-         | let r = fold_20([1, 2, 3, 4, 5], 9, sum)
-         | true
-       """.stripMargin
-
-    val expected =
-      s"""
-         |func sum (a,b) = (a + b)
-         |
-         |let r = fold_20([1, 2, 3, 4, 5], 9, "sum")
-         |true
-       """.stripMargin.trim
-
-    val expr   = TestCompiler(V6).compileExpression(script).expr.asInstanceOf[EXPR]
-    val result = Decompiler(expr, getDecompilerContext(V6, Expression))
-    result shouldBe expected
   }
 }
