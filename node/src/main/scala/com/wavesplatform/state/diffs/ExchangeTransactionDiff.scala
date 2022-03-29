@@ -134,10 +134,9 @@ object ExchangeTransactionDiff {
 
     for {
       _ <- Either.cond(
-        blockchain.height < blockchain.settings.functionalitySettings.forbidNonPositiveMatcherFee ||
-          tx.buyMatcherFee > 0 && tx.sellMatcherFee > 0,
+        tx.buyMatcherFee >= 0 && tx.sellMatcherFee >= 0,
         (),
-        GenericError("Matcher fee can not be negative or zero")
+        GenericError("Matcher fee can not be negative")
       )
       _ <- Either.cond(assets.values.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
       amountDecimals = if (tx.version < TxVersion.V3) 8 else tx.buyOrder.assetPair.amountAsset.fold(8)(ia => assets(ia).fold(8)(_.decimals))
