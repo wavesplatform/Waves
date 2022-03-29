@@ -102,17 +102,17 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     withDomain(DomainPresets.RideV6) { d =>
       d.helpers.creditWavesToDefaultSigner()
 
-      val setScript160kb = TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeContract(StdLibVersion.V6, 160 * 1024), version = TxVersion.V2)
+      val setScript160kb = TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeContract(StdLibVersion.V6, 160 * 1024), 0.16.waves, version = TxVersion.V2)
       d.commonApi.calculateWavesFee(setScript160kb) shouldBe 0.16.waves
       d.appendAndAssertSucceed(setScript160kb)
 
-      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeContract(StdLibVersion.V6, 160 * 1024 + 1), version = TxVersion.V2))
+      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeContract(StdLibVersion.V6, 160 * 1024 + 1), 0.161.waves, version = TxVersion.V2))
         .toString should include(
         "Script is too large: 163841 bytes > 163840 bytes"
       )
 
-      d.appendAndAssertSucceed(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(StdLibVersion.V6, 8 * 1024), version = TxVersion.V2))
-      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(StdLibVersion.V6, 8 * 1024 + 1), version = TxVersion.V2))
+      d.appendAndAssertSucceed(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(StdLibVersion.V6, 8 * 1024), 0.008.waves, version = TxVersion.V2))
+      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(StdLibVersion.V6, 8 * 1024 + 1), 0.009.waves, version = TxVersion.V2))
         .toString should include(
         "Script is too large: 8193 bytes > 8192 bytes"
       )

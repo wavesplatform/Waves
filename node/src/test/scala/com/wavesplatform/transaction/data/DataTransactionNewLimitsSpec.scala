@@ -27,7 +27,7 @@ class DataTransactionNewLimitsSpec extends FlatSpec with WithDomain {
 
     val (bool, int, str, bytes) = generateMaxAllowed(DataTransaction.MaxRideV6Bytes)
     val dataEntries             = Seq(bool, int, str) ++ bytes
-    val dataTransaction         = TxHelpers.dataWithMultipleEntries(TxHelpers.defaultSigner, dataEntries)
+    val dataTransaction         = TxHelpers.dataV2(TxHelpers.defaultSigner, dataEntries, fee = 0.162.waves)
     d.appendAndAssertSucceed(dataTransaction)
 
     val networkMessage = network.TransactionSpec.serializeData(dataTransaction)

@@ -37,8 +37,8 @@ class MaxCallableComplexityTest extends PropSpec with WithDomain with Transactio
     withDomain(DomainPresets.RideV6) { d =>
       val genDApp = GenesisTransaction.create(dApp.toAddress, ENOUGH_AMT, ts).explicitGet()
       val genInvoker = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      val setScript = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(largeScript(V6, 285)), 0.01.waves, ts).explicitGet()
-      val setLargeScript = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(largeScript(V6, 300)), 0.01.waves, ts).explicitGet()
+      val setScript = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(largeScript(V6, 285)), 0.021.waves, ts).explicitGet()
+      val setLargeScript = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(largeScript(V6, 300)), 0.022.waves, ts).explicitGet()
 
       d.appendBlock(genDApp, genInvoker, setScript)
       val invokeDiff = d.transactionDiffer(invokeScript(invoker, dApp.toAddress, "test")).resultE.explicitGet()

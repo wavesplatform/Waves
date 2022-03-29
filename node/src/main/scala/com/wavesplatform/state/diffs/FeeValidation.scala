@@ -67,7 +67,7 @@ object FeeValidation {
 
     val errorMessage = s"Fee for ${txType.transactionName} ($actualFee) does not exceed minimal value of $requiredFee."
 
-    GenericError((if (feeDetails.requirements.nonEmpty) (feeDetails.requirements mkString_ " ") ++ ". " else "") ++ errorMessage)
+    GenericError((if (feeDetails.requirements.nonEmpty) (feeDetails.requirements mkString_ ". ") ++ ". " else "") ++ errorMessage)
   }
 
   private case class FeeInfo(assetInfo: Option[(IssuedAsset, AssetDescription)], requirements: Chain[String], wavesFee: Long)
@@ -152,7 +152,6 @@ object FeeValidation {
 
     val assetsCount = tx match {
       case _: InvokeScriptTransaction =>
-        println(s"activated = ${blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)}, ${tx.smartAssets(blockchain)}")
         if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) 0 else tx.smartAssets(blockchain).size
       case tx: ExchangeTransaction =>
         tx.smartAssets(blockchain).size /* *3 if we decide to check orders and transaction */
@@ -162,8 +161,6 @@ object FeeValidation {
     val finalAssetsCount =
       if (tokenIsSmart) assetsCount + 1
       else assetsCount
-
-    println(s"\n\tassetCount = $assetsCount, finalAssetCount = $finalAssetsCount\n")
 
     val extraFee = finalAssetsCount * ScriptExtraFee
 
@@ -184,7 +181,7 @@ object FeeValidation {
 
     val extraFee = smartAccountScriptsCount * ScriptExtraFee
     val extraRequirements =
-      if (smartAccountScriptsCount > 0) Chain(s"Transaction sent from smart account. Requires $extraFee extra fee.")
+      if (smartAccountScriptsCount > 0) Chain(s"Transaction sent from smart account. Requires $extraFee extra fee")
       else Chain.empty
 
     val FeeInfo(feeAssetInfo, reqs, feeAmount) = inputFee

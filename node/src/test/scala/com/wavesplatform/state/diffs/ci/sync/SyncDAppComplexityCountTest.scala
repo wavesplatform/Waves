@@ -29,24 +29,24 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
 
   private def dApp(otherDApps: List[Address], paymentAsset: Option[IssuedAsset], transferAsset: Option[IssuedAsset], condition: String): Script =
     TestCompiler(V5).compileContract(s"""
-      | {-# STDLIB_VERSION 5       #-}
-      | {-# CONTENT_TYPE   DAPP    #-}
-      | {-# SCRIPT_TYPE    ACCOUNT #-}
-      |
-      | @Callable(i)
-      | func default() = {
-      |    if (
-      |      $condition
-      |    ) then {
-      |      let payment = ${paymentAsset.fold("[]")(id => s"[AttachedPayment(base58'$id', 1)]")}
-      |      let transfer = ${transferAsset.fold("[]")(id => s"[ScriptTransfer(i.caller, 1, base58'$id')]")}
-      |      ${otherDApps.mapWithIndex((a, i) => s""" strict r$i = invoke(Address(base58'$a'), "default", [], payment) """).mkString("\n")}
-      |      transfer
-      |    } else {
-      |      throw("Error raised")
-      |    }
-      | }
-      |""".stripMargin)
+                                        | {-# STDLIB_VERSION 5       #-}
+                                        | {-# CONTENT_TYPE   DAPP    #-}
+                                        | {-# SCRIPT_TYPE    ACCOUNT #-}
+                                        |
+                                        | @Callable(i)
+                                        | func default() = {
+                                        |    if (
+                                        |      $condition
+                                        |    ) then {
+                                        |      let payment = ${paymentAsset.fold("[]")(id => s"[AttachedPayment(base58'$id', 1)]")}
+                                        |      let transfer = ${transferAsset.fold("[]")(id => s"[ScriptTransfer(i.caller, 1, base58'$id')]")}
+                                        |      ${otherDApps.mapWithIndex((a, i) => s""" strict r$i = invoke(Address(base58'$a'), "default", [], payment) """).mkString("\n")}
+                                        |      transfer
+                                        |    } else {
+                                        |      throw("Error raised")
+                                        |    }
+                                        | }
+                                        |""".stripMargin)
 
   // ~1900 complexity
   private val verifierScript: Script = {
@@ -99,18 +99,18 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
       sequentialCalls: Boolean,
       invokeExpression: Boolean
   ): (Seq[Transaction], InvokeTransaction, IssuedAsset, Address) = {
-    val invoker = TxHelpers.signer(0)
+    val invoker  = TxHelpers.signer(0)
     val dAppAccs = (1 to dAppCount).map(idx => TxHelpers.signer(idx))
 
-      val fee = TxHelpers.ciFee(
-        sc = (if (withVerifier) 1 else 0) + (if (withPayment) 1 else 0) + (if (withThroughTransfer) 1 else 0),
-        freeCall = invokeExpression
-      )
+    val fee = TxHelpers.ciFee(
+      sc = (if (withVerifier) 1 else 0) + (if (withPayment) 1 else 0) + (if (withThroughTransfer) 1 else 0),
+      freeCall = invokeExpression
+    )
 
     val invokerGenesis = TxHelpers.genesis(invoker.toAddress)
-    val assetIssue = TxHelpers.issue(invoker, ENOUGH_AMT, script = Some(assetScript(if (raiseError) sigVerify else groth)), fee = fee)
-    val asset   = IssuedAsset(assetIssue.id())
-    val payment = List(Payment(1, asset))
+    val assetIssue     = TxHelpers.issue(invoker, ENOUGH_AMT, script = Some(assetScript(if (raiseError) sigVerify else groth)), fee = 1.waves)
+    val asset          = IssuedAsset(assetIssue.id())
+    val payment        = List(Payment(1, asset))
 
     val dAppGenesisTxs = dAppAccs.flatMap { dAppAcc =>
       List(
@@ -118,24 +118,23 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
         TxHelpers.transfer(invoker, dAppAcc.toAddress, 10, asset, fee = fee)
       )
     }
-    val setScriptTxs = dAppAccs.foldLeft(List.empty[SetScriptTransaction]) {
-      case (txs, currentAcc) =>
-        val isLast      = txs.size == dAppAccs.size - 1
-        val callPayment = if (withThroughPayment) Some(asset) else None
-        val transfer    = if (withThroughTransfer) Some(asset) else None
-        val condition   = if (raiseError) if (txs.nonEmpty) "true" else "false" else groth
-        val script =
-          if (sequentialCalls)
-            if (isLast)
-              dApp(txs.map(_.sender.toAddress), callPayment, transfer, condition)
-            else
-              dApp(Nil, callPayment, transfer, condition)
+    val setScriptTxs = dAppAccs.foldLeft(List.empty[SetScriptTransaction]) { case (txs, currentAcc) =>
+      val isLast      = txs.size == dAppAccs.size - 1
+      val callPayment = if (withThroughPayment) Some(asset) else None
+      val transfer    = if (withThroughTransfer) Some(asset) else None
+      val condition   = if (raiseError) if (txs.nonEmpty) "true" else "false" else groth
+      val script =
+        if (sequentialCalls)
+          if (isLast)
+            dApp(txs.map(_.sender.toAddress), callPayment, transfer, condition)
           else
-            dApp(txs.headOption.map(_.sender.toAddress).toList, callPayment, transfer, condition)
+            dApp(Nil, callPayment, transfer, condition)
+        else
+          dApp(txs.headOption.map(_.sender.toAddress).toList, callPayment, transfer, condition)
 
-        val nextTx = TxHelpers.setScript(currentAcc, script, fee)
-        nextTx :: txs
-      }
+      val nextTx = TxHelpers.setScript(currentAcc, script, fee)
+      nextTx :: txs
+    }
 
     val setVerifier = if (withVerifier) List(TxHelpers.setScript(invoker, verifierScript)) else Nil
 
@@ -172,7 +171,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
     val (preparingTxs, invokeTx, asset, lastCallingDApp) =
       scenario(dAppCount, withPayment, withThroughPayment, withThroughTransfer, withVerifier, raiseError, sequentialCalls, invokeExpression)
     assertDiffEi(
-      Seq(TestBlock.create(preparingTxs)),
+      Seq(TestBlock.create(preparingTxs), TestBlock.create(Seq.empty)),
       TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion),
       features(invokeExpression)
     ) { diffE =>
@@ -190,18 +189,15 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
           diff.errorMessage(invokeTx.id()) shouldBe None
 
         val dAppAddress = invokeTx.dApp.asInstanceOf[Address]
-        val basePortfolios = Map(
-          TestBlock.defaultSigner.toAddress -> Portfolio(CurrentBlockFeePart(invokeTx.fee)),
-          invokeTx.sender.toAddress            -> Portfolio(-invokeTx.fee)
-        )
-        val paymentsPortfolios = Map(
-          invokeTx.sender.toAddress -> Portfolio(assets = Map(asset -> -1)),
-          dAppAddress            -> Portfolio(assets = Map(asset -> 1))
-        )
-        val throughTransfersPortfolios = Map(
-          invokeTx.sender.toAddress -> Portfolio(assets = Map(asset -> 1)),
-          lastCallingDApp        -> Portfolio(assets = Map(asset -> -1))
-        )
+        val basePortfolios =
+          Map(TestBlock.defaultSigner.toAddress -> Portfolio(CurrentBlockFeePart(invokeTx.fee))) |+|
+            Map(invokeTx.sender.toAddress       -> Portfolio(-invokeTx.fee))
+        val paymentsPortfolios =
+          Map(invokeTx.sender.toAddress -> Portfolio(assets = Map(asset -> -1))) |+|
+            Map(dAppAddress             -> Portfolio(assets = Map(asset -> 1)))
+        val throughTransfersPortfolios =
+          Map(invokeTx.sender.toAddress -> Portfolio(assets = Map(asset -> 1))) |+|
+            Map(lastCallingDApp         -> Portfolio(assets = Map(asset -> -1)))
         val throughPaymentsPortfolios =
           Map(lastCallingDApp -> Portfolio(assets = Map(asset -> 1))) |+|
             Map(dAppAddress   -> Portfolio(assets = Map(asset -> -1)))
