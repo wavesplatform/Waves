@@ -4,7 +4,7 @@ import scala.util.Try
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -68,7 +68,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
         .asInstanceOf[ContractScriptImpl]
         .expr
     ) {
-      override val bytes: Coeval[ByteStr] = Coeval(ByteStr(new Array[Byte](size)))
+      override val bytes: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(new Array[Byte](size)))
     }
 
   private[this] def exactSizeExpr(version: StdLibVersion, size: Int): ExprScript = new ExprScript {
@@ -129,64 +129,34 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     )
   }
 
-  def singleDeclaration(size: Int) = s"let foo = base64'${Base64.encode(Array.fill(size - 91)(127.toByte))}'"
-  def tripleDeclarations(size: Int) =
-    s"""let foo1 = base64'${Base64.encode(Array.fill(1024 * 12)(127.toByte))}'
-       |let foo2 = base64'${Base64.encode(Array.fill(1024 - 91)(127.toByte))}'
-       |let foo3 = base64'${Base64.encode(Array.fill(1024 - 91)(127.toByte))}'
-       |""".stripMargin
-
-  def zzz(size: Int) = {
-    val letCount = size / (12 * 1024)
-    val overhead = (letCount - 1).max(0)
-
-  }
-
   val scriptSizes = Table(
     ("StdLibVersion", "scriptSize", "fee"),
     (V3, 1024, 0.001.waves),
     (V3, 1025, 0.002.waves),
     (V3, 32 * 1024, 0.032.waves),
-//    (V4, 1024, 0.001.waves),
-//    (V4, 1025, 0.002.waves),
-//    (V4, 32 * 1024, 0.032.waves),
-//    (V5, 1024, 0.001.waves),
-//    (V5, 1025, 0.002.waves),
-//    (V5, 32 * 1024, 0.032.waves),
-//    (V6, 1024, 0.001.waves),
-//    (V6, 1025, 0.002.waves),
-//    (V6, 32 * 1024, 0.032.waves),
-//    (V6, 160 * 1024, 0.16.waves),
+    (V4, 1024, 0.001.waves),
+    (V4, 1025, 0.002.waves),
+    (V4, 32 * 1024, 0.032.waves),
+    (V5, 1024, 0.001.waves),
+    (V5, 1025, 0.002.waves),
+    (V5, 32 * 1024, 0.032.waves),
+    (V6, 1024, 0.001.waves),
+    (V6, 1025, 0.002.waves),
+    (V6, 32 * 1024, 0.032.waves),
+    (V6, 160 * 1024, 0.16.waves),
   )
 
-  property("lowered fee after V6") {
-    def mkScript(v: StdLibVersion, size: Int) = {
-      TestCompiler(v).compileContract(
-        s"""{-# STDLIB_VERSION 3 #-}
-           |{-# CONTENT_TYPE DAPP #-}
-           |{-# SCRIPT_TYPE ACCOUNT #-}
-           |
-           |@Callable(i)
-           |func call() = {
-           |  let foo = base64'${Base64.encode(Array.fill(size - 91)(127.toByte))}'
-           |  TransferSet([])
-           |}""".stripMargin)
-    }
-
-    forAll(scriptSizes) { case (v, size, fee) =>
-      mkScript(v, size).bytes().size shouldEqual size
-    }
-
-    val script = TxHelpers.scriptV6(s"""
-                                       |@Callable(i)
-                                       |func test() = {
-                                       |  []
-                                       |}
-                                       |""".stripMargin)
-
+  property("lowered contract fee after V6") {
     withDomain(DomainPresets.RideV6) { d =>
-      val setScriptTransaction = TxHelpers.setScript(TxHelpers.defaultSigner, script, version = TxVersion.V2)
-      d.commonApi.calculateWavesFee(setScriptTransaction) shouldBe 0.001.waves
+      forAll(scriptSizes) {
+        case (ver, size, fee) =>
+          val script = exactSizeContract(ver, size)
+          val sstx = TxHelpers.setScript(TxHelpers.defaultSigner, script, version = TxVersion.V2, fee = fee - 1)
+          d.appendBlockE(sstx) should produce("does not exceed minimal value")
+          val setScriptTransaction = TxHelpers.setScript(TxHelpers.defaultSigner, script, version = TxVersion.V2, fee = fee)
+          d.appendBlock(setScriptTransaction)
+          d.commonApi.calculateWavesFee(setScriptTransaction) shouldBe fee
+      }
     }
   }
 

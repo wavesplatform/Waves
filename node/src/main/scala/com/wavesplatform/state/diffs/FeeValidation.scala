@@ -151,7 +151,9 @@ object FeeValidation {
         .exists(_.script.isDefined)
 
     val assetsCount = tx match {
-      case _: InvokeScriptTransaction if blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) => 0
+      case _: InvokeScriptTransaction =>
+        println(s"activated = ${blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)}, ${tx.smartAssets(blockchain)}")
+        if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) 0 else tx.smartAssets(blockchain).size
       case tx: ExchangeTransaction =>
         tx.smartAssets(blockchain).size /* *3 if we decide to check orders and transaction */
       case _ => tx.smartAssets(blockchain).size
@@ -160,6 +162,8 @@ object FeeValidation {
     val finalAssetsCount =
       if (tokenIsSmart) assetsCount + 1
       else assetsCount
+
+    println(s"\n\tassetCount = $assetsCount, finalAssetCount = $finalAssetsCount\n")
 
     val extraFee = finalAssetsCount * ScriptExtraFee
 

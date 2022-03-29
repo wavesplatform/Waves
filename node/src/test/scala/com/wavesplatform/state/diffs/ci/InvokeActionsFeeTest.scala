@@ -72,13 +72,15 @@ class InvokeActionsFeeTest extends PropSpec with Inside with WithState with DBCa
 
       val invokeFromScripted1    = invokeFromScripted()
       val invokeFromNonScripted1 = invokeFromNonScripted()
-      d.appendBlock(invokeFromScripted1, invokeFromNonScripted1)
-      d.blockchain.bestLiquidDiff.get.errorMessage(invokeFromScripted1.id()).get.text should include(
+
+      println(s"activated=${d.blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)}")
+
+      d.appendBlockE(invokeFromScripted1) should produce(
         s"Fee in WAVES for InvokeScriptTransaction (${invokeFromScripted1.fee} in WAVES) " +
           s"with 6 total scripts invoked " +
           s"does not exceed minimal value of ${FeeConstants(TransactionType.InvokeScript) * FeeUnit + 6 * ScriptExtraFee} WAVES"
       )
-      d.blockchain.bestLiquidDiff.get.errorMessage(invokeFromNonScripted1.id()).get.text should include(
+      d.appendBlockE(invokeFromNonScripted1) should produce(
         s"Fee in WAVES for InvokeScriptTransaction (${invokeFromNonScripted1.fee} in WAVES) " +
           s"with 5 total scripts invoked " +
           s"does not exceed minimal value of ${FeeConstants(TransactionType.InvokeScript) * FeeUnit + 5 * ScriptExtraFee} WAVES"

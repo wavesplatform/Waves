@@ -225,9 +225,10 @@ trait WithDomain extends WithState { _: Suite =>
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.SmartAccountTrading,
       BlockchainFeatures.OrderV3,
-      BlockchainFeatures.FeeSponsorship,
       BlockchainFeatures.DataTransaction,
       BlockchainFeatures.SmartAssets
+    ).setFeaturesHeight(
+      BlockchainFeatures.FeeSponsorship -> -NG.blockchainSettings.functionalitySettings.activationWindowSize(1)
     )
 
     val RideV3 = ScriptsAndSponsorship.addFeatures(
