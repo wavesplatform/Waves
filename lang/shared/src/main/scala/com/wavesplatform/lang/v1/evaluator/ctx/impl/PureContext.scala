@@ -1187,8 +1187,9 @@ object PureContext {
   }
 
   val splitStrFixed = splitStrFixedF(SPLIT, DataEntryValueMax, MaxListLengthV4, 51)
-  val splitStr1C    = splitStrFixedF(SPLIT1C, 500, 20, 1)
+  val splitStrV6    = splitStrFixedF(SPLIT, 500, 20, 1)
   val splitStr4C    = splitStrFixedF(SPLIT4C, 6000, 100, 4)
+  val splitStr51C   = splitStrFixedF(SPLIT51C, DataEntryValueMax, MaxListLengthV4, 51)
 
   private def split(str: String, sep: String, unicode: Boolean): Iterable[CONST_STRING] = {
     if (str == "") listWithEmptyStr
@@ -1224,7 +1225,7 @@ object PureContext {
   }
 
   def makeStringF(id: Short, complexityV6: Long, inputLimit: Int, outputLimit: Int, rejectNonStrings: Boolean): BaseFunction[NoContext] = {
-    val name = if (inputLimit == MaxListLengthV4) "makeString" else s"makeString_${complexityV6}C"
+    val name = if (id == MAKESTRING) "makeString" else s"makeString_${complexityV6}C"
     NativeFunction(name, Map(V4 -> 30L, V5 -> 30L, V6 -> complexityV6), id, STRING, ("list", LIST(STRING)), ("separator", STRING)) {
       case (arr: ARR) :: CONST_STRING(separator) :: Nil =>
         if (arr.xs.length > inputLimit)
@@ -1246,10 +1247,10 @@ object PureContext {
     }
   }
 
-  val makeString: BaseFunction[NoContext]       = makeStringF(MAKESTRING, 11, MaxListLengthV4, DataEntryValueMax, rejectNonStrings = false)
-  val makeString_V6: BaseFunction[NoContext]    = makeStringF(MAKESTRING, 11, MaxListLengthV4, DataEntryValueMax, rejectNonStrings = true)
-  val makeString_V6_1C: BaseFunction[NoContext] = makeStringF(MAKESTRING1C, 1, 70, 500, rejectNonStrings = true)
-  val makeString_V6_2C: BaseFunction[NoContext] = makeStringF(MAKESTRING2C, 2, 100, 6000, rejectNonStrings = true)
+  val makeString: BaseFunction[NoContext]        = makeStringF(MAKESTRING, 11, MaxListLengthV4, DataEntryValueMax, rejectNonStrings = false)
+  val makeString_V6: BaseFunction[NoContext]     = makeStringF(MAKESTRING, 1, 70, 500, rejectNonStrings = true)
+  val makeString_V6_2C: BaseFunction[NoContext]  = makeStringF(MAKESTRING2C, 2, 100, 6000, rejectNonStrings = true)
+  val makeString_V6_11C: BaseFunction[NoContext] = makeStringF(MAKESTRING11C, 11, MaxListLengthV4, DataEntryValueMax, rejectNonStrings = true)
 
   lazy val contains: BaseFunction[NoContext] =
     UserFunction(
@@ -1931,7 +1932,6 @@ object PureContext {
         indexOfNFixed,
         lastIndexOfFixed,
         lastIndexOfWithOffsetFixed,
-        splitStrFixed,
         sizeStringFixed,
         intToBigInt,
         bigIntToInt,
@@ -1962,19 +1962,23 @@ object PureContext {
       )
 
   private def v5Functions(useNewPowPrecision: Boolean) =
-    fromV5Functions(useNewPowPrecision) ++ takeDropBytesBeforeV6 ++ takeDropStringFixedBeforeV6 :+ fractionIntRounds(
-      UNION(fromV5RoundTypes)
-    ) :+ makeString
+    fromV5Functions(useNewPowPrecision) ++
+      takeDropBytesBeforeV6 ++
+      takeDropStringFixedBeforeV6 :+
+      fractionIntRounds(UNION(fromV5RoundTypes)) :+
+      makeString :+
+      splitStrFixed
 
   private val v6Functions =
     fromV5Functions(true) ++
       Array(
         sizeTuple,
         makeString_V6,
-        makeString_V6_1C,
         makeString_V6_2C,
-        splitStr1C,
+        makeString_V6_11C,
+        splitStrV6,
         splitStr4C,
+        splitStr51C,
         sqrtInt,
         sqrtBigInt,
         fractionIntRoundsNative,
