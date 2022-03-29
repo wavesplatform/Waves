@@ -9,7 +9,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
@@ -28,8 +27,8 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
   def priorityTransactions: Seq[Transaction] = priorityDiffs.flatMap(_.diff.transactionsValues)
   def priorityTransactionIds: Seq[ByteStr]   = priorityTransactions.map(_.id())
 
-  def compositeBlockchain: Either[GenericError, Blockchain] =
-    if (priorityDiffs.isEmpty) Right(realBlockchain)
+  def compositeBlockchain: Blockchain =
+    if (priorityDiffs.isEmpty) realBlockchain
     else CompositeBlockchain(realBlockchain, priorityDiffsCombined)
 
   def lockedWrite[T](f: => T): T =

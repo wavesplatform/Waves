@@ -75,15 +75,19 @@ object BlockDiffer extends ScorexLogging {
       } else
         Right(Portfolio.empty)
 
-    def wrap[A](r: Either[String, A]) = TracedResult(r).leftMap(GenericError(_))
+    val blockchainWithNewBlock = CompositeBlockchain(blockchain, Diff.empty, block, hitSource, 0, None)
+    val initDiffE =
+      for {
+        feeFromPreviousBlock    <- feeFromPreviousBlockE
+        initialFeeFromThisBlock <- initialFeeFromThisBlockE
+        totalReward             <- minerReward.combine(initialFeeFromThisBlock).flatMap(_.combine(feeFromPreviousBlock))
+        patches                 <- patchesDiff(blockchainWithNewBlock)
+        resultDiff              <- Diff(portfolios = Map(block.sender.toAddress -> totalReward)).combine(patches)
+      } yield resultDiff
+
     for {
-      _                       <- wrap(Either.cond(!verify || block.signatureValid(), (), s"Block $block has invalid signature"))
-      feeFromPreviousBlock    <- wrap(feeFromPreviousBlockE)
-      initialFeeFromThisBlock <- wrap(initialFeeFromThisBlockE)
-      totalReward             <- wrap(minerReward.combine(initialFeeFromThisBlock).flatMap(_.combine(feeFromPreviousBlock)))
-      blockchainWithNewBlock  <- TracedResult(CompositeBlockchain(blockchain, Diff.empty, block, hitSource, 0, None))
-      patches                 <- TracedResult(patchesDiff(blockchainWithNewBlock))
-      resultDiff              <- wrap(Diff(portfolios = Map(block.sender.toAddress -> totalReward)).combine(patches))
+      _          <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
+      resultDiff <- TracedResult(initDiffE.leftMap(GenericError(_)))
       r <- apply(
         blockchainWithNewBlock,
         constraint,
@@ -164,52 +168,50 @@ object BlockDiffer extends ScorexLogging {
       .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil)).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _, _), _) => acc
         case (TracedResult(Right(Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs))), _, _), tx) =>
-          TracedResult(CompositeBlockchain(blockchain, currDiff)).flatMap { currBlockchain =>
-            txDiffer(currBlockchain, tx).flatMap { thisTxDiff =>
-              val updatedConstraint = updateConstraint(currConstraint, currBlockchain, tx, thisTxDiff)
-              if (updatedConstraint.isOverfilled)
-                TracedResult(Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint")))
-              else {
-                val (feeAsset, feeAmount) = maybeApplySponsorship(currBlockchain, hasSponsorship, tx.assetFee)
-                val currentBlockFee       = CurrentBlockFeePart(feeAmount)
+          val currBlockchain = CompositeBlockchain(blockchain, currDiff)
+          txDiffer(currBlockchain, tx).flatMap { thisTxDiff =>
+            val updatedConstraint = updateConstraint(currConstraint, currBlockchain, tx, thisTxDiff)
+            if (updatedConstraint.isOverfilled)
+              TracedResult(Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint")))
+            else {
+              val (feeAsset, feeAmount) = maybeApplySponsorship(currBlockchain, hasSponsorship, tx.assetFee)
+              val currentBlockFee       = CurrentBlockFeePart(feeAmount)
 
-                // unless NG is activated, miner has already received all the fee from this block by the time the first
-                // transaction is processed (see abode), so there's no need to include tx fee into portfolio.
-                // if NG is activated, just give them their 40%
-                val minerPortfolio = if (!hasNg) Portfolio.empty else Portfolio.build(feeAsset, feeAmount).multiply(CurrentBlockFeePart)
+              // unless NG is activated, miner has already received all the fee from this block by the time the first
+              // transaction is processed (see abode), so there's no need to include tx fee into portfolio.
+              // if NG is activated, just give them their 40%
+              val minerPortfolio = if (!hasNg) Portfolio.empty else Portfolio.build(feeAsset, feeAmount).multiply(CurrentBlockFeePart)
 
-                // carry is 60% of waves fees the next miner will get. obviously carry fee only makes sense when both
-                // NG and sponsorship is active. also if sponsorship is active, feeAsset can only be Waves
-                val carry = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
+              // carry is 60% of waves fees the next miner will get. obviously carry fee only makes sense when both
+              // NG and sponsorship is active. also if sponsorship is active, feeAsset can only be Waves
+              val carry = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
 
-                val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
-                val minerDiff     = Diff(portfolios = Map(blockGenerator -> minerPortfolio))
+              val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
+              val minerDiff     = Diff(portfolios = Map(blockGenerator -> minerPortfolio))
 
-                val result = for {
-                  diff          <- currDiff.combine(thisTxDiff).flatMap(_.combine(minerDiff))
-                  newParentDiff <- parentDiff.combine(minerDiff)
-                } yield Result(
-                  diff,
-                  carryFee + carry,
-                  totalWavesFee,
-                  updatedConstraint,
-                  DetailedDiff(newParentDiff, thisTxDiff :: txDiffs)
-                )
-                TracedResult(result.leftMap(GenericError(_)))
-              }
+              val result = for {
+                diff          <- currDiff.combine(thisTxDiff).flatMap(_.combine(minerDiff))
+                newParentDiff <- parentDiff.combine(minerDiff)
+              } yield Result(
+                diff,
+                carryFee + carry,
+                totalWavesFee,
+                updatedConstraint,
+                DetailedDiff(newParentDiff, thisTxDiff :: txDiffs)
+              )
+              TracedResult(result.leftMap(GenericError(_)))
             }
           }
       }
   }
 
-  private def patchesDiff(blockchain: Blockchain): Either[ValidationError, Diff] =
+  private def patchesDiff(blockchain: Blockchain): Either[String, Diff] = {
     Seq(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn, CancelLeasesToDisabledAliases)
       .foldM(Diff.empty) {
         case (prevDiff, patch) =>
-          CompositeBlockchain(blockchain, prevDiff).flatMap(
-            patch
-              .lift(_)
-              .fold(prevDiff.asRight[ValidationError])(d => prevDiff.combine(d).leftMap(GenericError(_)))
-          )
+          patch
+            .lift(CompositeBlockchain(blockchain, prevDiff))
+            .fold(prevDiff.asRight[String])(prevDiff.combine)
       }
+  }
 }

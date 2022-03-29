@@ -162,7 +162,6 @@ object InvokeScriptDiff {
 
           result <- for {
             paymentsPart <- traced(InvokeDiffsCommon.paymentsPart(tx, tx.dAppAddress, Map()))
-            blockchainWithPayments <- traced(CompositeBlockchain(blockchain, paymentsPart))
             (diff, (scriptResult, log), availableActions, availableData, availableDataSize) <- {
               stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
                 val height = blockchain.height
@@ -183,7 +182,6 @@ object InvokeScriptDiff {
                   Coeval.evalOnce(input),
                   Coeval(height),
                   blockchain,
-                  blockchainWithPayments,
                   tthis,
                   directives,
                   tx.root,
@@ -217,13 +215,13 @@ object InvokeScriptDiff {
             }
             _ = invocationRoot.setLog(log)
 
-            blockchainAfterEvaluation <- traced(CompositeBlockchain(blockchain, diff))
-
             _ = if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
-              checkDiffBalances(diff, blockchainAfterEvaluation)
+              checkDiffBalances(diff, blockchain)
+
+            newBlockchain = CompositeBlockchain(blockchain, diff)
 
             _ <- traced {
-              val newBalance = blockchainAfterEvaluation.balance(invoker)
+              val newBalance = newBlockchain.balance(invoker)
               Either.cond(
                 blockchain.height < blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight || newBalance >= 0,
                 (),
@@ -242,7 +240,7 @@ object InvokeScriptDiff {
                     pk,
                     storingComplexity.toInt,
                     tx,
-                    blockchainAfterEvaluation,
+                    newBlockchain,
                     blockTime,
                     isSyncCall = true,
                     limitedExecution,
@@ -301,9 +299,8 @@ object InvokeScriptDiff {
                 .leftMap(GenericError(_))
             )
 
-            blockchainAfterActions <- traced(CompositeBlockchain(blockchain, resultDiff))
             _ = if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
-              checkDiffBalances(resultDiff, blockchainAfterActions)
+              checkDiffBalances(resultDiff, blockchain)
 
             _ = invocationRoot.setResult(scriptResult)
           } yield (resultDiff, evaluated, remainingActions1, remainingData1, remainingDataSize1)
@@ -318,23 +315,25 @@ object InvokeScriptDiff {
     }
   }
 
-  private def checkDiffBalances(diff: Diff, blockchain: Blockchain): Unit =
+  private def checkDiffBalances(diff: Diff, blockchain: Blockchain): Unit = {
+    val newBlockchain = CompositeBlockchain(blockchain, diff)
     diff.portfolios.toList.foreach {
       case (address, portfolio) =>
         if (portfolio.balance < 0) {
-          val newBalance = blockchain.balance(address)
+          val newBalance = newBlockchain.balance(address)
           if (newBalance < 0)
             throw RejectException(balanceError(address, newBalance, Waves))
         }
         portfolio.assets.foreach {
           case (asset, amount) =>
             if (amount < 0) {
-              val newBalance = blockchain.balance(address, asset)
+              val newBalance = newBlockchain.balance(address, asset)
               if (newBalance < 0)
                 throw RejectException(balanceError(address, newBalance, asset))
             }
         }
     }
+  }
 
   private def balanceError(address: Address, balance: Long, asset: Asset) = {
     val assetInfo = asset match {

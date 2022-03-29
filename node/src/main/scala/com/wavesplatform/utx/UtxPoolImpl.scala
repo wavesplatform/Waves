@@ -193,14 +193,12 @@ class UtxPoolImpl(
       canLock: Boolean = true
   ): TracedResult[ValidationError, Boolean] = {
     val diffEi = {
-      def calculateDiff(): TracedResult[ValidationError, Diff] =
-        TracedResult(priorityPool.compositeBlockchain).flatMap(
-          priorityBlockchain =>
-            if (forceValidate)
-              TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(priorityBlockchain, tx)
-            else
-              TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(priorityBlockchain, tx)
-        )
+      def calculateDiff(): TracedResult[ValidationError, Diff] = {
+        if (forceValidate)
+          TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, tx)
+        else
+          TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(priorityPool.compositeBlockchain, tx)
+      }
 
       if (canLock) priorityPool.optimisticRead(calculateDiff())(_.resultE.isLeft)
       else calculateDiff()
@@ -263,13 +261,11 @@ class UtxPoolImpl(
         if (TxCheck.isExpired(tx)) {
           TxStateActions.removeExpired(tx)
         } else {
-          TracedResult(priorityPool.compositeBlockchain)
-            .flatMap(b => TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime())(b, tx))
-            .resultE
-            .left
-            .foreach { error =>
-              TxStateActions.removeInvalid(tx, error)
-            }
+          val differ = TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, _)
+          val diffEi = differ(tx).resultE
+          diffEi.left.foreach { error =>
+            TxStateActions.removeInvalid(tx, error)
+          }
         }
       }
   }
@@ -327,10 +323,11 @@ class UtxPoolImpl(
                 val newScriptedAddresses = scriptedAddresses(tx)
                 if (!priority && r.checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
                 else {
+                  val updatedBlockchain   = CompositeBlockchain(blockchain, r.totalDiff)
                   val newCheckedAddresses = newScriptedAddresses ++ r.checkedAddresses
-                  val e                   = CompositeBlockchain(blockchain, r.totalDiff).flatMap(b => differ(b, tx).resultE.map((_, b)))
+                  val e                   = differ(updatedBlockchain, tx).resultE
                   e match {
-                    case Right((newDiff, updatedBlockchain)) =>
+                    case Right(newDiff) =>
                       val updatedConstraint = r.constraint.put(updatedBlockchain, tx, newDiff)
                       if (updatedConstraint.isOverfilled) {
                         log.trace(
