@@ -3,18 +3,18 @@ package com.wavesplatform.utx
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 
-import scala.annotation.tailrec
-
 import cats.kernel.Monoid
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
+
+import scala.annotation.tailrec
 
 final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging with OptimisticLockable {
   import UtxPriorityPool._
@@ -39,8 +39,10 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
     this.readLockCond(f)(shouldRecheck)
 
   private[utx] def setPriorityDiffs(discDiffs: Seq[Diff]): Set[Transaction] =
-    if (discDiffs.isEmpty) Set.empty
-    else {
+    if (discDiffs.isEmpty) {
+      clear()
+      Set.empty
+    } else {
       val transactions = updateDiffs(_ => discDiffs.map(PriorityData(_)))
       log.trace(
         s"Priority pool updated with diffs: [${discDiffs.map(_.hashString).mkString(", ")}], transactions order: [${priorityTransactionIds.mkString(", ")}]"
