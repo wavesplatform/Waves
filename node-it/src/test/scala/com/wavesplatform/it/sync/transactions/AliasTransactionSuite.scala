@@ -1,18 +1,32 @@
 package com.wavesplatform.it.sync.transactions
 
-import scala.util.{Random, Try}
+import com.google.common.primitives.Longs
+import com.typesafe.config.Config
 
+import scala.util.{Random, Try}
 import com.wavesplatform.account.{AddressScheme, KeyPair}
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.features.BlockchainFeatures.RideV6
+import com.wavesplatform.it.NodeConfigs
+import com.wavesplatform.it.NodeConfigs.Default
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.CreateAliasTransaction
+import com.wavesplatform.lang.directives.values.V6
+import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs}
 import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.Json
 
 class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs
+      .Builder(Default, 2, Seq.empty)
+      .overrideBase(_.preactivatedFeatures((RideV6.id, 0)))
+      .overrideBase(_.raw(s"waves.blockchain.custom.functionality.allow-multiple-proofs-in-create-alias-until = 0"))
+      .buildNonConflicting()
+
   var version: Byte = 1
 
   test("Able to send money to an alias") {
@@ -152,6 +166,37 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     }
   }
 
+  test("Able to broadcast CreateAliasTransaction with more than one proof") {
+    val verifier = TestCompiler(V6).compileExpression(
+      """{-# STDLIB_VERSION 6 #-}
+        |{-# CONTENT_TYPE EXPRESSION #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |true
+        |""".stripMargin
+    )
+
+    val kp = KeyPair(Longs.toByteArray(Random.nextLong()))
+    val cat = CreateAliasTransaction(3.toByte, notMiner.publicKey, "abc12345", 0.005.waves, System.currentTimeMillis(), Proofs.empty, AddressScheme.current.chainId)
+    val signedCreateAlias = cat.copy(
+      proofs = cat.signWith(notMiner.keyPair.privateKey).proofs.proofs ++ cat.signWith(kp.privateKey).proofs.proofs
+    )
+
+    assertBadRequestAndMessage(
+      notMiner.signedBroadcast(signedCreateAlias.json()),
+      "State check failed. Reason: Transactions from non-scripted accounts must have exactly 1 proof"
+    )
+
+    val setScriptTx = notMiner.setScript(notMiner.keyPair, Some(verifier.bytes().base64))
+    nodes.waitForHeightAriseAndTxPresent(setScriptTx.id)
+
+    notMiner.signedBroadcast(signedCreateAlias.json(), waitForTx = true)
+    nodes.waitForHeightArise()
+
+    val txStatus = miner.transactionStatus(signedCreateAlias.id().toString)
+    txStatus.status shouldBe "confirmed"
+  }
+
   private def createAlias(address: KeyPair, alias: String): Long = {
     if (!sender.aliasByAddress(address.toAddress.toString).exists(_.endsWith(alias))) {
       val aliasId = sender.createAlias(address, alias, minFee, version = version).id
@@ -161,7 +206,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   }
 
   private def createAliasFromJson(target: KeyPair, alias: String, fee: Long, version: Byte) = {
-    import com.wavesplatform.common.utils._
+    import com.wavesplatform.common.utils.*
     val transactionJson = Try(
       CreateAliasTransaction
         .selfSigned(version, target, alias, fee, System.currentTimeMillis())

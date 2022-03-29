@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account._
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto

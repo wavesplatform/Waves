@@ -13,6 +13,7 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, ci}
@@ -173,7 +174,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
     assertDiffEi(
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion),
-      RideV6.blockchainSettings.functionalitySettings
+      features(invokeExpression)
     ) { diffE =>
       if (reject) {
         diffE shouldBe Symbol("left")
@@ -268,6 +269,14 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
 
       assert(14, 0, raiseError = true, withThroughTransfer = true, reject = true, invokeExpression = b)
       assert(15, 1065, raiseError = true, withThroughTransfer = true, invokeExpression = b)
+    }
+  }
+
+  private def features(invokeExpression: Boolean): FunctionalitySettings = {
+    if (invokeExpression) {
+      ContinuationTransaction.blockchainSettings.functionalitySettings
+    } else {
+      RideV6.blockchainSettings.functionalitySettings
     }
   }
 }

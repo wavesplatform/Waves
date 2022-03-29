@@ -1718,15 +1718,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         )
         .explicitGet()
 
-    withDomain(
-      DomainPresets.RideV5.copy(
-        blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
-          functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(
-            forbidNegativeMatcherFee = 3
-          )
-        )
-      )
-    ) { d =>
+    withDomain(DomainPresets.RideV5) { d =>
       d.appendBlock(
         GenesisTransaction.create(sender.toAddress, 2.003.waves, ntpTime.getTimestamp()).explicitGet(),
         priceAsset,
@@ -1734,10 +1726,6 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       )
 
       d.balance(sender.toAddress) shouldBe 0.003.waves
-
-      d.appendBlock(mkExchangeTx)
-
-      d.balance(sender.toAddress) shouldBe 50.003.waves
 
       d.appendBlockE(mkExchangeTx) should produce("Matcher fee can not be negative")
     }
