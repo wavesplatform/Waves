@@ -172,8 +172,7 @@ class UtxPoolImpl(
   }
 
   def resetPriorityPool(): Unit = {
-    val txs = priorityPool.clear()
-    txs.foreach(addTransaction(_, verify = false))
+    priorityPool.clear()
   }
 
   private[this] def removeFromOrdPool(txId: ByteStr): Option[Transaction] = {
@@ -350,7 +349,7 @@ class UtxPoolImpl(
 
                     case Left(TransactionValidationError(AlreadyInTheState(txId, _), tx)) if r.validatedTransactions.contains(tx.id()) =>
                       log.trace(s"Transaction $txId already validated in priority pool")
-                      removeFromOrdPool(tx.id()) // Dont run events/metrics publication here because the tx is still exists in the priority pool
+                      removeFromOrdPool(tx.id()) // Don't run events/metrics publication here because the tx is still exists in the priority pool
                       r
 
                     case Left(error) =>
@@ -385,7 +384,9 @@ class UtxPoolImpl(
           } else {
             val continue = try {
               while (!cancelled() && !isTimeEstimateReached && allValidated(newSeed)) Thread.sleep(200)
-              !cancelled() && (!isTimeEstimateReached || isUnlimited)
+              log.info(s"isCancelled = ${cancelled()}, isTimeEstimateReached = $isTimeEstimateReached, allValidated = ${allValidated(newSeed)}, " +
+                s"isTimeLimitReached = $isTimeLimitReached, isUnlimited = $isUnlimited")
+              !cancelled() && (!isTimeLimitReached || isUnlimited)
             } catch {
               case _: InterruptedException =>
                 false
