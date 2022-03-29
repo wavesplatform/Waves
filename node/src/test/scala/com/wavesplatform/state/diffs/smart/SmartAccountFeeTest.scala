@@ -110,7 +110,7 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
   private def appendAndAssertNotEnoughFee(tx: Transaction & TxWithFee, d: Domain) = {
     d.appendBlockE(tx) should produce(
       "TransactionValidationError(cause = GenericError(Transaction sent from smart account. " +
-        s"Requires $ScriptExtraFee extra fee.. " +
+        s"Requires $ScriptExtraFee extra fee. " +
         s"Fee for ${tx.tpe.transactionName} (${tx.fee} in WAVES) " +
         s"does not exceed minimal value of ${FeeConstants(tx.tpe) * FeeUnit + ScriptExtraFee} WAVES.)"
     )

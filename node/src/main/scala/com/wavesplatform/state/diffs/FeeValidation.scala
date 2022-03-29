@@ -67,7 +67,7 @@ object FeeValidation {
 
     val errorMessage = s"Fee for ${txType.transactionName} ($actualFee) does not exceed minimal value of $requiredFee."
 
-    GenericError((if (feeDetails.requirements.nonEmpty) (feeDetails.requirements mkString_ " ") ++ ". " else "") ++ errorMessage)
+    GenericError((if (feeDetails.requirements.nonEmpty) (feeDetails.requirements mkString_ ". ") ++ ". " else "") ++ errorMessage)
   }
 
   private case class FeeInfo(assetInfo: Option[(IssuedAsset, AssetDescription)], requirements: Chain[String], wavesFee: Long)
@@ -102,6 +102,14 @@ object FeeValidation {
               case _: EthereumTransaction.Transfer   => 1
               case _: EthereumTransaction.Invocation => 5
             }
+
+          case ss: SetScriptTransaction if blockchain.isFeatureActivated(BlockchainFeatures.RideV6) =>
+            ss.script.fold(1) { script =>
+              val scriptSize = script.bytes().size
+              val kbs        = scriptSize / 1024
+              if (scriptSize > 0 && scriptSize % 1024 == 0) kbs else kbs + 1
+            }
+
           case _ => baseFee
         }
       }
@@ -143,7 +151,8 @@ object FeeValidation {
         .exists(_.script.isDefined)
 
     val assetsCount = tx match {
-      case _: InvokeScriptTransaction if blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) => 0
+      case _: InvokeScriptTransaction =>
+        if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) 0 else tx.smartAssets(blockchain).size
       case tx: ExchangeTransaction =>
         tx.smartAssets(blockchain).size /* *3 if we decide to check orders and transaction */
       case _ => tx.smartAssets(blockchain).size
@@ -172,7 +181,7 @@ object FeeValidation {
 
     val extraFee = smartAccountScriptsCount * ScriptExtraFee
     val extraRequirements =
-      if (smartAccountScriptsCount > 0) Chain(s"Transaction sent from smart account. Requires $extraFee extra fee.")
+      if (smartAccountScriptsCount > 0) Chain(s"Transaction sent from smart account. Requires $extraFee extra fee")
       else Chain.empty
 
     val FeeInfo(feeAssetInfo, reqs, feeAmount) = inputFee

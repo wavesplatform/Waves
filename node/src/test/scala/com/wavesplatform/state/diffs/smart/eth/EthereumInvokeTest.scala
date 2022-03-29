@@ -18,7 +18,7 @@ import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.diffs.smart.predef.{assertProvenPart, provenPart}
-import com.wavesplatform.test.{PropSpec, TestTime}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{ABIConverter, Asset, EthereumTransaction, GenesisTransaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
@@ -77,7 +77,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
      """.stripMargin
   }
 
-  private def makeDAppScript2(version: StdLibVersion, fee: Long, thisDApp: KeyPair, callingDApp: KeyPair, invoker: Address, invokerPk: PublicKey): Script =
+  private def makeDAppScript2(version: StdLibVersion, thisDApp: KeyPair, callingDApp: KeyPair, invoker: Address, invokerPk: PublicKey): Script =
     TestCompiler(version).compileContract(
       s"""
          | @Callable(i)
@@ -105,8 +105,8 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
 
   private def preconditions(dAppVersion: StdLibVersion, assetScriptVersion: StdLibVersion, paymentCount: Int, syncCall: Boolean) = {
     val fee   = ciFee().sample.get
-    val dApp  = accountGen.sample.get
-    val dApp2 = accountGen.sample.get
+    val dApp  = RandomKeyPair()
+    val dApp2 = RandomKeyPair()
 
     val dummyInvoke    = EthereumTransaction.Invocation(dApp.toAddress, "")
     val dummyEthInvoke = EthereumTransaction(dummyInvoke, TestEthRawTransaction, TestEthSignature, 'T'.toByte) // needed to pass into asset script
@@ -115,17 +115,17 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
 
     val emptyScript = Some(ExprScript(Terms.TRUE).explicitGet())
     val issues =
-      (1 to paymentCount).map(_ => IssueTransaction.selfSigned(2.toByte, dApp, "Asset", "", ENOUGH_AMT, 8, true, emptyScript, fee, ts).explicitGet())
+      (1 to paymentCount).map(_ => IssueTransaction.selfSigned(2.toByte, dApp, "Asset", "", ENOUGH_AMT, 8, true, emptyScript, 1.waves, ts).explicitGet())
     val assets = issues.map(i => IssuedAsset(i.id()))
     val setAssetScripts = assets.map { asset =>
       val resultScript = assetScript(dummyEthInvoke, dApp.toAddress, assets, asset, assetScriptVersion)
-      SetAssetScriptTransaction.selfSigned(1.toByte, dApp, asset, Some(resultScript), fee, ts).explicitGet()
+      SetAssetScriptTransaction.selfSigned(1.toByte, dApp, asset, Some(resultScript), 1.waves, ts).explicitGet()
     }
     val assetTransfers =
       assets.map(a => TransferTransaction.selfSigned(2.toByte, dApp, invoker, a, ENOUGH_AMT, Waves, fee, ByteStr.empty, ts).explicitGet())
 
     val dAppScript  = makeDAppScript(assets, dApp2.toAddress, dAppVersion, syncCall)
-    val dAppScript2 = makeDAppScript2(if (dAppVersion >= V5) dAppVersion else V5, fee, dApp2, dApp, invoker, invokerPk)
+    val dAppScript2 = makeDAppScript2(if (dAppVersion >= V5) dAppVersion else V5, dApp2, dApp, invoker, invokerPk)
     val setDApp     = SetScriptTransaction.selfSigned(1.toByte, dApp, Some(dAppScript), fee, ts).explicitGet()
     val setDApp2    = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dAppScript2), fee, ts).explicitGet()
 

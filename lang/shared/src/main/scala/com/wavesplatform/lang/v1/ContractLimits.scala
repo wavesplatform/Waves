@@ -3,7 +3,6 @@ package com.wavesplatform.lang.v1
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.compiler.Terms
 
-//noinspection ScalaStyle
 object ContractLimits {
   val MaxComplexityByVersion: StdLibVersion => Int = {
     case V1 | V2 => 2000
@@ -34,6 +33,7 @@ object ContractLimits {
 
   val MaxExprSizeInBytes: Int     = 8 * 1024
   val MaxContractSizeInBytes: Int = 32 * 1024
+  val MaxContractSizeInBytesV6 = 160 * 1024
 
   val MaxContractMetaSizeInBytes = 1024
 
@@ -41,7 +41,7 @@ object ContractLimits {
   val MaxInvokeScriptArgs       = 22
   val MaxDeclarationNameInBytes = 255
 
-  // Data	0.001 per kilobyte, rounded up, fee for CI is 0.005
+  // Data 0.001 per kilobyte, rounded up, fee for CI is 0.005
   val MaxInvokeScriptSizeInBytes: Int = 5 * 1024
   val MaxWriteSetSizeInBytes: Int     = 5 * 1024
 

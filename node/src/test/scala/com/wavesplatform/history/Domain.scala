@@ -210,7 +210,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   }
 
   def appendBlockE(txs: Transaction*): Either[ValidationError, Seq[Diff]] =
-    appendBlockE(createBlock(blockchainUpdater.nextBlockVersion, txs))
+    appendBlockE(createBlock(Block.PlainBlockVersion, txs))
 
   def appendBlock(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
