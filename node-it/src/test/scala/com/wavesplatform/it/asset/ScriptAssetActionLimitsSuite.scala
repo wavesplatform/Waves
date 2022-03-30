@@ -9,7 +9,7 @@ import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.grpc.GrpcBaseTransactionSuiteLike
-import com.wavesplatform.it.sync.{issueFee, minFee, setScriptFee, smartMinFee}
+import com.wavesplatform.it.sync.{issueFee, minFee, smartMinFee}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4, V5, V6}
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
