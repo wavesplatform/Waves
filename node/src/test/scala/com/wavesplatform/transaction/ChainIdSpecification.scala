@@ -307,7 +307,7 @@ class ChainIdSpecification extends PropSpec {
             TxVersion.V2,
             sender.publicKey,
             Waves,
-            Seq(ParsedTransfer(addressOrAlias, amount.value)),
+            Seq(ParsedTransfer(addressOrAlias, TxNonNegativeAmount.unsafeFrom(amount.value))),
             fee,
             ts,
             ByteStr.empty,

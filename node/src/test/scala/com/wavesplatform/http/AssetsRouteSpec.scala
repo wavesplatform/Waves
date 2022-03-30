@@ -16,7 +16,7 @@ import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Height}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers}
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxNonNegativeAmount}
 import com.wavesplatform.{TestTime, TestWallet}
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
@@ -165,7 +165,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
     val issueTransaction = TxHelpers.issue(issuer, 100_0000, 4, "PA_01")
     d.appendBlock(TxHelpers.genesis(issuer.toAddress, 10.waves))
     val recipients = testWallet.generateNewAccounts(5)
-    val transfers  = recipients.zipWithIndex.map { case (kp, i) => MassTransferTransaction.ParsedTransfer(kp.toAddress, (i + 1) * 10000) }
+    val transfers  = recipients.zipWithIndex.map { case (kp, i) => MassTransferTransaction.ParsedTransfer(kp.toAddress, TxNonNegativeAmount.unsafeFrom((i + 1) * 10000)) }
     d.appendBlock(
       issueTransaction,
       MassTransferTransaction
@@ -185,8 +185,8 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
     Get(routePath(s"/${issueTransaction.id()}/distribution/2/limit/$MaxAddressesPerRequest")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "items").as[JsObject] shouldBe Json.obj(
-        transfers.map(pt => pt.address.toString -> (pt.amount: JsValueWrapper)) :+
-          (issuer.toAddress.toString -> (issueTransaction.quantity.value - transfers.map(_.amount).sum: JsValueWrapper)): _*
+        transfers.map(pt => pt.address.toString -> (pt.amount.value: JsValueWrapper)) :+
+          (issuer.toAddress.toString -> (issueTransaction.quantity.value - transfers.map(_.amount.value).sum: JsValueWrapper)): _*
       )
     }
 

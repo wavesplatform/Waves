@@ -511,7 +511,7 @@ class TransactionBindingsTest
                       .getOrElse("")}'
                     |      else isDefined(t.assetId) == false
                     |     let transferCount = t.transferCount == ${tx.transfers.length}
-                    |     let totalAmount = t.totalAmount == ${tx.transfers.map(_.amount).sum}
+                    |     let totalAmount = t.totalAmount == ${tx.transfers.map(_.amount.value).sum}
                     |     let attachment = t.attachment == base58'${Base58.encode(tx.attachment.arr)}'
                     |     ${tx.transfers.indices.map(pg).mkString("\n")}
                     |   ${provenPart(tx)}

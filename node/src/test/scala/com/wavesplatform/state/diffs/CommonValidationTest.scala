@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
 
 class CommonValidationTest extends PropSpec with WithState {
 
@@ -188,7 +188,7 @@ class CommonValidationTest extends PropSpec with WithState {
           chainId = invChainId
         ),
         TxHelpers.issue(master, amount, chainId = invChainId),
-        TxHelpers.massTransfer(master, Seq(ParsedTransfer(invChainAddr, amount)), chainId = invChainId),
+        TxHelpers.massTransfer(master, Seq(ParsedTransfer(invChainAddr, TxNonNegativeAmount.unsafeFrom(amount))), chainId = invChainId),
         TxHelpers.leaseCancel(asset.id, master, version = TxVersion.V3, chainId = invChainId),
         TxHelpers.setScript(master, script, version = TxVersion.V2, chainId = invChainId),
         TxHelpers.setAssetScript(master, asset, script, version = TxVersion.V2, chainId = invChainId),

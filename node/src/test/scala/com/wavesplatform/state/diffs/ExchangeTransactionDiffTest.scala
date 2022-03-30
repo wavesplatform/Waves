@@ -1881,7 +1881,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
     val massTransfer = TxHelpers.massTransfer(
       from = buyer,
-      to = sellers.map(seller => ParsedTransfer(seller.toAddress, issue2.quantity.value / sellOrdersCount)),
+      to = sellers.map(seller => ParsedTransfer(seller.toAddress, TxNonNegativeAmount.unsafeFrom(issue2.quantity.value / sellOrdersCount))),
       asset = issue2.asset,
       fee = 1000L,
       version = TxVersion.V1

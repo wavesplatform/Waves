@@ -78,7 +78,7 @@ object MassTransferTransaction extends TransactionParser {
     implicit val jsonFormat = Json.format[Transfer]
   }
 
-  case class ParsedTransfer(address: AddressOrAlias, amount: Long)
+  case class ParsedTransfer(address: AddressOrAlias, amount: TxNonNegativeAmount)
 
   def create(
       version: TxVersion,
@@ -121,11 +121,15 @@ object MassTransferTransaction extends TransactionParser {
   ): Either[ValidationError, MassTransferTransaction] =
     signed(version, sender.publicKey, assetId, transfers, fee, timestamp, attachment, sender.privateKey, chainId)
 
-  def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] = {
+  def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] =
     transfers.traverse {
       case Transfer(recipient, amount) =>
-        AddressOrAlias.fromString(recipient).map(ParsedTransfer(_, amount))
+        for {
+          addressOrAlias <- AddressOrAlias.fromString(recipient)
+          transferAmount <- TxNonNegativeAmount(amount)(NegativeAmount(amount, "asset"))
+        } yield {
+          ParsedTransfer(addressOrAlias, transferAmount)
+        }
     }
-  }
 
 }

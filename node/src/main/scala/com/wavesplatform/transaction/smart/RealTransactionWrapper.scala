@@ -91,8 +91,8 @@ object RealTransactionWrapper {
             proven(ms),
             assetId = ms.assetId.compatId,
             transferCount = ms.transfers.length,
-            totalAmount = ms.transfers.map(_.amount).sum,
-            transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(r.address, r.amount)).toIndexedSeq,
+            totalAmount = ms.transfers.map(_.amount.value).sum,
+            transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(r.address, r.amount.value)).toIndexedSeq,
             attachment = ms.attachment
           )
           .asRight

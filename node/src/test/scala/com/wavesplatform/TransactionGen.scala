@@ -269,7 +269,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       transferGen = for {
         recipient <- accountOrAliasGen
         amount    <- Gen.choose(1L, Long.MaxValue / maxTransfersCount)
-      } yield ParsedTransfer(recipient, amount)
+      } yield ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount))
       recipients <- Gen.listOfN(transferCount, transferGen)
     } yield MassTransferTransaction.selfSigned(1.toByte, sender, assetId, recipients, feeAmount, timestamp, attachment).explicitGet()
   }

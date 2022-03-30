@@ -117,7 +117,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
   private def massTransferWithRecipients(sender: KeyPair, recipients: List[PublicKey], maxAmount: Long, time: Time) = {
     val amount    = maxAmount / (recipients.size + 1)
-    val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
+    val transfers = recipients.map(r => ParsedTransfer(r.toAddress, TxNonNegativeAmount.unsafeFrom(amount)))
     val minFee    = FeeValidation.FeeConstants(TransferTransaction.typeId) + FeeValidation.FeeConstants(MassTransferTransaction.typeId) * transfers.size
     val txs =
       for { fee <- chooseNum(minFee, amount) } yield MassTransferTransaction

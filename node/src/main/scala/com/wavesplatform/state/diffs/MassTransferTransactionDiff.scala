@@ -19,10 +19,10 @@ object MassTransferTransactionDiff {
       for {
         recipientAddr <- blockchain.resolveAlias(xfer.address)
         portfolio = tx.assetId
-          .fold(Map(recipientAddr -> Portfolio(xfer.amount, LeaseBalance.empty, Map.empty))) { asset =>
-            Map(recipientAddr -> Portfolio(0, LeaseBalance.empty, Map(asset -> xfer.amount)))
+          .fold(Map(recipientAddr -> Portfolio(xfer.amount.value, LeaseBalance.empty, Map.empty))) { asset =>
+            Map(recipientAddr -> Portfolio(0, LeaseBalance.empty, Map(asset -> xfer.amount.value)))
           }
-      } yield (portfolio, xfer.amount)
+      } yield (portfolio, xfer.amount.value)
     }
     val portfoliosEi = tx.transfers.toList.traverse(parseTransfer)
 

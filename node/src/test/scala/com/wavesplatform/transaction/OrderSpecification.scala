@@ -57,11 +57,14 @@ class OrderSpecification extends PropSpec with ValidationMatcher with NTPTime {
     versions.foreach { version =>
       val matcherFeeAsset = if (version == 3) IssuedAsset(ByteStr.fill(32)(3)) else Waves
 
-      Order.buy(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, matcherFee, matcherFeeAsset).explicitGet().isValid(30000000000L) shouldBe not(valid)
-      Order.buy(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, matcherFee, matcherFeeAsset).explicitGet().isValid(expirationTime - Order.MaxLiveTime - 1) shouldBe not(valid)
+      val buyOrder = Order.buy(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, matcherFee, matcherFeeAsset).explicitGet()
+      val sellOrder = Order.sell(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, matcherFee, matcherFeeAsset).explicitGet()
 
-      Order.sell(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, matcherFee, matcherFeeAsset).explicitGet().isValid(30000000000L) shouldBe not(valid)
-      Order.sell(version, sender, matcher.publicKey, pair, amount, price, time, expirationTime, matcherFee, matcherFeeAsset).explicitGet().isValid(expirationTime - Order.MaxLiveTime - 1) shouldBe not(valid)
+      buyOrder.isValid(30000000000L) shouldBe not(valid)
+      buyOrder.isValid(expirationTime - Order.MaxLiveTime - 1) shouldBe not(valid)
+
+      sellOrder.isValid(30000000000L) shouldBe not(valid)
+      sellOrder.isValid(expirationTime - Order.MaxLiveTime - 1) shouldBe not(valid)
     }
   }
 

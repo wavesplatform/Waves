@@ -6,7 +6,7 @@ import com.wavesplatform.account.{AddressOrAlias, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.serialization._
-import com.wavesplatform.transaction.{TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.{TxNonNegativeAmount, TxPositiveAmount, TxVersion}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.utils.byteStrFormat
@@ -16,7 +16,7 @@ import scala.util.Try
 
 object MassTransferTxSerializer {
   def transfersJson(transfers: Seq[ParsedTransfer]): JsValue =
-    Json.toJson(transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) })
+    Json.toJson(transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount.value) })
 
   def toJson(tx: MassTransferTransaction): JsObject = {
     import tx._
@@ -24,7 +24,7 @@ object MassTransferTxSerializer {
       "assetId"       -> assetId.maybeBase58Repr,
       "attachment"    -> attachment,
       "transferCount" -> transfers.size,
-      "totalAmount"   -> transfers.map(_.amount).sum,
+      "totalAmount"   -> transfers.map(_.amount.value).sum,
       "transfers"     -> transfersJson(transfers)
     )
   }
@@ -33,7 +33,7 @@ object MassTransferTxSerializer {
     import tx._
     version match {
       case TxVersion.V1 =>
-        val transferBytes = transfers.map { case ParsedTransfer(recipient, amount) => Bytes.concat(recipient.bytes, Longs.toByteArray(amount)) }
+        val transferBytes = transfers.map { case ParsedTransfer(recipient, amount) => Bytes.concat(recipient.bytes, Longs.toByteArray(amount.value)) }
 
         Bytes.concat(
           Array(builder.typeId, version),
@@ -59,7 +59,7 @@ object MassTransferTxSerializer {
     def parseTransfers(buf: ByteBuffer): Seq[MassTransferTransaction.ParsedTransfer] = {
       def readTransfer(buf: ByteBuffer): ParsedTransfer = {
         val addressOrAlias = AddressOrAlias.fromBytes(buf).explicitGet()
-        val amount         = buf.getLong
+        val amount         = TxNonNegativeAmount.unsafeFrom(buf.getLong)
         ParsedTransfer(addressOrAlias, amount)
       }
 

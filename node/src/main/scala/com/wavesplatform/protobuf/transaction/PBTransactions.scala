@@ -1,5 +1,6 @@
 package com.wavesplatform.protobuf.transaction
 
+import cats.syntax.traverse._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -12,12 +13,12 @@ import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.{GenericError, NegativeAmount}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxDecimals, TxExchangeAmount, TxExchangePrice, TxNonNegativeAmount, TxValidationError}
+import com.wavesplatform.transaction.{Proofs, TxDecimals, TxExchangeAmount, TxExchangePrice, TxNonNegativeAmount, TxPositiveAmount, TxValidationError}
 import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{transaction => vt}
 import scalapb.UnknownFieldSet.empty
@@ -230,17 +231,25 @@ object PBTransactions {
         vt.DataTransaction.create(version.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs, chainId)
 
       case Data.MassTransfer(mt) =>
-        vt.transfer.MassTransferTransaction.create(
-          version.toByte,
-          sender,
-          PBAmounts.toVanillaAssetId(mt.assetId),
-          mt.transfers.flatMap(t => t.getRecipient.toAddressOrAlias(chainId).toOption.map(ParsedTransfer(_, t.amount))).toList,
-          feeAmount,
-          timestamp,
-          mt.attachment.toByteStr,
-          proofs,
-          chainId
-        )
+        for {
+          parsedTransfers <- mt.transfers.flatMap { t =>
+            t.getRecipient.toAddressOrAlias(chainId).toOption.map { addressOrAlias =>
+              TxNonNegativeAmount(t.amount)(NegativeAmount(t.amount, "asset"))
+                .map(ParsedTransfer(addressOrAlias, _))
+            }
+          }.sequence
+          tx <- vt.transfer.MassTransferTransaction.create(
+            version.toByte,
+            sender,
+            PBAmounts.toVanillaAssetId(mt.assetId),
+            parsedTransfers,
+            feeAmount,
+            timestamp,
+            mt.attachment.toByteStr,
+            proofs,
+            chainId
+          )
+        } yield tx
 
       case Data.SponsorFee(SponsorFeeTransactionData(Some(Amount(assetId, minFee, `empty`)), `empty`)) =>
         vt.assets.SponsorFeeTransaction.create(
@@ -456,7 +465,7 @@ object PBTransactions {
           version.toByte,
           sender,
           PBAmounts.toVanillaAssetId(mt.assetId),
-          mt.transfers.flatMap(t => t.getRecipient.toAddressOrAlias(chainId).toOption.map(ParsedTransfer(_, t.amount))).toList,
+          mt.transfers.flatMap(t => t.getRecipient.toAddressOrAlias(chainId).toOption.map(ParsedTransfer(_, TxNonNegativeAmount.unsafeFrom(t.amount)))).toList,
           TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
           mt.attachment.toByteStr,
@@ -585,7 +594,7 @@ object PBTransactions {
       case tx @ MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, attachment, proofs, chainId) =>
         val data = MassTransferTransactionData(
           PBAmounts.toPBAssetId(assetId),
-          transfers.map(pt => MassTransferTransactionData.Transfer(Some(pt.address), pt.amount)),
+          transfers.map(pt => MassTransferTransactionData.Transfer(Some(pt.address), pt.amount.value)),
           attachment.toByteString
         )
         PBTransactions.create(sender, chainId, fee.value, tx.assetFee._1, timestamp, version, proofs, Data.MassTransfer(data))

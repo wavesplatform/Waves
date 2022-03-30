@@ -100,6 +100,7 @@ object AsyncGrpcApi {
       script match {
         case Left(_) => transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.EMPTY)))
         case Right(sc) =>
+          // IssueTxSerializer.toBytes can't be used here because we must be able to test broadcasting issue transaction with incorrect data
           val baseBytes = Bytes.concat(
             source.publicKey.arr,
             Deser.serializeArrayWithLength(name.getBytes),
