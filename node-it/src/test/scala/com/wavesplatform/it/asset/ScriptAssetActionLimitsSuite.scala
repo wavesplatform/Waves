@@ -123,7 +123,7 @@ class ScriptAssetActionLimitsSuite extends AnyFreeSpec with GrpcBaseTransactionS
       miner
         .signedBroadcast(
           SetScriptTransaction
-            .selfSigned(1.toByte, address, Some(compiledScript), setScriptFee, System.currentTimeMillis())
+            .selfSigned(1.toByte, address, Some(compiledScript), 1.waves, System.currentTimeMillis())
             .explicitGet()
             .json()
         )
