@@ -450,7 +450,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       TxOrderPrice.unsafeFrom(6000000000L),
       1526992336241L,
       1529584336241L,
-      1,
+      TxMatcherFee.unsafeFrom(1),
       proofs = Proofs(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
     )
 
@@ -464,7 +464,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       TxOrderPrice.unsafeFrom(5000000000L),
       1526992336241L,
       1529584336241L,
-      2,
+      TxMatcherFee.unsafeFrom(2),
       proofs = Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
     )
 
@@ -546,7 +546,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       TxOrderPrice.unsafeFrom(6000000000L),
       1526992336241L,
       1529584336241L,
-      1,
+      TxMatcherFee.unsafeFrom(1),
       proofs = Proofs(Seq(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get))
     )
 
@@ -560,7 +560,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       TxOrderPrice.unsafeFrom(5000000000L),
       1526992336241L,
       1529584336241L,
-      2,
+      TxMatcherFee.unsafeFrom(2),
       proofs = Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
     )
 
@@ -643,7 +643,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       TxOrderPrice.unsafeFrom(6000000000L),
       1526992336241L,
       1529584336241L,
-      1,
+      TxMatcherFee.unsafeFrom(1),
       extractAssetId("9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       Proofs(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
     )
@@ -658,7 +658,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
       TxOrderPrice.unsafeFrom(5000000000L),
       1526992336241L,
       1529584336241L,
-      2,
+      TxMatcherFee.unsafeFrom(2),
       proofs = Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
     )
 

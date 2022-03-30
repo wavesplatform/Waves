@@ -58,9 +58,9 @@ package object transaction {
     val errMsg = s"price should be in interval (0; ${Order.MaxAmount}]"
   }
 
-  type TxMatcherFee = Long Refined Interval.OpenClosed[0, Order.MaxAmount.type ]
+  type TxMatcherFee = Long Refined Interval.Open[0, Order.MaxAmount.type ]
   object TxMatcherFee extends RefinedTypeOps[TxMatcherFee, Long] {
-    val errMsg = s"matcher fee should be in interval (0; ${Order.MaxAmount}]"
+    val errMsg = s"matcher fee should be in interval (0; ${Order.MaxAmount})"
   }
 
   implicit class TransactionValidationOps[T <: Transaction](val tx: T) extends AnyVal {

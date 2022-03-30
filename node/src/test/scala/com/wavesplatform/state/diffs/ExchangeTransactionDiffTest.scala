@@ -657,7 +657,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           bigBuyOrder.matcherFeeAssetId
             .fold(combinedPortfolio.balance)(combinedPortfolio.assets)
 
-        (feeSumPaidByBuyer <= exchanges.head.buyOrder.matcherFee) shouldBe true
+        (feeSumPaidByBuyer <= exchanges.head.buyOrder.matcherFee.value) shouldBe true
     }
   }
 
@@ -776,7 +776,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
   }
 
   def createExTx(buy: Order, sell: Order, price: Long, matcher: KeyPair): ExchangeTransaction = {
-    val mf     = buy.matcherFee
+    val mf     = buy.matcherFee.value
     val amount = math.min(buy.amount.value, sell.amount.value)
     TxHelpers.exchange(
       order1 = buy,
@@ -786,7 +786,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       price = price,
       buyMatcherFee = (BigInt(mf) * amount / buy.amount.value).toLong,
       sellMatcherFee = (BigInt(mf) * amount / sell.amount.value).toLong,
-      fee = buy.matcherFee
+      fee = buy.matcherFee.value
     )
   }
 
@@ -906,7 +906,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       price = 238,
       buyMatcherFee = 41,
       sellMatcherFee = 300000,
-      fee = buy.matcherFee,
+      fee = buy.matcherFee.value,
       version = TxVersion.V1
     )
 
@@ -1328,8 +1328,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             buyMatcherFee = fee,
             sellMatcherFee = fee,
             fee = TxPositiveAmount.unsafeFrom(fee),
-            order1 = tx.order1.copy(version = Order.V4, matcherFee = fee).signWith(buyer.privateKey),
-            order2 = tx.order2.copy(version = Order.V4, matcherFee = fee).signWith(seller.privateKey)
+            order1 = tx.order1.copy(version = Order.V4, matcherFee = TxMatcherFee.unsafeFrom(fee)).signWith(buyer.privateKey),
+            order2 = tx.order2.copy(version = Order.V4, matcherFee = TxMatcherFee.unsafeFrom(fee)).signWith(seller.privateKey)
           ).signWith(matcher.privateKey)
         val reversed = fixed
           .copy(
@@ -1897,8 +1897,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         amount = sellOrder.amount.value,
         price = bigBuyOrder.price.value,
         buyMatcherFee = buyMatcherFee,
-        sellMatcherFee = sellOrder.matcherFee,
-        fee = (bigBuyOrder.matcherFee + sellOrder.matcherFee) / 2
+        sellMatcherFee = sellOrder.matcherFee.value,
+        fee = (bigBuyOrder.matcherFee.value + sellOrder.matcherFee.value) / 2
       )
     }
 

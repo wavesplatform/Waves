@@ -50,7 +50,7 @@ object RealTransactionWrapper {
       price = o.price.value,
       timestamp = o.timestamp,
       expiration = o.expiration,
-      matcherFee = o.matcherFee,
+      matcherFee = o.matcherFee.value,
       bodyBytes = ByteStr(o.bodyBytes()),
       proofs = o.proofs.proofs.map(a => ByteStr(a.arr)).toIndexedSeq,
       matcherFeeAssetId = o.matcherFeeAssetId.compatId

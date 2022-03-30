@@ -403,8 +403,8 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           sell,
           buy.amount,
           TxExchangePrice.unsafeFrom(buy.price.value),
-          buy.matcherFee,
-          sell.matcherFee,
+          buy.matcherFee.value,
+          sell.matcherFee.value,
           matcherFee + smartFee * 3,
           version = TxVersion.V3
         )
@@ -432,8 +432,8 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           sell,
           buy.amount,
           TxExchangePrice.unsafeFrom(buy.price.value),
-          buy.matcherFee,
-          sell.matcherFee,
+          buy.matcherFee.value,
+          sell.matcherFee.value,
           matcherFee + smartFee * 3,
           version = TxVersion.V3
         )

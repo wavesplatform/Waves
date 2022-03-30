@@ -5,7 +5,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.protobuf.transaction.PBOrders
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
-import com.wavesplatform.transaction.{Proofs, TxExchangeAmount, TxOrderPrice}
+import com.wavesplatform.transaction.{Proofs, TxExchangeAmount, TxMatcherFee, TxOrderPrice}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import play.api.libs.json.{JsObject, Json}
 
@@ -26,7 +26,7 @@ object OrderSerializer {
       "price"            -> price.value,
       "timestamp"        -> timestamp,
       "expiration"       -> expiration,
-      "matcherFee"       -> matcherFee,
+      "matcherFee"       -> matcherFee.value,
       "signature"        -> proofs.toSignature.toString,
       "proofs"           -> proofs.proofs.map(_.toString)
     ) ++ (if (version >= Order.V3) Json.obj("matcherFeeAssetId" -> matcherFeeAssetId) else JsObject.empty)
@@ -46,7 +46,7 @@ object OrderSerializer {
           Longs.toByteArray(amount.value),
           Longs.toByteArray(timestamp),
           Longs.toByteArray(expiration),
-          Longs.toByteArray(matcherFee)
+          Longs.toByteArray(matcherFee.value)
         )
 
       case Order.V2 =>
@@ -60,7 +60,7 @@ object OrderSerializer {
           Longs.toByteArray(amount.value),
           Longs.toByteArray(timestamp),
           Longs.toByteArray(expiration),
-          Longs.toByteArray(matcherFee)
+          Longs.toByteArray(matcherFee.value)
         )
 
       case Order.V3 =>
@@ -74,7 +74,7 @@ object OrderSerializer {
           Longs.toByteArray(amount.value),
           Longs.toByteArray(timestamp),
           Longs.toByteArray(expiration),
-          Longs.toByteArray(matcherFee),
+          Longs.toByteArray(matcherFee.value),
           matcherFeeAssetId.byteRepr
         )
 
@@ -97,12 +97,12 @@ object OrderSerializer {
       val matcher    = buf.getPublicKey
       val assetPair  = AssetPair(buf.getAsset, buf.getAsset)
       val orderType  = OrderType(buf.get())
-      val price      = buf.getLong
-      val amount     = buf.getLong
+      val price      = TxOrderPrice.unsafeFrom(buf.getLong)
+      val amount     = TxExchangeAmount.unsafeFrom(buf.getLong)
       val timestamp  = buf.getLong
       val expiration = buf.getLong
-      val matcherFee = buf.getLong
-      Order(version, sender, matcher, assetPair, orderType, TxExchangeAmount.unsafeFrom(amount), TxOrderPrice.unsafeFrom(price), timestamp, expiration, matcherFee)
+      val matcherFee = TxMatcherFee.unsafeFrom(buf.getLong)
+      Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee)
     }
 
     version match {

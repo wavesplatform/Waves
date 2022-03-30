@@ -173,7 +173,7 @@ object ExchangeTransactionDiff {
       isFeeValid(
         feeTotal = filledBuy.fee + exTrans.buyMatcherFee,
         amountTotal = buyTotal,
-        maxfee = exTrans.buyOrder.matcherFee,
+        maxfee = exTrans.buyOrder.matcherFee.value,
         maxAmount = exTrans.buyOrder.amount.value,
         order = exTrans.buyOrder
       )
@@ -182,7 +182,7 @@ object ExchangeTransactionDiff {
       isFeeValid(
         feeTotal = filledSell.fee + exTrans.sellMatcherFee,
         amountTotal = sellTotal,
-        maxfee = exTrans.sellOrder.matcherFee,
+        maxfee = exTrans.sellOrder.matcherFee.value,
         maxAmount = exTrans.sellOrder.amount.value,
         order = exTrans.sellOrder
       )
@@ -206,7 +206,7 @@ object ExchangeTransactionDiff {
       if (order.orderType == OrderType.SELL) matchAmount
       else {
         val spend = (BigDecimal(matchAmount) * matchPrice * BigDecimal(10).pow(priceDecimals - amountDecimals - 8)).toBigInt
-        if (order.getSpendAssetId == Waves && !(spend + order.matcherFee).isValidLong) {
+        if (order.getSpendAssetId == Waves && !(spend + order.matcherFee.value).isValidLong) {
           throw new ArithmeticException("BigInteger out of long range")
         } else spend.bigInteger.longValueExact()
       }
