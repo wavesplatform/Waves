@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.account.{AddressScheme, Alias}
+import com.google.protobuf.ByteString
+import com.wavesplatform.account.{Address, AddressScheme, Alias}
 import com.wavesplatform.api.http.requests.{MassTransferRequest, SignedMassTransferRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -8,12 +9,14 @@ import com.wavesplatform.it.api.MassTransferTransactionInfo
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.it.util.TxHelpers
+import com.wavesplatform.protobuf.transaction.{MassTransferTransactionData, PBRecipients, Recipient}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, Transfer}
 import com.wavesplatform.transaction.transfer.TransferTransaction.MaxAttachmentSize
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Proofs, TxVersion}
+import com.wavesplatform.transaction.{FastHashId, Proofs, TxVersion}
 import play.api.libs.json._
 
 import scala.concurrent.duration._
@@ -132,7 +135,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
   test("invalid transfer should not be in UTX or blockchain") {
     import com.wavesplatform.transaction.transfer._
 
-    for (v <- massTransferTxSupportedVersions) {
+    for (_ <- massTransferTxSupportedVersions) {
       def request(
                    transfers: List[Transfer] = List(Transfer(secondAddress, transferAmount)),
                    fee: Long = calcMassTransferFee(1),
@@ -168,6 +171,38 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
         (req, idOpt)
       }
 
+      def negativeTransferAmountRequest: (SignedMassTransferRequest, Option[ByteStr]) = {
+        val recipient = secondKeyPair
+
+        val transfers = List(Transfer(recipient.toAddress.toString, -1))
+        val attachment = ByteStr(Array.emptyByteArray)
+        val fee = calcMassTransferFee(1)
+        val timestamp = System.currentTimeMillis()
+        val version = TxVersion.V1
+        val mttdTransfers = transfers.map { t =>
+          MassTransferTransactionData.Transfer(
+            Some(Recipient().withPublicKeyHash(PBRecipients.create(Address.fromPublicKey(recipient.publicKey)).getPublicKeyHash)),
+            t.amount
+          )
+        }
+
+        val bodyBytes = TxHelpers.massTransferBodyBytes(sender.keyPair, None, mttdTransfers, ByteString.copyFrom(attachment.arr), fee, timestamp, version)
+
+        (
+          SignedMassTransferRequest(
+            Some(version),
+            sender.publicKey.toString,
+            None,
+            transfers,
+            fee,
+            timestamp,
+            ByteStr(Array.emptyByteArray),
+            Proofs(Seq(bodyBytes))
+          ),
+          Some(FastHashId.create(bodyBytes.arr))
+        )
+      }
+
       val (balance1, eff1) = miner.accountBalances(firstAddress)
       val invalidTransfers = Seq(
         (request(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction timestamp .* is more than .*ms in the future"),
@@ -175,7 +210,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
           request(transfers = List.fill(MaxTransferCount + 1)(Transfer(secondAddress, 1)), fee = calcMassTransferFee(MaxTransferCount + 1)),
           s"Number of transfers ${MaxTransferCount + 1} is greater than 100"
         ),
-        (request(transfers = List(Transfer(secondAddress, -1))), "One of the transfers has negative amount"),
+        (negativeTransferAmountRequest, "negative amount: -1 of asset"),
         (request(fee = 0), "insufficient fee"),
         (request(fee = 99999), "Fee .* does not exceed minimal value"),
         (request(attachment = ("a" * (MaxAttachmentSize + 1)).getBytes("UTF-8")), "exceeds maximum length")

@@ -121,7 +121,7 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     val negativeTransfer = List(Transfer(Some(Recipient().withPublicKeyHash(secondAddress)), -1))
     assertGrpcError(
       sender.broadcastMassTransfer(firstAcc, transfers = negativeTransfer, fee = calcMassTransferFee(negativeTransfer.size)),
-      "One of the transfers has negative amount",
+      "negative amount: -1 of asset",
       Code.INVALID_ARGUMENT
     )
 
