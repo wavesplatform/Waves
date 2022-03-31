@@ -45,11 +45,8 @@ class OverdraftTest extends PropSpec with WithDomain {
       val (genesis, setDApp, ci, _) = paymentPreconditions(withEnoughFee = false, withPayment = false, emptyResultDApp(version))
 
       assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), settings) { r =>
-        if (settings.preActivatedFeatures.contains(BlockchainFeatures.BlockV5.id))
-          r should produce("AccountBalanceError")
-        else
           r should produce(
-            s"Fee in WAVES for InvokeScriptTransaction (1 in WAVES) does not exceed minimal value of $InvokeFee WAVES"
+            s"Fee for InvokeScriptTransaction (1 in WAVES) does not exceed minimal value of $InvokeFee WAVES"
           )
       }
     }

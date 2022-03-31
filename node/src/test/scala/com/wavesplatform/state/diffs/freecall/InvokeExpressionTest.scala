@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.freecall
 
-import scala.util.Try
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -9,24 +8,26 @@ import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, NewAssetInfo}
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, NewAssetInfo}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.JsonMatchers
 import org.scalatest.{Assertion, EitherValues}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.libs.json.Json
 
+import scala.util.Try
+
 class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with WithDomain with EitherValues with JsonMatchers {
-  import DomainPresets.{RideV6, ContinuationTransaction}
+  import DomainPresets.{ContinuationTransaction, RideV6}
   import InvokeExpressionTest.*
 
   property("can use max contract complexity") {
@@ -40,14 +41,16 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
     TxHelpers.estimate(script) shouldBe 51949
 
     val bigScript = TxHelpers.freeCallScript(s"""
-                                             |strict a = ${sigVerifyList(ContractLimits.MaxTotalInvokeComplexity(StdLibVersion.V6) / 181 + 1)}
-                                             |[]
-                                             |""".stripMargin)
+                                                |strict a = ${sigVerifyList(ContractLimits.MaxTotalInvokeComplexity(StdLibVersion.V6) / 181 + 1)}
+                                                |[]
+                                                |""".stripMargin)
 
     withDomain(DomainPresets.ContinuationTransaction) { d =>
       d.helpers.creditWavesToDefaultSigner()
       d.appendAndAssertSucceed(TxHelpers.invokeExpression(script))
-      d.appendAndCatchError(TxHelpers.invokeExpression(bigScript)).toString should include("Contract function (default) is too complex: 52130 > 52000")
+      d.appendAndCatchError(TxHelpers.invokeExpression(bigScript)).toString should include(
+        "Contract function (default) is too complex: 52130 > 52000"
+      )
     }
   }
 
@@ -391,10 +394,11 @@ private object InvokeExpressionTest {
     val genesis     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, TxHelpers.timestamp).explicitGet()
     val setVerifier = SetScriptTransaction.selfSigned(TxVersion.V2, invoker, verifier, fee, TxHelpers.timestamp).explicitGet()
 
-    val sponsorIssueTx = IssueTransaction.selfSigned(TxVersion.V2, invoker, "name", "", 1000, 1, true, None, fee, TxHelpers.timestamp).explicitGet()
-    val sponsorAsset   = IssuedAsset(sponsorIssueTx.id.value())
-    val sponsorTx      = SponsorFeeTransaction.selfSigned(TxVersion.V2, invoker, sponsorAsset, Some(1000L), fee, TxHelpers.timestamp).explicitGet()
-    val feeAsset       = if (sponsor) sponsorAsset else Waves
+    val sponsorIssueTx =
+      IssueTransaction.selfSigned(TxVersion.V2, invoker, "name", "", 1000, 1, true, None, 1.waves, TxHelpers.timestamp).explicitGet()
+    val sponsorAsset = IssuedAsset(sponsorIssueTx.id.value())
+    val sponsorTx    = SponsorFeeTransaction.selfSigned(TxVersion.V2, invoker, sponsorAsset, Some(1000L), fee, TxHelpers.timestamp).explicitGet()
+    val feeAsset     = if (sponsor) sponsorAsset else Waves
 
     val call   = makeExpression(invoker, fee, issue, transfersCount, receiver.toAddress, sigVerifyCount, raiseError)
     val invoke = InvokeExpressionTransaction.selfSigned(version, invoker, call, fee, feeAsset, TxHelpers.timestamp).explicitGet()
@@ -406,8 +410,7 @@ private object InvokeExpressionTest {
     val expectingFee =
       FeeConstants(invoke.tpe) * FeeUnit + (if (issue) 1 else 0) * 1_0000_0000L + (if (verifier) 1 else 0) * FeeValidation.ScriptExtraFee
     val issueErr    = if (issue) " with 1 assets issued" else ""
-    val verifierErr = if (verifier) " with 1 total scripts invoked" else ""
-    s"Fee in WAVES for InvokeExpressionTransaction (${invoke.fee} in WAVES)$issueErr$verifierErr does not exceed minimal value of $expectingFee WAVES."
+    s"for InvokeExpressionTransaction (${invoke.fee} in WAVES)$issueErr does not exceed minimal value of $expectingFee WAVES."
   }
 
   def verifier(version: StdLibVersion): Script =

@@ -5,11 +5,11 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 
 class IllegalAddressChainIdTest extends PropSpec with WithDomain {
   import DomainPresets.*
@@ -28,22 +28,21 @@ class IllegalAddressChainIdTest extends PropSpec with WithDomain {
      """.stripMargin
   )
 
-  private[this] def scenario(fail: Boolean, bigComplexity: Boolean = false) =
-    for {
-      master  <- accountGen
-      invoker <- accountGen
-      fee     <- ciFee()
-      gTx1     = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, TxHelpers.timestamp).explicitGet()
-      gTx2     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, TxHelpers.timestamp).explicitGet()
-      ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, Some(contract(bigComplexity)), fee, TxHelpers.timestamp).explicitGet()
-      invokeTx = Signed.invokeScript(TxVersion.V3, invoker, master.toAddress, None, Nil, fee, Waves, TxHelpers.timestamp)
-    } yield (Seq(gTx1, gTx2, ssTx), invokeTx)
+  private[this] def scenario(fail: Boolean, bigComplexity: Boolean = false) = {
+    val master   = RandomKeyPair()
+    val invoker  = RandomKeyPair()
+    val gTx1     = TxHelpers.genesis(master.toAddress, ENOUGH_AMT, TxHelpers.timestamp)
+    val gTx2     = TxHelpers.genesis(invoker.toAddress, ENOUGH_AMT, TxHelpers.timestamp)
+    val ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, Some(contract(bigComplexity)), 0.01.waves, TxHelpers.timestamp).explicitGet()
+    val invokeTx = Signed.invokeScript(TxVersion.V3, invoker, master.toAddress, None, Nil, 0.005.waves, Waves, TxHelpers.timestamp)
+    (Seq(gTx1, gTx2, ssTx), invokeTx)
+  }
 
   private val error = "Address belongs to another network: expected: 84(T), actual: 87(W)"
 
   property("no fail before fix") {
     withDomain(RideV5) { d =>
-      val (genesisTxs, invokeTx) = scenario(fail = true).sample.get
+      val (genesisTxs, invokeTx) = scenario(fail = true)
       d.appendBlock(genesisTxs*)
       intercept[Exception](d.appendBlock(invokeTx)).getMessage should include(error)
     }
@@ -51,7 +50,7 @@ class IllegalAddressChainIdTest extends PropSpec with WithDomain {
 
   property("reject after fix") {
     withDomain(RideV6) { d =>
-      val (genesisTxs, invokeTx) = scenario(fail = true).sample.get
+      val (genesisTxs, invokeTx) = scenario(fail = true)
       d.appendBlock(genesisTxs*)
       d.appendAndCatchError(invokeTx).toString should include(error)
     }
@@ -59,8 +58,8 @@ class IllegalAddressChainIdTest extends PropSpec with WithDomain {
 
   property("fail after fix and big complexity") {
     withDomain(RideV6) { d =>
-      val (genesisTxs, invokeTx) = scenario(fail = true, bigComplexity = true).sample.get
-      d.appendBlock(genesisTxs: _*)
+      val (genesisTxs, invokeTx) = scenario(fail = true, bigComplexity = true)
+      d.appendBlock(genesisTxs*)
       d.appendAndAssertFailed(invokeTx)
     }
   }

@@ -225,9 +225,10 @@ trait WithDomain extends WithState { _: Suite =>
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.SmartAccountTrading,
       BlockchainFeatures.OrderV3,
-      BlockchainFeatures.FeeSponsorship,
       BlockchainFeatures.DataTransaction,
       BlockchainFeatures.SmartAssets
+    ).setFeaturesHeight(
+      BlockchainFeatures.FeeSponsorship -> -NG.blockchainSettings.functionalitySettings.activationWindowSize(1)
     )
 
     val RideV3 = ScriptsAndSponsorship.addFeatures(
@@ -245,6 +246,8 @@ trait WithDomain extends WithState { _: Suite =>
       featuresSettings = RideV6.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
+    def mostRecent: WavesSettings = RideV6
+
     def settingsForRide(version: StdLibVersion): WavesSettings =
       version match {
         case V1 => RideV3
@@ -254,8 +257,6 @@ trait WithDomain extends WithState { _: Suite =>
         case V5 => RideV5
         case V6 => RideV6
       }
-
-    def mostRecent: WavesSettings = RideV5
   }
 
   def withDomain[A](

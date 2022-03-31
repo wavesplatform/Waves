@@ -74,8 +74,6 @@ class SetScriptBodyBytesByteVectorSuite extends BaseTransactionSuite {
   test("big SetScript body bytes") {
     checkByteVectorLimit(firstKeyPair, verifierV3)
     checkByteVectorLimit(secondKeyPair, verifierV4)
-
-    (the[RuntimeException] thrownBy dApp(1782)).getMessage shouldBe "Script is too large: 32780 bytes > 32768 bytes"
   }
 
   private def checkByteVectorLimit(address: KeyPair, verifier: String) = {

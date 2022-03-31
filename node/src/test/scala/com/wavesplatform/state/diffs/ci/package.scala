@@ -13,16 +13,15 @@ import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, SetScri
 import org.scalacheck.Gen
 
 package object ci {
-  private def invokeFee(freeCall: Boolean) =
+  private def invokeFee(freeCall: Boolean): Long =
     if (freeCall)
       FeeUnit * FeeConstants(TransactionType.InvokeExpression)
     else
       FeeUnit * FeeConstants(TransactionType.InvokeScript)
 
   def ciFee(sc: Int = 0, nonNftIssue: Int = 0, freeCall: Boolean = false): Gen[Long] =
-    Gen.choose(
-      invokeFee(freeCall) + sc * ScriptExtraFee + nonNftIssue * FeeConstants(TransactionType.Issue) * FeeUnit,
-      invokeFee(freeCall) + (sc + 1) * ScriptExtraFee - 1 + nonNftIssue * FeeConstants(TransactionType.Issue) * FeeUnit
+    Gen.const(
+      invokeFee(freeCall) + sc * ScriptExtraFee + nonNftIssue * FeeConstants(TransactionType.Issue) * FeeUnit
     )
 
   def toInvokeExpression(
