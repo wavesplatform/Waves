@@ -76,7 +76,8 @@ case class FunctionalitySettings(
     estimationOverflowFixHeight: Int = 0,
     estimatorSumOverflowFixHeight: Int = 0,
     forbidSyncDAppNegativePaymentHeight: Int = 0,
-    allowMultipleProofsInCreateAliasUntil: Int = Int.MaxValue
+    allowMultipleProofsInCreateAliasUntil: Int = Int.MaxValue,
+    enforceTransferValidationAfter: Int = 0
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
@@ -135,7 +136,8 @@ object FunctionalitySettings {
     estimationOverflowFixHeight = 1793770,
     estimatorSumOverflowFixHeight = 1832520,
     forbidSyncDAppNegativePaymentHeight = 1894600,
-    allowMultipleProofsInCreateAliasUntil = 1964900
+    allowMultipleProofsInCreateAliasUntil = 1964900,
+    enforceTransferValidationAfter = 1698800
   )
 
   val STAGENET: FunctionalitySettings = apply(

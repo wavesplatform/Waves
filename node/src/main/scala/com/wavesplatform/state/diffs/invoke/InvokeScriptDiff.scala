@@ -232,7 +232,7 @@ object InvokeScriptDiff {
 
             _ <- traced(
               BalanceDiffValidation
-                .cond(blockchain, _.isFeatureActivated(BlockchainFeatures.SynchronousCalls))(diff)
+                .cond(blockchain, b => b.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && b.height >= b.settings.functionalitySettings.enforceTransferValidationAfter)(diff)
                 .leftMap(be => FailedTransactionError.dAppExecution(be.toString, spentComplexity, log))
             )
 
@@ -303,7 +303,7 @@ object InvokeScriptDiff {
 
             _ <- traced(
               BalanceDiffValidation
-                .cond(blockchain, _.isFeatureActivated(BlockchainFeatures.SynchronousCalls))(resultDiff)
+                .cond(blockchain, b => b.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && b.height >= b.settings.functionalitySettings.enforceTransferValidationAfter)(resultDiff)
                 .leftMap(be => FailedTransactionError.dAppExecution(be.toString, resultDiff.scriptsComplexity, log))
             )
 
