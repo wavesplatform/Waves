@@ -1,13 +1,13 @@
 package com.wavesplatform.state.diffs
 
-import scala.util.{Left, Right}
-
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
 import com.wavesplatform.utils.ScorexLogging
+
+import scala.util.{Left, Right}
 
 object BalanceDiffValidation extends ScorexLogging {
   def cond(b: Blockchain, cond: Blockchain => Boolean)(d: Diff): Either[AccountBalanceError, Diff] = {
@@ -43,24 +43,19 @@ object BalanceDiffValidation extends ScorexLogging {
          }
        } else {
          None
-       }) orElse (portfolioDiff.assets find {
-        case (a, c) =>
-          // Tokens it can produce overflow are exist.
-          val oldB = b.balance(acc, a)
-          val newB = oldB + c
-          newB < 0
+       }) orElse (portfolioDiff.assets find { case (a, c) =>
+        // Tokens it can produce overflow are exist.
+        val oldB = b.balance(acc, a)
+        val newB = oldB + c
+        newB < 0
       } map { _ =>
         acc -> s"negative asset balance: $acc, new portfolio: ${negativeAssetsInfo(b, acc, portfolioDiff)}"
       })
     }
 
-    val positiveBalanceErrors: Map[Address, String] = changedAccounts.flatMap(check).toMap
-
-    if (positiveBalanceErrors.isEmpty) {
-      Right(d)
-    } else {
-      Left(AccountBalanceError(positiveBalanceErrors))
-    }
+    if (changedAccounts.exists(check(_).nonEmpty)) {
+      Left(AccountBalanceError(changedAccounts.flatMap(check).toMap))
+    } else Right(d)
   }
 
   private def negativeAssetsInfo(b: Blockchain, acc: Address, diff: Portfolio): Map[ByteStr, Long] =
