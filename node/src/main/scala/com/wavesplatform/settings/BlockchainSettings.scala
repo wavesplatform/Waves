@@ -75,7 +75,6 @@ case class FunctionalitySettings(
     delayDelta: Int = 8,
     estimationOverflowFixHeight: Int = 0,
     estimatorSumOverflowFixHeight: Int = 0,
-    forbidSyncDAppNegativePaymentHeight: Int = 0,
     allowMultipleProofsInCreateAliasUntil: Int = Int.MaxValue,
     enforceTransferValidationAfter: Int = 0
 ) {
@@ -122,7 +121,6 @@ object FunctionalitySettings {
     estimatorPreCheckHeight = 1847610,
     estimationOverflowFixHeight = 2858710,
     estimatorSumOverflowFixHeight = 2897510,
-    forbidSyncDAppNegativePaymentHeight = 2959447,
     allowMultipleProofsInCreateAliasUntil = 3029980
   )
 
@@ -135,7 +133,6 @@ object FunctionalitySettings {
     estimatorPreCheckHeight = 817380,
     estimationOverflowFixHeight = 1793770,
     estimatorSumOverflowFixHeight = 1832520,
-    forbidSyncDAppNegativePaymentHeight = 1894600,
     allowMultipleProofsInCreateAliasUntil = 1964900,
     enforceTransferValidationAfter = 1698800
   )

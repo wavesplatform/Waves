@@ -8,7 +8,6 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -45,8 +44,8 @@ class SyncDAppNegativePaymentTest extends PropSpec with WithDomain {
 
   private def scenario(bigComplexityDApp1: Boolean, bigComplexityDApp2: Boolean, customAsset: Boolean) = {
     val invoker = TxHelpers.signer(0)
-    val dApp1 = TxHelpers.signer(1)
-    val dApp2 = TxHelpers.signer(2)
+    val dApp1   = TxHelpers.signer(1)
+    val dApp2   = TxHelpers.signer(2)
 
     val balances = AddrWithBalance.enoughBalances(invoker, dApp1, dApp2)
 
@@ -54,10 +53,10 @@ class SyncDAppNegativePaymentTest extends PropSpec with WithDomain {
     val asset = if (customAsset) IssuedAsset(issue.id()) else Waves
     val setScript = Seq(
       TxHelpers.setScript(dApp1, dApp1Script(dApp2.toAddress, bigComplexityDApp1, asset)),
-      TxHelpers.setScript(dApp2, dApp2Script(bigComplexityDApp2)),
+      TxHelpers.setScript(dApp2, dApp2Script(bigComplexityDApp2))
     )
 
-    val invoke = () => TxHelpers.invoke(dApp1.toAddress, invoker = invoker)
+    val invoke = TxHelpers.invoke(dApp1.toAddress, invoker = invoker)
 
     (balances, issue +: setScript, invoke, dApp1.toAddress, dApp2.toAddress, asset)
   }
@@ -65,9 +64,8 @@ class SyncDAppNegativePaymentTest extends PropSpec with WithDomain {
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(forbidSyncDAppNegativePaymentHeight = 4)
 
-  property("negative sync dApp payments amount rejects tx after forbidSyncDAppNegativePaymentHeight") {
+  property("negative sync dApp payments amount rejects tx") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)
@@ -76,19 +74,9 @@ class SyncDAppNegativePaymentTest extends PropSpec with WithDomain {
       val (balances, preparingTxs, invoke, dApp1, dApp2, asset) = scenario(bigComplexityDApp1, bigComplexityDApp2, customAsset)
       withDomain(domainSettingsWithFS(settings), balances) { d =>
         d.appendBlock(preparingTxs*)
-
-        val invoke1 = invoke()
-        d.appendBlock(invoke1)
-        d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
-
-        d.liquidDiff.portfolios(dApp1) shouldBe Portfolio.build(asset, 1)
-        d.liquidDiff.portfolios(dApp2) shouldBe Portfolio.build(asset, -1)
-
-        d.appendBlock()
-        val invoke2 = invoke()
-        d.createDiffE(invoke2) should produceRejectOrFailedDiff {
+        d.createDiffE(invoke) should produceRejectOrFailedDiff {
           if (customAsset)
-              s"DApp $dApp1 invoked DApp $dApp2 with attached token $asset amount = -1"
+            s"DApp $dApp1 invoked DApp $dApp2 with attached token $asset amount = -1"
           else
             s"DApp $dApp1 invoked DApp $dApp2 with attached WAVES amount = -1"
         }

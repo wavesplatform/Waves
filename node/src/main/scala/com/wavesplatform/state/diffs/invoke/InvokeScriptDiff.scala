@@ -90,7 +90,7 @@ object InvokeScriptDiff {
             )
           )
           _ <- traced {
-            if (blockchain.height >= blockchain.settings.functionalitySettings.forbidSyncDAppNegativePaymentHeight) {
+            if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) {
               tx.payments.find { case Payment(amount, _) =>
                 amount < 0
               }.map(payment => Left(GenericError(s"DApp $invoker invoked DApp $dAppAddress with attached ${payment.assetId.fold("WAVES")(a => s"token $a")} amount = ${payment.amount}")))
