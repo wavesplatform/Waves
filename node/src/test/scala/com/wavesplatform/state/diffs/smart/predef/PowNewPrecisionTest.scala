@@ -57,7 +57,7 @@ class PowNewPrecisionTest extends PropSpec with WithDomain {
 
   property("pow changes precision after SynchronousCalls") {
     val (balances, setScript, invoke, dApp) = scenario
-    withDomain(DomainPresets.RideV5, balances) { d =>
+    withDomain(DomainPresets.RideV5.configure(_.copy(enforceTransferValidationAfter = 0)), balances) { d =>
       d.appendBlock(setScript)
 
       d.appendBlock(invoke())
