@@ -1,9 +1,7 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.wavesplatform.TestTime
-import com.wavesplatform.account.Address
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.script.Script
@@ -11,18 +9,12 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
-import org.scalacheck.Gen
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxHelpers
 
 class ScriptTransferByAliasTest extends PropSpec with WithDomain {
 
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
-
-  private val activationHeight = 3
+  private val activationHeight = 4
 
   private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -74,31 +66,25 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
     )
   }
 
-  private val paymentPreconditions: Gen[(List[Transaction], () => InvokeScriptTransaction, IssuedAsset, Address)] =
-    for {
-      dAppAcc  <- accountGen
-      invoker  <- accountGen
-      receiver <- accountGen
-      fee      <- ciFee(sc = 1)
-    } yield {
-      for {
-        genesis     <- GenesisTransaction.create(dAppAcc.toAddress, ENOUGH_AMT, ts)
-        genesis2    <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
-        genesis3    <- GenesisTransaction.create(receiver.toAddress, ENOUGH_AMT, ts)
-        createAlias <- CreateAliasTransaction.selfSigned(2.toByte, receiver, alias, fee, ts)
-        issue       <- IssueTransaction.selfSigned(2.toByte, dAppAcc, "Asset", "Description", ENOUGH_AMT, 8, true, Some(verifier), fee, ts)
-        asset = IssuedAsset(issue.id())
-        setDApp <- SetScriptTransaction.selfSigned(1.toByte, dAppAcc, Some(dApp(asset)), fee, ts)
-        invoke = () => InvokeScriptTransaction.selfSigned(1.toByte, invoker, dAppAcc.toAddress, None, Nil, fee, Waves, ts).explicitGet()
-      } yield (List(genesis, genesis2, genesis3, createAlias, issue, setDApp), invoke, asset, receiver.toAddress)
-    }.explicitGet()
-
   property(s"ScriptTransfer alias recipient is mapped correctly after ${BlockchainFeatures.SynchronousCalls} activation") {
-    val (preparingTxs, invoke, asset, receiver) = paymentPreconditions.sample.get
-    withDomain(domainSettingsWithFS(fsWithV5)) { d =>
+    val dAppAcc = TxHelpers.signer(0)
+    val invoker = TxHelpers.signer(1)
+    val receiver = TxHelpers.signer(2)
+
+    val balances = AddrWithBalance.enoughBalances(dAppAcc, invoker, receiver)
+
+    val createAlias = TxHelpers.createAlias(alias, receiver)
+    val issue = TxHelpers.issue(dAppAcc, ENOUGH_AMT, script = Some(verifier))
+    val asset = IssuedAsset(issue.id())
+    val setDApp = TxHelpers.setScript(dAppAcc, dApp(asset))
+    val preparingTxs = Seq(createAlias, issue, setDApp)
+
+    val invoke1 = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker, fee = TxHelpers.ciFee(sc = 1))
+    val invoke2 = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker, fee = TxHelpers.ciFee(sc = 1))
+
+    withDomain(domainSettingsWithFS(fsWithV5), balances) { d =>
       d.appendBlock(preparingTxs: _*)
 
-      val invoke1 = invoke()
       d.appendBlock(invoke1)
       d.blockchain.bestLiquidDiff.get.errorMessage(invoke1.id()).get.text should include(
         s"Transaction is not allowed by script of the asset $asset: alias expected!"
@@ -107,10 +93,9 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
       d.appendBlock()
       d.blockchainUpdater.height shouldBe activationHeight
 
-      val invoke2 = invoke()
       d.appendBlock(invoke2)
       d.blockchain.bestLiquidDiff.get.errorMessage(invoke2.id()) shouldBe None
-      d.balance(receiver, asset) shouldBe transferAmount
+      d.balance(receiver.toAddress, asset) shouldBe transferAmount
     }
   }
 }

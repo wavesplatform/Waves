@@ -12,18 +12,16 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
+import com.wavesplatform.state.diffs.{FeeValidation, produce}
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import org.scalacheck.Gen
 
 class OverdraftTest extends PropSpec with WithState {
   private val InvokeFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeValidation.FeeUnit
-  private val SetScriptFee = FeeConstants(SetScriptTransaction.typeId) * FeeValidation.FeeUnit
   private val IssueFee     = FeeConstants(IssueTransaction.typeId) * FeeValidation.FeeUnit
 
   private val dAppVersions: List[StdLibVersion] =
@@ -31,12 +29,13 @@ class OverdraftTest extends PropSpec with WithState {
       .filter(_ >= V3)
       .toList
 
-  private val dAppVersionWithSettingsGen: Gen[(StdLibVersion, FunctionalitySettings)] =
+  private val dAppVersionWithSettings: Seq[(StdLibVersion, FunctionalitySettings)] = {
     for {
-      version    <- Gen.oneOf(dAppVersions)
-      activateV4 <- Gen.oneOf(true, version >= V4)
-      activateV5 <- Gen.oneOf(true, version >= V5)
+      version    <- dAppVersions
+      activateV4 <- Seq(true, version >= V4)
+      activateV5 <- Seq(true, version >= V5)
     } yield (version, features(activateV4, activateV5))
+  }
 
   private val allActivatedSettings = features(activateV4 = true, activateV5 = true)
 
@@ -53,126 +52,99 @@ class OverdraftTest extends PropSpec with WithState {
   }
 
   property("insufficient fee") {
-    forAll(
-      for {
-        (version, settings)       <- dAppVersionWithSettingsGen
-        (genesis, setDApp, ci, _) <- paymentPreconditions(withEnoughFee = false, withPayment = false, emptyResultDApp(version))
-      } yield (genesis, setDApp, ci, settings)
-    ) {
-      case (genesis, setDApp, ci, settings) =>
-        assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), settings) { r =>
-          if (settings.preActivatedFeatures.contains(BlockchainFeatures.BlockV5.id))
-            r should produce("AccountBalanceError")
-          else
-            r should produce(
-              s"Fee in WAVES for InvokeScriptTransaction (1 in WAVES) does not exceed minimal value of $InvokeFee WAVES"
-            )
-        }
+    dAppVersionWithSettings.foreach { case (version, settings) =>
+      val (genesis, setDApp, ci, _) = paymentPreconditions(withEnoughFee = false, withPayment = false, emptyResultDApp(version))
+
+      assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), settings) { r =>
+        if (settings.preActivatedFeatures.contains(BlockchainFeatures.BlockV5.id))
+          r should produce("AccountBalanceError")
+        else
+          r should produce(
+            s"Fee in WAVES for InvokeScriptTransaction (1 in WAVES) does not exceed minimal value of $InvokeFee WAVES"
+          )
+      }
     }
   }
 
   property("overdraft") {
-    forAll(
-      for {
-        (version, settings)       <- dAppVersionWithSettingsGen
-        (genesis, setDApp, ci, _) <- paymentPreconditions(withEnoughFee = true, withPayment = false, payingDApp(version))
-      } yield (genesis, setDApp, ci, settings)
-    ) {
-      case (genesis, setDApp, ci, settings) =>
-        assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), settings) { r =>
-          if (settings.preActivatedFeatures.contains(BlockchainFeatures.BlockV5.id))
-            r should produce("AccountBalanceError")
-          else
-            r.explicitGet()
-        }
+    dAppVersionWithSettings.foreach { case (version, settings) =>
+      val (genesis, setDApp, ci, _) = paymentPreconditions(withEnoughFee = true, withPayment = false, payingDApp(version))
+
+      assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), settings) { r =>
+        if (settings.preActivatedFeatures.contains(BlockchainFeatures.BlockV5.id))
+          r should produce("AccountBalanceError")
+        else
+          r.explicitGet()
+      }
     }
   }
 
   property("overdraft with payment V3") {
-    forAll(
-      for {
-        (_, settings)                 <- dAppVersionWithSettingsGen
-        (genesis, setDApp, ci, issue) <- paymentPreconditions(withEnoughFee = true, withPayment = true, payingDApp(V3))
-      } yield (genesis, setDApp, ci, settings, issue)
-    ) {
-      case (genesis, setDApp, ci, settings, issue) =>
-        assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(ci)), settings) {
-          _ should produce("leads to negative waves balance to (at least) temporary negative state")
-        }
+    dAppVersionWithSettings.foreach { case (_, settings) =>
+      val (genesis, setDApp, ci, issue) = paymentPreconditions(withEnoughFee = true, withPayment = true, payingDApp(V3))
+
+      assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(ci)), settings) {
+        _ should produce("leads to negative waves balance to (at least) temporary negative state")
+      }
     }
   }
 
   property("overdraft with payment V4") {
-    forAll(
-      for {
-        version                       <- Gen.oneOf(dAppVersions.filter(_ >= V4))
-        (genesis, setDApp, ci, issue) <- paymentPreconditions(withEnoughFee = true, withPayment = true, payingDApp(version))
-      } yield (genesis, setDApp, ci, issue)
-    ) {
-      case (genesis, setDApp, ci, issue) =>
-        assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(ci)), allActivatedSettings) {
-          _ should produce("AccountBalanceError")
-        }
+    dAppVersions.filter(_ >= V4).foreach { version =>
+      val (genesis, setDApp, ci, issue) = paymentPreconditions(withEnoughFee = true, withPayment = true, payingDApp(version))
+
+      assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(ci)), allActivatedSettings) {
+        _ should produce("AccountBalanceError")
+      }
     }
   }
 
   property("attach unexisting tokens using multiple payment") {
-    forAll(
-      for {
-        version                       <- Gen.oneOf(dAppVersions)
-        (genesis, setDApp, ci, issue) <- splitPaymentPreconditions(version)
-      } yield (genesis, setDApp, ci, issue)
-    ) {
-      case (genesis, setDApp, ci, issue) =>
-        assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(ci)), allActivatedSettings) {
-          _ should produce("Attempt to transfer unavailable funds: Transaction application leads to negative asset")
-        }
+    dAppVersions.foreach { version =>
+      val master = TxHelpers.signer(0)
+      val invoker = TxHelpers.signer(1)
+
+      val genesis = Seq(
+        TxHelpers.genesis(master.toAddress),
+        TxHelpers.genesis(invoker.toAddress)
+      )
+      val issue = TxHelpers.issue(invoker)
+      val setDApp = TxHelpers.setScript(master, payingAssetDApp(version, issue.assetId))
+
+      val count    = ContractLimits.MaxAttachedPaymentAmount
+      val payments = (1 to count).map(_ => Payment(issue.quantity / count + 1, IssuedAsset(issue.id())))
+      val invoke = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker, payments = payments)
+
+      assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(invoke)), allActivatedSettings) {
+        _ should produce("Attempt to transfer unavailable funds: Transaction application leads to negative asset")
+      }
     }
   }
 
-  private def paymentPreconditions(
-      withEnoughFee: Boolean,
-      withPayment: Boolean,
-      dApp: Script
-  ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction)] =
-    for {
-      master  <- accountGen
-      invoker <- accountGen
-      ts      <- timestampGen
-      issue   <- issueV2TransactionGen(invoker, Gen.const(None), feeParam = Some(IssueFee))
-    } yield {
-      val fee = if (withEnoughFee) InvokeFee else 1
-      val (payment, invokerBalance) =
-        if (withPayment)
-          (List(Payment(issue.quantity, IssuedAsset(issue.id()))), IssueFee)
-        else
-          (Nil, 0L)
-      for {
-        genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
-        genesis2 <- GenesisTransaction.create(invoker.toAddress, invokerBalance, ts)
-        setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp), SetScriptFee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, payment, fee, Waves, ts + 3)
-      } yield (List(genesis, genesis2), setDApp, ci, issue)
-    }.explicitGet()
+  private def paymentPreconditions(withEnoughFee: Boolean,
+                                   withPayment: Boolean,
+                                   dApp: Script): (Seq[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction) = {
+    val master = TxHelpers.signer(0)
+    val invoker = TxHelpers.signer(1)
 
-  private def splitPaymentPreconditions(
-      version: StdLibVersion
-  ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction)] =
-    for {
-      master  <- accountGen
-      invoker <- accountGen
-      ts      <- timestampGen
-      issue   <- issueV2TransactionGen(invoker, Gen.const(None), feeParam = Some(IssueFee))
-    } yield {
-      val count    = ContractLimits.MaxAttachedPaymentAmount
-      val payments = (1 to count).map(_ => Payment(issue.quantity / count + 1, IssuedAsset(issue.id())))
-      for {
-        genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
-        genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
-        setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, Some(payingAssetDApp(version, issue.assetId)), SetScriptFee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, payments, InvokeFee, Waves, ts + 3)
-      } yield (List(genesis, genesis2), setDApp, ci, issue)
-    }.explicitGet()
+    val genesis = Seq(
+      TxHelpers.genesis(master.toAddress),
+      TxHelpers.genesis(invoker.toAddress, if (withPayment) IssueFee else 0)
+    )
+    val setDApp = TxHelpers.setScript(master, dApp)
+    val issue = TxHelpers.issue(invoker, fee = IssueFee)
+
+    val invoke = TxHelpers.invoke(
+      dApp = master.toAddress,
+      func = None,
+      invoker = invoker,
+      payments = if (withPayment) List(Payment(issue.quantity, IssuedAsset(issue.id()))) else Nil,
+      fee = if (withEnoughFee) InvokeFee else 1,
+      version = TxVersion.V1
+    )
+
+    (genesis, setDApp, invoke, issue)
+  }
 
   private def emptyResultDApp(version: StdLibVersion): Script = {
     val body = if (version >= V4) "[]" else "WriteSet([])"

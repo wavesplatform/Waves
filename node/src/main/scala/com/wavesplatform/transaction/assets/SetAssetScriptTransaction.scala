@@ -74,9 +74,10 @@ object SetAssetScriptTransaction extends TransactionParser {
       script: Option[Script],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetAssetScriptTransaction] =
-    create(version, sender, asset, script, fee, timestamp, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, asset, script, fee, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
@@ -84,7 +85,8 @@ object SetAssetScriptTransaction extends TransactionParser {
       asset: IssuedAsset,
       script: Option[Script],
       fee: TxAmount,
-      timestamp: TxTimestamp
+      timestamp: TxTimestamp,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetAssetScriptTransaction] =
-    signed(version, sender.publicKey, asset, script, fee, timestamp, sender.privateKey)
+    signed(version, sender.publicKey, asset, script, fee, timestamp, sender.privateKey, chainId)
 }

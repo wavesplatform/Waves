@@ -151,7 +151,6 @@ class LevelDBWriterSpec
       f(defaultWriter, account)
     } finally {
       bcu.shutdown()
-      db.close()
     }
   }
 
@@ -172,7 +171,6 @@ class LevelDBWriterSpec
       f(defaultWriter, blocks, account)
     } finally {
       bcu.shutdown()
-      db.close()
     }
   }
 
@@ -285,7 +283,6 @@ class LevelDBWriterSpec
 
     } finally {
       bcu.shutdown()
-      db.close()
     }
   }
 

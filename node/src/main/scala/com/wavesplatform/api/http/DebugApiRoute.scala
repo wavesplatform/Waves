@@ -233,21 +233,25 @@ case class DebugApiRoute(
       val transactionJson = parsedTransaction.fold(_ => jsv, _.json())
 
       val serializer = tracedDiff.resultE
-        .fold(_ => this.serializer, { case (_, diff) =>
-          val compositeBlockchain = CompositeBlockchain(blockchain, diff)
-          this.serializer.copy(blockchain = compositeBlockchain)
+        .fold(_ => this.serializer, {
+          case (_, diff) =>
+            val compositeBlockchain = CompositeBlockchain(blockchain, diff)
+            this.serializer.copy(blockchain = compositeBlockchain)
         })
 
       val extendedJson = tracedDiff.resultE
-        .fold(_ => jsv, { case (tx, diff) =>
-          val meta = tx match {
-            case ist: InvokeScriptTransaction =>
-              val result = diff.scriptResults.get(ist.id())
-              TransactionMeta.Invoke(Height(blockchain.height), ist, succeeded = true, diff.scriptsComplexity, result)
-            case tx => TransactionMeta.Default(Height(blockchain.height), tx, succeeded = true, diff.scriptsComplexity)
+        .fold(
+          _ => jsv, {
+            case (tx, diff) =>
+              val meta = tx match {
+                case ist: InvokeScriptTransaction =>
+                  val result = diff.scriptResults.get(ist.id())
+                  TransactionMeta.Invoke(Height(blockchain.height), ist, succeeded = true, diff.scriptsComplexity, result)
+                case tx => TransactionMeta.Default(Height(blockchain.height), tx, succeeded = true, diff.scriptsComplexity)
+              }
+              serializer.transactionWithMetaJson(meta)
           }
-          serializer.transactionWithMetaJson(meta)
-        })
+        )
 
       val response = Json.obj(
         "valid"          -> error.isEmpty,
@@ -282,13 +286,14 @@ case class DebugApiRoute(
             implicit val ss: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
             Source
-              .fromPublisher(
+              .future(
                 transactionsApi
                   .transactionsByAddress(address, None, Set.empty, afterOpt)
                   .take(limit)
-                  .map(Json.toJsObject(_))
-                  .toReactivePublisher
+                  .toListL
+                  .runToFuture
               )
+              .mapConcat(_.map(Json.toJsObject(_)))
           }
         }
       }
