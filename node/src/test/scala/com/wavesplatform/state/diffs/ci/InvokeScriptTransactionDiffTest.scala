@@ -611,7 +611,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
   }
 
   Seq(V3, V4, V5, V6).foreach { version =>
-    property(s"can't make more than ${ContractLimits.MaxCallableActionsAmount(version)} payments for V${version.id}") {
+    property(s"can't make more than ${ContractLimits.MaxCallableActionsAmount(version)} ScriptTransfers for V${version.id}") {
       val (genesis, setScript, ci) =
         preconditionsAndSetContract(
           dAppWithTransfers(
