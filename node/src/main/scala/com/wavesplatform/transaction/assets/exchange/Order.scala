@@ -40,7 +40,12 @@ case class Order(
     (timestamp > 0) :| "timestamp should be > 0" &&
     (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
     (expiration >= atTime) :| "expiration should be > currentTime" &&
-    (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves"
+    (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves" &&
+    (version > 0 && version < 5) :| "invalid version" &&
+    (Proofs.validate(proofs) match {
+      case Left(value) => Validation.failure(value.toString)
+      case Right(_)    => Validation.success
+    })
   }
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.bodyBytes(this))
@@ -103,9 +108,8 @@ object Order {
       price      <- TxOrderPrice(price)(GenericError(s"Order validation error: ${TxOrderPrice.errMsg}"))
       matcherFee <- TxMatcherFee(matcherFee)(GenericError(s"Order validation error: ${TxMatcherFee.errMsg}"))
     } yield {
-      Order(version, sender.publicKey, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
-        .signWith(sender.privateKey)
-    }
+    Order(version, sender.publicKey, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
+      .signWith(sender.privateKey)}
 
   def buy(
       version: TxVersion,

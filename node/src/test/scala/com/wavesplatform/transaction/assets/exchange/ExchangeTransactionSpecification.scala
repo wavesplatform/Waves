@@ -1,4 +1,4 @@
-package com.wavesplatform.transaction
+package com.wavesplatform.transaction.assets.exchange
 
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -8,7 +8,7 @@ import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
-import com.wavesplatform.transaction.assets.exchange.{Order, _}
+import com.wavesplatform.transaction.{Asset, Proofs, TxExchangeAmount, TxMatcherFee, TxOrderPrice, TxVersion}
 import com.wavesplatform.{NTPTime, crypto}
 import org.scalacheck.Gen
 import play.api.libs.json.Json
